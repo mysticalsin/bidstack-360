@@ -50,9 +50,13 @@ export function CompanyDetailPage() {
   const [tab, setTab] = useState<TabKey>('contacts');
   const [intelTab, setIntelTab] = useState<IntelTab>('direction');
   const tabsRef = useRef<HTMLDivElement>(null);
+  const canReadIntel = useHasPermission('account-intel:read');
   const canRefreshIntel = useHasPermission('account-intel:write');
   const refreshIntel = useRefreshCompanyIntel(id ?? '');
-  const intelSummary = useCompanyIntelSummary(id, refreshIntel.pollUntil);
+  const intelSummary = useCompanyIntelSummary(
+    canReadIntel ? id : undefined,
+    refreshIntel.pollUntil,
+  );
   const openIntel = (next: IntelTab) => {
     setIntelTab(next);
     setTab('intel');
@@ -185,31 +189,33 @@ export function CompanyDetailPage() {
             )}
           </div>
 
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
-            <div className="min-w-0 flex-1">
-              <IntelStrip
-                summary={intelSummary.data?.summary ?? null}
-                onOpen={openIntel}
-                crmEmployees={c.employeeCount ?? null}
-              />
-            </div>
-            {canRefreshIntel && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="self-start lg:self-center"
-                onClick={() => refreshIntel.mutate()}
-                disabled={refreshIntel.isPending || Boolean(refreshIntel.pollUntil)}
-                aria-label="Refresh company intel"
-              >
-                <RefreshCw
-                  className={`size-3.5 ${refreshIntel.isPending || refreshIntel.pollUntil ? 'animate-spin motion-reduce:animate-none' : ''}`}
-                  aria-hidden
+          {canReadIntel && (
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
+              <div className="min-w-0 flex-1">
+                <IntelStrip
+                  summary={intelSummary.data?.summary ?? null}
+                  onOpen={openIntel}
+                  crmEmployees={c.employeeCount ?? null}
                 />
-                Refresh
-              </Button>
-            )}
-          </div>
+              </div>
+              {canRefreshIntel && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="self-start lg:self-center"
+                  onClick={() => refreshIntel.mutate()}
+                  disabled={refreshIntel.isPending || Boolean(refreshIntel.pollUntil)}
+                  aria-label="Refresh company intel"
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${refreshIntel.isPending || refreshIntel.pollUntil ? 'animate-spin motion-reduce:animate-none' : ''}`}
+                    aria-hidden
+                  />
+                  Refresh
+                </Button>
+              )}
+            </div>
+          )}
 
           <CompanyTechStackSection companyId={c.id} />
 

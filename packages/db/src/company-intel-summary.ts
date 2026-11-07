@@ -32,15 +32,31 @@ type Db = Pick<
 >;
 
 const DAY = 86_400_000;
-const POST_LABEL: Record<string, string> = { newsroom: 'Company newsroom', sitemap: 'Company news sitemap', ir_feed: 'Investor relations feed', fixture: 'Sample data' };
-const NEWS_LABEL: Record<string, string> = { gdelt: 'GDELT news', google_news: 'Google News', company_rss: 'Company press feed', ir_feed: 'IR feed', sec_edgar: 'SEC EDGAR', companies_house: 'Companies House', apollo: 'Apollo', fixture: 'Sample data' };
+const POST_LABEL: Record<string, string> = {
+  newsroom: 'Company newsroom',
+  sitemap: 'Company news sitemap',
+  ir_feed: 'Investor relations feed',
+  fixture: 'Sample data',
+};
+const NEWS_LABEL: Record<string, string> = {
+  gdelt: 'GDELT news',
+  google_news: 'Google News',
+  company_rss: 'Company press feed',
+  ir_feed: 'IR feed',
+  sec_edgar: 'SEC EDGAR',
+  companies_house: 'Companies House',
+  apollo: 'Apollo',
+  fixture: 'Sample data',
+};
 const NEWS_EXCLUDED = ['financials', 'apify_linkedin'];
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 
 /** Which sources the server can reach, read from env names only. */
-export function intelConnections(env: Record<string, string | undefined>): IntelSummaryInput['connections'] {
+export function intelConnections(
+  env: Record<string, string | undefined>,
+): IntelSummaryInput['connections'] {
   const ua = (env.ACCOUNT_INTEL_USER_AGENT ?? env.SEC_USER_AGENT ?? '').trim();
   return { publicSources: /@/.test(ua), apollo: Boolean(env.APOLLO_API_KEY?.trim()) };
 }
@@ -64,34 +80,83 @@ export async function loadIntelSummaryInput(
       where: { orgId, companyId, periodType: 'FY' },
       orderBy: { periodEnd: 'desc' },
       take: 40,
-      select: { source: true, fiscalYear: true, periodEnd: true, currency: true, metrics: true, updatedAt: true },
+      select: {
+        source: true,
+        fiscalYear: true,
+        periodEnd: true,
+        currency: true,
+        metrics: true,
+        updatedAt: true,
+      },
     }),
     db.companyJobPosting.findMany({
-      where: { orgId, companyId, OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }] },
+      where: {
+        orgId,
+        companyId,
+        OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }],
+      },
       orderBy: { postedAt: 'desc' },
       take: 500,
-      select: { id: true, source: true, title: true, url: true, function: true, skills: true, department: true, postedAt: true, lastSeenAt: true, fetchedAt: true, sample: true },
+      select: {
+        id: true,
+        source: true,
+        title: true,
+        url: true,
+        function: true,
+        skills: true,
+        department: true,
+        postedAt: true,
+        lastSeenAt: true,
+        fetchedAt: true,
+        sample: true,
+      },
     }),
-    db.companyPost.findMany({ where: { orgId, companyId }, orderBy: { publishedAt: 'desc' }, take: 30, select: { source: true, url: true, title: true, kind: true, publishedAt: true, sample: true } }),
-    db.accountWatchEvent.findMany({ where: { orgId, companyId, occurredAt: { gte: newsSince }, source: { notIn: NEWS_EXCLUDED } }, orderBy: { occurredAt: 'desc' }, take: 20, select: { source: true, title: true, sourceUrl: true, occurredAt: true } }),
-    db.intelSourceRun.findMany({ where: { orgId, companyId }, take: 10, select: { source: true, status: true, lastFetchedAt: true } }),
+    db.companyPost.findMany({
+      where: { orgId, companyId },
+      orderBy: { publishedAt: 'desc' },
+      take: 30,
+      select: { source: true, url: true, title: true, kind: true, publishedAt: true, sample: true },
+    }),
+    db.accountWatchEvent.findMany({
+      where: { orgId, companyId, occurredAt: { gte: newsSince }, source: { notIn: NEWS_EXCLUDED } },
+      orderBy: { occurredAt: 'desc' },
+      take: 20,
+      select: { source: true, title: true, sourceUrl: true, occurredAt: true },
+    }),
+    db.intelSourceRun.findMany({
+      where: { orgId, companyId },
+      take: 10,
+      select: { source: true, status: true, lastFetchedAt: true },
+    }),
     db.companyFirmographics.findFirst({ where: { orgId, companyId } }),
   ]);
 
-  const metric = (m: unknown, k: string) => num(((m ?? {}) as Record<string, { value?: unknown } | undefined>)[k]?.value);
+  const metric = (m: unknown, k: string) =>
+    num(((m ?? {}) as Record<string, { value?: unknown } | undefined>)[k]?.value);
   const runMap: IntelSummaryRuns = {};
   for (const r of runs) {
-    if (r.source === 'hiring' || r.source === 'posts' || r.source === 'financials' || r.source === 'registry') runMap[r.source] = { status: r.status, lastFetchedAt: iso(r.lastFetchedAt) };
+    if (
+      r.source === 'hiring' ||
+      r.source === 'posts' ||
+      r.source === 'financials' ||
+      r.source === 'registry'
+    )
+      runMap[r.source] = { status: r.status, lastFetchedAt: iso(r.lastFetchedAt) };
   }
   const ownUrls = new Set(posts.map((p) => p.url).filter(Boolean));
-  const kindOf = (k: string, title: string) => (IntelPostKind.safeParse(k).success ? (k as IntelPostKind) : classifyPost(title).kind);
+  const kindOf = (k: string, title: string) =>
+    IntelPostKind.safeParse(k).success ? (k as IntelPostKind) : classifyPost(title).kind;
 
   return {
     companyId,
     now: opts.now,
     connections: opts.connections,
     runs: runMap,
-    crm: { employeeCount: company.employeeCount, industry: company.industry, updatedAt: iso(company.updatedAt) },
+    crm: {
+      employeeCount: company.employeeCount,
+      industry: company.industry,
+      updatedAt: iso(company.updatedAt),
+    },
     years: periods.map((p) => ({
       fiscalYear: p.fiscalYear,
       periodEnd: p.periodEnd.toISOString().slice(0, 10),
@@ -103,10 +168,24 @@ export async function loadIntelSummaryInput(
     })),
     postings: postings.map((p) => ({ ...p, fetchedAt: iso(p.fetchedAt) })),
     posts: [
-      ...posts.map((p) => ({ kind: kindOf(p.kind, p.title), title: p.title, url: p.url, publishedAt: iso(p.publishedAt), sourceLabel: POST_LABEL[p.source] ?? p.source, sample: p.sample })),
+      ...posts.map((p) => ({
+        kind: kindOf(p.kind, p.title),
+        title: p.title,
+        url: p.url,
+        publishedAt: iso(p.publishedAt),
+        sourceLabel: POST_LABEL[p.source] ?? p.source,
+        sample: p.sample,
+      })),
       ...events
         .filter((e) => !ownUrls.has(e.sourceUrl))
-        .map((e) => ({ kind: classifyPost(e.title).kind, title: e.title, url: e.sourceUrl || null, publishedAt: iso(e.occurredAt), sourceLabel: NEWS_LABEL[e.source] ?? e.source, sample: e.source === 'fixture' })),
+        .map((e) => ({
+          kind: classifyPost(e.title).kind,
+          title: e.title,
+          url: e.sourceUrl || null,
+          publishedAt: iso(e.occurredAt),
+          sourceLabel: NEWS_LABEL[e.source] ?? e.source,
+          sample: e.source === 'fixture',
+        })),
     ],
     firmographics: firmo
       ? {
@@ -122,7 +201,10 @@ export async function loadIntelSummaryInput(
           industry: firmo.industry,
           techStack: firmo.techStack,
           departmentHeadcount: (firmo.departmentHeadcount ?? null) as Record<string, number> | null,
-          provenance: (firmo.provenance ?? {}) as Record<string, { source?: string; fetchedAt?: string }>,
+          provenance: (firmo.provenance ?? {}) as Record<
+            string,
+            { source?: string; fetchedAt?: string }
+          >,
           fetchedAt: iso(firmo.fetchedAt),
         }
       : null,
@@ -152,7 +234,11 @@ export async function recomputeCompanyIntelSummary(
     sample: s.sample,
     computedAt: opts.now,
   };
-  await db.companyIntelSummary.upsert({ where: { companyId }, create: { orgId, companyId, ...data }, update: data });
+  await db.companyIntelSummary.upsert({
+    where: { companyId },
+    create: { orgId, companyId, ...data },
+    update: data,
+  });
   return s;
 }
 
@@ -163,7 +249,11 @@ export function parseIntelSummary(payload: unknown): CompanyIntelSummary | null 
 }
 
 /** Stored summaries for the given companies in this org. */
-export async function readCompanyIntelSummaries(db: Db, orgId: string, companyIds: string[]): Promise<Map<string, CompanyIntelSummary>> {
+export async function readCompanyIntelSummaries(
+  db: Db,
+  orgId: string,
+  companyIds: string[],
+): Promise<Map<string, CompanyIntelSummary>> {
   const out = new Map<string, CompanyIntelSummary>();
   if (!companyIds.length) return out;
   const rows = await db.companyIntelSummary.findMany({
@@ -181,11 +271,25 @@ export async function readCompanyIntelSummaries(db: Db, orgId: string, companyId
 /** Open (or extend) the enrichment batch for one import. Returns the batch id. */
 export async function openImportBatch(
   db: Db,
-  args: { orgId: string; migrationJobId: string | null; origin: 'csv' | 'hubspot'; companyIds: string[]; createdById: string | null },
+  args: {
+    orgId: string;
+    migrationJobId: string | null;
+    origin: 'csv' | 'hubspot';
+    companyIds: string[];
+    createdById: string | null;
+  },
 ): Promise<string> {
   const ids = [...new Set(args.companyIds)];
   if (!args.migrationJobId) {
-    const row = await db.intelImportBatch.create({ data: { orgId: args.orgId, origin: args.origin, companyIds: ids, createdById: args.createdById }, select: { id: true } });
+    const row = await db.intelImportBatch.create({
+      data: {
+        orgId: args.orgId,
+        origin: args.origin,
+        companyIds: ids,
+        createdById: args.createdById,
+      },
+      select: { id: true },
+    });
     return row.id;
   }
   const rows = await db.$queryRaw<Array<{ id: string }>>`
@@ -205,7 +309,9 @@ export async function markImportBatchCompany(
   db: Db,
   args: { orgId: string; batchId: string; companyId: string; ok: boolean; now?: Date },
 ): Promise<'running' | 'complete' | 'missing'> {
-  const rows = await db.$queryRaw<Array<{ company_ids: string[]; done_ids: string[]; failed_ids: string[]; status: string }>>`
+  const rows = await db.$queryRaw<
+    Array<{ company_ids: string[]; done_ids: string[]; failed_ids: string[]; status: string }>
+  >`
     UPDATE intel_import_batches SET
       done_ids = CASE WHEN ${args.ok} AND NOT (${args.companyId} = ANY(done_ids)) THEN array_append(done_ids, ${args.companyId}) ELSE done_ids END,
       failed_ids = CASE WHEN ${args.ok} THEN array_remove(failed_ids, ${args.companyId})
@@ -235,7 +341,11 @@ export async function markImportBatchCompany(
 }
 
 /** Recent import batches for this org, newest first. */
-export async function readImportBatches(db: Db, orgId: string, opts: { since?: Date; limit?: number } = {}): Promise<IntelImportBatchView[]> {
+export async function readImportBatches(
+  db: Db,
+  orgId: string,
+  opts: { since?: Date; limit?: number } = {},
+): Promise<IntelImportBatchView[]> {
   const rows = await db.intelImportBatch.findMany({
     where: { orgId, ...(opts.since ? { createdAt: { gte: opts.since } } : {}) },
     orderBy: { createdAt: 'desc' },
@@ -258,7 +368,14 @@ export async function readImportBatches(db: Db, orgId: string, opts: { since?: D
 }
 
 /** Delete import batches older than the retention window. */
-export async function pruneImportBatches(db: Db, orgId: string, now: Date, days = 90): Promise<number> {
-  const res = await db.intelImportBatch.deleteMany({ where: { orgId, createdAt: { lt: new Date(now.getTime() - days * DAY) } } });
+export async function pruneImportBatches(
+  db: Db,
+  orgId: string,
+  now: Date,
+  days = 90,
+): Promise<number> {
+  const res = await db.intelImportBatch.deleteMany({
+    where: { orgId, createdAt: { lt: new Date(now.getTime() - days * DAY) } },
+  });
   return res.count;
 }

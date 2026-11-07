@@ -64,7 +64,10 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           minNewRoles30d: z.coerce.number().int().min(0).optional(),
         }),
         response: {
-          200: z.object({ items: z.array(CompanyListItem), nextCursor: z.string().uuid().optional() }),
+          200: z.object({
+            items: z.array(CompanyListItem),
+            nextCursor: z.string().uuid().optional(),
+          }),
         },
       },
     },
@@ -74,13 +77,14 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       // /crm/companies/search: a restricted user must not list or search
       // companies outside their access groups through this older route.
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const canIntel = await server.hasPermission(req, 'account-intel:read');
       const items = await prisma.company.findMany({
         where: applyCompanyScope(
           {
             orgId: req.auth.orgId,
             deletedAt: null,
             ...(req.query.industry ? { industry: req.query.industry } : {}),
-            ...intelFilter(req.query),
+            ...(canIntel ? intelFilter(req.query) : {}),
             ...(s
               ? {
                   OR: [
@@ -123,9 +127,18 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       const hasMore = items.length > req.query.limit;
       const sliced = hasMore ? items.slice(0, -1) : items;
       const nextCursor = hasMore ? sliced[sliced.length - 1]?.id : undefined;
-      const intel = await readCompanyIntelSummaries(prisma, req.auth.orgId, sliced.map((c) => c.id));
+      const intel = canIntel
+        ? await readCompanyIntelSummaries(
+            prisma,
+            req.auth.orgId,
+            sliced.map((c) => c.id),
+          )
+        : new Map<string, never>();
 
-      return { items: sliced.map((c) => ({ ...serializeCompany(c), intel: intel.get(c.id) ?? null })), nextCursor };
+      return {
+        items: sliced.map((c) => ({ ...serializeCompany(c), intel: intel.get(c.id) ?? null })),
+        nextCursor,
+      };
     },
   );
 
@@ -141,7 +154,10 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const c = await prisma.company.findFirst({
-        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
+        where: applyCompanyScope(
+          { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          scope,
+        ),
         include: {
           parent: { select: { id: true, name: true } },
           children: {
@@ -288,7 +304,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           'company',
           patch.customFieldValues.map((v) => v.definitionId),
         );
-        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
+        if (foreign.length > 0)
+          throw server.httpErrors.badRequest('Unknown custom field definition');
       }
       // CF upserts included in the same transaction so a CF failure rolls back
       // the company update — prevents partial-update / data corruption (P0 #5).
@@ -338,7 +355,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       ]);
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
       // v23: a tier change starts or stops the financials schedule right away.
-      if (patch.tier !== undefined && patch.tier !== null) await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
+      if (patch.tier !== undefined && patch.tier !== null)
+        await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
 
       const changedFields: string[] = [];
       const changes: Record<string, unknown> = {};
@@ -381,7 +399,10 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const root = await prisma.company.findFirst({
-        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
+        where: applyCompanyScope(
+          { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          scope,
+        ),
         select: { id: true, name: true, parentId: true },
       });
       if (!root) throw server.httpErrors.notFound('Company not found');

@@ -99,7 +99,7 @@ function Value({
   );
 }
 
-function revenueText(r: NonNullable<CompanyIntelSummary['revenue']>): string {
+export function revenueText(r: NonNullable<CompanyIntelSummary['revenue']>): string {
   if (r.fiscalYear === null && r.range && /range/.test(r.method))
     return `${r.range} ${r.currency ?? ''}`.trim();
   return money(r.value, r.currency);

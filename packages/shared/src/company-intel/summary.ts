@@ -87,11 +87,20 @@ export const CompanyIntelSummary = z.object({
     trend90Pct: z.number().nullable(),
   }).nullable(),
   hiringTrend: z
-    .object({ monthly: z.array(z.number()), source: z.string(), sourceLabel: z.string(), asOf: Iso.nullable(), sample: z.boolean() })
+    .object({
+      monthly: z.array(z.number()),
+      source: z.string(),
+      sourceLabel: z.string(),
+      asOf: Iso.nullable(),
+      sample: z.boolean(),
+    })
     .nullable(),
   hiringMix: z.array(z.object({ key: z.string(), label: z.string(), count: z.number() })),
   topSkills: z.array(z.string()),
-  funding: IntelMetric.extend({ latestRound: z.string().nullable(), latestRoundAt: Iso.nullable() }).nullable(),
+  funding: IntelMetric.extend({
+    latestRound: z.string().nullable(),
+    latestRoundAt: Iso.nullable(),
+  }).nullable(),
   foundedYear: z.number().nullable(),
   industry: z.string().nullable(),
   technologies: z.array(z.string()),
@@ -164,7 +173,12 @@ export interface IntelSummaryPost {
 }
 
 /** Last run per public source. */
-export type IntelSummaryRuns = Partial<Record<'hiring' | 'posts' | 'financials' | 'registry', { status: string; lastFetchedAt: string | null }>>;
+export type IntelSummaryRuns = Partial<
+  Record<
+    'hiring' | 'posts' | 'financials' | 'registry',
+    { status: string; lastFetchedAt: string | null }
+  >
+>;
 
 /** Everything the summary is built from. */
 export interface IntelSummaryInput {
@@ -245,8 +259,20 @@ export function approxUsd(amount: number, currency: string | null): number | nul
 const DAY = 86_400_000;
 const FILED = new Set(['sec_edgar', 'esef']);
 const REGISTRY = new Set(['brreg', 'fr_rne', 'companies_house']);
-const PERIOD_PRIORITY: Record<string, number> = { sec_edgar: 0, esef: 1, brreg: 2, fr_rne: 3, companies_house: 4, manual_import: 5, fixture: 9 };
-const PERIOD_LABEL: Record<string, string> = { ...FINANCIAL_SOURCE_LABEL, companies_house: 'Companies House', manual_import: 'Imported financials' };
+const PERIOD_PRIORITY: Record<string, number> = {
+  sec_edgar: 0,
+  esef: 1,
+  brreg: 2,
+  fr_rne: 3,
+  companies_house: 4,
+  manual_import: 5,
+  fixture: 9,
+};
+const PERIOD_LABEL: Record<string, string> = {
+  ...FINANCIAL_SOURCE_LABEL,
+  companies_house: 'Companies House',
+  manual_import: 'Imported financials',
+};
 const POSTING_LABEL: Record<string, string> = {
   greenhouse: 'Greenhouse',
   lever: 'Lever',
@@ -262,7 +288,11 @@ const POSTING_LABEL: Record<string, string> = {
   seamless: 'Seamless',
   fixture: 'Sample data',
 };
-const PROVIDER_LABEL: Record<string, string> = { apollo: 'Apollo', seamless: 'Seamless', fixture: 'Sample data' };
+const PROVIDER_LABEL: Record<string, string> = {
+  apollo: 'Apollo',
+  seamless: 'Seamless',
+  fixture: 'Sample data',
+};
 const SIGNAL_WINDOW_DAYS = 180;
 
 const providerLabel = (s: string) => PROVIDER_LABEL[s] ?? s.charAt(0).toUpperCase() + s.slice(1);
@@ -308,7 +338,8 @@ function bestYears(years: IntelSummaryYear[]): IntelSummaryYear[] {
   const by = new Map<number, IntelSummaryYear>();
   for (const y of years) {
     const cur = by.get(y.fiscalYear);
-    if (!cur || (PERIOD_PRIORITY[y.source] ?? 6) < (PERIOD_PRIORITY[cur.source] ?? 6)) by.set(y.fiscalYear, y);
+    if (!cur || (PERIOD_PRIORITY[y.source] ?? 6) < (PERIOD_PRIORITY[cur.source] ?? 6))
+      by.set(y.fiscalYear, y);
   }
   return [...by.values()].sort((a, b) => b.fiscalYear - a.fiscalYear);
 }
@@ -320,7 +351,8 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
   const gap = (field: IntelSummaryField, reason: IntelEmptyReason, detail: string) => {
     gaps[field] = { reason, detail };
   };
-  const ran = (k: keyof IntelSummaryRuns) => Boolean(runs[k] && ['ok', 'partial'].includes(runs[k]!.status));
+  const ran = (k: keyof IntelSummaryRuns) =>
+    Boolean(runs[k] && ['ok', 'partial'].includes(runs[k]!.status));
   const fAsOf = (field: string) => f?.provenance[field]?.fetchedAt ?? f?.fetchedAt ?? null;
   const fSource = (field: string) => f?.provenance[field]?.source ?? 'apollo';
   const isSampleSource = (s: string) => s === 'fixture';
@@ -345,7 +377,9 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       range: null,
       approxUsd: approxUsd(latest.revenue!, latest.currency),
     };
-    const prev = withRevenue.find((y) => y.fiscalYear === latest.fiscalYear - 1 && y.currency === latest.currency);
+    const prev = withRevenue.find(
+      (y) => y.fiscalYear === latest.fiscalYear - 1 && y.currency === latest.currency,
+    );
     const g = prev ? pctChange(latest.revenue!, prev.revenue!) : null;
     if (prev && g !== null) {
       revenueGrowth = {
@@ -368,8 +402,11 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       source: src,
       sourceLabel: providerLabel(src),
       asOf: fAsOf('annualRevenueUsd'),
-      method: f.annualRevenueUsd != null ? 'Provider revenue estimate' : `Provider revenue estimate, range ${f.revenueRange}`,
-      inferred: false,
+      method:
+        f.annualRevenueUsd != null
+          ? 'Provider revenue estimate'
+          : `Provider revenue estimate, range ${f.revenueRange}, low end used for sorting`,
+      inferred: f.annualRevenueUsd == null,
       sample: isSampleSource(src),
       currency: 'USD',
       fiscalYear: null,
@@ -378,25 +415,65 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
     };
   }
   if (!revenue) {
-    if (!connections.publicSources && !connections.apollo) gap('revenue', 'not_connected', 'Public sources and Apollo are not connected');
-    else if (ran('financials') || ran('registry')) gap('revenue', 'private_company', connections.apollo ? 'No published accounts and no provider estimate' : 'No published accounts; Apollo not connected');
+    if (!connections.publicSources && !connections.apollo)
+      gap('revenue', 'not_connected', 'Public sources and Apollo are not connected');
+    else if (ran('financials') || ran('registry'))
+      gap(
+        'revenue',
+        'private_company',
+        connections.apollo
+          ? 'No published accounts and no provider estimate'
+          : 'No published accounts; Apollo not connected',
+      );
     else gap('revenue', 'no_public_data', 'No filings or provider estimate yet');
   }
-  if (!revenueGrowth) gaps.revenueGrowth = revenue ? { reason: 'no_public_data', detail: 'Needs two consecutive filed years' } : (gaps.revenue ?? { reason: 'no_public_data', detail: 'No revenue' });
+  if (!revenueGrowth)
+    gaps.revenueGrowth = revenue
+      ? { reason: 'no_public_data', detail: 'Needs two consecutive filed years' }
+      : (gaps.revenue ?? { reason: 'no_public_data', detail: 'No revenue' });
 
   // Headcount and growth: provider org data, then filed headcount, then the CRM record.
   const filedHead = years.filter((y) => y.headcount != null && y.headcount > 0);
   let headcount: CompanyIntelSummary['headcount'] = null;
   if (f?.employeeCount != null) {
     const src = fSource('employeeCount');
-    headcount = { value: f.employeeCount, source: src, sourceLabel: providerLabel(src), asOf: fAsOf('employeeCount'), method: 'Provider employee estimate', inferred: false, sample: isSampleSource(src) };
+    headcount = {
+      value: f.employeeCount,
+      source: src,
+      sourceLabel: providerLabel(src),
+      asOf: fAsOf('employeeCount'),
+      method: 'Provider employee estimate',
+      inferred: false,
+      sample: isSampleSource(src),
+    };
   } else if (filedHead[0]) {
     const y = filedHead[0];
-    headcount = { value: y.headcount!, source: y.source, sourceLabel: PERIOD_LABEL[y.source] ?? y.source, asOf: y.fetchedAt, method: `Employees in ${periodMethod(y.source, y.fiscalYear).toLowerCase()}`, inferred: false, sample: isSampleSource(y.source) };
+    headcount = {
+      value: y.headcount!,
+      source: y.source,
+      sourceLabel: PERIOD_LABEL[y.source] ?? y.source,
+      asOf: y.fetchedAt,
+      method: `Employees in ${periodMethod(y.source, y.fiscalYear).toLowerCase()}`,
+      inferred: false,
+      sample: isSampleSource(y.source),
+    };
   } else if (input.crm.employeeCount != null) {
-    headcount = { value: input.crm.employeeCount, source: 'crm', sourceLabel: 'CRM record', asOf: input.crm.updatedAt, method: 'Employee count on the CRM record', inferred: false, sample: false };
+    headcount = {
+      value: input.crm.employeeCount,
+      source: 'crm',
+      sourceLabel: 'CRM record',
+      asOf: input.crm.updatedAt,
+      method: 'Employee count on the CRM record',
+      inferred: false,
+      sample: false,
+    };
   }
-  if (!headcount) gap('headcount', connections.apollo || connections.publicSources ? 'no_public_data' : 'not_connected', connections.apollo ? 'No employee count found' : 'Apollo not connected; no filed headcount');
+  if (!headcount)
+    gap(
+      'headcount',
+      connections.apollo || connections.publicSources ? 'no_public_data' : 'not_connected',
+      connections.apollo ? 'No employee count found' : 'Apollo not connected; no filed headcount',
+    );
 
   let headcountGrowth: CompanyIntelSummary['headcountGrowth'] = null;
   const g6 = f?.headcountGrowth6m;
@@ -431,7 +508,14 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       };
     }
   }
-  if (!headcountGrowth) gap('headcountGrowth', connections.apollo ? 'no_public_data' : 'not_connected', connections.apollo ? 'No headcount trend from Apollo or filings' : 'Apollo not connected; filings show no headcount trend');
+  if (!headcountGrowth)
+    gap(
+      'headcountGrowth',
+      connections.apollo ? 'no_public_data' : 'not_connected',
+      connections.apollo
+        ? 'No headcount trend from Apollo or filings'
+        : 'Apollo not connected; filings show no headcount trend',
+    );
 
   // Hiring: public job boards. New postings in 30 days is the hiring proxy, never a hire count.
   let openRoles: CompanyIntelSummary['openRoles'] = null;
@@ -445,32 +529,93 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
     const allSample = input.postings.every((p) => p.sample);
     const label = sources.map((s) => POSTING_LABEL[s] ?? s).join(', ');
     const asOf = latestIso(input.postings.map((p) => p.fetchedAt ?? p.lastSeenAt));
-    const base = { source: allSample ? 'fixture' : 'job_boards', sourceLabel: label, asOf, inferred: false, sample: allSample };
-    openRoles = { ...base, value: h.openRoles, method: 'Open postings on public job boards, seen in the last 45 days' };
-    newRoles30d = { ...base, value: h.posted30, method: 'Postings first published in the last 30 days (hiring proxy)', prev30: h.postedPrev30, trend30Pct: h.trend30Pct, trend90Pct: h.trend90Pct };
-    hiringTrend = { monthly: h.monthly, source: base.source, sourceLabel: label, asOf, sample: allSample };
-    hiringMix = h.byFunction.slice(0, 6).map((x) => ({ key: x.key, label: FUNCTION_LABEL[x.key] ?? x.label, count: x.count }));
+    const base = {
+      source: allSample ? 'fixture' : 'job_boards',
+      sourceLabel: label,
+      asOf,
+      inferred: false,
+      sample: allSample,
+    };
+    openRoles = {
+      ...base,
+      value: h.openRoles,
+      method: 'Open postings on public job boards, seen in the last 45 days',
+    };
+    newRoles30d = {
+      ...base,
+      value: h.posted30,
+      method: 'Postings first published in the last 30 days (hiring proxy)',
+      prev30: h.postedPrev30,
+      trend30Pct: h.trend30Pct,
+      trend90Pct: h.trend90Pct,
+    };
+    hiringTrend = {
+      monthly: h.monthly,
+      source: base.source,
+      sourceLabel: label,
+      asOf,
+      sample: allSample,
+    };
+    hiringMix = h.byFunction
+      .slice(0, 6)
+      .map((x) => ({ key: x.key, label: FUNCTION_LABEL[x.key] ?? x.label, count: x.count }));
     topSkills = h.skills.slice(0, 6).map((s) => s.skill);
   } else {
     const reason: IntelEmptyReason = connections.publicSources ? 'no_public_data' : 'not_connected';
-    const detail = connections.publicSources ? (ran('hiring') ? 'No public job board found' : 'Job boards not read yet') : 'Public job boards are not connected';
+    const detail = connections.publicSources
+      ? ran('hiring')
+        ? 'No public job board found'
+        : 'Job boards not read yet'
+      : 'Public job boards are not connected';
     for (const k of ['openRoles', 'newRoles30d', 'hiringTrend'] as const) gap(k, reason, detail);
   }
 
   let funding: CompanyIntelSummary['funding'] = null;
   if (f?.totalFundingUsd != null && f.totalFundingUsd > 0) {
     const src = fSource('totalFundingUsd');
-    funding = { value: f.totalFundingUsd, source: src, sourceLabel: providerLabel(src), asOf: fAsOf('totalFundingUsd'), method: 'Provider total funding', inferred: false, sample: isSampleSource(src), latestRound: f.latestFundingStage, latestRoundAt: f.latestFundingAt };
-  } else gap('funding', connections.apollo ? 'no_public_data' : 'not_connected', connections.apollo ? 'No funding rounds reported' : 'Apollo not connected');
+    funding = {
+      value: f.totalFundingUsd,
+      source: src,
+      sourceLabel: providerLabel(src),
+      asOf: fAsOf('totalFundingUsd'),
+      method: 'Provider total funding',
+      inferred: false,
+      sample: isSampleSource(src),
+      latestRound: f.latestFundingStage,
+      latestRoundAt: f.latestFundingAt,
+    };
+  } else
+    gap(
+      'funding',
+      connections.apollo ? 'no_public_data' : 'not_connected',
+      connections.apollo ? 'No funding rounds reported' : 'Apollo not connected',
+    );
 
   const recent = input.posts
-    .filter((p) => p.publishedAt && now.getTime() - Date.parse(p.publishedAt) <= SIGNAL_WINDOW_DAYS * DAY)
+    .filter(
+      (p) => p.publishedAt && now.getTime() - Date.parse(p.publishedAt) <= SIGNAL_WINDOW_DAYS * DAY,
+    )
     .sort((a, b) => Date.parse(b.publishedAt!) - Date.parse(a.publishedAt!));
   const top = recent.find((p) => p.kind !== 'other') ?? recent[0] ?? null;
   const signal: CompanyIntelSummary['signal'] = top
-    ? { kind: top.kind, label: POST_KIND_LABEL[top.kind], title: top.title, url: top.url, publishedAt: top.publishedAt, sourceLabel: top.sourceLabel, sample: top.sample }
+    ? {
+        kind: top.kind,
+        label: POST_KIND_LABEL[top.kind],
+        title: top.title,
+        url: top.url,
+        publishedAt: top.publishedAt,
+        sourceLabel: top.sourceLabel,
+        sample: top.sample,
+      }
     : null;
-  if (!signal) gap('signal', connections.publicSources ? 'no_public_data' : 'not_connected', connections.publicSources ? 'No company posts or news in 6 months' : 'Public sources are not connected');
+  if (!signal)
+    gap(
+      'signal',
+      connections.publicSources ? 'no_public_data' : 'not_connected',
+      connections.publicSources
+        ? 'No company posts or news in 6 months'
+        : 'Public sources are not connected',
+    );
 
   // Direction: Polo's read of the signals above, always inferred.
   const plus: string[] = [];
@@ -488,28 +633,49 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
   }
   if (newRoles30d) {
     const t = newRoles30d.trend30Pct;
-    if (newRoles30d.value >= 3 && (t === null ? newRoles30d.prev30 === 0 && newRoles30d.value >= 5 : t >= 25)) {
-      plus.push(`${newRoles30d.value} new postings in 30 days${t !== null ? `, ${signed(t)} vs the prior 30` : ''}`);
+    if (
+      newRoles30d.value >= 3 &&
+      (t === null ? newRoles30d.prev30 === 0 && newRoles30d.value >= 5 : t >= 25)
+    ) {
+      plus.push(
+        `${newRoles30d.value} new postings in 30 days${t !== null ? `, ${signed(t)} vs the prior 30` : ''}`,
+      );
     } else if (t !== null && t <= -40 && newRoles30d.prev30 >= 3) {
       minus.push(`New postings ${signed(t)} vs the prior 30 days`);
     }
   }
   for (const p of recent.slice(0, 10)) {
     if (p.kind === 'layoffs') minus.push(`Layoffs post: ${p.title}`);
-    else if (p.kind === 'expansion' || p.kind === 'acquisition') plus.push(`${POST_KIND_LABEL[p.kind]} post: ${p.title}`);
+    else if (p.kind === 'expansion' || p.kind === 'acquisition')
+      plus.push(`${POST_KIND_LABEL[p.kind]} post: ${p.title}`);
   }
   const score = plus.length - minus.length;
   const hasInputs = Boolean(headcountGrowth || revenueGrowth || newRoles30d || recent.length);
   const direction: CompanyIntelSummary['direction'] = hasInputs
     ? {
         value: score >= 1 ? 'growing' : score <= -1 ? 'contracting' : 'steady',
-        reasons: score >= 1 ? [...plus, ...minus] : score <= -1 ? [...minus, ...plus] : [...plus, ...minus].length ? [...plus, ...minus] : ['No strong move in headcount, revenue or postings'],
+        reasons:
+          score >= 1
+            ? [...plus, ...minus]
+            : score <= -1
+              ? [...minus, ...plus]
+              : [...plus, ...minus].length
+                ? [...plus, ...minus]
+                : ['No strong move in headcount, revenue or postings'],
         inferred: true,
       }
     : null;
   if (!direction) gap('direction', 'no_public_data', 'Not enough signals to read a direction');
 
-  const metrics = [revenue, revenueGrowth, headcount, headcountGrowth, openRoles, newRoles30d, funding];
+  const metrics = [
+    revenue,
+    revenueGrowth,
+    headcount,
+    headcountGrowth,
+    openRoles,
+    newRoles30d,
+    funding,
+  ];
   const sample = metrics.some((m) => m?.sample) || Boolean(signal?.sample);
   return {
     companyId: input.companyId,

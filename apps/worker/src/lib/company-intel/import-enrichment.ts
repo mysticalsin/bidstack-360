@@ -7,7 +7,7 @@
  * never fails the import; Refresh on the company page covers the gap.
  * Off when ACCOUNT_INTEL_IMPORT_ENRICH=false.
  */
-import { openImportBatch, prisma } from '@bidstack/db';
+import { markImportBatchCompany, openImportBatch, prisma } from '@bidstack/db';
 
 import type { FullRefreshQueueJob } from './full-refresh.js';
 
@@ -40,17 +40,53 @@ export async function queueImportEnrichment(
 ): Promise<{ batchId: string | null; queued: number }> {
   const ids = [...new Set(args.companyIds)];
   if (!ids.length || !importEnrichEnabled(args.env)) return { batchId: null, queued: 0 };
+  let batchId: string | null = null;
   try {
-    const user = args.userId ? await prisma.user.findFirst({ where: { id: args.userId, orgId: args.orgId }, select: { id: true } }) : null;
-    const batchId = await openImportBatch(prisma, { orgId: args.orgId, migrationJobId: args.migrationJobId, origin: args.origin, companyIds: ids, createdById: user?.id ?? null });
+    const user = args.userId
+      ? await prisma.user.findFirst({
+          where: { id: args.userId, orgId: args.orgId },
+          select: { id: true },
+        })
+      : null;
+    batchId = await openImportBatch(prisma, {
+      orgId: args.orgId,
+      migrationJobId: args.migrationJobId,
+      origin: args.origin,
+      companyIds: ids,
+      createdById: user?.id ?? null,
+    });
+    const opened = batchId;
     const jobs = ids.map((companyId) => ({
-      data: { kind: 'full-refresh' as const, orgId: args.orgId, companyId, batchId, force: false, requestedBy: user?.id ?? null },
-      jobId: importIntelJobId(args.orgId, batchId, companyId),
+      data: {
+        kind: 'full-refresh' as const,
+        orgId: args.orgId,
+        companyId,
+        batchId: opened,
+        force: false,
+        requestedBy: user?.id ?? null,
+      },
+      jobId: importIntelJobId(args.orgId, opened, companyId),
     }));
     await args.enqueue(jobs);
     return { batchId, queued: jobs.length };
   } catch (err) {
-    log.warn({ orgId: args.orgId, migrationJobId: args.migrationJobId, err: (err as Error).message }, 'import enrichment not queued');
+    log.warn(
+      { orgId: args.orgId, migrationJobId: args.migrationJobId, err: (err as Error).message },
+      'import enrichment not queued',
+    );
+    if (batchId) {
+      const failed = batchId;
+      const now = new Date();
+      for (const companyId of ids) {
+        await markImportBatchCompany(prisma, {
+          orgId: args.orgId,
+          batchId: failed,
+          companyId,
+          ok: false,
+          now,
+        }).catch(() => undefined);
+      }
+    }
     return { batchId: null, queued: 0 };
   }
 }

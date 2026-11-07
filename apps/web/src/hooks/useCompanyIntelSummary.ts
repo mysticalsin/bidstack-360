@@ -2,7 +2,7 @@
 // header strip read, a one-click refresh of every source, and the progress of
 // enrichment queued by recent imports.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { CompanyIntelSummary, IntelImportBatchView } from '@bidstack/shared';
 
@@ -46,12 +46,19 @@ export function useRefreshCompanyIntel(companyId: string) {
         return;
       }
       setPollUntil(Date.now() + POLL_FOR_MS);
-      setTimeout(() => setPollUntil(undefined), POLL_FOR_MS + POLL_MS);
       void qc.invalidateQueries({ queryKey: ['company-intel', companyId] });
       void qc.invalidateQueries({ queryKey: ['companies'] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not refresh'),
   });
+  useEffect(() => {
+    if (pollUntil === undefined) return;
+    const t = setTimeout(
+      () => setPollUntil(undefined),
+      Math.max(0, pollUntil - Date.now()) + POLL_MS,
+    );
+    return () => clearTimeout(t);
+  }, [pollUntil]);
   return { ...m, pollUntil };
 }
 

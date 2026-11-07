@@ -6,7 +6,14 @@ import type { ReactNode } from 'react';
 
 import { compactAmount, type CompanyIntelSummary } from '@bidstack/shared';
 
-import { EmptyIntel, gapFor, money, provenance, signedPct } from '../companiesPage/IntelCells';
+import {
+  EmptyIntel,
+  gapFor,
+  money,
+  provenance,
+  revenueText,
+  signedPct,
+} from '../companiesPage/IntelCells';
 
 export type IntelTab = 'direction' | 'hiring' | 'financials' | 'news';
 
@@ -89,7 +96,7 @@ export function IntelStrip({
       >
         {r ? (
           <>
-            <span>{money(r.value, r.currency)}</span>
+            <span>{revenueText(r)}</span>
             {r.fiscalYear ? <Sub>{`FY${r.fiscalYear}`}</Sub> : <Sub>Estimate</Sub>}
           </>
         ) : (

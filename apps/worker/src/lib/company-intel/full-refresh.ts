@@ -15,9 +15,17 @@ import {
   prisma,
   recomputeCompanyIntelSummary,
 } from '@bidstack/db';
-import { accountEnrichmentConfigFromEnv, type AccountIntelQueueJob, IntelSourceKey } from '@bidstack/shared';
+import {
+  accountEnrichmentConfigFromEnv,
+  type AccountIntelQueueJob,
+  IntelSourceKey,
+} from '@bidstack/shared';
 
-import { EnrichmentRateLimitedError, runAccountEnrichment, type EnrichmentDeps } from '../../account-enrichment/job.js';
+import {
+  EnrichmentRateLimitedError,
+  runAccountEnrichment,
+  type EnrichmentDeps,
+} from '../../account-enrichment/job.js';
 import { createApolloProvider, type FetchLike } from '../../account-enrichment/providers.js';
 import { defaultIntelFetch, type IntelFetch } from '../account-intel/http.js';
 import { prismaIntelStore } from '../account-intel/prisma-store.js';
@@ -48,7 +56,10 @@ export function fullRefreshDeps(opts: {
   sleep?: (ms: number) => Promise<void>;
 }): FullRefreshDeps {
   const now = opts.now ?? (() => new Date());
-  const apolloProvider = createApolloProvider({ env: opts.env, ...(opts.apolloFetch ? { fetchImpl: opts.apolloFetch } : {}) });
+  const apolloProvider = createApolloProvider({
+    env: opts.env,
+    ...(opts.apolloFetch ? { fetchImpl: opts.apolloFetch } : {}),
+  });
   return {
     env: opts.env,
     now,
@@ -76,18 +87,42 @@ export interface FullRefreshResult {
   summary: boolean;
 }
 
+/** Bulk imports never spend paid job-aggregator calls; a manual Refresh still can. */
+function withoutPaidAggregator(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  const { ACCOUNT_INTEL_JOB_AGGREGATOR: _omit, ...rest } = env;
+  return rest;
+}
+
 async function publicSourcesFresh(orgId: string, companyId: string, now: Date): Promise<boolean> {
-  const run = await prisma.intelSourceRun.findFirst({ where: { orgId, companyId, source: 'hiring', lastFetchedAt: { gte: new Date(now.getTime() - FRESH_MS) } }, select: { id: true } });
+  const run = await prisma.intelSourceRun.findFirst({
+    where: {
+      orgId,
+      companyId,
+      source: 'hiring',
+      lastFetchedAt: { gte: new Date(now.getTime() - FRESH_MS) },
+    },
+    select: { id: true },
+  });
   return Boolean(run);
 }
 
 /** Refresh one company end to end. `finalAttempt` false lets a retry settle the batch instead. */
-export async function runCompanyFullRefresh(job: FullRefreshQueueJob, deps: FullRefreshDeps, opts: { finalAttempt?: boolean } = {}): Promise<FullRefreshResult> {
+export async function runCompanyFullRefresh(
+  job: FullRefreshQueueJob,
+  deps: FullRefreshDeps,
+  opts: { finalAttempt?: boolean } = {},
+): Promise<FullRefreshResult> {
   const now = deps.now();
   try {
     const intel: Record<string, string> = {};
     if (job.force || !(await publicSourcesFresh(job.orgId, job.companyId, now))) {
-      const res = await runAccountIntel({ orgId: job.orgId, companyId: job.companyId, sources: [...IntelSourceKey.options] }, { ...deps.intel, now });
+      const env = job.batchId ? withoutPaidAggregator(deps.intel.env) : deps.intel.env;
+      const res = await runAccountIntel(
+        { orgId: job.orgId, companyId: job.companyId, sources: [...IntelSourceKey.options] },
+        { ...deps.intel, env, now },
+      );
       for (const [k, v] of Object.entries(res)) if (v) intel[k] = v.status;
     } else {
       intel.skipped = 'fresh';
@@ -96,7 +131,15 @@ export async function runCompanyFullRefresh(job: FullRefreshQueueJob, deps: Full
     let apollo = 'not_configured';
     if (deps.apollo) {
       try {
-        const r = await runAccountEnrichment({ orgId: job.orgId, companyId: job.companyId, force: job.force, requestedById: job.requestedBy ?? null }, deps.apollo);
+        const r = await runAccountEnrichment(
+          {
+            orgId: job.orgId,
+            companyId: job.companyId,
+            force: false,
+            requestedById: job.requestedBy ?? null,
+          },
+          deps.apollo,
+        );
         apollo = r.status ?? r.outcome;
       } catch (err) {
         if (!(err instanceof EnrichmentRateLimitedError)) throw err;
@@ -104,12 +147,28 @@ export async function runCompanyFullRefresh(job: FullRefreshQueueJob, deps: Full
       }
     }
 
-    const summary = await recomputeCompanyIntelSummary(prisma, job.orgId, job.companyId, { now, connections: intelConnections(deps.env) });
-    if (job.batchId) await markImportBatchCompany(prisma, { orgId: job.orgId, batchId: job.batchId, companyId: job.companyId, ok: true, now });
+    const summary = await recomputeCompanyIntelSummary(prisma, job.orgId, job.companyId, {
+      now,
+      connections: intelConnections(deps.env),
+    });
+    if (job.batchId)
+      await markImportBatchCompany(prisma, {
+        orgId: job.orgId,
+        batchId: job.batchId,
+        companyId: job.companyId,
+        ok: true,
+        now,
+      });
     return { intel, apollo, summary: Boolean(summary) };
   } catch (err) {
     if (job.batchId && opts.finalAttempt !== false) {
-      await markImportBatchCompany(prisma, { orgId: job.orgId, batchId: job.batchId, companyId: job.companyId, ok: false, now }).catch(() => undefined);
+      await markImportBatchCompany(prisma, {
+        orgId: job.orgId,
+        batchId: job.batchId,
+        companyId: job.companyId,
+        ok: false,
+        now,
+      }).catch(() => undefined);
     }
     throw err;
   }

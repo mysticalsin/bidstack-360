@@ -678,6 +678,8 @@ async function chunkCreatedIds(payload: MigrationJobPayload): Promise<string[]> 
       diff: { path: ['chunkOffset'], equals: payload.chunkOffset },
     },
     select: { diff: true },
+    orderBy: { at: 'asc' },
+    take: 50,
   });
   return rows.flatMap((r) => {
     const ids = (r.diff as { createdIds?: unknown } | null)?.createdIds;
@@ -741,7 +743,7 @@ export async function processMigrationChunk(
     if (!payload.redisKey) throw new Error('CSV chunk missing redisKey');
     const raw = await deps.readRows(payload.redisKey);
     if (!raw) {
-      throw new Error('CSV rows expired from Redis (1h TTL) — restart the import to re-upload');
+      throw new Error('CSV rows expired from Redis (1h TTL). Restart the import to re-upload');
     }
     const all = JSON.parse(raw) as Record<string, unknown>[];
     rows = all.slice(payload.chunkOffset, payload.chunkOffset + payload.chunkSize);
