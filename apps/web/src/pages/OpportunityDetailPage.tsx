@@ -212,7 +212,7 @@ export function OpportunityDetailPage() {
                 <li>
                   <Link
                     to="/opportunities"
-                    className="hover:text-[var(--brand-primary)] transition-colors"
+                    className="hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] transition-colors"
                   >
                     {t('opportunityDetail.breadcrumbOpportunities', 'Opportunities')}
                   </Link>
@@ -252,7 +252,7 @@ export function OpportunityDetailPage() {
               </h1>
               <div className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-secondary)]">
                 <span className="flex items-center gap-1.5 font-medium">
-                  <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
+                  <Icon name="building" size={14} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
                   {canWrite ? (
                     <InlineEditText
                       value={data.customer}
@@ -325,7 +325,7 @@ export function OpportunityDetailPage() {
                 />
                 <Link to={`/rfp/${data.id}/pipeline`}>
                   <Button variant="ghost" size="sm" className="rounded-full">
-                    <Icon name="wand" size={12} className="text-[var(--brand-primary)] mr-1" />
+                    <Icon name="wand" size={12} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] mr-1" />
                     {t('opportunityDetail.rfpPipelineButton', 'RFP Pipeline')}
                   </Button>
                 </Link>
@@ -341,7 +341,7 @@ export function OpportunityDetailPage() {
                   )}
                   trigger={
                     <Button variant="ghost" size="sm" className="rounded-full">
-                      <Icon name="clock" size={12} className="text-[var(--brand-primary)] mr-1" />
+                      <Icon name="clock" size={12} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] mr-1" />
                       {t('opportunityDetail.scheduleReviewButton', 'Schedule review')}
                     </Button>
                   }

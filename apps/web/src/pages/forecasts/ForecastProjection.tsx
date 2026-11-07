@@ -124,7 +124,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
           </div>
           <div
             className={`mt-1 text-lg font-bold tabular-nums ${
-              c.accent ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-primary)]'
+              c.accent ? 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]' : 'text-[var(--fg-primary)]'
             }`}
           >
             {formatMoneyMicros(c.value, 'EUR')}

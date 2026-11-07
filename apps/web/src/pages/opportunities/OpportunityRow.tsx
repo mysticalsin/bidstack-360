@@ -142,7 +142,7 @@ export const Row = memo(function Row({
       </td>
 
       <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
-        <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)]">
+        <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]">
           {opp.code}
         </Link>
       </td>
@@ -150,7 +150,7 @@ export const Row = memo(function Row({
       <td className="px-5 py-3">
         <Link
           to={`/opportunities/${opp.id}`}
-          className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
+          className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]"
         >
           {opp.name}
         </Link>

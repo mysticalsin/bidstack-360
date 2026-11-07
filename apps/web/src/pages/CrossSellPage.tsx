@@ -256,7 +256,7 @@ export default function CrossSellPage() {
             aria-pressed={status === s.key}
             className={`min-h-[44px] rounded-full border px-3 text-xs font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] ${
               status === s.key
-                ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+                ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                 : 'border-[var(--border)] text-[var(--fg-secondary)]'
             }`}
           >
@@ -322,7 +322,7 @@ export default function CrossSellPage() {
                       <td className="px-4 py-3 align-top">
                         <Link
                           to={`/accounts/${encodeURIComponent(action.accountKey)}`}
-                          className="font-medium text-[var(--brand-primary)] hover:underline"
+                          className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                         >
                           {action.accountKey}
                         </Link>

@@ -571,7 +571,7 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
                     >
                       <td className="py-1 pr-3 text-[var(--fg-primary)]">
                         {row.isGate && (
-                          <span aria-hidden className="mr-1 text-[var(--brand-primary)]">
+                          <span aria-hidden className="mr-1 text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
                             ◆
                           </span>
                         )}

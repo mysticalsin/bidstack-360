@@ -127,7 +127,7 @@ export function AnalyticsDashboardPage() {
     <div className="flex flex-col h-full">
       {/* Topbar */}
       <div className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--surface-card)] dark:bg-[var(--surface-glass)]">
-        <BarChart2 size={18} className="text-[var(--brand-primary)]" aria-hidden />
+        <BarChart2 size={18} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" aria-hidden />
         <h1 className="text-sm font-semibold text-[var(--fg-primary)]">{t('analyticsDashboard.title', 'Analytics')}</h1>
 
         {/* Dashboard switcher */}
@@ -171,7 +171,7 @@ export function AnalyticsDashboardPage() {
                   className={cn(
                     'flex w-full items-center px-3 py-2 text-sm min-h-[44px]',
                     d.id === activeDash?.id
-                      ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+                      ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                       : 'text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
                   )}
                 >
