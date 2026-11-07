@@ -711,7 +711,24 @@ Appended by factory slice 1. Values only; no existing token changed.
 - Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
   that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
 
-### 9.9 Consulting partners (slice 15)
+### 9.9 Slice 2 console shell as built (2026-11-07)
+
+Appended by factory slice 2. Refines the existing shell (AppShell, Sidebar, MobileNav, Topbar); the look
+is unchanged. This supersedes the "56px icon rail" line in 9.4.
+
+- Rail: 232px expanded, 64px collapsed, from `--sidebar-w` on `.app-shell`. The grid track eases
+  200ms with `var(--ease-ui-out)`. It is instant for a keyboard toggle (Enter or Space) and under
+  `prefers-reduced-motion`, via `data-motion="instant"` on `.sidebar`. Collapsed items keep an
+  `aria-label` and a tooltip; section flyouts open on hover and on keyboard focus.
+- Breakpoint: `56rem` (`SHELL_WIDE_QUERY` in `components/layout/shellBreakpoint.ts`). Below it the rail
+  is hidden and the topbar "Open navigation" button opens the nav as an in-place drawer inside the
+  shell (left side, `--ease-drawer`, backdrop button "Close navigation"). The drawer is a
+  `role="dialog"` named "Primary navigation"; focus moves in, Tab is trapped, Escape or a link closes
+  it, and focus returns to the hamburger. Body scroll is locked while it is open.
+- One vertical scroll: the document scrolls; the sidebar keeps only its own safety-net overflow.
+- Pinned by `MobileNav.test.tsx`, `Sidebar.console.test.tsx` and `shell-css.contract.test.ts`.
+
+### 9.10 Consulting partners (slice 15)
 
 One section on the account page and the `/accounts/:id` cockpit, after Account direction: which third-party consulting firms work with the client, and how we stand against each one. Our own group entities stay in the MSA "who works with them" panel; this section is outside firms only.
 

@@ -1,5 +1,5 @@
 // Slice 15 "Consulting partners": which third-party consulting firms work
-// with the client and how we stand against each one. DESIGN.md 9.9.
+// with the client and how we stand against each one. DESIGN.md 9.10.
 import '../signals/signals.css';
 import '../company-intel/company-intel.css';
 import './consulting-partners.css';

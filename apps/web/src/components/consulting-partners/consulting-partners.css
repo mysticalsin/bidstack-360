@@ -1,4 +1,4 @@
-/* Slice 15 consulting partners. Uses the signals tokens (.sg) and the account intel base (.ci). DESIGN.md 9.9. */
+/* Slice 15 consulting partners. Uses the signals tokens (.sg) and the account intel base (.ci). DESIGN.md 9.10. */
 .cp-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
 .cp-run { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
 .cp-run[data-status='ok'] .ci-source-status { color: var(--sg-pos); }
