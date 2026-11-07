@@ -17,6 +17,7 @@ import {
   readInternalRecord,
   readPublicItem,
   readWinLoss,
+  redactContactDetails,
   scorePartner,
   type PartnerEvidence,
   type PartnerEvidenceDraft,
@@ -216,8 +217,31 @@ describe('positioning math', () => {
     for (const a of kpmg.angles) for (const id of a.evidenceIds) expect(ids.has(id)).toBe(true);
     const accenture = summary.partners[1]!;
     expect(accenture.angles).toEqual([]);
-    expect(accenture.scorecard.filter((d) => d.status === 'no_evidence').map((d) => d.dimension)).toEqual(['quality', 'price', 'speed', 'domain']);
+    expect(accenture.scorecard.filter((d) => d.status === 'no_evidence').map((d) => d.dimension)).toEqual(['quality', 'price', 'speed', 'domain', 'relationship']);
     expect(accenture.strength.level).toBe('weak');
     expect(JSON.stringify(summary)).not.toContain('\u2014');
+  });
+});
+
+describe('contact details and evidence-only scores', () => {
+  it('redacts emails and phone numbers everywhere text is stored, but keeps dates and amounts', () => {
+    expect(redactContactDetails('Call +47 915 55 123 or 0612345678 on 2026-03-01 about 1 200 000 EUR')).toBe('Call [phone removed] or [phone removed] on 2026-03-01 about 1 200 000 EUR');
+    const [note] = readInternalRecord({ source: 'note', recordType: 'note', recordId: 'n9', title: 'From ana@client.example', text: 'Our quality is better than KPMG, ask ana@client.example or +34 600 123 456.', occurredAt: NOW }, firms);
+    expect(JSON.stringify(note)).not.toMatch(/@client|600 123/);
+    const [wl] = readWinLoss({ id: 'w9', opportunityId: 'o9', opportunityName: 'Lot', outcome: 'lost', reason: 'price', competitor: 'KPMG', note: 'Buyer bob@buyer.example said KPMG was cheaper', decidedAt: NOW }, firms);
+    expect(JSON.stringify(wl)).not.toContain('bob@buyer.example');
+    const [bid] = readBidCompetitor({ opportunityId: 'o9', opportunityName: 'Lot', vendor: 'KPMG', score: 70, strengths: ['Cheap rates, see +44 20 7946 0958'], weaknesses: [], at: NOW }, firms);
+    expect(JSON.stringify(bid)).not.toContain('7946');
+  });
+
+  it('never reads LinkedIn items', () => {
+    const item = { source: 'gdelt' as const, url: 'https://www.linkedin.com/posts/x', title: 'MAPFRE selects KPMG for advisory', description: '', publishedAt: NOW };
+    expect(readPublicItem(item, 'MAPFRE', firms)).toEqual([]);
+  });
+
+  it('relationship has no evidence when nothing cites the partner side, even with our own deals', () => {
+    const [note] = readInternalRecord({ source: 'note', recordType: 'note', recordId: 'n10', title: null, text: 'Our quality is better than KPMG.', occurredAt: NOW }, firms);
+    const rel = scorePartner([ev(note!)], { won: 4, open: 2 }).find((d) => d.dimension === 'relationship');
+    expect(rel).toMatchObject({ status: 'no_evidence', us: null, partner: null, evidenceIds: [] });
   });
 });

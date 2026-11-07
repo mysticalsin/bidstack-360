@@ -3,7 +3,9 @@
  *   consulting-partners.refresh  scan one account (Refresh on the account page)
  *   consulting-partners.sweep    repeatable (daily): prune evidence older than
  *                                three years, rescan our own records on
- *                                accounts touched in the last day, and when
+ *                                accounts whose notes, meetings or deals
+ *                                changed in the last day (activities, emails
+ *                                and win/loss wait for Refresh), and when
  *                                CONSULTING_PARTNERS_AUTO_REFRESH=true run a
  *                                full refresh for stale key and top accounts
  */
@@ -15,7 +17,7 @@ import type pino from 'pino';
 
 import { defaultIntelFetch } from '../lib/account-intel/http.js';
 import { partnerLlm, prismaPartnerStore } from '../lib/consulting-partners/prisma-store.js';
-import { runConsultingPartners } from '../lib/consulting-partners/run.js';
+import { llmPartnerRemarks, runConsultingPartners } from '../lib/consulting-partners/run.js';
 
 const DAY_MS = 24 * 60 * 60_000;
 const STALE_DAYS = 14;
@@ -43,8 +45,10 @@ async function sweep(queue: Queue, env: NodeJS.ProcessEnv, log: pino.Logger): Pr
     });
     if (changed.length) {
       const firms = await loadOrgFirmCatalog(prisma, org.id, env.CONSULTING_PARTNER_FIRMS);
+      const llm = env.CONSULTING_PARTNERS_LLM === 'true' ? await partnerLlm(org.id) : null;
       for (const c of changed) {
         const drafts = await scanInternalPartnerEvidence(prisma, { orgId: org.id, companyId: c.id, firms, now });
+        if (llm) await llmPartnerRemarks(drafts, firms, llm);
         await savePartnerEvidence(prisma, { orgId: org.id, companyId: c.id, drafts, now, replaceInternal: true });
         rescanned++;
       }

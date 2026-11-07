@@ -69,7 +69,7 @@ export function scorePartner(items: PartnerEvidence[], ours: OurEngagements): Di
   const theirs = partnerEngagements(items);
   const ourCount = Math.max(0, ours.won) + Math.max(0, ours.open);
   const n = ourCount + theirs.length;
-  if (n === 0) {
+  if (theirs.length === 0) {
     out.push({ dimension: 'relationship', status: 'no_evidence', us: null, partner: null, evidenceCount: 0, evidenceIds: [] });
   } else {
     const us = Math.round((100 * ourCount) / n);
@@ -128,11 +128,12 @@ export function partnerAngles(
   if (publicLinks.length) {
     const rels = byFrequency(publicLinks.map((e) => e.relationship as PartnerRelationship)).slice(0, 2);
     const doms = byFrequency(publicLinks.flatMap((e) => e.domains)).slice(0, 2);
-    const since = Math.min(...publicLinks.map((e) => year(when(e))));
+    const dated = publicLinks.filter((e) => e.date !== null).map((e) => year(e.date!));
+    const since = dated.length ? ` since ${Math.min(...dated)}` : '';
     const relText = joinWords(rels.map((r) => PARTNER_RELATIONSHIP_LABEL[r].toLowerCase()));
     const domText = doms.length ? ` in ${joinWords(doms.map((d) => PARTNER_DOMAIN_LABEL[d]))}` : '';
     out.push({
-      text: `${name} works on ${relText} at ${clientName}${domText}, ${plural(publicLinks.length, 'public source', 'public sources')} since ${since}.`,
+      text: `${name} works on ${relText} at ${clientName}${domText}, ${plural(publicLinks.length, 'public source', 'public sources')}${since}.`,
       basis: publicLinks.every((e) => e.inferred) ? 'inferred' : 'observed',
       evidenceIds: publicLinks.slice(0, MAX_CITES).map((e) => e.id),
     });
@@ -199,6 +200,8 @@ export function composeConsultingPartners(input: ComposePartnersInput): Consulti
     const scorecard = scorePartner(items, input.engagements);
     const record = partnerRecord(items);
     const dates = items.map(when).sort();
+    const angles = partnerAngles(name, input.clientName, items, scorecard, record);
+    const cited = new Set(angles.flatMap((a) => a.evidenceIds));
     partners.push({
       firmKey,
       name,
@@ -213,8 +216,8 @@ export function composeConsultingPartners(input: ComposePartnersInput): Consulti
       internalCount: items.filter((e) => e.origin === 'internal').length,
       record,
       scorecard,
-      angles: partnerAngles(name, input.clientName, items, scorecard, record),
-      timeline: items.slice(0, MAX_TIMELINE).map((e) => ({
+      angles,
+      timeline: items.filter((e, i) => i < MAX_TIMELINE || cited.has(e.id)).map((e) => ({
         id: e.id,
         date: when(e),
         origin: e.origin,

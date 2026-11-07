@@ -42,7 +42,7 @@ export async function visiblePartnerRows(server: FastifyInstance, req: FastifyRe
   const ids = (type: string) => uniq(internal.filter((r) => r.recordType === type).map((r) => r.recordId));
   const oppIds = uniq(internal.map((r) => r.opportunityId));
 
-  const [opps, meetings, notes, activities, emails] = await Promise.all([
+  const [opps, meetings, notes, activities, emails, winLoss] = await Promise.all([
     oppIds.length
       ? prisma.opportunity.findMany({ where: applyOpportunityScope({ orgId, id: { in: oppIds }, deletedAt: null }, scope), select: { id: true }, take: oppIds.length })
       : [],
@@ -54,14 +54,16 @@ export async function visiblePartnerRows(server: FastifyInstance, req: FastifyRe
       ? prisma.activity.findMany({ where: { orgId, id: { in: ids('activity') }, deletedAt: null }, select: { id: true }, take: ids('activity').length })
       : [],
     ids('email').length
-      ? prisma.emailMessage.findMany({ where: { orgId, id: { in: ids('email') }, deletedAt: null }, select: { id: true, userId: true, entityType: true }, take: ids('email').length })
+      ? prisma.emailMessage.findMany({ where: { orgId, id: { in: ids('email') }, deletedAt: null }, select: { id: true, userId: true, entityType: true, entityId: true }, take: ids('email').length })
       : [],
+    ids('win_loss').length ? prisma.winLossRecord.findMany({ where: { orgId, id: { in: ids('win_loss') } }, select: { id: true }, take: ids('win_loss').length }) : [],
   ]);
   const oppOk = new Set(opps.map((o) => o.id));
   const meetingOk = new Set(meetings.map((m) => m.id));
   const noteOk = new Set(notes.map((n) => n.id));
   const activityOk = new Set(activities.map((a) => a.id));
   const emailById = new Map(emails.map((e) => [e.id, e]));
+  const winLossOk = new Set(winLoss.map((w) => w.id));
 
   const linkedOk = (r: PartnerEvidenceRow) => !r.opportunityId || oppOk.has(r.opportunityId);
   const allowed = (r: PartnerEvidenceRow): boolean => {
@@ -79,9 +81,11 @@ export async function visiblePartnerRows(server: FastifyInstance, req: FastifyRe
         if (!e) return false;
         if (e.userId === userId) return true;
         if (!canActivities) return false;
-        if (e.entityType === 'deal') return Boolean(r.opportunityId) && oppOk.has(r.opportunityId!);
+        if (e.entityType === 'deal') return Boolean(e.entityId) && oppOk.has(e.entityId!);
         return e.entityType === 'contact';
       }
+      case 'win_loss':
+        return winLossOk.has(id) && canOpps && Boolean(r.opportunityId) && oppOk.has(r.opportunityId!);
       default:
         return OPP_RECORDS.has(r.recordType ?? '') && canOpps && Boolean(r.opportunityId) && oppOk.has(r.opportunityId!);
     }

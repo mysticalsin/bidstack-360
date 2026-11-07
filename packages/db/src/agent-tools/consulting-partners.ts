@@ -5,7 +5,8 @@
  * Public evidence is open to any caller with account-intel:read. Internal
  * evidence (our notes, meetings, emails, activities, win/loss and bid fields)
  * is only included for a signed-in Jarvis user, and only for records that
- * user authored, owns or attended. MCP API keys get public evidence only.
+ * user authored, owns or attended, and our deal counts only cover deals that
+ * user owns. MCP API keys get public evidence only and no deal counts.
  * Every angle and score cites evidence ids returned in the same answer.
  */
 import { z } from 'zod';
@@ -91,7 +92,7 @@ export const consultingPartners = {
     const visible = rows.filter((r) => !isInternalPartnerRow(r) || owned.has(r.id)).filter((r) => !args.firm || r.firmKey === args.firm);
     const [firms, engagements, run] = await Promise.all([
       loadOrgFirmCatalog(prisma, ctx.orgId, process.env.CONSULTING_PARTNER_FIRMS),
-      countPartnerEngagements(prisma, ctx.orgId, company.id),
+      userId ? countPartnerEngagements(prisma, ctx.orgId, company.id, { ownerId: userId }) : Promise.resolve({ won: 0, open: 0 }),
       loadPartnerRun(prisma, ctx.orgId, company.id),
     ]);
     const evidence = visible.map(toPartnerEvidence);

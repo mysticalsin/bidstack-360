@@ -4,7 +4,7 @@
  * keys every draft on `key`, so a rescan updates in place.
  */
 import { createHashKey } from './hash.js';
-import { classifyDomains, classifyRelationship, partnerExcerpt, readPartnerMentions } from './classify.js';
+import { classifyDomains, classifyRelationship, partnerExcerpt, readPartnerMentions, redactContactDetails } from './classify.js';
 import { matchFirms, namesClient, type ConsultingFirm } from './firms.js';
 import type {
   PartnerContext,
@@ -64,7 +64,10 @@ const hostOf = (url: string | null): string | null => {
   }
 };
 
-const onDomain = (host: string | null, domains: string[]) => Boolean(host && domains.some((d) => host === d || host.endsWith(`.${d}`)));
+/** Never read items published on these hosts (no LinkedIn content). */
+const BLOCKED_HOSTS = ['linkedin.com', 'lnkd.in'];
+
+const onDomain = (host: string | null, domains: readonly string[]) => Boolean(host && domains.some((d) => host === d || host.endsWith(`.${d}`)));
 
 /**
  * Firms linked to the client by one public item. The item must name the
@@ -72,9 +75,10 @@ const onDomain = (host: string | null, domains: string[]) => Boolean(host && dom
  * the firm's own site counts without one and is marked inferred.
  */
 export function readPublicItem(item: PartnerPublicItem, clientName: string, firms: readonly ConsultingFirm[]): PartnerEvidenceDraft[] {
-  const text = `${item.title}. ${item.description}`.trim();
+  const text = redactContactDetails(`${item.title}. ${item.description}`.trim());
   if (!namesClient(text, clientName)) return [];
   const host = item.host?.toLowerCase() ?? hostOf(item.url);
+  if (onDomain(host, BLOCKED_HOSTS) || onDomain(hostOf(item.url), BLOCKED_HOSTS)) return [];
   const siteOwners = firms.filter((f) => onDomain(host, f.domains)).map((f) => f.key);
   const keys = [...new Set([...matchFirms(text, firms).map((m) => m.firmKey), ...siteOwners])];
   const out: PartnerEvidenceDraft[] = [];
@@ -96,7 +100,7 @@ export function readPublicItem(item: PartnerPublicItem, clientName: string, firm
       recordType: null,
       recordId: null,
       opportunityId: null,
-      title: item.title.slice(0, 300),
+      title: redactContactDetails(item.title).slice(0, 300),
       excerpt,
       occurredAt: item.publishedAt,
       relationship,
@@ -138,7 +142,7 @@ export function readInternalRecord(rec: PartnerInternalRecord, firms: readonly C
     recordType: rec.recordType,
     recordId: rec.recordId,
     opportunityId: rec.opportunityId ?? null,
-    title: rec.title?.slice(0, 300) ?? null,
+    title: rec.title ? redactContactDetails(rec.title).slice(0, 300) : null,
     excerpt: r.excerpt,
     occurredAt: rec.occurredAt,
     relationship: null,
@@ -172,7 +176,8 @@ export interface WinLossInput {
 }
 
 /** Evidence from a win/loss record: outcome against the firm, the reason as a remark. */
-export function readWinLoss(w: WinLossInput, firms: readonly ConsultingFirm[]): PartnerEvidenceDraft[] {
+export function readWinLoss(raw: WinLossInput, firms: readonly ConsultingFirm[]): PartnerEvidenceDraft[] {
+  const w = { ...raw, note: raw.note ? redactContactDetails(raw.note) : null };
   const fromField = w.competitor ? [...new Set(matchFirms(w.competitor, firms).map((m) => m.firmKey))] : [];
   const keys = fromField.length ? fromField : [...new Set(matchFirms(w.note ?? '', firms).map((m) => m.firmKey))];
   const dim = REASON_DIMENSION[w.reason];
@@ -227,7 +232,8 @@ const DIMENSION_WORDS: Array<[RemarkDimension, RegExp]> = [
 ];
 
 /** Evidence from a bid competitor field: strengths favour the firm, weaknesses favour us. */
-export function readBidCompetitor(b: BidCompetitorInput, firms: readonly ConsultingFirm[]): PartnerEvidenceDraft[] {
+export function readBidCompetitor(raw: BidCompetitorInput, firms: readonly ConsultingFirm[]): PartnerEvidenceDraft[] {
+  const b = { ...raw, strengths: raw.strengths.map(redactContactDetails), weaknesses: raw.weaknesses.map(redactContactDetails) };
   const keys = [...new Set(matchFirms(b.vendor, firms).map((m) => m.firmKey))];
   const remarks: PartnerRemark[] = [];
   for (const [list, favours] of [[b.strengths, 'partner'], [b.weaknesses, 'us']] as const) {

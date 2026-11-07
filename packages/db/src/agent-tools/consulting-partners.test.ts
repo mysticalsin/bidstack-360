@@ -29,12 +29,13 @@ const rows: PartnerEvidenceRow[] = [
 
 const findFirst = vi.fn();
 const owned = vi.fn();
+const engagements = vi.fn();
 vi.mock('../index.js', () => ({ prisma: { company: { findFirst: (...a: unknown[]) => findFirst(...a) } } }));
 vi.mock('../consulting-partners.js', async (orig) => ({
   ...(await orig<typeof PartnerDb>()),
   loadPartnerEvidenceRows: async () => rows,
   loadOrgFirmCatalog: async () => DEFAULT_CONSULTING_FIRMS,
-  countPartnerEngagements: async () => ({ won: 1, open: 1 }),
+  countPartnerEngagements: (...a: unknown[]) => engagements(...a),
   loadPartnerRun: async () => ({ status: 'ok', lastFetchedAt: NOW.toISOString(), result: { new: 2, updated: 0, skipped: 0, failed: 0 }, detail: null }),
   ownedPartnerRowIds: (...a: unknown[]) => owned(...a),
 }));
@@ -48,6 +49,7 @@ describe('consulting_partners shared agent tool', () => {
   beforeEach(() => {
     findFirst.mockReset().mockResolvedValue({ id: COMPANY, name: 'MAPFRE' });
     owned.mockReset().mockResolvedValue(new Set(['int1']));
+    engagements.mockReset().mockResolvedValue({ won: 1, open: 1 });
   });
 
   it('is a read tool gated by account-intel:read', () => {
@@ -58,6 +60,7 @@ describe('consulting_partners shared agent tool', () => {
   it('gives an MCP key public evidence only, so quality has no evidence', async () => {
     const out = (await tool.handler({ companyId: COMPANY, limit: 6 }, { orgId: 'org-1' })) as Out;
     expect(owned).not.toHaveBeenCalled();
+    expect(engagements).not.toHaveBeenCalled();
     expect(out.partners[0]!.internalCount).toBe(0);
     expect(out.partners[0]!.scorecard.find((d) => d.dimension === 'quality')!.status).toBe('no_evidence');
     expect(out.citations[0]!.href).toBe(`/accounts/${COMPANY}`);
@@ -66,6 +69,7 @@ describe('consulting_partners shared agent tool', () => {
   it('adds internal records the Jarvis user owns, cited and fenced', async () => {
     const out = (await tool.handler({ companyId: COMPANY, limit: 6 }, { orgId: 'org-1', userId: USER, surface: 'jarvis' })) as Out;
     expect(owned).toHaveBeenCalledWith(expect.anything(), 'org-1', USER, [expect.objectContaining({ id: 'int1' })]);
+    expect(engagements).toHaveBeenCalledWith(expect.anything(), 'org-1', COMPANY, { ownerId: USER });
     const quality = out.partners[0]!.scorecard.find((d) => d.dimension === 'quality')!;
     expect(quality.status).toBe('scored');
     const ids = new Set(out.evidence.map((e) => e.id));

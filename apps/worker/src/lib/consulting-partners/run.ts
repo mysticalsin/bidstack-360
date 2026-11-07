@@ -167,7 +167,10 @@ export async function llmPartnerRemarks(drafts: PartnerEvidenceDraft[], firms: r
 export async function runConsultingPartners(input: { orgId: string; companyId: string }, deps: PartnerRunDeps): Promise<PartnerRunResult> {
   const { store, now } = deps;
   const subject = await store.subject(input.orgId, input.companyId);
-  if (!subject) return { status: 'skipped', counts: { new: 0, updated: 0, skipped: 0, failed: 0 }, detail: 'Account not found' };
+  if (!subject) {
+    await store.setRun(input.orgId, input.companyId, { status: 'failed', detail: 'Account not found' }).catch(() => undefined);
+    return { status: 'skipped', counts: { new: 0, updated: 0, skipped: 0, failed: 0 }, detail: 'Account not found' };
+  }
   await store.setRun(input.orgId, input.companyId, { status: 'running' });
   const firms = await store.firms(input.orgId);
   const counts: PartnerRunCounts = { new: 0, updated: 0, skipped: 0, failed: 0 };

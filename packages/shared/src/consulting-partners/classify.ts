@@ -160,7 +160,7 @@ function subjectOf(sentence: string, at: number, firmKey: string, mentions: Firm
 /** Quality, price, speed and domain remarks about `firmKey` in `text`. */
 export function extractRemarks(text: string, firmKey: string, firms: readonly ConsultingFirm[]): PartnerRemark[] {
   const out: PartnerRemark[] = [];
-  for (const s of splitPartnerSentences(text)) {
+  for (const s of splitPartnerSentences(redactContactDetails(text))) {
     const mentions = matchFirms(s.text, firms);
     if (!mentions.some((m) => m.firmKey === firmKey)) continue;
     const us = usPositions(s.text);
@@ -193,17 +193,26 @@ export function sentimentFromRemarks(remarks: PartnerRemark[]): PartnerSentiment
 }
 
 const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-const PHONE_RE = /\+?\d[\d\s().-]{7,}\d/g;
+const PHONE_CANDIDATE_RE = /\+?\(?\d[\d\s().-]{7,}\d/g;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const AMOUNT_RE = /^\d{1,3}(?:[ .,]\d{3})+$/;
+
+function looksLikePhone(candidate: string): boolean {
+  const digits = candidate.replace(/\D/g, '').length;
+  if (candidate.startsWith('+')) return digits >= 8;
+  return digits >= 9 && !DATE_RE.test(candidate) && !AMOUNT_RE.test(candidate);
+}
 
 /** Text with email addresses and phone numbers removed. Excerpts never carry contact details. */
 export function redactContactDetails(text: string): string {
-  return text.replace(EMAIL_RE, '[email removed]').replace(PHONE_RE, '[phone removed]');
+  return text.replace(EMAIL_RE, '[email removed]').replace(PHONE_CANDIDATE_RE, (m) => (looksLikePhone(m) ? '[phone removed]' : m));
 }
 
 /** The sentences around each mention of `firmKey`, at most `max` characters, contact details removed. */
 export function partnerExcerpt(text: string, firmKey: string, firms: readonly ConsultingFirm[], max = 300): string {
-  const picked = splitPartnerSentences(text).filter((s) => matchFirms(s.text, firms).some((m) => m.firmKey === firmKey));
-  const joined = redactContactDetails((picked.length ? picked.map((s) => s.text) : [text]).join(' ')).replace(/\s+/g, ' ').trim();
+  const clean = redactContactDetails(text);
+  const picked = splitPartnerSentences(clean).filter((s) => matchFirms(s.text, firms).some((m) => m.firmKey === firmKey));
+  const joined = (picked.length ? picked.map((s) => s.text) : [clean]).join(' ').replace(/\s+/g, ' ').trim();
   return joined.length > max ? `${joined.slice(0, max - 1).trimEnd()}\u2026` : joined;
 }
 
@@ -218,7 +227,8 @@ export interface PartnerMentionRead {
 }
 
 /** Every firm in an internal record with context, sentiment, remarks and domains. */
-export function readPartnerMentions(text: string, firms: readonly ConsultingFirm[]): PartnerMentionRead[] {
+export function readPartnerMentions(raw: string, firms: readonly ConsultingFirm[]): PartnerMentionRead[] {
+  const text = redactContactDetails(raw);
   const keys = [...new Set(matchFirms(text, firms).map((m) => m.firmKey))];
   return keys.map((firmKey) => {
     const excerpt = partnerExcerpt(text, firmKey, firms);
