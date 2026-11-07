@@ -17,9 +17,9 @@
 //   "own records only" — intentional, not a bug.
 //
 // HONEST LIMITS of v1 (documented gaps, not silent ones):
-// - Opportunity LIST + COUNT + DETAIL-by-id (GET /opportunities/:id) are
-//   scoped — a restricted user cannot open an out-of-scope deal by direct
-//   link/ID. Companies/leads/contacts stay org-visible even though
+// - Opportunity list, count, and the by-id deal routes (via
+//   lib/visible-opportunity.ts) are scoped, so a restricted user cannot read
+//   or change an out-of-scope deal by direct link/ID. Companies/leads/contacts stay org-visible even though
 //   Company.countryCode exists (v2 candidate).
 // - API-key callers (req.auth.userId = "apikey:<id>", not a User row) have no
 //   group membership. New keys default-deny company/MSA resources unless the
@@ -174,6 +174,11 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
+// API-key actors own no deals, and "apikey:<id>" is not a valid uuid for ownerId.
+function ownerClause(scope: AccessScope): Prisma.OpportunityWhereInput[] {
+  return isApiKeyActor(scope.userId) ? [] : [{ ownerId: scope.userId }];
+}
+
 /**
  * Merge the visibility rule into an existing opportunity where clause.
  * Wraps in AND so route-level filters (search OR, stage, owner…) survive.
@@ -195,7 +200,7 @@ export function applyOpportunityScope(
         OR: [
           { country: { in: variants } },
           { territory: { countryCodes: { hasSome: variants } } },
-          { ownerId: scope.userId },
+          ...ownerClause(scope),
         ],
       },
     ],
@@ -217,7 +222,7 @@ export function accountOpportunityScopePredicate(
 ): Prisma.OpportunityWhereInput | null {
   if (scope.unrestricted) return null;
   const variants = countryVariantsForScope(scope);
-  const clauses: Prisma.OpportunityWhereInput[] = [{ ownerId: scope.userId }];
+  const clauses: Prisma.OpportunityWhereInput[] = ownerClause(scope);
   if (variants.length > 0) {
     clauses.unshift({ territory: { countryCodes: { hasSome: variants } } });
     clauses.unshift({ country: { in: variants } });

@@ -4,8 +4,8 @@ import { applyOpportunityScope, getAccessScope } from './access-scope.js';
 
 /**
  * Where clause for one opportunity the caller may see: same org, not deleted,
- * and inside their M7 access scope. Every by-id route (reads and writes) uses
- * it so an out-of-scope deal answers 404 exactly like GET /opportunities/:id.
+ * and inside their M7 access scope. By-id deal routes use it so an
+ * out-of-scope deal answers 404 exactly like GET /opportunities/:id.
  */
 export async function visibleOpportunityWhere(
   auth: { orgId: string; userId: string },
