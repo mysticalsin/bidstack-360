@@ -56,7 +56,11 @@ const map: RelationshipMap = {
   ],
   entities: [{ id: 'e0000000-0000-4000-8000-000000000001', slug: 'hema', name: 'HEMA', lines: ['pharma'], msaIds: [MSA] }],
   people: [{ owner: { id: OWNER, name: 'Alex Owner' }, entities: ['hema'], lines: ['digital'], lastActivityAt: '2026-10-20T00:00:00.000Z', valueMicros: 250_000_000_000, currency: 'EUR', counts: { msas: 1, opportunities: 0, projects: 1, contacts: 1, activities: 1 } }],
-  rows: [],
+  rows: [
+    { kind: 'msa', id: MSA, label: 'HEMA global MSA', companyId: PFIZER, companyName: 'Pfizer', entity: 'HEMA', line: 'health_economics', owner: { id: OWNER, name: 'Alex Owner' }, lastActivityAt: '2026-10-01T00:00:00.000Z', valueMicros: null, currency: null, country: 'US' },
+    { kind: 'project', id: 'p1', label: 'Patient engagement', companyId: PFIZER, companyName: 'Pfizer', entity: null, line: 'digital', owner: null, lastActivityAt: '2026-09-01T00:00:00.000Z', valueMicros: 250_000_000_000, currency: 'EUR', country: 'US' },
+    { kind: 'activity', id: 'a1', label: 'QBR', companyId: PFIZER, companyName: 'Pfizer', entity: null, line: 'health_economics', owner: { id: OWNER, name: 'Alex Owner' }, lastActivityAt: '2026-10-20T00:00:00.000Z', valueMicros: null, currency: null, country: null },
+  ],
   lines: [{ line: 'digital', count: 1 }],
   countries: ['US', 'GB'],
 };
@@ -111,8 +115,12 @@ describe('WhitespacePage', () => {
     expect(within(factors).getByText(/Clause 2\.1/)).toBeTruthy();
     const who = await within(row!).findByTestId('who-works-with-them');
     await waitFor(() => expect(within(who).getByText('Alex Owner')).toBeTruthy());
-    expect(within(who).getByText('HEMA')).toBeTruthy();
-    expect(within(who).getByText('Digital')).toBeTruthy();
+    const trs = within(who).getAllByRole('row').slice(1).map((r) => r.textContent);
+    expect(trs[0]).toContain('HEMA');
+    expect(trs[0]).toContain('Health economics');
+    expect(trs[0]).toContain('20 Oct 2026');
+    expect(trs[1]).toContain('Digital');
+    expect(trs[1]).toMatch(/€250/);
     expect(within(who).getByTestId('who-works-with-them-family').textContent).toContain('Pfizer Ltd (UK)');
   });
 

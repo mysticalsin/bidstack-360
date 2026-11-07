@@ -65,3 +65,39 @@ export function lastRunText(s: AgreementSource): string {
   if (run.state === 'failed') return `Failed ${when}${run.reasons[0] ? ` · ${run.reasons[0]}` : ''}`;
   return `Last sync ${when}${counts ? ` · ${counts}` : ''}`;
 }
+
+export interface WhoRow {
+  key: string;
+  entity: string | null;
+  line: string | null;
+  owners: string[];
+  lastActivityAt: string | null;
+  valueMicros: number;
+  currency: string | null;
+}
+
+const WORK_KINDS = new Set(['msa', 'opportunity', 'project', 'revenue']);
+
+export function whoRows(map: RelationshipMap): WhoRow[] {
+  const groups = new Map<string, WhoRow>();
+  const all = Array.isArray(map.rows) ? map.rows : [];
+  for (const r of all) {
+    if (!WORK_KINDS.has(r.kind)) continue;
+    const key = `${r.entity ?? ''}|${r.line ?? ''}`;
+    const g = groups.get(key) ?? { key, entity: r.entity, line: r.line, owners: [], lastActivityAt: null, valueMicros: 0, currency: null };
+    if (r.owner && !g.owners.includes(r.owner.name)) g.owners.push(r.owner.name);
+    if (r.lastActivityAt && (!g.lastActivityAt || r.lastActivityAt > g.lastActivityAt)) g.lastActivityAt = r.lastActivityAt;
+    if (r.valueMicros && (!g.currency || g.currency === r.currency)) {
+      g.valueMicros += r.valueMicros;
+      g.currency = r.currency;
+    }
+    groups.set(key, g);
+  }
+  for (const a of all) {
+    if (a.kind !== 'activity' || !a.lastActivityAt) continue;
+    for (const g of groups.values()) {
+      if (g.line === a.line && (!g.lastActivityAt || a.lastActivityAt > g.lastActivityAt)) g.lastActivityAt = a.lastActivityAt;
+    }
+  }
+  return [...groups.values()].sort((a, b) => (b.lastActivityAt ?? '').localeCompare(a.lastActivityAt ?? ''));
+}

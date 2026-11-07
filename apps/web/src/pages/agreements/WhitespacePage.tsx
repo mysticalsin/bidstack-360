@@ -31,14 +31,21 @@ function inDays(n: number): string {
   return new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 }
 
+const plain = (v: string) => v.replace(/[\s,]/g, '').toLowerCase();
+
 function Citation({ c }: { c: WhitespaceFactor['citations'][number] }) {
-  const text = [c.clause, c.page ? `p. ${c.page}` : null, c.label].filter(Boolean).join(' · ');
+  const parts = [c.clause, c.page ? `p. ${c.page}` : null, c.label].filter((v): v is string => Boolean(v));
+  const text = parts.filter((v, i) => parts.findIndex((o) => plain(o) === plain(v)) === i).join(' · ');
   return (
     <li>
       {c.url ? <a href={c.url} target="_blank" rel="noreferrer noopener">{text}</a> : text}
       {c.excerpt ? <q className="agr-ws-excerpt">{c.excerpt}</q> : null}
     </li>
   );
+}
+
+function cited(f: WhitespaceFactor) {
+  return f.citations.filter((c) => c.url || c.excerpt || c.clause || plain(c.label) !== plain(f.detail));
 }
 
 function Factors({ factors }: { factors: WhitespaceFactor[] }) {
@@ -52,7 +59,7 @@ function Factors({ factors }: { factors: WhitespaceFactor[] }) {
           </div>
           <span className="agr-ws-meter" aria-hidden="true"><span style={{ width: `${f.max ? (f.points / f.max) * 100 : 0}%` }} /></span>
           <span className="drill-sub">{f.detail}</span>
-          {f.citations.length ? <ul className="agr-ws-cites">{f.citations.map((c, i) => <Citation key={i} c={c} />)}</ul> : null}
+          {cited(f).length ? <ul className="agr-ws-cites">{cited(f).map((c, i) => <Citation key={i} c={c} />)}</ul> : null}
         </li>
       ))}
     </ul>
