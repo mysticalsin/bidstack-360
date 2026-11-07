@@ -1,0 +1,130 @@
+/**
+ * Live access tokens for Google and Microsoft grants, refreshed when they are
+ * about to expire.
+ *
+ * - Rotated refresh tokens are stored (Microsoft rotates on every refresh).
+ * - Microsoft refreshes ask for the scopes the user actually granted, so a
+ *   read-only grant never silently asks for send rights.
+ * - invalid_grant means the user revoked access at the provider: the row is
+ *   marked revoked with a reconnect hint and sync stops for it.
+ */
+import type pino from 'pino';
+
+import { prisma } from '@bidstack/db';
+import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
+import { WORKSPACE_READ_SCOPES } from '@bidstack/shared';
+
+const EXPIRY_SKEW_MS = 60_000;
+
+export const REVOKED_MESSAGE = 'Access was revoked at the provider. Reconnect to resume sync.';
+
+/** The provider no longer honours this grant; the user must reconnect. */
+export class GrantRevokedError extends Error {
+  override readonly name = 'GrantRevokedError';
+}
+
+/** Columns needed to use or refresh a grant. */
+export interface WorkspaceTokenRow {
+  id: string;
+  orgId: string;
+  provider: string;
+  accessTokenEncrypted: string;
+  refreshTokenEncrypted: string | null;
+  expiresAt: Date | null;
+  scope: string[];
+}
+
+function isGoogle(provider: string): boolean {
+  return provider === 'gmail' || provider === 'google_workspace';
+}
+
+function refreshRequest(row: WorkspaceTokenRow, refreshToken: string): { url: string; body: URLSearchParams } {
+  if (isGoogle(row.provider)) {
+    return {
+      url: 'https://oauth2.googleapis.com/token',
+      body: new URLSearchParams({
+        client_id: process.env.GMAIL_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
+        client_secret: process.env.GMAIL_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    };
+  }
+  const granted = row.scope.length > 0 ? row.scope : [...WORKSPACE_READ_SCOPES.microsoft];
+  const scope = granted.includes('offline_access') ? granted : [...granted, 'offline_access'];
+  return {
+    url: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID ?? 'common'}/oauth2/v2.0/token`,
+    body: new URLSearchParams({
+      client_id: process.env.MICROSOFT_GRAPH_CLIENT_ID ?? '',
+      client_secret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET ?? '',
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+      scope: scope.join(' '),
+    }),
+  };
+}
+
+async function readError(res: Response): Promise<string | null> {
+  try {
+    const body = (await res.json()) as { error?: string };
+    return body.error ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Return a usable access token, refreshing and persisting it when needed. */
+export async function getWorkspaceAccessToken(
+  row: WorkspaceTokenRow,
+  log: pino.Logger,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const fresh = row.expiresAt ? row.expiresAt.getTime() > Date.now() + EXPIRY_SKEW_MS : true;
+  if (fresh) return decryptToken(row.accessTokenEncrypted);
+  if (!row.refreshTokenEncrypted) {
+    await prisma.integrationToken.update({
+      where: { id: row.id },
+      data: { status: 'revoked', errorMessage: REVOKED_MESSAGE },
+    });
+    throw new GrantRevokedError('Access token expired and no refresh token is stored');
+  }
+
+  const { url, body } = refreshRequest(row, decryptToken(row.refreshTokenEncrypted));
+  const res = await fetchImpl(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const code = res.status === 400 || res.status === 401 ? await readError(res) : null;
+    if (code === 'invalid_grant' || code === 'unauthorized_client') {
+      log.warn({ tokenId: row.id, provider: row.provider }, 'workspace grant revoked at provider');
+      await prisma.integrationToken.update({
+        where: { id: row.id },
+        data: { status: 'revoked', errorMessage: REVOKED_MESSAGE },
+      });
+      throw new GrantRevokedError(`${row.provider} refresh rejected: ${code}`);
+    }
+    log.error({ tokenId: row.id, provider: row.provider, status: res.status }, 'workspace token refresh failed');
+    await prisma.integrationToken.update({
+      where: { id: row.id },
+      data: { status: 'error', errorMessage: `Token refresh failed (${res.status}). Polo will retry.` },
+    });
+    throw new Error(`${row.provider} token refresh failed: ${res.status}`);
+  }
+
+  const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
+  await prisma.integrationToken.update({
+    where: { id: row.id },
+    data: {
+      accessTokenEncrypted: encryptToken(data.access_token),
+      ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
+      expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null,
+      status: 'active',
+      lastRefreshedAt: new Date(),
+      errorMessage: null,
+    },
+  });
+  return data.access_token;
+}

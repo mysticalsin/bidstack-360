@@ -3,6 +3,7 @@
 import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
+import { graphEventTime } from '@bidstack/shared';
 
 import {
   claimCalendarPush,
@@ -11,6 +12,9 @@ import {
 } from './calendar-sync-claim.js';
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
+
+import { captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { providerFetch } from '../lib/provider-http.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Microsoft push ────────────────────────────────────────────────────────
@@ -107,15 +111,36 @@ export async function handleMicrosoftPush({
       headers,
     });
     if (!res.ok && res.status !== 404) throw new Error(`MS Graph delete failed: ${res.status}`);
-    await prisma.calendarEvent.update({
-      where: { id: event.id },
-      data: { syncState: 'SYNCED', deletedAt: new Date() },
+    // The API soft-deleted the row before enqueueing; the explicit deletedAt
+    // filter reaches past the soft-delete middleware.
+    await prisma.calendarEvent.updateMany({
+      where: { id: event.id, deletedAt: { not: null } },
+      data: { syncState: 'SYNCED' },
     });
   }
 }
 
 // ─── Microsoft incremental pull ────────────────────────────────────────────
 
+const MAX_PAGES_PER_RUN = 20;
+
+const GRAPH_READ_HEADERS = (accessToken: string) => ({
+  Authorization: `Bearer ${accessToken}`,
+  // UTC wall times, so parsing never depends on the worker's local zone.
+  Prefer: 'odata.maxpagesize=50, outlook.timezone="UTC"',
+});
+
+function initialDeltaUrl(now = Date.now()): string {
+  const from = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const to = new Date(now + 90 * 24 * 60 * 60 * 1000).toISOString();
+  return `https://graph.microsoft.com/v1.0/me/calendarView/delta?startDateTime=${from}&endDateTime=${to}`;
+}
+
+/**
+ * Pull changed events with the calendarView delta query, following every
+ * nextLink page until Graph hands back a deltaLink. A run that hits the page
+ * cap stores the nextLink and resumes from it on the next tick.
+ */
 export async function pullMicrosoftIncremental(
   tokenId: string,
   orgId: string,
@@ -123,6 +148,7 @@ export async function pullMicrosoftIncremental(
   accessToken: string,
   deltaState: Record<string, unknown>,
   log: pino.Logger,
+  ownerEmail: string | null = null,
 ): Promise<void> {
   await assertSerumConnectorAllowed({
     orgId,
@@ -131,42 +157,50 @@ export async function pullMicrosoftIncremental(
     writeRequested: false,
   });
 
-  const deltaLink = deltaState['calendarDeltaLink'] as string | undefined;
-  const url =
-    deltaLink ??
-    'https://graph.microsoft.com/v1.0/me/calendarView/delta?startDateTime=' +
-      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() +
-      '&endDateTime=' +
-      new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+  let url =
+    (deltaState['calendarNextLink'] as string | undefined) ??
+    (deltaState['calendarDeltaLink'] as string | undefined) ??
+    initialDeltaUrl();
+  let count = 0;
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Prefer: 'odata.maxpagesize=50',
-    },
-  });
+  for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
+    const res = await providerFetch(url, { headers: GRAPH_READ_HEADERS(accessToken) }, { provider: 'Microsoft Graph' });
 
-  if (!res.ok) throw new Error(`MS Graph delta failed: ${res.status}`);
+    if (res.status === 410) {
+      log.warn({ tokenId }, 'Graph calendar delta expired (410); resyncing from scratch');
+      const { calendarDeltaLink: _d, calendarNextLink: _n, ...rest } = deltaState;
+      await prisma.integrationToken.update({ where: { id: tokenId }, data: { deltaState: rest as object } });
+      return;
+    }
+    if (!res.ok) throw new Error(`MS Graph delta failed: ${res.status}`);
 
-  const body = (await res.json()) as {
-    value?: MsGraphEventItem[];
-    '@odata.deltaLink'?: string;
-  };
+    const body = (await res.json()) as {
+      value?: MsGraphEventItem[];
+      '@odata.nextLink'?: string;
+      '@odata.deltaLink'?: string;
+    };
+    const items = body.value ?? [];
+    count += items.length;
+    await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
 
-  const items = body.value ?? [];
-  await upsertMicrosoftEvents(items, orgId, userId, log);
-
-  if (body['@odata.deltaLink']) {
-    await prisma.integrationToken.update({
-      where: { id: tokenId },
-      data: {
-        deltaState: { ...deltaState, calendarDeltaLink: body['@odata.deltaLink'] },
-        lastSyncedAt: new Date(),
-      },
-    });
+    if (body['@odata.deltaLink']) {
+      const { calendarNextLink: _n, ...rest } = deltaState;
+      await prisma.integrationToken.update({
+        where: { id: tokenId },
+        data: { deltaState: { ...rest, calendarDeltaLink: body['@odata.deltaLink'] }, lastSyncedAt: new Date() },
+      });
+      log.debug({ tokenId, count }, 'MS Graph incremental pull complete');
+      return;
+    }
+    if (!body['@odata.nextLink']) break;
+    url = body['@odata.nextLink'];
   }
 
-  log.debug({ tokenId, count: items.length }, 'MS Graph incremental pull complete');
+  await prisma.integrationToken.update({
+    where: { id: tokenId },
+    data: { deltaState: { ...deltaState, calendarNextLink: url }, lastSyncedAt: new Date() },
+  });
+  log.info({ tokenId, count }, 'MS Graph calendar pull paused at page cap; resuming next tick');
 }
 
 interface MsGraphEventItem {
@@ -192,6 +226,7 @@ async function upsertMicrosoftEvents(
   items: MsGraphEventItem[],
   orgId: string,
   userId: string,
+  ownerEmail: string | null,
   log: pino.Logger,
 ): Promise<void> {
   for (const item of items) {
@@ -199,14 +234,19 @@ async function upsertMicrosoftEvents(
 
     if (item['@removed']) {
       await prisma.calendarEvent.updateMany({
-        where: { provider: 'microsoft_graph', externalId: item.id, orgId },
+        where: { provider: 'microsoft_graph', externalId: item.id, orgId, ownerId: userId },
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
       continue;
     }
 
-    const startAt = new Date(item.start?.dateTime ?? Date.now());
-    const endAt = new Date(item.end?.dateTime ?? Date.now());
+    const isAllDay = item.isAllDay ?? false;
+    const startAt = graphEventTime(item.start, isAllDay);
+    const endAt = graphEventTime(item.end, isAllDay);
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+      log.warn({ eventId: item.id }, 'MS event without a readable start/end; skipping');
+      continue;
+    }
 
     try {
       const attendees = (item.attendees ?? []).map((a) => ({
@@ -214,44 +254,43 @@ async function upsertMicrosoftEvents(
         displayName: a.emailAddress.name,
         responseStatus: a.status?.response,
       }));
+      const organizerEmail = item.organizer?.emailAddress?.address ?? null;
+      const target = await resolveCaptureTarget({
+        orgId,
+        ownerEmail,
+        participants: [...attendees.map((a) => a.email), ...(organizerEmail ? [organizerEmail] : [])],
+      });
+
+      const fields = {
+        subject: item.subject ?? '(No title)',
+        bodyPreview: item.bodyPreview?.slice(0, 500) ?? null,
+        startAt,
+        endAt,
+        location: item.location?.displayName ?? null,
+        isAllDay,
+        isCancelled: item.isCancelled ?? false,
+        attendees,
+        organizerEmail,
+        relatedEntityType: target?.entityType ?? null,
+        relatedEntityId: target?.entityId ?? null,
+        ...captureColumns(target),
+        externalUpdatedAt: item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime) : null,
+        etag: item['@odata.etag'] ?? null,
+        syncState: 'SYNCED' as const,
+        lastSyncedAt: new Date(),
+      };
 
       await prisma.calendarEvent.upsert({
         where: {
-          provider_externalId: { provider: 'microsoft_graph', externalId: item.id },
-        } as Parameters<typeof prisma.calendarEvent.upsert>[0]['where'],
-        create: {
-          orgId,
-          ownerId: userId,
-          externalId: item.id,
-          provider: 'microsoft_graph',
-          subject: item.subject ?? '(No title)',
-          bodyPreview: item.bodyPreview?.slice(0, 500) ?? null,
-          startAt,
-          endAt,
-          location: item.location?.displayName ?? null,
-          isAllDay: item.isAllDay ?? false,
-          isCancelled: item.isCancelled ?? false,
-          attendees,
-          organizerEmail: item.organizer?.emailAddress?.address ?? null,
-          externalUpdatedAt: item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime) : null,
-          etag: item['@odata.etag'] ?? null,
-          syncState: 'SYNCED',
-          lastSyncedAt: new Date(),
+          orgId_ownerId_provider_externalId: {
+            orgId,
+            ownerId: userId,
+            provider: 'microsoft_graph',
+            externalId: item.id,
+          },
         },
-        update: {
-          subject: item.subject ?? '(No title)',
-          bodyPreview: item.bodyPreview?.slice(0, 500) ?? null,
-          startAt,
-          endAt,
-          location: item.location?.displayName ?? null,
-          isAllDay: item.isAllDay ?? false,
-          isCancelled: item.isCancelled ?? false,
-          attendees,
-          externalUpdatedAt: item.lastModifiedDateTime ? new Date(item.lastModifiedDateTime) : null,
-          etag: item['@odata.etag'] ?? null,
-          syncState: 'SYNCED',
-          lastSyncedAt: new Date(),
-        },
+        create: { orgId, ownerId: userId, externalId: item.id, provider: 'microsoft_graph', ...fields },
+        update: fields,
       });
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert MS event; skipping');

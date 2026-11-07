@@ -14,13 +14,19 @@
  * renewal can run once daily without affecting throughput on the other queues.
  */
 
-import { Queue, Worker } from 'bullmq';
+import { DelayedError, Queue, Worker, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
-import { CALENDAR_PUSH, CALENDAR_PULL_INCREMENTAL, CALENDAR_WATCH_RENEW } from '@bidstack/shared';
-import { decryptToken } from '@bidstack/shared/token-crypto';
+import {
+  CALENDAR_PUSH,
+  CALENDAR_PULL_INCREMENTAL,
+  CALENDAR_WATCH_RENEW,
+  grantsCalendarRead,
+  grantsCalendarWrite,
+  grantsMailRead,
+} from '@bidstack/shared';
 
 import { CalendarConflictError, PushJobData, PullJobData } from './calendar-sync-types.js';
 import {
@@ -29,6 +35,33 @@ import {
   renewGoogleWatchChannel,
 } from './calendar-sync-google.js';
 import { handleMicrosoftPush, pullMicrosoftIncremental } from './calendar-sync-microsoft.js';
+import { pullGmail } from './email-sync.gmail.js';
+import { ProviderRateLimitError } from '../lib/provider-http.js';
+import { GrantRevokedError, getWorkspaceAccessToken } from '../lib/workspace-token.js';
+
+/** Token rows that can carry a calendar grant. Google grants live on the gmail row. */
+const CALENDAR_TOKEN_PROVIDERS = ['google_workspace', 'gmail', 'microsoft_graph'] as const;
+
+function tokenProvidersFor(eventProvider: string): Array<(typeof CALENDAR_TOKEN_PROVIDERS)[number]> {
+  return eventProvider === 'microsoft_graph' ? ['microsoft_graph'] : ['google_workspace', 'gmail'];
+}
+
+/**
+ * Throttled: park the job for the provider's Retry-After instead of failing it.
+ * Revoked: stop quietly; the card already tells the user to reconnect.
+ */
+async function handleProviderError(err: unknown, job: Job, log: pino.Logger): Promise<void> {
+  if (err instanceof ProviderRateLimitError) {
+    log.warn({ jobId: job.id, delayMs: err.retryAfterMs, provider: err.provider }, 'provider throttled; delaying job');
+    await job.moveToDelayed(Date.now() + err.retryAfterMs, job.token);
+    throw new DelayedError();
+  }
+  if (err instanceof GrantRevokedError) {
+    log.warn({ jobId: job.id }, 'grant revoked; skipping until the user reconnects');
+    return;
+  }
+  throw err;
+}
 
 // ─── Scheduling / fan-out constants ────────────────────────────────────────
 
@@ -114,33 +147,44 @@ export async function startCalendarSync(
       const data = PushJobData.parse(job.data);
       const childLog = log.child({ job: job.name, jobId: job.id, ...data });
 
+      // Deletes soft-delete the row before enqueueing, so look past deletedAt.
+      const event = await prisma.calendarEvent.findFirst({
+        where: {
+          id: data.calendarEventId,
+          orgId: data.orgId,
+          ...(data.operation === 'delete' ? { deletedAt: { not: null } } : { deletedAt: null }),
+        },
+      });
+
+      if (!event) {
+        childLog.warn('CalendarEvent not found; skipping push');
+        return;
+      }
+
       const token = await prisma.integrationToken.findFirst({
         where: {
           orgId: data.orgId,
           userId: data.userId,
+          provider: { in: tokenProvidersFor(event.provider) },
           status: 'active',
           deletedAt: null,
         },
+        orderBy: { updatedAt: 'desc' },
       });
 
-      if (!token) {
-        childLog.warn('No active integration token found; skipping push');
-        return;
-      }
-
-      const event = await prisma.calendarEvent.findFirst({
-        where: { id: data.calendarEventId, orgId: data.orgId, deletedAt: null },
-      });
-
-      if (!event) {
-        childLog.warn('CalendarEvent not found or deleted; skipping push');
+      if (!token || !grantsCalendarWrite(token.scope)) {
+        // Read-only grant (the default): the event stays in Polo only.
+        if (data.operation !== 'delete') {
+          await prisma.calendarEvent.update({ where: { id: event.id }, data: { syncState: 'SYNCED' } });
+        }
+        childLog.info('No calendar write grant; keeping the event in Polo only');
         return;
       }
 
       try {
-        const accessToken = decryptToken(token.accessTokenEncrypted);
+        const accessToken = await getWorkspaceAccessToken(token, childLog);
 
-        if (token.provider === 'google_workspace') {
+        if (token.provider === 'google_workspace' || token.provider === 'gmail') {
           await handleGooglePush({
             event,
             operation: data.operation,
@@ -170,7 +214,7 @@ export async function startCalendarSync(
           childLog.warn({ eventId: event.id }, 'Calendar push conflict — etag mismatch');
           return; // don't retry a conflict
         }
-        throw err; // let BullMQ retry transient errors
+        await handleProviderError(err, job, childLog);
       }
     },
     { connection, concurrency: 5 },
@@ -192,7 +236,11 @@ export async function startCalendarSync(
 
       const data = PullJobData.parse(raw);
       const childLog = log.child({ ...data });
-      await runIncrementalPull(data.integrationTokenId, data.orgId, data.userId, childLog);
+      try {
+        await runIncrementalPull(data.integrationTokenId, data.orgId, data.userId, childLog);
+      } catch (err) {
+        await handleProviderError(err, job, childLog);
+      }
     },
     { connection, concurrency: 3 },
   );
@@ -236,7 +284,7 @@ export async function fanoutIncrementalPulls(queue: Queue, log: pino.Logger): Pr
 
   while (true) {
     const batch = await prisma.integrationToken.findMany({
-      where: { status: 'active', deletedAt: null },
+      where: { status: 'active', deletedAt: null, provider: { in: [...CALENDAR_TOKEN_PROVIDERS] } },
       select: { id: true, orgId: true, userId: true },
       take: FANOUT_BATCH_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -268,7 +316,7 @@ export async function fanoutWatchRenewals(queue: Queue, log: pino.Logger): Promi
 
   while (true) {
     const batch = await prisma.integrationToken.findMany({
-      where: { provider: 'google_workspace', status: 'active', deletedAt: null },
+      where: { provider: { in: ['google_workspace', 'gmail'] }, status: 'active', deletedAt: null },
       select: { id: true },
       take: FANOUT_BATCH_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -295,10 +343,19 @@ export async function fanoutWatchRenewals(queue: Queue, log: pino.Logger): Promi
 /** Renew the Google watch channel for a single token (per-token fan-out job). */
 async function renewWatchForToken(tokenId: string, log: pino.Logger): Promise<void> {
   const token = await prisma.integrationToken.findFirst({
-    where: { id: tokenId, provider: 'google_workspace', status: 'active', deletedAt: null },
-    select: { id: true, orgId: true, accessTokenEncrypted: true, deltaState: true },
+    where: { id: tokenId, provider: { in: ['google_workspace', 'gmail'] }, status: 'active', deletedAt: null },
+    select: {
+      id: true,
+      orgId: true,
+      provider: true,
+      accessTokenEncrypted: true,
+      refreshTokenEncrypted: true,
+      expiresAt: true,
+      scope: true,
+      deltaState: true,
+    },
   });
-  if (!token) return;
+  if (!token || !grantsCalendarRead(token.scope)) return;
 
   const childLog = log.child({ tokenId: token.id });
   try {
@@ -314,8 +371,8 @@ async function renewWatchForToken(tokenId: string, log: pino.Logger): Promise<vo
       return;
     }
 
-    const accessToken = decryptToken(token.accessTokenEncrypted);
-    await renewGoogleWatchChannel(token.orgId, token.id, accessToken, childLog);
+    const accessToken = await getWorkspaceAccessToken(token, childLog);
+    await renewGoogleWatchChannel(token.orgId, token.id, accessToken, childLog, deltaState);
   } catch (err) {
     childLog.error({ err, tokenId: token.id }, 'Watch channel renewal failed');
   }
@@ -377,6 +434,10 @@ export async function sweepStrandedPushes(queue: Queue, log: pino.Logger): Promi
 
 // ─── Incremental pull dispatcher ──────────────────────────────────────────
 
+/**
+ * One tick for one grant: calendar when the grant can read it, and for Google
+ * grants the Gmail inbox too (Outlook mail has its own delta queue).
+ */
 async function runIncrementalPull(
   tokenId: string,
   orgId: string,
@@ -386,15 +447,29 @@ async function runIncrementalPull(
   // WHY findFirst + orgId in where (not findUnique by bare id): defense-in-depth —
   // callers pass ids from org-scoped fetches today, but the helper must not
   // decrypt a cross-tenant token if a future caller passes a mismatched pair.
-  const token = await prisma.integrationToken.findFirst({ where: { id: tokenId, orgId } });
+  const token = await prisma.integrationToken.findFirst({ where: { id: tokenId, orgId, deletedAt: null } });
   if (!token || token.status !== 'active') return;
 
-  const accessToken = decryptToken(token.accessTokenEncrypted);
-  const deltaState = token.deltaState as Record<string, unknown>;
+  const isGoogle = token.provider === 'google_workspace' || token.provider === 'gmail';
+  const wantsCalendar = grantsCalendarRead(token.scope);
+  const wantsGmail = isGoogle && grantsMailRead(token.scope);
+  if (!wantsCalendar && !wantsGmail) return;
 
-  if (token.provider === 'google_workspace') {
-    await pullGoogleIncremental(token.id, orgId, userId, accessToken, deltaState, log);
-  } else if (token.provider === 'microsoft_graph') {
-    await pullMicrosoftIncremental(token.id, orgId, userId, accessToken, deltaState, log);
+  const accessToken = await getWorkspaceAccessToken(token, log);
+  const ownerEmail = token.externalAccountEmail ?? null;
+
+  if (wantsCalendar) {
+    const deltaState = token.deltaState as Record<string, unknown>;
+    if (isGoogle) {
+      await pullGoogleIncremental(token.id, orgId, userId, accessToken, deltaState, log, ownerEmail);
+    } else if (token.provider === 'microsoft_graph') {
+      await pullMicrosoftIncremental(token.id, orgId, userId, accessToken, deltaState, log, ownerEmail);
+    }
+  }
+
+  if (wantsGmail) {
+    // Re-read: the calendar pass may have advanced its own cursor.
+    const latest = await prisma.integrationToken.findFirst({ where: { id: token.id, orgId } });
+    if (latest) await pullGmail(latest, accessToken, log);
   }
 }

@@ -3,6 +3,8 @@
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as CommsCapture from '../lib/comms-capture.js';
+
 import { prisma } from '@bidstack/db';
 
 import { pullDelta } from './email-sync.pull.js';
@@ -20,7 +22,8 @@ vi.mock('../lib/workspace-token.js', () => ({
   getWorkspaceAccessToken: vi.fn(async () => 'access-token'),
 }));
 
-vi.mock('../lib/comms-capture.js', () => ({
+vi.mock('../lib/comms-capture.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof CommsCapture>()),
   resolveCaptureTarget: vi.fn(async () => ({
     entityType: 'contact',
     entityId: 'contact-1',

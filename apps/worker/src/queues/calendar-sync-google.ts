@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
+import { googleEventTime } from '@bidstack/shared';
 
 import {
   claimCalendarPush,
@@ -13,6 +14,8 @@ import {
 } from './calendar-sync-claim.js';
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
+import { captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { providerFetch } from '../lib/provider-http.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Google push ───────────────────────────────────────────────────────────
@@ -127,9 +130,11 @@ export async function handleGooglePush({
     if (!res.ok && res.status !== 404 && res.status !== 410) {
       throw new Error(`Google delete failed: ${res.status}`);
     }
-    await prisma.calendarEvent.update({
-      where: { id: event.id },
-      data: { syncState: 'SYNCED', deletedAt: new Date() },
+    // The API soft-deleted the row before enqueueing; the explicit deletedAt
+    // filter reaches past the soft-delete middleware.
+    await prisma.calendarEvent.updateMany({
+      where: { id: event.id, deletedAt: { not: null } },
+      data: { syncState: 'SYNCED' },
     });
   }
 }
@@ -141,8 +146,8 @@ interface GoogleEventItem {
   status?: string;
   summary?: string;
   description?: string;
-  start?: { dateTime?: string; date?: string };
-  end?: { dateTime?: string; date?: string };
+  start?: { dateTime?: string; date?: string; timeZone?: string };
+  end?: { dateTime?: string; date?: string; timeZone?: string };
   location?: string;
   attendees?: Array<{ email: string; displayName?: string; responseStatus?: string }>;
   organizer?: { email?: string };
@@ -150,6 +155,22 @@ interface GoogleEventItem {
   etag?: string;
 }
 
+const MAX_PAGES_PER_RUN = 20;
+const EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+
+function googleListUrl(syncToken: string | undefined, pageToken: string | undefined, now = Date.now()): string {
+  const params = new URLSearchParams({ maxResults: '250', singleEvents: 'true' });
+  if (syncToken) params.set('syncToken', syncToken);
+  else params.set('timeMin', new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString());
+  if (pageToken) params.set('pageToken', pageToken);
+  return `${EVENTS_URL}?${params.toString()}`;
+}
+
+/**
+ * Pull changed events with Google sync tokens, following nextPageToken until
+ * Google returns nextSyncToken (only the last page carries it). A run that
+ * hits the page cap stores the page token and resumes next tick.
+ */
 export async function pullGoogleIncremental(
   tokenId: string,
   orgId: string,
@@ -157,6 +178,7 @@ export async function pullGoogleIncremental(
   accessToken: string,
   deltaState: Record<string, unknown>,
   log: pino.Logger,
+  ownerEmail: string | null = null,
 ): Promise<void> {
   await assertSerumConnectorAllowed({
     orgId,
@@ -166,116 +188,112 @@ export async function pullGoogleIncremental(
   });
 
   const syncToken = deltaState['calendarSyncToken'] as string | undefined;
-  let url: string;
+  let pageToken = deltaState['calendarPageToken'] as string | undefined;
+  let count = 0;
 
-  if (syncToken) {
-    url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?syncToken=${encodeURIComponent(syncToken)}`;
-  } else {
-    // Full sync on first run: last 30 days
-    const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&singleEvents=true`;
+  for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
+    const res = await providerFetch(
+      googleListUrl(syncToken, pageToken),
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { provider: 'Google Calendar' },
+    );
+
+    if (res.status === 410) {
+      log.warn({ tokenId }, 'Google sync token expired; clearing for full re-sync');
+      const { calendarSyncToken: _s, calendarPageToken: _p, ...rest } = deltaState;
+      await prisma.integrationToken.update({ where: { id: tokenId }, data: { deltaState: rest as object } });
+      return;
+    }
+    if (!res.ok) throw new Error(`Google events list failed: ${res.status}`);
+
+    const body = (await res.json()) as { items?: GoogleEventItem[]; nextSyncToken?: string; nextPageToken?: string };
+    const items = body.items ?? [];
+    count += items.length;
+    await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
+
+    if (body.nextSyncToken) {
+      const { calendarPageToken: _p, ...rest } = deltaState;
+      await prisma.integrationToken.update({
+        where: { id: tokenId },
+        data: { deltaState: { ...rest, calendarSyncToken: body.nextSyncToken }, lastSyncedAt: new Date() },
+      });
+      log.debug({ tokenId, count }, 'Google incremental pull complete');
+      return;
+    }
+    if (!body.nextPageToken) break;
+    pageToken = body.nextPageToken;
   }
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+  await prisma.integrationToken.update({
+    where: { id: tokenId },
+    data: { deltaState: { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) }, lastSyncedAt: new Date() },
   });
-
-  if (res.status === 410) {
-    // Sync token expired — clear and retry full sync next iteration
-    log.warn({ tokenId }, 'Google sync token expired; clearing for full re-sync');
-    await prisma.integrationToken.update({
-      where: { id: tokenId },
-      data: { deltaState: {}, updatedAt: new Date() },
-    });
-    return;
-  }
-
-  if (!res.ok) throw new Error(`Google events list failed: ${res.status}`);
-
-  const body = (await res.json()) as {
-    items?: GoogleEventItem[];
-    nextSyncToken?: string;
-    nextPageToken?: string;
-  };
-
-  const items = body.items ?? [];
-  await upsertGoogleEvents(items, orgId, userId, log);
-
-  const newSyncToken = body.nextSyncToken;
-  if (newSyncToken) {
-    await prisma.integrationToken.update({
-      where: { id: tokenId },
-      data: {
-        deltaState: { ...deltaState, calendarSyncToken: newSyncToken },
-        lastSyncedAt: new Date(),
-      },
-    });
-  }
-
-  log.debug({ tokenId, count: items.length }, 'Google incremental pull complete');
+  log.info({ tokenId, count }, 'Google calendar pull paused at page cap; resuming next tick');
 }
 
 async function upsertGoogleEvents(
   items: GoogleEventItem[],
   orgId: string,
   userId: string,
+  ownerEmail: string | null,
   log: pino.Logger,
 ): Promise<void> {
   for (const item of items) {
     if (!item.id) continue;
 
-    const isCancelled = item.status === 'cancelled';
-
-    if (isCancelled) {
-      // Soft-delete or mark DELETED_REMOTE so the UI can show a tombstone
+    if (item.status === 'cancelled') {
       await prisma.calendarEvent.updateMany({
-        where: { provider: 'google_workspace', externalId: item.id, orgId },
+        where: { provider: 'google_workspace', externalId: item.id, orgId, ownerId: userId },
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
       continue;
     }
 
-    const startAt = new Date(item.start?.dateTime ?? item.start?.date ?? Date.now());
-    const endAt = new Date(item.end?.dateTime ?? item.end?.date ?? Date.now());
+    const startAt = googleEventTime(item.start);
+    const endAt = googleEventTime(item.end);
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+      log.warn({ eventId: item.id }, 'Google event without a readable start/end; skipping');
+      continue;
+    }
     const isAllDay = Boolean(item.start?.date && !item.start?.dateTime);
 
     try {
+      const attendees = item.attendees ?? [];
+      const organizerEmail = item.organizer?.email ?? null;
+      const target = await resolveCaptureTarget({
+        orgId,
+        ownerEmail,
+        participants: [...attendees.map((a) => a.email), ...(organizerEmail ? [organizerEmail] : [])],
+      });
+      const fields = {
+        subject: item.summary ?? '(No title)',
+        bodyPreview: item.description?.slice(0, 500) ?? null,
+        startAt,
+        endAt,
+        location: item.location ?? null,
+        isAllDay,
+        isCancelled: false,
+        attendees,
+        organizerEmail,
+        relatedEntityType: target?.entityType ?? null,
+        relatedEntityId: target?.entityId ?? null,
+        ...captureColumns(target),
+        externalUpdatedAt: item.updated ? new Date(item.updated) : null,
+        etag: item.etag ?? null,
+        syncState: 'SYNCED' as const,
+        lastSyncedAt: new Date(),
+      };
       await prisma.calendarEvent.upsert({
         where: {
-          provider_externalId: { provider: 'google_workspace', externalId: item.id },
-        } as Parameters<typeof prisma.calendarEvent.upsert>[0]['where'],
-        create: {
-          orgId,
-          ownerId: userId,
-          externalId: item.id,
-          provider: 'google_workspace',
-          subject: item.summary ?? '(No title)',
-          bodyPreview: item.description?.slice(0, 500) ?? null,
-          startAt,
-          endAt,
-          location: item.location ?? null,
-          isAllDay,
-          isCancelled: false,
-          attendees: item.attendees ?? [],
-          organizerEmail: item.organizer?.email ?? null,
-          externalUpdatedAt: item.updated ? new Date(item.updated) : null,
-          etag: item.etag ?? null,
-          syncState: 'SYNCED',
-          lastSyncedAt: new Date(),
+          orgId_ownerId_provider_externalId: {
+            orgId,
+            ownerId: userId,
+            provider: 'google_workspace',
+            externalId: item.id,
+          },
         },
-        update: {
-          subject: item.summary ?? '(No title)',
-          bodyPreview: item.description?.slice(0, 500) ?? null,
-          startAt,
-          endAt,
-          location: item.location ?? null,
-          isAllDay,
-          attendees: item.attendees ?? [],
-          externalUpdatedAt: item.updated ? new Date(item.updated) : null,
-          etag: item.etag ?? null,
-          syncState: 'SYNCED',
-          lastSyncedAt: new Date(),
-        },
+        create: { orgId, ownerId: userId, externalId: item.id, provider: 'google_workspace', ...fields },
+        update: fields,
       });
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
@@ -290,6 +308,7 @@ export async function renewGoogleWatchChannel(
   tokenId: string,
   accessToken: string,
   log: pino.Logger,
+  deltaState: Record<string, unknown> = {},
 ): Promise<void> {
   await assertSerumConnectorAllowed({
     orgId,
@@ -332,6 +351,7 @@ export async function renewGoogleWatchChannel(
     where: { id: tokenId },
     data: {
       deltaState: {
+        ...deltaState,
         watchChannelId: json.id,
         watchChannelExpiry: new Date(Number(json.expiration)).toISOString(),
       },

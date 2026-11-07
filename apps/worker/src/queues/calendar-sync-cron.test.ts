@@ -134,7 +134,7 @@ describe('calendar cron fan-out is bounded (does not load every token in one job
     expect(tokenFindMany).toHaveBeenCalledTimes(2);
     expect(tokenFindMany.mock.calls[0]![0]).toMatchObject({
       take: 200,
-      where: { provider: 'google_workspace', status: 'active', deletedAt: null },
+      where: { provider: { in: ['google_workspace', 'gmail'] }, status: 'active', deletedAt: null },
     });
     expect(add).toHaveBeenCalledTimes(203);
     expect(add).toHaveBeenCalledWith(
