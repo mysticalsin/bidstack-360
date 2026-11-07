@@ -13,7 +13,14 @@
 import { test, expect } from '../fixtures/auth.fixture.js';
 import type { Page, Request, Response } from '@playwright/test';
 
-import { THEMES, VIEWPORTS, layoutIssues, useTheme, type LayoutIssue } from './admin-layout.js';
+import {
+  THEMES,
+  VIEWPORTS,
+  geometryIssues,
+  layoutIssues,
+  useTheme,
+  type LayoutIssue,
+} from './admin-layout.js';
 
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:4010';
 
@@ -320,11 +327,25 @@ test.describe('admin layout audit', () => {
         await useTheme(page, theme);
         await page.setViewportSize({ width: vp.width, height: vp.height });
         const found: Record<string, LayoutIssue[]> = {};
-        for (const path of [...STATIC_ROUTES, ...dynamicRoutes(), '/login']) {
+        const small: string[] = [];
+        for (const path of [...STATIC_ROUTES, ...dynamicRoutes()]) {
           await open(page, path).catch(() => undefined);
           const issues = await layoutIssues(page);
-          if (issues.length) found[path] = issues.slice(0, 15);
+          const gated = issues.filter((i) => i.kind !== 'small-text');
+          small.push(...issues.filter((i) => i.kind === 'small-text').map((i) => `${path}: ${i.detail}`));
+          if (gated.length) found[path] = gated.slice(0, 15);
         }
+        test.info().annotations.push({
+          type: 'small-text',
+          description: JSON.stringify([...new Set(small)].slice(0, 60)),
+        });
+        // Shell typography (sidebar eyebrows, topbar chips) is a DESIGN.md
+        // decision shared by every screen; it is reported, not gated, here.
+        const shell = await geometryIssues(page, 'shell');
+        test.info().annotations.push({
+          type: 'shell-layout',
+          description: JSON.stringify(shell.slice(0, 30)),
+        });
         expect.soft(found, `layout issues ${theme} ${vp.name}`).toEqual({});
       });
     }

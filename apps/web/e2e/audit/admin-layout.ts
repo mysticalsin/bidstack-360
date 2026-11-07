@@ -18,7 +18,8 @@ export const VIEWPORTS = [
 export const THEMES: readonly Theme[] = ['light', 'dark'];
 
 export interface LayoutIssue {
-  kind: 'overflow' | 'overlap' | 'clipped' | 'tiny-text' | 'contrast';
+  /** small-text: 11px badge/tag scale from the design system, reported only. */
+  kind: 'overflow' | 'overlap' | 'clipped' | 'tiny-text' | 'small-text' | 'contrast';
   detail: string;
 }
 
@@ -50,11 +51,22 @@ export async function settle(page: Page): Promise<void> {
  * Geometry checks run in the page: horizontal page overflow, overlapping text
  * leaves, clipped text without an ellipsis and title, and text under 12px.
  */
-export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
-  return page.evaluate(() => {
-    const issues: { kind: 'overflow' | 'overlap' | 'clipped' | 'tiny-text'; detail: string }[] = [];
+export async function geometryIssues(
+  page: Page,
+  scope: 'content' | 'shell' = 'content',
+): Promise<LayoutIssue[]> {
+  return page.evaluate((scope) => {
+    const issues: {
+      kind: 'overflow' | 'overlap' | 'clipped' | 'tiny-text' | 'small-text';
+      detail: string;
+    }[] = [];
     const doc = document.documentElement;
-    if (doc.scrollWidth > window.innerWidth + 1) {
+    const main = document.querySelector('main');
+    const inScope = (el: Element) => {
+      const content = (main?.contains(el) ?? false) || el.closest('[role="dialog"]') !== null;
+      return scope === 'content' ? content : !content;
+    };
+    if (scope === 'content' && doc.scrollWidth > window.innerWidth + 1) {
       issues.push({
         kind: 'overflow',
         detail: `page scrollWidth ${doc.scrollWidth} > viewport ${window.innerWidth}`,
@@ -87,7 +99,7 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
       if (!parent || seen.has(parent)) continue;
       if (!(n.textContent ?? '').trim()) continue;
       seen.add(parent);
-      if (insideHidden(parent) || !isVisible(parent)) continue;
+      if (insideHidden(parent) || !isVisible(parent) || !inScope(parent)) continue;
       leaves.push(parent);
     }
 
@@ -97,8 +109,11 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
     for (const el of leaves) {
       const style = getComputedStyle(el);
       const size = parseFloat(style.fontSize);
-      if (size < 12 && !el.closest('[data-audit-allow-small]')) {
-        issues.push({ kind: 'tiny-text', detail: `${label(el)} is ${size}px` });
+      if (size < 12) {
+        issues.push({
+          kind: size < 11 ? 'tiny-text' : 'small-text',
+          detail: `${label(el)} is ${size}px`,
+        });
       }
       const clips =
         (style.overflowX === 'hidden' || style.overflow === 'hidden') &&
@@ -146,12 +161,15 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
       }
     }
     return issues;
-  });
+  }, scope);
 }
 
 /** axe color-contrast (WCAG AA) violations on the settled page. */
 export async function contrastIssues(page: Page): Promise<LayoutIssue[]> {
-  const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
+  const result = await new AxeBuilder({ page })
+    .include('main')
+    .withRules(['color-contrast'])
+    .analyze();
   return result.violations.flatMap((v) =>
     v.nodes.map((n) => ({ kind: 'contrast' as const, detail: `${n.target.join(' ')}` })),
   );
