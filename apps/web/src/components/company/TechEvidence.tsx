@@ -38,7 +38,7 @@ export function TechCoverageLine({ coverage }: { coverage: TechnicalStackCoverag
       </span>
       {checked ? <span className="text-[var(--fg-tertiary)]">Checked {checked}</span> : null}
       {coverage.sample ? (
-        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2 text-[11px] font-semibold text-[var(--fg-tertiary)]">
+        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2 text-xs font-semibold text-[var(--fg-tertiary)]">
           Sample
         </span>
       ) : null}
@@ -71,7 +71,7 @@ export function TechEvidenceChip({ item }: { item: TechnicalStackItemType }) {
           onKeyDown={(event) => {
             if (event.key === 'Escape') setPinned(false);
           }}
-          className="inline-flex min-h-6 shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 text-[11px] font-semibold text-[var(--fg-secondary)] hover:border-[var(--border-default)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
+          className="inline-flex min-h-6 shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 text-xs font-semibold text-[var(--fg-secondary)] hover:border-[var(--border-default)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
         >
           <span>{source}</span>
           <span className="font-normal text-[var(--fg-tertiary)]">{confidence}%</span>
