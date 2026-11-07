@@ -95,7 +95,7 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
           key={kpi.label}
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
         >
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
             {kpi.label}
           </div>
           {/* One line each, so the card height never depends on which values
@@ -147,7 +147,7 @@ export function OppPageHeader({
     ? (stageOptions.find((s) => s.id === stageFilter)?.name ?? formatStage(stageFilter))
     : '';
   const clearBtnClass =
-    'ml-2 rounded text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
+    'ml-2 rounded text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
 
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
