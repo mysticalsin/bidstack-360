@@ -226,32 +226,22 @@ export default function WhitespacePage() {
     limit: params.get('all') ? 50 : 10,
   };
   const list = useWhitespace(filters);
-  const everything = useWhitespace({ state: 'all', limit: 50 });
   const [openId, setOpenId] = useState<string | null>(null);
   const set = (k: string, v: string | null) => {
     const next = new URLSearchParams(params);
     if (v) next.set(k, v); else next.delete(k);
     setParams(next, { replace: true });
   };
-  const options = useMemo(() => {
-    const items = everything.data?.items ?? [];
-    const entities = new Map<string, string>();
-    const countries = new Set<string>();
-    const lines = new Set<string>();
-    const owners = new Map<string, string>();
-    for (const f of items) {
-      entities.set(f.signingEntity.id, f.signingEntity.name);
-      f.countries.forEach((c) => countries.add(c));
-      f.lines.forEach((l) => lines.add(l));
-      if (f.owner) owners.set(f.owner.id, f.owner.name);
-    }
-    return {
-      entities: [...entities].sort((a, b) => a[1].localeCompare(b[1])),
-      countries: [...countries].sort(),
-      lines: [...lines].sort((a, b) => labelBusinessLine(a).localeCompare(labelBusinessLine(b))),
-      owners: [...owners].sort((a, b) => a[1].localeCompare(b[1])),
-    };
-  }, [everything.data]);
+  const facets = list.data?.facets;
+  const options = useMemo(
+    () => ({
+      entities: (facets?.entities ?? []).map((e) => [e.id, e.name] as const),
+      countries: facets?.countries ?? [],
+      lines: [...(facets?.lines ?? [])].sort((a, b) => labelBusinessLine(a).localeCompare(labelBusinessLine(b))),
+      owners: (facets?.owners ?? []).map((o) => [o.id, o.name] as const),
+    }),
+    [facets],
+  );
   const pickers = useMemo(
     () => (users.data ?? []).filter((u) => !u.deletedAt).map((u) => ({ id: u.id, name: u.name ?? u.email })),
     [users.data],

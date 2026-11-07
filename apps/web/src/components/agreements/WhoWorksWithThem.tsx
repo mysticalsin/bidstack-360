@@ -44,7 +44,7 @@ export function WhoWorksWithThem({ companyId, as = 'section' }: { companyId: str
                   <td>{r.line ? labelBusinessLine(r.line) : '–'}</td>
                   <td>{r.owners.join(', ') || '–'}</td>
                   <td>{fmtDate(r.lastActivityAt)}</td>
-                  <td className="num">{r.valueMicros > 0 && r.currency ? fmtMoneyMicros(r.valueMicros, r.currency) : '–'}</td>
+                  <td className="num">{r.totals.length ? r.totals.map((t) => fmtMoneyMicros(t.valueMicros, t.currency)).join(' · ') : '–'}</td>
                 </tr>
               ))}
             </tbody>

@@ -109,6 +109,17 @@ describe('GET /msa/whitespace', () => {
     expect(one.total).toBeGreaterThanOrEqual(1);
   });
 
+  it('returns filter options from every visible flag, whatever the filters and limit', async () => {
+    const res = await call({ method: 'GET', url: '/msa/whitespace?country=ZZ&limit=1' });
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json() as { items: WhitespaceFlag[]; facets: { entities: Array<{ name: string }>; countries: string[]; lines: string[]; owners: Array<{ id: string }> } };
+    expect(body.items.filter((f) => !f.global)).toHaveLength(0);
+    expect(body.facets.entities.map((e) => e.name)).toContain('HEMA');
+    expect(body.facets.countries).toEqual(expect.arrayContaining(['US', 'GB']));
+    expect(body.facets.lines).toEqual(expect.arrayContaining(['it', 'engineering']));
+    expect(body.facets.owners.map((o) => o.id)).toContain(adminId);
+  });
+
   it('is readable with msa:read and hidden from other tenants', async () => {
     expect((await call({ method: 'GET', url: '/msa/whitespace', role: 'sdr' })).statusCode).toBe(200);
     const other = await createIsolatedOrg('msa-whitespace-other');

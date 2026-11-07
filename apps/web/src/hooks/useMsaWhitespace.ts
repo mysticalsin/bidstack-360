@@ -47,7 +47,15 @@ export function useWhitespaceDecision() {
       const { msaId, ...body } = v;
       return acceptWhitespace(msaId, body);
     },
-    onSuccess: done,
+    onSuccess: (res) => {
+      done();
+      void qc.invalidateQueries({ queryKey: ['msa', 'relationship-map'] });
+      if (res.opportunityId) {
+        void qc.invalidateQueries({ queryKey: ['opportunities'] });
+        void qc.invalidateQueries({ queryKey: ['opportunity'] });
+        void qc.invalidateQueries({ queryKey: ['opportunity-rows:viz'] });
+      }
+    },
   });
   const dismiss = useMutation({
     mutationFn: (v: { msaId: string; line: string; reason: string }) => dismissWhitespace(v.msaId, { line: v.line, reason: v.reason }),
