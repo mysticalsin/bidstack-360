@@ -287,3 +287,34 @@ export const AI_AUDIT_RETENTION: QueueConfig = {
     removeOnFail: { age: 86_400 * 30, count: 100 },
   },
 };
+
+/**
+ * GDPR data subject requests (export / erase, Art. 15, 17, 20). One job per
+ * request row; the runner claims the row, so a redelivery after completion is
+ * a no-op. Erasure is not retried aggressively: a failed run leaves the row
+ * `failed` with the error for an admin to re-file.
+ */
+export const DATA_SUBJECT_REQUEST: QueueConfig = {
+  name: 'data-subject-request',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 1000 },
+  },
+};
+
+/**
+ * Retention sweep per data class (GDPR Art. 5(1)(e)). Daily repeatable cron.
+ * Report-only unless RETENTION_MODE=enforce. Idempotent: it only touches rows
+ * older than a cutoff.
+ */
+export const RETENTION_SWEEP: QueueConfig = {
+  name: 'retention-sweep',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 30 },
+    removeOnFail: { age: 86_400 * 30, count: 100 },
+  },
+};

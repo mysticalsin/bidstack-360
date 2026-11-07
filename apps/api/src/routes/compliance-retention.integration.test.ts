@@ -56,8 +56,10 @@ async function seedAged() {
   const u = userId!;
   const tag = randomUUID().slice(0, 8);
   const old = new Date(Date.now() - 5 * YEAR);
-  const token = await prisma.integrationToken.create({
-    data: { orgId: o, userId: u, provider: 'gmail', accessTokenEncrypted: 'placeholder-ciphertext' },
+  const token = await prisma.integrationToken.upsert({
+    where: { orgId_userId_provider: { orgId: o, userId: u, provider: 'gmail' } },
+    create: { orgId: o, userId: u, provider: 'gmail', accessTokenEncrypted: 'placeholder-ciphertext' },
+    update: {},
   });
   const oldMail = await prisma.emailMessage.create({
     data: {

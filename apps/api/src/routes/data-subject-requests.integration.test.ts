@@ -127,8 +127,10 @@ async function seedSubject(opts: { optedOut?: boolean } = {}): Promise<Seeded> {
     },
   });
 
-  const token = await prisma.integrationToken.create({
-    data: { orgId: o, userId: u, provider: 'twilio', accessTokenEncrypted: 'placeholder-ciphertext' },
+  const token = await prisma.integrationToken.upsert({
+    where: { orgId_userId_provider: { orgId: o, userId: u, provider: 'twilio' } },
+    create: { orgId: o, userId: u, provider: 'twilio', accessTokenEncrypted: 'placeholder-ciphertext' },
+    update: {},
   });
   const mail = await prisma.emailMessage.create({
     data: {
@@ -478,10 +480,12 @@ describe('data subject engine', () => {
     const tag = randomUUID().slice(0, 8);
     const email = `lead.residue.${tag}@example.com`;
     const lead = await prisma.lead.create({
-      data: { orgId: orgId!, firstName: 'Lena', lastName: `Residue${tag}`, email, phone: '+15557654321' },
+      data: { orgId: orgId!, firstName: 'Lena', lastName: `Residue${tag}`, companyName: 'Residue Test Co', email, phone: '+15557654321' },
     });
-    const token = await prisma.integrationToken.create({
-      data: { orgId: orgId!, userId: userId!, provider: 'twilio', accessTokenEncrypted: 'placeholder-ciphertext' },
+    const token = await prisma.integrationToken.upsert({
+      where: { orgId_userId_provider: { orgId: orgId!, userId: userId!, provider: 'twilio' } },
+      create: { orgId: orgId!, userId: userId!, provider: 'twilio', accessTokenEncrypted: 'placeholder-ciphertext' },
+      update: {},
     });
     await prisma.emailMessage.create({
       data: {
