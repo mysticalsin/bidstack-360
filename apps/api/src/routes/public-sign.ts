@@ -7,7 +7,7 @@
  *
  * Security:
  *   - Token is a 256-bit random hex string — unguessable.
- *   - Rate-limited aggressively: 10 attempts per IP per hour.
+ *   - Rate-limited per IP: 30 reads and 10 submissions per minute.
  *   - Submitter IP + user-agent captured for audit trail.
  *   - No orgId, no auth — the token is the sole credential.
  *   - No PII in logs (recipient email not logged).
