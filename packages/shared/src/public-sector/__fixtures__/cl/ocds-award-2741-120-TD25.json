@@ -1,0 +1,195 @@
+{
+  "uri": "https://api.mercadopublico.cl/APISOCDS/OCDS/award/2741-120-TD25",
+  "version": "1.1",
+  "extensions": [
+    "https://raw.githubusercontent.com/open-contracting-extensions/ocds_tenderClassification_extension/master/extension.json",
+    "https://raw.githubusercontent.com/open-contracting-extensions/ocds_organizationClassification_extension/master/extension.json",
+    "https://raw.githubusercontent.com/open-contracting-extensions/ocds_partyDetails_scale_extension/master/extension.json",
+    "https://raw.githubusercontent.com/open-contracting-extensions/ocds_valueBreakdown_extension/refs/heads/master/extension.json",
+    "https://raw.githubusercontent.com/open-contracting-extensions/ocds_bid_extension/master/extension.json",
+    "https://gitlab.com/dncp-opendata/ocds_statusdetails_extension/-/raw/master/extension.json",
+    "https://chilecompracl.visualstudio.com/a6a3f587-5f23-42f6-9255-ac5852fae1e7/_apis/git/repositories/fb91c43b-011b-434b-901d-9d36ec50c586/items?path=%2Fextension.json&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0",
+    "https://raw.githubusercontent.com/open-contracting-extensions/ocds_techniques_extension/master/extension.json"
+  ],
+  "publishedDate": "2025-07-03T17:12:34Z",
+  "releases": [
+    {
+      "ocid": "ocds-70d2nz-2741-120-TD25",
+      "id": "9379f120-53007339",
+      "date": "2025-07-03T17:11:14Z",
+      "tag": [
+        "award"
+      ],
+      "initiationType": "tender",
+      "parties": [
+        {
+          "name": "I MUNICIPALIDAD DE SAN FELIPE | SECPLA - MUNISANFE",
+          "id": "CL-MP-3730",
+          "identifier": {
+            "id": "690506009",
+            "legalName": "I MUNICIPALIDAD DE SAN FELIPE",
+            "scheme": "CL-RUT"
+          },
+          "address": {
+            "streetAddress": "SALINAS  1211",
+            "region": "Región de Valparaíso ",
+            "countryName": "Chile"
+          },
+          "contactPoint": {
+            "name": "CONTACTO INSTITUCIONAL"
+          },
+          "roles": [
+            "procuringEntity",
+            "buyer"
+          ],
+          "additionalIdentifiers": [
+            {
+              "id": "3730",
+              "legalName": "I MUNICIPALIDAD DE SAN FELIPE",
+              "scheme": "CL-MP",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Comprador/Unidad/3730"
+            }
+          ]
+        },
+        {
+          "name": "AUTOMATICA Y REGULACION S A | automatica y regulacion s.a.",
+          "id": "CL-MP-32629",
+          "identifier": {
+            "id": "876067005",
+            "legalName": "AUTOMATICA Y REGULACION S A",
+            "scheme": "CL-RUT"
+          },
+          "address": {
+            "streetAddress": "AVDA CONDELL N° 1735",
+            "region": "Región Metropolitana de Santiago",
+            "countryName": "Chile"
+          },
+          "roles": [
+            "supplier"
+          ],
+          "additionalIdentifiers": [
+            {
+              "id": "32629",
+              "legalName": "AUTOMATICA Y REGULACION S A",
+              "scheme": "CL-MP",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Empresa/BuscarProveedor/32629"
+            }
+          ],
+          "details": {
+            "classifications": [
+              {
+                "Id": "NPDM",
+                "Scheme": "CL-DCCP-SM",
+                "Description": "Negocio propiedad de mujeres",
+                "Uri": "https://api.mercadopublico.cl/APISOCDS/Utilidades/Politicas/Actualizacion#SelloMujer"
+              }
+            ]
+          }
+        }
+      ],
+      "buyer": {
+        "name": "I MUNICIPALIDAD DE SAN FELIPE | SECPLA - MUNISANFE",
+        "id": "CL-MP-3730"
+      },
+      "tender": {
+        "id": "2741-120-TD25",
+        "procuringEntity": {
+          "name": "I MUNICIPALIDAD DE SAN FELIPE | SECPLA - MUNISANFE",
+          "id": "CL-MP-3730"
+        },
+        "procurementMethod": "direct",
+        "procurementMethodRationale": "Naturaleza de la negociación - Reposición o complementación de servicios o equipamientos accesorios",
+        "hasEnquiries": false,
+        "classification": {
+          "id": "Normal",
+          "scheme": "CL-EVENTS"
+        }
+      },
+      "awards": [
+        {
+          "id": "53007339",
+          "title": "Orden de Compra generada por Trato Directo ID 2741-13-FTD25",
+          "description": "SERVICIO DE CONFIGURACIÓN Y MODIFICACION DE SEMAFOROS EN LA INTERSECCION AVENIDA    O´HIGGINS/AV.RIQUELME (02) NODOS; CON EL OBJETIVO DE OPTIMIZAR LAS CONDICIONES DEL TRAFICO Y PRIORIZAR EL MOVIMIENTO DE MAYOR DEMANDA CON SENTIDO NORTE A ORIENTE ",
+          "status": "active",
+          "statusDetails": "4-Orden de Compra enviada al proveedor",
+          "date": "2025-07-03T17:11:14Z",
+          "value": {
+            "amount": 1953545,
+            "currency": "CLP",
+            "amountGross": 2324718.55
+          },
+          "documents": [
+            {
+              "id": "1",
+              "documentType": "awardNotice",
+              "title": "Página documentos del proceso de contratación",
+              "description": "Todos los documentos relacionados al proceso de contratación",
+              "url": "https://www.mercadopublico.cl/PurchaseOrder/Modules/PO/DetailsPurchaseOrder.aspx?codigoOC=2741-120-TD25",
+              "format": "text/html",
+              "language": "es"
+            }
+          ],
+          "suppliers": [
+            {
+              "name": "AUTOMATICA Y REGULACION S A | automatica y regulacion s.a.",
+              "id": "CL-MP-32629"
+            }
+          ],
+          "items": [
+            {
+              "id": "143121011",
+              "description": "Ingeniería de tránsitoSERVICIO DE CONFIGURACION Y MODIFICACION DE SEMAFOROS EN LA INTERSECCION DE AV. O'HIGGINS/AV.RIQUELME (02 NODOS).",
+              "quantity": 1,
+              "unit": {
+                "name": "GL",
+                "value": {
+                  "amount": 1953545,
+                  "currency": "CLP"
+                }
+              },
+              "classification": {
+                "id": "81102201",
+                "scheme": "UNSPSC",
+                "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/81102201"
+              },
+              "valueBreakdown": [
+                {
+                  "id": "net",
+                  "description": "Precio total neto",
+                  "value": {
+                    "amount": 1953545,
+                    "currency": "CLP"
+                  }
+                }
+              ]
+            }
+          ],
+          "valueBreakdown": [
+            {
+              "id": "net",
+              "description": "Precio total neto",
+              "value": {
+                "amount": 1953545,
+                "currency": "CLP"
+              }
+            },
+            {
+              "id": "taxes",
+              "description": "Impuestos",
+              "value": {
+                "amount": 371173.55,
+                "currency": "CLP"
+              }
+            }
+          ]
+        }
+      ],
+      "language": "es"
+    }
+  ],
+  "publisher": {
+    "name": "Dirección de Compras y Contratación Pública"
+  },
+  "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "publicationPolicy": "http://api.mercadopublico.cl/APISOCDS/Utilidades/Politicas/Actualizacion"
+}
