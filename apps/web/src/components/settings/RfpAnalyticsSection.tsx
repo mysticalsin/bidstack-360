@@ -154,9 +154,6 @@ export function RfpAnalyticsSection() {
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('rfpAnalytics.byOwnerTitle', 'By owner')}
           </h3>
-          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-            {t('rfpAnalytics.byOwnerSubtitle', 'Who owns what, and the pipeline value behind it.')}
-          </p>
         </div>
         {q.isLoading ? (
           // Shimmer rows shaped like the per-owner table — shared bs-shimmer
@@ -238,7 +235,7 @@ function KpiTile({
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
           {label}
         </span>
         <Icon name={icon} size={14} ariaHidden />
@@ -246,7 +243,7 @@ function KpiTile({
       <div className="mt-1.5 text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
         {value}
       </div>
-      <div className="mt-0.5 text-[11px] text-[var(--fg-tertiary)]">{detail}</div>
+      <div className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{detail}</div>
     </Card>
   );
 }
