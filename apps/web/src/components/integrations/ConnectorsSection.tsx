@@ -290,7 +290,7 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
         {connector.message ? (
           <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{connector.message}</p>
         ) : null}
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--fg-tertiary)]">
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[var(--fg-tertiary)]">
           <span>
             {t('connectors.row.checkedAt', 'Checked {{time}}', {
               time: relativeTime(connector.lastCheckedAt),
