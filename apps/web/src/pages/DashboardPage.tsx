@@ -29,7 +29,9 @@ import { FinancialHealthSection } from '@/components/financials/FinancialHealthS
 import { PulseHero } from '@/components/signals/PulseHero';
 import { KeyNumbersStrip } from '@/components/positioning/KeyNumbersStrip';
 import { WhatToPosition } from '@/components/positioning/WhatToPosition';
+import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
 import { AccountVisuals } from '@/components/account/AccountVisuals';
+import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
 import { WhoWeMetCard } from '@/components/meetings/WhoWeMetCard';
 import { OrgChartCard } from '@/components/orgchart/OrgChartCard';
@@ -89,6 +91,9 @@ export function DashboardPage() {
   // Each branch renders its own single H1 (org title or the company name).
   return !accountId ? <OrgDashboard /> : <AccountCockpitPage accountId={accountId} />;
 }
+
+// The activity summary API takes a company id; name-keyed cockpits skip the charts.
+const COMPANY_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
@@ -276,6 +281,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
             </Reveal>
           )}
 
+          {show('activityTimeline') && isAccountView && COMPANY_ID_RE.test(accountId) && (
+            <Reveal delay={0.17}>
+              <AccountActivityCharts companyId={accountId} />
+            </Reveal>
+          )}
+
           {show('crossSell') && (
             <Reveal delay={0.18}>
               <CrossSellCard accountKey={accountRecordKey} />
@@ -397,6 +408,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         <>
           <KeyNumbersStrip companyId={cockpit.company.id} />
           <WhatToPosition companyId={cockpit.company.id} />
+          <AccountDirectionSection companyId={cockpit.company.id} />
           <div id="pulse" style={{ scrollMarginTop: 80 }}>
             <PulseHero companyId={cockpit.company.id} />
           </div>

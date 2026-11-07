@@ -26,8 +26,9 @@ function permission(key: string, name: string, description: string) {
 // orgchart:read follows companies:read on every seeded role: whoever can read
 // an account can read its org chart (Tony Walteur, 2026-10-31 18:57 BRT).
 // orgchart:write is Admin-only (Admin gets every key via ADMIN_PERMISSION_KEYS).
+// account-intel:read follows companies:read the same way (slice 12).
 function role(name: string, description: string, permissionKeys: readonly string[]) {
-  const keys = permissionKeys.includes('companies:read') ? [...permissionKeys, 'orgchart:read'] : permissionKeys;
+  const keys = permissionKeys.includes('companies:read') ? [...permissionKeys, 'orgchart:read', 'account-intel:read'] : permissionKeys;
   return { name, description, permissionKeys: Array.from(new Set(keys)) };
 }
 
@@ -42,6 +43,16 @@ function writeKeys(...resources: string[]) {
 // ─── Permission catalogue ─────────────────────────────────────────────────────
 
 const PERMISSION_SEEDS = [
+  permission(
+    'account-intel:read',
+    'Read account intelligence',
+    'View hiring, company posts, financials, investment themes and direction for an account.',
+  ),
+  permission(
+    'account-intel:write',
+    'Refresh account intelligence',
+    'Queue a refresh of job boards, company posts, registries or filings for an account.',
+  ),
   permission('accounts:read', 'Read accounts', 'View account records and account cockpit data.'),
   permission('accounts:write', 'Manage accounts', 'Create and update account records.'),
   permission('activities:read', 'Read activities', 'View CRM activity timelines.'),
@@ -219,6 +230,7 @@ export const ROLE_SEEDS = [
       'tasks',
     ),
     ...writeKeys(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -278,6 +290,7 @@ export const ROLE_SEEDS = [
   role('Manager', 'Manages commercial execution, team performance, and approvals.', [
     ...READ_PERMISSION_KEYS,
     ...writeKeys(
+      'account-intel',
       'activities',
       'bid-scores',
       'comments',
@@ -330,6 +343,7 @@ export const ROLE_SEEDS = [
     [
       ...READ_PERMISSION_KEYS,
       ...writeKeys(
+        'account-intel',
         'accounts',
         'activities',
         'comments',
@@ -372,6 +386,7 @@ export const ROLE_SEEDS = [
         'territories',
       ),
       ...writeKeys(
+        'account-intel',
         'accounts',
         'activities',
         'comments',

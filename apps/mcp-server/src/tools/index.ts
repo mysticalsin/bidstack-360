@@ -104,6 +104,11 @@ export const tools = {
   'rfp.summary': agentTools['rfp.summary'],
   'bids.overdue': agentTools['bids.overdue'],
   'proposal.section_draft': agentTools['proposal.section_draft'],
+  // Account intelligence (slice 12): hiring, news, financials, direction.
+  account_direction: agentTools.account_direction,
+  account_hiring: agentTools.account_hiring,
+  account_financials_summary: agentTools.account_financials_summary,
+  account_news: agentTools.account_news,
   // Account activity (Dust, CRMs): additive, defined in activity-tools.ts
   ...activityTools,
 } as const;
@@ -156,6 +161,10 @@ export const toolScopes = {
   'rfp.summary': 'read',
   'bids.overdue': 'read',
   'proposal.section_draft': 'write',
+  account_direction: 'read',
+  account_hiring: 'read',
+  account_financials_summary: 'read',
+  account_news: 'read',
   ...activityToolScopes,
 } satisfies Record<ToolName, ToolScope>;
 

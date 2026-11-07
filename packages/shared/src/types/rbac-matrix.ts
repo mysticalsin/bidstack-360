@@ -30,6 +30,7 @@ export type SystemRoleName = (typeof SYSTEM_ROLE_NAMES)[number];
 
 /** All read permissions (resources ending in :read) */
 const ALL_READ: PermissionKey[] = [
+  'account-intel:read',
   'accounts:read',
   'activities:read',
   'agents:read',
@@ -64,6 +65,7 @@ const ALL_READ: PermissionKey[] = [
 ];
 
 const ALL_WRITE: PermissionKey[] = [
+  'account-intel:write',
   'accounts:write',
   'activities:write',
   'agents:write',
@@ -114,6 +116,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
   'Sales Manager': [
     ...ALL_READ,
     ...write(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -133,6 +136,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
   'Account Executive': [
     ...read(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -153,6 +157,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'territories',
     ),
     ...write(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -170,6 +175,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
   SDR: [
     ...read(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -188,6 +194,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
   'Customer Success': [
     ...read(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -219,6 +226,8 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
 /** Resources that appear in the permission matrix (for matrix display) */
 export const MATRIX_RESOURCES = [
+  // Account intelligence: hiring, posts, financials and direction (slice 12).
+  'account-intel',
   'accounts',
   'activities',
   'agents',

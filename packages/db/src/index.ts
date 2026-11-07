@@ -186,6 +186,9 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 export { seedRolesAndPermissions } from './seed.rbac.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
 
+// Account intelligence read model (slice 12), shared by the API, MCP and worker.
+export { loadCompanyIntel } from './company-intel-read.js';
+export type { CompanyIntelSnapshot } from './company-intel-read.js';
 // Inbound activity API + account activity aggregates. One service behind the
 // REST route (apps/api) and the MCP tools (apps/mcp-server).
 export {
