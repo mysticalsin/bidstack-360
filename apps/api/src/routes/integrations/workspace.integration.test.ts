@@ -195,6 +195,15 @@ describe('POST /integrations/workspace/:provider/connect', () => {
     expect(decryptToken(row!.accessTokenEncrypted)).toBe('access-plain');
   });
 
+  it('rejects a connect body that tries to ask for extra scopes', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/integrations/workspace/google/connect',
+      payload: { scope: 'https://www.googleapis.com/auth/gmail.send' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('rejects an unknown provider', async () => {
     const res = await server.inject({ method: 'POST', url: '/api/v1/integrations/workspace/yahoo/connect' });
     expect(res.statusCode).toBe(400);
