@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   accessScopeFromApiKey,
   applyCompanyScope,
+  accountOpportunityScopePredicate,
   applyMsaResourceScope,
+  applyOpportunityScope,
   companyScopePredicate,
 } from './access-scope.js';
 
@@ -53,5 +55,19 @@ describe('API key resource scope (B2)', () => {
         { OR: [{ id: { in: [MSA_A] } }, { companyId: { in: [COMPANY_A] } }] },
       ],
     });
+  });
+});
+
+describe('API key opportunity scope', () => {
+  it('never matches a restricted key against the uuid owner column', () => {
+    const scope = accessScopeFromApiKey(KEY, {
+      unrestrictedScope: false,
+      companyIds: [],
+      msaIds: [],
+    });
+    const where = JSON.stringify(applyOpportunityScope({ orgId: 'org-1' }, scope));
+    const account = JSON.stringify(accountOpportunityScopePredicate(scope));
+    expect(where).not.toContain(KEY);
+    expect(account).not.toContain(KEY);
   });
 });
