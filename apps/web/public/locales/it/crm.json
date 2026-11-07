@@ -221,7 +221,7 @@
       "status": "Stato",
       "priority": "Priorità",
       "score": "Punteggio",
-      "scoreRange": "Punteggio (0-10000)",
+      "scoreRange": "Punteggio (0-100)",
       "source": "Fonte",
       "created": "Creato"
     },
@@ -309,7 +309,7 @@
       "undo": "Annulla"
     },
     "search": {
-      "placeholder": "Cerca per nome, cliente, e-mail, ruolo…",
+      "placeholder": "Cerca per nome, cliente, ruolo…",
       "aria": "Cerca contatti",
       "clear": {
         "aria": "Cancella ricerca"

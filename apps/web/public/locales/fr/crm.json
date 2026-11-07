@@ -222,7 +222,7 @@
       "status": "Statut",
       "priority": "Priorité",
       "score": "Score",
-      "scoreRange": "Score (0-10000)",
+      "scoreRange": "Score (0-100)",
       "source": "Source",
       "created": "Créé"
     },
@@ -394,7 +394,7 @@
       "undo": "Annuler"
     },
     "search": {
-      "placeholder": "Rechercher par nom, client, e-mail, rôle…",
+      "placeholder": "Rechercher par nom, client, rôle…",
       "aria": "Rechercher des contacts",
       "clear": {
         "aria": "Effacer la recherche"

@@ -19,7 +19,12 @@ export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const contact = useContact(id);
-  const allOpps = useOpportunities({ limit: 100 });
+  // Server-side search narrows to this customer's deals; the exact-name filter
+  // below drops substring matches such as "Globex Labs" for "Globex".
+  const allOpps = useOpportunities({
+    search: contact.data?.customer.slice(0, 100),
+    limit: 200,
+  });
   const allTasks = useTasks();
   const allNotes = useNotes(contact.data?.customer);
 

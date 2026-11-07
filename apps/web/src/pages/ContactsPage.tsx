@@ -414,7 +414,7 @@ export function ContactsPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('contacts.search.placeholder', 'Search by name, customer, email, role…')}
+            placeholder={t('contacts.search.placeholder', 'Search by name, customer, role…')}
             aria-label={t('contacts.search.aria', 'Search contacts')}
             className="dialog-input w-full pr-9"
           />

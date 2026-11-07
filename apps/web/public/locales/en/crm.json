@@ -221,7 +221,7 @@
       "status": "Status",
       "priority": "Priority",
       "score": "Score",
-      "scoreRange": "Score (0-10000)",
+      "scoreRange": "Score (0-100)",
       "source": "Source",
       "created": "Created"
     },
@@ -309,7 +309,7 @@
       "undo": "Undo"
     },
     "search": {
-      "placeholder": "Search by name, customer, email, role…",
+      "placeholder": "Search by name, customer, role…",
       "aria": "Search contacts",
       "clear": {
         "aria": "Clear search"

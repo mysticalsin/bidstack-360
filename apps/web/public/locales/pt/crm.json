@@ -221,7 +221,7 @@
       "status": "Status",
       "priority": "Prioridade",
       "score": "Pontuação",
-      "scoreRange": "Pontuação (0-10000)",
+      "scoreRange": "Pontuação (0-100)",
       "source": "Origem",
       "created": "Criado"
     },
@@ -309,7 +309,7 @@
       "undo": "Desfazer"
     },
     "search": {
-      "placeholder": "Pesquisar por nome, cliente, e-mail, função…",
+      "placeholder": "Pesquisar por nome, cliente, função…",
       "aria": "Pesquisar contatos",
       "clear": {
         "aria": "Limpar pesquisa"

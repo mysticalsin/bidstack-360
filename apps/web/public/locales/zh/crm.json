@@ -221,7 +221,7 @@
       "status": "状态",
       "priority": "优先级",
       "score": "评分",
-      "scoreRange": "评分 (0-10000)",
+      "scoreRange": "评分 (0-100)",
       "source": "来源",
       "created": "创建时间"
     },
@@ -309,7 +309,7 @@
       "undo": "撤销"
     },
     "search": {
-      "placeholder": "按姓名、客户、邮箱、角色搜索…",
+      "placeholder": "按姓名、客户、角色搜索…",
       "aria": "搜索联系人",
       "clear": {
         "aria": "清除搜索"
