@@ -88,12 +88,10 @@ async function learnLink(
   externalId: string,
   entityId: string,
 ): Promise<void> {
-  await prisma.externalRecordLink.upsert({
-    where: {
-      orgId_source_entityType_externalId: { orgId, source, entityType, externalId },
-    },
-    create: { orgId, source, entityType, externalId, entityId },
-    update: { entityId },
+  // Create-only: a link another integration already learned is never re-pointed.
+  await prisma.externalRecordLink.createMany({
+    data: [{ orgId, source, entityType, externalId, entityId }],
+    skipDuplicates: true,
   });
 }
 
@@ -167,6 +165,12 @@ function activityData(
   };
 }
 
+/** Fields an ingest replay may change; owner and actor stay with the first writer. */
+function updatableData(data: ReturnType<typeof activityData>) {
+  const { actorType: _a, actorId: _b, ownerId: _c, ...rest } = data;
+  return rest;
+}
+
 export async function ingestActivities(
   input: IngestActivitiesInput,
 ): Promise<IngestActivitiesResponse> {
@@ -205,6 +209,10 @@ export async function ingestActivities(
       }),
     );
 
+  const scope = input.companyScope;
+  // A scoped key must not learn which records exist outside its allowlist.
+  const notFound = (reason: IngestSkipReason): IngestSkipReason =>
+    scope ? 'out_of_scope' : reason;
   const seen = new Set<string>();
 
   for (const [index, item] of input.activities.entries()) {
@@ -215,6 +223,12 @@ export async function ingestActivities(
       continue;
     }
     seen.add(batchKey);
+
+    const pendingLinks: Array<{
+      entityType: 'company' | 'opportunity';
+      externalId: string;
+      entityId: string;
+    }> = [];
 
     // ── Opportunity: id, then code, then a learned external id ──
     let opportunity: OpportunityHit = null;
@@ -244,11 +258,15 @@ export async function ingestActivities(
         if (opportunity) resolvedBy = 'link';
       }
       if (!opportunity) {
-        skip(index, item, 'opportunity_not_found');
+        skip(index, item, notFound('opportunity_not_found'));
         continue;
       }
       if (resolvedBy === 'direct' && ref.externalId) {
-        await learnLink(orgId, source, 'opportunity', ref.externalId, opportunity.id);
+        pendingLinks.push({
+          entityType: 'opportunity',
+          externalId: ref.externalId,
+          entityId: opportunity.id,
+        });
       }
     }
 
@@ -285,17 +303,32 @@ export async function ingestActivities(
         if (company) resolvedBy = 'direct';
       }
       if (company && resolvedBy === 'direct' && ref.externalId) {
-        await learnLink(orgId, source, 'company', ref.externalId, company.id);
+        pendingLinks.push({
+          entityType: 'company',
+          externalId: ref.externalId,
+          entityId: company.id,
+        });
       }
+    }
+    if (item.company && !company && !opportunity) {
+      skip(index, item, notFound('company_not_found'));
+      continue;
+    }
+    // The opportunity decides where the row lands, so its account must agree
+    // with the company ref; otherwise a ref to an allowed company could carry
+    // an opportunity of another account past the scope check.
+    if (company && opportunity?.companyId && opportunity.companyId !== company.id) {
+      skip(index, item, 'company_mismatch');
+      continue;
     }
     if (!company && opportunity?.companyId) company = { id: opportunity.companyId };
     if (!company && !opportunity) {
-      skip(index, item, 'company_not_found');
+      skip(index, item, notFound('company_not_found'));
       continue;
     }
 
     const companyId = company?.id ?? null;
-    if (input.companyScope && (!companyId || !input.companyScope.includes(companyId))) {
+    if (scope && (!companyId || !scope.includes(companyId))) {
       skip(index, item, 'out_of_scope');
       continue;
     }
@@ -307,7 +340,12 @@ export async function ingestActivities(
       const email = participant.email.trim().toLowerCase();
       const id = await contactByEmail(email, async () => {
         const contact = await prisma.contact.findFirst({
-          where: { orgId, email, deletedAt: null },
+          where: {
+            orgId,
+            email,
+            deletedAt: null,
+            ...(scope ? { companyId: { in: scope } } : {}),
+          },
           select: { id: true },
         });
         return contact?.id ?? null;
@@ -327,13 +365,23 @@ export async function ingestActivities(
       opportunityId: opportunity?.id ?? null,
     });
     const ref = { index, externalSource: item.externalSource, externalId: item.externalId };
+    for (const link of pendingLinks) {
+      await learnLink(orgId, source, link.entityType, link.externalId, link.entityId);
+    }
 
     const existing = await prisma.activity.findFirst({
       where: { orgId, idempotencyKey },
       select: { id: true, metadata: true },
     });
     if (existing) {
-      const previous = (existing.metadata as Record<string, unknown> | null)?.ingestHash;
+      const stored = (existing.metadata as Record<string, unknown> | null) ?? {};
+      // A scoped key may only replay rows that already sit on an allowed account.
+      const storedCompany = typeof stored.companyId === 'string' ? stored.companyId : null;
+      if (scope && (!storedCompany || !scope.includes(storedCompany))) {
+        skip(index, item, 'out_of_scope');
+        continue;
+      }
+      const previous = stored.ingestHash;
       if (previous === hash) {
         skip(index, item, 'unchanged');
         continue;
@@ -342,7 +390,7 @@ export async function ingestActivities(
         prisma.activityAttendee.deleteMany({ where: { orgId, activityId: existing.id } }),
         prisma.activity.update({
           where: { id: existing.id },
-          data: { ...data, attendees: { create: attendees } },
+          data: { ...updatableData(data), attendees: { create: attendees } },
         }),
       ]);
       out.updated.push({ ...ref, activityId: existing.id });

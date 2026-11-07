@@ -96,7 +96,10 @@ export function hubspotRunFromJobs(
   const failedRows = jobs.reduce((n, j) => n + j.errorRows, 0);
 
   let state: SyncRun['state'];
-  if (jobs.some((j) => j.status === 'FAILED' || j.status === 'CANCELLED')) state = 'failed';
+  const pending = jobs.some((j) => j.status === 'PENDING' || j.status === 'RUNNING');
+  // A failed entity only fails the run once the other entities have settled.
+  if (!pending && jobs.some((j) => j.status === 'FAILED' || j.status === 'CANCELLED'))
+    state = 'failed';
   else if (jobs.length > 0 && jobs.every((j) => j.status === 'COMPLETE')) state = 'completed';
   else if (jobs.some((j) => j.startedAt || j.status === 'RUNNING')) state = 'running';
   else state = 'queued';

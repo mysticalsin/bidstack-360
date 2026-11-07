@@ -3,7 +3,7 @@ import type { SyncOverview, SyncRun } from '@bidstack/shared';
 
 import { enqueueDustSyncRun, getDustPollJob } from '../../queues/dust-poll.js';
 import { dustRunFromJob, syncRunId } from './runs.js';
-import { SyncNotFoundError, type StartSyncInput } from './errors.js';
+import { SyncNotFoundError, SyncUnavailableError, type StartSyncInput } from './errors.js';
 
 async function snapshot(runId: string, orgId: string): Promise<SyncRun | null> {
   const job = await getDustPollJob(runId);
@@ -22,7 +22,11 @@ async function snapshot(runId: string, orgId: string): Promise<SyncRun | null> {
 
 export async function startDustSync(input: StartSyncInput): Promise<SyncRun> {
   const runId = syncRunId(input.orgId, 'dust', input.idempotencyKey);
-  await enqueueDustSyncRun(input.orgId, runId);
+  try {
+    await enqueueDustSyncRun(input.orgId, runId);
+  } catch (err) {
+    throw new SyncUnavailableError(err instanceof Error ? err.message : 'Sync queue unavailable');
+  }
   await prisma.auditLog.create({
     data: {
       orgId: input.orgId,

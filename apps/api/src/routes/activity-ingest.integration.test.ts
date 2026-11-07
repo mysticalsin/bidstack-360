@@ -266,6 +266,32 @@ describe('POST /api/v1/ingest/activities', () => {
     expect(body.overdue.count).toBeGreaterThanOrEqual(1);
   });
 
+  it('a scoped key cannot attach an activity to another account through its opportunity', async () => {
+    const res = await post(scopedKey, [
+      call('m-1', { company: { id: otherCompanyId }, opportunity: { id: opportunity.id } }),
+    ]);
+    expect(res.json().skipped).toEqual([
+      expect.objectContaining({ externalId: 'm-1', reason: 'company_mismatch' }),
+    ]);
+  });
+
+  it('a scoped key learns no links and cannot re-point a learned one', async () => {
+    await post(scopedKey, [
+      call('m-2', { company: { id: company.id, externalId: `steal-${run}` } }),
+      call('m-3', { company: { id: otherCompanyId, externalId: `acct-${run}` } }),
+    ]);
+    const links = await prisma.externalRecordLink.findMany({
+      where: { orgId, source: 'crm-test', externalId: { in: [`steal-${run}`, `acct-${run}`] } },
+      select: { externalId: true, entityId: true },
+    });
+    expect(links).toEqual([{ externalId: `acct-${run}`, entityId: company.id }]);
+  });
+
+  it('a scoped key cannot tell a missing record from one outside its scope', async () => {
+    const res = await post(scopedKey, [call('m-4', { company: { domain: 'nobody.example.org' } })]);
+    expect(res.json().skipped[0].reason).toBe('out_of_scope');
+  });
+
   it('publishes both routes in the OpenAPI spec under Activities', () => {
     const spec = (
       server as unknown as {

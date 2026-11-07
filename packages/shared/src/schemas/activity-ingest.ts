@@ -95,6 +95,7 @@ export const IngestSkipReason = z.enum([
   'company_not_found',
   'opportunity_not_found',
   'out_of_scope',
+  'company_mismatch',
   'duplicate_in_batch',
   'unchanged',
 ]);

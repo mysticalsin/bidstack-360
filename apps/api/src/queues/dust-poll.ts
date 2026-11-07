@@ -78,12 +78,25 @@ export async function enqueueDustResync(job: DustPollJob): Promise<string | null
  * as the idempotency key. Throws when Redis is unreachable so the caller can
  * report the failure instead of handing back an unpollable run.
  */
+const SYNC_ENQUEUE_TIMEOUT_MS = 5_000;
+
 export async function enqueueDustSyncRun(orgId: string, runId: string): Promise<string> {
-  const queued = await getQueue().add(
-    'dust.poll',
-    { source: 'manual', orgId } satisfies DustPollJob,
-    { jobId: runId, removeOnComplete: { age: 86_400, count: 500 }, removeOnFail: { age: 86_400 } },
-  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // The queue connection queues commands while Redis is down, so `add` would
+  // wait forever; bound it so the caller can answer instead of hanging.
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Sync queue unavailable')), SYNC_ENQUEUE_TIMEOUT_MS);
+  });
+  const queued = await Promise.race([
+    getQueue().add('dust.poll', { source: 'manual', orgId } satisfies DustPollJob, {
+      jobId: runId,
+      // Age only: a count cap is shared with every org's scheduled polls and
+      // could drop a run while its control is still polling.
+      removeOnComplete: { age: 86_400 },
+      removeOnFail: { age: 86_400 },
+    }),
+    timeout,
+  ]).finally(() => clearTimeout(timer));
   log.info({ jobId: queued.id, orgId }, 'Dust sync-now job enqueued');
   return queued.id ?? runId;
 }

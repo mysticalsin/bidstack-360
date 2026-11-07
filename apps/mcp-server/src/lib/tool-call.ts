@@ -34,7 +34,11 @@ export function assertToolGrant(ctx: McpAuthCtx, scope: ToolGrantScope): void {
  */
 export function fenceUntrusted(text: string | null | undefined): string | null {
   if (text === null || text === undefined) return null;
-  const safe = text.split(UNTRUSTED_CLOSE).join('</untrusted-record-text\u200b>');
+  // Any casing or spacing of the close tag (e.g. `</ UNTRUSTED-record-text >`).
+  const safe = text.replace(
+    /<\s*\/\s*untrusted-record-text\s*>/gi,
+    '</untrusted-record-text\u200b>',
+  );
   return `${UNTRUSTED_OPEN}${safe}${UNTRUSTED_CLOSE}`;
 }
 

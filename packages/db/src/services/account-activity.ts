@@ -21,16 +21,28 @@ const MAX_LINKED_IDS = 2_000;
 type TypeCounts = Record<IngestActivityType, number>;
 const zeroCounts = (): TypeCounts => ({ call: 0, email: 0, meeting: 0, note: 0, stage_change: 0 });
 
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+function formatterFor(tz: string): Intl.DateTimeFormat {
+  let f = formatters.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+      weekday: 'short',
+    });
+    // Bounded: IANA has a few hundred zones.
+    if (formatters.size < 600) formatters.set(tz, f);
+  }
+  return f;
+}
+
 function localParts(date: Date, tz: string) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    hourCycle: 'h23',
-    weekday: 'short',
-  }).formatToParts(date);
+  const parts = formatterFor(tz).formatToParts(date);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return {
