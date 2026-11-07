@@ -18,6 +18,12 @@ export const EmailRecipient = z.object({
 });
 export type EmailRecipient = z.infer<typeof EmailRecipient>;
 
+/** Addresses as captured from a provider: may be empty or an Exchange internal address. */
+const CapturedRecipient = z.object({
+  email: z.string(),
+  name: z.string().optional(),
+});
+
 export const SendEmailRequest = z.object({
   to: z.array(EmailRecipient).min(1).max(50),
   cc: z.array(EmailRecipient).max(20).optional().default([]),
@@ -43,9 +49,9 @@ export const EmailMessageDto = z.object({
   provider: z.enum(['GMAIL', 'OUTLOOK']),
   externalMessageId: z.string(),
   threadId: z.string().nullable(),
-  fromEmail: z.string().email(),
-  toEmails: z.array(EmailRecipient),
-  ccEmails: z.array(EmailRecipient),
+  fromEmail: z.string(),
+  toEmails: z.array(CapturedRecipient),
+  ccEmails: z.array(CapturedRecipient),
   subject: z.string(),
   bodyText: z.string().nullable(),
   isOutbound: z.boolean(),

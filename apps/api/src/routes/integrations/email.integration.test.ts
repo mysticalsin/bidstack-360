@@ -120,6 +120,18 @@ describe('GET /email/messages', () => {
     expect(body.total).toBe(2);
   });
 
+  it('lists captured mail with a missing sender or an Exchange internal address', async () => {
+    const msg = await seedMessage({ subject: 'internal' });
+    await prisma.emailMessage.update({
+      where: { id: msg.id },
+      data: { fromEmail: '', toEmails: [{ email: '/O=EXCHANGELABS/OU=EXCHANGE/CN=RECIPIENTS/CN=TONY' }] },
+    });
+    const list = await server.inject({ method: 'GET', url: '/api/v1/email/messages' });
+    expect(list.statusCode).toBe(200);
+    const thread = await server.inject({ method: 'GET', url: '/api/v1/email/threads/thread-1' });
+    expect(thread.statusCode).toBe(200);
+  });
+
   it('rejects out-of-range pagination', async () => {
     for (const qs of ['limit=101', 'limit=0', 'page=0']) {
       const res = await server.inject({ method: 'GET', url: `/api/v1/email/messages?${qs}` });
