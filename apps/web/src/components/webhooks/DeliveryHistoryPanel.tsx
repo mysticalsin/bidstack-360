@@ -94,7 +94,7 @@ function DeliveryRow({ delivery }: { delivery: WebhookDeliveryRecord }) {
         <td className="px-3 py-2">
           <span
             className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
               delivery.success
                 ? 'bg-[var(--success-surface)] text-[var(--success-fg)]'
                 : 'bg-[var(--error-surface)] text-[var(--error-fg)]',
@@ -132,7 +132,7 @@ function DeliveryRow({ delivery }: { delivery: WebhookDeliveryRecord }) {
       {showError && delivery.errorMessage ? (
         <tr>
           <td colSpan={5} className="px-3 pb-2 pt-0">
-            <pre className="overflow-x-auto rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-[10px] text-[var(--error-fg)]">
+            <pre className="overflow-x-auto rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-xs text-[var(--error-fg)]">
               {delivery.errorMessage}
             </pre>
           </td>

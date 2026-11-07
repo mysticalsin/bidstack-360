@@ -43,6 +43,12 @@ export interface FinancialsScanDeps {
   now?: Date;
   sleep?: (ms: number) => Promise<void>;
   orgId?: string;
+  /**
+   * Slice 12: pull one account now, on request from the account page. Skips
+   * the schedule sync and the tier gate (the gate only governs automatic
+   * pulls); still needs a CIK or LEI and a filer name match.
+   */
+  companyId?: string;
   log?: { info(o: object, m?: string): void; warn(o: object, m?: string): void };
 }
 
@@ -50,7 +56,19 @@ export interface FinancialsScanSummary {
   scheduled: number;
   paused: number;
   due: number;
-  pulled: Array<{ companyId: string; name: string; status: string; source: string | null; periods: number; signals: number }>;
+  pulled: Array<{
+    companyId: string;
+    name: string;
+    status: string;
+    source: string | null;
+    periods: number;
+    signals: number;
+    /** Narrative text of the latest report and where it lives (ESEF), for stated priorities. */
+    textBlocks?: Array<{ concept: string; text: string }>;
+    textUrl?: string | null;
+    secCik?: string | null;
+    lastError?: string | null;
+  }>;
 }
 
 const ELIGIBLE_WHERE: Prisma.CompanyWhereInput = {
@@ -102,9 +120,18 @@ export async function runFinancialsScan(deps: FinancialsScanDeps = {}): Promise<
   const secPace = pacer(150, sleep); // under the SEC 10 req/s cap
   const xbrlPace = pacer(1_000, sleep);
 
-  const { scheduled, paused } = await syncFinancialsSchedule(db, now, deps.orgId);
+  const scoped = deps.companyId ?? null;
+  if (scoped) {
+    const c = await db.company.findFirst({ where: { id: scoped, deletedAt: null, ...(deps.orgId ? { orgId: deps.orgId } : {}) }, select: { id: true, orgId: true } });
+    if (!c) return { scheduled: 0, paused: 0, due: 0, pulled: [] };
+    const has = await db.accountFinancialProfile.findFirst({ where: { companyId: c.id }, select: { companyId: true } });
+    if (!has) await db.accountFinancialProfile.create({ data: { orgId: c.orgId, companyId: c.id, status: 'pending', nextPullAt: null } });
+  }
+  const { scheduled, paused } = scoped ? { scheduled: 0, paused: 0 } : await syncFinancialsSchedule(db, now, deps.orgId);
   const due = await db.accountFinancialProfile.findMany({
-    where: { ...(deps.orgId ? { orgId: deps.orgId } : {}), nextPullAt: { lte: now }, company: ELIGIBLE_WHERE },
+    where: scoped
+      ? { companyId: scoped, ...(deps.orgId ? { orgId: deps.orgId } : {}) }
+      : { ...(deps.orgId ? { orgId: deps.orgId } : {}), nextPullAt: { lte: now }, company: ELIGIBLE_WHERE },
     orderBy: [{ lastPulledAt: { sort: 'asc', nulls: 'first' } }],
     select: { orgId: true, companyId: true, company: { select: { name: true, tier: true, topAccountRank: true, trackFinancials: true } } },
     take: max,
@@ -112,13 +139,14 @@ export async function runFinancialsScan(deps: FinancialsScanDeps = {}): Promise<
   const summary: FinancialsScanSummary = { scheduled, paused, due: due.length, pulled: [] };
 
   for (const d of due) {
-    // Defence in depth: never pull a General account that is not opted in.
-    if (!financialsEligible(d.company)) continue;
+    // Defence in depth: never pull a General account that is not opted in,
+    // unless someone asked for this account explicitly.
+    if (!scoped && !financialsEligible(d.company)) continue;
     const subject = await db.accountWatchSubject.findFirst({ where: { orgId: d.orgId, companyId: d.companyId }, select: { secCik: true, lei: true } });
     const tries: Array<() => Promise<PulledEntity>> = [];
     if (subject?.lei) tries.push(() => pullEsef(subject.lei!, { fetchImpl, userAgent: ua || 'PoloFinancials/1.0', pace: xbrlPace }));
     if (subject?.secCik) tries.push(() => pullEdgar(subject.secCik!, { fetchImpl, userAgent: ua, pace: secPace }));
-    const row = { companyId: d.companyId, name: d.company.name, status: 'no_identifier', source: null as string | null, periods: 0, signals: 0 };
+    const row: FinancialsScanSummary['pulled'][number] = { companyId: d.companyId, name: d.company.name, status: 'no_identifier', source: null, periods: 0, signals: 0, secCik: subject?.secCik ?? null };
     if (!tries.length) {
       await db.accountFinancialProfile.update({ where: { companyId: d.companyId }, data: { status: 'no_identifier', lastPulledAt: now, nextPullAt: new Date(now.getTime() + RECHECK_DAYS * DAY), lastError: null } });
       summary.pulled.push(row);
@@ -157,6 +185,7 @@ export async function runFinancialsScan(deps: FinancialsScanDeps = {}): Promise<
     }
     row.status = status;
     row.source = used?.source ?? null;
+    row.lastError = lastError;
     if (status !== 'ok' || !used) {
       await db.accountFinancialProfile.update({
         where: { companyId: d.companyId },
@@ -214,6 +243,10 @@ export async function runFinancialsScan(deps: FinancialsScanDeps = {}): Promise<
     });
     row.periods = withUrl.length;
     row.signals = signals.length;
+    if (scoped) {
+      row.textBlocks = used.textBlocks;
+      row.textUrl = used.textUrl;
+    }
     summary.pulled.push(row);
   }
   return summary;
