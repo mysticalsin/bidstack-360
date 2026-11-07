@@ -6,7 +6,7 @@ import { prisma } from '@bidstack/db';
 import { GrantRevokedError, getWorkspaceAccessToken } from './workspace-token.js';
 
 vi.mock('@bidstack/db', () => ({
-  prisma: { integrationToken: { update: vi.fn() } },
+  prisma: { integrationToken: { update: vi.fn(), updateMany: vi.fn(async () => ({ count: 1 })) } },
 }));
 
 vi.mock('@bidstack/shared/token-crypto', () => ({
@@ -15,6 +15,7 @@ vi.mock('@bidstack/shared/token-crypto', () => ({
 }));
 
 const update = vi.mocked(prisma.integrationToken.update);
+const updateMany = vi.mocked(prisma.integrationToken.updateMany);
 const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as pino.Logger;
 
 function row(provider: 'gmail' | 'microsoft_graph' | 'google_workspace', expired = true) {
@@ -61,9 +62,10 @@ describe('getWorkspaceAccessToken', () => {
     const body = new URLSearchParams(String(init.body));
     expect(body.get('scope')).toContain('Calendars.Read');
     expect(body.get('scope')).not.toContain('Mail.Send');
-    expect(update).toHaveBeenCalledWith(
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'tok-1' },
+        where: { id: 'tok-1', deletedAt: null },
         data: expect.objectContaining({
           accessTokenEncrypted: 'enc(new-access)',
           refreshTokenEncrypted: 'enc(new-refresh)',
@@ -77,6 +79,12 @@ describe('getWorkspaceAccessToken', () => {
     const fetchImpl = vi.fn(async () => json({ access_token: 'g-access', expires_in: 3600 }));
     await getWorkspaceAccessToken(row('gmail'), log, fetchImpl);
     expect((fetchImpl.mock.calls[0] as unknown as [string])[0]).toBe('https://oauth2.googleapis.com/token');
+  });
+
+  it('does not revive a grant disconnected while the refresh was in flight', async () => {
+    updateMany.mockResolvedValueOnce({ count: 0 });
+    const fetchImpl = vi.fn(async () => json({ access_token: 'late-access', expires_in: 3600 }));
+    await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(GrantRevokedError);
   });
 
   it('marks the grant revoked when the provider answers invalid_grant', async () => {

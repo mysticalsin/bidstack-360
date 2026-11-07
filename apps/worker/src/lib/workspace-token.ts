@@ -15,6 +15,7 @@ import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import { WORKSPACE_READ_SCOPES } from '@bidstack/shared';
 
 const EXPIRY_SKEW_MS = 60_000;
+const REFRESH_TIMEOUT_MS = 15_000;
 
 export const REVOKED_MESSAGE = 'Access was revoked at the provider. Reconnect to resume sync.';
 
@@ -94,6 +95,7 @@ export async function getWorkspaceAccessToken(
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
+    signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -115,8 +117,9 @@ export async function getWorkspaceAccessToken(
   }
 
   const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
-  await prisma.integrationToken.update({
-    where: { id: row.id },
+  // A disconnect can land while the refresh is in flight; never write fresh tokens onto the tombstone.
+  const stored = await prisma.integrationToken.updateMany({
+    where: { id: row.id, deletedAt: null },
     data: {
       accessTokenEncrypted: encryptToken(data.access_token),
       ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
@@ -126,5 +129,6 @@ export async function getWorkspaceAccessToken(
       errorMessage: null,
     },
   });
+  if (stored.count === 0) throw new GrantRevokedError('Grant was disconnected during refresh');
   return data.access_token;
 }
