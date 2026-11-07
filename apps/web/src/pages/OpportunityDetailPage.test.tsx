@@ -2,7 +2,7 @@
 // stage/value/probability/due date), and the Mark Won/Lost stage-change
 // buttons all 403 server-side without opportunities:write. Before this fix
 // they rendered enabled for every role and only failed after the click.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OpportunityDetailPage } from './OpportunityDetailPage';
 import { useOpportunity } from '@/hooks/useOpportunities';
 import type { OpportunityFull } from '@/hooks/useOpportunities';
+import { ApiError } from '@/lib/api';
 
 vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunity: vi.fn(),
@@ -201,5 +202,47 @@ describe('OpportunityDetailPage — hero header layout', () => {
     const actions = titleBlock!.nextElementSibling as HTMLElement | null;
     expect(actions).toBeTruthy();
     expect(actions!.className).toContain('min-w-0');
+  });
+});
+
+describe('OpportunityDetailPage load states', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('shows "not found" with a link back to the list when the API answers 404', () => {
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new ApiError('Opportunity not found', 404, ''),
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.getByText('Opportunity not found')).toBeTruthy();
+    expect(screen.queryByText("Couldn't load this opportunity")).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /Back to opportunities/i }).getAttribute('href'),
+    ).toBe('/opportunities');
+  });
+
+  it('offers a retry for any other load failure', () => {
+    const refetch = vi.fn();
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new ApiError('Server error', 500, ''),
+      refetch,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.getByText("Couldn't load this opportunity")).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+    expect(refetch).toHaveBeenCalled();
   });
 });

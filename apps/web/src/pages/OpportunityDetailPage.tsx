@@ -9,7 +9,7 @@ import { DueDateChip } from '@/components/ui/DueDateChip';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import {
@@ -73,7 +73,7 @@ export function OpportunityDetailPage() {
     { value: 'closed_lost', label: t('opportunityDetail.stageClosedLost', 'Closed lost') },
   ];
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading, isError, error } = useOpportunity(id);
+  const { data, isLoading, isError, error, refetch } = useOpportunity(id);
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
   // Delete/patch/stage-move all 403 server-side without opportunities:write
@@ -142,14 +142,21 @@ export function OpportunityDetailPage() {
   );
 
   if (isLoading) return <DetailPageSkeleton tabs columns={2} cards={3} />;
-  if (isError)
+  // A 404 (deleted, foreign or out of access scope) is "not found", not a failure.
+  const notFound = isError ? error instanceof ApiError && error.status === 404 : !data;
+  if (isError && !notFound)
     return (
       <ErrorState
         title={t('opportunityDetail.errorTitle', "Couldn't load this opportunity")}
-        message={error?.message ?? '—'}
+        message={error?.message}
+        action={
+          <Button variant="secondary" onClick={() => void refetch()}>
+            {t('opportunityDetail.retry', 'Retry')}
+          </Button>
+        }
       />
     );
-  if (!data) {
+  if (notFound || !data) {
     return (
       <EmptyState
         title={t('opportunityDetail.notFoundTitle', 'Opportunity not found')}
@@ -158,9 +165,12 @@ export function OpportunityDetailPage() {
           'The opportunity may have been deleted or you may not have access to it.',
         )}
         action={
-          <Button variant="secondary" onClick={() => window.history.back()}>
-            {t('opportunityDetail.goBack', 'Go back')}
-          </Button>
+          <Link
+            to="/opportunities"
+            className="inline-flex min-h-[44px] items-center rounded-lg border border-[var(--border-default)] px-4 text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]"
+          >
+            {t('opportunityDetail.backToList', 'Back to opportunities')}
+          </Link>
         }
       />
     );
