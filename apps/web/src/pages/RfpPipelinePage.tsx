@@ -111,6 +111,7 @@ export function RfpPipelinePage() {
           <>
             <Link
               to={`/opportunities/${opportunityId}`}
+              title={opportunityId}
               className="max-w-[160px] truncate hover:text-[var(--fg-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
               {opportunityId}

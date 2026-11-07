@@ -38,6 +38,16 @@ function withoutRowToggle(run: () => void) {
   };
 }
 
+/** Fixed-width columns cut long values; the title keeps the full text reachable. */
+function truncatedCell(value: string | null | undefined) {
+  if (!value) return null;
+  return (
+    <span className="block truncate" title={value}>
+      {value}
+    </span>
+  );
+}
+
 function contactLine(reference: Reference): string | null {
   return [reference.contactName, reference.contactEmail].filter(Boolean).join(' · ') || null;
 }
@@ -132,7 +142,7 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       sortable: true,
       width: 'w-32',
       hideBelow: 'md',
-      cell: (row) => row.company?.name ?? null,
+      cell: (row) => truncatedCell(row.company?.name),
     },
     {
       id: 'industry',
@@ -140,7 +150,7 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       sortable: true,
       width: 'w-28',
       hideBelow: 'lg',
-      cell: (row) => row.industry,
+      cell: (row) => truncatedCell(row.industry),
     },
     {
       id: 'usageCount',
