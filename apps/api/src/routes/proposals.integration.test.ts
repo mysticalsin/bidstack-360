@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { prisma } from '@bidstack/db';
 import { buildServer } from '../server.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -78,5 +80,95 @@ describe('proposal routes', () => {
     const body = res.json();
     expect(Array.isArray(body.items)).toBe(true);
     expect(typeof body.total).toBe('number');
+  });
+
+  it('POST /api/v1/proposals/:id/draft never drafts into a soft-deleted section', async () => {
+    const create = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      payload: { name: 'Deleted Section Proposal' },
+    });
+    const proposal = create.json<{ id: string; sections: Array<{ id: string; key: string }> }>();
+    const pricing = proposal.sections.find((s) => s.key === 'pricing')!;
+    await prisma.proposalSection.updateMany({
+      where: { id: pricing.id },
+      data: { deletedAt: new Date() },
+    });
+
+    const draft = await server.inject({
+      method: 'POST',
+      url: `/api/v1/proposals/${proposal.id}/draft`,
+      payload: { sectionKey: 'pricing' },
+    });
+    expect(draft.statusCode).toBe(404);
+    const row = await prisma.proposalSection.findFirstOrThrow({
+      where: { id: pricing.id, deletedAt: { not: null } },
+    });
+    expect(row.aiDrafted).toBe(false);
+  });
+
+  it('GET /api/v1/proposals rejects out-of-range pagination', async () => {
+    for (const qs of ['limit=0', 'limit=101', 'offset=-1']) {
+      const res = await server.inject({ method: 'GET', url: `/api/v1/proposals?${qs}` });
+      expect(res.statusCode, qs).toBe(400);
+    }
+  });
+
+  it('POST /api/v1/proposals is 400 on an empty name', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      payload: { name: '' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /api/v1/proposals is 403 for a read-only role', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      headers: { 'x-bidstack-e2e-role': 'read-only' },
+      payload: { name: 'Read only proposal' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('GET/PATCH/DELETE on another org proposal are 404', async () => {
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_prop_foreign_${randomUUID()}`, name: 'Foreign Proposal Tenant' },
+    });
+    try {
+      const foreign = await prisma.proposal.create({
+        data: { orgId: org.id, name: 'Foreign proposal' },
+      });
+      const get = await server.inject({ method: 'GET', url: `/api/v1/proposals/${foreign.id}` });
+      expect(get.statusCode).toBe(404);
+      const patch = await server.inject({
+        method: 'PATCH',
+        url: `/api/v1/proposals/${foreign.id}`,
+        payload: { name: 'hijack' },
+      });
+      expect(patch.statusCode).toBe(404);
+      const del = await server.inject({ method: 'DELETE', url: `/api/v1/proposals/${foreign.id}` });
+      expect(del.statusCode).toBe(404);
+      const row = await prisma.proposal.findUniqueOrThrow({ where: { id: foreign.id } });
+      expect(row.name).toBe('Foreign proposal');
+      expect(row.deletedAt).toBeNull();
+    } finally {
+      await prisma.org.deleteMany({ where: { id: org.id } });
+    }
+  });
+
+  it('DELETE /api/v1/proposals/:id is idempotent: a retry is 404, not 500', async () => {
+    const create = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      payload: { name: 'Delete twice' },
+    });
+    const { id } = create.json<{ id: string }>();
+    const first = await server.inject({ method: 'DELETE', url: `/api/v1/proposals/${id}` });
+    expect(first.statusCode).toBe(204);
+    const retry = await server.inject({ method: 'DELETE', url: `/api/v1/proposals/${id}` });
+    expect(retry.statusCode).toBe(404);
   });
 });
