@@ -45,7 +45,7 @@ vi.mock('@bidstack/db', () => ({
   },
 }));
 
-const { sweepTenantExports, PENDING_GRACE_MS, RUNNING_SLA_MS } = await import(
+const { makeRedrive, sweepTenantExports, PENDING_GRACE_MS, RUNNING_SLA_MS } = await import(
   './tenant-export-sweeper.js'
 );
 const log = pino({ level: 'silent' });
@@ -70,7 +70,7 @@ beforeEach(() => {
 describe('sweepTenantExports', () => {
   it('re-enqueues pending rows past the grace period and leaves fresh ones alone', async () => {
     store.rows = [row('old', 'pending', PENDING_GRACE_MS + 1_000), row('fresh', 'pending', 1_000)];
-    const enqueue = vi.fn(async () => undefined);
+    const enqueue = vi.fn(async () => true);
     const result = await sweepTenantExports(enqueue, log, now);
     expect(enqueue).toHaveBeenCalledTimes(1);
     expect(enqueue).toHaveBeenCalledWith({ exportId: 'old', orgId: 'org-1' });
@@ -92,7 +92,7 @@ describe('sweepTenantExports', () => {
     const deleted = row('gone', 'pending', PENDING_GRACE_MS * 3);
     deleted.deletedAt = ago(1_000);
     store.rows = [row('done', 'ready', RUNNING_SLA_MS * 3, RUNNING_SLA_MS * 3), deleted];
-    const enqueue = vi.fn(async () => undefined);
+    const enqueue = vi.fn(async () => true);
     const result = await sweepTenantExports(enqueue, log, now);
     expect(enqueue).not.toHaveBeenCalled();
     expect(result).toEqual({ requeued: 0, failed: 0 });
@@ -105,11 +105,46 @@ describe('sweepTenantExports', () => {
       row('b', 'pending', PENDING_GRACE_MS * 2),
     ];
     const enqueue = vi
-      .fn<(job: { exportId: string }) => Promise<unknown>>()
+      .fn<(job: { exportId: string }) => Promise<boolean>>()
       .mockRejectedValueOnce(new Error('ECONNREFUSED'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce(true);
     const result = await sweepTenantExports(enqueue, log, now);
     expect(enqueue).toHaveBeenCalledTimes(2);
     expect(result.requeued).toBe(1);
+  });
+});
+
+// jobId = exportId, and removeOnFail keeps failed jobs for 30 days, so a plain
+// add would be a silent no-op for exactly the rows that need a re-drive.
+describe('makeRedrive', () => {
+  function fakeQueue(state: string | null) {
+    const job = state
+      ? { getState: vi.fn(async () => state), retry: vi.fn(async () => undefined), remove: vi.fn(async () => undefined) }
+      : undefined;
+    const queue = { getJob: vi.fn(async () => job), add: vi.fn(async () => ({})) };
+    return { queue, job };
+  }
+  const data = { exportId: 'e1', orgId: 'org-1' };
+
+  it('adds a job when none exists', async () => {
+    const { queue } = fakeQueue(null);
+    await expect(makeRedrive(queue as never)(data)).resolves.toBe(true);
+    expect(queue.add).toHaveBeenCalledWith('tenant.export', data, { jobId: 'e1' });
+  });
+
+  it('retries a kept failed job instead of a no-op add', async () => {
+    const { queue, job } = fakeQueue('failed');
+    await expect(makeRedrive(queue as never)(data)).resolves.toBe(true);
+    expect(job!.retry).toHaveBeenCalled();
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('leaves a waiting or active job alone and does not count it', async () => {
+    for (const state of ['waiting', 'active', 'delayed']) {
+      const { queue, job } = fakeQueue(state);
+      await expect(makeRedrive(queue as never)(data)).resolves.toBe(false);
+      expect(job!.retry).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    }
   });
 });

@@ -3,8 +3,7 @@
 //    was written. The row would wait forever.
 //  - `running` with no live worker: the worker died mid-export and BullMQ's
 //    stall handling exhausted the job without running our catch block.
-// The sweeper re-enqueues the first kind (jobId = exportId, so a job that
-// still exists makes the add a no-op) and fails the second kind past an SLA.
+// The sweeper re-drives the first kind and fails the second kind past an SLA.
 
 import type { Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
@@ -28,8 +27,37 @@ export interface SweepResult {
   failed: number;
 }
 
+/**
+ * Re-drive one export. Returns true when a job was created or retried.
+ * jobId = exportId, so a plain add is a no-op while a kept job has that id:
+ * a failed job (kept 30 days by removeOnFail) must be retried instead, and a
+ * waiting or active job is left alone.
+ */
+export type RedriveExport = (job: { exportId: string; orgId: string }) => Promise<boolean>;
+
+export function makeRedrive(queue: Pick<Queue, 'add' | 'getJob'>): RedriveExport {
+  return async (data) => {
+    const existing = await queue.getJob(data.exportId);
+    if (!existing) {
+      await queue.add('tenant.export', data, { jobId: data.exportId });
+      return true;
+    }
+    const state = await existing.getState();
+    if (state === 'failed') {
+      await existing.retry('failed');
+      return true;
+    }
+    if (state === 'completed') {
+      await existing.remove();
+      await queue.add('tenant.export', data, { jobId: data.exportId });
+      return true;
+    }
+    return false;
+  };
+}
+
 export async function sweepTenantExports(
-  enqueue: (job: { exportId: string; orgId: string }) => Promise<unknown>,
+  redrive: RedriveExport,
   log: pino.Logger,
   now: Date = new Date(),
 ): Promise<SweepResult> {
@@ -59,8 +87,7 @@ export async function sweepTenantExports(
   let requeued = 0;
   for (const row of pending) {
     try {
-      await enqueue({ exportId: row.id, orgId: row.orgId });
-      requeued += 1;
+      if (await redrive({ exportId: row.id, orgId: row.orgId })) requeued += 1;
     } catch (err) {
       log.warn({ exportId: row.id, err }, 'tenant-export sweeper: re-enqueue failed');
     }
@@ -96,11 +123,7 @@ export async function startTenantExportSweeper(
   const sweepLog = log.child({ kind: 'tenant-export-sweeper' });
   const worker = new BullWorker(
     SWEEPER_QUEUE,
-    async () =>
-      sweepTenantExports(
-        (job) => exportQueue.add('tenant.export', job, { jobId: job.exportId }),
-        sweepLog,
-      ),
+    async () => sweepTenantExports(makeRedrive(exportQueue), sweepLog),
     { connection },
   );
   worker.on('failed', (job, err) =>
