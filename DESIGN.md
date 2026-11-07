@@ -598,14 +598,16 @@ names or copy into Polo.
 - No em dashes in new copy; no banned AI words (vault `Preferences/dont.md`).
 - **Never cut or reword the pinned consent and safety copy below.** Slice agents must add a test that
   pins these strings (keys in `public/locales/en/*.json` and the inline defaults) before cutting any
-  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept):
+  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept).
+  The three signature lines were realigned to `main` after #304: the page and the PDF say this is an
+  internal approval signature, not a legally binding e-signature.
 
 ```text
 # Signatures (PublicSignPage, signatures.json)
-Your signature is legally binding. This page contains no tracking technologies.
-I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.
+This is an internal approval signature, not a legally binding e-signature. This page contains no tracking technologies.
+I understand this is an internal approval signature, not a legally binding e-signature, and that it represents my intent to approve this document. I have had the opportunity to review its contents.
 {{senderName}} has been notified. A copy of the signed document will be sent to your email address.
-I agree that this electronic signature is legally equivalent to my handwritten signature.
+I understand this electronic signature is an internal approval signature, not a legally binding e-signature.
 
 # SMS (SmsComposerModal)
 This number has requested to stop receiving SMS. Sending is blocked (TCPA compliance).

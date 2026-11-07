@@ -11,11 +11,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 export const PINNED_CONSENT_COPY: readonly string[] = [
-  // Signatures
-  'Your signature is legally binding. This page contains no tracking technologies.',
-  'I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.',
+  // Signatures. #304: internal approval, matching the signed PDF. Do not restore a claim that the signature is legally binding.
+  'This is an internal approval signature, not a legally binding e-signature. This page contains no tracking technologies.',
+  'I understand this is an internal approval signature, not a legally binding e-signature, and that it represents my intent to approve this document. I have had the opportunity to review its contents.',
   '{{senderName}} has been notified. A copy of the signed document will be sent to your email address.',
-  'I agree that this electronic signature is legally equivalent to my handwritten signature.',
+  'I understand this electronic signature is an internal approval signature, not a legally binding e-signature.',
   // SMS
   'This number has requested to stop receiving SMS. Sending is blocked (TCPA compliance).',
   'This message will be sent as {{count}} segments (billed per segment by Twilio).',
