@@ -136,6 +136,8 @@ test.beforeAll(async ({ playwright }) => {
   await api.dispose();
 });
 
+const FULL_AUDIT = process.env.E2E_AUDIT === '1';
+
 test.describe('admin click audit', () => {
   test.beforeEach(async ({ loginAs }) => {
     await loginAs('admin');
@@ -182,6 +184,7 @@ test.describe('admin click audit', () => {
 
   for (const path of STATIC_ROUTES) {
     test(`every control does something: ${path}`, async ({ page, context }) => {
+      test.skip(!FULL_AUDIT, 'set E2E_AUDIT=1 for the full click sweep');
       test.setTimeout(480_000);
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
       await open(page, path);
@@ -323,6 +326,7 @@ test.describe('admin layout audit', () => {
   for (const theme of THEMES) {
     for (const vp of VIEWPORTS) {
       test(`layout ${theme} ${vp.name}`, async ({ page }) => {
+        test.skip(!FULL_AUDIT, 'set E2E_AUDIT=1 for the layout sweep');
         test.setTimeout(600_000);
         await useTheme(page, theme);
         await page.setViewportSize({ width: vp.width, height: vp.height });
