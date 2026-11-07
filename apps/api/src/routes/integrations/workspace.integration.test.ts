@@ -239,8 +239,9 @@ describe('DELETE /integrations/workspace/:provider', () => {
     expect(revokeCall).toBeTruthy();
     expect(String((revokeCall![1] as RequestInit).body)).toContain('token=refresh-plain');
 
+    // The row is tombstoned; an explicit deletedAt filter bypasses the soft-delete scope.
     const row = await prisma.integrationToken.findFirst({
-      where: { orgId, provider: IntegrationProvider.gmail },
+      where: { orgId, provider: IntegrationProvider.gmail, deletedAt: { not: null } },
     });
     expect(row?.status).toBe('revoked');
     expect(row?.refreshTokenEncrypted).toBeNull();

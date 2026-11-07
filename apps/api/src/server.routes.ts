@@ -124,6 +124,7 @@ import { publicSignRoutes } from './routes/public-sign.js';
 import { gmailOAuthRoutes } from './routes/integrations/gmail.js';
 import { microsoftMailOAuthRoutes } from './routes/integrations/microsoft-mail.js';
 import { emailRoutes } from './routes/integrations/email.js';
+import { workspaceRoutes } from './routes/integrations/workspace.js';
 import { microsoftWebhookRoutes } from './routes/integrations/microsoft-webhook.js';
 import { slackOAuthRoutes } from './routes/integrations/slack.js';
 import { slackCommandsPlugin } from './routes/integrations/slack-commands.js';
@@ -303,6 +304,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // OAuth redirect_uri and the web client pointing at 404s.)
   await server.register(gmailOAuthRoutes, { prefix: '/api/v1' });
   await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1' });
+  await server.register(workspaceRoutes, { prefix: '/api/v1' });
   await server.register(slackOAuthRoutes, { prefix: '/api/v1' });
   await server.register(slackCommandsPlugin, { prefix: '/api/v1' });
   await server.register(emailRoutes, { prefix: '/api/v1' });
