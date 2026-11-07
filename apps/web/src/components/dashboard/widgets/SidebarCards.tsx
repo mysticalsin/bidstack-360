@@ -28,7 +28,7 @@ export function QuickActionsCard() {
   const { t } = useTranslation('crm');
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
+      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
         {t('sidebarCards.quickActionsHeading', 'Quick actions')}
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -61,7 +61,7 @@ export function QuickLinksCard() {
   const { t } = useTranslation('crm');
   return (
     <GlassCard padding="sm" hoverable={false}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
+      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)] px-1 pt-1 pb-2">
         {t('sidebarCards.quickLinksHeading', 'Quick links')}
       </div>
       <div className="grid grid-cols-2 gap-1">

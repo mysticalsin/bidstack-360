@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { activityText, auditText } from '@bidstack/db/agent-tools';
 
+import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
+
 export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/opportunities/:id/timeline',
@@ -38,9 +40,9 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
       const oppId = req.params.id;
       const limit = req.query.limit;
 
-      // Verify the opportunity exists and belongs to the org
+      // The deal must exist in the org and sit inside the caller's access scope.
       const opp = await prisma.opportunity.findFirst({
-        where: { id: oppId, orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, oppId),
         select: { id: true, customer: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');

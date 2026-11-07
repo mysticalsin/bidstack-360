@@ -55,7 +55,7 @@ export function PipelineCard({
 
   return (
     <GlassCard className="text-center" hoverable={false}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
         {t('pipeline.heading', 'Open pipeline')}
       </div>
       <div className="mt-2 text-3xl font-bold tabular-nums text-[var(--fg-primary)]">
