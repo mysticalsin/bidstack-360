@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
-import { deriveAccount, segmentMatches, techStackPillsFor } from './accountUtils';
+import { deriveAccount, segmentMatches, techStackPillsFor, topTechFor } from './accountUtils';
 
 const now = '2026-06-16T12:00:00.000Z';
 
@@ -97,5 +97,28 @@ describe('accountUtils', () => {
     expect(row.coverage.nextAction).toBe('Assign an industry to unlock sector routing.');
     expect(segmentMatches(row, 'needs_data')).toBe(true);
     expect(segmentMatches(row, 'watch')).toBe(true);
+  });
+});
+
+describe('topTechFor', () => {
+  it('returns the three most confident technologies across categories, one per name', () => {
+    const top = topTechFor(
+      company({
+        technicalStack: [
+          { label: 'Cloud', items: [{ name: 'AWS', source: 'open_data:dns', confidence: 0.7 }, { name: 'Azure', source: 'open_data:dns', confidence: 0.95 }] },
+          { label: 'CRM', items: [{ name: 'Salesforce', source: 'apollo_io', confidence: 0.82 }] },
+          { label: 'Data', items: [{ name: 'Snowflake', source: 'open_data:jobs', confidence: 0.6 }, { name: 'AWS', source: 'open_data:jobs', confidence: 0.99 }] },
+        ],
+      }),
+    );
+    expect(top).toEqual([
+      { name: 'AWS', category: 'Data' },
+      { name: 'Azure', category: 'Cloud' },
+      { name: 'Salesforce', category: 'CRM' },
+    ]);
+  });
+
+  it('is empty when the account has no stack', () => {
+    expect(topTechFor(company())).toEqual([]);
   });
 });
