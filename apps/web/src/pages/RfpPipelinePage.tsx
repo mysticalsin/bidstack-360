@@ -128,7 +128,6 @@ export function RfpPipelinePage() {
             {t('nav.rfpSection')}
           </p>
           <h1 className="page-title">{t('pipeline.title')}</h1>
-          <p className="page-sub">{t('pipeline.subtitle')}</p>
         </div>
         {/* A3 — same bid, same presence signal as the opportunity detail header. */}
         <PresenceAvatars entityType="opportunity" entityId={opportunityId} />

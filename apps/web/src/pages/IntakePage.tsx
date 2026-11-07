@@ -135,12 +135,6 @@ export function IntakePage() {
         <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
           {t('intake.title', 'Intake')}
         </h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {t(
-            'intake.subtitle',
-            'Receive documents, extract intelligence, review, and publish to account profiles.',
-          )}
-        </p>
       </motion.header>
 
       {/* Stepper */}

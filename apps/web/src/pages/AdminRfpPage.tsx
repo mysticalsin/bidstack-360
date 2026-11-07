@@ -22,12 +22,6 @@ export function AdminRfpPage() {
             {t('adminRfp.eyebrow', 'Admin')}
           </p>
           <h1 className="page-title">{t('adminRfp.title', 'RFP Analytics')}</h1>
-          <p className="page-sub">
-            {t(
-              'adminRfp.subtitle',
-              'Every RFP across the organisation, its value, and the per-owner breakdown.',
-            )}
-          </p>
         </div>
         <Link
           to="/proposals"
