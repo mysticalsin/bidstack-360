@@ -93,7 +93,17 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   async function loadTechnicalStackContext(orgId: string, userId: string, rawCompanyKey: string) {
     const scope = await getAccessScope(orgId, userId);
     const rawKey = normalizeName(rawCompanyKey);
-    const company = await resolveCockpitCompany(orgId, rawKey, prisma);
+    let company = await resolveCockpitCompany(orgId, rawKey, prisma);
+    if (!company) {
+      // A Company row with no enrichment and no deals only resolves by id.
+      // Two rows with the same name are ambiguous, so neither resolves.
+      const rows = await prisma.company.findMany({
+        where: { orgId, deletedAt: null, name: { equals: rawCompanyKey.trim(), mode: 'insensitive' } },
+        select: { id: true },
+        take: 2,
+      });
+      if (rows.length === 1) company = await resolveCockpitCompany(orgId, rows[0]!.id, prisma);
+    }
     if (!company) throw server.httpErrors.notFound('Company not found');
     const access = await canReadAccount({
       orgId,

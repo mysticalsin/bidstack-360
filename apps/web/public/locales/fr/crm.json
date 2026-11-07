@@ -222,7 +222,7 @@
       "status": "Statut",
       "priority": "Priorité",
       "score": "Score",
-      "scoreRange": "Score (0-10000)",
+      "scoreRange": "Score (0-100)",
       "source": "Source",
       "created": "Créé"
     },
@@ -394,7 +394,7 @@
       "undo": "Annuler"
     },
     "search": {
-      "placeholder": "Rechercher par nom, client, e-mail, rôle…",
+      "placeholder": "Rechercher par nom, client, rôle…",
       "aria": "Rechercher des contacts",
       "clear": {
         "aria": "Effacer la recherche"
@@ -482,7 +482,7 @@
       "button": "Synchroniser les comptes ERP",
       "errorTitle": "Échec de la synchronisation des comptes ERP",
       "errorDescription": "La dernière récupération des clients ERP n'a pas pu aboutir.",
-      "alertFallback": "La dernière synchronisation n'a pas pu récupérer les 20 principaux clients ERP.",
+      "alertFallback": "La dernière synchronisation n'a pas pu récupérer les principaux clients ERP.",
       "retry": "Relancer la synchronisation"
     },
     "actions": {
@@ -632,13 +632,11 @@
     "accountOwners": "Responsables de compte",
     "noActiveOwners": "Aucun responsable actif",
     "noCountrySelected": "Aucun pays sélectionné",
-    "noCountrySelectedHint": "Cliquez sur un territoire actif de la carte interactive ci-dessus pour charger les indicateurs.",
     "territories": "Territoires",
     "countTotal": "{{count}} au total",
     "failedToLoad": "Échec du chargement",
     "retry": "Réessayer",
     "noTerritories": "Aucun territoire",
-    "noTerritoriesHint": "Créez votre premier territoire pour commencer.",
     "active": "Actif",
     "inactive": "Inactif",
     "global": "Mondial",
@@ -649,7 +647,6 @@
     "delete": "Supprimer",
     "leadRoutingRules": "Règles de routage des leads",
     "noRoutingRules": "Aucune règle de routage",
-    "noRoutingRulesHint": "Créez votre première règle pour attribuer automatiquement les leads.",
     "assignUser": "Utilisateur",
     "assignTerritory": "Territoire",
     "assignRoundRobin": "Rotation ({{count}})",
@@ -1181,6 +1178,7 @@
     "cockpitDetailsAria": "Détails du cockpit"
   },
   "leadKanban": {
+    "convertFromLead": "Ouvrez le lead et utilisez Convertir",
     "moveSuccess": "Déplacé vers {{status}}",
     "moveError": "Impossible de déplacer le prospect",
     "boardAriaLabel": "Kanban du pipeline de prospects",
@@ -1256,7 +1254,6 @@
   },
   "territories": {
     "pageTitle": "Territoires",
-    "pageSubtitle": "Empreinte mondiale des opportunités, couverture des territoires et routage des prospects.",
     "totalsBadge": "{{opportunities}} opportunités dans {{countries}} pays",
     "newRuleButton": "Nouvelle règle",
     "newTerritoryButton": "Nouveau territoire",
@@ -1876,9 +1873,9 @@
       "label": "Sections de l'entreprise"
     },
     "tab": {
-      "contacts": "Contacts ({{count}})",
-      "opportunities": "Opportunités ({{count}})",
-      "cases": "Cas ({{count}})",
+      "contacts": "Contacts ({{shown}})",
+      "opportunities": "Opportunités ({{shown}})",
+      "cases": "Cas ({{shown}})",
       "notes": "Notes ({{count}})",
       "hierarchy": "Hiérarchie"
     }

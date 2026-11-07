@@ -44,6 +44,7 @@ model Org {
   syncEvents         SyncEvent[]
   apiKeys            ApiKey[]
   webhookSubs        WebhookSubscription[]
+  webhookOutbox      WebhookOutbox[]
   auditLogs          AuditLog[]
   notes              Note[]
   fileAttachments    FileAttachment[]
@@ -714,6 +715,10 @@ model Contact {
   @@index([orgId, createdAt(sort: Desc)], map: "contacts_org_created_idx")
   @@index([deletedAt])
   @@index([orgId, emailHash], map: "contacts_org_email_hash_idx")
+  // ?search= ILIKE '%term%' over these three columns.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_name_trgm_idx")
+  @@index([customer(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_customer_trgm_idx")
+  @@index([role(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_role_trgm_idx")
   @@map("contacts")
 }
 
@@ -1007,6 +1012,37 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
+enum WebhookOutboxStatus {
+  pending
+  dispatched
+  dead
+
+  @@map("webhook_outbox_status")
+}
+
+/// Durable outbox for outbound webhook events. A domain write records the
+/// event here (optionally in the same transaction); the worker relay fans it
+/// out to the webhook.delivery queue. (orgId, idempotencyKey) dedupes retries.
+model WebhookOutbox {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId          String              @map("org_id") @db.Uuid
+  event          String
+  payload        Json
+  idempotencyKey String              @map("idempotency_key") @db.VarChar(255)
+  status         WebhookOutboxStatus @default(pending)
+  attempts       Int                 @default(0)
+  nextAttemptAt  DateTime            @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  lastError      String?             @map("last_error")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  dispatchedAt   DateTime?           @map("dispatched_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, idempotencyKey], map: "webhook_outbox_org_idempotency_key")
+  @@index([status, nextAttemptAt], map: "webhook_outbox_due_idx")
+  @@map("webhook_outbox")
+}
+
 model AuditLog {
   id         BigInt    @id @default(autoincrement())
   orgId      String    @map("org_id") @db.Uuid
@@ -1017,10 +1053,16 @@ model AuditLog {
   diff       Json?
   at         DateTime  @default(now()) @db.Timestamptz(6)
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Hash chain, set by the audit_log_chain trigger on insert (never by the app).
+  /// Rows written before the chain migration stay NULL.
+  chainSeq   BigInt?   @map("chain_seq")
+  prevHash   String?   @map("prev_hash") @db.VarChar(64)
+  rowHash    String?   @map("row_hash") @db.VarChar(64)
 
   org  Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [userId], references: [id])
 
+  @@unique([orgId, chainSeq], map: "audit_log_org_chain_seq_key")
   @@index([orgId, at(sort: Desc)])
   @@index([orgId, targetType, targetId, at(sort: Desc)])
   // Scale: backs the id-keyset cursor list (routes/audit-logs.ts) — org +
@@ -2706,6 +2748,8 @@ model Lead {
   @@index([orgId, status, statusChangedAt])
   @@index([deletedAt])
   @@index([orgId, emailHash], map: "leads_org_email_hash_idx")
+  // Backs the GET /leads cursor sort (score DESC, createdAt DESC, id ASC).
+  @@index([orgId, score(sort: Desc), createdAt(sort: Desc), id], map: "leads_org_list_sort_idx")
   @@map("leads")
 }
 
