@@ -223,7 +223,7 @@ export function AnalyticsDashboardPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {dashError ? (
+        {dashError && dashboards.length === 0 ? (
           <ErrorState
             title={t('analyticsDashboard.loadDashboardsError', 'Could not load dashboards')}
             action={

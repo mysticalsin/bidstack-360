@@ -109,7 +109,7 @@ describe('BidNoBidPage — bid-scores:write gating', () => {
   });
 });
 
-describe('BidNoBidPage — switching opportunity', () => {
+describe('BidNoBidPage switching opportunity', () => {
   beforeEach(() => {
     capabilitiesMocks.useHasPermission.mockReturnValue(true);
     opportunitiesMocks.useOpportunities.mockReturnValue({
