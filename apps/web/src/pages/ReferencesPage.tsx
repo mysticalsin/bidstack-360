@@ -171,12 +171,6 @@ export function ReferencesPage() {
           <h1 className="text-2xl font-bold tracking-tight text-fg-primary">
             {t('references.heading', 'Reference Library')}
           </h1>
-          <p className="mt-1 text-sm text-fg-secondary">
-            {t(
-              'references.subtitle',
-              'Proof that wins bids — the right case study and testimonial for every proposal.',
-            )}
-          </p>
         </div>
         {canWrite && (
           <Button onClick={() => setShowCreate(true)}>

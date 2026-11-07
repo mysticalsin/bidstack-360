@@ -113,10 +113,6 @@ function CreateProposalSheet({
       <SheetContent
         size="md"
         title={t('proposals.createProposal', 'Create Proposal')}
-        description={t(
-          'proposals.createSubtitle',
-          'Name it now; everything else is editable on the proposal itself.',
-        )}
         footer={
           <>
             <Button variant="secondary" size="sm" onClick={onClose}>
