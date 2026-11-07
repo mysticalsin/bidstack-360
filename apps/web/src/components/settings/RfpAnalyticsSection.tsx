@@ -154,9 +154,6 @@ export function RfpAnalyticsSection() {
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('rfpAnalytics.byOwnerTitle', 'By owner')}
           </h3>
-          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-            {t('rfpAnalytics.byOwnerSubtitle', 'Who owns what, and the pipeline value behind it.')}
-          </p>
         </div>
         {q.isLoading ? (
           // Shimmer rows shaped like the per-owner table — shared bs-shimmer
