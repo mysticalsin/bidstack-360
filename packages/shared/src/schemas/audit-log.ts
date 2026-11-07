@@ -30,7 +30,12 @@ export const AuditLogFilter = z.object({
   // string. Restricting to digits stops garbage input from reaching the
   // BigInt(cursor) cast in the route handler — a non-numeric value would
   // raise SyntaxError and surface as an opaque 500.
-  cursor: z.string().regex(/^[1-9]\d*$/, 'cursor must be a positive integer string').optional(),
+  // Postgres int8 tops out at 9223372036854775807; a longer cursor overflows.
+  cursor: z
+    .string()
+    .regex(/^[1-9]\d{0,18}$/, 'cursor must be a positive integer string')
+    .refine((v) => !/^\d+$/.test(v) || BigInt(v) <= 9223372036854775807n, 'cursor is out of range')
+    .optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 export type AuditLogFilter = z.infer<typeof AuditLogFilter>;

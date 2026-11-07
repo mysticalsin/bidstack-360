@@ -2,11 +2,23 @@
 
 import type { AuditLogEntry } from '@bidstack/shared';
 
+import { toast } from '@/components/ui/Toast';
+
 import { actorLabel, classifyAudit, riskScore, safeStringify } from './audit-log-helpers';
 
-export function writeClipboard(value: string) {
+export async function writeClipboard(
+  value: string,
+  successMessage: string,
+  failureMessage = 'Copy failed',
+): Promise<void> {
   if (!value) return;
-  void navigator.clipboard?.writeText(value);
+  try {
+    if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(value);
+    toast.success(successMessage);
+  } catch {
+    toast.error(failureMessage);
+  }
 }
 
 export function exportCsv(rows: AuditLogEntry[]) {

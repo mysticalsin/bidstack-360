@@ -19,6 +19,7 @@ import {
   financialsEligible,
   financialsGate,
   tierLabel,
+  FINANCIAL_SOURCE_LABEL,
   type FinancialPeriod,
 } from '@bidstack/shared';
 
@@ -29,7 +30,7 @@ import { syncAccountFinancialsSchedule } from '../services/account-financials/sc
 /** Who may opt a General account in or out. */
 export const TRACK_FINANCIALS_ROLES = ['Admin', 'Account Executive'];
 
-const SOURCE_NAME: Record<string, string> = { sec_edgar: 'SEC EDGAR', esef: 'ESEF (filings.xbrl.org)' };
+const SOURCE_NAME: Record<string, string> = FINANCIAL_SOURCE_LABEL;
 
 async function canToggle(orgId: string, userId: string, role: string): Promise<boolean> {
   if (role === 'api') return false;

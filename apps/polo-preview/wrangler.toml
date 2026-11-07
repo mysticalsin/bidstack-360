@@ -1,23 +1,30 @@
-# polo-preview Worker. Deploy ONLY from the preview box with
-# `npx wrangler deploy` after a human review. CI must never upload this
-# script: a binding/secret/migration mismatch drops the box relay and the
-# Access-gated URL goes 502.
+# polo-preview Worker. Deploy ONLY after a human review, never from CI: a
+# binding/secret/migration mismatch drops the box relay and the URL goes 502.
+# Mirrors the live Worker (v27, 2026-11-03): entry index.js, UPSTREAM_ORIGIN
+# proxy to the Vercel demo, RELAY_KEY secret, Relay Durable Object.
 #
 # Existing production identity (do not recreate):
 #   account 294885a27b3cc0a1cbe5d0ccbe38de4f
 #   worker  polo-preview
 #   DO      RELAY / Relay / namespace 0d921e2b3ba74386afdb1147745866d0
 #   secret  RELAY_KEY (set once on the Worker; never committed)
+#
+# Polo sign-in with a one-time code (off until all three exist):
+#   secret  SESSION_SECRET  (wrangler secret put SESSION_SECRET)
+#   var     OTP_FROM        sender on a Cloudflare zone with Email Routing
+#   binding OTP_EMAIL       [[send_email]] below; recipients must be verified
+#                           Email Routing destination addresses
 
 name = "polo-preview"
-main = "src/worker.js"
+main = "src/index.js"
 compatibility_date = "2026-10-01"
 account_id = "294885a27b3cc0a1cbe5d0ccbe38de4f"
 workers_dev = true
 
 [vars]
 ACCESS_AUD = "826c47f72e2aa2bb7973d533363fcc2b536137578c33a3f1972afb90584e686c"
-ALLOWED_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com,marc.bisiou@amaris.com"
+ALLOWED_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com,marc.bisiou@amaris.com,acamaret@amaris.com"
+UPSTREAM_ORIGIN = "https://bidstack-demo.vercel.app"
 
 [[durable_objects.bindings]]
 name = "RELAY"
@@ -28,3 +35,6 @@ class_name = "Relay"
 [[migrations]]
 tag = "v1"
 new_classes = ["Relay"]
+
+# [[send_email]]
+# name = "OTP_EMAIL"

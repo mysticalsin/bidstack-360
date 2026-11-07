@@ -168,7 +168,8 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
         const job = await queue.add(
           `manual-retrain:${orgId}:${entityType}`,
           { orgId, entityType },
-          { jobId: `manual:${orgId}:${entityType}:${Date.now()}` },
+          // BullMQ rejects custom ids with ':' unless they have exactly three parts.
+          { jobId: `manual-retrain-${orgId}-${entityType}-${Date.now()}` },
         );
         reply.code(202);
         return { jobId: job.id ?? null, message: `Retrain queued for ${entityType}` };

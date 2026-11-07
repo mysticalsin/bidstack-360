@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
@@ -98,6 +98,90 @@ export function useAccountIntel() {
         method: 'POST',
         body: { accountId },
       }),
+  });
+}
+
+// Jarvis: mirrors apps/api/src/services/jarvis/jarvis.types.ts.
+
+export interface JarvisContextInput {
+  accountId?: string;
+  opportunityId?: string;
+  proposalId?: string;
+  rfpOpportunityId?: string;
+}
+
+export type JarvisStepStatus = 'running' | 'done' | 'error' | 'denied' | 'pending';
+
+export interface JarvisStep {
+  id: string;
+  tool: string;
+  kind: 'read' | 'write';
+  status: JarvisStepStatus;
+  summary: string;
+}
+
+export interface JarvisCitation {
+  kind: 'account' | 'opportunity' | 'proposal' | 'rfp' | 'task' | 'activity';
+  label: string;
+  href: string;
+  date?: string | null;
+}
+
+export interface JarvisPendingAction {
+  id: string;
+  tool: string;
+  title: string;
+  changes: Array<{ field: string; value: string }>;
+}
+
+export interface JarvisRun {
+  runId: string;
+  status: 'running' | 'done' | 'error';
+  mode: 'llm' | 'demo';
+  steps: JarvisStep[];
+  answer: { text: string; citations: JarvisCitation[]; missing: string[] } | null;
+  pendingActions: JarvisPendingAction[];
+}
+
+export interface JarvisDecisionInput {
+  actionId: string;
+  decision: 'confirm' | 'cancel';
+}
+
+export interface JarvisDecisionResult {
+  ok: boolean;
+  citation?: JarvisCitation | null;
+}
+
+export function useStartJarvisRun() {
+  return useMutation({
+    mutationFn: (input: { message: string; context: JarvisContextInput }) =>
+      api<{ runId: string }>('/api/ai-assistant/jarvis/runs', { method: 'POST', body: input }),
+  });
+}
+
+/** Polls a run until it settles; steps appear as the server records them. */
+export function useJarvisRunStatus(runId: string | null) {
+  return useQuery({
+    queryKey: ['jarvis', 'run', runId],
+    queryFn: () => api<JarvisRun>(`/api/ai-assistant/jarvis/runs/${runId}`),
+    enabled: Boolean(runId),
+    refetchInterval: (query) => (query.state.data?.status === 'running' ? 700 : false),
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+}
+
+export function useJarvisActionDecision() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ actionId, decision }: JarvisDecisionInput) =>
+      api<JarvisDecisionResult>(`/api/ai-assistant/jarvis/actions/${actionId}/${decision}`, {
+        method: 'POST',
+      }),
+    onSuccess: (_data, vars) => {
+      if (vars.decision === 'confirm') void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
   });
 }
 
