@@ -145,8 +145,6 @@ export const OpportunityImportResult = z.object({
 });
 export type OpportunityImportResult = z.infer<typeof OpportunityImportResult>;
 
-// Filter is consumed from query strings — coerce numerics so callers can pass
-// `?limit=20` without manual casting.
 // Query-string flag: "false"/"0" must read as false. z.coerce.boolean() turns
 // every non-empty string, "false" included, into true.
 export const QueryFlag = z.preprocess(
@@ -154,6 +152,8 @@ export const QueryFlag = z.preprocess(
   z.boolean(),
 );
 
+// Filter is consumed from query strings — coerce numerics so callers can pass
+// `?limit=20` without manual casting.
 export const OpportunityFilter = z.object({
   pipelineStageId: z.string().uuid().optional(),
   stage: OpportunityStage.optional(),
