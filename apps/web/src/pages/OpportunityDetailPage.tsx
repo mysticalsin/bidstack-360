@@ -126,7 +126,10 @@ export function OpportunityDetailPage() {
             label: t('opportunityDetail.commandCreateTaskLabel', 'Create task for {{name}}', {
               name: data.name,
             }),
-            hint: t('opportunityDetail.commandCreateTaskHint', 'Add a to-do linked to this opportunity'),
+            hint: t(
+              'opportunityDetail.commandCreateTaskHint',
+              'Add a to-do linked to this opportunity',
+            ),
             onSelect: () => setTaskOpen(true),
           },
           {
@@ -134,7 +137,10 @@ export function OpportunityDetailPage() {
             label: t('opportunityDetail.commandBriefingLabel', 'Open AI briefing for {{name}}', {
               name: data.name,
             }),
-            hint: t('opportunityDetail.commandBriefingHint', 'Generate a Dust AI briefing document'),
+            hint: t(
+              'opportunityDetail.commandBriefingHint',
+              'Generate a Dust AI briefing document',
+            ),
             onSelect: () => setBriefOpen(true),
           },
         ]
@@ -270,11 +276,13 @@ export function OpportunityDetailPage() {
                       value={data.industry ?? ''}
                       onSave={(v) => patch.mutateAsync({ id: id!, patch: { industry: v || null } })}
                       label={t('opportunityDetail.editIndustryLabel', 'Edit industry')}
-                      display={(v) => v || '—'}
+                      display={(v) => (v ? formatStage(v) : '—')}
                       placeholder={t('opportunityDetail.industryPlaceholder', 'Industry')}
                     />
                   ) : (
-                    <span title={readOnlyHint}>{data.industry || '—'}</span>
+                    <span title={readOnlyHint}>
+                      {data.industry ? formatStage(data.industry) : '—'}
+                    </span>
                   )}
                 </span>
                 <span className="opacity-30">|</span>
@@ -293,7 +301,10 @@ export function OpportunityDetailPage() {
                     <span className="opacity-30">|</span>
                     <span
                       className="flex items-center gap-1.5"
-                      title={t('opportunityDetail.bidClassHint', 'Amaris bid class (FTE size × commitment)')}
+                      title={t(
+                        'opportunityDetail.bidClassHint',
+                        'Amaris bid class (FTE size × commitment)',
+                      )}
                     >
                       <Icon name="shield" size={14} className="text-[var(--fg-tertiary)]" />
                       <Badge tone={BID_CLASS_TONE[data.bidClass] ?? 'gray'}>{data.bidClass}</Badge>
@@ -321,9 +332,13 @@ export function OpportunityDetailPage() {
                 <ScheduleReviewDialog
                   entityType="OPPORTUNITY"
                   entityId={data.id}
-                  defaultTopic={t('opportunityDetail.reviewDefaultTopic', 'Go/No-Go review — {{name}}', {
-                    name: data.name,
-                  })}
+                  defaultTopic={t(
+                    'opportunityDetail.reviewDefaultTopic',
+                    'Go/No-Go review — {{name}}',
+                    {
+                      name: data.name,
+                    },
+                  )}
                   trigger={
                     <Button variant="ghost" size="sm" className="rounded-full">
                       <Icon name="clock" size={12} className="text-[var(--brand-primary)] mr-1" />
@@ -356,7 +371,10 @@ export function OpportunityDetailPage() {
               </div>
               <div
                 className="flex flex-wrap items-center gap-2"
-                aria-label={t('opportunityDetail.outcomeActionsLabel', 'Opportunity outcome actions')}
+                aria-label={t(
+                  'opportunityDetail.outcomeActionsLabel',
+                  'Opportunity outcome actions',
+                )}
               >
                 {isWon ? (
                   <Button variant="success" size="sm" disabled className="rounded-full">
@@ -416,7 +434,10 @@ export function OpportunityDetailPage() {
                   options={stageOptions}
                   label={t('opportunityDetail.changeStageLabel', 'Change stage')}
                   display={(v) => (
-                    <Badge tone={stageTone(v)} className="px-4 py-1 text-xs uppercase tracking-wider">
+                    <Badge
+                      tone={stageTone(v)}
+                      className="px-4 py-1 text-xs uppercase tracking-wider"
+                    >
                       {formatStage(v)}
                     </Badge>
                   )}

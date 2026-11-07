@@ -205,6 +205,28 @@ describe('OpportunityDetailPage — hero header layout', () => {
   });
 });
 
+describe('OpportunityDetailPage industry label', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it.each([true, false])('shows a stored industry code as words (canWrite=%s)', (canWrite) => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(canWrite);
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: { ...OPPORTUNITY, industry: 'financial_services' },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.getByText('Financial Services')).toBeTruthy();
+    expect(screen.queryByText('financial_services')).toBeNull();
+  });
+});
+
 describe('OpportunityDetailPage load states', () => {
   afterEach(() => {
     cleanup();
