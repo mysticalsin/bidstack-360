@@ -181,6 +181,8 @@ function statusCodeFrom(details: string | null | undefined): { code: number | nu
   return m ? { code: Number(m[1]), label: m[2]!.trim() } : { code: null, label: str(details) };
 }
 
+const TERMINAL_TENDER_STATUSES = new Set(['complete', 'cancelled', 'unsuccessful', 'withdrawn']);
+
 function tenderStatusStage(status: string | null | undefined): PsStage | null {
   switch (status) {
     case 'planning':
@@ -414,7 +416,14 @@ export const ocdsAdapter: PsAdapter<OcdsCursor> = {
     // releases. Until compiled-release merging lands, each endpoint is its own
     // stream so the two projections never share one idempotency key.
     const prov = raw.unit.kind === 'ocds.award' ? { ...base, sourceKey: OCDS_AWARD_SOURCE_KEY } : base;
-    const releases = [...pkg.releases].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+    // ChileCompra stamps revocation tenderUpdates with the original publication
+    // time, so a later Publicada release can sort after them. A terminal tender
+    // status never reverts, so terminal releases win before date order applies.
+    const terminal = (r: z.infer<typeof Release>) =>
+      TERMINAL_TENDER_STATUSES.has(r.tender?.status ?? '') ? 1 : 0;
+    const releases = [...pkg.releases].sort(
+      (a, b) => terminal(b) - terminal(a) || (b.date ?? '').localeCompare(a.date ?? ''),
+    );
     for (const release of releases) normalizeRelease(release, prov, ctx, col);
     return col.out;
   },

@@ -138,4 +138,16 @@ describe('purchase orders and the erroneous list (real oc-da 2025-7 head)', () =
     expect(flags.map((f) => f.targetExternalId).sort()).toEqual(direct.map((p) => p.externalId).sort());
     expect(n.purchaseOrders.every((p) => p.stage !== 'paid')).toBe(true);
   });
+
+  it('takes the supplier RUT from RutSucursal, the only supplier RUT column in oc-da', async () => {
+    const n = await loadOrdenesCompraCsv(chunked(fixtureBytes('oc-da-2025-7.head.csv')), {
+      ...CTX,
+      erroneous: erroneous(),
+    });
+    expect(n.suppliers.length).toBeGreaterThan(0);
+    const companies = n.suppliers.filter((s) => !s.isNaturalPerson);
+    expect(companies.length).toBeGreaterThan(0);
+    for (const s of companies) expect(s.externalId).toBe(`rut:${s.taxId}`);
+    expect(companies.map((s) => s.taxId)).toContain('85.825.700-K');
+  });
 });
