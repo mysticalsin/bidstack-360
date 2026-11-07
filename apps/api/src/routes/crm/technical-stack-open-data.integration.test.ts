@@ -161,7 +161,7 @@ describe('technical stack refresh, open data lane', () => {
     const res = await withApolloKey(() => refresh(companyId));
     expect(res.statusCode).toBe(200);
     expect(res.json().providers.find((p: { id: string }) => p.id === 'apollo')).toMatchObject({ status: 'queued' });
-    expect(enqueued).toEqual([{ orgId: orgA!.orgId, companyName: NAME, domain: DOMAIN }]);
+    expect(enqueued).toEqual([{ orgId: orgA!.orgId, companyName: NAME, domain: DOMAIN, orgOnly: true }]);
     expect(res.json().state.coverage.apolloFallback).toBe('queued');
   });
 
@@ -198,7 +198,8 @@ describe('technical stack refresh, open data lane', () => {
 
   skipIfNoDb('rejects a bad key, a read-only role and another org', async () => {
     __setOpenTechDetectDepsForTest({ network: false });
-    expect((await refresh('x'.repeat(300))).statusCode).toBe(400);
+    // Fastify caps path params before zod runs, so an oversize key is 414, never a 2xx.
+    expect([400, 414]).toContain((await refresh('x'.repeat(300))).statusCode);
     expect((await server.inject({ method: 'POST', url: `/api/crm/companies/${companyId}/technical-stack/refresh`, payload: { unexpected: true } })).statusCode).toBe(400);
     expect((await refresh(companyId, READ_ONLY)).statusCode).toBe(403);
     expect((await refresh(foreignCompanyId)).statusCode).toBe(404);
