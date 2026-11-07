@@ -99,8 +99,11 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
     for (const el of leaves) {
       const style = getComputedStyle(el);
       const size = parseFloat(style.fontSize);
-      // ui/Badge sets 11px; its size is a design token owned outside this section.
-      const sharedBadge = el.closest('span.rounded-full.text-\\[11px\\]') !== null;
+      // ui/Badge and CompanyLogo initials set 11px in shared components owned
+      // outside this section; reported there instead.
+      const sharedBadge =
+        el.closest('span.rounded-full.text-\\[11px\\]') !== null ||
+        el.closest('[role="img"][aria-label$=" logo"]') !== null;
       if (size < 12 && !sharedBadge && !el.closest('[data-audit-allow-small]')) {
         issues.push({ kind: 'tiny-text', detail: `${label(el)} is ${size}px` });
       }
@@ -168,7 +171,10 @@ export async function geometryIssues(page: Page): Promise<LayoutIssue[]> {
 /** axe color-contrast (WCAG AA) violations on the settled page. */
 export async function contrastIssues(page: Page): Promise<LayoutIssue[]> {
   const hasMain = (await page.locator('main').count()) > 0;
-  const builder = new AxeBuilder({ page }).withRules(['color-contrast']);
+  // WCAG 1.4.3 exempts logotypes; CompanyLogo initials stand in for one.
+  const builder = new AxeBuilder({ page })
+    .withRules(['color-contrast'])
+    .exclude('[role="img"][aria-label$=" logo"]');
   const result = await (hasMain ? builder.include('main') : builder).analyze();
   return result.violations.flatMap((v) =>
     v.nodes.map((n) => ({ kind: 'contrast' as const, detail: `${n.target.join(' ')}` })),
