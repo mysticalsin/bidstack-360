@@ -45,7 +45,12 @@ export const notificationsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/notifications',
     {
       schema: {
-        querystring: z.object({ unreadOnly: z.coerce.boolean().optional() }),
+        querystring: z.object({
+          unreadOnly: z
+            .enum(['true', 'false'])
+            .transform((v) => v === 'true')
+            .optional(),
+        }),
         response: { 200: NotificationPage },
       },
     },
