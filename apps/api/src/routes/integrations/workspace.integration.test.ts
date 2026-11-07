@@ -237,6 +237,20 @@ describe('POST /integrations/workspace/:provider/connect', () => {
 });
 
 describe('DELETE /integrations/workspace/:provider', () => {
+  it('also revokes a legacy Google calendar grant so calendar sync stops', async () => {
+    await seedToken(IntegrationProvider.gmail);
+    await seedToken(IntegrationProvider.google_workspace, { scope: ['https://www.googleapis.com/auth/calendar'] });
+    mockedFetch.mockResolvedValue(new Response('', { status: 200 }));
+    const res = await server.inject({ method: 'DELETE', url: '/api/v1/integrations/workspace/google' });
+    expect(res.statusCode).toBe(204);
+    const live = await prisma.integrationToken.count({
+      where: { orgId, provider: { in: [IntegrationProvider.gmail, IntegrationProvider.google_workspace] } },
+    });
+    expect(live).toBe(0);
+    const revokes = mockedFetch.mock.calls.filter(([u]) => String(u).startsWith('https://oauth2.googleapis.com/revoke'));
+    expect(revokes).toHaveLength(2);
+  });
+
   it('revokes the Google grant at the provider and wipes the stored secrets', async () => {
     await seedToken(IntegrationProvider.gmail);
     mockedFetch.mockResolvedValue(new Response('', { status: 200 }));

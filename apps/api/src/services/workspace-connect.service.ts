@@ -9,7 +9,7 @@
  * OAuth app keep working.
  */
 import { z } from 'zod';
-import { prisma, IntegrationProvider } from '@bidstack/db';
+import { prisma, IntegrationProvider, type Prisma } from '@bidstack/db';
 import {
   WORKSPACE_PROVIDERS,
   WORKSPACE_READ_SCOPES,
@@ -170,12 +170,24 @@ export async function disconnectWorkspace(
   userId: string,
   log: ServiceLogger,
 ): Promise<void> {
-  const row = await prisma.integrationToken.findFirst({
-    where: { orgId, userId, provider: WORKSPACE_ROW[provider] },
+  // Google also covers the legacy calendar-only row, which sync still reads.
+  const rows = await prisma.integrationToken.findMany({
+    where: {
+      orgId,
+      userId,
+      provider: { in: provider === 'google' ? [WORKSPACE_ROW.google, IntegrationProvider.google_workspace] : [WORKSPACE_ROW.microsoft] },
+    },
     include: { graphSubscriptions: { select: { subscriptionId: true } } },
+    take: 5,
   });
-  if (!row) return;
+  for (const row of rows) await disconnectRow(row, provider, log);
+}
 
+async function disconnectRow(
+  row: Prisma.IntegrationTokenGetPayload<{ include: { graphSubscriptions: { select: { subscriptionId: true } } } }>,
+  provider: WorkspaceProvider,
+  log: ServiceLogger,
+): Promise<void> {
   const access = row.status === 'active' ? safeDecrypt(row.accessTokenEncrypted) : null;
   const refresh = safeDecrypt(row.refreshTokenEncrypted);
   try {
