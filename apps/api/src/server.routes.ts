@@ -67,6 +67,7 @@ import { signingEntityRoutes } from './routes/signing-entities.js';
 import { meetingIntelRoutes } from './routes/meeting-intel.js';
 import { marsRoutes } from './routes/mars.js';
 import { accountEnrichmentRoutes } from './routes/account-enrichment.js';
+import { companyIntelRoutes } from './routes/company-intel.js';
 import orgChartRoutes from './routes/org-chart.js';
 import orgChartFileRoutes from './routes/org-chart-files.js';
 import { accountWatchdogRoutes } from './routes/account-watchdog.js';
@@ -116,6 +117,7 @@ import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
 // Wave 4 — AI assistant
 import { aiAssistantRoutes } from './routes/ai-assistant.js';
+import { jarvisRoutes } from './routes/jarvis.js';
 import { documentTemplatesRoutes } from './routes/document-templates.js';
 import { signaturesRoutes } from './routes/signatures.js';
 import { publicSignRoutes } from './routes/public-sign.js';
@@ -194,6 +196,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(orgChartFileRoutes, { prefix: '/api/v1' });
   await server.register(accountWatchdogRoutes, { prefix: '/api/v1' });
   await server.register(accountFinancialsRoutes, { prefix: '/api/v1' });
+  await server.register(companyIntelRoutes, { prefix: '/api/v1' });
   await server.register(accountSignalsRoutes, { prefix: '/api/v1' });
   await server.register(winLossRoutes, { prefix: '/api/v1' });
   await server.register(governanceRoutes, { prefix: '/api/v1' });
@@ -291,6 +294,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 4 — AI Assistant
   await server.register(aiAssistantRoutes, { prefix: '/api/v1' });
+  await server.register(jarvisRoutes, { prefix: '/api/v1' });
   await server.register(documentTemplatesRoutes, { prefix: '/api/v1' });
   await server.register(signaturesRoutes, { prefix: '/api/v1' });
   await server.register(publicSignRoutes, { prefix: '/api/v1' });

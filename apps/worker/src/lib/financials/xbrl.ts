@@ -63,6 +63,21 @@ export const CONCEPTS: Record<FinancialMetric, string[]> = {
     'us-gaap:AssetImpairmentCharges',
     'us-gaap:ImpairmentOfIntangibleAssetsExcludingGoodwill',
   ],
+  intangibles: [
+    'ifrs-full:PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities',
+    'ifrs-full:PurchaseOfIntangibleAssets',
+    'us-gaap:PaymentsToAcquireIntangibleAssets',
+    'us-gaap:PaymentsToDevelopSoftware',
+    'us-gaap:PaymentsForSoftware',
+  ],
+  debtIssued: [
+    'ifrs-full:ProceedsFromNoncurrentBorrowings',
+    'ifrs-full:ProceedsFromBorrowingsClassifiedAsFinancingActivities',
+    'ifrs-full:ProceedsFromIssueOfBondsNotesAndDebentures',
+    'us-gaap:ProceedsFromIssuanceOfLongTermDebt',
+    'us-gaap:ProceedsFromIssuanceOfSeniorLongTermDebt',
+    'us-gaap:ProceedsFromIssuanceOfDebt',
+  ],
 };
 
 /** Balance-sheet (point in time) metrics; the rest are flows over the period. */

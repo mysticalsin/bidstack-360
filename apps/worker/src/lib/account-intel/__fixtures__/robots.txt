@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /private/
+Disallow: /careers/internal
+
+User-agent: BadBot
+Disallow: /
+
+Sitemap: https://www.acme.example/news-sitemap.xml

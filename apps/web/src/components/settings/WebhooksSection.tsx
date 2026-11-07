@@ -52,7 +52,7 @@ export function WebhooksSection() {
       <Card className="overflow-hidden">
         <div className="grid gap-5 p-5 xl:grid-cols-[1.35fr,0.65fr]">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-primary-tint)] px-3 py-1 text-xs font-medium text-[var(--brand-primary)]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-primary-tint)] px-3 py-1 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
               <Icon name="webhook" size={14} ariaHidden />
               {t('webhooks.controlPlaneBadge', 'Admin webhook control plane')}
             </div>
@@ -258,7 +258,7 @@ function AdminOnlyNotice() {
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
           <Icon name="shield" size={20} />
         </div>
         <div>
@@ -295,7 +295,7 @@ function MetricCard({
         <span className="min-w-0 text-xs font-medium leading-4 text-[var(--fg-secondary)]">
           {label}
         </span>
-        <span className="text-[var(--brand-primary)]">
+        <span className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
           <Icon name={icon} size={15} />
         </span>
       </div>
@@ -327,7 +327,7 @@ function ReadinessCard({
   return (
     <Card className="p-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-sunken)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
           <Icon name={icon} size={16} />
         </div>
         <div>
@@ -349,7 +349,7 @@ function SigningSecretCard({ secret, url }: { secret: string; url: string }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Icon name="shield" size={16} className="text-[var(--brand-primary)]" />
+            <Icon name="shield" size={16} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
               {t('webhooks.signingSecretTitle', 'Copy the signing secret now')}
             </h3>
@@ -500,7 +500,7 @@ function SubscriptionRow({
 
           <div className="mt-3 flex flex-wrap gap-1.5">
             {subscription.events.map((event) => (
-              <Badge key={event} tone="gray" className="font-mono text-[10px]">
+              <Badge key={event} tone="gray" className="font-mono text-xs">
                 {event}
               </Badge>
             ))}
