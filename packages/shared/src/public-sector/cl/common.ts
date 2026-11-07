@@ -73,11 +73,12 @@ const THOUSANDS_RE = /^-?\d{1,3}(?:\.\d{3})+$/;
  */
 export function amountMicros(v: unknown): bigint | null {
   let s: string | null;
-  if (typeof v === 'number') s = Number.isFinite(v) ? String(v) : null;
+  const numeric = typeof v === 'number';
+  if (numeric) s = Number.isFinite(v) ? String(v) : null;
   else s = str(v);
   if (s === null) return null;
   s = s.replace(/\s/g, '');
-  if (THOUSANDS_RE.test(s)) s = s.replace(/\./g, '');
+  if (!numeric && THOUSANDS_RE.test(s)) s = s.replace(/\./g, '');
   else if (s.includes(',')) {
     if (s.includes('.') || s.indexOf(',') !== s.lastIndexOf(',')) return null;
     s = s.replace(',', '.');

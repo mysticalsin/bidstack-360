@@ -266,3 +266,33 @@ describe('fail-closed guards', () => {
     await expect(fetchBulkUnit(unit!, { fetch, now: () => quiet })).resolves.toMatchObject({ httpStatus: 200 });
   });
 });
+
+describe('PR #308 review: OCDS identifiers and numeric amounts', () => {
+  it('redacts a dashless natural-person RUT in an OCDS identifier and its party', () => {
+    const party = {
+      id: 'CL-MP-1',
+      name: SYNTHETIC_PERSON_NAME,
+      identifier: { id: '123456785', legalName: SYNTHETIC_PERSON_NAME, scheme: 'CL-RUT' },
+      address: { streetAddress: 'CALLE SINTETICA 1' },
+    };
+    const out = JSON.stringify(redactPersonalRaw({ parties: [party], note: SYNTHETIC_PERSON_NAME }, TEST_TAX_ID_HASHER));
+    expect(out).not.toContain('123456785');
+    expect(out).not.toContain(SYNTHETIC_PERSON_NAME);
+    expect(out).not.toContain('CALLE SINTETICA 1');
+    expect(out).toContain('rut-hash:');
+  });
+
+  it('keeps a dashless company RUT and leaves bare numbers outside CL-RUT identifiers alone', () => {
+    const raw = {
+      parties: [{ name: 'I MUNICIPALIDAD', identifier: { id: '690506009', scheme: 'CL-RUT' } }],
+      items: [{ id: '123456785', classification: { id: '80111701', scheme: 'UNSPSC' } }],
+    };
+    expect(redactPersonalRaw(raw, TEST_TAX_ID_HASHER)).toEqual(raw);
+  });
+
+  it('numeric amounts keep their decimal point', () => {
+    expect(amountMicros(1.234)).toBe(1_234_000n);
+    expect(amountMicros(1234.5)).toBe(1_234_500_000n);
+    expect(amountMicros('1.234')).toBe(1_234_000_000n);
+  });
+});
