@@ -181,7 +181,10 @@ export default function CrossSellPage() {
               ? dateOnly(summary.nextDue.dueDate)
               : t('crossSell.noDatedAction', 'No dated action')}
           </p>
-          <p className="mt-1 truncate text-xs text-[var(--fg-tertiary)]">
+          <p
+            className="mt-1 truncate text-xs text-[var(--fg-tertiary)]"
+            title={summary.nextDue?.description ?? undefined}
+          >
             {summary.nextDue?.description ?? t('crossSell.allClear', 'No dated active action')}
           </p>
         </Card>

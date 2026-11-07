@@ -66,11 +66,11 @@ const NEGATIVE_OUTCOMES = new Set<string>(['no_go', 'no_bid', 'rejected']);
 
 // Severity tone per class — a legitimate status encoding (simple→strategic).
 const CLASS_TONE: Record<BidClass, string> = {
-  C0: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
-  C1: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30',
-  C2: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
-  C3: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
-  C4: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
+  C0: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  C1: 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30',
+  C2: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
+  C3: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30',
+  C4: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30',
 };
 
 const MISSION_TONE: Record<BidMission, string> = {
@@ -310,7 +310,7 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
             className={`flex flex-col items-center justify-center rounded-lg border p-4 ${CLASS_TONE[bidClass]}`}
           >
             <span className="text-3xl font-bold leading-none">{bidClass}</span>
-            <span className="mt-1 text-[11px] font-medium uppercase tracking-wider opacity-80">
+            <span className="mt-1 text-xs font-medium uppercase tracking-wider">
               {sizeBand} · {governance.estDurationDays[0]}–{governance.estDurationDays[1]}d
             </span>
           </div>
