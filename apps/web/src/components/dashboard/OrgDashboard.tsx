@@ -162,15 +162,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
     ] satisfies OrgKpi[];
   }, [closedLost, closedWon, pipelineStages, s, t]);
 
-  // Compute the greeting once per render instead of calling new Date() three
-  // times inline in the JSX below.
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return t('orgDashboard.greetingMorning', 'Good morning');
-    if (hour < 18) return t('orgDashboard.greetingAfternoon', 'Good afternoon');
-    return t('orgDashboard.greetingEvening', 'Good evening');
-  }, [t]);
-
   // A brand-new org has no records at all. Sum the core entity counts: when
   // every one is zero, the command center would just read "0 · 0 · 0", so we
   // show a getting-started branch that points at the first real moves instead.
@@ -217,7 +208,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
         transition={springSoft}
       >
         <div>
-          <div className="text-xs font-medium text-[var(--brand-primary)] mb-1">{greeting}</div>
           <div className="flex items-center gap-3">
             <PoloPreSalesLogo variant="mark" className="h-8 w-8 shrink-0" />
             <h1 className="page-title">{t('orgDashboard.pageTitle', 'Dashboard')}</h1>

@@ -675,3 +675,23 @@ Delete all demonstration data? This action cannot be undone.
 - Live regions: delivery replay and policy publish results announce via `aria-live="polite"`.
 - Reduced motion honoured everywhere (9.2). Hit targets at least 24 x 24 px.
 - Lighthouse a11y stays at 100 on `/login` and `/dashboard` (baseline in `docs/factory/RECON.md`).
+
+### 9.7 Slice 1 as built (2026-11-06)
+
+Appended by factory slice 1. Values only; no existing token changed.
+
+- Surfaces: `--surface-shell` and `--surface-inset` in both theme blocks, bridged as
+  `bg-surface-shell` and `bg-surface-inset`.
+- Status aliases: `--color-positive(-tint)` and `--color-negative(-tint)` in `@theme` point at
+  `--success(-tint)` and `--danger(-tint)`; `warning` already existed. They exist so vendored chart
+  fills keep one meaning across themes. New code still writes `success` and `danger`.
+- Motion: `--ease-ui-out`, `--ease-ui-in-out`, `--ease-drawer` in `@theme` (utilities `ease-ui-out`
+  and so on), mirrored in `apps/web/src/lib/motion-tokens.ts` with `enter` (210ms), `exit` (150ms),
+  `spring`, `instant` and `motionFor(reduced, transition)`. A contract test keeps CSS and TS equal.
+- Components: `components/vendor/tuffui/status-pill.tsx` (`StatusPill` with filled lucide glyphs,
+  `Tag`) and `surface.tsx` (`Shell`, `Panel`, `Inset`, `IconTile`, `ShellHeader`), plus `LICENSE`.
+- Lint ratchet: `no-foreign-token-vocabulary` now also bans bare `text-foreground`, `bg-foreground`,
+  `text-background`, `bg-background`, `fill-foreground`, `stroke-foreground`. The last live
+  leftovers (funnel-chart, sankey-node, chart-stat-flow) now use `fg-*` tokens.
+- Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
+  that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.

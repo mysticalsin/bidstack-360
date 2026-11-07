@@ -27,6 +27,7 @@ const CUT: Record<string, string[]> = {
     "'crossSell.queueNeedsOwnerHint'",
     "'crossSell.queueReadyHint'",
     "'crossSell.queueInMotionHint'",
+    "'crossSell.commandQueueBody'",
   ],
   'src/pages/ForecastsPage.tsx': ["'forecasts.subtitle'"],
   'src/pages/BidNoBidPage.tsx': ["'bidNoBid.subtitle'"],

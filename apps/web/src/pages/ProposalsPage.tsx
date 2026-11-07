@@ -313,10 +313,6 @@ function ProposalsHead({ onCreate, canWrite }: { onCreate: () => void; canWrite:
   return (
     <PageHeader
       title={t('proposals.title', 'Proposals')}
-      description={t(
-        'proposals.subtitle',
-        'RFP workspace — draft, review, and submit winning proposals.',
-      )}
       actions={
         canWrite ? (
           <Button variant="primary" size="sm" onClick={onCreate}>

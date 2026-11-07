@@ -71,12 +71,6 @@ export default function SectorViewPage() {
       >
         <div>
           <h1 className="page-title gradient-text">{t('sectorView.title', 'Sector view')}</h1>
-          <div className="page-sub">
-            {t(
-              'sectorView.subtitle',
-              'Industry presence, country depth, and account-level coverage from ABC.',
-            )}
-          </div>
         </div>
         <div className="page-actions">
           <Link to="/accounts" className="btn btn-secondary">
