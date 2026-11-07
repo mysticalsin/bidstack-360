@@ -37,12 +37,12 @@ const CUT: Record<string, string[]> = {
     "'orgDashboard.greetingAfternoon'",
     "'orgDashboard.greetingEvening'",
   ],
+  'src/pages/ContactsPage.tsx': ["'contacts.subtitle'"],
 };
 
 const KEPT: Record<string, string[]> = {
   'src/pages/BidNoBidPage.tsx': ["'bidNoBid.criteriaRated'"],
   'src/components/dashboard/OrgDashboard.tsx': ["'orgDashboard.pageSubtitle'"],
-  'src/pages/ContactsPage.tsx': ["'contacts.subtitle'"],
   'src/pages/TasksPage.tsx': ["'tasks.subtitle'"],
 };
 
