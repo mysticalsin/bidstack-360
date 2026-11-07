@@ -10,8 +10,14 @@ vi.mock('@/hooks/useFiles', () => ({
   useFiles: () => ({ data: { items: [] }, isLoading: false, isError: false }),
 }));
 
+const intel = vi.hoisted(() => ({
+  data: undefined as
+    | { extractions: { documentId: string; status: string; error: string | null }[] }
+    | undefined,
+}));
+
 vi.mock('@/hooks/useAccountIntel', () => ({
-  useAccountIntel: () => ({ data: undefined }),
+  useAccountIntel: () => ({ data: intel.data }),
   useExtractDocument: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -35,7 +41,33 @@ function step(name: string) {
 }
 
 describe('IntakePage stepper', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    intel.data = undefined;
+  });
+
+  it('resumes review from persisted extractions after a reload', () => {
+    intel.data = { extractions: [{ documentId: 'doc-1', status: 'done', error: null }] };
+    render(
+      <MemoryRouter initialEntries={['/intake?account=acc-1']}>
+        <IntakePage />
+      </MemoryRouter>,
+    );
+    expect((step('Review') as HTMLButtonElement).disabled).toBe(false);
+    expect((step('Publish') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(step('Review'));
+    expect(screen.getByText('Review body')).toBeTruthy();
+  });
+
+  it('keeps review locked when the account has no finished extraction', () => {
+    intel.data = { extractions: [{ documentId: 'doc-1', status: 'error', error: 'boom' }] };
+    render(
+      <MemoryRouter initialEntries={['/intake?account=acc-1']}>
+        <IntakePage />
+      </MemoryRouter>,
+    );
+    expect((step('Review') as HTMLButtonElement).disabled).toBe(true);
+  });
 
   it('marks the current step and does not let you skip ahead', () => {
     render(
