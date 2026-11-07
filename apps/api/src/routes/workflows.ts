@@ -20,7 +20,10 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          active: z.coerce.boolean().optional(),
+          active: z
+            .enum(['true', 'false'])
+            .transform((v) => v === 'true')
+            .optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
         }),
         response: {
@@ -310,6 +313,11 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      const wf = await prisma.workflow.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!wf) throw server.httpErrors.notFound('Workflow not found');
       const rows = await prisma.workflowRun.findMany({
         where: { workflowId: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         orderBy: { startedAt: 'desc' },

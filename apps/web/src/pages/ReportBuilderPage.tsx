@@ -411,7 +411,7 @@ function SortEditor({
         <button
           type="button"
           onClick={() => onChange([...sort, { field: '', dir: 'desc' }])}
-          className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] hover:underline"
+          className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
         >
           {t('reportBuilder.sort.add', '+ Add sort')}
         </button>

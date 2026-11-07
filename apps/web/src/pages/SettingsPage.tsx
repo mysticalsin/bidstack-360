@@ -24,8 +24,9 @@ import { OpportunityFiltersSection } from '@/components/settings/OpportunityFilt
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
 import { SigningEntitiesSection } from '@/components/settings/SigningEntitiesSection';
-import { useHasPermission } from '@/hooks/useCapabilities';
-import { useIsAdmin } from '@/lib/auth';
+import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
+import { useOrgAdminStatus } from '@/lib/auth';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
 // The English default is passed to t() so the UI never shows a raw key.
@@ -89,16 +90,21 @@ function resolveSettingsTab(
 export function SettingsPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
-  const isAdmin = useIsAdmin();
+  const { isAdmin, isLoading: adminLoading } = useOrgAdminStatus();
+  const capabilitiesLoading = useCapabilities().isLoading;
   const canReadAudit = useHasPermission('audit-log:read');
   const requestedTab = searchParams.get('tab');
+  // Until the capability manifest arrives every gated tab resolves to
+  // overview, so a deep link must not be rewritten (or rendered) yet.
+  const accessPending = adminLoading || capabilitiesLoading;
   const activeTab = resolveSettingsTab(requestedTab, isAdmin, canReadAudit);
 
   useEffect(() => {
+    if (accessPending) return;
     if (requestedTab && requestedTab !== activeTab) {
       setSearchParams({ tab: activeTab }, { replace: true });
     }
-  }, [activeTab, requestedTab, setSearchParams]);
+  }, [accessPending, activeTab, requestedTab, setSearchParams]);
 
   const setActive = (tab: SettingsSection) => {
     setSearchParams({ tab });
@@ -162,7 +168,11 @@ export function SettingsPage() {
             {t(`settings.${SECTION_TITLES[activeTab][0]}`, SECTION_TITLES[activeTab][1])}
           </h2>
         </div>
-        {sections[activeTab]}
+        {accessPending && requestedTab && requestedTab !== activeTab ? (
+          <LoadingSkeleton rows={4} />
+        ) : (
+          sections[activeTab]
+        )}
       </SettingsLayout>
     </div>
   );

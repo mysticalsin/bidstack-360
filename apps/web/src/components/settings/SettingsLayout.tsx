@@ -185,7 +185,7 @@ export function SettingsLayout({ active, children }: Props) {
           <nav className="sticky top-0 px-3 py-4">
             {GROUPS.map((group) => (
               <div key={group.label} className="mb-5">
-                <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                <span className="px-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                   {groupLabel(group.label)}
                 </span>
                 <ul className="mt-1 space-y-0.5">
