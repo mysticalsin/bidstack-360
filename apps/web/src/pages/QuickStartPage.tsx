@@ -156,7 +156,7 @@ export function QuickStartPage() {
         <button
           type="button"
           onClick={startTour}
-          className="mb-8 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--brand)] px-4 py-3 text-sm font-medium text-[var(--brand)] transition-colors hover:bg-[var(--brand)]/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+          className="mb-8 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--brand)] dark:border-[var(--brand-deep)] px-4 py-3 text-sm font-medium text-[var(--brand)] dark:text-[var(--brand-deep)] transition-colors hover:bg-[var(--brand)]/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
         >
           <Icon name="play" size={16} />
           {t('quickStart.tourButton', 'Take the 2-minute product tour')}

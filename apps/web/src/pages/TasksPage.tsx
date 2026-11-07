@@ -438,7 +438,7 @@ function Chip({
         active
           ? tone === 'danger'
             ? 'border-[var(--danger)] bg-[var(--danger-tint)] text-[var(--danger)]'
-            : 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+            : 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
           : 'border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--fg-secondary)] hover:border-[var(--border-strong)]'
       }`}
     >

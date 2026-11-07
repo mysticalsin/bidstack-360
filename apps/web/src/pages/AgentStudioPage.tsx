@@ -88,7 +88,7 @@ export function AgentStudioPage() {
     <div className="space-y-6">
       <header className="page-head">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)]">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
             {t('agentStudio.eyebrow', 'Bids & RFP')}
           </p>
           <h1 className="page-title">{t('agentStudio.title', 'Agent Studio')}</h1>
@@ -602,7 +602,7 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
                 className={`text-xs font-semibold ${
                   run.data.status === 'partial'
                     ? 'text-[var(--tag-amber-fg)]'
-                    : 'text-[var(--brand-primary)]'
+                    : 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                 }`}
               >
                 {run.data.status === 'partial'

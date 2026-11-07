@@ -113,7 +113,7 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
                 <div
                   className={cn(
                     'mb-1 text-right text-xs font-medium',
-                    cell.isToday ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-secondary)]',
+                    cell.isToday ? 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]' : 'text-[var(--fg-secondary)]',
                   )}
                 >
                   {cell.day}
