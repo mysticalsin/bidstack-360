@@ -194,3 +194,7 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
+
+// Account intelligence read model (slice 12), shared by the API, MCP and worker.
+export { loadCompanyIntel } from './company-intel-read.js';
+export type { CompanyIntelSnapshot } from './company-intel-read.js';
