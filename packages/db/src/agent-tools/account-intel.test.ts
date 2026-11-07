@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CompanyIntelSnapshot } from '@bidstack/db';
+import type { CompanyIntelSnapshot } from '@bidstack/shared';
 
 const NOW = new Date('2026-11-06T12:00:00Z');
 const snapshot: CompanyIntelSnapshot = {
@@ -22,44 +22,55 @@ const snapshot: CompanyIntelSnapshot = {
 
 const findFirst = vi.fn();
 const loadCompanyIntel = vi.fn();
-vi.mock('@bidstack/db', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock('../index.js', () => ({
   prisma: { company: { findFirst: (...a: unknown[]) => findFirst(...a) } },
+}));
+vi.mock('../company-intel-read.js', () => ({
   loadCompanyIntel: (...a: unknown[]) => loadCompanyIntel(...a),
 }));
 
-import { accountIntelTools } from './account-intel-tools.js';
-import { requiredScopeForTool, tools } from './index.js';
+import { agentTools } from './index.js';
 
-const ctx = { orgId: 'org-1', keyId: 'k', scopes: ['read'] };
+const accountIntelTools = {
+  account_direction: agentTools.account_direction,
+  account_hiring: agentTools.account_hiring,
+  account_financials_summary: agentTools.account_financials_summary,
+  account_news: agentTools.account_news,
+};
+const ctx = { orgId: 'org-1' };
 
-describe('account intel MCP tools', () => {
+describe('account intel shared agent tools', () => {
   beforeEach(() => {
     findFirst.mockReset().mockResolvedValue({ id: snapshot.company.id, name: 'DNB Bank' });
     loadCompanyIntel.mockReset().mockResolvedValue(snapshot);
   });
 
-  it('registers four read-only tools in the shared registry', () => {
-    for (const name of ['account_direction', 'account_hiring', 'account_financials_summary', 'account_news'] as const) {
-      expect(tools[name]).toBe(accountIntelTools[name]);
-      expect(requiredScopeForTool(name)).toBe('read');
+  it('registers four read-only tools gated by account-intel:read', () => {
+    for (const tool of Object.values(accountIntelTools)) {
+      expect(tool.kind).toBe('read');
+      expect(tool.permission).toBe('account-intel:read');
     }
   });
 
+  it('cites the account page so Jarvis can link the answer', async () => {
+    const out = (await accountIntelTools.account_news.handler({ companyId: snapshot.company.id, limit: 20 }, ctx)) as { citations: Array<{ kind: string; href: string }> };
+    expect(out.citations).toEqual([expect.objectContaining({ kind: 'account', href: `/accounts/${snapshot.company.id}` })]);
+  });
+
   it('resolves the account inside the caller org only', async () => {
-    await accountIntelTools.account_direction.handler({ companyName: 'DNB Bank' }, ctx);
+    await accountIntelTools.account_direction.handler({ companyName: 'DNB Bank', limit: 20 }, ctx);
     expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-1', deletedAt: null }) }));
     findFirst.mockResolvedValue(null);
-    await expect(accountIntelTools.account_hiring.handler({ companyName: 'Nobody' }, ctx)).rejects.toThrow(/not found/i);
+    await expect(accountIntelTools.account_hiring.handler({ companyName: 'Nobody', limit: 20 }, ctx)).rejects.toThrow(/not found/i);
   });
 
   it('answers direction with cited claims and fenced record text', async () => {
-    const out = (await accountIntelTools.account_direction.handler({ companyId: snapshot.company.id }, ctx)) as { claims: Array<{ evidenceIds: string[] }>; evidence: Array<{ id: string }>; note: string };
+    const out = (await accountIntelTools.account_direction.handler({ companyId: snapshot.company.id, limit: 20 }, ctx)) as { claims: Array<{ evidenceIds: string[] }>; evidence: Array<{ id: string }>; note: string };
     expect(out.claims.length).toBeGreaterThan(0);
     const ids = new Set(out.evidence.map((e) => e.id));
     for (const c of out.claims) for (const id of c.evidenceIds) expect(ids.has(id)).toBe(true);
     expect(out.note).toMatch(/inferred/i);
-    const hiring = (await accountIntelTools.account_hiring.handler({ companyId: snapshot.company.id }, ctx)) as { postings: Array<{ title: string }> };
+    const hiring = (await accountIntelTools.account_hiring.handler({ companyId: snapshot.company.id, limit: 20 }, ctx)) as { postings: Array<{ title: string }> };
     expect(hiring.postings[0]!.title).not.toContain('<script>');
   });
 

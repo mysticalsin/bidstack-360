@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./agent-tools": {
+      "types": "./dist/agent-tools/index.d.ts",
+      "default": "./dist/agent-tools/index.js"
+    },
     "./serum-runtime-policy": {
       "types": "./dist/serum-runtime-policy.d.ts",
       "default": "./dist/serum-runtime-policy.js"
@@ -39,7 +43,8 @@
   "dependencies": {
     "@bidstack/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
-    "dotenv-flow": "^4.1.0"
+    "dotenv-flow": "^4.1.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
