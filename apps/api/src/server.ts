@@ -58,7 +58,9 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     },
     genReqId: (req) => {
       const incoming = req.headers['x-request-id'];
-      if (typeof incoming === 'string' && incoming.length >= 8 && incoming.length <= 255) {
+      // The id is echoed in a response header and stamped on every log line,
+      // so only a conservative token charset is trusted from the client.
+      if (typeof incoming === 'string' && /^[A-Za-z0-9._:-]{8,255}$/.test(incoming)) {
         return incoming;
       }
       return crypto.randomUUID();

@@ -219,7 +219,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/nps/surveys/:id/respond',
     {
-      config: { public: true },
+      config: { public: true, rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         params: SurveyParams,
         body: NpsRespondBody,
