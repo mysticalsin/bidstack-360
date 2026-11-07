@@ -101,15 +101,23 @@ export function AccessPoliciesSection() {
     }
   };
 
-  const run = async (action: 'submit' | 'approve' | 'reject' | 'publish' | 'rollback', id: string, note?: string) => {
+  const run = async (
+    action: 'submit' | 'withdraw' | 'approve' | 'reject' | 'publish' | 'rollback',
+    id: string,
+    note?: string,
+  ) => {
+    // A decision names the version the reviewer saw, so a later edit makes it stale.
+    const expectedUpdatedAt =
+      action === 'approve' || action === 'reject' ? data.items.find((i) => i.id === id)?.updatedAt : undefined;
     try {
-      const row = await transition.mutateAsync({ id, action, note });
+      const row = await transition.mutateAsync({ id, action, note, ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}) });
       const messages = {
         submit: t('accessPolicies.submitted', 'Submitted for approval.'),
+        withdraw: t('accessPolicies.withdrawn', 'Withdrawn. It is a draft again.'),
         approve: t('accessPolicies.approvedMsg', 'Approved. It can be published now.'),
         reject: t('accessPolicies.rejectedMsg', 'Rejected and returned to its author.'),
         publish: t('accessPolicies.published', 'Published v{{n}}.', { n: row.version }),
-        rollback: t('accessPolicies.rolledBack', 'Rolled back. v{{n}} is live.', { n: row.version }),
+        rollback: t('accessPolicies.rollbackFiled', '{{name}} is waiting for a second admin.', { name: row.name }),
       };
       setAnnouncement(messages[action]);
       if (action === 'submit') setEdited(null);
@@ -129,10 +137,9 @@ export function AccessPoliciesSection() {
       title: t('accessPolicies.rollbackTitle', 'Roll back to v{{n}}?', { n: target?.version }),
       description: t(
         'accessPolicies.rollbackDescription',
-        'Its rules are published again as v{{next}}. The current version stays in the history.',
-        { next: data.nextVersion },
+        'Its rules go to the approvals queue as a new request. A second admin approves it before it can be published, and the current version stays live until then.',
       ),
-      confirmLabel: t('accessPolicies.rollbackConfirm', 'Roll back'),
+      confirmLabel: t('accessPolicies.rollbackConfirm', 'Request rollback'),
     });
     if (ok) await run('rollback', id);
   };
@@ -236,6 +243,7 @@ export function AccessPoliciesSection() {
               onApprove={(id, note) => run('approve', id, note)}
               onReject={(id, note) => run('reject', id, note)}
               onPublish={(id) => run('publish', id)}
+              onWithdraw={canWrite ? (id) => run('withdraw', id) : undefined}
             />
           </Panel>
         </Shell>

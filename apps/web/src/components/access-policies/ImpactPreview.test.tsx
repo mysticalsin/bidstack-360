@@ -18,9 +18,11 @@ const RESULT: AccessPolicySimulation = {
   window: { from: '2026-10-31T18:00:00.000Z', to: '2026-11-07T18:00:00.000Z' },
   evaluated: 5,
   baselineVersion: null,
-  gained: { count: 1, users: [{ userId: 'u2', name: 'Ana Diaz', count: 1 }], examples: [] },
+  recordOnly: 2,
+  gained: { count: 1, userCount: 1, users: [{ userId: 'u2', name: 'Ana Diaz', count: 1 }], examples: [] },
   lost: {
     count: 2,
+    userCount: 1,
     users: [{ userId: 'u1', name: 'Fran Seller', count: 2 }],
     examples: [
       {
@@ -52,9 +54,15 @@ describe('ImpactPreview', () => {
 
   it('shows counts, people and examples for gains and losses', () => {
     render(<ImpactPreview result={RESULT} onRun={vi.fn()} running={false} />);
-    expect(screen.getByText('2 lose access')).toBeTruthy();
-    expect(screen.getByText('1 gains access')).toBeTruthy();
-    expect(screen.getByText('Across 5 audit events in the last 7 days.')).toBeTruthy();
+    expect(screen.getByText('1 person loses access')).toBeTruthy();
+    expect(screen.getByText('1 person gains access')).toBeTruthy();
+    expect(
+      screen.getByText('2 actions blocked and 1 newly allowed, across 5 audit events in the last 7 days.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('2 of these changes depend on the record country, which enforcement does not check yet.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Reads are not in the audit log, so rules on read actions show no impact here.')).toBeTruthy();
     const lost = screen.getByRole('region', { name: 'Loses access' });
     expect(within(lost).getByText('Fran Seller')).toBeTruthy();
     expect(within(lost).getByText(/companies:write on Companies/)).toBeTruthy();
@@ -72,7 +80,12 @@ describe('ImpactPreview', () => {
   it('says so in one sentence when nothing changes', () => {
     render(
       <ImpactPreview
-        result={{ ...RESULT, gained: { count: 0, users: [], examples: [] }, lost: { count: 0, users: [], examples: [] } }}
+        result={{
+          ...RESULT,
+          recordOnly: 0,
+          gained: { count: 0, userCount: 0, users: [], examples: [] },
+          lost: { count: 0, userCount: 0, users: [], examples: [] },
+        }}
         onRun={vi.fn()}
         running={false}
       />,

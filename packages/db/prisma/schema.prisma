@@ -1090,7 +1090,11 @@ enum AccessPolicyStatus {
 /// One version of an org's access policy (When / Then / Except rules over the
 /// RBAC matrix). draft -> pending -> approved by a second admin -> published
 /// as vN. At most one row per org is published; rollback copies an earlier
-/// version into a new published row that points back through rollbackOfId.
+/// version into a new pending row that points back through rollbackOfId.
+/// Raw SQL in 20261107180000_access_policy_versions adds what Prisma cannot
+/// express: the access_policy_versions_no_self_approval CHECK and the
+/// access_policy_versions_one_published_idx partial unique index. An
+/// integration test asserts both exist; keep them out of any drop.
 model AccessPolicyVersion {
   id            String             @id @default(uuid()) @db.Uuid
   orgId         String             @map("org_id") @db.Uuid

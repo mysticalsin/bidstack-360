@@ -10,10 +10,10 @@ describe('access policy grants in the spec matrix', () => {
     for (const key of KEYS) expect(PERMISSION_KEYS).toContain(key);
   });
 
-  it('only Admin may draft or approve an access policy', () => {
-    // WHY: a published policy narrows what every role can reach. Drafting and
-    // approving are tenant administration, never a sales or read-only grant.
-    for (const key of ['access-policies:write', 'access-policies:approve'] as const) {
+  it('only Admin may read, draft or approve an access policy', () => {
+    // WHY: a published policy narrows what every role can reach, and the rule
+    // set shows how. Reading, drafting and approving are tenant administration.
+    for (const key of KEYS) {
       const holders = Object.entries(RBAC_MATRIX)
         .filter(([, perms]) => perms.includes(key))
         .map(([role]) => role);
@@ -21,8 +21,8 @@ describe('access policy grants in the spec matrix', () => {
     }
   });
 
-  it('a read-only role can see policies but cannot change them', () => {
-    expect(RBAC_MATRIX['Read-Only']).toContain('access-policies:read');
+  it('a read-only role cannot see or change policies', () => {
+    expect(RBAC_MATRIX['Read-Only']).not.toContain('access-policies:read');
     expect(RBAC_MATRIX['Read-Only']).not.toContain('access-policies:write');
     expect(RBAC_MATRIX['Sales Manager']).not.toContain('access-policies:approve');
   });

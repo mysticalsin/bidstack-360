@@ -19,6 +19,7 @@ function version(partial: Partial<AccessPolicyVersion> & Pick<AccessPolicyVersio
     rules: [],
     createdById: 'author',
     createdByName: 'Tony Admin',
+    submittedById: 'author',
     submittedAt: '2026-11-07T12:00:00.000Z',
     approvedById: null,
     approvedByName: null,
@@ -27,6 +28,7 @@ function version(partial: Partial<AccessPolicyVersion> & Pick<AccessPolicyVersio
     publishedAt: null,
     rollbackOfId: null,
     createdAt: '2026-11-07T11:00:00.000Z',
+    updatedAt: '2026-11-07T12:00:00.000Z',
     ...partial,
   };
 }
@@ -52,6 +54,25 @@ describe('ApprovalsQueue', () => {
     const row = screen.getByRole('listitem', { name: /Policy p1/ });
     expect(within(row).queryByRole('button', { name: 'Approve' })).toBeNull();
     expect(within(row).getByText('You submitted this policy. A second admin must approve it.')).toBeTruthy();
+  });
+
+  it('never offers Approve to the submitter and lets them withdraw', () => {
+    const onWithdraw = vi.fn();
+    render(
+      <ApprovalsQueue
+        items={[version({ id: 'p1', status: 'pending', createdById: 'other', submittedById: 'submitter' })]}
+        currentUserId="submitter"
+        canApprove
+        canPublish
+        nextVersion={1}
+        onWithdraw={onWithdraw}
+        {...handlers()}
+      />,
+    );
+    const row = screen.getByRole('listitem', { name: 'Policy p1' });
+    expect(within(row).queryByRole('button', { name: 'Approve' })).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: 'Withdraw' }));
+    expect(onWithdraw).toHaveBeenCalledWith('p1');
   });
 
   it('lets a second admin approve or reject with a note', async () => {

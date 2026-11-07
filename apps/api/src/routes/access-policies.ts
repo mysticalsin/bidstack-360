@@ -2,10 +2,11 @@
  * Access policies (factory slice 5).
  *
  * A policy version moves draft -> pending -> approved -> published as vN. A
- * second admin approves: the author or submitter never can. Publishing
- * supersedes the live version; rollback republishes an earlier version's
- * rules as a new version. Every transition writes to the hash-chained audit
- * log in the same transaction.
+ * second admin approves: the author or submitter never can, and only the
+ * author edits. Publishing supersedes the live version; rollback files an
+ * earlier version's rules as a new pending request that needs the same second
+ * approval. Each transition is conditional on the status and updatedAt it was
+ * read with and writes to the hash-chained audit log in the same transaction.
  *
  * Rules only narrow the RBAC matrix. Enforcement (lib/access-policy-
  * enforcement.ts) is off unless ACCESS_POLICIES_ENFORCE=true; the simulation
@@ -36,6 +37,7 @@ const PolicyDto = z.object({
   rules: z.any(),
   createdById: z.string().uuid(),
   createdByName: z.string().nullable(),
+  submittedById: z.string().uuid().nullable(),
   submittedAt: z.string().datetime().nullable(),
   approvedById: z.string().uuid().nullable(),
   approvedByName: z.string().nullable(),
@@ -44,15 +46,23 @@ const PolicyDto = z.object({
   publishedAt: z.string().datetime().nullable(),
   rollbackOfId: z.string().uuid().nullable(),
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 const IdParams = z.object({ id: z.string().uuid() });
 const NoBody = z.object({}).strict().nullish();
-const NoteBody = z.object({ note: z.string().trim().max(ACCESS_POLICY_LIMITS.noteLength).optional() }).strict();
+const DecisionBody = z
+  .object({
+    note: z.string().trim().max(ACCESS_POLICY_LIMITS.noteLength).optional(),
+    /** The updatedAt of the version the reviewer read; a later edit makes the decision stale. */
+    expectedUpdatedAt: z.string().datetime(),
+  })
+  .strict();
 const Name = z.string().trim().min(1).max(ACCESS_POLICY_LIMITS.nameLength);
 
 const SimulationSide = z.object({
   count: z.number().int(),
+  userCount: z.number().int(),
   users: z.array(z.object({ userId: z.string(), name: z.string(), count: z.number().int() })),
   examples: z.array(
     z.object({
@@ -68,12 +78,14 @@ const SimulationSide = z.object({
 });
 
 type Tx = Prisma.TransactionClient;
+type Status = (typeof STATUSES)[number];
 
+/** Display names only: emails stay out of a response every admin screen reads. */
 async function userNames(orgId: string, ids: Array<string | null>): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
   if (unique.length === 0) return new Map();
-  const users = await prisma.user.findMany({ where: { orgId, id: { in: unique } }, select: { id: true, name: true, email: true }, take: unique.length });
-  return new Map(users.map((u) => [u.id, u.name ?? u.email]));
+  const users = await prisma.user.findMany({ where: { orgId, id: { in: unique } }, select: { id: true, name: true }, take: unique.length });
+  return new Map(users.flatMap((u) => (u.name ? [[u.id, u.name] as const] : [])));
 }
 
 function toDto(p: AccessPolicyVersion, names: Map<string, string>): z.infer<typeof PolicyDto> {
@@ -85,6 +97,7 @@ function toDto(p: AccessPolicyVersion, names: Map<string, string>): z.infer<type
     rules: p.rules,
     createdById: p.createdById,
     createdByName: names.get(p.createdById) ?? null,
+    submittedById: p.submittedById,
     submittedAt: p.submittedAt?.toISOString() ?? null,
     approvedById: p.approvedById,
     approvedByName: p.approvedById ? (names.get(p.approvedById) ?? null) : null,
@@ -93,6 +106,7 @@ function toDto(p: AccessPolicyVersion, names: Map<string, string>): z.infer<type
     publishedAt: p.publishedAt?.toISOString() ?? null,
     rollbackOfId: p.rollbackOfId,
     createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
   };
 }
 
@@ -132,6 +146,38 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
     throw err;
   }
 
+  /**
+   * Moves a row only if it still has the status and updatedAt it was read
+   * with, so concurrent transitions cannot both win.
+   */
+  async function transition(
+    tx: Tx,
+    row: AccessPolicyVersion,
+    from: readonly Status[],
+    data: Prisma.AccessPolicyVersionUpdateManyMutationInput,
+  ): Promise<AccessPolicyVersion> {
+    const moved = await tx.accessPolicyVersion.updateMany({
+      where: { id: row.id, orgId: row.orgId, status: { in: [...from] }, updatedAt: row.updatedAt },
+      data,
+    });
+    if (moved.count === 0) {
+      throw server.httpErrors.conflict('This policy changed since it was loaded. Reload and try again.');
+    }
+    return tx.accessPolicyVersion.findFirstOrThrow({ where: { id: row.id, orgId: row.orgId } });
+  }
+
+  function assertAuthor(req: FastifyRequest, row: AccessPolicyVersion, what: string): void {
+    if (row.createdById !== req.auth.userId) {
+      throw server.httpErrors.forbidden(`Only the author can ${what} this policy. Start your own draft instead.`);
+    }
+  }
+
+  function assertValidRules(row: AccessPolicyVersion): void {
+    if (!AccessPolicyRulesSchema.safeParse(row.rules).success) {
+      throw server.httpErrors.conflict('These rules no longer pass validation. Start a new draft from them.');
+    }
+  }
+
   server.get(
     '/access-policies',
     {
@@ -149,14 +195,20 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const rows = await prisma.accessPolicyVersion.findMany({
-        where: { orgId: req.auth.orgId },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: LIST_CAP,
-      });
-      const names = await userNames(req.auth.orgId, rows.flatMap((r) => [r.createdById, r.approvedById]));
-      const published = rows.find((r) => r.status === 'published') ?? null;
-      const max = await prisma.accessPolicyVersion.aggregate({ where: { orgId: req.auth.orgId }, _max: { version: true } });
+      const [rows, published, max] = await Promise.all([
+        prisma.accessPolicyVersion.findMany({
+          where: { orgId: req.auth.orgId },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: LIST_CAP,
+        }),
+        // Read on its own so the live version shows however many drafts follow it.
+        prisma.accessPolicyVersion.findFirst({ where: { orgId: req.auth.orgId, status: 'published' } }),
+        prisma.accessPolicyVersion.aggregate({ where: { orgId: req.auth.orgId }, _max: { version: true } }),
+      ]);
+      const names = await userNames(
+        req.auth.orgId,
+        [...rows, ...(published ? [published] : [])].flatMap((r) => [r.createdById, r.approvedById]),
+      );
       return {
         items: rows.map((r) => toDto(r, names)),
         published: published ? toDto(published, names) : null,
@@ -205,19 +257,21 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const row = await owned(req, req.params.id);
+      // Only the author edits, so a reviewer can never approve rules they wrote.
+      assertAuthor(req, row, 'edit');
       if (row.status !== 'draft' && row.status !== 'rejected') {
         throw server.httpErrors.conflict(`A ${row.status} policy cannot be edited. Start a new draft.`);
       }
       const updated = await prisma.$transaction(async (tx) => {
-        const next = await tx.accessPolicyVersion.update({
-          where: { id: row.id },
-          data: {
-            ...(req.body.name !== undefined ? { name: req.body.name } : {}),
-            ...(req.body.rules !== undefined ? { rules: req.body.rules as Prisma.InputJsonValue } : {}),
-            status: 'draft',
-            submittedById: null,
-            submittedAt: null,
-          },
+        const next = await transition(tx, row, ['draft', 'rejected'], {
+          ...(req.body.name !== undefined ? { name: req.body.name } : {}),
+          ...(req.body.rules !== undefined ? { rules: req.body.rules as Prisma.InputJsonValue } : {}),
+          status: 'draft',
+          submittedById: null,
+          submittedAt: null,
+          approvedById: null,
+          approvedAt: null,
+          decisionNote: null,
         });
         await audit(tx, req, 'update', row.id, {
           from: row.status,
@@ -237,15 +291,41 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const row = await owned(req, req.params.id);
+      assertAuthor(req, row, 'submit');
       if (row.status !== 'draft' && row.status !== 'rejected') {
         throw server.httpErrors.conflict(`Only a draft can be submitted (this one is ${row.status})`);
       }
       const updated = await prisma.$transaction(async (tx) => {
-        const next = await tx.accessPolicyVersion.update({
-          where: { id: row.id },
-          data: { status: 'pending', submittedById: req.auth.userId, submittedAt: new Date(), decisionNote: null },
+        const next = await transition(tx, row, ['draft', 'rejected'], {
+          status: 'pending',
+          submittedById: req.auth.userId,
+          submittedAt: new Date(),
+          decisionNote: null,
         });
         await audit(tx, req, 'submit', row.id, { name: row.name });
+        return next;
+      });
+      return dto(updated);
+    },
+  );
+
+  server.post(
+    '/access-policies/:id/withdraw',
+    {
+      preHandler: [server.requirePermission('access-policies:write'), server.requireHumanActor()],
+      schema: { params: IdParams, body: NoBody, response: { 200: PolicyDto } },
+    },
+    async (req) => {
+      const row = await owned(req, req.params.id);
+      if (row.createdById !== req.auth.userId && row.submittedById !== req.auth.userId) {
+        throw server.httpErrors.forbidden('Only the author or submitter can withdraw this policy.');
+      }
+      if (row.status !== 'pending') {
+        throw server.httpErrors.conflict(`Only a pending policy can be withdrawn (this one is ${row.status})`);
+      }
+      const updated = await prisma.$transaction(async (tx) => {
+        const next = await transition(tx, row, ['pending'], { status: 'draft', submittedById: null, submittedAt: null });
+        await audit(tx, req, 'withdraw', row.id, { name: row.name });
         return next;
       });
       return dto(updated);
@@ -257,7 +337,7 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
       `/access-policies/:id/${decision}`,
       {
         preHandler: [server.requirePermission('access-policies:approve'), server.requireHumanActor()],
-        schema: { params: IdParams, body: NoteBody, response: { 200: PolicyDto } },
+        schema: { params: IdParams, body: DecisionBody, response: { 200: PolicyDto } },
       },
       async (req) => {
         const row = await owned(req, req.params.id);
@@ -267,15 +347,19 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
         if (row.status !== 'pending') {
           throw server.httpErrors.conflict(`Only a pending policy can be reviewed (this one is ${row.status})`);
         }
+        if (row.updatedAt.toISOString() !== req.body.expectedUpdatedAt) {
+          throw server.httpErrors.conflict('This policy changed after you opened it. Reload and review it again.');
+        }
         const note = req.body.note || null;
         const updated = await prisma.$transaction(async (tx) => {
-          const next = await tx.accessPolicyVersion.update({
-            where: { id: row.id },
-            data:
-              decision === 'approve'
-                ? { status: 'approved', approvedById: req.auth.userId, approvedAt: new Date(), decisionNote: note }
-                : { status: 'rejected', decisionNote: note },
-          });
+          const next = await transition(
+            tx,
+            row,
+            ['pending'],
+            decision === 'approve'
+              ? { status: 'approved', approvedById: req.auth.userId, approvedAt: new Date(), decisionNote: note }
+              : { status: 'rejected', approvedById: null, approvedAt: null, decisionNote: note },
+          );
           await audit(tx, req, decision, row.id, { name: row.name, note });
           return next;
         });
@@ -295,6 +379,7 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
       if (row.status !== 'approved') {
         throw server.httpErrors.conflict(`Only an approved policy can be published (this one is ${row.status})`);
       }
+      assertValidRules(row);
       const published = await prisma
         .$transaction(async (tx) => {
           const version = await nextVersion(tx, req.auth.orgId);
@@ -303,16 +388,22 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
             select: { id: true, version: true },
           });
           if (previous) {
-            await tx.accessPolicyVersion.update({ where: { id: previous.id }, data: { status: 'superseded' } });
+            await tx.accessPolicyVersion.updateMany({
+              where: { id: previous.id, orgId: req.auth.orgId, status: 'published' },
+              data: { status: 'superseded' },
+            });
           }
-          const next = await tx.accessPolicyVersion.update({
-            where: { id: row.id },
-            data: { status: 'published', version, publishedAt: new Date(), publishedById: req.auth.userId },
+          const next = await transition(tx, row, ['approved'], {
+            status: 'published',
+            version,
+            publishedAt: new Date(),
+            publishedById: req.auth.userId,
           });
           await audit(tx, req, 'publish', row.id, {
             version,
             supersedes: previous?.version ?? null,
             approvedById: row.approvedById,
+            ...(row.rollbackOfId ? { rollbackOfId: row.rollbackOfId } : {}),
           });
           return next;
         })
@@ -326,45 +417,34 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
     '/access-policies/:id/rollback',
     {
       preHandler: [server.requirePermission('access-policies:write'), server.requireHumanActor()],
-      schema: { params: IdParams, body: NoBody, response: { 200: PolicyDto } },
+      schema: { params: IdParams, body: NoBody, response: { 201: PolicyDto } },
     },
-    async (req) => {
+    async (req, reply) => {
       const target = await owned(req, req.params.id);
       if (target.status !== 'superseded' || target.version === null) {
         throw server.httpErrors.conflict('Only an earlier published version can be rolled back to');
       }
-      const restored = await prisma
-        .$transaction(async (tx) => {
-          const version = await nextVersion(tx, req.auth.orgId);
-          const live = await tx.accessPolicyVersion.findFirst({
-            where: { orgId: req.auth.orgId, status: 'published' },
-            select: { id: true, version: true },
-          });
-          if (live) await tx.accessPolicyVersion.update({ where: { id: live.id }, data: { status: 'superseded' } });
-          const now = new Date();
-          const next = await tx.accessPolicyVersion.create({
-            data: {
-              orgId: req.auth.orgId,
-              name: `Rollback to v${target.version}`,
-              status: 'published',
-              version,
-              rules: target.rules as Prisma.InputJsonValue,
-              createdById: req.auth.userId,
-              publishedById: req.auth.userId,
-              publishedAt: now,
-              rollbackOfId: target.id,
-            },
-          });
-          await audit(tx, req, 'rollback', next.id, {
-            version,
-            restoresVersion: target.version,
-            supersedes: live?.version ?? null,
-          });
-          return next;
-        })
-        .catch(conflictOnRace);
-      invalidateAccessPolicyCache(req.auth.orgId);
-      return dto(restored);
+      assertValidRules(target);
+      // A rollback can loosen the live policy, so it goes through the same
+      // second-admin approval as any other change before it is published.
+      const request = await prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const created = await tx.accessPolicyVersion.create({
+          data: {
+            orgId: req.auth.orgId,
+            name: `Rollback to v${target.version}`,
+            status: 'pending',
+            rules: target.rules as Prisma.InputJsonValue,
+            createdById: req.auth.userId,
+            submittedById: req.auth.userId,
+            submittedAt: now,
+            rollbackOfId: target.id,
+          },
+        });
+        await audit(tx, req, 'rollback_request', created.id, { restoresVersion: target.version, rollbackOfId: target.id });
+        return created;
+      });
+      return reply.code(201).send(await dto(request));
     },
   );
 
@@ -380,6 +460,7 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
             window: z.object({ from: z.string(), to: z.string() }),
             evaluated: z.number().int(),
             baselineVersion: z.number().int().nullable(),
+            recordOnly: z.number().int(),
             gained: SimulationSide,
             lost: SimulationSide,
             byDay: z.array(z.object({ day: z.string(), gained: z.number().int(), lost: z.number().int() })),

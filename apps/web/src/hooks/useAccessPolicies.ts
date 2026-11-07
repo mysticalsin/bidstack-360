@@ -14,6 +14,7 @@ export interface AccessPolicyVersion {
   rules: AccessPolicyRule[];
   createdById: string;
   createdByName: string | null;
+  submittedById: string | null;
   submittedAt: string | null;
   approvedById: string | null;
   approvedByName: string | null;
@@ -22,6 +23,7 @@ export interface AccessPolicyVersion {
   publishedAt: string | null;
   rollbackOfId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface AccessPolicyList {
@@ -34,6 +36,7 @@ export interface AccessPolicyList {
 
 export interface AccessPolicySimulationSide {
   count: number;
+  userCount: number;
   users: Array<{ userId: string; name: string; count: number }>;
   examples: Array<{
     at: string;
@@ -50,6 +53,7 @@ export interface AccessPolicySimulation {
   window: { from: string; to: string };
   evaluated: number;
   baselineVersion: number | null;
+  recordOnly: number;
   gained: AccessPolicySimulationSide;
   lost: AccessPolicySimulationSide;
   byDay: Array<{ day: string; gained: number; lost: number }>;
@@ -87,15 +91,29 @@ export function useSaveAccessPolicy() {
   });
 }
 
-export type AccessPolicyTransition = 'submit' | 'approve' | 'reject' | 'publish' | 'rollback';
+export type AccessPolicyTransition = 'submit' | 'withdraw' | 'approve' | 'reject' | 'publish' | 'rollback';
 
 export function useAccessPolicyTransition() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: ({ id, action, note }: { id: string; action: AccessPolicyTransition; note?: string }) =>
+    mutationFn: ({
+      id,
+      action,
+      note,
+      expectedUpdatedAt,
+    }: {
+      id: string;
+      action: AccessPolicyTransition;
+      note?: string;
+      /** Required for approve and reject: the version the reviewer read. */
+      expectedUpdatedAt?: string;
+    }) =>
       api<AccessPolicyVersion>(`${BASE}/${id}/${action}`, {
         method: 'POST',
-        body: action === 'approve' || action === 'reject' ? (note ? { note } : {}) : {},
+        body:
+          action === 'approve' || action === 'reject'
+            ? { expectedUpdatedAt, ...(note ? { note } : {}) }
+            : {},
       }),
     onSuccess: invalidate,
   });

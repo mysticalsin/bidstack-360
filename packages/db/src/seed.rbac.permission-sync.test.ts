@@ -119,7 +119,7 @@ describe('integrations:write parity with contacts:write', () => {
       expect(PERMISSION_KEYS as readonly string[]).toContain(key);
       expect(ALL_PERMISSION_KEYS).toContain(key);
     }
-    for (const key of ['access-policies:write', 'access-policies:approve']) {
+    for (const key of ['access-policies:read', 'access-policies:write', 'access-policies:approve']) {
       const holders = ROLE_SEEDS.filter((r) => r.permissionKeys.includes(key)).map((r) => r.name);
       expect(holders, key).toEqual(['Admin']);
     }

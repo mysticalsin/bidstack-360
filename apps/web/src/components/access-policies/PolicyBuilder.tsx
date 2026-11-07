@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -50,10 +51,13 @@ function Checks<T extends string | number>({
   onToggle: (value: T, on: boolean) => void;
   disabled?: boolean;
 }) {
+  const labelId = useId();
   if (values.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="text-xs text-fg-secondary">{label}</span>
+    <div role="group" aria-labelledby={labelId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span id={labelId} className="text-xs text-fg-secondary">
+        {label}
+      </span>
       {values.map((v) => (
         <label key={String(v)} className="inline-flex min-h-6 items-center gap-1.5 text-sm text-fg-primary">
           <input
@@ -286,7 +290,7 @@ function RuleCard({
             />
             <div className="flex flex-wrap items-center gap-2 text-xs text-fg-secondary">
               <label className="inline-flex items-center gap-1.5">
-                {t('accessPolicies.fromHour', 'From hour')}
+                {t('accessPolicies.fromHour', 'From hour (UTC)')}
                 <input
                   type="number"
                   min={0}
@@ -305,7 +309,7 @@ function RuleCard({
                 />
               </label>
               <label className="inline-flex items-center gap-1.5">
-                {t('accessPolicies.toHour', 'To hour')}
+                {t('accessPolicies.toHour', 'To hour (UTC)')}
                 <input
                   type="number"
                   min={1}

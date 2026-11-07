@@ -84,21 +84,32 @@ export function ImpactPreview({ result, onRun, running, disabled }: ImpactPrevie
           <Inset className="space-y-1 p-3">
             <p className="flex flex-wrap gap-x-4 text-lg font-medium tabular-nums">
               <span className="text-danger">
-                {result.lost.count === 1
-                  ? t('accessPolicies.loseOne', '{{count}} loses access', { count: result.lost.count })
-                  : t('accessPolicies.loseMany', '{{count}} lose access', { count: result.lost.count })}
+                {result.lost.userCount === 1
+                  ? t('accessPolicies.loseOne', '{{count}} person loses access', { count: result.lost.userCount })
+                  : t('accessPolicies.loseMany', '{{count}} people lose access', { count: result.lost.userCount })}
               </span>
               <span className="text-success">
-                {result.gained.count === 1
-                  ? t('accessPolicies.gainOne', '{{count}} gains access', { count: result.gained.count })
-                  : t('accessPolicies.gainMany', '{{count}} gain access', { count: result.gained.count })}
+                {result.gained.userCount === 1
+                  ? t('accessPolicies.gainOne', '{{count}} person gains access', { count: result.gained.userCount })
+                  : t('accessPolicies.gainMany', '{{count}} people gain access', { count: result.gained.userCount })}
               </span>
             </p>
             <p className="text-xs text-fg-secondary">
-              {t('accessPolicies.evaluated', 'Across {{count}} audit events in the last 7 days.', {
-                count: result.evaluated,
-              })}
+              {t(
+                'accessPolicies.evaluated',
+                '{{lost}} actions blocked and {{gained}} newly allowed, across {{count}} audit events in the last 7 days.',
+                { lost: result.lost.count, gained: result.gained.count, count: result.evaluated },
+              )}
             </p>
+            {result.recordOnly > 0 && (
+              <p className="text-xs text-fg-secondary">
+                {t(
+                  'accessPolicies.recordOnly',
+                  '{{count}} of these changes depend on the record country, which enforcement does not check yet.',
+                  { count: result.recordOnly },
+                )}
+              </p>
+            )}
           </Inset>
 
           <div className="flex justify-end">
@@ -134,6 +145,14 @@ export function ImpactPreview({ result, onRun, running, disabled }: ImpactPrevie
             )}
           </div>
         </>
+      )}
+      {result && (
+        <p className="text-xs text-fg-secondary">
+          {t(
+            'accessPolicies.readsNote',
+            'Reads are not in the audit log, so rules on read actions show no impact here.',
+          )}
+        </p>
       )}
     </div>
   );

@@ -30,7 +30,6 @@ export type SystemRoleName = (typeof SYSTEM_ROLE_NAMES)[number];
 
 /** All read permissions (resources ending in :read) */
 const ALL_READ: PermissionKey[] = [
-  'access-policies:read',
   'account-intel:read',
   'accounts:read',
   'activities:read',
@@ -113,9 +112,17 @@ function write(...res: string[]): PermissionKey[] {
 export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> = {
   // msa:admin (archive MSAs and file versions, edit any MSA) and
   // webhooks:replay (re-send a stored payload to an endpoint) are Admin-only.
-  // access-policies:approve is Admin-only and the API refuses self-approval,
-  // so publishing a policy always takes two admins.
-  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin', 'webhooks:replay', 'access-policies:approve'],
+  // access-policies:* is Admin-only: the rule set shows how access is
+  // restricted. The API refuses self-approval, so publishing a policy always
+  // takes two admins.
+  Admin: [
+    ...ALL_READ,
+    ...ALL_WRITE,
+    'msa:admin',
+    'webhooks:replay',
+    'access-policies:read',
+    'access-policies:approve',
+  ],
 
   'Sales Manager': [
     ...ALL_READ,

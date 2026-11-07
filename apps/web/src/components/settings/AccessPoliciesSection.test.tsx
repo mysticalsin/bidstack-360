@@ -37,6 +37,7 @@ const APPROVED = {
   rules: [],
   createdById: 'author',
   createdByName: 'Tony Admin',
+  submittedById: 'author',
   submittedAt: '2026-11-07T12:00:00.000Z',
   approvedById: 'reviewer',
   approvedByName: 'Rae Reviewer',
@@ -45,6 +46,7 @@ const APPROVED = {
   publishedAt: null,
   rollbackOfId: null,
   createdAt: '2026-11-07T11:00:00.000Z',
+  updatedAt: '2026-11-07T12:30:00.000Z',
 };
 
 beforeEach(() => {
@@ -75,6 +77,26 @@ describe('AccessPoliciesSection', () => {
     await waitFor(() => expect(m.transition).toHaveBeenCalledWith({ id: 'a1', action: 'publish', note: undefined }));
     const live = await screen.findByText('Published v1.');
     expect(live.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('sends the version the reviewer saw with an approval', async () => {
+    const pending = { ...APPROVED, id: 'p1', status: 'pending' as const, approvedById: null, approvedByName: null };
+    m.useAccessPolicies.mockReturnValue({
+      data: { items: [pending], published: null, nextVersion: 1, enforcement: false, viewerId: 'reviewer' },
+      isLoading: false,
+      isError: false,
+    });
+    m.transition.mockResolvedValue({ ...pending, status: 'approved' });
+    render(<AccessPoliciesSection />);
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() =>
+      expect(m.transition).toHaveBeenCalledWith({
+        id: 'p1',
+        action: 'approve',
+        note: '',
+        expectedUpdatedAt: pending.updatedAt,
+      }),
+    );
   });
 
   it('keeps the builder read only without access-policies:write', () => {

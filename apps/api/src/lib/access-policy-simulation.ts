@@ -61,6 +61,8 @@ export interface SimulationExample {
 
 export interface SimulationSide {
   count: number;
+  /** Distinct people behind `count`. */
+  userCount: number;
   users: Array<{ userId: string; name: string; count: number }>;
   examples: SimulationExample[];
 }
@@ -69,6 +71,11 @@ export interface SimulationResult {
   window: { from: string; to: string };
   evaluated: number;
   baselineVersion: number | null;
+  /**
+   * Changes that depend on a record attribute (country). Route enforcement does
+   * not load the record, so these show here but would not apply yet.
+   */
+  recordOnly: number;
   gained: SimulationSide;
   lost: SimulationSide;
   byDay: Array<{ day: string; gained: number; lost: number }>;
@@ -101,7 +108,7 @@ async function recordCountries(orgId: string, ids: Record<AccessPolicyResource, 
   return out;
 }
 
-function side(): SimulationSide & { byUser: Map<string, number> } {
+function side(): Omit<SimulationSide, 'userCount'> & { byUser: Map<string, number> } {
   return { count: 0, users: [], examples: [], byUser: new Map() };
 }
 
@@ -171,6 +178,7 @@ export async function simulateAccessPolicy(args: {
 
   const gained = side();
   const lost = side();
+  let recordOnly = 0;
   const byDay = Array.from({ length: SIMULATION_WINDOW_DAYS }, (_, i) => ({
     day: new Date(from.getTime() + i * DAY_MS).toISOString().slice(0, 10),
     gained: 0,
@@ -194,6 +202,11 @@ export async function simulateAccessPolicy(args: {
     const before = evaluateAccessPolicy({ ...input, rules: args.baseline });
     const after = evaluateAccessPolicy({ ...input, rules: args.draft });
     if (before.allowed === after.allowed) continue;
+    const enforced = {
+      before: evaluateAccessPolicy({ ...input, rules: args.baseline, resourceAttributes: 'unknown' }).allowed,
+      after: evaluateAccessPolicy({ ...input, rules: args.draft, resourceAttributes: 'unknown' }).allowed,
+    };
+    if (enforced.before !== before.allowed || enforced.after !== after.allowed) recordOnly += 1;
     const bucket = after.allowed ? gained : lost;
     const dayIndex = Math.min(SIMULATION_WINDOW_DAYS - 1, Math.floor((e.at.getTime() - from.getTime()) / DAY_MS));
     byDay[dayIndex]![after.allowed ? 'gained' : 'lost'] += 1;
@@ -214,6 +227,7 @@ export async function simulateAccessPolicy(args: {
 
   const finish = ({ byUser, ...s }: ReturnType<typeof side>): SimulationSide => ({
     ...s,
+    userCount: byUser.size,
     users: [...byUser.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, USER_CAP)
@@ -224,6 +238,7 @@ export async function simulateAccessPolicy(args: {
     window: { from: from.toISOString(), to: to.toISOString() },
     evaluated: events.length,
     baselineVersion: args.baselineVersion,
+    recordOnly,
     gained: finish(gained),
     lost: finish(lost),
     byDay,

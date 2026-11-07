@@ -1,5 +1,5 @@
 import { CircleCheck, Clock, History } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
@@ -15,6 +15,7 @@ interface ApprovalsQueueProps {
   onApprove: (id: string, note: string) => void | Promise<unknown>;
   onReject: (id: string, note: string) => void | Promise<unknown>;
   onPublish: (id: string) => void | Promise<unknown>;
+  onWithdraw?: (id: string) => void | Promise<unknown>;
   busy?: boolean;
 }
 
@@ -28,6 +29,7 @@ function PendingItem({
   busy,
   onApprove,
   onReject,
+  onWithdraw,
 }: {
   item: AccessPolicyVersion;
   own: boolean;
@@ -35,14 +37,22 @@ function PendingItem({
   busy?: boolean;
   onApprove: ApprovalsQueueProps['onApprove'];
   onReject: ApprovalsQueueProps['onReject'];
+  onWithdraw?: ApprovalsQueueProps['onWithdraw'];
 }) {
   const { t } = useTranslation('settings');
   const [note, setNote] = useState('');
   if (own) {
     return (
-      <p className="text-sm text-fg-secondary">
-        {t('accessPolicies.ownPending', 'You submitted this policy. A second admin must approve it.')}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-fg-secondary">
+          {t('accessPolicies.ownPending', 'You submitted this policy. A second admin must approve it.')}
+        </p>
+        {onWithdraw && (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void onWithdraw(item.id)}>
+            {t('accessPolicies.withdraw', 'Withdraw')}
+          </Button>
+        )}
+      </div>
     );
   }
   if (!canApprove) {
@@ -69,9 +79,8 @@ function PendingItem({
   );
 }
 
-/** Pending and approved versions. The author never sees Approve on their own policy. */
-export function ApprovalsQueue({
-  items,
+function QueueItem({
+  item,
   currentUserId,
   canApprove,
   canPublish,
@@ -79,8 +88,56 @@ export function ApprovalsQueue({
   onApprove,
   onReject,
   onPublish,
+  onWithdraw,
   busy,
-}: ApprovalsQueueProps) {
+}: Omit<ApprovalsQueueProps, 'items'> & { item: AccessPolicyVersion }) {
+  const { t } = useTranslation('settings');
+  const nameId = useId();
+  const pending = item.status === 'pending';
+  const label = pending ? t('accessPolicies.pending', 'Pending') : t('accessPolicies.approved', 'Approved');
+  return (
+    <li aria-labelledby={nameId} className="space-y-2 rounded-lg bg-surface-inset p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span id={nameId} className="text-sm font-medium text-fg-primary">
+          {item.name}
+        </span>
+        <StatusPill size="sm" tone={pending ? 'warning' : 'positive'} icon={pending ? Clock : CircleCheck}>
+          {label}
+        </StatusPill>
+        <span className="text-xs text-fg-secondary">
+          {t('accessPolicies.byAuthor', 'by {{name}}', { name: item.createdByName ?? t('accessPolicies.unknown', 'unknown') })}
+        </span>
+      </div>
+      {pending ? (
+        <PendingItem
+          item={item}
+          own={item.createdById === currentUserId || item.submittedById === currentUserId}
+          canApprove={canApprove}
+          busy={busy}
+          onApprove={onApprove}
+          onReject={onReject}
+          onWithdraw={onWithdraw}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-fg-secondary">
+            {t('accessPolicies.approvedBy', 'Approved by {{name}}', {
+              name: item.approvedByName ?? t('accessPolicies.unknown', 'unknown'),
+            })}
+          </span>
+          {canPublish && (
+            <Button size="sm" disabled={busy} onClick={() => void onPublish(item.id)}>
+              {t('accessPolicies.publish', 'Publish v{{n}}', { n: nextVersion })}
+            </Button>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** Pending and approved versions. The author or submitter never sees Approve on their own policy. */
+export function ApprovalsQueue({ items, ...rest }: ApprovalsQueueProps) {
   const { t } = useTranslation('settings');
   const queue = items.filter((i) => i.status === 'pending' || i.status === 'approved');
   if (queue.length === 0) {
@@ -88,46 +145,9 @@ export function ApprovalsQueue({
   }
   return (
     <ul className="space-y-2">
-      {queue.map((item) => {
-        const pending = item.status === 'pending';
-        const label = pending ? t('accessPolicies.pending', 'Pending') : t('accessPolicies.approved', 'Approved');
-        return (
-          <li key={item.id} aria-label={`${item.name}, ${label}`} className="space-y-2 rounded-lg bg-surface-inset p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-fg-primary">{item.name}</span>
-              <StatusPill size="sm" tone={pending ? 'warning' : 'positive'} icon={pending ? Clock : CircleCheck}>
-                {label}
-              </StatusPill>
-              <span className="text-xs text-fg-secondary">
-                {t('accessPolicies.byAuthor', 'by {{name}}', { name: item.createdByName ?? t('accessPolicies.unknown', 'unknown') })}
-              </span>
-            </div>
-            {pending ? (
-              <PendingItem
-                item={item}
-                own={item.createdById === currentUserId}
-                canApprove={canApprove}
-                busy={busy}
-                onApprove={onApprove}
-                onReject={onReject}
-              />
-            ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm text-fg-secondary">
-                  {t('accessPolicies.approvedBy', 'Approved by {{name}}', {
-                    name: item.approvedByName ?? t('accessPolicies.unknown', 'unknown'),
-                  })}
-                </span>
-                {canPublish && (
-                  <Button size="sm" disabled={busy} onClick={() => void onPublish(item.id)}>
-                    {t('accessPolicies.publish', 'Publish v{{n}}', { n: nextVersion })}
-                  </Button>
-                )}
-              </div>
-            )}
-          </li>
-        );
-      })}
+      {queue.map((item) => (
+        <QueueItem key={item.id} item={item} {...rest} />
+      ))}
     </ul>
   );
 }
@@ -139,9 +159,10 @@ interface VersionHistoryProps {
   busy?: boolean;
 }
 
-/** Published versions, newest first. Rollback republishes an earlier version as a new one. */
+/** Published versions, newest first. Rollback files an earlier version as a new request for approval. */
 export function VersionHistory({ items, canWrite, onRollback, busy }: VersionHistoryProps) {
   const { t } = useTranslation('settings');
+  const listId = useId();
   const versions = items
     .filter((i) => i.version !== null && (i.status === 'published' || i.status === 'superseded'))
     .sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
@@ -159,11 +180,15 @@ export function VersionHistory({ items, canWrite, onRollback, busy }: VersionHis
         return (
           <li
             key={v.id}
-            aria-label={`v${v.version} ${v.name}`}
+            aria-labelledby={`${listId}-${v.id}-n ${listId}-${v.id}-t`}
             className="flex flex-wrap items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover"
           >
-            <span className="w-10 font-mono text-sm tabular-nums text-fg-primary">v{v.version}</span>
-            <span className="min-w-0 flex-1 truncate text-sm text-fg-primary">{v.name}</span>
+            <span id={`${listId}-${v.id}-n`} className="w-10 font-mono text-sm tabular-nums text-fg-primary">
+              v{v.version}
+            </span>
+            <span id={`${listId}-${v.id}-t`} className="min-w-0 flex-1 truncate text-sm text-fg-primary">
+              {v.name}
+            </span>
             {v.publishedAt && <span className="text-xs text-fg-secondary">{v.publishedAt.slice(0, 10)}</span>}
             {live ? (
               <StatusPill size="sm" tone="positive" icon={CircleCheck}>

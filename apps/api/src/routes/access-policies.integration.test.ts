@@ -11,8 +11,9 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 
+import { invalidateAccessPolicyCache } from '../lib/access-policy-enforcement.js';
 import { buildServer } from '../server.js';
 import { createIsolatedOrg, dropIsolatedOrg, useIsolatedOrgAuth } from '../test-support/isolated-org.js';
 
@@ -46,6 +47,19 @@ async function auditCount(action: string): Promise<number> {
   return prisma.auditLog.count({ where: { orgId, action } });
 }
 
+async function updatedAt(id: string): Promise<string> {
+  return (await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id } })).updatedAt.toISOString();
+}
+
+async function decide(id: string, decision: 'approve' | 'reject', note = 'ok', headers = SECOND_ADMIN, seen?: string) {
+  return server.inject({
+    method: 'POST',
+    url: `/api/v1/access-policies/${id}/${decision}`,
+    headers,
+    payload: { note, expectedUpdatedAt: seen ?? (await updatedAt(id)) },
+  });
+}
+
 async function createDraft(name: string, rules: unknown): Promise<string> {
   const res = await server.inject({ method: 'POST', url: '/api/v1/access-policies', payload: { name, rules } });
   expect(res.statusCode, res.body).toBe(201);
@@ -55,12 +69,7 @@ async function createDraft(name: string, rules: unknown): Promise<string> {
 async function publishRules(name: string, rules: unknown): Promise<{ id: string; version: number }> {
   const id = await createDraft(name, rules);
   expect((await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit` })).statusCode).toBe(200);
-  const approved = await server.inject({
-    method: 'POST',
-    url: `/api/v1/access-policies/${id}/approve`,
-    headers: SECOND_ADMIN,
-    payload: { note: 'ok' },
-  });
+  const approved = await decide(id, 'approve');
   expect(approved.statusCode, approved.body).toBe(200);
   const published = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/publish` });
   expect(published.statusCode, published.body).toBe(200);
@@ -136,10 +145,11 @@ afterAll(async () => {
 });
 
 describe('access policy permissions', () => {
-  it('lets a read-only user list policies but not draft one', async () => {
+  it('keeps policies Admin-only: a read-only user can neither list nor draft one', async () => {
     const list = await server.inject({ method: 'GET', url: '/api/v1/access-policies', headers: READ_ONLY });
-    expect(list.statusCode, list.body).toBe(200);
-    expect(list.json()).toMatchObject({ enforcement: false, published: null });
+    expect(list.statusCode).toBe(403);
+    const own = await server.inject({ method: 'GET', url: '/api/v1/access-policies' });
+    expect(own.json()).toMatchObject({ enforcement: false, published: null });
     const create = await server.inject({
       method: 'POST',
       url: '/api/v1/access-policies',
@@ -205,8 +215,8 @@ describe('approval queue, publish and rollback', () => {
     expect(submitted.json().status).toBe('pending');
     expect(await auditCount('access_policy.submit')).toBeGreaterThanOrEqual(1);
 
-    const self = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/approve`, payload: {} });
-    expect(self.statusCode).toBe(403);
+    const self = await decide(firstId, 'approve', 'mine', {});
+    expect(self.statusCode, self.body).toBe(403);
     expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: firstId } })).status).toBe('pending');
   });
 
@@ -215,12 +225,7 @@ describe('approval queue, publish and rollback', () => {
     expect(early.statusCode).toBe(409);
 
     const before = await auditCount('access_policy.approve');
-    const approved = await server.inject({
-      method: 'POST',
-      url: `/api/v1/access-policies/${firstId}/approve`,
-      headers: SECOND_ADMIN,
-      payload: { note: 'Checked the impact preview' },
-    });
+    const approved = await decide(firstId, 'approve', 'Checked the impact preview');
     expect(approved.statusCode, approved.body).toBe(200);
     const row = await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: firstId } });
     expect(row.status).toBe('approved');
@@ -228,7 +233,7 @@ describe('approval queue, publish and rollback', () => {
     expect(await auditCount('access_policy.approve')).toBe(before + 1);
   });
 
-  it('publishes v1, then v2 supersedes it, and rollback republishes v1 rules as v3', async () => {
+  it('publishes v1, then v2 supersedes it, and a rollback request needs a second admin before it is v3', async () => {
     const pub = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/publish` });
     expect(pub.statusCode, pub.body).toBe(200);
     expect(pub.json()).toMatchObject({ status: 'published', version: 1 });
@@ -241,10 +246,17 @@ describe('approval queue, publish and rollback', () => {
     expect(edit.statusCode).toBe(409);
 
     const rollback = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/rollback` });
-    expect(rollback.statusCode, rollback.body).toBe(200);
-    const v3 = rollback.json();
-    expect(v3).toMatchObject({ status: 'published', version: 3, rollbackOfId: firstId });
-    expect(v3.rules).toEqual((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: firstId } })).rules);
+    expect(rollback.statusCode, rollback.body).toBe(201);
+    const request = rollback.json();
+    expect(request).toMatchObject({ status: 'pending', version: null, rollbackOfId: firstId, name: 'Rollback to v1' });
+    expect(request.rules).toEqual((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: firstId } })).rules);
+    // Nothing changes until a second admin approves: v2 stays live.
+    expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: second.id } })).status).toBe('published');
+    expect((await decide(request.id, 'approve', 'mine', {})).statusCode).toBe(403);
+    expect((await decide(request.id, 'approve')).statusCode).toBe(200);
+    const v3 = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${request.id}/publish` });
+    expect(v3.statusCode, v3.body).toBe(200);
+    expect(v3.json()).toMatchObject({ status: 'published', version: 3, rollbackOfId: firstId });
     expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: second.id } })).status).toBe('superseded');
 
     const list = await server.inject({ method: 'GET', url: '/api/v1/access-policies' });
@@ -264,25 +276,82 @@ describe('approval queue, publish and rollback', () => {
       orderBy: { id: 'asc' },
     });
     const actions = new Set(rows.map((r) => r.action));
-    for (const a of ['create', 'submit', 'approve', 'publish', 'rollback']) expect(actions).toContain(`access_policy.${a}`);
+    for (const a of ['create', 'submit', 'approve', 'publish', 'rollback_request']) {
+      expect(actions).toContain(`access_policy.${a}`);
+    }
     expect(rows.every((r) => r.targetType === 'access_policy' && typeof r.rowHash === 'string')).toBe(true);
   });
 
   it('records a rejection with its note and returns the draft for edits', async () => {
     const id = await createDraft('To reject', DENY_DE_WRITES);
     await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit` });
-    const rejected = await server.inject({
-      method: 'POST',
-      url: `/api/v1/access-policies/${id}/reject`,
-      headers: SECOND_ADMIN,
-      payload: { note: 'Too broad' },
-    });
+    const rejected = await decide(id, 'reject', 'Too broad');
     expect(rejected.statusCode, rejected.body).toBe(200);
     expect(rejected.json()).toMatchObject({ status: 'rejected', decisionNote: 'Too broad' });
     expect(await auditCount('access_policy.reject')).toBe(1);
     const edit = await server.inject({ method: 'PATCH', url: `/api/v1/access-policies/${id}`, payload: { name: 'Narrower' } });
     expect(edit.statusCode).toBe(200);
-    expect(edit.json().status).toBe('draft');
+    expect(edit.json()).toMatchObject({ status: 'draft', decisionNote: null, approvedById: null });
+  });
+
+  it('only the author edits or submits, so a reviewer never approves rules they wrote', async () => {
+    const id = await createDraft('Authored', DENY_DE_WRITES);
+    const edit = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/access-policies/${id}`,
+      headers: SECOND_ADMIN,
+      payload: { rules: [] },
+    });
+    expect(edit.statusCode).toBe(403);
+    const submit = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit`, headers: SECOND_ADMIN });
+    expect(submit.statusCode).toBe(403);
+    expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id } })).status).toBe('draft');
+  });
+
+  it('refuses a decision on rules the reviewer did not see', async () => {
+    const id = await createDraft('Changes under review', DENY_DE_WRITES);
+    await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit` });
+    const seen = await updatedAt(id);
+    const withdraw = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/withdraw` });
+    expect(withdraw.statusCode, withdraw.body).toBe(200);
+    expect(withdraw.json().status).toBe('draft');
+    expect(await auditCount('access_policy.withdraw')).toBeGreaterThanOrEqual(1);
+    await server.inject({ method: 'PATCH', url: `/api/v1/access-policies/${id}`, payload: { rules: [] } });
+    await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit` });
+    const stale = await decide(id, 'approve', 'ok', SECOND_ADMIN, seen);
+    expect(stale.statusCode).toBe(409);
+    expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id } })).status).toBe('pending');
+  });
+
+  it('lets only one of two concurrent decisions win', async () => {
+    const id = await createDraft('Raced', DENY_DE_WRITES);
+    await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit` });
+    const seen = await updatedAt(id);
+    const before = (await auditCount('access_policy.approve')) + (await auditCount('access_policy.reject'));
+    const results = await Promise.all([
+      decide(id, 'approve', 'yes', SECOND_ADMIN, seen),
+      decide(id, 'reject', 'no', SECOND_ADMIN, seen),
+    ]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    const after = (await auditCount('access_policy.approve')) + (await auditCount('access_policy.reject'));
+    expect(after).toBe(before + 1);
+  });
+});
+
+describe('database guards', () => {
+  it('keeps the one-published index and refuses approval by the submitter', async () => {
+    const idx = await prisma.$queryRaw<Array<{ indexname: string }>>`
+      SELECT indexname FROM pg_indexes WHERE tablename = 'access_policy_versions'
+        AND indexname = 'access_policy_versions_one_published_idx'`;
+    expect(idx).toHaveLength(1);
+    const author = await prisma.user.findFirstOrThrow({ where: { orgId }, orderBy: { createdAt: 'asc' } });
+    const row = await prisma.accessPolicyVersion.create({
+      data: { orgId, name: 'Guard', status: 'pending', rules: [], createdById: sellerId, submittedById: author.id },
+    });
+    await expect(
+      prisma.accessPolicyVersion.update({ where: { id: row.id }, data: { status: 'approved', approvedById: author.id } }),
+    ).rejects.toThrow();
+    await prisma.accessPolicyVersion.delete({ where: { id: row.id } });
   });
 });
 
@@ -295,7 +364,9 @@ describe('tenant isolation', () => {
         method: 'POST',
         url: `/api/v1/access-policies/${foreignPolicyId}/${action}`,
         headers: SECOND_ADMIN,
-        ...(action === 'approve' || action === 'reject' ? { payload: { note: 'x' } } : {}),
+        ...(action === 'approve' || action === 'reject'
+          ? { payload: { note: 'x', expectedUpdatedAt: new Date().toISOString() } }
+          : {}),
       });
       expect(res.statusCode, action).toBe(404);
     }
@@ -352,5 +423,33 @@ describe('enforcement behind ACCESS_POLICIES_ENFORCE', () => {
     const res = await server.inject({ method: 'DELETE', url: `/api/v1/opportunities/${missing}`, headers: READ_ONLY });
     expect(res.statusCode).toBe(403);
     expect(res.json().message).toMatch(/Requires permission: opportunities:write/);
+  });
+
+  it('fails closed when the stored rules no longer validate', async () => {
+    process.env.ACCESS_POLICIES_ENFORCE = 'true';
+    const live = await prisma.accessPolicyVersion.findFirstOrThrow({ where: { orgId, status: 'published' } });
+    await prisma.accessPolicyVersion.update({ where: { id: live.id }, data: { rules: [{ id: 'broken' }] } });
+    invalidateAccessPolicyCache(orgId);
+    try {
+      const res = await server.inject({ method: 'DELETE', url: `/api/v1/opportunities/${missing}` });
+      expect(res.statusCode).toBe(403);
+      expect(res.json().message).toMatch(/failed validation/);
+    } finally {
+      await prisma.accessPolicyVersion.update({ where: { id: live.id }, data: { rules: live.rules as Prisma.InputJsonValue } });
+      invalidateAccessPolicyCache(orgId);
+    }
+  });
+});
+
+describe('list response', () => {
+  it('still reports the live version behind more than a page of drafts', async () => {
+    const author = await prisma.user.findFirstOrThrow({ where: { orgId }, orderBy: { createdAt: 'asc' } });
+    await prisma.accessPolicyVersion.createMany({
+      data: Array.from({ length: 101 }, (_, i) => ({ orgId, name: `Bulk ${i}`, rules: [], createdById: author.id })),
+    });
+    const list = await server.inject({ method: 'GET', url: '/api/v1/access-policies' });
+    expect(list.statusCode).toBe(200);
+    expect(list.json().items).toHaveLength(100);
+    expect(list.json().published).not.toBeNull();
   });
 });

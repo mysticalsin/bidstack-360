@@ -214,7 +214,10 @@ const PERMISSION_SEEDS = [
 ] as const;
 
 export const ALL_PERMISSION_KEYS = PERMISSION_SEEDS.map((p) => p.key);
-const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter((key) => key.endsWith(':read'));
+// access-policies:read stays Admin-only: the rule set shows how access is restricted.
+const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => key.endsWith(':read') && key !== 'access-policies:read',
+);
 // Administrator is not the commercial approver. proposals:approve is granted
 // only to Manager (below), whose description already covers approvals.
 export const ADMIN_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(

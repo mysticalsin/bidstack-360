@@ -24,7 +24,9 @@ CREATE TABLE "access_policy_versions" (
     CONSTRAINT "access_policy_versions_pkey" PRIMARY KEY ("id"),
     -- Nobody approves their own policy, even through a direct write.
     CONSTRAINT "access_policy_versions_no_self_approval" CHECK (
-      "approved_by_id" IS NULL OR "approved_by_id" <> "created_by_id"
+      "approved_by_id" IS NULL
+      OR ("approved_by_id" <> "created_by_id"
+          AND ("submitted_by_id" IS NULL OR "approved_by_id" <> "submitted_by_id"))
     )
 );
 
