@@ -18,6 +18,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
+import { readOnlyScopes } from '@bidstack/shared';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import {
   NotConfigured,
@@ -214,7 +215,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
           refreshTokenEncrypted: tokens.refresh_token
             ? encryptToken(tokens.refresh_token)
             : undefined,
-          scope: tokens.scope?.split(' ') ?? [],
+          scope: readOnlyScopes(tokens.scope?.split(' ') ?? []),
           expiresAt,
           status: 'active',
           errorMessage: null,

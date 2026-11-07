@@ -9,6 +9,9 @@ import {
   grantsMailSend,
   googleEventTime,
   graphEventTime,
+  maySendMail,
+  mayWriteCalendar,
+  readOnlyScopes,
   zonedWallTimeToUtc,
 } from './index.js';
 
@@ -56,6 +59,36 @@ describe('workspace scopes', () => {
     expect(grants.map((g) => g.key)).toEqual(['identity', 'offline', 'mail_read', 'calendar_read']);
     expect(grantsCalendarRead(['Calendars.ReadWrite'])).toBe(true);
     expect(grantsCalendarWrite(['https://graph.microsoft.com/Calendars.ReadWrite'])).toBe(true);
+  });
+
+  it('keeps only read scopes from what the provider returns on reconnect', () => {
+    const returned = [
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.modify',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://graph.microsoft.com/Mail.Send',
+      'Calendars.ReadWrite',
+      'offline_access',
+      'https://www.googleapis.com/auth/drive',
+    ];
+    expect(readOnlyScopes(returned)).toEqual([
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'offline_access',
+    ]);
+  });
+
+  it('never allows provider writes, even on a legacy send or write grant', () => {
+    const legacy = ['https://www.googleapis.com/auth/gmail.send', 'https://www.googleapis.com/auth/calendar'];
+    expect(grantsMailSend(legacy)).toBe(true);
+    expect(maySendMail(legacy)).toBe(false);
+    expect(mayWriteCalendar(legacy)).toBe(false);
   });
 });
 

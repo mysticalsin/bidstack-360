@@ -210,7 +210,10 @@ describe('POST /integrations/workspace/:provider/connect', () => {
             access_token: 'access-from-google',
             refresh_token: 'refresh-from-google',
             expires_in: 3600,
-            scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly',
+            // Google merges scopes granted earlier; send and calendar write must not be stored.
+            scope:
+              'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly ' +
+              'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
@@ -225,6 +228,11 @@ describe('POST /integrations/workspace/:provider/connect', () => {
     expect(row?.accessTokenEncrypted).not.toContain('access-from-google');
     expect(row?.refreshTokenEncrypted).not.toContain('refresh-from-google');
     expect(decryptToken(row!.refreshTokenEncrypted!)).toBe('refresh-from-google');
+    expect(row?.scope).toEqual([
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/calendar.readonly',
+    ]);
+    expect(new URL(start.json<{ authUrl: string }>().authUrl).searchParams.has('include_granted_scopes')).toBe(false);
   });
 });
 

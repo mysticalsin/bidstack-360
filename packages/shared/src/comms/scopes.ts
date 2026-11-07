@@ -126,3 +126,26 @@ export function grantsMailSend(scopes: readonly string[]): boolean {
 export function grantsCalendarWrite(scopes: readonly string[]): boolean {
   return keysOf(scopes).has('calendar_write');
 }
+
+/**
+ * Providers return every scope the user ever granted this app (Google with
+ * include_granted_scopes, Microsoft always), so a read-only reconnect can come
+ * back with send or write rights. Store only the read ones.
+ */
+export function readOnlyScopes(scopes: readonly string[]): string[] {
+  return scopes.filter((scope) => {
+    const keys = classify(scope);
+    return keys.length > 0 && keys.every((k) => SCOPE_LABEL[k].access === 'read');
+  });
+}
+
+/** Sending mail and changing provider calendars stay off whatever the stored grant says. */
+const PROVIDER_WRITES_ENABLED = false;
+
+export function maySendMail(scopes: readonly string[]): boolean {
+  return PROVIDER_WRITES_ENABLED && grantsMailSend(scopes);
+}
+
+export function mayWriteCalendar(scopes: readonly string[]): boolean {
+  return PROVIDER_WRITES_ENABLED && grantsCalendarWrite(scopes);
+}

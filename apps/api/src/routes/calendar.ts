@@ -11,7 +11,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
-import { CALENDAR_PUSH, grantsCalendarWrite } from '@bidstack/shared';
+import { CALENDAR_PUSH, mayWriteCalendar } from '@bidstack/shared';
 import { Queue } from 'bullmq';
 import { redis } from '../redis.js';
 
@@ -136,7 +136,7 @@ async function findCalendarGrant(
   });
   const grants = rows.map((r) => ({
     provider: (r.provider === 'microsoft_graph' ? 'microsoft_graph' : 'google_workspace') as CalendarProvider,
-    canWrite: grantsCalendarWrite(r.scope),
+    canWrite: mayWriteCalendar(r.scope),
   }));
   const pool = preferred ? grants.filter((g) => g.provider === preferred) : grants;
   return pool.find((g) => g.canWrite) ?? pool[0] ?? null;

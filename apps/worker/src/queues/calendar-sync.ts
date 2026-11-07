@@ -24,8 +24,8 @@ import {
   CALENDAR_PULL_INCREMENTAL,
   CALENDAR_WATCH_RENEW,
   grantsCalendarRead,
-  grantsCalendarWrite,
   grantsMailRead,
+  mayWriteCalendar,
 } from '@bidstack/shared';
 
 import { CalendarConflictError, PushJobData, PullJobData } from './calendar-sync-types.js';
@@ -172,8 +172,8 @@ export async function startCalendarSync(
         orderBy: { updatedAt: 'desc' },
       });
 
-      if (!token || !grantsCalendarWrite(token.scope)) {
-        // Read-only grant (the default): the event stays in Polo only.
+      if (!token || !mayWriteCalendar(token.scope)) {
+        // Provider writes are off: the event stays in Polo only.
         if (data.operation !== 'delete') {
           await prisma.calendarEvent.update({ where: { id: event.id }, data: { syncState: 'SYNCED' } });
         }

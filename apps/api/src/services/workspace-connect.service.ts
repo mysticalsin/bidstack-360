@@ -134,7 +134,6 @@ export async function buildConnectUrl(provider: WorkspaceProvider, orgId: string
       response_type: 'code',
       scope,
       access_type: 'offline',
-      include_granted_scopes: 'true',
       prompt: 'consent',
       state,
     });
