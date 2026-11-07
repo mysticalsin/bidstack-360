@@ -150,7 +150,6 @@ export function WorkflowsPage() {
       ) : items.length === 0 ? (
         <EmptyState
           title={t('workflows.emptyTitle', 'No workflows yet')}
-          message={t('workflows.emptyMessage', 'Automate your pre-sales workflows.')}
           action={
             canWrite ? (
               <Button onClick={() => setShowCreate(true)}>

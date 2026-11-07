@@ -675,3 +675,16 @@ Delete all demonstration data? This action cannot be undone.
 - Live regions: delivery replay and policy publish results announce via `aria-live="polite"`.
 - Reduced motion honoured everywhere (9.2). Hit targets at least 24 x 24 px.
 - Lighthouse a11y stays at 100 on `/login` and `/dashboard` (baseline in `docs/factory/RECON.md`).
+
+### 9.7 Account direction (slice 12)
+
+One section on the account page, after "What to position": where the company is heading.
+
+- Tabs, in order: Direction (default), Hiring, Financials, News and posts. `role="tablist"`, arrow keys move between tabs.
+- Direction: headline, cited claims, three columns (Investing, Cutting, Next 12 months), then bid relevance rows (offering, pitch, next step).
+- Every line names its basis. Observed and Stated are plain; Inferred carries an "Inferred" tag. Each line links its evidence: source label, year or date, and the excerpt on hover or focus.
+- Hiring: open roles as a big number, 30 and 90 day trend with arrows, a six month bar strip, function mix, top skills, recent postings with source.
+- Financials: one row per fiscal year with source and year on every row; registry facts below; the Apollo range only as a labelled fallback.
+- News and posts: one list, newest first, each item with a kind label (Product, Partnership, Acquisition, Leadership, Results, Layoffs, Expansion) and origin (company or press).
+- Sources strip at the foot of every tab: Job boards, Company posts, Filings, Registries. Each row shows status as text plus icon, last fetched time, the result (new, updated, failed) and a Refresh button (lucide `RefreshCw`) for users with `account-intel:write`. Not configured rows name the env var to set.
+- Sample data carries the "Sample" tag. No taglines or helper text. Tokens: signals `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers.

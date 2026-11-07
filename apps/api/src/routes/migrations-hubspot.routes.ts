@@ -133,7 +133,8 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/migrations/hubspot/callback',
     {
-      config: { public: true }, // auth is embedded in state param
+      // auth is embedded in state param
+      config: { public: true, rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         querystring: z.object({
           code: z.string().min(1),

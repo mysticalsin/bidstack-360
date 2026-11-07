@@ -73,6 +73,21 @@ async function createForeignUser() {
 
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
+function casePayload(subject: string) {
+  return {
+    subject,
+    description: null,
+    priority: 'low',
+    status: 'new',
+    accountId: null,
+    contactId: null,
+    ownerId: null,
+    source: 'web',
+    satisfaction: null,
+    slaDeadline: null,
+  };
+}
+
 describe('service-desk routes', () => {
   skipIfNoDb('GET /api/service-cases returns paginated cases', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/service-cases?limit=5' });
@@ -364,5 +379,77 @@ describe('service-desk routes', () => {
     // `{ createdAt: 'desc' }` sort returns heap order here (NOT id-sorted), so
     // this fails without the compound (createdAt, id) tiebreaker.
     expect(collected).toEqual(seededIdsDesc);
+  });
+
+  skipIfNoDb('PATCH assigns and clears a same-org owner', async () => {
+    const owner = await prisma.user.findFirst({ where: { orgId: orgId! }, select: { id: true } });
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/service-cases',
+      payload: casePayload('Owner assignment ticket'),
+    });
+    expect(created.statusCode).toBe(201);
+    const id = (created.json() as { id: string }).id;
+    createdCaseIds.push(id);
+
+    const assign = await server.inject({
+      method: 'PATCH',
+      url: `/api/service-cases/${id}`,
+      payload: { ownerId: owner!.id },
+    });
+    expect(assign.statusCode).toBe(200);
+    expect((assign.json() as { ownerId: string | null }).ownerId).toBe(owner!.id);
+
+    const clear = await server.inject({
+      method: 'PATCH',
+      url: `/api/service-cases/${id}`,
+      payload: { ownerId: null },
+    });
+    expect(clear.statusCode).toBe(200);
+    expect((clear.json() as { ownerId: string | null }).ownerId).toBeNull();
+  });
+
+  skipIfNoDb('deleting the newest case does not block the next case number', async () => {
+    const first = await server.inject({
+      method: 'POST',
+      url: '/api/service-cases',
+      payload: casePayload('Newest case to delete'),
+    });
+    expect(first.statusCode).toBe(201);
+    const { id, number } = first.json() as { id: string; number: string };
+    createdCaseIds.push(id);
+    const del = await server.inject({ method: 'DELETE', url: `/api/service-cases/${id}` });
+    expect(del.statusCode).toBe(204);
+
+    const next = await server.inject({
+      method: 'POST',
+      url: '/api/service-cases',
+      payload: casePayload('Case after delete'),
+    });
+    expect(next.statusCode).toBe(201);
+    const body = next.json() as { id: string; number: string };
+    createdCaseIds.push(body.id);
+    expect(body.number).not.toBe(number);
+  });
+
+  skipIfNoDb('RBAC and pagination bounds', async () => {
+    const prev = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+    try {
+      const write = await server.inject({
+        method: 'POST',
+        url: '/api/service-cases',
+        headers: { 'x-bidstack-e2e-role': 'read-only' },
+        payload: casePayload('Denied'),
+      });
+      expect(write.statusCode).toBe(403);
+    } finally {
+      if (prev === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = prev;
+    }
+    for (const q of ['limit=0', 'limit=10000', 'cursor=not-a-uuid']) {
+      const res = await server.inject({ method: 'GET', url: `/api/service-cases?${q}` });
+      expect(res.statusCode, q).toBe(400);
+    }
   });
 });

@@ -20,4 +20,17 @@ describe('MCP registry reuses the shared agent tools', () => {
       expect(toolScopes[name as keyof typeof toolScopes]).toBe(agentTools[name].kind);
     }
   });
+
+  it('serves the account intelligence tools from the shared registry', () => {
+    for (const name of [
+      'account_direction',
+      'account_hiring',
+      'account_financials_summary',
+      'account_news',
+    ] as const) {
+      expect(AGENT_TOOL_NAMES).toContain(name);
+      expect(tools[name]).toBe(agentTools[name]);
+      expect(toolScopes[name]).toBe('read');
+    }
+  });
 });

@@ -126,6 +126,7 @@ export function SerumMissionControlPage() {
               <button
                 key={module.id}
                 type="button"
+                aria-pressed={selectedModule?.id === module.id}
                 onClick={() => setSelectedId(module.id)}
                 className={cn(
                   'group flex min-h-[132px] w-full flex-col justify-between rounded-2xl border p-4 text-left transition-all',

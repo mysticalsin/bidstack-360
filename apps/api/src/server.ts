@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
-import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -35,13 +35,7 @@ import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
 
-/** Options for {@link buildServer}. */
-export interface BuildServerOptions {
-  /** Observes every route as it registers (route inventory tooling). */
-  onRoute?: onRouteHookHandler;
-}
-
-export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
+export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
     bodyLimit: 10485760, // 10 MiB to allow large Dust AI webhooks
     // Bound per-request and idle-socket lifetimes so a slow query or hung
@@ -58,7 +52,9 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     },
     genReqId: (req) => {
       const incoming = req.headers['x-request-id'];
-      if (typeof incoming === 'string' && incoming.length >= 8 && incoming.length <= 255) {
+      // The id is echoed in a response header and stamped on every log line,
+      // so only a conservative token charset is trusted from the client.
+      if (typeof incoming === 'string' && /^[A-Za-z0-9._:-]{8,255}$/.test(incoming)) {
         return incoming;
       }
       return crypto.randomUUID();
@@ -89,8 +85,6 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     },
     trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();
-
-  if (options.onRoute) server.addHook('onRoute', options.onRoute);
 
   // First hook: drop traffic that bypassed Front Door before any other work.
   registerFrontDoorGuard(server, config.AZURE_FRONT_DOOR_ID);
@@ -209,8 +203,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const isLowEnv = config.NODE_ENV === 'development' || config.NODE_ENV === 'test';
 
   await server.register(rateLimit, {
-    // Low envs keep a 10k floor; a larger API_RATE_LIMIT_MAX lifts it for load runs.
-    max: isLowEnv ? Math.max(10_000, config.API_RATE_LIMIT_MAX) : config.API_RATE_LIMIT_MAX,
+    max: isLowEnv ? 10_000 : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     redis: rateLimitRedis,
     // Fail OPEN when the store errors (e.g. the Redis provider's request quota

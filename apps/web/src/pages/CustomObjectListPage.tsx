@@ -152,19 +152,12 @@ export function CustomObjectListPage() {
         </div>
       )}
 
-      {!recordsQuery.isLoading && records.length === 0 && (
+      {!recordsQuery.isLoading && !recordsQuery.isError && records.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--fg-secondary)]">
           <p className="font-medium">
             {t('customObjectList.emptyTitle', 'No {{label}} yet', {
               label: def.labelPlural.toLowerCase(),
             })}
-          </p>
-          <p className="text-sm mt-1">
-            {t(
-              'customObjectList.emptyDescription',
-              'Click "New {{label}}" to create your first record.',
-              { label: def.labelSingular },
-            )}
           </p>
         </div>
       )}

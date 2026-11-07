@@ -60,6 +60,8 @@ export const FINANCIAL_METRICS = [
   'acquisitions',
   'restructuring',
   'impairment',
+  'intangibles',
+  'debtIssued',
 ] as const;
 export const FinancialMetric = z.enum(FINANCIAL_METRICS);
 export type FinancialMetric = z.infer<typeof FinancialMetric>;
@@ -80,6 +82,8 @@ export const METRIC_LABEL: Record<FinancialMetric | 'operatingMargin' | 'netMarg
   acquisitions: 'Acquisitions paid',
   restructuring: 'Restructuring charges',
   impairment: 'Impairments',
+  intangibles: 'Software and intangibles',
+  debtIssued: 'Debt raised',
   operatingMargin: 'Operating margin',
   netMargin: 'Net margin',
   freeCashFlow: 'Free cash flow',

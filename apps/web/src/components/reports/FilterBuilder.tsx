@@ -341,7 +341,7 @@ function GroupNode({
         <button
           onClick={addCondition}
           className={cn(
-            'flex items-center gap-1 text-xs text-[var(--brand-primary)] hover:underline',
+            'flex items-center gap-1 text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline',
             'focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] rounded px-2',
             'min-h-[44px]',
           )}
