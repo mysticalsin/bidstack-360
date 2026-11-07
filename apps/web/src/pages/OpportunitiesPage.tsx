@@ -313,13 +313,19 @@ export function OpportunitiesPage() {
         // Mirror the list query's stage branching: a configured stage is a UUID
         // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
         // legacy enum as pipelineStageId 400s the export.
-        querystring: stageFilter
-          ? isPipelineStageIdUuid(stageFilter)
-            ? { pipelineStageId: stageFilter }
-            : isLegacyOpportunityStage(stageFilter)
-              ? { stage: stageFilter }
-              : {}
-          : {},
+        // Search and the due chips travel too, so the file matches the table.
+        querystring: {
+          ...(stageFilter
+            ? isPipelineStageIdUuid(stageFilter)
+              ? { pipelineStageId: stageFilter }
+              : isLegacyOpportunityStage(stageFilter)
+                ? { stage: stageFilter }
+                : {}
+            : {}),
+          ...(search ? { search } : {}),
+          ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
+          ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
+        },
       });
       toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
