@@ -138,6 +138,7 @@ export const AgreementSource = z.object({
   name: z.string(),
   enabled: z.boolean(),
   config: z.record(z.unknown()),
+  connectionId: z.string().uuid().nullable(),
   configured: z.boolean(),
   lastSyncAt: z.string().nullable(),
   lastRun: AgreementSyncRun.nullable(),
@@ -146,9 +147,11 @@ export type AgreementSource = z.infer<typeof AgreementSource>;
 
 export const AgreementSourceList = z.object({ items: z.array(AgreementSource) });
 
+const ConnectionRef = z.string().uuid().optional();
+
 export const AgreementSourceCreate = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('sharepoint'), name: z.string().min(1).max(200), config: SharePointSourceConfig }).strict(),
-  z.object({ kind: z.literal('docusign'), name: z.string().min(1).max(200), config: DocuSignSourceConfig }).strict(),
+  z.object({ kind: z.literal('sharepoint'), name: z.string().min(1).max(200), connectionId: ConnectionRef, config: SharePointSourceConfig }).strict(),
+  z.object({ kind: z.literal('docusign'), name: z.string().min(1).max(200), connectionId: ConnectionRef, config: DocuSignSourceConfig }).strict(),
 ]);
 export type AgreementSourceCreate = z.infer<typeof AgreementSourceCreate>;
 
@@ -158,6 +161,27 @@ export const AgreementSourceUpdate = z
     enabled: z.boolean().optional(),
   })
   .strict();
+
+/** An org's own grant to Graph (admin consent) or DocuSign (account OAuth). No secrets. */
+export const AgreementConnectionStatus = z.enum(['pending', 'connected', 'revoked']);
+
+export const AgreementConnection = z.object({
+  id: z.string().uuid(),
+  provider: AgreementSourceKind,
+  status: AgreementConnectionStatus,
+  externalTenantId: z.string().nullable(),
+  accountId: z.string().nullable(),
+  accountName: z.string().nullable(),
+  connectedAt: z.string().nullable(),
+});
+export type AgreementConnection = z.infer<typeof AgreementConnection>;
+
+export const AgreementConnectionList = z.object({
+  items: z.array(AgreementConnection),
+  /** True when the deployment runs one tenant on env credentials. */
+  singleTenant: z.boolean(),
+});
+export type AgreementConnectionList = z.infer<typeof AgreementConnectionList>;
 
 /** PDF/DOCX by file name, for listing remote libraries before download. */
 export function isAgreementFileName(name: string): boolean {

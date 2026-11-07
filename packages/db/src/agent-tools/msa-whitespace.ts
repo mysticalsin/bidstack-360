@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { loadRelationshipMap } from '../msa-whitespace/relationship-map.js';
 import { loadWhitespaceFlags } from '../msa-whitespace/load.js';
-import { companyScopeWhere } from '../msa-whitespace/scope.js';
+import { companyScopeWhere, opportunityScopeWhere } from '../msa-whitespace/scope.js';
 
 import type { AgentCitation, AgentTool, AgentToolCtx } from './types.js';
 
@@ -107,7 +107,9 @@ export const relationshipMap: AgentTool<typeof MapInput> = {
     const where = await scopeFor(ctx as Ctx);
     const companyId = await resolveCompanyId(ctx as Ctx, args);
     if (!companyId) throw new Error('companyId or companyName is required');
-    const map = await loadRelationshipMap(prisma, ctx.orgId, companyId, where);
+    const c = ctx as Ctx;
+    const opportunityWhere = await opportunityScopeWhere(prisma, { orgId: c.orgId, userId: c.userId ?? null, keyId: c.keyId ?? null });
+    const map = await loadRelationshipMap(prisma, ctx.orgId, companyId, where, opportunityWhere);
     if (!map) throw new Error('Account not found');
     const citations: AgentCitation[] = [{ kind: 'account', label: map.companies.find((c) => c.relation === 'self')?.name ?? 'Account', href: `/accounts/${companyId}` }];
     return { ...map, rows: map.rows.slice(0, 100), citations };

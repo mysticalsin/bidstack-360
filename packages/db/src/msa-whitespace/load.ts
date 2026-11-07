@@ -40,6 +40,8 @@ function lines(text: string | null | undefined): string[] {
   return text ? detectBusinessLines(text) : [];
 }
 
+const DRAFT_STAGE = 's1_lead';
+
 /** Lines the account already buys: open opportunities, projects, revenue. */
 export async function loadAccountActivityLines(
   db: PrismaClient,
@@ -49,8 +51,9 @@ export async function loadAccountActivityLines(
   const out = new Map<string, AccountActivity>();
   for (const id of companyIds) out.set(id, { opportunityLines: [], projectLines: [], revenueLines: [] });
   if (companyIds.length === 0) return out;
-  // Opportunities drafted from an accepted flag are the flag's own follow-up,
-  // not evidence that the line is already sold.
+  // An opportunity drafted from an accepted flag is the flag's own follow-up,
+  // not evidence that the line is already sold, while it is still a lead.
+  // Once it moves past s1_lead it counts like any other opportunity.
   const drafted = await db.msaWhitespaceDecision.findMany({
     where: { orgId, companyId: { in: companyIds }, opportunityId: { not: null } },
     select: { opportunityId: true },
@@ -64,7 +67,7 @@ export async function loadAccountActivityLines(
         companyId: { in: companyIds },
         deletedAt: null,
         stage: { not: 'closed_lost' },
-        ...(draftedIds.length ? { id: { notIn: draftedIds } } : {}),
+        ...(draftedIds.length ? { NOT: { id: { in: draftedIds }, stage: DRAFT_STAGE } } : {}),
       },
       select: { companyId: true, name: true, industry: true },
       take: 1000,
