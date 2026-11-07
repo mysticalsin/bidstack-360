@@ -710,3 +710,17 @@ Appended by factory slice 1. Values only; no existing token changed.
   leftovers (funnel-chart, sankey-node, chart-stat-flow) now use `fg-*` tokens.
 - Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
   that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
+
+### 9.9 Consulting partners (slice 15)
+
+One section on the account page and the `/accounts/:id` cockpit, after Account direction: which third-party consulting firms work with the client, and how we stand against each one. Our own group entities stay in the MSA "who works with them" panel; this section is outside firms only.
+
+- Partner strip: one tile per firm, strongest first. Tile: monogram (two letters, brand-tinted inset), firm name, relationship tags (Strategic partner, Implementation, Managed services, Audit, Advisory, Engineering), domain chips (IT, Engineering, Digital, Data, SAP, Cloud, Cyber, HEMA / pharma), a three-step strength meter and the evidence count. Selected tile has the accent ring; arrow keys move along the strip (`role="listbox"`).
+- Selected partner, two columns at 1440 and 1024, one column at 390:
+  - Left: radar (repo `charts/PolarCharts.tsx` `RadarChart`, lazy) with two series, Us (accent) and the partner (muted), on Quality, Price, Speed, Domain depth. Below it a score table, one row per dimension including Relationship: us, partner, evidence count. A dimension without evidence shows "No evidence" in muted text and is left off the radar, never drawn as zero.
+  - Right: record line (wins and losses against the firm, years), then 1 to 3 angles. Each angle cites its evidence; an inferred angle carries the "Inferred" tag.
+- Timeline strip under both columns: one dot per evidence item on a time axis, public dots outlined, internal dots filled; hover or focus shows date, source and title.
+- Evidence list (collapsed by default, "Evidence" toggle): source label, date, excerpt, method, link to the URL or the record; "Load more" pages through the API.
+- Header: section title, last fetched time, and Refresh (lucide `RefreshCw`) for users with `account-intel:write`. Not configured status shows the detail text.
+- Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
+- Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
