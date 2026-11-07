@@ -4,7 +4,8 @@
 // text-brand -> text-brand-deep; positive -> success; negative -> danger; @/lib/utils -> @/lib/cn;
 // Phosphor CheckCircle/XCircle/Warning/WarningCircle/Info/Clock -> lucide CircleCheck/CircleX/
 // TriangleAlert/CircleAlert/Info/Clock; Phosphor weight="bold" -> lucide strokeWidth 2.5;
-// useId colons stripped so the mask url() reference is valid in every engine.
+// useId colons stripped so the mask url() reference is valid in every engine; glyphs.has + ! -> glyphs.get;
+// shrink-0 on the fallback icon; upstream donation line dropped.
 import { CircleAlert, CircleCheck, CircleX, Clock, Info, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useId, type ComponentProps, type ReactNode } from 'react';
 

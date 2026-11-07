@@ -30,6 +30,13 @@ describe('vendored TUFFUI', () => {
     expect(src).toMatch(/Rewrites at import:/);
   });
 
+  it('lib/motion-tokens.ts carries the same notice and rewrite list', () => {
+    const src = readFileSync(join(process.cwd(), 'src/lib/motion-tokens.ts'), 'utf8');
+    expect(src.startsWith(HEADER)).toBe(true);
+    expect(src).toContain('378f3eaa');
+    expect(src).toMatch(/Rewrites at import:/);
+  });
+
   it.each(sources.map((f) => [f]))('%s has no foreign vocabulary or phosphor', (file) => {
     const src = readFileSync(join(DIR, file), 'utf8').split('\n').filter((l) => !l.startsWith('//')).join('\n');
     expect(src).not.toMatch(/@phosphor-icons/);

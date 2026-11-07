@@ -12,8 +12,8 @@ export default function TuffuiSpecimen() {
     <main id="main" className="mx-auto max-w-4xl space-y-6 p-8">
       <h1 className="page-title">TUFFUI on repo tokens</h1>
 
-      <Shell aria-labelledby="pills-title">
-        <ShellHeader icon={Webhook} title={<span id="pills-title">Status pills</span>} aside={<Tag>v3.0.0</Tag>} />
+      <Shell aria-label="Status pills">
+        <ShellHeader as="h2" icon={Webhook} title="Status pills" aside={<Tag>v3.0.0</Tag>} />
         <Panel className="flex flex-wrap gap-2 p-4">
           <StatusPill tone="positive" icon={CircleCheck}>Delivered</StatusPill>
           <StatusPill tone="negative" icon={CircleX}>Failed</StatusPill>
@@ -25,8 +25,8 @@ export default function TuffuiSpecimen() {
         </Panel>
       </Shell>
 
-      <Shell aria-labelledby="tags-title">
-        <ShellHeader title={<span id="tags-title">Tags and insets</span>} subtitle="Shell, panel, inset" />
+      <Shell aria-label="Tags and insets">
+        <ShellHeader as="h2" title="Tags and insets" subtitle="Shell, panel, inset" />
         <Panel className="space-y-3 p-4">
           <div className="flex flex-wrap gap-2">
             <Tag>https</Tag>

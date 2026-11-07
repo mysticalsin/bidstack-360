@@ -1,6 +1,10 @@
-// UI motion tokens (DESIGN.md 9.2). Adapted from TUFFUI motion-tokens
-// (https://github.com/yurigdesigner/tuffui, MIT, commit 378f3eaa).
+// TUFFUI (https://tuffui.com) · MIT License · Copyright (c) 2026 TUFFUI contributors
+// Vendored from registry/motion-tokens/motion-tokens.ts at commit 378f3eaa (license text in
+// components/vendor/tuffui/LICENSE). Rewrites at import: enter 0.2s -> 0.21s and exit 0.14s -> 0.15s
+// to match --duration-enter / --duration-exit; EASE_DRAWER, CSS_EASE_DRAWER and motionFor() added;
+// double quotes -> single quotes; upstream donation line dropped.
 //
+// UI motion tokens (DESIGN.md 9.2).
 // Same curves as the `--ease-ui-*` / `--ease-drawer` @theme tokens in
 // src/index.css, and the same durations as `--duration-enter` (210ms) and
 // `--duration-exit` (150ms); motion-tokens.test.ts keeps the two in step.

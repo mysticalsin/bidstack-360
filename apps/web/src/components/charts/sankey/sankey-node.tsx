@@ -290,7 +290,7 @@ function AnimatedNode({
           </NodeLabel>
           {labelLayouts.value ? (
             <NodeLabel
-              className="fill-fg-secondary text-[11px]"
+              className="fill-fg-primary text-[11px]"
               key={`value-${index}-${revealEpoch}`}
               layout={labelLayouts.value}
               opacity={valueOpacity}

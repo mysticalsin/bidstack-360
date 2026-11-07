@@ -85,10 +85,14 @@ function collectJsonStrings(value: unknown, out: string[]): void {
   }
 }
 
-// Source text with JS string escapes and JSX line wrapping undone, so an inline
-// default reads the same as the rendered string.
+// Source text with comments dropped (a pin must ship, not sit in a comment) and
+// JS string escapes and JSX line wrapping undone, so an inline default reads
+// the same as the rendered string.
 function normalizeSource(src: string): string {
   return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^\s*\/\/.*$/gm, ' ')
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
     .replace(/\\u2014/g, '\u2014')
     .replace(/\\(['"`])/g, '$1')
     .replace(/&apos;|&#39;/g, "'")
@@ -108,9 +112,17 @@ function buildCorpus(): { locale: string[]; source: string } {
   return { locale, source };
 }
 
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// The pin must start and end at a string or JSX-text boundary, so a short pin
+// ("This action cannot be undone.") cannot pass by sitting inside a longer one.
+function shipsAsWholeCopy(haystack: string, pinned: string): boolean {
+  return new RegExp(`(?:^|['"\`>]) ?${escapeRe(pinned)} ?(?=$|['"\`<{])`, 'm').test(haystack);
+}
+
 describe('pinned consent and safety copy (DESIGN.md 9.5)', () => {
   const corpus = buildCorpus();
-  const localeText = corpus.locale.map((s) => s.replace(/\s+/g, ' ')).join('\n');
+  const localeText = corpus.locale.map((s) => `"${s.replace(/\s+/g, ' ')}"`).join('\n');
 
   it('lists every string from the DESIGN.md 9.5 block', () => {
     const design = readFileSync(join(WEB_ROOT, '../../DESIGN.md'), 'utf8');
@@ -125,7 +137,7 @@ describe('pinned consent and safety copy (DESIGN.md 9.5)', () => {
   });
 
   it.each(PINNED_CONSENT_COPY.map((s) => [s]))('still ships: %s', (pinned) => {
-    const found = localeText.includes(pinned) || corpus.source.includes(pinned);
+    const found = shipsAsWholeCopy(localeText, pinned) || shipsAsWholeCopy(corpus.source, pinned);
     expect(found, `pinned copy missing from locales and src: ${pinned}`).toBe(true);
   });
 });
