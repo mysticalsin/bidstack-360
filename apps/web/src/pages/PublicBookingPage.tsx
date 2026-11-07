@@ -171,6 +171,7 @@ export function PublicBookingPage() {
                     key={day}
                     type="button"
                     onClick={() => setDate(day)}
+                    aria-pressed={date === day}
                     className={cn(
                       'min-h-[44px] rounded-lg border px-3 py-2 text-left text-sm transition-colors',
                       date === day
