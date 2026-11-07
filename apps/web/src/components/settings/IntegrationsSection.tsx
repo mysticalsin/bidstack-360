@@ -72,6 +72,12 @@ export function IntegrationsSection() {
     [events.data?.items, setupGuide.data, status.data],
   );
 
+  // Both hero actions land on the developer tab; each scrolls to its own section.
+  function openDeveloperSection(id: 'api-keys' | 'webhooks') {
+    setActiveTab('developer');
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
+  }
+
   return (
     <div className="space-y-5">
       <IntegrationHero
@@ -79,8 +85,8 @@ export function IntegrationsSection() {
         isLoading={setupGuide.isLoading || status.isLoading || events.isLoading}
         summary={summary}
         eventsContinue={eventsContinue}
-        onCreateApiKey={() => setActiveTab('developer')}
-        onAddWebhook={() => setActiveTab('developer')}
+        onCreateApiKey={() => openDeveloperSection('api-keys')}
+        onAddWebhook={() => openDeveloperSection('webhooks')}
       />
 
 
