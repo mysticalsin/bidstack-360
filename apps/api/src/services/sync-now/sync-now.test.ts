@@ -31,7 +31,13 @@ describe('dustRunFromJob', () => {
 
   it('maps an active job to running', () => {
     expect(
-      dustRunFromJob({ id: 'dust-1', state: 'active', progress: 40, timestamp: 1_000, processedOn: 2_000 }),
+      dustRunFromJob({
+        id: 'dust-1',
+        state: 'active',
+        progress: 40,
+        timestamp: 1_000,
+        processedOn: 2_000,
+      }),
     ).toMatchObject({ state: 'running', progress: 40, startedAt: new Date(2_000).toISOString() });
   });
 
@@ -90,10 +96,14 @@ describe('hubspotRunFromJobs', () => {
   };
 
   it('is running with progress across every entity job', () => {
-    const run = hubspotRunFromJobs('hubspot-1', [
-      { ...base, processedRows: 5 },
-      { ...base, processedRows: 0 },
-    ], 0);
+    const run = hubspotRunFromJobs(
+      'hubspot-1',
+      [
+        { ...base, processedRows: 5 },
+        { ...base, processedRows: 0 },
+      ],
+      0,
+    );
     expect(run).toMatchObject({ state: 'running', progress: 25 });
   });
 
@@ -101,7 +111,14 @@ describe('hubspotRunFromJobs', () => {
     const run = hubspotRunFromJobs(
       'hubspot-1',
       [
-        { ...base, status: 'COMPLETE', processedRows: 8, errorRows: 2, completedAt: new Date(5_000), errorSummary: [{ row: 3, field: 'email', message: 'invalid email' }] },
+        {
+          ...base,
+          status: 'COMPLETE',
+          processedRows: 8,
+          errorRows: 2,
+          completedAt: new Date(5_000),
+          errorSummary: [{ row: 3, field: 'email', message: 'invalid email' }],
+        },
       ],
       6,
     );
@@ -120,7 +137,11 @@ describe('hubspotRunFromJobs', () => {
   });
 
   it('is queued before the worker starts', () => {
-    const run = hubspotRunFromJobs('hubspot-1', [{ ...base, status: 'PENDING', startedAt: null }], 0);
+    const run = hubspotRunFromJobs(
+      'hubspot-1',
+      [{ ...base, status: 'PENDING', startedAt: null }],
+      0,
+    );
     expect(run.state).toBe('queued');
   });
 });

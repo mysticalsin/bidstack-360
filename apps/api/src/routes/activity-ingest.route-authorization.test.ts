@@ -227,6 +227,7 @@ describe('slice 9 route authorization table', () => {
   }
 
   it('a read-only key cannot ingest even with ingest:write', async () => {
+    vi.mocked(ingestActivities).mockClear();
     actor = { kind: 'key', scopes: ['ingest:write'], readOnly: true };
     const app = await buildApp();
     const res = await app.inject({ method: 'POST', url: '/api/v1/ingest/activities', payload: ingestBody });

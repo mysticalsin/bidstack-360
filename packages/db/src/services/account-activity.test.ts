@@ -90,7 +90,13 @@ describe('bucketActivitySummary', () => {
   });
 
   it('returns one row per week, oldest first, ending with the current week', () => {
-    const summary = bucketActivitySummary({ now, tz: 'UTC', weeks: 4, activities: [], overdue: [] });
+    const summary = bucketActivitySummary({
+      now,
+      tz: 'UTC',
+      weeks: 4,
+      activities: [],
+      overdue: [],
+    });
     expect(summary.weekly.map((w) => w.weekStart)).toEqual([
       '2026-10-12',
       '2026-10-19',

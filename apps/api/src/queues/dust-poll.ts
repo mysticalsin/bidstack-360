@@ -71,3 +71,24 @@ export async function enqueueDustResync(job: DustPollJob): Promise<string | null
     return null;
   }
 }
+
+/**
+ * Enqueue a "Sync now" Dust poll under a caller-chosen job id. Re-adding the
+ * same id while the job is retained is a BullMQ no-op, so the run id doubles
+ * as the idempotency key. Throws when Redis is unreachable so the caller can
+ * report the failure instead of handing back an unpollable run.
+ */
+export async function enqueueDustSyncRun(orgId: string, runId: string): Promise<string> {
+  const queued = await getQueue().add(
+    'dust.poll',
+    { source: 'manual', orgId } satisfies DustPollJob,
+    { jobId: runId, removeOnComplete: { age: 86_400, count: 500 }, removeOnFail: { age: 86_400 } },
+  );
+  log.info({ jobId: queued.id, orgId }, 'Dust sync-now job enqueued');
+  return queued.id ?? runId;
+}
+
+/** Read a dust-poll job for status polling; null when unknown or expired. */
+export async function getDustPollJob(jobId: string) {
+  return (await getQueue().getJob(jobId)) ?? null;
+}

@@ -39,6 +39,7 @@ import {
   kamReadProspections,
   kamLogProspection,
 } from './kam-tools.js';
+import { activityTools, activityToolScopes } from './activity-tools.js';
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
   description: string;
@@ -93,6 +94,8 @@ export const tools = {
   kam_get_kpis: kamGetKpis,
   kam_read_prospections: kamReadProspections,
   kam_log_prospection: kamLogProspection,
+  // Account activity (Dust, CRMs): additive, defined in activity-tools.ts
+  ...activityTools,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -137,6 +140,7 @@ export const toolScopes = {
   kam_get_kpis: 'read',
   kam_read_prospections: 'read',
   kam_log_prospection: 'kam',
+  ...activityToolScopes,
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {

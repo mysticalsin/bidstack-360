@@ -85,6 +85,11 @@ const PERMISSION_SEEDS = [
   permission('documents:write', 'Manage documents', 'Upload and update bid and account documents.'),
   permission('files:read', 'Read files', 'View uploaded files and attachments.'),
   permission('files:write', 'Manage files', 'Upload, finalize, and manage file attachments.'),
+  permission(
+    'ingest:write',
+    'Ingest activity',
+    'Push calls, emails, meetings, notes and stage changes from an external CRM or Dust.',
+  ),
   permission('integrations:read', 'Read integrations', 'View integration configuration.'),
   permission('integrations:write', 'Manage integrations', 'Configure external integrations.'),
   permission(

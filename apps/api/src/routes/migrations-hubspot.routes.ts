@@ -13,15 +13,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import {
-  MigrationJobResponse,
-  DedupStrategyEnum,
-  MigrationJobPayload,
-  HUBSPOT_COMPANY_DEFAULTS,
-  HUBSPOT_CONTACT_DEFAULTS,
-  HUBSPOT_DEAL_DEFAULTS,
-  MIGRATION,
-} from '@bidstack/shared';
+import { MigrationJobResponse, DedupStrategyEnum, MIGRATION } from '@bidstack/shared';
 import { encryptSecret, decryptSecret } from '@bidstack/shared/server-crypto';
 import {
   buildHubSpotAuthUrl,
@@ -30,16 +22,16 @@ import {
   probeHubSpotConnection,
   type HubSpotTokens,
 } from '../lib/hubspot-client.js';
-import {
-  assertSerumConnectorAllowed,
-  recordSerumConnectorTestSuccess,
-} from '../lib/serum-connector-policy.js';
+import { recordSerumConnectorTestSuccess } from '../lib/serum-connector-policy.js';
+import { HubspotNotConnectedError, startHubspotImport } from '../services/hubspot-import.js';
 import { serializeJob } from './migrations.helpers.js';
 
 export const HUBSPOT_INTEGRATION_TYPE = 'hubspot' as const;
 export const HUBSPOT_MIGRATION_CONFIG_NAME = 'hubspot-migration' as const;
 
-export function hubspotIntegrationConfigKey(orgId: string): Prisma.IntegrationConfigWhereUniqueInput {
+export function hubspotIntegrationConfigKey(
+  orgId: string,
+): Prisma.IntegrationConfigWhereUniqueInput {
   return {
     orgId_type_name: {
       orgId,
@@ -58,31 +50,7 @@ export function hubspotIntegrationConfigWhere(orgId: string): Prisma.Integration
   };
 }
 
-export function buildHubSpotMigrationPayload(input: {
-  migrationJobId: string;
-  orgId: string;
-  userId: string;
-  entityType: string;
-  totalRows: number;
-  mappings: Record<string, string | null>;
-  dedupStrategy: z.infer<typeof DedupStrategyEnum>;
-  hubspotIntegrationConfigId: string;
-}): MigrationJobPayload {
-  return MigrationJobPayload.parse({
-    migrationJobId: input.migrationJobId,
-    orgId: input.orgId,
-    userId: input.userId,
-    source: 'HUBSPOT_OAUTH',
-    entityType: input.entityType,
-    chunkOffset: 0,
-    chunkSize: 100,
-    totalRows: input.totalRows,
-    mappings: input.mappings,
-    dedupStrategy: input.dedupStrategy,
-    externalIdColumn: 'hs_object_id',
-    meta: { hubspotIntegrationConfigId: input.hubspotIntegrationConfigId },
-  });
-}
+export { buildHubSpotMigrationPayload } from '../services/hubspot-import.js';
 
 export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
   // BullMQ queue handle (producer side only — worker consumes).
@@ -276,98 +244,20 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const { orgId, userId } = req.auth;
-
-      // Fetch the credential reference. Workers resolve encrypted tokens just
-      // in time so raw OAuth tokens are never persisted in BullMQ payloads.
-      const config = await prisma.integrationConfig.findFirst({
-        where: hubspotIntegrationConfigWhere(orgId),
-        select: { id: true, config: true },
-      });
-      if (!config) {
-        throw server.httpErrors.badRequest('HubSpot not connected — complete OAuth flow first');
-      }
-
-      await assertSerumConnectorAllowed({
-        orgId,
-        connectorId: 'hubspot',
-        operation: 'hubspot.import.start',
-        writeRequested: false,
-      });
-
-      const entityMappings: Record<string, Record<string, string | null>> = {
-        companies: HUBSPOT_COMPANY_DEFAULTS,
-        contacts: HUBSPOT_CONTACT_DEFAULTS,
-        deals: HUBSPOT_DEAL_DEFAULTS,
-        tasks: {},
-      };
-
-      const queue = getQueue();
-      const jobs: Awaited<ReturnType<typeof prisma.migrationJob.create>>[] = [];
-
-      for (const entity of req.body.entities) {
-        const discovery = (config.config as Record<string, unknown>).discovery as Record<
-          string,
-          number
-        >;
-        const totalRows = discovery?.[entity] ?? 0;
-
-        const job = await prisma.migrationJob.create({
-          data: {
-            orgId,
-            userId,
-            source: 'HUBSPOT_OAUTH',
-            status: 'RUNNING',
-            startedAt: new Date(),
-            totalRows,
-            meta: { entityType: entity },
-          },
-        });
-
-        // Save mappings.
-        await prisma.migrationMapping.upsert({
-          where: {
-            orgId_source_sourceEntity: { orgId, source: 'HUBSPOT_OAUTH', sourceEntity: entity },
-          },
-          create: {
-            orgId,
-            source: 'HUBSPOT_OAUTH',
-            sourceEntity: entity,
-            mappings: entityMappings[entity] ?? {},
-          },
-          update: { mappings: entityMappings[entity] ?? {} },
-        });
-
-        // Enqueue first chunk — worker paginates via hubspotAfter cursor.
-        const payload = buildHubSpotMigrationPayload({
-          migrationJobId: job.id,
+      try {
+        const jobs = await startHubspotImport({
           orgId,
           userId,
-          entityType: entity,
-          totalRows,
-          mappings: entityMappings[entity] ?? {},
+          entities: req.body.entities,
           dedupStrategy: req.body.dedupStrategy,
-          hubspotIntegrationConfigId: config.id,
+          queue: getQueue(),
         });
-
-        await queue.add(`${job.id}-chunk-0`, payload, {
-          jobId: `${job.id}-${entity}-chunk-0`,
-        });
-
-        await prisma.auditLog.create({
-          data: {
-            orgId,
-            userId,
-            action: 'migration.start',
-            targetType: 'MigrationJob',
-            targetId: job.id,
-            diff: { source: 'HUBSPOT_OAUTH', entityType: entity, totalRows },
-          },
-        });
-
-        jobs.push(job);
+        return reply.code(201).send({ jobs: jobs.map(serializeJob) });
+      } catch (err) {
+        if (err instanceof HubspotNotConnectedError)
+          throw server.httpErrors.badRequest(err.message);
+        throw err;
       }
-
-      return reply.code(201).send({ jobs: jobs.map(serializeJob) });
     },
   );
 };

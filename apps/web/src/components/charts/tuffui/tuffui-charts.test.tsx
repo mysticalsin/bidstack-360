@@ -69,7 +69,9 @@ describe('DivergingBars', () => {
       />,
     );
     expect(
-      screen.getByRole('img', { name: /calls, emails, with overdue below the line, oct 12 to nov 2/i }),
+      screen.getByRole('img', {
+        name: /calls, emails, with overdue below the line, oct 12 to nov 2/i,
+      }),
     ).toBeTruthy();
     // Accessible table carries every number.
     expect(screen.getByRole('table')).toBeTruthy();

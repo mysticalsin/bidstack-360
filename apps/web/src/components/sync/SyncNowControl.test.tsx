@@ -50,7 +50,10 @@ describe('SyncNowControl', () => {
 
   it('starts a run with an idempotency key, polls it, then shows the result', async () => {
     let polls = 0;
-    apiMock.mockImplementation((async (path: string, opts?: { method?: string; headers?: Record<string, string> }) => {
+    apiMock.mockImplementation((async (
+      path: string,
+      opts?: { method?: string; headers?: Record<string, string> },
+    ) => {
       if (opts?.method === 'POST') return run({});
       if (path.includes('/runs/')) {
         polls += 1;
@@ -98,7 +101,9 @@ describe('SyncNowControl', () => {
     });
     const bar = await screen.findByRole('progressbar');
     expect(bar.getAttribute('aria-valuenow')).toBe('40');
-    expect((screen.getByRole('button', { name: /sync/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /sync/i }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   it('has no helper text or tagline', async () => {

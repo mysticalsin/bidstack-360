@@ -209,7 +209,10 @@ describe('POST /api/v1/ingest/activities', () => {
     });
     const res = await post(rawKey, [
       call('g-1', {
-        participants: [{ email: `ADA-${run}@example.com` }, { email: `stranger-${run}@example.com` }],
+        participants: [
+          { email: `ADA-${run}@example.com` },
+          { email: `stranger-${run}@example.com` },
+        ],
       }),
     ]);
     expect(res.json().counts.accepted).toBe(1);
@@ -261,5 +264,17 @@ describe('POST /api/v1/ingest/activities', () => {
     expect(body.byHour[14].call).toBeGreaterThanOrEqual(1);
     expect(body.total).toBeGreaterThanOrEqual(2);
     expect(body.overdue.count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('publishes both routes in the OpenAPI spec under Activities', () => {
+    const spec = (
+      server as unknown as {
+        swagger: () => { paths: Record<string, Record<string, { tags?: string[] }>> };
+      }
+    ).swagger();
+    expect(spec.paths['/api/v1/ingest/activities']?.post?.tags).toContain('Activities');
+    expect(spec.paths['/api/v1/companies/{id}/activity-summary']?.get?.tags).toContain(
+      'Activities',
+    );
   });
 });
