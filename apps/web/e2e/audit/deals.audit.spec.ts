@@ -9,12 +9,21 @@
  * Layout audit: light and dark at 1440x900, 1024x768 and 390x844 with no page
  * overflow, overlapping text, unmarked clipping, text under 12px, or AA
  * contrast failures (see ./deals-layout.ts).
+ *
+ * Run with E2E_AUDIT=1 against a local stack.
  */
 import { expect, test, type Page, type Request } from '@playwright/test';
 
 import { auditLayout, settle, THEMES, useTheme, VIEWPORTS } from './deals-layout.js';
 
 const API_URL = process.env.E2E_API_URL ?? 'http://127.0.0.1:4010';
+
+// Opt-in like admin.audit.spec.ts: the click sweep writes to the shared seed,
+// and registering 77 extra tests reshuffles the CI shards other specs depend on.
+const FULL_AUDIT = process.env.E2E_AUDIT === '1';
+function auditSuite(title: string, body: () => void): void {
+  if (FULL_AUDIT) test.describe(title, body);
+}
 
 let firstOpportunityPath: string | null = null;
 async function opportunityDetailPath(page: Page): Promise<string> {
@@ -209,7 +218,7 @@ async function closeOverlays(page: Page) {
   }
 }
 
-test.describe('deals click audit', () => {
+auditSuite('deals click audit', () => {
   test.describe.configure({ mode: 'serial' });
 
   for (const route of ROUTES) {
@@ -296,7 +305,7 @@ test.describe('deals click audit', () => {
   }
 });
 
-test.describe('deals layout audit', () => {
+auditSuite('deals layout audit', () => {
   for (const theme of THEMES) {
     for (const vp of VIEWPORTS) {
       for (const route of ROUTES) {
