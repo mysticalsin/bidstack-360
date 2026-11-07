@@ -8,6 +8,7 @@ import {
   cleanText,
   seniorityFromTitle,
   SENIOR,
+  FINANCIAL_SOURCE_LABEL,
   stripSamplePrefix,
   themeForText,
   tierLabel,
@@ -296,7 +297,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   // Revenue, with YoY.
   const rev = latest?.metrics.revenue;
   if (rev && latest) {
-    items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
+    items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: latest.source === FINANCIAL_SOURCE_LABEL.fixture }));
   } else if (firmo?.annualRevenueUsd) {
     items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: 'USD', value: Number(firmo.annualRevenueUsd), source: 'Enrichment cache', period: `Annual, as of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}`, anchor: 'firmographics' }));
   } else items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', source: 'None', period: 'n/a', missing: finMissing }));

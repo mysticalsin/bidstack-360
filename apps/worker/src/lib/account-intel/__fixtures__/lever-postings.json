@@ -1,0 +1,53 @@
+[
+ {
+  "id": "6ed76ce8-4156-4b60-b120-403538bd66cd",
+  "text": "Administrative Business Partner",
+  "categories": {
+   "commitment": "Full-time",
+   "location": "Singapore, Singapore",
+   "team": "Administrative",
+   "allLocations": [
+    "Singapore, Singapore"
+   ]
+  },
+  "createdAt": 1786469891368,
+  "hostedUrl": "https://jobs.lever.co/palantir/6ed76ce8-4156-4b60-b120-403538bd66cd",
+  "country": "SG",
+  "workplaceType": "hybrid",
+  "descriptionPlain": "A World-Changing Company\n \nPalantir builds the world’s leading software for data-driven decisions and operations. By bringing the right data to the people who need it, our platforms empower our partners to develop lifesaving drugs, forecast supply chain disruptions, locate missing children, and more"
+ },
+ {
+  "id": "0ccbe620-a3ef-41d1-a5c4-68e56b3c91d0",
+  "text": "American Tech Fellowship",
+  "categories": {
+   "commitment": "Scholarship",
+   "location": "North America",
+   "team": "Business Development",
+   "allLocations": [
+    "North America"
+   ]
+  },
+  "createdAt": 1750119374985,
+  "hostedUrl": "https://jobs.lever.co/palantir/0ccbe620-a3ef-41d1-a5c4-68e56b3c91d0",
+  "country": "US",
+  "workplaceType": "remote",
+  "descriptionPlain": "A World-Changing Company\n \nPalantir builds the world’s leading software for data-driven decisions and operations. By bringing the right data to the people who need it, our platforms empower our partners to develop lifesaving drugs, power decisions on the battlefield, locate missing children, and mor"
+ },
+ {
+  "id": "10dfc8bc-99ad-4ca2-ab76-853cb90a92c2",
+  "text": "Backend Software Engineer - Application Development",
+  "categories": {
+   "commitment": "Full-time",
+   "location": "London, United Kingdom",
+   "team": "Dev",
+   "allLocations": [
+    "London, United Kingdom"
+   ]
+  },
+  "createdAt": 1710188707256,
+  "hostedUrl": "https://jobs.lever.co/palantir/10dfc8bc-99ad-4ca2-ab76-853cb90a92c2",
+  "country": "GB",
+  "workplaceType": "hybrid",
+  "descriptionPlain": "A World-Changing Company\n \nPalantir builds the world’s leading software for data-driven decisions and operations. By bringing the right data to the people who need it, our platforms empower our partners to develop lifesaving drugs, forecast supply chain disruptions, locate missing children, and more"
+ }
+]
