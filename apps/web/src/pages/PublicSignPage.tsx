@@ -225,7 +225,7 @@ export function PublicSignPage() {
         <footer className="mt-auto border-t border-[var(--border-subtle)] py-4 text-center text-xs text-[var(--fg-muted)] print:hidden">
           {t(
             'publicSign.footerLegalNote',
-            'Your signature is legally binding. This page contains no tracking technologies.',
+            'This is an internal approval signature, not a legally binding e-signature. This page contains no tracking technologies.',
           )}
         </footer>
       </div>
@@ -539,7 +539,7 @@ function SubmitStep({
           {t('publicSign.submitHeading', 'Review and submit')}
         </h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {t('publicSign.submitLegalIntro', 'By submitting, you legally sign')}{' '}
+          {t('publicSign.submitLegalIntro', 'By submitting, you apply an internal approval signature to')}{' '}
           <strong>{data.templateName}</strong>.
         </p>
       </div>
@@ -570,7 +570,7 @@ function SubmitStep({
           <span className="text-sm text-[var(--fg-secondary)] leading-relaxed">
             {t(
               'publicSign.termsAgreement',
-              'I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.',
+              'I understand this is an internal approval signature, not a legally binding e-signature, and that it represents my intent to approve this document. I have had the opportunity to review its contents.',
             )}
           </span>
         </label>
