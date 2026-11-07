@@ -19,6 +19,8 @@ import {
   type AuditLogEntry,
 } from '@bidstack/shared';
 
+import { verifyAuditChain } from '../lib/audit-chain.js';
+
 const SCAN_MULTIPLIER = 4; // overscan when applying account JSON-path filters
 const EXPORT_BATCH_SIZE = 1_000;
 const MAX_EXPORT_SCAN_ROWS = 10_000;
@@ -157,6 +159,32 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
         .header('Cache-Control', 'private, no-store')
         .send(workbook);
     },
+  );
+
+  server.get(
+    '/audit-logs/verify-chain',
+    {
+      config: { rateLimit: { max: 6, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('audit-log:read'),
+      schema: {
+        response: {
+          200: z.object({
+            checked: z.number().int(),
+            firstSeq: z.string().nullable(),
+            lastSeq: z.string().nullable(),
+            ok: z.boolean(),
+            breaks: z.array(
+              z.object({
+                id: z.string(),
+                chainSeq: z.string(),
+                reason: z.enum(['hash_mismatch', 'link_mismatch', 'sequence_gap']),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async (req) => verifyAuditChain(req.auth.orgId),
   );
 
   server.get(
