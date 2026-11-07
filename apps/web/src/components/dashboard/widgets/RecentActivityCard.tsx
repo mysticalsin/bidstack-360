@@ -15,7 +15,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { springSoft } from '@/lib/motion';
-import { relativeTime } from '@/lib/format';
+import { formatStage, relativeTime } from '@/lib/format';
 
 // ─── Type → presentation maps (private) ──────────────────────────────────────
 
@@ -111,7 +111,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
                   {a.subtitle && (
                     <>
                       <span>·</span>
-                      <Badge tone="gray">{a.subtitle}</Badge>
+                      <Badge tone="gray">{formatStage(a.subtitle)}</Badge>
                     </>
                   )}
                 </div>
