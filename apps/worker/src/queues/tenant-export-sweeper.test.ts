@@ -13,6 +13,7 @@ interface Row {
   deletedAt: Date | null;
   createdAt: Date;
   startedAt: Date | null;
+  updatedAt: Date;
 }
 
 const store = vi.hoisted(() => ({ rows: [] as Row[] }));
@@ -20,7 +21,7 @@ const store = vi.hoisted(() => ({ rows: [] as Row[] }));
 function matches(row: Row, where: Record<string, unknown>): boolean {
   if (where.status && row.status !== where.status) return false;
   if ('deletedAt' in where && row.deletedAt !== where.deletedAt) return false;
-  for (const key of ['createdAt', 'startedAt'] as const) {
+  for (const key of ['createdAt', 'startedAt', 'updatedAt'] as const) {
     const bound = where[key] as { lt: Date } | undefined;
     if (bound && !(row[key] && row[key]! < bound.lt)) return false;
   }
@@ -45,14 +46,20 @@ vi.mock('@bidstack/db', () => ({
   },
 }));
 
-const { makeRedrive, sweepTenantExports, PENDING_GRACE_MS, RUNNING_SLA_MS } = await import(
+const { makeRedrive, sweepTenantExports, PENDING_GRACE_MS, RUNNING_STALE_MS } = await import(
   './tenant-export-sweeper.js'
 );
 const log = pino({ level: 'silent' });
 const now = new Date('2026-11-07T12:00:00Z');
 const ago = (ms: number) => new Date(now.getTime() - ms);
 
-function row(id: string, status: string, ageMs: number, startedAgoMs: number | null = null): Row {
+function row(
+  id: string,
+  status: string,
+  ageMs: number,
+  startedAgoMs: number | null = null,
+  heartbeatAgoMs: number = startedAgoMs ?? ageMs,
+): Row {
   return {
     id,
     orgId: 'org-1',
@@ -60,6 +67,7 @@ function row(id: string, status: string, ageMs: number, startedAgoMs: number | n
     deletedAt: null,
     createdAt: ago(ageMs),
     startedAt: startedAgoMs === null ? null : ago(startedAgoMs),
+    updatedAt: ago(heartbeatAgoMs),
   };
 }
 
@@ -77,9 +85,9 @@ describe('sweepTenantExports', () => {
     expect(result.requeued).toBe(1);
   });
 
-  it('fails running rows past the SLA and keeps live ones running', async () => {
+  it('fails running rows whose heartbeat went stale and keeps live ones running', async () => {
     store.rows = [
-      row('dead', 'running', RUNNING_SLA_MS * 2, RUNNING_SLA_MS + 1_000),
+      row('dead', 'running', RUNNING_STALE_MS * 2, RUNNING_STALE_MS * 2, RUNNING_STALE_MS + 1_000),
       row('live', 'running', 60_000, 60_000),
     ];
     const result = await sweepTenantExports(vi.fn(), log, now);
@@ -88,10 +96,19 @@ describe('sweepTenantExports', () => {
     expect(store.rows.find((r) => r.id === 'live')?.status).toBe('running');
   });
 
+  // A large tenant can take hours; the in-flight job keeps its heartbeat fresh.
+  it('never fails a long export whose job is still heartbeating', async () => {
+    const hours = 60 * 60 * 1000;
+    store.rows = [row('big', 'running', 5 * hours, 5 * hours, 30_000)];
+    const result = await sweepTenantExports(vi.fn(), log, now);
+    expect(result.failed).toBe(0);
+    expect(store.rows[0]?.status).toBe('running');
+  });
+
   it('never touches terminal or deleted rows', async () => {
     const deleted = row('gone', 'pending', PENDING_GRACE_MS * 3);
     deleted.deletedAt = ago(1_000);
-    store.rows = [row('done', 'ready', RUNNING_SLA_MS * 3, RUNNING_SLA_MS * 3), deleted];
+    store.rows = [row('done', 'ready', RUNNING_STALE_MS * 3, RUNNING_STALE_MS * 3), deleted];
     const enqueue = vi.fn(async () => true);
     const result = await sweepTenantExports(enqueue, log, now);
     expect(enqueue).not.toHaveBeenCalled();
