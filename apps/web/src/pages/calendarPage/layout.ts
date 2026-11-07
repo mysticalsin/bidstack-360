@@ -123,7 +123,14 @@ export interface TimedBlock {
 export function layoutTimed(events: CalendarEvent[], key: string, tz: string): TimedBlock[] {
   const dayStart = zonedMidnight(key, tz).getTime();
   const dayEnd = zonedMidnight(addDays(key, 1), tz).getTime();
-  const dayMinutes = Math.round((dayEnd - dayStart) / 60_000);
+  // The grid is 24 wall-clock hours even on 23 or 25 hour DST days.
+  const dayMinutes = 24 * 60;
+  const wallMin = (t: number) => {
+    if (t <= dayStart) return 0;
+    if (t >= dayEnd) return dayMinutes;
+    const p = zonedParts(new Date(t), tz);
+    return p.hour * 60 + p.minute;
+  };
 
   const blocks = events
     .filter((ev) => !isLaneEvent(ev))
@@ -134,8 +141,8 @@ export function layoutTimed(events: CalendarEvent[], key: string, tz: string): T
     })
     .filter(({ ev, s, e }) => s < dayEnd && (e > dayStart || new Date(ev.startAt).getTime() >= dayStart))
     .map(({ ev, s, e }) => {
-      const startMin = Math.round((s - dayStart) / 60_000);
-      const endMin = Math.min(Math.max(Math.round((e - dayStart) / 60_000), startMin + MIN_BLOCK_MINUTES), dayMinutes);
+      const startMin = wallMin(s);
+      const endMin = Math.min(Math.max(wallMin(e), startMin + MIN_BLOCK_MINUTES), dayMinutes);
       return { event: ev, startMin: Math.min(startMin, dayMinutes - MIN_BLOCK_MINUTES), endMin, col: 0, cols: 1 };
     })
     .sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);

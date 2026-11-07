@@ -20,7 +20,7 @@ import {
   keyToLocalDate,
   layoutLane,
   layoutTimed,
-  zonedMidnight,
+  zonedParts,
 } from './layout';
 import { eventFill } from './eventFill';
 import type { CalendarEvent } from './types';
@@ -60,7 +60,7 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
   const now = new Date();
   const nowMinutes =
     keys.includes(todayKey) && dayKey(now, tz) === todayKey
-      ? (now.getTime() - zonedMidnight(todayKey, tz).getTime()) / 60_000
+      ? zonedParts(now, tz).hour * 60 + zonedParts(now, tz).minute
       : null;
 
   const timeRange = (ev: CalendarEvent) =>

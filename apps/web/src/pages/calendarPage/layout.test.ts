@@ -59,6 +59,15 @@ describe('day keys and boundaries', () => {
 });
 
 describe('layoutTimed', () => {
+  it('draws events at their wall-clock row on the 25-hour fall-back day', () => {
+    // 1 Nov 2026: Toronto falls back at 02:00. 14:00 EST = 19:00 UTC.
+    const [fallBack] = layoutTimed([ev('a', '2026-11-01T19:00:00Z', '2026-11-01T20:00:00Z')], '2026-11-01', TZ);
+    expect(fallBack).toMatchObject({ startMin: 14 * 60, endMin: 15 * 60 });
+    // 8 Mar 2026: springs forward at 02:00. 14:00 EDT = 18:00 UTC.
+    const [springForward] = layoutTimed([ev('b', '2026-03-08T18:00:00Z', '2026-03-08T19:00:00Z')], '2026-03-08', TZ);
+    expect(springForward).toMatchObject({ startMin: 14 * 60, endMin: 15 * 60 });
+  });
+
   it('places overlapping events side by side so their text never overlaps', () => {
     const blocks = layoutTimed(
       [
