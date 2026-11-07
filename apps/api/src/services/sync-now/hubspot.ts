@@ -69,36 +69,49 @@ async function snapshot(orgId: string, runId: string): Promise<SyncRun | null> {
   return hubspotRunFromJobs(runId, jobs, created);
 }
 
+// Covers the wait for a concurrent start plus the import's own setup.
+const START_LOCK_TIMEOUT_MS = 30_000;
+
 export async function startHubspotSync(input: StartSyncInput): Promise<SyncRun> {
   const runId = syncRunId(input.orgId, 'hubspot', input.idempotencyKey);
-  const existing = await snapshot(input.orgId, runId);
-  if (existing) return existing;
   // One HubSpot import per org at a time: a second click or a second admin
-  // joins the run in flight instead of starting a duplicate import.
-  const inFlight = await prisma.migrationJob.findFirst({
-    where: { orgId: input.orgId, source: 'HUBSPOT_OAUTH', status: { in: ['PENDING', 'RUNNING'] } },
-    orderBy: { createdAt: 'desc' },
-    select: { meta: true },
-  });
-  if (inFlight) {
-    const inFlightRun = (inFlight.meta as { syncRunId?: unknown } | null)?.syncRunId;
-    const run = typeof inFlightRun === 'string' ? await snapshot(input.orgId, inFlightRun) : null;
-    if (run) return run;
-    throw new SyncUnavailableError('A HubSpot import is already running');
-  }
-  try {
-    await startHubspotImport({
-      orgId: input.orgId,
-      userId: input.userId,
-      entities: HUBSPOT_IMPORT_ENTITIES,
-      dedupStrategy: 'update',
-      queue: migrationQueue(),
-      syncRunId: runId,
-    });
-  } catch (err) {
-    if (err instanceof HubspotNotConnectedError) throw new SyncUnavailableError(err.message);
-    throw err;
-  }
+  // joins the run in flight instead of starting a duplicate import. The
+  // advisory lock serialises check-then-start per org; the import writes its
+  // MigrationJobs on autocommit, so the next holder sees them as in flight.
+  const joined = await prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`sync-now:hubspot:${input.orgId}`}))`;
+      const existing = await snapshot(input.orgId, runId);
+      if (existing) return existing;
+      const inFlight = await prisma.migrationJob.findFirst({
+        where: { orgId: input.orgId, source: 'HUBSPOT_OAUTH', status: { in: ['PENDING', 'RUNNING'] } },
+        orderBy: { createdAt: 'desc' },
+        select: { meta: true },
+      });
+      if (inFlight) {
+        const inFlightRun = (inFlight.meta as { syncRunId?: unknown } | null)?.syncRunId;
+        const run = typeof inFlightRun === 'string' ? await snapshot(input.orgId, inFlightRun) : null;
+        if (run) return run;
+        throw new SyncUnavailableError('A HubSpot import is already running');
+      }
+      try {
+        await startHubspotImport({
+          orgId: input.orgId,
+          userId: input.userId,
+          entities: HUBSPOT_IMPORT_ENTITIES,
+          dedupStrategy: 'update',
+          queue: migrationQueue(),
+          syncRunId: runId,
+        });
+      } catch (err) {
+        if (err instanceof HubspotNotConnectedError) throw new SyncUnavailableError(err.message);
+        throw err;
+      }
+      return null;
+    },
+    { maxWait: START_LOCK_TIMEOUT_MS, timeout: START_LOCK_TIMEOUT_MS },
+  );
+  if (joined) return joined;
   const run = await snapshot(input.orgId, runId);
   if (!run) throw new SyncNotFoundError();
   return run;

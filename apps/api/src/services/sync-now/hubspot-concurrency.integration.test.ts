@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
+import type * as HubspotImport from '../hubspot-import.js';
 import { createIsolatedOrg, dropIsolatedOrg } from '../../test-support/isolated-org.js';
 import { startHubspotSync } from './hubspot.js';
 import { SyncUnavailableError } from './errors.js';
@@ -13,7 +14,7 @@ const importCalls = vi.hoisted(() => ({ count: 0 }));
 // The real import awaits the HubSpot connection and the connector policy
 // before it writes its first MigrationJob; the delay reproduces that window.
 vi.mock('../hubspot-import.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../hubspot-import.js')>();
+  const actual = await importOriginal<typeof HubspotImport>();
   const { prisma: db } = await import('@bidstack/db');
   return {
     ...actual,
