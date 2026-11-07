@@ -60,7 +60,13 @@ const dashboardsMocks = vi.hoisted(() => ({
 vi.mock('@/hooks/useDashboards', () => dashboardsMocks);
 
 vi.mock('@/components/widgets/WidgetRenderer', () => ({
-  WidgetRenderer: ({ widget: w, onDelete }: { widget: { title: string }; onDelete?: () => void }) => (
+  WidgetRenderer: ({
+    widget: w,
+    onDelete,
+  }: {
+    widget: { title: string };
+    onDelete?: () => void;
+  }) => (
     <div>
       <span>{w.title}</span>
       {onDelete ? (
@@ -127,11 +133,14 @@ describe('AnalyticsDashboardPage — reports:write gating', () => {
   });
 });
 
-describe('AnalyticsDashboardPage — states', () => {
+describe('AnalyticsDashboardPage states', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
-    dashboardsMocks.useDashboards.mockImplementation(() => ({ data: [dashboard], isLoading: false }));
+    dashboardsMocks.useDashboards.mockImplementation(() => ({
+      data: [dashboard],
+      isLoading: false,
+    }));
     dashboardsMocks.useDashboardWidgets.mockImplementation(() => ({
       data: [widget],
       isLoading: false,
@@ -143,7 +152,13 @@ describe('AnalyticsDashboardPage — states', () => {
     const refetch = vi.fn();
     dashboardsMocks.useDashboards.mockImplementation(
       () =>
-        ({ data: undefined, isLoading: false, isError: true, error: new Error('boom'), refetch }) as never,
+        ({
+          data: undefined,
+          isLoading: false,
+          isError: true,
+          error: new Error('boom'),
+          refetch,
+        }) as never,
     );
 
     renderPage();
@@ -152,6 +167,24 @@ describe('AnalyticsDashboardPage — states', () => {
     expect(screen.getByRole('alert')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it('keeps showing cached dashboards when a background refetch fails', () => {
+    dashboardsMocks.useDashboards.mockImplementation(
+      () =>
+        ({
+          data: [dashboard],
+          isLoading: false,
+          isError: true,
+          error: new Error('boom'),
+          refetch: vi.fn(),
+        }) as never,
+    );
+
+    renderPage();
+
+    expect(screen.queryByText('Could not load dashboards')).toBeNull();
+    expect(screen.getAllByText('Pipeline Overview').length).toBeGreaterThan(0);
   });
 
   it('shows a loading grid while the widgets load', () => {
