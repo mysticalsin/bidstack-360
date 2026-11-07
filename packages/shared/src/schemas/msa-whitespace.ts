@@ -140,8 +140,8 @@ export const RelationshipPerson = z.object({
   entities: z.array(z.string()),
   lines: z.array(z.string()),
   lastActivityAt: z.string().nullable(),
-  valueMicros: z.number().int(),
-  currency: z.string().nullable(),
+  /** One total per currency; amounts in different currencies are never summed. */
+  totals: z.array(z.object({ currency: z.string(), valueMicros: z.number().int() })),
   counts: z.object({
     msas: z.number().int(),
     opportunities: z.number().int(),

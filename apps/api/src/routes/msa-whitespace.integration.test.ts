@@ -8,7 +8,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { prisma } from '@bidstack/db';
+import { loadAccountActivityLines, prisma } from '@bidstack/db';
 import { agentTools } from '@bidstack/db/agent-tools';
 import type { WhitespaceFlag } from '@bidstack/shared';
 
@@ -157,6 +157,89 @@ describe('who works with them', () => {
     expect(map.countries).toEqual(expect.arrayContaining(['US', 'GB']));
   });
 
+  it('a country-restricted user sees only the opportunities they may see, in rows, activity and totals', async () => {
+    const teammate = await prisma.user.findFirstOrThrow({ where: { orgId: org.orgId, id: { not: adminId } }, orderBy: { createdAt: 'asc' } });
+    const hidden = await prisma.opportunity.create({
+      data: {
+        orgId: org.orgId,
+        code: `WS-HIDDEN-${randomUUID().slice(0, 8)}`,
+        customer: 'Pfizer',
+        companyId: pfizerId,
+        name: 'Secret DE advisory deal',
+        stage: 's2_sent',
+        ownerId: teammate.id,
+        country: 'DE',
+        valueMicros: 7_777_000_000n,
+      },
+    });
+    const call_ = await prisma.activity.create({
+      data: { orgId: org.orgId, type: 'call', subject: 'Secret DE pricing call', entityType: 'opportunity', entityId: hidden.id, ownerId: teammate.id },
+    });
+    const group = await prisma.userGroup.create({ data: { orgId: org.orgId, name: `ws-us-${randomUUID().slice(0, 8)}`, scopeCountries: ['US'], scopeAll: false } });
+    await prisma.userGroupMember.create({ data: { orgId: org.orgId, userId: adminId, groupId: group.id } });
+    invalidateAccessScope(org.orgId, adminId);
+    type Map = { rows: Array<{ id: string }>; people: Array<{ owner: { id: string }; totals: Array<{ currency: string; valueMicros: number }> }> };
+    const expectHidden = (map: Map) => {
+      expect(map.rows.map((r) => r.id)).not.toContain(hidden.id);
+      expect(map.rows.map((r) => r.id)).not.toContain(call_.id);
+      expect(JSON.stringify(map)).not.toContain('Secret DE');
+      const mate = map.people.find((p) => p.owner.id === teammate.id);
+      for (const t of mate?.totals ?? []) expect(t.valueMicros).toBeLessThan(7_777_000_000);
+    };
+    try {
+      const res = await call({ method: 'GET', url: `/companies/${pfizerId}/relationship-map` });
+      expect(res.statusCode, res.body).toBe(200);
+      expectHidden(res.json() as Map);
+      const viaTool = (await agentTools.relationship_map.handler({ companyId: pfizerId }, { orgId: org.orgId, userId: adminId })) as Map;
+      expectHidden(viaTool);
+      await prisma.userGroupMember.deleteMany({ where: { groupId: group.id } });
+      invalidateAccessScope(org.orgId, adminId);
+      // Unrestricted, the same deal is on the map.
+      const open = (await call({ method: 'GET', url: `/companies/${pfizerId}/relationship-map` })).json() as Map;
+      expect(open.rows.map((r) => r.id)).toEqual(expect.arrayContaining([hidden.id, call_.id]));
+    } finally {
+      await prisma.userGroupMember.deleteMany({ where: { groupId: group.id } });
+      await prisma.userGroup.delete({ where: { id: group.id } });
+      invalidateAccessScope(org.orgId, adminId);
+      await prisma.activity.delete({ where: { id: call_.id } });
+      await prisma.opportunity.delete({ where: { id: hidden.id } });
+    }
+  });
+
+  it('keeps person totals per currency and never sums EUR with USD', async () => {
+    const sub = await prisma.subscription.create({
+      data: {
+        orgId: org.orgId,
+        accountId: pfizerId,
+        planTier: 'Support plan',
+        arrAmountMicros: 300_000_000_000n,
+        currency: 'USD',
+        startedAt: new Date('2026-01-01T00:00:00Z'),
+        currentPeriodEnd: new Date('2026-12-31T00:00:00Z'),
+        renewalDate: new Date('2026-12-31T00:00:00Z'),
+        ownerId: adminId,
+      },
+    });
+    const opp = await prisma.opportunity.create({
+      data: { orgId: org.orgId, code: `WS-EUR-${randomUUID().slice(0, 8)}`, customer: 'Pfizer', companyId: pfizerId, name: 'Pfizer support renewal', stage: 's2_sent', ownerId: adminId, valueMicros: 200_000_000_000n },
+    });
+    try {
+      const res = await call({ method: 'GET', url: `/companies/${pfizerId}/relationship-map` });
+      expect(res.statusCode, res.body).toBe(200);
+      const map = res.json() as { people: Array<{ owner: { id: string }; totals: Array<{ currency: string; valueMicros: number }> }> };
+      const me = map.people.find((p) => p.owner.id === adminId)!;
+      expect(me).not.toHaveProperty('valueMicros');
+      const usd = me.totals.find((t) => t.currency === 'USD');
+      const eur = me.totals.find((t) => t.currency === 'EUR');
+      expect(usd?.valueMicros).toBe(300_000_000_000);
+      expect(eur?.valueMicros).toBeGreaterThanOrEqual(200_000_000_000);
+      expect(me.totals.map((t) => t.currency).sort()).toEqual(['EUR', 'USD']);
+    } finally {
+      await prisma.subscription.delete({ where: { id: sub.id } });
+      await prisma.opportunity.delete({ where: { id: opp.id } });
+    }
+  });
+
   it('respects a scoped API key', async () => {
     const key = await makeKey({ companyIds: [] });
     const res = await server.inject({ method: 'GET', url: `/api/v1/companies/${pfizerId}/relationship-map`, headers: { 'x-api-key': key.raw } });
@@ -195,6 +278,26 @@ describe('accept and dismiss', () => {
     expect(audit).not.toBeNull();
     const again = await call({ method: 'POST', url: `/msa/${pfizerMsaId}/whitespace/accept`, payload: { line: 'it', ownerId: adminId, dueDate: '2026-12-15' } });
     expect(again.statusCode).toBe(409);
+  });
+
+  it('an accepted opportunity is left out only while it is still a lead', async () => {
+    const decision = await prisma.msaWhitespaceDecision.findFirstOrThrow({ where: { orgId: org.orgId, contractId: pfizerMsaId, line: 'it', state: 'accepted' } });
+    const before = (await loadAccountActivityLines(prisma, org.orgId, [pfizerId])).get(pfizerId)!;
+    expect(before.opportunityLines).not.toContain('it');
+    await prisma.opportunity.update({ where: { id: decision.opportunityId! }, data: { stage: 's2_sent' } });
+    try {
+      const after = (await loadAccountActivityLines(prisma, org.orgId, [pfizerId])).get(pfizerId)!;
+      expect(after.opportunityLines).toContain('it');
+    } finally {
+      await prisma.opportunity.update({ where: { id: decision.opportunityId! }, data: { stage: 's1_lead' } });
+    }
+  });
+
+  it('the seeded HSBC Cybersecurity Transformation counts as IT business', async () => {
+    const hsbc = await prisma.company.findFirstOrThrow({ where: { orgId: org.orgId, name: 'HSBC' } });
+    expect(await prisma.opportunity.count({ where: { orgId: org.orgId, companyId: hsbc.id, name: 'Cybersecurity Transformation' } })).toBe(1);
+    const lines = (await loadAccountActivityLines(prisma, org.orgId, [hsbc.id])).get(hsbc.id)!;
+    expect(lines.opportunityLines).toContain('it');
   });
 
   it('dismiss hides a line for 90 days unless the evidence changes', async () => {
@@ -253,6 +356,58 @@ describe('concurrent accept', () => {
     const res = await Promise.all([1, 2].map(() => call({ method: 'POST', url: `/msa/${msa.id}/whitespace/accept`, payload: body })));
     expect(res.map((r) => r.statusCode).sort()).toEqual([201, 409]);
     expect(await prisma.crossSellAction.count({ where: { orgId: org.orgId } })).toBe(before + 1);
+  });
+  it('a dismissal racing an accept takes the same MSA lock, rechecks, and loses', async () => {
+    const msa = await prisma.contractAgreement.findFirstOrThrow({ where: { orgId: org.orgId, reference: 'NW-PHARMA-MSA-2026' } });
+    await prisma.msaWhitespaceDecision.deleteMany({ where: { orgId: org.orgId, contractId: msa.id } });
+    const flag = ((await call({ method: 'GET', url: `/msa/${msa.id}/whitespace` })).json() as { flag: WhitespaceFlag }).flag;
+    const line = flag.lines[0]!;
+    const lockWaiters = async () =>
+      Number(
+        (await prisma.$queryRaw<Array<{ n: bigint }>>`SELECT count(*)::bigint AS n FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`)[0]!.n,
+      );
+    const until = async (check: () => Promise<boolean>) => {
+      for (let i = 0; i < 100 && !(await check()); i += 1) await new Promise((r) => setTimeout(r, 50));
+    };
+
+    // Hold the MSA row so the accept is parked inside its transaction, then
+    // dismiss while it waits: the order a real double submit can produce.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let held!: () => void;
+    const holding = new Promise<void>((r) => (held = r));
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM contract_agreements WHERE id = ${msa.id}::uuid FOR UPDATE`;
+        held();
+        await gate;
+      },
+      { timeout: 20_000 },
+    );
+    await holding;
+    const accepting = call({ method: 'POST', url: `/msa/${msa.id}/whitespace/accept`, payload: { line, ownerId: adminId, dueDate: '2026-12-15' } });
+    await until(async () => (await lockWaiters()) >= 1);
+    let dismissDone = false;
+    const dismissing = call({ method: 'POST', url: `/msa/${msa.id}/whitespace/dismiss`, payload: { line, reason: 'Race check' } }).then((r) => {
+      dismissDone = true;
+      return r;
+    });
+    await until(async () => dismissDone || (await lockWaiters()) >= 2);
+    release();
+    await holder;
+    const [accept, dismiss] = await Promise.all([accepting, dismissing]);
+
+    // The accept queued for the row first, so it wins and the dismissal,
+    // which read the flag before the accept committed, must see it and stop.
+    expect(accept.statusCode, accept.body).toBe(201);
+    expect(dismiss.statusCode, dismiss.body).toBe(409);
+    const decisions = await prisma.msaWhitespaceDecision.findMany({
+      where: { orgId: org.orgId, contractId: msa.id, line },
+      orderBy: { decidedAt: 'desc' },
+    });
+    expect(decisions.map((d) => d.state)).toEqual(['accepted']);
+    const after = ((await call({ method: 'GET', url: `/msa/${msa.id}/whitespace` })).json() as { flag: WhitespaceFlag }).flag;
+    expect(after.decisions.find((d) => d.line === line)?.state).toBe('accepted');
   });
 });
 

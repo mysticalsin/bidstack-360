@@ -23,6 +23,8 @@ export async function loadRelationshipMap(
   orgId: string,
   companyId: string,
   companyWhere: Prisma.CompanyWhereInput,
+  /** The caller's opportunity visibility; hidden deals never reach rows, activity or totals. */
+  opportunityWhere: Prisma.OpportunityWhereInput,
 ): Promise<RelationshipMap | null> {
   const company = await db.company.findFirst({
     where: { AND: [companyWhere, { id: companyId, orgId, deletedAt: null }] },
@@ -72,7 +74,7 @@ export async function loadRelationshipMap(
       take: TAKE,
     }),
     db.opportunity.findMany({
-      where: { orgId, companyId: { in: ids }, deletedAt: null },
+      where: { AND: [opportunityWhere, { orgId, companyId: { in: ids }, deletedAt: null }] },
       select: { id: true, name: true, industry: true, companyId: true, ownerId: true, valueMicros: true, country: true, stage: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
       take: TAKE,
@@ -231,15 +233,17 @@ export async function loadRelationshipMap(
     if (!r.owner) continue;
     let p = people.get(r.owner.id);
     if (!p) {
-      p = { owner: r.owner, entities: [], lines: [], lastActivityAt: null, valueMicros: 0, currency: null, counts: { msas: 0, opportunities: 0, projects: 0, contacts: 0, activities: 0 } };
+      p = { owner: r.owner, entities: [], lines: [], lastActivityAt: null, totals: [], counts: { msas: 0, opportunities: 0, projects: 0, contacts: 0, activities: 0 } };
       people.set(r.owner.id, p);
     }
     if (r.entity && !p.entities.includes(r.entity)) p.entities.push(r.entity);
     if (r.line && !p.lines.includes(r.line)) p.lines.push(r.line);
     if (r.lastActivityAt && (!p.lastActivityAt || r.lastActivityAt > p.lastActivityAt)) p.lastActivityAt = r.lastActivityAt;
-    if (r.kind === 'opportunity' || r.kind === 'revenue') {
-      p.valueMicros += r.valueMicros ?? 0;
-      p.currency = p.currency ?? r.currency;
+    if ((r.kind === 'opportunity' || r.kind === 'revenue') && r.valueMicros !== null && r.currency) {
+      const currency = r.currency.toUpperCase();
+      const total = p.totals.find((t) => t.currency === currency);
+      if (total) total.valueMicros += r.valueMicros;
+      else p.totals.push({ currency, valueMicros: r.valueMicros });
     }
     if (r.kind === 'msa') p.counts.msas += 1;
     else if (r.kind === 'opportunity') p.counts.opportunities += 1;
@@ -247,6 +251,7 @@ export async function loadRelationshipMap(
     else if (r.kind === 'contact') p.counts.contacts += 1;
     else if (r.kind === 'activity') p.counts.activities += 1;
   }
+  for (const p of people.values()) p.totals.sort((a, b) => b.valueMicros - a.valueMicros);
 
   const entities = new Map<string, RelationshipMap['entities'][number]>();
   for (const m of msas) {

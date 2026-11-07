@@ -37,7 +37,7 @@ export const HEMA_PHARMA_LINES: readonly Line[] = [
 ];
 
 const LINE_ALIASES: Array<{ line: Line; tokens: string[] }> = [
-  { line: 'it', tokens: ['it', 'information technology', 'software', 'cloud', 'cyber', 'sap', 'infrastructure', 'data platform'] },
+  { line: 'it', tokens: ['it', 'information technology', 'software', 'cloud', 'cyber*', 'sap', 'infrastructure', 'data platform'] },
   { line: 'engineering', tokens: ['engineering', 'mechanical', 'industrial', 'manufacturing', 'r&d'] },
   { line: 'digital', tokens: ['digital', 'ux', 'product design', 'transformation', 'e-commerce'] },
   { line: 'pharma', tokens: ['pharma', 'pharmaceutical', 'life sciences', 'biotech'] },
@@ -56,10 +56,15 @@ export function labelBusinessLine(value: string): string {
   return isBusinessLine(value) ? BUSINESS_LINE_LABEL[value] : value;
 }
 
+/**
+ * Whole words only, so "it" never matches "digital" or "with". A trailing `*`
+ * marks a stem that may run on: "cyber*" covers cybersecurity and
+ * cyber-security. Keep stems long enough to stay unambiguous.
+ */
 function tokenPattern(token: string): RegExp {
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Whole words only: "it" must not match "digital" or "with".
-  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, 'i');
+  const stem = token.endsWith('*');
+  const escaped = (stem ? token.slice(0, -1) : token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}${stem ? '' : '(?:$|[^a-z0-9])'}`, 'i');
 }
 
 const LINE_PATTERNS = LINE_ALIASES.map(({ line, tokens }) => ({ line, patterns: tokens.map(tokenPattern) }));

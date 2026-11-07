@@ -20,6 +20,7 @@ import {
   labelBusinessLine,
   normalizeName,
   RelationshipMap,
+  resolveWhitespaceDecision,
   WhitespaceAccept,
   WhitespaceDecisionResponse,
   WhitespaceDismiss,
@@ -29,7 +30,7 @@ import {
   type WhitespaceFlag as WhitespaceFlagT,
 } from '@bidstack/shared';
 
-import { applyCompanyScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
+import { applyCompanyScope, applyOpportunityScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
 import { isUniqueViolation, mintNextCode } from './opportunities.helpers.js';
 
 const IdParams = z.object({ id: z.string().uuid() });
@@ -37,6 +38,25 @@ const IdParams = z.object({ id: z.string().uuid() });
 async function scopedCompanyWhere(req: FastifyRequest): Promise<Prisma.CompanyWhereInput> {
   const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
   return applyCompanyScope({ orgId: req.auth.orgId, deletedAt: null }, scope);
+}
+
+/**
+ * Decision time strictly after the line's latest decision. Read under the MSA
+ * row lock: now() would be the transaction start, which can predate a
+ * decision committed while this transaction waited for the lock.
+ */
+function later(latest: Date | undefined): Date {
+  const now = new Date();
+  return latest && latest.getTime() >= now.getTime() ? new Date(latest.getTime() + 1) : now;
+}
+
+async function nextDecidedAt(tx: Prisma.TransactionClient, orgId: string, contractId: string, line: string): Promise<Date> {
+  const latest = await tx.msaWhitespaceDecision.findFirst({
+    where: { orgId, contractId, line },
+    orderBy: { decidedAt: 'desc' },
+    select: { decidedAt: true },
+  });
+  return later(latest?.decidedAt);
 }
 
 export function filterWhitespace(flags: WhitespaceFlagT[], q: z.infer<typeof WhitespaceListQuery>): WhitespaceFlagT[] {
@@ -164,6 +184,7 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
               select: { id: true },
             });
             if (taken) throw server.httpErrors.conflict('This line is already accepted');
+            const decidedAt = await nextDecidedAt(tx, req.auth.orgId, flag.msaId, line);
             const action = await tx.crossSellAction.create({
               data: {
                 orgId: req.auth.orgId,
@@ -208,6 +229,7 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
                 decidedById: req.auth.userId,
                 crossSellActionId: action.id,
                 opportunityId,
+                decidedAt,
               },
             });
             await tx.auditLog.create({
@@ -243,8 +265,25 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!flag.lines.includes(line) || flag.decisions.some((d) => d.line === line)) {
         throw server.httpErrors.badRequest('This line is not open on this MSA');
       }
-      await prisma.$transaction([
-        prisma.msaWhitespaceDecision.create({
+      await prisma.$transaction(async (tx) => {
+        // Same lock as accept, then decide again: an accept that committed
+        // while this request was reading wins.
+        await tx.$queryRaw`SELECT id FROM contract_agreements WHERE id = ${flag.msaId}::uuid FOR UPDATE`;
+        const latest = await tx.msaWhitespaceDecision.findFirst({
+          where: { orgId: req.auth.orgId, contractId: flag.msaId, line },
+          orderBy: { decidedAt: 'desc' },
+          select: { line: true, state: true, evidenceHash: true, reason: true, decidedAt: true },
+        });
+        const decidedAt = later(latest?.decidedAt);
+        if (latest) {
+          const current = resolveWhitespaceDecision(
+            [{ ...latest, state: latest.state as 'accepted' | 'dismissed', decidedAt: latest.decidedAt.toISOString() }],
+            line,
+            flag.evidenceHash,
+          );
+          if (current.state !== 'new') throw server.httpErrors.conflict(`This line is already ${current.state}`);
+        }
+        await tx.msaWhitespaceDecision.create({
           data: {
             orgId: req.auth.orgId,
             contractId: flag.msaId,
@@ -255,9 +294,10 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
             evidenceHash: flag.evidenceHash,
             score: flag.score,
             decidedById: req.auth.userId,
+            decidedAt,
           },
-        }),
-        prisma.auditLog.create({
+        });
+        await tx.auditLog.create({
           data: {
             orgId: req.auth.orgId,
             userId: req.auth.userId,
@@ -266,8 +306,8 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
             targetId: flag.msaId,
             diff: { line, reason, score: flag.score, evidenceHash: flag.evidenceHash },
           },
-        }),
-      ]);
+        });
+      });
       return { flag: await refreshed(req, flag.msaId), crossSellActionId: null, opportunityId: null };
     },
   );
@@ -276,8 +316,10 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
     '/companies/:id/relationship-map',
     { config: { permission: 'msa:read' }, schema: { params: IdParams, response: { 200: RelationshipMap } } },
     async (req) => {
-      const where = await scopedCompanyWhere(req);
-      const map = await loadRelationshipMap(prisma, req.auth.orgId, req.params.id, where);
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const where = applyCompanyScope({ orgId: req.auth.orgId, deletedAt: null }, scope);
+      const opportunityWhere = applyOpportunityScope({ orgId: req.auth.orgId }, scope);
+      const map = await loadRelationshipMap(prisma, req.auth.orgId, req.params.id, where, opportunityWhere);
       if (!map) throw server.httpErrors.notFound('Account not found');
       return map;
     },
