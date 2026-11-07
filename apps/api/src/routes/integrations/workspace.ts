@@ -49,6 +49,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (server) => {
     config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: {
       params: Provider,
+      body: z.object({}).strict().nullish(),
       response: { 200: z.object({ authUrl: z.string().url() }), 503: NotConfigured },
     },
     handler: async (req, reply) => {
