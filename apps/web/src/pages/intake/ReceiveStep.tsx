@@ -123,7 +123,7 @@ export function ReceiveStep({
         <p className="mt-1 text-xs text-[var(--fg-secondary)]">
           {t('crm.receiveStep.dragDropPrefix', 'Drag & drop files here or')}{' '}
           <label
-            className={`text-[var(--brand-primary)] ${
+            className={`text-[var(--brand-primary)] dark:text-[var(--brand-deep)] ${
               canUpload ? 'cursor-pointer hover:underline' : 'cursor-not-allowed opacity-60'
             }`}
           >

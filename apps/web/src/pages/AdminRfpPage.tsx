@@ -18,14 +18,14 @@ export function AdminRfpPage() {
     <div className="space-y-6">
       <header className="page-head">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)]">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
             {t('adminRfp.eyebrow', 'Admin')}
           </p>
           <h1 className="page-title">{t('adminRfp.title', 'RFP Analytics')}</h1>
         </div>
         <Link
           to="/proposals"
-          className="inline-flex h-11 items-center text-sm font-medium text-[var(--brand-primary)] hover:underline"
+          className="inline-flex h-11 items-center text-sm font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
         >
           {t('adminRfp.viewAllProposals', 'View all proposals')}
         </Link>

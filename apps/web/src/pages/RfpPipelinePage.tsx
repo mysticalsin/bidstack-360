@@ -125,7 +125,7 @@ export function RfpPipelinePage() {
       {/* Page heading */}
       <header className="page-head flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)]">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
             {t('nav.rfpSection')}
           </p>
           <h1 className="page-title">{t('pipeline.title')}</h1>

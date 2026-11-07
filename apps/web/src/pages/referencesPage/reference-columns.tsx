@@ -132,7 +132,9 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       cell: (row) => (
         <span className="flex min-w-0 items-center gap-2">
           <Avatar seed={row.company?.name ?? row.title} size={20} decorative />
-          <span className="block truncate font-medium text-fg-primary">{row.title}</span>
+          <span className="block truncate font-medium text-fg-primary" title={row.title}>
+            {row.title}
+          </span>
         </span>
       ),
     },
@@ -149,7 +151,8 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       header: t('references.column.industry', 'Industry'),
       sortable: true,
       width: 'w-28',
-      hideBelow: 'lg',
+      // At lg the fixed columns leave the title column under 50px wide.
+      hideBelow: 'xl',
       cell: (row) => truncatedCell(row.industry),
     },
     {
@@ -166,6 +169,7 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       sortable: true,
       numeric: true,
       width: 'w-28',
+      hideBelow: 'xl',
       cell: (row) => (row.lastUsedAt ? new Date(row.lastUsedAt).toLocaleDateString() : null),
     },
     {
