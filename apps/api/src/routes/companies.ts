@@ -11,11 +11,15 @@ import {
   type CompanyHierarchyNode,
 } from '@bidstack/shared';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
+
+/** Per-relation row cap on GET /companies/:id; the full lists have their own paginated routes. */
+const COMPANY_DETAIL_RELATED_CAP = 200;
 
 export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -108,13 +112,22 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
         include: {
           parent: { select: { id: true, name: true } },
-          children: { where: { deletedAt: null }, select: { id: true, name: true } },
+          children: {
+            where: { deletedAt: null },
+            select: { id: true, name: true },
+            orderBy: { name: 'asc' },
+            take: COMPANY_DETAIL_RELATED_CAP,
+          },
           contacts: {
             where: { deletedAt: null },
             select: { id: true, name: true, role: true, email: true, phone: true },
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+            take: COMPANY_DETAIL_RELATED_CAP,
           },
           opportunities: {
             where: { deletedAt: null },
+            orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+            take: COMPANY_DETAIL_RELATED_CAP,
             select: {
               id: true,
               code: true,
@@ -128,6 +141,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           serviceCases: {
             where: { deletedAt: null, status: { not: 'closed' } },
             select: { id: true, number: true, subject: true, status: true, priority: true },
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+            take: COMPANY_DETAIL_RELATED_CAP,
           },
           notes: {
             where: { deletedAt: null },
@@ -218,18 +233,30 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           select: { id: true },
         });
         if (!parent) throw server.httpErrors.badRequest('Parent company not found');
-        // Prevent circular reference
+        // Prevent circular reference. The visited set also stops the walk on an
+        // existing corrupt cycle above the new parent (parentId has no DB-level
+        // acyclicity constraint), which would otherwise loop forever.
         let currentId: string | null = patch.parentId;
+        const visited = new Set<string>();
         while (currentId) {
-          if (currentId === req.params.id) {
+          if (currentId === req.params.id || visited.has(currentId)) {
             throw server.httpErrors.badRequest('Circular reference detected');
           }
+          visited.add(currentId);
           const row: { parentId: string | null } | null = await prisma.company.findFirst({
             where: { id: currentId, orgId: req.auth.orgId, deletedAt: null },
             select: { parentId: true },
           });
           currentId = row?.parentId ?? null;
         }
+      }
+      if (patch.customFieldValues?.length) {
+        const foreign = await foreignCustomFieldDefinitions(
+          req.auth.orgId,
+          'company',
+          patch.customFieldValues.map((v) => v.definitionId),
+        );
+        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
       }
       // CF upserts included in the same transaction so a CF failure rolls back
       // the company update — prevents partial-update / data corruption (P0 #5).

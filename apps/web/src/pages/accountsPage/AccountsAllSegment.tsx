@@ -8,7 +8,7 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import { useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
+import { AUTOPOPULATE_MAX, useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
@@ -249,7 +249,7 @@ export function AccountsAllSegment() {
 
   const syncErpAccounts = () => {
     autopopulate.mutate(
-      { limit: 20 },
+      { limit: AUTOPOPULATE_MAX },
       {
         onError: (error) => {
           toast.error(t('accounts.sync.errorTitle', 'ERP account sync failed'), {
@@ -344,7 +344,7 @@ export function AccountsAllSegment() {
               {syncError ??
                 t(
                   'accounts.sync.alertFallback',
-                  'The last sync could not pull the top 20 ERP customers.',
+                  'The last sync could not pull the top ERP customers.',
                 )}
             </div>
           </div>

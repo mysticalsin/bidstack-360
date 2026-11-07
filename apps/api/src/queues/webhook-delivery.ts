@@ -9,12 +9,23 @@
  * from the API — webhook delivery is best-effort and logged separately.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import pino from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, recordWebhookOutboxEvent, type Prisma } from '@bidstack/db';
 import { WEBHOOK_DELIVERY } from '@bidstack/shared';
+
+/**
+ * WEBHOOK_OUTBOX_ENABLED=true records events in the durable webhook_outbox
+ * (relayed by the worker) instead of enqueueing straight to Redis, so a Redis
+ * outage no longer loses events. Off by default until the relay is rolled out.
+ */
+export function webhookOutboxEnabled(): boolean {
+  return process.env.WEBHOOK_OUTBOX_ENABLED === 'true';
+}
 
 const log = pino({ name: 'queue:webhook-delivery', level: process.env.LOG_LEVEL ?? 'info' });
 
@@ -76,7 +87,7 @@ export async function fanOutWebhookEvent(
   orgId: string,
   event: string,
   payload: Record<string, unknown>,
-  options?: { idempotencyKey?: string },
+  options?: { idempotencyKey?: string; tx?: Prisma.TransactionClient },
 ): Promise<WebhookFanOutResult> {
   try {
     // findMany is inside try/catch — a DB error here must NOT propagate to the
@@ -88,6 +99,20 @@ export async function fanOutWebhookEvent(
     });
 
     if (subs.length === 0) return { delivery: 'no_subscribers' };
+
+    if (webhookOutboxEnabled()) {
+      const recorded = await recordWebhookOutboxEvent(options?.tx ?? prisma, {
+        orgId,
+        event,
+        payload,
+        idempotencyKey: options?.idempotencyKey ?? randomUUID(),
+      });
+      log.info(
+        { orgId, event, outboxId: recorded.id, duplicate: recorded.duplicate },
+        'webhook event recorded in outbox',
+      );
+      return { delivery: 'enqueued', count: subs.length };
+    }
 
     const queue = getQueue();
     // BullMQ forbids colons in job IDs (Redis uses `:` as key namespace separator).

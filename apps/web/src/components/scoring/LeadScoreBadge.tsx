@@ -156,7 +156,7 @@ export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBad
             {t('leadScoreBadge.popoverHeading', 'Top scoring factors')}
           </p>
           <FactorList factors={factors} />
-          <p className="mt-2 text-[10px] text-[var(--fg-muted)]">
+          <p className="mt-2 text-xs text-[var(--fg-muted)]">
             {t('leadScoreBadge.popoverFooter', 'Score {{score}}/100 · ML model', { score })}
           </p>
         </div>

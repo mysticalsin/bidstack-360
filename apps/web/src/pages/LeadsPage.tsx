@@ -272,7 +272,7 @@ export function LeadsPage() {
                   { key: 'company', label: t('leads.csv.company', 'Company') },
                   { key: 'title', label: t('leads.csv.title', 'Title') },
                   { key: 'status', label: t('leads.csv.status', 'Status') },
-                  { key: 'score', label: t('leads.csv.scoreRange', 'Score (0-10000)') },
+                  { key: 'score', label: t('leads.csv.scoreRange', 'Score (0-100)') },
                   { key: 'source', label: t('leads.csv.source', 'Source') },
                   { key: 'createdAt', label: t('leads.csv.created', 'Created') },
                 ],

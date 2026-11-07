@@ -178,6 +178,15 @@ export {
 // Curated multi-tenant demo seeding — shared by the `db:seed:demo` CLI and the
 // runtime demo sign-in door, which populates a fresh per-visitor org on sign-in.
 export { seedOrgData } from './seed-org-data.js';
+export {
+  WEBHOOK_OUTBOX_MAX_ATTEMPTS,
+  claimWebhookOutboxBatch,
+  markWebhookOutboxDispatched,
+  markWebhookOutboxFailed,
+  recordWebhookOutboxEvent,
+  webhookOutboxBackoffMs,
+  type WebhookOutboxRow,
+} from './webhook-outbox.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';
 
 // System RBAC seeding (roles + permission manifest, NO fixture data) — shared
