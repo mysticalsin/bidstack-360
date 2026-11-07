@@ -36,6 +36,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/territories',
     {
+      config: { permission: 'territories:read' },
       schema: {
         response: {
           200: z.object({

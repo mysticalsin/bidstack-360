@@ -136,6 +136,55 @@ describe('ContactCsvImportDialog', () => {
     expect(screen.getByRole('dialog')).toBeTruthy();
   });
 
+  it('sends blank optional cells as null so the API does not reject an empty email', async () => {
+    hookMocks.mutateAsync.mockResolvedValue(undefined);
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    pasteCsv('name,customer,role,email,phone,influence,sentiment\nAlice,Mantu,,,,,');
+    fireEvent.click(screen.getByRole('button', { name: 'Import 1' }));
+
+    await waitFor(() => expect(hookMocks.mutateAsync).toHaveBeenCalledOnce());
+    expect(hookMocks.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      name: 'Alice',
+      customer: 'Mantu',
+      role: null,
+      email: null,
+      phone: null,
+      influence: null,
+      sentiment: null,
+    });
+  });
+
+  it('flags influence outside the 1 to 5 integer range before import', async () => {
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    pasteCsv('name,customer,influence\nA,Mantu,0\nB,Mantu,3.5\nC,Mantu,high\nD,Mantu,4');
+
+    expect(screen.getAllByText('1 issue')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: 'Import 1' })).toBeTruthy();
+  });
+
+  it('keeps only the failed rows after a partial failure so a retry cannot duplicate', async () => {
+    hookMocks.mutateAsync
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('duplicate'));
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    pasteCsv('name,customer\nAlice,Mantu\nBob,Mantu');
+    fireEvent.click(screen.getByRole('button', { name: 'Import 2' }));
+
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledOnce());
+    const textarea = screen.getByLabelText('CSV contact rows') as HTMLTextAreaElement;
+    await waitFor(() => expect(textarea.value).toBe('name,customer\nBob,Mantu'));
+    expect(screen.getByRole('button', { name: 'Import 1' })).toBeTruthy();
+  });
+
   it('the textarea is labeled and wired to the error message via aria-describedby when a row is invalid', async () => {
     // WHY: this is a plain <textarea>, not a design-system Input — the a11y
     // contract (label + aria-invalid + aria-describedby pointing at the

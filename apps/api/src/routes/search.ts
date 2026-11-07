@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
 import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/shared';
 
-import { countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
+import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
 
 const VALID_TYPES = [
@@ -251,7 +251,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   id: c.id,
                   title: c.name,
                   subtitle: [c.role, c.email, c.customer].filter(Boolean).join(' · '),
-                  url: `/contacts?search=${encodeURIComponent(c.name)}`,
+                  url: `/contacts/${c.id}`,
                   score: scoreMatch(q, [
                     { text: c.name, weight: 3 },
                     { text: c.role, weight: 2 },
@@ -269,17 +269,34 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
       if (requestedTypes.includes('company')) {
         queries.push(
           (async () => {
-            const companies = await prisma.companyEnrichment.findMany({
-              where: {
-                orgId: req.auth.orgId,
-                deletedAt: null,
-                AND: tokenAndClauses(tokens, [
-                  'normalizedName',
-                  'domain',
-                  'tradeName',
-                  'legalName',
-                ]) as Prisma.CompanyEnrichmentWhereInput['AND'],
+            // CRM companies (the account records), not the enrichment cache:
+            // an enrichment id does not resolve on /accounts/:id. Same access
+            // scope as /companies so search is not a side door around it.
+            const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+            const companies = await prisma.company.findMany({
+              where: applyCompanyScope(
+                {
+                  orgId: req.auth.orgId,
+                  deletedAt: null,
+                  AND: tokenAndClauses(tokens, [
+                    'name',
+                    'legalName',
+                    'domain',
+                    'industry',
+                  ]) as Prisma.CompanyWhereInput['AND'],
+                },
+                scope,
+              ),
+              select: {
+                id: true,
+                name: true,
+                legalName: true,
+                domain: true,
+                industry: true,
+                createdAt: true,
+                updatedAt: true,
               },
+              orderBy: { updatedAt: 'desc' },
               take: perTypeLimit + 1,
             });
             addResults(
@@ -287,14 +304,14 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                 item: {
                   type: 'company' as const,
                   id: c.id,
-                  title: c.tradeName ?? c.legalName,
-                  subtitle: c.domain ?? '',
+                  title: c.name,
+                  subtitle: [c.domain, c.industry].filter(Boolean).join(' · '),
                   url: `/accounts/${encodeURIComponent(c.id)}`,
                   score: scoreMatch(q, [
-                    { text: c.tradeName, weight: 3 },
-                    { text: c.normalizedName, weight: 3 },
-                    { text: c.domain, weight: 2 },
+                    { text: c.name, weight: 3 },
                     { text: c.legalName, weight: 2 },
+                    { text: c.domain, weight: 2 },
+                    { text: c.industry, weight: 1 },
                   ]),
                 },
                 recency: recencyMs(c.updatedAt, c.createdAt),

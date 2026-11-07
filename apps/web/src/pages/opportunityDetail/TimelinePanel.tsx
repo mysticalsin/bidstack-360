@@ -86,7 +86,7 @@ export function TimelinePanel({ oppId }: { oppId: string }) {
           <li key={e.id} className="flex items-start gap-3">
             <span
               aria-hidden="true"
-              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken-alpha)] text-[var(--brand-primary)]"
+              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken-alpha)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]"
             >
               <Icon name={iconFor(e.kind)} size={13} />
             </span>

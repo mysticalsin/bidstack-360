@@ -39,6 +39,9 @@ function ownerModelForCountry(cc: string | null): KamAccount['kamOwnerModel'] {
 
 // ─── Rich account header ─────────────────────────────────────────────────────
 export function KamAccountHero({ account, onSwitch }: { account: KamAccount; onSwitch: () => void }) {
+  const meta =
+    [account.countryCode, account.industry?.replace(/_/g, ' ')].filter(Boolean).join(' · ') ||
+    'No country / industry yet';
   return (
     <Card className="relative overflow-hidden">
       {account.kamStatus === 'active' && (
@@ -48,12 +51,14 @@ export function KamAccountHero({ account, onSwitch }: { account: KamAccount; onS
         <CompanyLogo name={account.name} companyId={account.id} domain={account.domain} size={56} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-lg font-semibold text-[var(--fg-primary)]">{account.name}</h2>
+            <h2 className="truncate text-lg font-semibold text-[var(--fg-primary)]" title={account.name}>
+              {account.name}
+            </h2>
             <Badge tone={STATUS_TONE[account.kamStatus]}>{account.kamStatus}</Badge>
             {account.kamOwnerModel && <Badge tone="blue">{OWNER_LABEL[account.kamOwnerModel]}</Badge>}
           </div>
-          <p className="mt-0.5 truncate text-sm text-[var(--fg-tertiary)]">
-            {[account.countryCode, account.industry].filter(Boolean).join(' · ') || 'No country / industry yet'}
+          <p className="mt-0.5 truncate text-sm text-[var(--fg-tertiary)]" title={meta}>
+            {meta}
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={onSwitch}>

@@ -58,4 +58,13 @@ describe('NewLeadPage — leads:write gating', () => {
     expect(screen.getByRole('button', { name: /Create lead/i })).toBeTruthy();
     expect(screen.queryByText(/You need lead write access to create a lead/i)).toBeNull();
   });
+
+  it('carries no tagline under the heading', () => {
+    vi.mocked(useHasPermission).mockReturnValue(true);
+
+    renderWithProviders();
+
+    expect(screen.getByRole('heading', { name: 'New lead' })).toBeTruthy();
+    expect(screen.queryByText(/Add a new prospect to your pipeline/i)).toBeNull();
+  });
 });
