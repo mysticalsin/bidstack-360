@@ -313,7 +313,7 @@ export function OpportunitiesPage() {
         // Mirror the list query's stage branching: a configured stage is a UUID
         // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
         // legacy enum as pipelineStageId 400s the export.
-        // Search and the due chips travel too, so the file matches the table.
+        // Export must send the same filters as the list query.
         querystring: {
           ...(stageFilter
             ? isPipelineStageIdUuid(stageFilter)
