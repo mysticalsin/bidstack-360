@@ -4,7 +4,7 @@
  * required, ODbL share-alike for the open tier). Reads the company record
  * only, never officers.
  */
-import type { IntelClient } from '../http.js';
+import { webUrl, type IntelClient } from '../http.js';
 import type { RegistryFact } from './types.js';
 
 type J = Record<string, unknown>;
@@ -21,7 +21,7 @@ export function openCorporatesFacts(body: string): { facts: RegistryFact[]; url:
   if (inc) facts.push({ label: 'Incorporated', value: inc });
   const type = str(c.company_type);
   if (type) facts.push({ label: 'Company type', value: type });
-  return { facts, url: str(c.opencorporates_url) };
+  return { facts, url: webUrl(str(c.opencorporates_url)) };
 }
 
 /** Fetch one company by jurisdiction and registry number. */

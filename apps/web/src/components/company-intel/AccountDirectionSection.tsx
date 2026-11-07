@@ -88,9 +88,9 @@ export function AccountDirectionSection({ companyId }: { companyId: string }) {
   const canRefresh = useHasPermission('account-intel:write');
   const refresh = useRefreshIntelSource(companyId);
   const direction = useCompanyDirection(companyId, refresh.pollUntil);
-  const hiring = useCompanyHiringIntel(companyId, refresh.pollUntil);
-  const financials = useCompanyFinancialsIntel(companyId, refresh.pollUntil);
-  const news = useCompanyNewsIntel(companyId, refresh.pollUntil);
+  const hiring = useCompanyHiringIntel(companyId);
+  const financials = useCompanyFinancialsIntel(companyId);
+  const news = useCompanyNewsIntel(companyId);
 
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;

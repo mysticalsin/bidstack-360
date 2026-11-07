@@ -1,44 +1,44 @@
 {
- "apiVersion": "1",
- "jobs": [
-  {
-   "id": "7458d4e9-da2e-47bd-98cb-adfda43d42b2",
-   "title": "Engineering Manager - EU",
-   "department": "Engineering",
-   "team": "EMEA Engineering",
-   "employmentType": "FullTime",
-   "location": "Remote - European Union",
-   "publishedAt": "2024-03-04T14:29:08.532+00:00",
-   "isListed": true,
-   "isRemote": true,
-   "jobUrl": "https://jobs.ashbyhq.com/Ashby/7458d4e9-da2e-47bd-98cb-adfda43d42b2",
-   "descriptionPlain": "Hi 👋 I’m Colin https://uk.linkedin.com/in/colinhoweuk, Director of Engineering, Europe. How do you feel about software engineers writing product specs, making product decisions, and not breaking down projects into individual tickets? If that sounds exciting (even if a bit scary), read on because I’m"
-  },
-  {
-   "id": "86a60834-ba64-484d-9658-afa1bc97a957",
-   "title": "Mid Market Account Executive - EMEA (French Speaking)",
-   "department": "Sales",
-   "team": "Sales",
-   "employmentType": "FullTime",
-   "location": "France",
-   "publishedAt": "2026-09-08T16:27:26.694+00:00",
-   "isListed": true,
-   "isRemote": true,
-   "jobUrl": "https://jobs.ashbyhq.com/Ashby/86a60834-ba64-484d-9658-afa1bc97a957",
-   "descriptionPlain": "WHY JOIN SALES AT ASHBY\n\nSales at Ashby is a unique opportunity to sell a product customers genuinely love https://www.ashbyhq.com/customers during an AI-fueled market expansion. Over 5,000 companies rely on Ashby, including OpenAI, Doctolib, Alan, Mistral and Monday.com http://Monday.com, and our b"
-  },
-  {
-   "id": "f40ef345-82a8-4956-9150-193b4fdf8183",
-   "title": "Senior Product Designer",
-   "department": "Design",
-   "team": "Design",
-   "employmentType": "FullTime",
-   "location": "Remote - US",
-   "publishedAt": "2025-12-05T22:43:22.147+00:00",
-   "isListed": true,
-   "isRemote": true,
-   "jobUrl": "https://jobs.ashbyhq.com/Ashby/f40ef345-82a8-4956-9150-193b4fdf8183",
-   "descriptionPlain": "Hi! 👋 I'm Chris https://www.linkedin.com/in/chkrlee/, head of Product Design at Ashby.\n\nWe're looking for a versatile, intrinsically motivated designer who is excited to contribute to rethinking how modern software is designed. At Ashby, you'll be part designer, part product manager, part consultant"
-  }
- ]
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+      "title": "Engineering Manager - EU",
+      "department": "Engineering",
+      "team": "EMEA Engineering",
+      "employmentType": "FullTime",
+      "location": "Remote - European Union",
+      "publishedAt": "2024-03-04T14:29:08.532+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "jobUrl": "https://jobs.ashbyhq.com/Ashby/7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+      "descriptionPlain": "Sample job description."
+    },
+    {
+      "id": "86a60834-ba64-484d-9658-afa1bc97a957",
+      "title": "Mid Market Account Executive - EMEA (French Speaking)",
+      "department": "Sales",
+      "team": "Sales",
+      "employmentType": "FullTime",
+      "location": "France",
+      "publishedAt": "2026-09-08T16:27:26.694+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "jobUrl": "https://jobs.ashbyhq.com/Ashby/86a60834-ba64-484d-9658-afa1bc97a957",
+      "descriptionPlain": "Sample job description."
+    },
+    {
+      "id": "f40ef345-82a8-4956-9150-193b4fdf8183",
+      "title": "Senior Product Designer",
+      "department": "Design",
+      "team": "Design",
+      "employmentType": "FullTime",
+      "location": "Remote - US",
+      "publishedAt": "2025-12-05T22:43:22.147+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "jobUrl": "https://jobs.ashbyhq.com/Ashby/f40ef345-82a8-4956-9150-193b4fdf8183",
+      "descriptionPlain": "Sample job description."
+    }
+  ]
 }

@@ -81,7 +81,7 @@ export async function edgarAnnualReportSection(client: IntelClient, cik: string)
   if (!r || i < 0 || !r.accessionNumber?.[i] || !r.primaryDocument?.[i]) return null;
   const form = r.form![i]!;
   const url = `https://www.sec.gov/Archives/edgar/data/${Number(id)}/${r.accessionNumber[i]!.replace(/-/g, '')}/${r.primaryDocument[i]}`;
-  const section = annualReportSection(htmlToText(await client.get(url, { accept: 'text/html' })), form);
+  const section = annualReportSection(htmlToText(await client.get(url, { accept: 'text/html', maxBytes: 25_000_000, noCache: true })), form);
   if (!section) return null;
   const period = r.reportDate?.[i] ? ` for the period ended ${r.reportDate[i]}` : '';
   return { ...section, locator: `${section.locator}${period}`, url };

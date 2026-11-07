@@ -245,8 +245,10 @@ async function runRegistry(s: IntelSubject, client: IntelClient, deps: IntelRunD
         saved++;
       } else if (oc) {
         const o = await fetchOpenCorporates(client, oc, 'gb', id.companiesHouseNumber);
-        if (o.url) await deps.store.saveRegistryFacts(s, 'opencorporates', o.facts, o.url, deps.now);
-        saved++;
+        if (o.url && o.facts.length) {
+          await deps.store.saveRegistryFacts(s, 'opencorporates', o.facts, o.url, deps.now);
+          saved++;
+        }
       } else {
         notes.push('Companies House: set COMPANIES_HOUSE_API_KEY to read the company profile');
       }
@@ -266,7 +268,7 @@ export async function runAccountIntel(job: { orgId: string; companyId: string; s
   const out: Partial<Record<IntelSourceKey, SourceRunResult>> = {};
   const ua = intelUserAgent(deps.env);
   const client = ua
-    ? createIntelClient({ fetchImpl: deps.fetchImpl, userAgent: ua, cache: deps.cache ?? sharedCache, minGapMs: Number(deps.env.ACCOUNT_INTEL_MIN_GAP_MS ?? 1000), sleep: deps.sleep })
+    ? createIntelClient({ fetchImpl: deps.fetchImpl, userAgent: ua, cache: deps.cache ?? sharedCache, minGapMs: Math.max(250, Number(deps.env.ACCOUNT_INTEL_MIN_GAP_MS ?? 1000) || 1000), sleep: deps.sleep })
     : null;
   const runners: Record<Exclude<IntelSourceKey, 'financials'>, (c: IntelClient) => Promise<SourceRunResult>> = {
     hiring: (c) => runHiring(s, c, deps),

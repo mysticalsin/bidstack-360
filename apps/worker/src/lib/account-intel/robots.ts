@@ -70,7 +70,7 @@ function ruleMatches(pattern: string, path: string): boolean {
 export function robotsAllows(rules: RobotsRules, agent: string, path: string): boolean {
   if (rules.disallowAll) return false;
   const token = agent.toLowerCase();
-  const named = rules.groups.filter((g) => g.agents.some((a) => a !== '*' && token.includes(a)));
+  const named = rules.groups.filter((g) => g.agents.some((a) => a !== '*' && (token === a || token.startsWith(`${a}/`))));
   const groups = named.length ? named : rules.groups.filter((g) => g.agents.includes('*'));
   let best: RobotsRule | null = null;
   for (const g of groups) {

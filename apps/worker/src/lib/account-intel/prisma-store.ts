@@ -207,7 +207,10 @@ export function financialsForAccount(env: Record<string, string | undefined>, lo
     let detail = mapped.detail(row.lastError ?? null);
 
     const ua = intelUserAgent(env);
-    const sections: FilingSection[] = row.textBlocks?.length ? esefSections(row.textBlocks, row.textUrl ?? null) : [];
+    const latest = row.textBlocks?.length && !row.textUrl
+      ? await prisma.accountFinancialPeriod.findFirst({ where: { orgId, companyId, periodType: 'FY' }, orderBy: { periodEnd: 'desc' }, select: { sourceUrl: true } })
+      : null;
+    const sections: FilingSection[] = row.textBlocks?.length ? esefSections(row.textBlocks, row.textUrl ?? latest?.sourceUrl ?? null) : [];
     if (ua && row.secCik) {
       try {
         const sec = await edgarAnnualReportSection(createIntelClient({ fetchImpl: defaultIntelFetch(60_000), userAgent: ua, minGapMs: 150 }), row.secCik);
@@ -217,7 +220,7 @@ export function financialsForAccount(env: Record<string, string | undefined>, lo
       }
     }
     if (sections.length) {
-      const statements = await statementsFromSections(sections, await statementLlm(orgId));
+      const statements = (await statementsFromSections(sections, await statementLlm(orgId))).filter((st) => Boolean(st.url));
       const now = new Date();
       const source = row.source ?? (row.secCik ? 'sec_edgar' : 'esef');
       await prisma.intelEvidence.deleteMany({ where: { orgId, companyId, kind: 'statement' } });
@@ -238,7 +241,7 @@ export async function pruneAccountIntel(orgId: string, now: Date = new Date()): 
   const jobCut = new Date(now.getTime() - POSTING_RETENTION_DAYS * DAY);
   const [postings, posts, evidence] = await Promise.all([
     prisma.companyJobPosting.deleteMany({ where: { orgId, source: { in: PRUNABLE_POSTING_SOURCES }, fetchedAt: { lt: jobCut } } }),
-    prisma.companyPost.deleteMany({ where: { orgId, fetchedAt: { lt: postCut }, publishedAt: { lt: postCut } } }),
+    prisma.companyPost.deleteMany({ where: { orgId, fetchedAt: { lt: postCut }, OR: [{ publishedAt: { lt: postCut } }, { publishedAt: null }] } }),
     prisma.intelEvidence.deleteMany({ where: { orgId, fetchedAt: { lt: postCut } } }),
   ]);
   return { postings: postings.count, posts: posts.count, evidence: evidence.count };

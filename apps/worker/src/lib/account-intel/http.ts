@@ -18,7 +18,18 @@ export interface IntelFetchResponse {
 }
 
 /** Fetch seam: production wraps the SSRF-guarded fetch, tests pass a recorder. */
-export type IntelFetch = (url: string, init?: { headers?: Record<string, string>; method?: 'GET' | 'POST'; body?: string }) => Promise<IntelFetchResponse>;
+export type IntelFetch = (url: string, init?: IntelFetchInit) => Promise<IntelFetchResponse>;
+
+/** Request options passed to the fetch seam. */
+export interface IntelFetchInit {
+  headers?: Record<string, string>;
+  method?: 'GET' | 'POST';
+  body?: string;
+  /** Stop reading the body past this many bytes. */
+  maxBytes?: number;
+  /** Called before following a redirect; throw to refuse the hop (robots.txt). */
+  beforeRedirect?: (url: string) => Promise<void>;
+}
 
 const SECRET_PARAMS = /^(app_key|app_id|api_key|apikey|key|token|access_token|api_token)$/i;
 
@@ -30,6 +41,17 @@ export function redactUrl(url: string): string {
     return u.toString();
   } catch {
     return url;
+  }
+}
+
+/** The URL when it is http or https, else null. Guards every stored link. */
+export function webUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null;
+  } catch {
+    return null;
   }
 }
 
@@ -74,6 +96,10 @@ export class IntelHttpError extends Error {
 export interface IntelGetOptions {
   headers?: Record<string, string>;
   accept?: string;
+  /** Body size limit for this request (default 3 MB). */
+  maxBytes?: number;
+  /** Skip the response cache (large documents). */
+  noCache?: boolean;
 }
 
 /** Polite client. */
@@ -87,23 +113,36 @@ export interface IntelClient {
 
 const DEFAULT_TTL_MS = 6 * 3_600_000;
 const MAX_BODY = 3_000_000;
+/** Total cached body size; oldest entries are evicted past it. */
+const MAX_CACHE_CHARS = 50_000_000;
+/** Bodies larger than this are never cached. */
+const MAX_CACHED_ENTRY = 1_000_000;
 
-/** In-memory cache with a TTL. */
-export function memoryIntelCache(now: () => number = Date.now, ttlMs = DEFAULT_TTL_MS): IntelCache {
+/** In-memory cache with a TTL, bounded by total body size. */
+export function memoryIntelCache(now: () => number = Date.now, ttlMs = DEFAULT_TTL_MS, maxChars = MAX_CACHE_CHARS): IntelCache {
   const map = new Map<string, IntelCacheEntry>();
+  let total = 0;
+  const drop = (key: string) => {
+    const hit = map.get(key);
+    if (hit) total -= hit.body.length;
+    map.delete(key);
+  };
   return {
     get(key) {
       const hit = map.get(key);
       if (!hit) return null;
       if (now() - hit.at > ttlMs) {
-        map.delete(key);
+        drop(key);
         return null;
       }
       return hit;
     },
     set(key, value) {
-      if (map.size > 2000) map.delete(map.keys().next().value as string);
+      if (value.body.length > MAX_CACHED_ENTRY) return;
+      drop(key);
+      while (map.size && total + value.body.length > maxChars) drop(map.keys().next().value as string);
       map.set(key, { ...value, at: now() });
+      total += value.body.length;
     },
   };
 }
@@ -150,9 +189,16 @@ export function createIntelClient(opts: {
     lastHit.set(host, now());
   }
 
-  async function raw(url: string, headers: Record<string, string>, post?: string): Promise<IntelFetchResponse> {
+  async function raw(url: string, headers: Record<string, string>, post?: string, maxBytes = MAX_BODY): Promise<IntelFetchResponse> {
     await pace(new URL(url).host);
-    const init = { headers: { 'User-Agent': opts.userAgent, ...headers } };
+    const init: IntelFetchInit = {
+      headers: { 'User-Agent': opts.userAgent, ...headers },
+      maxBytes,
+      beforeRedirect: async (next) => {
+        await allowed(next);
+        await pace(new URL(next).host);
+      },
+    };
     return opts.fetchImpl(url, post === undefined ? init : { ...init, method: 'POST', body: post });
   }
 
@@ -169,7 +215,8 @@ export function createIntelClient(opts: {
     if (!p) {
       p = (async () => {
         try {
-          const res = await raw(`${origin}/robots.txt`, { Accept: 'text/plain' });
+          await pace(new URL(origin).host);
+          const res = await opts.fetchImpl(`${origin}/robots.txt`, { headers: { 'User-Agent': opts.userAgent, Accept: 'text/plain' }, maxBytes: 500_000 });
           if (res.ok) return parseRobots((await res.text()).slice(0, 500_000));
           // RFC 9309: unreachable (5xx) means assume complete disallow; 4xx means no rules.
           return res.status >= 500 ? { ...ALLOW_ALL, disallowAll: true } : ALLOW_ALL;
@@ -186,13 +233,14 @@ export function createIntelClient(opts: {
     userAgent: opts.userAgent,
     robots,
     async get(url, o = {}) {
-      const hit = cache.get(url);
+      const hit = o.noCache ? null : cache.get(url);
       if (hit) return hit.body;
       await allowed(url);
-      const res = await raw(url, { Accept: o.accept ?? '*/*', ...(o.headers ?? {}) });
-      const body = (await res.text()).slice(0, MAX_BODY);
+      const max = o.maxBytes ?? MAX_BODY;
+      const res = await raw(url, { Accept: o.accept ?? '*/*', ...(o.headers ?? {}) }, undefined, max);
+      const body = (await res.text()).slice(0, max);
       if (!res.ok) throw new IntelHttpError(url, res.status, body.slice(0, 300));
-      cache.set(url, { status: res.status, body, at: now() });
+      if (!o.noCache) cache.set(url, { status: res.status, body, at: now() });
       return body;
     },
     async postJson(url, payload, o = {}) {
@@ -205,20 +253,63 @@ export function createIntelClient(opts: {
   };
 }
 
+/** Read at most `maxBytes` of a body, then cancel the stream. */
+async function readCapped(res: Response, maxBytes: number): Promise<string> {
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (size < maxBytes) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+  }
+  if (size >= maxBytes) await reader.cancel().catch(() => undefined);
+  const buf = new Uint8Array(Math.min(size, maxBytes));
+  let off = 0;
+  for (const c of chunks) {
+    const part = c.subarray(0, Math.min(c.byteLength, buf.byteLength - off));
+    buf.set(part, off);
+    off += part.byteLength;
+    if (off >= buf.byteLength) break;
+  }
+  return new TextDecoder().decode(buf);
+}
+
+const CREDENTIAL_HEADERS = /^(authorization|x-api-key|api-key|x-auth-token)$/i;
+
 /**
  * Production fetch: SSRF and DNS guarded, follows at most 3 redirects and
- * re-validates each hop. No cookies, no credentials.
+ * re-validates each hop. No cookies. Credential headers never follow a
+ * redirect to another origin; 303 (and 301/302 after POST) switch to GET.
+ * Bodies are streamed and cut at `maxBytes`.
  */
 export function defaultIntelFetch(timeoutMs = 15_000): IntelFetch {
   const guarded = createResearchFetch(fetch);
   return async (url, init) => {
     let target = url;
+    let method = init?.method ?? 'GET';
+    let body = init?.body;
+    let headers = { ...(init?.headers ?? {}) };
+    const max = init?.maxBytes ?? MAX_BODY;
     for (let hop = 0; hop < 4; hop++) {
-      const res = await guarded(target, { method: init?.method ?? 'GET', body: init?.body, headers: init?.headers, redirect: 'manual', credentials: 'omit', signal: AbortSignal.timeout(timeoutMs) });
+      const res = await guarded(target, { method, body, headers, redirect: 'manual', credentials: 'omit', signal: AbortSignal.timeout(timeoutMs) });
       const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
-      if (!loc) return { ok: res.ok, status: res.status, text: () => res.text() };
-      target = assertPublicHttpUrl(new URL(loc, target).toString()).toString();
+      if (!loc) return { ok: res.ok, status: res.status, text: () => readCapped(res, max) };
+      await res.body?.cancel().catch(() => undefined);
+      const next = assertPublicHttpUrl(new URL(loc, target).toString()).toString();
+      if (new URL(next).origin !== new URL(target).origin) {
+        headers = Object.fromEntries(Object.entries(headers).filter(([k]) => !CREDENTIAL_HEADERS.test(k)));
+      }
+      if (res.status === 303 || (method === 'POST' && (res.status === 301 || res.status === 302))) {
+        method = 'GET';
+        body = undefined;
+        delete headers['Content-Type'];
+      }
+      if (init?.beforeRedirect) await init.beforeRedirect(next);
+      target = next;
     }
-    throw new Error(`too many redirects for ${url}`);
+    throw new Error(`too many redirects for ${redactUrl(url)}`);
   };
 }

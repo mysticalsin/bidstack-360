@@ -88,6 +88,7 @@ export function parseBrregRegnskap(body: string, orgnr = ''): RegistryPeriod | n
 /** Entity plus the latest accounts, with a note when the accounts layout is not served. */
 export async function fetchBrreg(client: IntelClient, orgnr: string): Promise<{ entity: BrregEntity | null; period: RegistryPeriod | null; note: string | null; entityUrl: string; accountsUrl: string }> {
   const n = orgnr.replace(/\s+/g, '');
+  if (!/^\d{9}$/.test(n)) throw new Error('Brreg: organisation number must be 9 digits');
   const entityUrl = `${ENHET}${n}`;
   const accountsUrl = `${REGNSKAP}${n}`;
   const entity = parseBrregEnhet(await client.get(entityUrl, { accept: 'application/json' }));

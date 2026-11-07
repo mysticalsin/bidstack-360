@@ -15,7 +15,7 @@ import {
   type InvestmentThemeItem,
 } from '@bidstack/shared';
 
-import { fmtDate } from './intel-format';
+import { fmtDate, safeHref } from './intel-format';
 
 const money = (n: number | null, currency: string | null) => (n === null ? null : `${compactAmount(n)}${currency ? ` ${currency}` : ''}`);
 const pct = (n: number | null) => (n === null ? null : `${n > 0 ? '+' : ''}${Math.round(n)}%`);
@@ -37,20 +37,30 @@ function Trend({ value }: { value: number | null }) {
 }
 
 function Cites({ ids, evidence }: { ids: string[]; evidence: Map<string, IntelEvidence> }) {
-  const items = ids.map((id) => evidence.get(id)).filter((e): e is IntelEvidence => Boolean(e));
-  if (!items.length) return null;
+  const groups = new Map<string, IntelEvidence[]>();
+  for (const id of ids) {
+    const e = evidence.get(id);
+    if (!e) continue;
+    const text = `${e.sourceLabel}${e.locator ? ` ${e.locator}` : ''}`;
+    groups.set(text, [...(groups.get(text) ?? []), e]);
+  }
+  if (!groups.size) return null;
   return (
     <span className="ci-cites">
-      {items.map((e) => {
-        const text = `${e.sourceLabel}${e.locator ? ` ${e.locator}` : ''}`;
-        const tip = `${e.excerpt} (fetched ${fmtDate(e.fetchedAt)})`;
-        return e.url ? (
-          <a key={e.id} className="ci-cite" href={e.url} target="_blank" rel="noopener noreferrer" title={tip}>
+      {[...groups.entries()].map(([text, list]) => {
+        const e = list.find((x) => safeHref(x.url)) ?? list[0]!;
+        const href = safeHref(e.url);
+        const tip = list.slice(0, 3).map((x) => `${x.excerpt} (fetched ${fmtDate(x.fetchedAt)})`).join('\n');
+        const more = list.length > 1 ? <span className="ci-cite-more"> +{list.length - 1}</span> : null;
+        return href ? (
+          <a key={text} className="ci-cite" href={href} target="_blank" rel="noopener noreferrer" title={tip}>
             {text}
+            {more}
           </a>
         ) : (
-          <span key={e.id} className="ci-cite" title={tip} tabIndex={0}>
+          <span key={text} className="ci-cite" title={tip} tabIndex={0}>
             {text}
+            {more}
           </span>
         );
       })}
@@ -196,8 +206,8 @@ export function HiringPanel({ h }: { h: AccountHiringIntel }) {
             {h.postings.map((p) => (
               <li key={p.id} className="ci-row">
                 <span className="ci-line-label">
-                  {p.url ? (
-                    <a href={p.url} target="_blank" rel="noopener noreferrer">
+                  {safeHref(p.url) ? (
+                    <a href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">
                       {p.title}
                     </a>
                   ) : (
@@ -248,8 +258,8 @@ export function FinancialsPanel({ f }: { f: AccountFinancialsIntel }) {
                   <td>{money(y.acquisitions, y.currency) ?? '-'}</td>
                   <td>{y.headcount === null ? '-' : y.headcount.toLocaleString('en-GB')}</td>
                   <td>
-                    {y.sourceUrl ? (
-                      <a href={y.sourceUrl} target="_blank" rel="noopener noreferrer">
+                    {safeHref(y.sourceUrl) ? (
+                      <a href={safeHref(y.sourceUrl)} target="_blank" rel="noopener noreferrer">
                         {y.source}
                       </a>
                     ) : (
@@ -278,8 +288,8 @@ export function FinancialsPanel({ f }: { f: AccountFinancialsIntel }) {
                 <span>{r.label}</span>
                 <span className="ci-meta">
                   {r.value},{' '}
-                  {r.sourceUrl ? (
-                    <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer">
+                  {safeHref(r.sourceUrl) ? (
+                    <a href={safeHref(r.sourceUrl)} target="_blank" rel="noopener noreferrer">
                       {r.source}
                     </a>
                   ) : (
@@ -304,8 +314,8 @@ export function NewsPanel({ n }: { n: AccountNewsIntel }) {
         <li key={p.id} className="ci-row">
           <span className="ci-line-head">
             <span className="ci-tag" data-kind={p.kind}>{POST_KIND_LABEL[p.kind]}</span>
-            {p.url ? (
-              <a className="ci-line-label" href={p.url} target="_blank" rel="noopener noreferrer">
+            {safeHref(p.url) ? (
+              <a className="ci-line-label" href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">
                 {p.title}
                 <ExternalLink size={12} aria-hidden />
               </a>

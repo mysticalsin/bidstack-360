@@ -40,6 +40,7 @@ a.ci-line-label:hover, .ci-line-label a:hover, .ci-table a:hover, .ci-meta a:hov
 .ci-cites { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .ci-cite { font-size: 12px; color: var(--sg-accent); text-decoration: none; }
 .ci-cite:hover { text-decoration: underline; }
+.ci-cite-more { color: var(--sg-muted); font-variant-numeric: tabular-nums; }
 .ci-cite:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 1px; border-radius: 4px; }
 .ci-trend { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .ci-trend[data-tone='pos'] { color: var(--sg-pos); }

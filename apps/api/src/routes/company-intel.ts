@@ -29,6 +29,17 @@ import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { enqueueAccountIntel } from '../queues/account-intel.js';
 
 const idParam = z.object({ id: z.string().uuid() });
+/** One read audit per user, account and view in this window; refresh polling would otherwise write one per poll. */
+const READ_AUDIT_WINDOW_MS = 5 * 60_000;
+const lastReadAudit = new Map<string, number>();
+
+function shouldAuditRead(key: string, now = Date.now()): boolean {
+  const last = lastReadAudit.get(key);
+  if (last !== undefined && now - last < READ_AUDIT_WINDOW_MS) return false;
+  if (lastReadAudit.size > 10_000) lastReadAudit.clear();
+  lastReadAudit.set(key, now);
+  return true;
+}
 const READ = { permission: 'account-intel:read' as const, rateLimit: { max: 60, timeWindow: '1 minute' } };
 
 async function audit(req: FastifyRequest, action: string, targetId: string, diff: Record<string, unknown> = {}): Promise<void> {
@@ -52,7 +63,7 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     if (!company) throw server.httpErrors.notFound('Company not found');
     const snapshot = await loadCompanyIntel(prisma, req.auth.orgId, company.id, new Date());
     if (!snapshot) throw server.httpErrors.notFound('Company not found');
-    await audit(req, `intel.${view}.view`, company.id);
+    if (shouldAuditRead(`${req.auth.orgId}:${req.auth.userId}:${company.id}:${view}`)) await audit(req, `intel.${view}.view`, company.id);
     return composeAccountIntel(snapshot);
   }
 
@@ -91,17 +102,22 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!company) throw server.httpErrors.notFound('Company not found');
       const orgId = req.auth.orgId;
       const source = req.body.source;
-      const jobId = await enqueueAccountIntel({ kind: 'refresh', orgId, companyId: company.id, sources: [source], requestedBy: req.auth.userId });
       const key = { orgId_companyId_source: { orgId, companyId: company.id, source } };
-      const row = jobId
-        ? await prisma.intelSourceRun.upsert({
-            where: key,
-            create: { orgId, companyId: company.id, source, status: 'queued' },
-            update: { status: 'queued' },
-          })
-        : await prisma.intelSourceRun.findUnique({ where: key });
+      const before = await prisma.intelSourceRun.findUnique({ where: key });
+      // Queued is written first so a fast worker's final status is never overwritten.
+      const row = await prisma.intelSourceRun.upsert({
+        where: key,
+        create: { orgId, companyId: company.id, source, status: 'queued' },
+        update: { status: 'queued' },
+      });
+      const jobId = await enqueueAccountIntel({ kind: 'refresh', orgId, companyId: company.id, sources: [source], requestedBy: req.auth.userId });
+      if (!jobId) {
+        if (before) await prisma.intelSourceRun.update({ where: key, data: { status: before.status } });
+        else await prisma.intelSourceRun.delete({ where: key });
+      }
+      const shown = jobId ? row : before;
       await audit(req, 'intel.refresh', company.id, { source, queued: jobId !== null });
-      const result = (row?.result ?? {}) as Partial<IntelSourceStatus['result']>;
+      const result = (shown?.result ?? {}) as Partial<IntelSourceStatus['result']>;
       reply.code(202);
       return {
         queued: jobId !== null,
@@ -109,10 +125,10 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
         status: {
           key: source,
           label: INTEL_SOURCE_LABEL[source],
-          status: (row?.status as IntelSourceStatus['status'] | undefined) ?? 'never',
-          lastFetchedAt: row?.lastFetchedAt?.toISOString() ?? null,
+          status: (shown?.status as IntelSourceStatus['status'] | undefined) ?? 'never',
+          lastFetchedAt: shown?.lastFetchedAt?.toISOString() ?? null,
           result: { new: result.new ?? 0, updated: result.updated ?? 0, skipped: result.skipped ?? 0, failed: result.failed ?? 0 },
-          detail: row?.detail ?? null,
+          detail: shown?.detail ?? null,
         },
       };
     },

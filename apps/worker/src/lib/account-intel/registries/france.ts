@@ -48,6 +48,7 @@ export function parseRechercheEntreprises(body: string, siren: string): { name: 
 /** Fetch and parse one SIREN. */
 export async function fetchFrance(client: IntelClient, siren: string) {
   const s = siren.replace(/\s+/g, '');
+  if (!/^\d{9}$/.test(s)) throw new Error('France: SIREN must be 9 digits');
   const url = rechercheUrl(s);
   return { url, parsed: parseRechercheEntreprises(await client.get(url, { accept: 'application/json' }), s) };
 }

@@ -41,9 +41,9 @@ function getQueue(): Queue {
   return queueSingleton;
 }
 
-/** Same account and sources within the same minute collapse to one job. */
+/** Unique per request: a reused id would be ignored by BullMQ once the earlier job completed. */
 export function accountIntelJobId(job: AccountIntelRefreshJob, now = Date.now()): string {
-  return `${job.orgId}--intel--${job.companyId}--${[...job.sources].sort().join('-')}--${Math.floor(now / 60_000)}`;
+  return `${job.orgId}--intel--${job.companyId}--${[...job.sources].sort().join('-')}--${now}`;
 }
 
 /** Fail-open: null when Redis is unreachable; the caller reports queued=false. */

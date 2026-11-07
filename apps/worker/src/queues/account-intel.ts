@@ -3,8 +3,8 @@
  *   account-intel.refresh          refresh chosen sources for one account (from the account page)
  *   account-intel.sweep            repeatable (daily): apply retention, and when
  *                                  ACCOUNT_INTEL_AUTO_REFRESH=true refresh stale key and top accounts
- *   account-intel.financials-scan  repeatable (daily) filings scan for tier-gated accounts,
- *                                  on unless FINANCIALS_SCAN_ENABLED=false
+ *   account-intel.financials-scan  repeatable (daily) filings scan for tier-gated accounts, on when
+ *                                  a contact User-Agent is set, unless FINANCIALS_SCAN_ENABLED=false
  */
 import { prisma } from '@bidstack/db';
 import { ACCOUNT_INTEL, IntelSourceKey, type AccountIntelQueueJob } from '@bidstack/shared';
@@ -13,7 +13,7 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { runFinancialsScan } from '../lib/financials/scan.js';
-import { defaultIntelFetch } from '../lib/account-intel/http.js';
+import { defaultIntelFetch, intelUserAgent } from '../lib/account-intel/http.js';
 import { financialsForAccount, prismaIntelStore, pruneAccountIntel } from '../lib/account-intel/prisma-store.js';
 import { runAccountIntel } from '../lib/account-intel/run.js';
 
@@ -29,8 +29,14 @@ async function sweep(queue: Queue, env: NodeJS.ProcessEnv, log: pino.Logger): Pr
   const limit = env.ACCOUNT_INTEL_AUTO_REFRESH === 'true' ? Number(env.ACCOUNT_INTEL_SWEEP_LIMIT ?? 25) || 25 : 0;
   const now = new Date();
   const stale = new Date(now.getTime() - STALE_DAYS * DAY_MS);
-  const orgs = await prisma.org.findMany({ select: { id: true }, take: 500 });
   let enqueued = 0;
+  const orgs: Array<{ id: string }> = [];
+  for (let cursor: string | undefined; ; ) {
+    const page = await prisma.org.findMany({ select: { id: true }, orderBy: { id: 'asc' }, take: 500, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
+    orgs.push(...page);
+    if (page.length < 500) break;
+    cursor = page[page.length - 1]!.id;
+  }
   for (const org of orgs) {
     const pruned = await pruneAccountIntel(org.id, now);
     if (pruned.postings || pruned.posts || pruned.evidence) log.info({ orgId: org.id, ...pruned }, 'account intel retention applied');
@@ -66,7 +72,16 @@ export async function startAccountIntel(connection: IORedis, log: pino.Logger, w
         log.info({ jobId: job.id, scheduled: s.scheduled, paused: s.paused, due: s.due, pulled: s.pulled.length }, 'scheduled financials scan finished');
         return { due: s.due, pulled: s.pulled.length };
       }
-      const res = await runAccountIntel({ orgId: data.orgId, companyId: data.companyId, sources: data.sources }, { store, env, fetchImpl, now: new Date(), financials });
+      let res: Awaited<ReturnType<typeof runAccountIntel>>;
+      try {
+        res = await runAccountIntel({ orgId: data.orgId, companyId: data.companyId, sources: data.sources }, { store, env, fetchImpl, now: new Date(), financials });
+      } catch (err) {
+        await prisma.intelSourceRun.updateMany({
+          where: { orgId: data.orgId, companyId: data.companyId, source: { in: data.sources }, status: { in: ['queued', 'running'] } },
+          data: { status: 'failed', detail: (err as Error).message.slice(0, 500) },
+        });
+        throw err;
+      }
       log.info({ jobId: job.id, orgId: data.orgId, companyId: data.companyId, results: Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v?.status])) }, 'account intel refresh finished');
       return res;
     },
@@ -79,8 +94,9 @@ export async function startAccountIntel(connection: IORedis, log: pino.Logger, w
   workers.push(worker);
 
   await queue.add('account-intel.sweep', { kind: 'sweep' }, { repeat: { every: DAY_MS }, jobId: 'account-intel-sweep' });
-  if (env.FINANCIALS_SCAN_ENABLED !== 'false') {
+  const financialsScan = env.FINANCIALS_SCAN_ENABLED !== 'false' && intelUserAgent(env) !== null;
+  if (financialsScan) {
     await queue.add('account-intel.financials-scan', { kind: 'financials-scan' }, { repeat: { every: DAY_MS }, jobId: 'account-intel-financials-scan' });
   }
-  log.info({ queue: ACCOUNT_INTEL.name, autoRefresh: env.ACCOUNT_INTEL_AUTO_REFRESH === 'true', financialsScan: env.FINANCIALS_SCAN_ENABLED !== 'false' }, 'account intel worker started');
+  log.info({ queue: ACCOUNT_INTEL.name, autoRefresh: env.ACCOUNT_INTEL_AUTO_REFRESH === 'true', financialsScan }, 'account intel worker started');
 }

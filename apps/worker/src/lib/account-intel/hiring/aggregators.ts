@@ -3,7 +3,8 @@
  * with ACCOUNT_INTEL_JOB_AGGREGATOR plus the provider's own key env names.
  * Both are licensed APIs; their keys are read by name and never logged.
  */
-import type { IntelClient } from '../http.js';
+import { webUrl, type IntelClient } from '../http.js';
+import { normaliseLegalName } from '../registries/types.js';
 import type { RawPosting } from './ats.js';
 
 /** A configured aggregator. */
@@ -15,6 +16,16 @@ export interface JobAggregator {
 
 type J = Record<string, unknown>;
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : typeof v === 'number' ? String(v) : null);
+/** Adzuna country endpoints. */
+const ADZUNA_COUNTRIES = new Set(['gb', 'us', 'at', 'au', 'be', 'br', 'ca', 'ch', 'de', 'es', 'fr', 'in', 'it', 'mx', 'nl', 'nz', 'pl', 'sg', 'za']);
+
+/** Name searches are fuzzy upstream; keep only results for the same company. */
+function sameCompany(found: string | null, wanted: string): boolean {
+  if (!found) return false;
+  const a = normaliseLegalName(found);
+  const b = normaliseLegalName(wanted);
+  return Boolean(a) && a === b;
+}
 
 function theirStack(apiKey: string): JobAggregator {
   return {
@@ -28,8 +39,9 @@ function theirStack(apiKey: string): JobAggregator {
         const id = str(j.id);
         const title = str(j.job_title);
         if (!id || !title) return [];
+        if (!q.domain && !sameCompany(str(j.company_name) ?? str((j.company_object as J | undefined)?.name), q.companyName)) return [];
         const at = str(j.date_posted);
-        return [{ externalId: id, source: 'theirstack' as const, title, url: str(j.url), city: null, state: null, country: str(j.country_code), location: str(j.location), department: null, postedAt: at ? new Date(at) : null }];
+        return [{ externalId: id, source: 'theirstack' as const, title, url: webUrl(str(j.url)), city: null, state: null, country: str(j.country_code), location: str(j.location), department: null, postedAt: at ? new Date(at) : null }];
       });
     },
   };
@@ -40,7 +52,8 @@ function adzuna(appId: string, appKey: string): JobAggregator {
     id: 'adzuna',
     label: 'Adzuna',
     async fetch(client, q) {
-      const country = (q.countryCode ?? 'gb').toLowerCase();
+      const country = q.countryCode?.toLowerCase() ?? '';
+      if (!ADZUNA_COUNTRIES.has(country)) return [];
       const params = new URLSearchParams({ app_id: appId, app_key: appKey, company: q.companyName, results_per_page: '50', max_days_old: '90', 'content-type': 'application/json' });
       const body = await client.get(`https://api.adzuna.com/v1/api/jobs/${encodeURIComponent(country)}/search/1?${params}`, { accept: 'application/json' });
       const results = (JSON.parse(body) as { results?: J[] }).results ?? [];
@@ -48,9 +61,10 @@ function adzuna(appId: string, appKey: string): JobAggregator {
         const id = str(j.id);
         const title = str(j.title);
         if (!id || !title) return [];
+        if (!sameCompany(str((j.company as J | undefined)?.display_name), q.companyName)) return [];
         const at = str(j.created);
         const loc = (j.location as { display_name?: string } | undefined)?.display_name ?? null;
-        return [{ externalId: id, source: 'adzuna' as const, title, url: str(j.redirect_url), city: null, state: null, country: country.toUpperCase(), location: loc, department: (j.category as { label?: string } | undefined)?.label ?? null, postedAt: at ? new Date(at) : null }];
+        return [{ externalId: id, source: 'adzuna' as const, title, url: webUrl(str(j.redirect_url)), city: null, state: null, country: country.toUpperCase(), location: loc, department: (j.category as { label?: string } | undefined)?.label ?? null, postedAt: at ? new Date(at) : null }];
       });
     },
   };

@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { classifyPost, cleanText, type InitiativeTheme, type IntelPostKind } from '@bidstack/shared';
 
 import { parseFeed } from '../../watchdog/news.js';
-import type { IntelClient } from '../http.js';
+import { webUrl, type IntelClient } from '../http.js';
 
 /** A company post ready to store. */
 export interface OwnPost {
@@ -100,11 +100,12 @@ export async function fetchOwnPosts(client: IntelClient, t: PostsTarget, now: Da
   const errors: string[] = [];
   const byUrl = new Map<string, OwnPost>();
   const cutoff = now.getTime() - MAX_AGE_DAYS * 86_400_000;
-  const domain = t.domain?.replace(/^www\./, '') ?? (t.newsroomUrl ? new URL(t.newsroomUrl).hostname : null);
+  const domain = t.domain?.replace(/^www\./, '') ?? (webUrl(t.newsroomUrl) ? new URL(t.newsroomUrl!).hostname : null);
   let foundFeed: string | null = null;
 
-  const add = (source: OwnPost['source'], url: string, title: string, description: string, at: Date | null) => {
-    if (byUrl.has(url) || byUrl.size >= MAX_POSTS) return;
+  const add = (source: OwnPost['source'], rawUrl: string, title: string, description: string, at: Date | null) => {
+    const url = webUrl(rawUrl);
+    if (!url || byUrl.has(url) || byUrl.size >= MAX_POSTS) return;
     if (source !== 'ir_feed' && domain && !onDomain(url, domain)) return;
     if (at && at.getTime() < cutoff) return;
     const cls = classifyPost(title, description);
@@ -124,7 +125,7 @@ export async function fetchOwnPosts(client: IntelClient, t: PostsTarget, now: Da
     }
   }
 
-  const pages = [t.newsroomUrl, domain ? `https://www.${domain}/` : null].filter((x): x is string => !!x);
+  const pages = [webUrl(t.newsroomUrl), domain ? `https://www.${domain}/` : null].filter((x): x is string => !!x);
   const feeds: string[] = [];
   for (const page of pages) {
     try {

@@ -1,7 +1,7 @@
 // Slice 12 account intelligence: direction, hiring, financials, news, and a
 // per-source refresh that polls until the worker lands the run.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type {
   AccountDirection,
@@ -30,24 +30,33 @@ function useIntel<T>(view: string, companyId: string | undefined, pollUntil?: nu
   });
 }
 
-/** Direction: cited claims, investment plan, bid relevance and source status. */
+/** Direction: cited claims, investment plan, bid relevance and source status. Polls after a refresh. */
 export function useCompanyDirection(companyId: string | undefined, pollUntil?: number) {
-  return useIntel<AccountDirection>('direction', companyId, pollUntil);
+  const q = useIntel<AccountDirection>('direction', companyId, pollUntil);
+  const qc = useQueryClient();
+  const runs = q.data?.sources.map((s) => `${s.key}:${s.status}:${s.lastFetchedAt ?? ''}`).join('|') ?? '';
+  const seen = useRef(runs);
+  useEffect(() => {
+    if (seen.current === runs) return;
+    seen.current = runs;
+    for (const view of ['hiring', 'financials', 'news']) void qc.invalidateQueries({ queryKey: ['company-intel', companyId, view] });
+  }, [runs, companyId, qc]);
+  return q;
 }
 
 /** Hiring summary and recent postings. */
-export function useCompanyHiringIntel(companyId: string | undefined, pollUntil?: number) {
-  return useIntel<AccountHiringIntel>('hiring', companyId, pollUntil);
+export function useCompanyHiringIntel(companyId: string | undefined) {
+  return useIntel<AccountHiringIntel>('hiring', companyId);
 }
 
 /** Financial years with source, registry facts and labelled fallback. */
-export function useCompanyFinancialsIntel(companyId: string | undefined, pollUntil?: number) {
-  return useIntel<AccountFinancialsIntel>('financials', companyId, pollUntil);
+export function useCompanyFinancialsIntel(companyId: string | undefined) {
+  return useIntel<AccountFinancialsIntel>('financials', companyId);
 }
 
 /** Company posts and major news. */
-export function useCompanyNewsIntel(companyId: string | undefined, pollUntil?: number) {
-  return useIntel<AccountNewsIntel>('news', companyId, pollUntil);
+export function useCompanyNewsIntel(companyId: string | undefined) {
+  return useIntel<AccountNewsIntel>('news', companyId);
 }
 
 /** Queue one source; invalidate and poll the intel views for a few minutes. */
