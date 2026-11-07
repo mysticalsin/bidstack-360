@@ -189,3 +189,12 @@ export { seedSigningEntities } from './seed-signing-entities.js';
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+
+// Agreement ingest staging (slice 13a), shared by the REST route and MCP.
+export {
+  AgreementStageError,
+  INGEST_ITEM_SELECT,
+  serializeIngestItem,
+  stageAgreementIngest,
+} from './agreements/stage.js';
+export type { IngestActor, StageAgreementInput, StageAgreementResult } from './agreements/stage.js';

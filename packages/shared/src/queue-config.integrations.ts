@@ -299,3 +299,27 @@ export const WORKFLOW_SCHEDULE: QueueConfig = {
     removeOnFail: { age: 86_400 * 7, count: 500 },
   },
 };
+
+/**
+ * agreement-ingest (slice 13a). Hosted by the API process because the intake
+ * pipeline (storage, extraction, matching) lives there. Job kinds:
+ *   'process' one AgreementIngestItem (REST, MCP, or a synced file)
+ *   'sync'    pull one AgreementSource (Graph delta or DocuSign envelopes)
+ *   'sweep'   repeatable: pick queued items left by MCP or a lost job
+ * Job ids derive from the item id or the Sync now idempotency key, so a
+ * double click or a retried request lands on the same job.
+ */
+export const AGREEMENT_INGEST: QueueConfig = {
+  name: 'agreement-ingest',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 500 },
+    removeOnFail: { age: 86_400 * 14, count: 2000 },
+  },
+};
+
+export type AgreementIngestJob =
+  | { kind: 'process'; orgId: string; itemId: string }
+  | { kind: 'sync'; orgId: string; sourceId: string; runId: string; userId: string }
+  | { kind: 'sweep' };

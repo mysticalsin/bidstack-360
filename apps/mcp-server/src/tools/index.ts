@@ -19,6 +19,7 @@ import { leadsConvert } from './leads-convert.js';
 import { notesList } from './notes-list.js';
 import { notesCreate } from './notes-create.js';
 import { salesToolkitsList } from './sales-toolkits-list.js';
+import { agreementsIngest } from './agreements-ingest.js';
 import {
   crmSearchCompanies,
   crmCreateDeal,
@@ -108,6 +109,8 @@ export const tools = {
   account_hiring: agentTools.account_hiring,
   account_financials_summary: agentTools.account_financials_summary,
   account_news: agentTools.account_news,
+  // Agreement pull (slice 13a): stages a document for MSA intake review.
+  agreements_ingest: agreementsIngest,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -162,6 +165,7 @@ export const toolScopes = {
   account_hiring: 'read',
   account_financials_summary: 'read',
   account_news: 'read',
+  agreements_ingest: 'write',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {

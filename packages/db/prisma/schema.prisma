@@ -202,6 +202,8 @@ model Org {
   contractFileVersions          ContractFileVersion[]
   signingEntities               SigningEntity[]
   msaIntakeDrafts               MsaIntakeDraft[]
+  agreementSources              AgreementSource[]
+  agreementIngestItems          AgreementIngestItem[]
   meetingSourceConnections      MeetingSourceConnection[]
   meetingIngestItems            MeetingIngestItem[]
   meetingIntel                  MeetingIntel[]
@@ -5441,6 +5443,77 @@ model MsaIntakeDraft {
   @@index([orgId, createdById], map: "msa_intake_drafts_org_creator_idx")
   @@index([deletedAt])
   @@map("msa_intake_drafts")
+}
+
+// A configured pull source for agreements (slice 13): a SharePoint/OneDrive
+// folder read through Microsoft Graph, or DocuSign completed envelopes. Config
+// holds ids and filters only; credentials stay in env (MICROSOFT_GRAPH_*,
+// DOCUSIGN_*). cursor is the Graph delta link or the last envelope date.
+model AgreementSource {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  kind        String    @db.VarChar(20)
+  name        String    @db.VarChar(200)
+  enabled     Boolean   @default(true)
+  config      Json      @default("{}")
+  cursor      String?
+  lastSyncAt  DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  lastRunId   String?   @map("last_run_id") @db.VarChar(80)
+  lastResult  Json?     @map("last_result")
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org   Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  items AgreementIngestItem[]
+
+  @@index([orgId, kind], map: "agreement_sources_org_kind_idx")
+  @@index([deletedAt])
+  @@map("agreement_sources")
+}
+
+// One inbound agreement document from any channel (SharePoint, DocuSign, REST,
+// MCP). The row is the durable queue: status moves queued -> processing ->
+// drafted | versioned | duplicate | rejected | failed. A drafted item waits
+// for human review on its MsaIntakeDraft; nothing creates an agreement here.
+// pendingContent holds inline bytes until processing and is then cleared.
+model AgreementIngestItem {
+  id                    String    @id @default(uuid()) @db.Uuid
+  orgId                 String    @map("org_id") @db.Uuid
+  sourceId              String?   @map("source_id") @db.Uuid
+  channel               String    @db.VarChar(20)
+  externalSource        String    @map("external_source") @db.VarChar(120)
+  externalId            String    @map("external_id") @db.VarChar(300)
+  externalVersion       String?   @map("external_version") @db.VarChar(200)
+  idempotencyKey        String?   @map("idempotency_key") @db.VarChar(128)
+  fileName              String    @map("file_name") @db.VarChar(255)
+  contentType           String?   @map("content_type") @db.VarChar(100)
+  bytes                 Int?
+  sha256                String?   @db.VarChar(64)
+  fileUrl               String?   @map("file_url") @db.VarChar(2000)
+  pendingContent        Bytes?    @map("pending_content")
+  metadata              Json      @default("{}")
+  status                String    @default("queued") @db.VarChar(20)
+  error                 String?   @db.VarChar(500)
+  attempts              Int       @default(0)
+  intakeDraftId         String?   @map("intake_draft_id") @db.Uuid
+  contractId            String?   @map("contract_id") @db.Uuid
+  contractFileVersionId String?   @map("contract_file_version_id") @db.Uuid
+  actorType             String    @map("actor_type") @db.VarChar(20)
+  actorId               String?   @map("actor_id") @db.VarChar(80)
+  processedAt           DateTime? @map("processed_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org    Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  source AgreementSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, idempotencyKey], map: "agreement_ingest_items_org_idem_uq")
+  @@index([orgId, externalSource, externalId], map: "agreement_ingest_items_org_ext_idx")
+  @@index([orgId, sha256], map: "agreement_ingest_items_org_sha_idx")
+  @@index([status, createdAt], map: "agreement_ingest_items_status_idx")
+  @@map("agreement_ingest_items")
 }
 
 // One uploaded file version of a contract (MSA, SOW, amendment, addendum).

@@ -311,6 +311,9 @@ export const envSchema = z.object({
   DOCUSIGN_ACCOUNT_ID: z.string().min(1).optional().or(z.literal('')),
   DOCUSIGN_BASE_URL: z.string().url().optional().or(z.literal('')),
   DOCUSIGN_WEBHOOK_HMAC_KEY: z.string().min(1).optional().or(z.literal('')),
+  // JWT audience host for the agreement pull: account-d.docusign.com (demo)
+  // or account.docusign.com (production). Defaults to the demo host.
+  DOCUSIGN_OAUTH_HOST: z.string().min(1).optional().or(z.literal('')),
 });
 
 export type Env = z.infer<typeof envSchema>;
