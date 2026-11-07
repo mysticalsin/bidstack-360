@@ -13,6 +13,7 @@ import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
+import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
@@ -166,6 +167,7 @@ export function CompanyDetailPage() {
           </div>
 
           <CompanyTechStackSection companyId={c.id} />
+          <ConsultingPartnersSection companyId={c.id} />
 
           <div
             className="flex gap-2 border-b border-[var(--border-subtle)]"
