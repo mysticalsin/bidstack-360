@@ -78,8 +78,7 @@ function watch(page: Page): Watch {
     if (!url.includes('/api/')) return;
     const status = res.status();
     if (status < 400) return;
-    // 401/403 are permission probes some panels make on purpose; 404 on a
-    // probe for optional data (latest bid score) is the documented empty state.
+    // 404 on a probe for optional data (latest bid score) is the documented empty state.
     if (status === 404 && /\/bid-scores\/[^/]+\/latest/.test(url)) return;
     // Other specs share the seed; a deal deleted under an open board answers 404,
     // which the detail page renders as "not found".
@@ -89,7 +88,9 @@ function watch(page: Page): Watch {
       /\/opportunities\/[0-9a-f-]{36}$/.test(url)
     )
       return;
-    if (status === 409) return;
+    // The audit clicks each create control again on a seed that already holds
+    // the row; the API answers a duplicate write with 409 by contract.
+    if (status === 409 && res.request().method() !== 'GET') return;
     errors.push(`http ${status}: ${res.request().method()} ${url}`);
   };
   const onRequest = (req: Request) => {
@@ -112,7 +113,8 @@ function watch(page: Page): Watch {
 }
 
 /** Controls that would change shared seed data or leave the app. */
-const SKIP_NAME = /delete|remove|archive|sign out|log out|discard|reset/i;
+const SKIP_NAME =
+  /delete|remove|archive|sign out|log out|discard|reset|submit|send|approve|confirm|mark (as )?(won|lost)/i;
 
 interface Control {
   index: number;
