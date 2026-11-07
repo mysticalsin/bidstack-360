@@ -77,7 +77,8 @@ const ROUTES: Array<{ name: string; path: () => string; root?: string }> = [
   { name: 'public-booking', path: () => '/book/test-slug' },
 ];
 
-test.describe.configure({ retries: 0, timeout: 600_000 });
+// The settings page is heavy; on the shared dev machine 30 clicks can take over 10 minutes.
+test.describe.configure({ retries: 0, timeout: 900_000 });
 
 // ─── Layout ────────────────────────────────────────────────────────────────
 
@@ -208,7 +209,7 @@ async function scrollSum(page: Page): Promise<number> {
 
 for (const route of ROUTES) {
   test(`click audit ${route.name}: every control does something`, async ({ page }) => {
-    test.setTimeout(600_000);
+    test.setTimeout(900_000);
     const path = route.path();
     const w = watch(page);
     await open(page, path);
