@@ -137,7 +137,6 @@ export function ServiceDeskPage() {
       ) : items.length === 0 ? (
         <EmptyState
           title={t('serviceDesk.empty.title', 'No cases yet')}
-          message={t('serviceDesk.empty.message', 'Service cases will appear here.')}
         />
       ) : (
         <Card>

@@ -34,7 +34,6 @@ import {
   ContactDetailPage,
   ContactsPage,
   CustomObjectDetailPage,
-  CustomObjectEditorPage,
   CustomObjectListPage,
   DashboardPage,
   DashboardsListPage,
@@ -80,6 +79,11 @@ function MsaReminderRedirect() {
   const { id } = useParams();
   const { search } = useLocation();
   return <Navigate to={`/agreements/${id ?? ''}${search}`} replace />;
+}
+
+function CustomObjectDefRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/settings/custom-objects/${id ?? ''}`} replace />;
 }
 
 export function AppRoutes() {
@@ -515,22 +519,15 @@ export function AppRoutes() {
             path="/custom-objects"
             element={<Navigate to="/settings/custom-objects" replace />}
           />
+          {/* Object definitions are created and edited under
+              /settings/custom-objects; the bare /custom-objects/new and
+              /custom-objects/:id paths rendered pages that read params these
+              routes never provide ("Object not found"). */}
           <Route
             path="/custom-objects/new"
-            element={
-              <RequireAuth>
-                <CustomObjectEditorPage />
-              </RequireAuth>
-            }
+            element={<Navigate to="/settings/custom-objects" replace />}
           />
-          <Route
-            path="/custom-objects/:id"
-            element={
-              <RequireAuth>
-                <CustomObjectDetailPage />
-              </RequireAuth>
-            }
-          />
+          <Route path="/custom-objects/:id" element={<CustomObjectDefRedirect />} />
           {/* Custom-object record browsing. The List/Detail pages read
               :objectKey (and :recordId) from the path; without these routes the
               "New <record>" button and every record link 404'd. */}

@@ -89,7 +89,10 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
                     })}
                   />
                 </div>
-                <span className="max-w-full truncate text-[10px] font-medium text-[var(--text-muted)]">
+                <span
+                  title={bucket.label}
+                  className="max-w-full truncate text-xs font-medium text-[var(--text-muted)]"
+                >
                   {bucket.label}
                 </span>
               </div>

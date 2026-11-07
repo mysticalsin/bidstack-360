@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const authMocks = vi.hoisted(() => ({
   isAdmin: true,
   canReadAudit: false,
+  loading: false,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -15,11 +16,17 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/lib/auth', () => ({
-  useIsAdmin: () => authMocks.isAdmin,
+  useIsAdmin: () => !authMocks.loading && authMocks.isAdmin,
+  useOrgAdminStatus: () => ({
+    isAdmin: !authMocks.loading && authMocks.isAdmin,
+    isLoading: authMocks.loading,
+  }),
 }));
 
 vi.mock('@/hooks/useCapabilities', () => ({
-  useHasPermission: (key: string) => key === 'audit-log:read' && authMocks.canReadAudit,
+  useCapabilities: () => ({ isLoading: authMocks.loading }),
+  useHasPermission: (key: string) =>
+    !authMocks.loading && key === 'audit-log:read' && authMocks.canReadAudit,
 }));
 
 vi.mock('@/components/settings/SettingsLayout', () => ({
@@ -114,6 +121,7 @@ describe('SettingsPage routing guard', () => {
   beforeEach(() => {
     authMocks.isAdmin = true;
     authMocks.canReadAudit = false;
+    authMocks.loading = false;
   });
 
   afterEach(() => cleanup());
@@ -166,5 +174,27 @@ describe('SettingsPage routing guard', () => {
     expect(screen.getByTestId('active-tab').textContent).toBe('identity');
     expect(screen.getByText('Identity panel')).toBeTruthy();
     expect(screen.getByTestId('location').textContent).toBe('/settings?tab=identity');
+  });
+
+  it('keeps an admin deep link while capabilities are still loading', async () => {
+    authMocks.loading = true;
+    const view = renderPage('/settings?tab=audit-log');
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByTestId('location').textContent).toBe('/settings?tab=audit-log');
+    expect(screen.queryByText('Overview panel')).toBeNull();
+
+    authMocks.loading = false;
+    authMocks.canReadAudit = true;
+    view.rerender(
+      <MemoryRouter initialEntries={['/settings?tab=audit-log']}>
+        <LocationProbe />
+        <Routes>
+          <Route path="/settings" element={<SettingsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId('active-tab').textContent).toBe('audit-log'));
+    expect(screen.getByTestId('location').textContent).toBe('/settings?tab=audit-log');
   });
 });

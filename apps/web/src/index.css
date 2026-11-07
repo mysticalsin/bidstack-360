@@ -2585,8 +2585,14 @@ select:focus-visible {
 /* A pager at the end of a list sat under Quick actions: 60px / 48px page
    padding is shorter than the 76px+ FAB stack. Only pages that actually
    paginate grow the bottom safe area, including the mobile breakpoint. */
+/* Same for a list whose last row ends in a right-aligned action: opt in with
+   `data-fab-clear` on the list. The gooey layer around the disc catches clicks
+   about one disc above it, so these rows clear an extra --fab-size. */
 .app-shell .page:has([data-slot='pagination']) {
   padding-bottom: var(--fab-clearance);
+}
+.app-shell .page:has([data-fab-clear]) {
+  padding-bottom: calc(var(--fab-clearance) + var(--fab-size));
 }
 /* Escape hatch for surfaces that genuinely own the whole viewport — a kanban
    board that scrolls sideways, a calendar grid, a canvas. The page opts in by
@@ -2604,6 +2610,9 @@ select:focus-visible {
 [data-slot='pagination'],
 [data-slot='pagination'] button {
   scroll-margin-bottom: var(--fab-clearance);
+}
+[data-fab-clear] button {
+  scroll-margin-bottom: calc(var(--fab-clearance) + var(--fab-size));
 }
 [data-slot='pagination'] {
   padding-right: calc(
@@ -2639,6 +2648,9 @@ select:focus-visible {
   }
   .app-shell .page:has([data-slot='pagination']) {
     padding-bottom: var(--fab-clearance);
+  }
+  .app-shell .page:has([data-fab-clear]) {
+    padding-bottom: calc(var(--fab-clearance) + var(--fab-size));
   }
   .sidebar {
     display: none;
