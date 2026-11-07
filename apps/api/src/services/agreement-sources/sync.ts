@@ -77,13 +77,22 @@ async function saveRun(source: Source, run: AgreementSyncRun, extra: Prisma.Agre
 }
 
 /** Mark a run queued before the job is picked up (the route calls this). */
-export async function markRunQueued(sourceId: string, orgId: string, runId: string): Promise<AgreementSyncRun> {
+/**
+ * Claim the next run. `seenUpdatedAt` is the source row version the caller
+ * checked; a concurrent Sync now that got there first makes this return null.
+ */
+export async function markRunQueued(
+  sourceId: string,
+  orgId: string,
+  runId: string,
+  seenUpdatedAt?: Date,
+): Promise<AgreementSyncRun | null> {
   const run: AgreementSyncRun = { runId, sourceId, state: 'queued', startedAt: null, finishedAt: null, result: null, reasons: [] };
-  await prisma.agreementSource.updateMany({
-    where: { id: sourceId, orgId },
+  const res = await prisma.agreementSource.updateMany({
+    where: { id: sourceId, orgId, ...(seenUpdatedAt ? { updatedAt: seenUpdatedAt } : {}) },
     data: { lastRunId: runId, lastResult: run as unknown as Prisma.InputJsonValue },
   });
-  return run;
+  return res.count === 1 ? run : null;
 }
 
 async function landAndProcess(
@@ -129,17 +138,28 @@ async function landAndProcess(
       diff: { channel: source.kind, externalSource: file.externalSource, externalId: file.externalId, sourceId: source.id },
     },
   });
-  try {
-    const buf = await download();
-    return (await processAgreementBytes(item, buf)).status;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Download failed';
+  const fail = async (err: unknown, fallback: string) => {
+    const message = err instanceof Error ? err.message : fallback;
     await prisma.agreementIngestItem.update({
       where: { id: item.id },
       data: { status: 'failed', error: message.slice(0, 500), processedAt: new Date() },
     });
     log.warn({ sourceId: source.id, itemId: item.id, err: message }, 'agreement source item failed');
+  };
+  let buf: Buffer;
+  try {
+    buf = await download();
+  } catch (err) {
+    // A failed download is retried by the next run.
+    await fail(err, 'Download failed');
     return 'failed';
+  }
+  try {
+    return (await processAgreementBytes(item, buf)).status;
+  } catch (err) {
+    // The bytes arrived but could not be read; retrying the same file will not help.
+    await fail(err, 'Processing failed');
+    return 'rejected';
   }
 }
 
@@ -156,6 +176,7 @@ async function syncSharePoint(source: Source, deps: Required<SyncDeps>, result: 
   const files = delta.files.filter((f) => isAgreementFileName(f.name));
   result.skipped += delta.files.length - files.length;
   if (files.length > MAX_FILES_PER_RUN) reasons.push(`Only the first ${MAX_FILES_PER_RUN} files were pulled; run again for the rest`);
+  let retryLater = false;
   for (const file of files.slice(0, MAX_FILES_PER_RUN)) {
     const status = await landAndProcess(
       source,
@@ -169,8 +190,11 @@ async function syncSharePoint(source: Source, deps: Required<SyncDeps>, result: 
       () => downloadDriveItem(deps.fetch, token, { driveId: config.driveId, itemId: file.id, maxBytes: AGREEMENT_INGEST_MAX_BYTES }),
     );
     tally(result, status);
+    if (status === 'failed') retryLater = true;
   }
-  return files.length > MAX_FILES_PER_RUN ? source.cursor : delta.deltaLink;
+  // A failed download is not returned by the next delta, so keep the old
+  // cursor until it lands. Rejected files (wrong type, too big) do not block.
+  return files.length > MAX_FILES_PER_RUN || retryLater ? source.cursor : delta.deltaLink;
 }
 
 async function syncDocuSign(source: Source, deps: Required<SyncDeps>, result: AgreementSyncResult) {
@@ -187,6 +211,7 @@ async function syncDocuSign(source: Source, deps: Required<SyncDeps>, result: Ag
     keyword: config.keyword,
   });
   let cursor = source.cursor;
+  let blocked = false;
   for (const env of envelopes.slice(0, MAX_FILES_PER_RUN)) {
     const status = await landAndProcess(
       source,
@@ -204,7 +229,9 @@ async function syncDocuSign(source: Source, deps: Required<SyncDeps>, result: Ag
       () => downloadCombinedPdf(deps.fetch, token, creds, env.envelopeId, AGREEMENT_INGEST_MAX_BYTES),
     );
     tally(result, status);
-    if (env.completedAt && (!cursor || env.completedAt > cursor)) cursor = env.completedAt;
+    // The cursor never moves past a failed envelope, so the next run retries it.
+    if (status === 'failed') blocked = true;
+    if (!blocked && env.completedAt && (!cursor || env.completedAt > cursor)) cursor = env.completedAt;
   }
   return cursor;
 }

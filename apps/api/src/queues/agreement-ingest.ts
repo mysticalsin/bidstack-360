@@ -18,6 +18,7 @@ const log = createLogger({ name: 'queue:agreement-ingest' });
 const SWEEP_EVERY_MS = 60_000;
 const SWEEP_BATCH = 50;
 const MAX_ATTEMPTS = 5;
+const PROCESSING_STALE_MS = 10 * 60_000;
 
 let queueSingleton: Queue | null = null;
 let connectionSingleton: IORedis | null = null;
@@ -47,7 +48,7 @@ function getQueue(): Queue {
 
 export function ingestJobId(job: AgreementIngestJob): string {
   if (job.kind === 'process') return `process--${job.orgId}--${job.itemId}`;
-  if (job.kind === 'sync') return `sync--${job.orgId}--${job.runId}`;
+  if (job.kind === 'sync') return `sync--${job.orgId}--${job.runId}${job.claimId ? `--${job.claimId}` : ''}`;
   return 'sweep';
 }
 
@@ -71,6 +72,18 @@ export async function enqueueAgreementIngest(job: AgreementIngestJob): Promise<s
 /** Re-enqueue rows left queued (Redis outage, MCP-staged items, crashes). */
 export async function sweepQueuedAgreementItems(): Promise<number> {
   const stale = new Date(Date.now() - 30_000);
+  // A crash mid-process leaves rows in `processing`. REST and MCP rows still
+  // hold their bytes or URL, so they go back to the queue; source rows are
+  // marked failed so the next sync pulls the file again.
+  const stuck = new Date(Date.now() - PROCESSING_STALE_MS);
+  await prisma.agreementIngestItem.updateMany({
+    where: { status: 'processing', updatedAt: { lt: stuck }, sourceId: null },
+    data: { status: 'queued' },
+  });
+  await prisma.agreementIngestItem.updateMany({
+    where: { status: 'processing', updatedAt: { lt: stuck }, sourceId: { not: null } },
+    data: { status: 'failed', error: 'Interrupted; the next sync pulls it again', processedAt: new Date() },
+  });
   const rows = await prisma.agreementIngestItem.findMany({
     where: { status: 'queued', attempts: { lt: MAX_ATTEMPTS }, updatedAt: { lt: stale } },
     orderBy: { createdAt: 'asc' },

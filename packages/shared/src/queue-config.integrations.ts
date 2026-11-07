@@ -321,5 +321,5 @@ export const AGREEMENT_INGEST: QueueConfig = {
 
 export type AgreementIngestJob =
   | { kind: 'process'; orgId: string; itemId: string }
-  | { kind: 'sync'; orgId: string; sourceId: string; runId: string; userId: string }
+  | { kind: 'sync'; orgId: string; sourceId: string; runId: string; userId: string; claimId?: string }
   | { kind: 'sweep' };
