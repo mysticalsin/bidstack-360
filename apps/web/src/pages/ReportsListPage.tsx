@@ -183,9 +183,7 @@ export function ReportsListPage() {
         <EmptyState
           title={t('reportsList.emptyTitle', 'No reports found')}
           message={
-            search
-              ? t('reportsList.emptySearchMessage', 'Try a different search.')
-              : t('reportsList.emptyMessage', 'Create your first analytical report.')
+            search ? t('reportsList.emptySearchMessage', 'Try a different search.') : undefined
           }
           action={
             !search && canWrite ? (

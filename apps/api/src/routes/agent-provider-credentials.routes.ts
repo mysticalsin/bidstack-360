@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { encryptSecret } from '@bidstack/shared/server-crypto';
 import { completeChat, normalizeCloudflareBaseUrl } from '@bidstack/shared/llm';
-import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 
 import {
   agentProviderCredentialName,
@@ -128,26 +127,6 @@ function assertSafeProviderBaseUrl(
           ? 'OmniRoute base URL must be public https://, or localhost for the local gateway.'
           : 'Base URL must be a public https:// endpoint.',
     );
-  }
-}
-
-/**
- * Call-time DNS gate. The save path checks the URL string only, so a stored
- * host can still resolve (or later re-resolve) to internal space.
- */
-async function baseUrlResolvesPublic(provider: DirectAgentProvider, baseUrl: string): Promise<boolean> {
-  let parsed: URL;
-  try {
-    parsed = new URL(baseUrl);
-  } catch {
-    return false;
-  }
-  if (isLocalKeylessGatewayUrl(provider, parsed)) return true;
-  try {
-    await assertUrlResolvesPublic(baseUrl);
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -431,15 +410,6 @@ export const agentProviderCredentialsRoutes: FastifyPluginAsyncZod = async (serv
           model: cred?.model ?? null,
           latencyMs: 0,
           error: 'No usable credentials configured for this provider.',
-        };
-      }
-      if (!(await baseUrlResolvesPublic(provider, llm.baseUrl))) {
-        return {
-          provider,
-          ok: false,
-          model: llm.model,
-          latencyMs: 0,
-          error: 'Base URL resolves to an internal address.',
         };
       }
       const startedAt = Date.now();

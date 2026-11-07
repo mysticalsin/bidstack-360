@@ -20,6 +20,10 @@ describe('shared agent tool registry', () => {
       'tasks.create',
       'opportunity.update',
       'proposal.section_draft',
+      'account_direction',
+      'account_hiring',
+      'account_financials_summary',
+      'account_news',
     ]) {
       expect(AGENT_TOOL_NAMES).toContain(name);
     }
