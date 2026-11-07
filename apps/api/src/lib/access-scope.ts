@@ -22,8 +22,9 @@
 //   or change an out-of-scope deal by direct link/ID. Companies/leads/contacts stay org-visible even though
 //   Company.countryCode exists (v2 candidate).
 // - API-key callers (req.auth.userId = "apikey:<id>", not a User row) have no
-//   group membership. New keys default-deny company/MSA resources unless the
-//   creator sets unrestrictedScope or an explicit company/MSA allowlist.
+//   group membership. New keys default-deny company/MSA resources and deals
+//   unless the creator sets unrestrictedScope or an explicit company/MSA
+//   allowlist; a restricted key sees deals on its allowlisted companies only.
 //   Their REST verbs are also bounded by exact permission scopes (and
 //   readOnly). Legacy read/write fallback is dev/migration only.
 
@@ -182,9 +183,11 @@ export function applyOpportunityScope(
   where: Prisma.OpportunityWhereInput,
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput {
-  // Country groups bind users. API keys are bounded by permission scopes and the
-  // company/MSA allowlist, and "apikey:<id>" is not a valid uuid for ownerId.
-  if (scope.unrestricted || isApiKeyActor(scope.userId)) return where;
+  if (scope.unrestricted) return where;
+  // A key owns no deals and its userId is not a uuid: scope by its company allowlist.
+  if (isApiKeyActor(scope.userId)) {
+    return { AND: [where, { companyId: { in: scope.companyIds } }] };
+  }
   // Group codes are uppercase ISO-2 (CountryCode schema), but opportunity.country
   // / territory.countryCodes are stored raw — match both cases so a lowercase
   // record isn't silently hidden from a user who should see it. Prisma `in`
@@ -217,7 +220,8 @@ export function countryVariantsForScope(scope: AccessScope): string[] {
 export function accountOpportunityScopePredicate(
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput | null {
-  if (scope.unrestricted || isApiKeyActor(scope.userId)) return null;
+  if (scope.unrestricted) return null;
+  if (isApiKeyActor(scope.userId)) return { companyId: { in: scope.companyIds } };
   const variants = countryVariantsForScope(scope);
   const clauses: Prisma.OpportunityWhereInput[] = [{ ownerId: scope.userId }];
   if (variants.length > 0) {
