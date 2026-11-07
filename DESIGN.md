@@ -473,7 +473,205 @@ Every list, table, and dashboard widget must have an empty state.
 | Version | Date       | Change                | Agent |
 | ------- | ---------- | --------------------- | ----- |
 | 1.0.0   | 2026-05-22 | Initial seed document | #5    |
+| 3.0.0   | 2026-11-06 | Enterprise upgrade addendum (section 9): TUFFUI token map, motion tokens, components, layout, copy, a11y. Sections 1 to 7 above are stale on tokens; `docs/DESIGN.md` and `apps/web/src/index.css` win. | factory-0 (Cursor) |
 
 ---
 
 _DESIGN.md is a living document. Every design decision must be traceable to a Principle. When taste_profile.json evolves, update the relevant sections here._
+
+---
+
+## 9. v3.0.0 (2026-11-06): Enterprise upgrade addendum
+
+Appended by factory slice 0. Earlier sections are kept as history. Where they disagree with this
+section, this section wins; where this section is silent, `docs/DESIGN.md` (green visual system) and
+the live values in `apps/web/src/index.css` win. Backup of the prior file: `DESIGN.backup-2026-11-06.md`.
+
+Ground truth on `main` (`ad2d0839`):
+
+- Tailwind **4.3.3**, CSS-first via `@tailwindcss/vite`. No `tailwind.config.*`. Tokens are CSS variables
+  in `apps/web/src/index.css` (`:root` / `[data-theme='light']`, `[data-theme='dark']`) bridged into
+  utilities by one `@theme` block. Dark mode is `data-theme`, not `prefers-color-scheme`.
+- Brand is green: `--brand-primary` `#006b4f` (light), `#00805e` (dark fill), `--brand-deep` `#3fbe93`
+  (dark foreground accent). The blue values in sections 1 to 3 and in ADR 0005 are stale.
+- Design law is enforced by ESLint (`packages/eslint-rules/design-law.js`): `no-foreign-token-vocabulary`,
+  `no-arbitrary-geometry`, `no-theme-variant-geometry` (errors), `no-raw-hex-in-classname` (warn).
+  ADR 0002: tokens change value, never name; no second vocabulary.
+- Class merge helper is `@/lib/cn` (clsx + tailwind-merge). There is no `@/lib/utils`.
+
+### 9.1 Tokens: TUFFUI to repo
+
+TUFFUI (MIT, https://github.com/yurigdesigner/tuffui, pinned `378f3eaac693c693d2ec845baf38bf6c0488cb37`)
+ships shadcn-style names. Rewrite every class at import; never add the TUFFUI names to `@theme`.
+
+| TUFFUI class / token | Repo class | Note |
+|---|---|---|
+| `text-foreground` | `text-fg-primary` | |
+| `text-muted-foreground` | `text-fg-secondary` | tertiary copy: `text-fg-tertiary` |
+| `text-foreground/NN`, `bg-foreground/NN` | `text-fg-primary/NN`, `bg-fg-primary/NN` | keep the opacity step |
+| `bg-background` | `bg-surface-page` | |
+| `bg-surface` (outer shell) | `bg-surface-shell` | new token, see below |
+| `bg-surface-inset` (inner panel) | `bg-surface-inset` | new token, see below |
+| `bg-surface-raised` (control) | `bg-surface-hover` | |
+| `bg-brand` | `bg-brand` | |
+| `text-brand`, `fill-brand`, `stroke-brand` | `text-brand-deep`, `fill-brand-deep`, `stroke-brand-deep` | contrast-safe in both themes |
+| `text-brand-foreground` | `text-fg-on-brand` | |
+| `positive` | `success` (+ `success-tint`) | |
+| `negative` | `danger` (+ `danger-tint`) | |
+| `warning` | `warning` (+ `warning-tint`) | |
+| `border-border` | `border-[var(--border-subtle)]` or `border-border-subtle` | strong: `border-border-strong` |
+| `ring` / focus | `--border-focus` | |
+| hex palettes (agent-avatar, diverging-bars, iso-bars) | `var(--chart-1)` .. `var(--chart-8)` | chart palette is an allowed exemption |
+
+New tokens (value-only additions, both themes, added to `:root`, `[data-theme='dark']` and `@theme`):
+
+| Token | Light | Dark | Purpose |
+|---|---|---|---|
+| `--surface-shell` | `#f0f0f0` | `#121214` | outer shell of a dense panel |
+| `--surface-inset` | `#ffffff` | `#0c0c0e` | inner panel inside a shell |
+
+Geometry: shell `rounded-xl` (12px), inset `rounded-lg` (8px), controls and pills `rounded-md` (5px).
+Replace TUFFUI `rounded-[1.375rem]`, `rounded-[1.5rem]`, `p-[2px]` with scale steps. Drop
+`shadow-[...]` and `dark:shadow-[...]`; separation comes from surface steps and `--border-subtle`.
+Fonts stay on the repo system stacks.
+
+### 9.2 Motion tokens
+
+Add to `@theme` (CSS) and vendor `lib/motion-tokens.ts` (TS) with the same values:
+
+| Token | Value | Use |
+|---|---|---|
+| `--ease-ui-out` / `EASE_OUT` | `cubic-bezier(0.23, 1, 0.32, 1)` | enter, hover, press |
+| `--ease-ui-in-out` / `EASE_IN_OUT` | `cubic-bezier(0.77, 0, 0.175, 1)` | move, reorder |
+| `--ease-drawer` | `cubic-bezier(0.32, 0.72, 0, 1)` | drawers and sheets |
+| `--duration-enter` | `210ms` (exists) | TUFFUI `enter` 0.2s maps here |
+| `--duration-exit` | `150ms` (exists) | TUFFUI `exit` 0.14s maps here |
+| `--duration-move` | `400ms` (exists) | layout moves only |
+| `spring` | `{ type: 'spring', duration: 0.3, bounce: 0 }` | `motion` / framer only |
+
+Rules: nothing over 300ms except layout moves; animate transform and opacity only; every animated
+component reads `useReducedMotion()` and falls back to `instant` (`duration: 0`). Keep using
+`apps/web/src/lib/motion.ts`; `motion-tokens.ts` re-exports from it where values match.
+
+### 9.3 Components
+
+Vendor path: `apps/web/src/components/vendor/tuffui/<name>.tsx`, plus `LICENSE` (full MIT text) in that
+folder. Keep each file header verbatim:
+`// TUFFUI (https://tuffui.com) · MIT License · Copyright (c) 2026 TUFFUI contributors`.
+Add one line under it listing the rewrites made (table-kit precedent). Swap Phosphor icons for Lucide
+(section 7).
+
+| Component | Source | Use in Polo |
+|---|---|---|
+| StatusPill, Tag | `registry/status-pill/status-pill.tsx` | delivery status, policy effect, endpoint state |
+| AgentConsole | `registry/agent-console/` (+ run-trace, tool-approval-queue, usage-summary, rate-limits, progress-bar, eval-results, context-window-meter, background-agents) | SERUM agent runs, approvals |
+| DotHistogram | `registry/dot-histogram/` | webhook response-time distribution |
+| RadialDots | `registry/radial-dots/` | success-rate gauge |
+| MatchField | `registry/match-field/` | policy condition builder (When / Except) |
+| RadarChart | `registry/radar-chart/` | bid scoring |
+| DivergingBars | `registry/diverging-bars/` | policy impact preview (gained vs lost access) |
+| IsoBars | `registry/iso-bars/` | volume by event type |
+| HexDensity | `registry/hex-density/` | delivery heatmap |
+
+Reference screens are style input only: dark delivery heatmap with gauge; message log with dot timeline
+and attempts / replay; retry step chart, response-time histogram, endpoint form; light access-policy
+builder with When / Then / Except, impact preview, publish version. Do not copy any third-party product
+names or copy into Polo.
+
+### 9.4 Layout rules
+
+- App frame unchanged: 56px icon rail, `PageShell` `max-w-7xl`, one vertical scroll per page (no nested
+  scroll areas except logs and tables with a fixed header).
+- Dense panels use shell + inset: `bg-surface-shell rounded-xl p-1` wrapping `bg-surface-inset rounded-lg`.
+- Side panels (message detail, policy editor) become a drawer below `56rem` container width, using
+  container queries (native in Tailwind 4: `@container`, `@4xl:`). Drawer closes on Escape and returns
+  focus to the trigger.
+- Collapsible rails: 64px collapsed, 232px expanded.
+- Charts sit in an inset with a one-line title and a value; legends only when there are more than two
+  series.
+
+### 9.5 Copy rules
+
+- Cut taglines, helper text under labels, and secondary labels that repeat the primary. One title, one
+  value, one action per card.
+- Empty states: one sentence, one action.
+- No em dashes in new copy; no banned AI words (vault `Preferences/dont.md`).
+- **Never cut or reword the pinned consent and safety copy below.** Slice agents must add a test that
+  pins these strings (keys in `public/locales/en/*.json` and the inline defaults) before cutting any
+  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept):
+
+```text
+# Signatures (PublicSignPage, signatures.json)
+Your signature is legally binding. This page contains no tracking technologies.
+I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.
+{{senderName}} has been notified. A copy of the signed document will be sent to your email address.
+I agree that this electronic signature is legally equivalent to my handwritten signature.
+
+# SMS (SmsComposerModal)
+This number has requested to stop receiving SMS. Sending is blocked (TCPA compliance).
+This message will be sent as {{count}} segments (billed per segment by Twilio).
+
+# Secrets shown once (ApiKeysSection, WebhooksSection, MeetingSourcesSection)
+Copy the secret now — it will not be shown again.
+You'll see the secret exactly once — copy it before closing.
+Copy your new key now — it won't be shown again.
+Any client using this key will start failing immediately. This cannot be undone.
+Copy the signing secret now
+Store this secret in the receiver for
+It will not be shown again.
+Webhooks are limited to administrators
+Webhook subscriptions can push sensitive platform data to external systems, so only admins can view, create, test, pause, or delete them.
+The endpoint will stop receiving Polo PreSales events immediately. Delivery history is retained.
+Copy this token now. It is shown once and Polo keeps only its fingerprint.
+
+# AI disclosure and review
+AI-assisted draft — review before sending
+These are AI suggestions only. Review before applying to the deal.
+Open-web signal; verify before treating as a Mantu fact.
+{{label}} open-web feed checked at {{fetchedAt}} with {{confidence}}% source confidence. Verify before treating it as a Mantu fact.
+Source: Google News · verify before treating as a Mantu fact.
+Human Review: Pre-Drafting Gate
+Extracted fields applied — review before saving
+Apply extracted fields (review before saving)
+Verify before staging
+
+# Transcripts and data privacy
+Show transcript (shared with consent)
+No transcript stored. Transcripts are kept only when a Métis user opts in.
+No transcript is stored for manual entries.
+Data privacy:
+Model artifacts contain only learned weights — no raw deal data, names, or emails. Each org trains its own isolated model. Scores are cached for 1 hour in Redis and invalidated on record updates.
+Phone numbers and contact leads are not stored
+Secrets stay server-side. Add them to local/production env, then restart worker/API.
+Create read/write keys only for the exact workflow and keep secrets server-side.
+No secrets sent
+Raw API keys, passwords, credentials, and secrets are rejected server-side. Use secretRef fields.
+Enrichment falls back to free open data. The stored key is removed.
+Only admins can manage data-source keys.
+
+# Governance
+Standing decision: an opportunity with a recorded No-Go / No-Bid cannot advance until a positive gate or a justified override is on record.
+
+# Destructive actions
+This permanently removes "{{name}}". This cannot be undone.
+This permanently removes the proposal and all its sections. This cannot be undone.
+This will permanently delete the object definition and all records belonging to it. This action cannot be undone.
+This action cannot be undone.
+Delete all demonstration data? This action cannot be undone.
+"{{name}}" will be removed. This can't be undone.
+{{recordKey}} will be soft-deleted. It can be restored via the API.
+```
+
+### 9.6 Accessibility rules
+
+- WCAG 2.2 AA in both themes. Body text 4.5:1, large text and UI parts 3:1. Use `brand-deep` for
+  brand-coloured text on dark surfaces.
+- Status is never colour alone: StatusPill carries text and an icon; heatmap cells and dots carry an
+  accessible name with value and time.
+- Every chart has a text alternative: a visually hidden summary plus a "View as table" toggle for
+  HexDensity, DotHistogram, DivergingBars and IsoBars.
+- Keyboard: all controls reachable in order; Escape closes drawers and popovers; focus returns to the
+  trigger; visible focus ring from `--border-focus`. MatchField rule rows are reorderable by keyboard.
+- Live regions: delivery replay and policy publish results announce via `aria-live="polite"`.
+- Reduced motion honoured everywhere (9.2). Hit targets at least 24 x 24 px.
+- Lighthouse a11y stays at 100 on `/login` and `/dashboard` (baseline in `docs/factory/RECON.md`).
