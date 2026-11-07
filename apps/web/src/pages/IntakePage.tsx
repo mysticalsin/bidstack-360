@@ -47,6 +47,14 @@ export function IntakePage() {
     refetchInterval: hasPendingExtractions ? 2000 : false,
   });
 
+  // `reached` is session state; finished extractions on the account are
+  // persisted, so a reload can still return to Review.
+  const hasPersistedExtraction = (intel.data?.extractions ?? []).some((e) => e.status === 'done');
+  const unlocked = Math.max(
+    reached,
+    hasPersistedExtraction ? STEPS.findIndex((s) => s.id === 'review') : 0,
+  );
+
   // Auto-advance to review once the extractions WE triggered this session
   // settle. Scope to extractingDocIds so historical extractions on the account
   // can't trigger (or block) advancement.
@@ -154,7 +162,7 @@ export function IntakePage() {
             <button
               type="button"
               onClick={() => setStep(s.id)}
-              disabled={step === s.id || i > reached}
+              disabled={step === s.id || i > unlocked}
               aria-current={step === s.id ? 'step' : undefined}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-default ${
                 step === s.id
