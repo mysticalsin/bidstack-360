@@ -131,7 +131,7 @@ export async function stageAgreementIngest(input: StageAgreementInput): Promise<
 
   if (input.idempotencyKey) {
     const prior = await prisma.agreementIngestItem.findFirst({
-      where: { orgId, idempotencyKey: input.idempotencyKey },
+      where: { orgId, idempotencyKey: input.idempotencyKey, ...actorFields(input.actor) },
       select: INGEST_ITEM_SELECT,
     });
     if (prior) return { item: serializeIngestItem(prior), created: false };
@@ -152,6 +152,7 @@ export async function stageAgreementIngest(input: StageAgreementInput): Promise<
         externalId: request.externalId,
         sha256,
         status: { notIn: ['failed', 'rejected'] },
+        ...actorFields(input.actor),
       },
       orderBy: { createdAt: 'asc' },
       select: INGEST_ITEM_SELECT,
@@ -184,7 +185,7 @@ export async function stageAgreementIngest(input: StageAgreementInput): Promise<
       // A concurrent call with the same idempotency key won the insert.
       if ((err as { code?: string }).code === 'P2002' && input.idempotencyKey) {
         const winner = await prisma.agreementIngestItem.findFirst({
-          where: { orgId, idempotencyKey: input.idempotencyKey },
+          where: { orgId, idempotencyKey: input.idempotencyKey, ...actorFields(input.actor) },
           select: INGEST_ITEM_SELECT,
         });
         if (winner) return { ...winner, replay: true as const };

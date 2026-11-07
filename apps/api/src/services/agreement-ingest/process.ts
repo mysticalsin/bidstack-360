@@ -12,6 +12,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import { MSA_MAX_BYTES, type MsaContentType } from '@bidstack/shared';
 import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 
+import { applyCompanyScope, getAccessScope } from '../../lib/access-scope.js';
 import { detectMsaContentType, sha256Hex } from '../../msa/file-checks.js';
 import { createIntakeDraftFromBuffer, intakeKey } from '../../msa/intake-draft.js';
 import { enqueueMsaTextExtract } from '../../queues/msa-text-extract.js';
@@ -67,6 +68,25 @@ const ITEM_FOR_PROCESS = {
   actorId: true,
 } as const;
 
+/** Read a body without trusting content-length; stop as soon as it passes the cap. */
+export async function readCapped(res: Response): Promise<Buffer> {
+  if (!res.body) return Buffer.alloc(0);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MSA_MAX_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw new IngestRejectedError('File is larger than 25 MB');
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
 /**
  * Fetch a sender-supplied URL with the SSRF guard on every hop: the host must
  * resolve to public addresses only, redirects are followed by hand and
@@ -91,9 +111,7 @@ export async function fetchAgreementUrl(rawUrl: string, fetchFn: FetchFn = fetch
       if (!res.ok) throw new IngestRejectedError(`File URL answered ${res.status}`);
       const declared = Number(res.headers.get('content-length') ?? '0');
       if (declared > MSA_MAX_BYTES) throw new IngestRejectedError('File is larger than 25 MB');
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length > MSA_MAX_BYTES) throw new IngestRejectedError('File is larger than 25 MB');
-      return buf;
+      return await readCapped(res);
     } finally {
       clearTimeout(timer);
     }
@@ -156,13 +174,17 @@ async function notify(orgId: string, userId: string, title: string, body: string
   });
 }
 
-/** Earlier document from the same external record that already became an agreement. */
+/**
+ * Earlier document from the same external record and the same sender (source,
+ * user or API key) that already became an agreement.
+ */
 async function priorContractId(item: ItemForProcess): Promise<string | null> {
   const prior = await prisma.agreementIngestItem.findMany({
     where: {
       orgId: item.orgId,
       externalSource: item.externalSource,
       externalId: item.externalId,
+      ...(item.sourceId ? { sourceId: item.sourceId } : { actorType: item.actorType, actorId: item.actorId }),
       id: { not: item.id },
       status: { in: ['drafted', 'versioned'] },
     },
@@ -183,12 +205,37 @@ async function priorContractId(item: ItemForProcess): Promise<string | null> {
   return confirmed?.confirmedContractId ?? null;
 }
 
+/** Sources are admin-configured; users and API keys must still see the agreement's account. */
+async function senderMaySeeCompany(item: ItemForProcess, companyId: string | null): Promise<boolean> {
+  if (item.actorType === 'source') return true;
+  if (!item.actorId) return false;
+  if (item.actorType === 'api_key') {
+    const key = await prisma.apiKey.findFirst({
+      where: { id: item.actorId, orgId: item.orgId },
+      select: { unrestrictedScope: true, companyIds: true },
+    });
+    if (!key) return false;
+    return key.unrestrictedScope || (companyId !== null && key.companyIds.includes(companyId));
+  }
+  const scope = await getAccessScope(item.orgId, item.actorId);
+  if (scope.unrestricted) return true;
+  if (!companyId) return false;
+  const visible = await prisma.company.findFirst({
+    where: applyCompanyScope({ orgId: item.orgId, id: companyId, deletedAt: null }, scope),
+    select: { id: true },
+  });
+  return Boolean(visible);
+}
+
 async function addVersion(item: ItemForProcess, contractId: string, buf: Buffer, contentType: MsaContentType, sha256: string, reviewerId: string) {
   const contract = await prisma.contractAgreement.findFirst({
     where: { id: contractId, orgId: item.orgId, deletedAt: null },
     select: { id: true, companyId: true, title: true, reference: true, ownerId: true },
   });
   if (!contract) return null;
+  if (!(await senderMaySeeCompany(item, contract.companyId))) {
+    throw new IngestRejectedError('The earlier agreement for this record is outside this sender scope');
+  }
   const storage = await getStorage();
   if (!storage.putObject) throw new Error('Storage driver cannot write server-side objects');
   const storageKey = storage.newKey(item.orgId, `msa-${contract.id}`, item.fileName);

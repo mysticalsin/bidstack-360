@@ -27,7 +27,7 @@ import {
   AgreementSyncRun,
 } from '@bidstack/shared';
 
-import { getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
+import { applyCompanyScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
 import { enqueueAgreementIngest } from '../queues/agreement-ingest.js';
 import { docuSignCredentialsFromEnv } from '../services/agreement-sources/docusign-envelopes.js';
 import { graphCredentialsFromEnv } from '../services/agreement-sources/graph-drive.js';
@@ -81,6 +81,14 @@ function credentialsConfigured(kind: string): boolean {
   return kind === 'sharepoint' ? graphCredentialsFromEnv() !== null : docuSignCredentialsFromEnv() !== null;
 }
 
+/** A run that never finished inside the stale window shows as failed, so Sync now unlocks. */
+function visibleRun(row: SourceRow): AgreementSource['lastRun'] {
+  const run = runStateFromJson(row.lastResult, row.id);
+  if (!run || (run.state !== 'queued' && run.state !== 'running')) return run;
+  if (Date.now() - row.updatedAt.getTime() < RUN_STALE_MS) return run;
+  return { ...run, state: 'failed', reasons: [...run.reasons, 'The run did not finish; start it again'] };
+}
+
 function serializeSource(row: SourceRow): AgreementSource {
   return {
     id: row.id,
@@ -90,7 +98,7 @@ function serializeSource(row: SourceRow): AgreementSource {
     config: (row.config ?? {}) as Record<string, unknown>,
     configured: credentialsConfigured(row.kind),
     lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
-    lastRun: runStateFromJson(row.lastResult, row.id),
+    lastRun: visibleRun(row),
   };
 }
 
@@ -125,9 +133,15 @@ export const agreementIngestRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req, reply) => {
       const keyId = apiKeyId(req);
       let companyScope: string[] | null = null;
+      const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       if (keyId) {
-        const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
         companyScope = scope.unrestricted ? null : scope.companyIds;
+      } else if (!scope.unrestricted && req.body.metadata?.companyId) {
+        const visible = await prisma.company.findFirst({
+          where: applyCompanyScope({ orgId: req.auth.orgId, id: req.body.metadata.companyId, deletedAt: null }, scope),
+          select: { id: true },
+        });
+        if (!visible) throw server.httpErrors.forbidden('metadata.companyId is outside your access');
       }
       try {
         const { item, created } = await stageAgreementIngest({
@@ -249,9 +263,22 @@ export const agreementIngestRoutes: FastifyPluginAsyncZod = async (server) => {
       if (current && (current.runId === runId || active)) {
         return reply.code(202).send(current);
       }
-      const run = await markRunQueued(source.id, req.auth.orgId, runId);
+      const run = await markRunQueued(source.id, req.auth.orgId, runId, source.updatedAt);
+      if (!run) {
+        const now = await prisma.agreementSource.findFirst({ where: { id: source.id, orgId: req.auth.orgId }, select: { lastResult: true } });
+        const winner = now ? runStateFromJson(now.lastResult, source.id) : null;
+        if (!winner) throw server.httpErrors.conflict('Another sync just started');
+        return reply.code(202).send(winner);
+      }
       await audit(req, 'sync_now.start', source.id, { kind: source.kind, runId });
-      await enqueueAgreementIngest({ kind: 'sync', orgId: req.auth.orgId, sourceId: source.id, runId, userId: req.auth.userId });
+      await enqueueAgreementIngest({
+        kind: 'sync',
+        orgId: req.auth.orgId,
+        sourceId: source.id,
+        runId,
+        userId: req.auth.userId,
+        claimId: randomUUID(),
+      });
       return reply.code(202).send(run);
     },
   );
