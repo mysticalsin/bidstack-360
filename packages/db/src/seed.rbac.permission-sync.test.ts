@@ -112,6 +112,19 @@ describe('integrations:write parity with contacts:write', () => {
     expect(holders).toEqual(['Admin']);
   });
 
+  it('access policy drafting and approval are Admin-only grants', () => {
+    // WHY: a published policy narrows every role's reach. Only the tenant
+    // administrator may draft one, and approval needs a second Admin.
+    for (const key of ['access-policies:read', 'access-policies:write', 'access-policies:approve']) {
+      expect(PERMISSION_KEYS as readonly string[]).toContain(key);
+      expect(ALL_PERMISSION_KEYS).toContain(key);
+    }
+    for (const key of ['access-policies:write', 'access-policies:approve']) {
+      const holders = ROLE_SEEDS.filter((r) => r.permissionKeys.includes(key)).map((r) => r.name);
+      expect(holders, key).toEqual(['Admin']);
+    }
+  });
+
   it('Presales (a write role without contacts:write) is not granted integrations:write', () => {
     // Guards against over-granting: Presales writes bid-scores/documents/proposals
     // etc but never contacts, so it must not pick up integrations:write either.
