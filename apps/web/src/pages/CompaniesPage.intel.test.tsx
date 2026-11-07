@@ -68,7 +68,7 @@ describe('CompaniesPage intel columns', () => {
   it('shows every intel column with values from the summary', () => {
     renderPage();
     const table = screen.getByRole('table');
-    for (const h of INTEL_HEADERS) expect(within(table).getByRole('columnheader', { name: new RegExp(`^${h.replace(/[()]/g, '\\$&')}`) })).toBeTruthy();
+    for (const h of INTEL_HEADERS) expect(within(table).getByRole('columnheader', { name: new RegExp(`^${h.replace(/[()]/g, '\\$&')}$`) })).toBeTruthy();
     expect(within(table).getByText('2.4bn EUR')).toBeTruthy();
     expect(within(table).getByText('Growing')).toBeTruthy();
     expect(within(table).getByText('Acquisition')).toBeTruthy();

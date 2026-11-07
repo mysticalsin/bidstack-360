@@ -12,21 +12,23 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import { type Prisma, loadCompanyIntel, prisma } from '@bidstack/db';
+import { type Prisma, loadCompanyIntel, prisma, readCompanyIntelSummaries, readImportBatches } from '@bidstack/db';
 import {
   AccountDirection,
   AccountFinancialsIntel,
   AccountHiringIntel,
   AccountNewsIntel,
+  CompanyIntelSummary,
   composeAccountIntel,
   INTEL_SOURCE_LABEL,
   IntelRefreshBody,
+  IntelImportBatchView,
   IntelRefreshResponse,
   type IntelSourceStatus,
 } from '@bidstack/shared';
 
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
-import { enqueueAccountIntel } from '../queues/account-intel.js';
+import { enqueueAccountIntel, enqueueCompanyFullRefresh } from '../queues/account-intel.js';
 
 const idParam = z.object({ id: z.string().uuid() });
 /** One read audit per user, account and view in this window; refresh polling would otherwise write one per poll. */
@@ -55,6 +57,9 @@ async function loadCompany(req: FastifyRequest, id: string): Promise<{ id: strin
     select: { id: true },
   });
 }
+
+/** Import progress rows stay on the Companies page for a day. */
+const IMPORT_BATCH_WINDOW_MS = 24 * 60 * 60_000;
 
 /** Account intelligence routes under /companies/:id/intel/*. */
 export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -132,5 +137,38 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       };
     },
+  );
+
+  server.get(
+    '/companies/:id/intel/summary',
+    { config: READ, schema: { params: idParam, response: { 200: z.object({ summary: CompanyIntelSummary.nullable() }) } } },
+    async (req) => {
+      const company = await loadCompany(req, req.params.id);
+      if (!company) throw server.httpErrors.notFound('Company not found');
+      const summaries = await readCompanyIntelSummaries(prisma, req.auth.orgId, [company.id]);
+      return { summary: summaries.get(company.id) ?? null };
+    },
+  );
+
+  server.post(
+    '/companies/:id/intel/refresh-all',
+    {
+      config: { permission: 'account-intel:write', rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: { params: idParam, response: { 202: z.object({ queued: z.boolean() }) } },
+    },
+    async (req, reply) => {
+      const company = await loadCompany(req, req.params.id);
+      if (!company) throw server.httpErrors.notFound('Company not found');
+      const jobId = await enqueueCompanyFullRefresh({ kind: 'full-refresh', orgId: req.auth.orgId, companyId: company.id, batchId: null, force: true, requestedBy: req.auth.userId });
+      await audit(req, 'intel.refresh_all', company.id, { queued: jobId !== null });
+      reply.code(202);
+      return { queued: jobId !== null };
+    },
+  );
+
+  server.get(
+    '/companies/intel-imports',
+    { config: READ, schema: { response: { 200: z.object({ items: z.array(IntelImportBatchView) }) } } },
+    async (req) => ({ items: await readImportBatches(prisma, req.auth.orgId, { since: new Date(Date.now() - IMPORT_BATCH_WINDOW_MS), limit: 5 }) }),
   );
 };

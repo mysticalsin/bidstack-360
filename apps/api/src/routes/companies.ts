@@ -1,9 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, readCompanyIntelSummaries, type Prisma } from '@bidstack/db';
 import {
   Company,
+  COMPANY_INTEL_VIEWS,
+  CompanyIntelSummary,
+  CompanyIntelView,
+  IntelDirection,
   CompanyCreate,
   CompanyDetail,
   CompanyPatch,
@@ -17,6 +21,28 @@ import { syncAccountFinancialsSchedule } from '../services/account-financials/sc
 
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
+
+/** A list row: the company plus its stored intel summary (null until the first refresh). */
+const CompanyListItem = Company.extend({ intel: CompanyIntelSummary.nullable() });
+
+/** Saved views and filters on the stored summary columns. */
+function intelFilter(q: {
+  view?: CompanyIntelView;
+  direction?: IntelDirection;
+  minRevenueUsd?: number;
+  minNewRoles30d?: number;
+}): Prisma.CompanyWhereInput {
+  const v = q.view ? COMPANY_INTEL_VIEWS[q.view] : null;
+  const minRevenue = q.minRevenueUsd ?? (v && 'minRevenueUsd' in v ? v.minRevenueUsd : undefined);
+  const minNew = q.minNewRoles30d ?? (v && 'minNewRoles30d' in v ? v.minNewRoles30d : undefined);
+  const direction = q.direction ?? (v && 'direction' in v ? v.direction : undefined);
+  const where: Prisma.CompanyIntelSummaryWhereInput = {
+    ...(minRevenue !== undefined ? { revenueUsdApprox: { gte: minRevenue } } : {}),
+    ...(minNew !== undefined ? { newRoles30d: { gte: minNew } } : {}),
+    ...(direction ? { direction } : {}),
+  };
+  return Object.keys(where).length ? { intelSummary: { is: where } } : {};
+}
 
 /** Per-relation row cap on GET /companies/:id; the full lists have their own paginated routes. */
 const COMPANY_DETAIL_RELATED_CAP = 200;
@@ -32,9 +58,13 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           industry: z.string().max(100).optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
           cursor: z.string().uuid().optional(),
+          view: CompanyIntelView.optional(),
+          direction: IntelDirection.optional(),
+          minRevenueUsd: z.coerce.number().min(0).optional(),
+          minNewRoles30d: z.coerce.number().int().min(0).optional(),
         }),
         response: {
-          200: z.object({ items: z.array(Company), nextCursor: z.string().uuid().optional() }),
+          200: z.object({ items: z.array(CompanyListItem), nextCursor: z.string().uuid().optional() }),
         },
       },
     },
@@ -50,6 +80,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
             orgId: req.auth.orgId,
             deletedAt: null,
             ...(req.query.industry ? { industry: req.query.industry } : {}),
+            ...intelFilter(req.query),
             ...(s
               ? {
                   OR: [
@@ -92,8 +123,9 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       const hasMore = items.length > req.query.limit;
       const sliced = hasMore ? items.slice(0, -1) : items;
       const nextCursor = hasMore ? sliced[sliced.length - 1]?.id : undefined;
+      const intel = await readCompanyIntelSummaries(prisma, req.auth.orgId, sliced.map((c) => c.id));
 
-      return { items: sliced.map(serializeCompany), nextCursor };
+      return { items: sliced.map((c) => ({ ...serializeCompany(c), intel: intel.get(c.id) ?? null })), nextCursor };
     },
   );
 

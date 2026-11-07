@@ -710,3 +710,21 @@ Appended by factory slice 1. Values only; no existing token changed.
   leftovers (funnel-chart, sankey-node, chart-stat-flow) now use `fg-*` tokens.
 - Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
   that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
+
+### 9.9 Company intel on the Companies page (slice 14)
+
+Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.
+
+- List columns, after Company and Domain: Revenue, Revenue growth, Headcount, Headcount growth (6m), Open roles, New roles (30d), Hiring trend, Funding, Signal, Direction. All sortable on the loaded page; filters run on the server.
+- Saved views as a segmented row above the table: Hiring fast (5 or more new postings in 30 days), Revenue over 1B (USD equivalent), Contracting. `aria-pressed` on the active one; one click again clears it. A Direction select sits beside them.
+- Columns button (lucide `Columns3`) opens a checkbox menu; hidden columns persist per browser in `localStorage` key `polo.companies.columns.v1`.
+- Every number names its source, year or as-of date and method in its hover title and accessible label. Derived numbers (revenue growth, filed headcount growth, direction) say "inferred"; growth values render italic when inferred.
+- Empty values render an en dash with the reason on hover: Not connected, Private company, No public data, plus one line of detail.
+- New roles (30d) is the hiring proxy: postings first published in the last 30 days, with the delta against the prior 30 days. It is never called hires.
+- Hiring trend: vendored TUFFUI sparkline (72 x 28), six monthly points, last point dotted; success tone when the 30 day trend is up, danger when down, tertiary when flat.
+- Direction: `StatusPill` sm with lucide `TrendingUp`, `Minus` or `TrendingDown` and the word Growing, Steady or Contracting; reasons in a tooltip ending with "Inferred". Signal: `StatusPill` with the post kind.
+- Import progress: one row above the table while an import's companies are enriched: origin, done of total, then the result counts when complete (with revenue, headcount growth, new roles 30d).
+- Account header: a compact strip under the name with five buttons: Revenue (with FY), Headcount (with 6m growth), Open roles (with 30 day delta), Funding, Direction. Each opens the matching Intel tab (financials, hiring, hiring, financials, direction). A Refresh button (lucide `RefreshCw`) for `account-intel:write` queues every source.
+- Intel tab on the account page mounts the slice 12 section (9.7).
+- Widths: the table scrolls horizontally inside its card; the strip wraps to two rows at 1024 and stacks at 390. No overlapping text at 1440, 1024 and 390.
+- No taglines or helper text. Tokens only, both themes, tabular numbers, sample data tagged.

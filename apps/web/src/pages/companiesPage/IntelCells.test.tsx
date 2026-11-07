@@ -18,12 +18,21 @@ describe('intel cells', () => {
 
   it('marks derived numbers as inferred', () => {
     render(<IntelCellFor column="revenueGrowth" summary={intelSummary()} />);
-    const label = screen.getByText('+14%').closest('[aria-label]')?.getAttribute('aria-label') ?? '';
+    const label =
+      screen.getByText('+14%').closest('[aria-label]')?.getAttribute('aria-label') ?? '';
     expect(label).toMatch(/inferred/i);
   });
 
   it('shows a dash with the reason when a value is empty', () => {
-    render(<IntelCellFor column="revenue" summary={intelSummary({ revenue: null, gaps: { revenue: { reason: 'private_company', detail: 'No published accounts found' } } })} />);
+    render(
+      <IntelCellFor
+        column="revenue"
+        summary={intelSummary({
+          revenue: null,
+          gaps: { revenue: { reason: 'private_company', detail: 'No published accounts found' } },
+        })}
+      />,
+    );
     const dash = screen.getByText('\u2013');
     expect(dash.getAttribute('aria-label')).toMatch(/Private company/);
     expect(dash.getAttribute('aria-label')).toMatch(/No published accounts/);
@@ -35,7 +44,9 @@ describe('intel cells', () => {
   });
 
   it('never renders an em dash', () => {
-    const { container } = render(<EmptyIntel gap={{ reason: 'not_connected', detail: 'Apollo not connected' }} />);
+    const { container } = render(
+      <EmptyIntel gap={{ reason: 'not_connected', detail: 'Apollo not connected' }} />,
+    );
     expect(container.textContent).not.toContain('\u2014');
   });
 
@@ -55,7 +66,17 @@ describe('intel cells', () => {
   });
 
   it('direction badge for contracting', () => {
-    render(<DirectionBadge summary={intelSummary({ direction: { value: 'contracting', reasons: ['Layoffs post: Acme to cut 800 roles'], inferred: true } })} />);
+    render(
+      <DirectionBadge
+        summary={intelSummary({
+          direction: {
+            value: 'contracting',
+            reasons: ['Layoffs post: Acme to cut 800 roles'],
+            inferred: true,
+          },
+        })}
+      />,
+    );
     expect(screen.getByText('Contracting')).toBeTruthy();
   });
 });

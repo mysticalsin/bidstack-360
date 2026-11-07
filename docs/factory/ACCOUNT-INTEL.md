@@ -53,3 +53,18 @@ Every fact stores its source URL, fetched date and the excerpt it came from (`In
 ## Tenancy and retention
 
 All tables carry `orgId` and every query filters by it. Job board postings not seen for 180 days and company posts or evidence older than 3 years are pruned by the sweep. Run status (`IntelSourceRun`) keeps one row per account and source. Sample rows (`source = 'fixture'`, `sample = true`) are only written by `db:seed`.
+
+## Companies list intel (slice 14)
+
+Why the list showed only employee count: `GET /companies` selected Company columns only, the slice 12 section was mounted on the Dashboard cockpit but not the account page, imports created companies without queuing any enrichment, Apollo funding and founded year were not mapped, and the demo seed covered 3 of 10 companies with no firmographics.
+
+- Summary store: `company_intel_summaries`, one row per company, rebuilt after every intel refresh, enrichment run and full refresh (`recomputeCompanyIntelSummary`). Indexed columns drive the list filters; the JSON payload carries every metric with `source`, `sourceLabel`, `asOf`, `method`, `inferred` and `sample`, plus a reason (`not_connected`, `private_company`, `no_public_data`) for each empty field.
+- Revenue: filings and registries first (SEC EDGAR, ESEF, Brreg, recherche-entreprises, imports), with fiscal year and currency; the Apollo estimate or range is a labelled fallback. Revenue growth is derived from two consecutive filed years and marked inferred. USD equivalents for filtering use a fixed rate table and are approximate.
+- Headcount: Apollo organization estimate, then filed headcount, then the CRM record. Headcount growth is Apollo 6m (or 12m), else filed headcount year over year (inferred).
+- Hiring: open roles (seen in 45 days), new postings in the last 30 days as the hiring proxy with the prior 30 days, 30 and 90 day trend, six month series, function mix and skills, from public job boards only. Never presented as hires.
+- Direction: growing, steady or contracting from headcount change, filed revenue change, posting trend and recent layoffs, expansion or acquisition posts; always inferred, with the reasons.
+- Apollo: `organizations/enrich` by domain only, behind `APOLLO_API_KEY`, inside `APOLLO_MONTHLY_CREDIT_BUDGET` (or `ENRICHMENT_MONTHLY_CREDIT_BUDGET`), job pages off on this path. Funding total, latest round and date, founded year, departments and technologies are mapped. No people, contact, email or phone endpoint is called and no such field is stored; tests pin both.
+- Full refresh: `account-intel.full-refresh` job (manual Refresh on the account page, `POST /companies/:id/intel/refresh-all`, or an import) runs every public source, then Apollo organization data, then the summary.
+- Imports: each CSV or HubSpot chunk queues one full refresh per new company and joins an `intel_import_batches` row per migration job. Retries merge ids and reuse job ids, so nothing is queued twice. The Companies page shows the batch while it runs and the result counts when it completes (`GET /companies/intel-imports`). `ACCOUNT_INTEL_IMPORT_ENRICH=false` turns it off. Batches older than 90 days are pruned by the sweep.
+- List API: `GET /companies` items carry `intel` (or null). Filters: `view` (`hiring_fast`, `revenue_over_1b`, `contracting`), `direction`, `minRevenueUsd`, `minNewRoles30d`. `GET /companies/:id/intel/summary` returns one summary.
+- Demo seed: sample organization data and postings for every demo company, all tagged as sample data.

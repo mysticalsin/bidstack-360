@@ -166,7 +166,11 @@ export function parseIntelSummary(payload: unknown): CompanyIntelSummary | null 
 export async function readCompanyIntelSummaries(db: Db, orgId: string, companyIds: string[]): Promise<Map<string, CompanyIntelSummary>> {
   const out = new Map<string, CompanyIntelSummary>();
   if (!companyIds.length) return out;
-  const rows = await db.companyIntelSummary.findMany({ where: { orgId, companyId: { in: companyIds } }, select: { companyId: true, payload: true } });
+  const rows = await db.companyIntelSummary.findMany({
+    where: { orgId, companyId: { in: companyIds } },
+    select: { companyId: true, payload: true },
+    take: companyIds.length,
+  });
   for (const r of rows) {
     const s = parseIntelSummary(r.payload);
     if (s) out.set(r.companyId, s);
