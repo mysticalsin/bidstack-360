@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { decodeLatin1 } from './csv.js';
-import { fakeRut, findPersonalData, scrubBulkCsvText, scrubOcdsPackage } from './scrub.js';
+import { fakeRut, findPersonalData, scrubBulkCsvText, scrubOcdsPackage, scrubText } from './scrub.js';
 
 const FIXTURES = fileURLToPath(new URL('./__fixtures__/cl/', import.meta.url));
 
@@ -30,6 +30,16 @@ describe('personal data detector', () => {
   it('flags emails and Chilean phone numbers', () => {
     expect(findPersonalData('contact: person.name@hospital.cl').map((f) => f.kind)).toEqual(['email']);
     expect(findPersonalData('fono +56 9 8765 4321').map((f) => f.kind)).toEqual(['phone']);
+  });
+
+  it('flags and removes names in the free-text patterns seen in real rows', () => {
+    const text = 'REPRESENTANTE LEGAL: JUANA PEREZ SOTO\r\nRUT:12.345.678-5; despacho Sr.Luis Prueba, Sr. proveedor';
+    expect(findPersonalData(text).map((f) => f.kind).sort()).toEqual(['name', 'name', 'rut']);
+    const out = scrubText(text);
+    expect(out).not.toContain('JUANA PEREZ');
+    expect(out).not.toContain('Luis Prueba');
+    expect(out).toContain('Sr. proveedor');
+    expect(findPersonalData(out)).toEqual([]);
   });
 
   it('accepts the scrubber fakes, so a scrubbed fixture passes', () => {

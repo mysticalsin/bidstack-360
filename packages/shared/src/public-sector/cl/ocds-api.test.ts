@@ -155,7 +155,7 @@ describe('OCDS API adapter: idempotency (spec 3.4, 8b.2)', () => {
 
   it('a changed amount changes that record hash only', async () => {
     const a = ocdsAdapter.normalize(await rawFrom(body, unit), NORM);
-    const changedRaw = await rawFrom(body.replace('22622500.0', '22622501.0'), unit);
+    const changedRaw = await rawFrom(body.replaceAll('"amount": 22622500,', '"amount": 22622501,'), unit);
     const c = ocdsAdapter.normalize(changedRaw, NORM);
     expect(c.opportunities[0]!.idempotencyKey).toBe(a.opportunities[0]!.idempotencyKey);
     expect(c.opportunities[0]!.recordHash).not.toBe(a.opportunities[0]!.recordHash);
