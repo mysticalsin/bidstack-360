@@ -577,6 +577,36 @@ describe('accounts', () => {
   });
 });
 
+describe('account technical stack', () => {
+  skipIfNoDb('a company with no enrichment row resolves by name as well as by id', async () => {
+    const company = await prisma.company.create({
+      data: { orgId: orgA!.orgId, name: `Plain Account ${tag}` },
+      select: { id: true, name: true },
+    });
+    const byId = await server.inject({
+      method: 'GET',
+      url: `/api/crm/companies/${company.id}/technical-stack`,
+    });
+    expect(byId.statusCode).toBe(200);
+    const byName = await server.inject({
+      method: 'GET',
+      url: `/api/crm/companies/${encodeURIComponent(company.name)}/technical-stack`,
+    });
+    expect(byName.statusCode).toBe(200);
+    expect(byName.json()).toEqual(byId.json());
+
+    const foreign = await prisma.company.create({
+      data: { orgId: orgB!.orgId, name: `Foreign Plain ${tag}` },
+      select: { name: true },
+    });
+    const leaked = await server.inject({
+      method: 'GET',
+      url: `/api/crm/companies/${encodeURIComponent(foreign.name)}/technical-stack`,
+    });
+    expect(leaked.statusCode).toBe(404);
+  });
+});
+
 describe('search', () => {
   skipIfNoDb('company results are CRM companies linking to their account page', async () => {
     const company = await prisma.company.create({
