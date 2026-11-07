@@ -185,7 +185,10 @@ export function DashboardsListPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <Layout size={16} className="text-[var(--brand-primary)] shrink-0" />
-                    <span className="text-sm font-semibold text-[var(--fg-primary)] truncate max-w-[160px]">
+                    <span
+                      title={d.name}
+                      className="text-sm font-semibold text-[var(--fg-primary)] truncate max-w-[160px]"
+                    >
                       {d.name}
                     </span>
                   </div>
@@ -208,7 +211,7 @@ export function DashboardsListPage() {
                     {d.description}
                   </p>
                 )}
-                <p className="mt-auto text-[10px] text-[var(--fg-muted)] pt-2">
+                <p className="mt-auto text-xs text-[var(--fg-muted)] pt-2">
                   {new Date(d.updatedAt).toLocaleDateString()}
                 </p>
               </Link>

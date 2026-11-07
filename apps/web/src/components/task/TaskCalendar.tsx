@@ -95,7 +95,7 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
         ].map((d) => (
           <div
             key={d.key}
-            className="bg-[var(--surface-card)] px-2 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]"
+            className="bg-[var(--surface-card)] px-2 py-1.5 text-center text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]"
           >
             {d.label}
           </div>
@@ -123,7 +123,7 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
                     <Link
                       key={t.id}
                       to={`/tasks?search=${encodeURIComponent(t.title)}`}
-                      className="block truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-[var(--surface-hover)]"
+                      className="block truncate rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-[var(--surface-hover)]"
                       style={{
                         backgroundColor:
                           t.status === 'done'

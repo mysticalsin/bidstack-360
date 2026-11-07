@@ -226,7 +226,7 @@ function AgentsSection({
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm font-semibold text-[var(--fg-primary)]">{a.role}</span>
                 <span
-                  className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold ${
+                  className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-semibold ${
                     a.isStandard
                       ? 'bg-[var(--tag-blue-bg)] text-[var(--tag-blue-fg)]'
                       : 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]'

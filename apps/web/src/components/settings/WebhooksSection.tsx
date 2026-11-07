@@ -500,7 +500,7 @@ function SubscriptionRow({
 
           <div className="mt-3 flex flex-wrap gap-1.5">
             {subscription.events.map((event) => (
-              <Badge key={event} tone="gray" className="font-mono text-[10px]">
+              <Badge key={event} tone="gray" className="font-mono text-xs">
                 {event}
               </Badge>
             ))}
