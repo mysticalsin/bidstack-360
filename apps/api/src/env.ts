@@ -314,6 +314,11 @@ export const envSchema = z.object({
   // JWT audience host for the agreement pull: account-d.docusign.com (demo)
   // or account.docusign.com (production). Defaults to the demo host.
   DOCUSIGN_OAUTH_HOST: z.string().min(1).optional().or(z.literal('')),
+  // Agreement pull: the DocuSign app secret for each org's account OAuth.
+  DOCUSIGN_CLIENT_SECRET: z.string().min(1).optional().or(z.literal('')),
+  // Agreement pull: 'true' only when the deployment serves one organization;
+  // then sources may use the env tenant / JWT user without an org connection.
+  AGREEMENT_SOURCES_SINGLE_TENANT: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;

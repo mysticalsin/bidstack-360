@@ -13,12 +13,16 @@ import { MSA_MAX_BYTES, type MsaContentType } from '@bidstack/shared';
 import { assertUrlResolvesPublic } from '@bidstack/shared/server';
 
 import { applyCompanyScope, getAccessScope } from '../../lib/access-scope.js';
+import { createLogger } from '../../lib/logger.js';
 import { detectMsaContentType, sha256Hex } from '../../msa/file-checks.js';
 import { createIntakeDraftFromBuffer, intakeKey } from '../../msa/intake-draft.js';
 import { enqueueMsaTextExtract } from '../../queues/msa-text-extract.js';
 import { getStorage } from '../../storage/index.js';
+import { readBodyCapped } from '../agreement-sources/read-capped.js';
 
 export type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
+
+const log = createLogger({ name: 'agreement-ingest:process' });
 
 const MAX_REDIRECTS = 3;
 const URL_FETCH_TIMEOUT_MS = 30_000;
@@ -70,21 +74,9 @@ const ITEM_FOR_PROCESS = {
 
 /** Read a body without trusting content-length; stop as soon as it passes the cap. */
 export async function readCapped(res: Response): Promise<Buffer> {
-  if (!res.body) return Buffer.alloc(0);
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MSA_MAX_BYTES) {
-      await reader.cancel().catch(() => undefined);
-      throw new IngestRejectedError('File is larger than 25 MB');
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks);
+  const buf = await readBodyCapped(res, MSA_MAX_BYTES);
+  if (!buf) throw new IngestRejectedError('File is larger than 25 MB');
+  return buf;
 }
 
 /**
@@ -141,6 +133,28 @@ export async function resolveReviewer(item: Pick<ItemForProcess, 'orgId' | 'acto
   return admin?.id ?? null;
 }
 
+const SIDE_EFFECT_TRIES = 3;
+
+/**
+ * Audit and notification writes after the outcome is saved. They retry on
+ * their own and never throw: a failure here must not send a finished item
+ * back to the queue and process the document twice.
+ */
+async function afterFinish(itemId: string, what: string, fn: () => Promise<unknown>): Promise<void> {
+  for (let attempt = 1; attempt <= SIDE_EFFECT_TRIES; attempt += 1) {
+    try {
+      await fn();
+      return;
+    } catch (err) {
+      if (attempt === SIDE_EFFECT_TRIES) {
+        log.error({ itemId, what, err: err instanceof Error ? err.message : String(err) }, 'agreement ingest side effect failed');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 50 * attempt));
+    }
+  }
+}
+
 async function finish(
   item: ItemForProcess,
   status: ProcessOutcome['status'],
@@ -149,34 +163,40 @@ async function finish(
 ): Promise<void> {
   await prisma.agreementIngestItem.update({
     where: { id: item.id },
-    data: { status, pendingContent: null, processedAt: new Date(), ...data },
+    data: { status, pendingContent: null, processedAt: new Date(), nextAttemptAt: null, ...data },
   });
-  await prisma.auditLog.create({
-    data: {
-      orgId: item.orgId,
-      userId: item.actorType === 'user' ? item.actorId : null,
-      action: `agreement.ingest.${status}`,
-      targetType: 'agreement_ingest_item',
-      targetId: item.id,
-      diff: {
-        channel: item.channel,
-        externalSource: item.externalSource,
-        externalId: item.externalId,
-        ...audit,
-      } as Prisma.InputJsonValue,
-    },
-  });
+  await afterFinish(item.id, 'audit', () =>
+    prisma.auditLog.create({
+      data: {
+        orgId: item.orgId,
+        userId: item.actorType === 'user' ? item.actorId : null,
+        action: `agreement.ingest.${status}`,
+        targetType: 'agreement_ingest_item',
+        targetId: item.id,
+        diff: {
+          channel: item.channel,
+          externalSource: item.externalSource,
+          externalId: item.externalId,
+          ...audit,
+        } as Prisma.InputJsonValue,
+      },
+    }),
+  );
 }
 
 async function notify(orgId: string, userId: string, title: string, body: string, url: string, entityId: string) {
-  await prisma.notification.create({
-    data: { orgId, userId, type: 'system', title: title.slice(0, 250), body, entityType: 'agreement_ingest', entityId, url },
-  });
+  await afterFinish(entityId, 'notification', () =>
+    prisma.notification.create({
+      data: { orgId, userId, type: 'system', title: title.slice(0, 250), body, entityType: 'agreement_ingest', entityId, url },
+    }),
+  );
 }
 
 /**
  * Earlier document from the same external record and the same sender (source,
- * user or API key) that already became an agreement.
+ * user or API key) that already became an agreement. A duplicate counts too:
+ * when the first copy matched a file already on an agreement, changed bytes
+ * for that record must still become a new version of it.
  */
 async function priorContractId(item: ItemForProcess): Promise<string | null> {
   const prior = await prisma.agreementIngestItem.findMany({
@@ -186,7 +206,10 @@ async function priorContractId(item: ItemForProcess): Promise<string | null> {
       externalId: item.externalId,
       ...(item.sourceId ? { sourceId: item.sourceId } : { actorType: item.actorType, actorId: item.actorId }),
       id: { not: item.id },
-      status: { in: ['drafted', 'versioned'] },
+      OR: [
+        { status: { in: ['drafted', 'versioned'] } },
+        { status: 'duplicate', OR: [{ contractId: { not: null } }, { intakeDraftId: { not: null } }] },
+      ],
     },
     orderBy: { createdAt: 'desc' },
     select: { contractId: true, intakeDraftId: true },
@@ -373,18 +396,26 @@ export async function processAgreementBytes(item: ItemForProcess, buf: Buffer): 
   const hints: string[] = [];
   if (meta.counterparty) hints.push(`Sending system names the counterparty: ${meta.counterparty}.`);
   if (meta.signedAt) hints.push(`Signed on ${meta.signedAt.slice(0, 10)} according to the sending system.`);
-  const { row } = await createIntakeDraftFromBuffer({
-    orgId: item.orgId,
-    userId: reviewerId,
-    draftId,
-    fileName: item.fileName,
-    contentType: detected,
-    buffer: buf,
-    sha256,
-    storageKey,
-    namedCompanyId: meta.companyId ?? null,
-    extraWarnings: hints,
-  });
+  let row: { id: string };
+  try {
+    ({ row } = await createIntakeDraftFromBuffer({
+      orgId: item.orgId,
+      userId: reviewerId,
+      draftId,
+      fileName: item.fileName,
+      contentType: detected,
+      buffer: buf,
+      sha256,
+      storageKey,
+      namedCompanyId: meta.companyId ?? null,
+      extraWarnings: hints,
+    }));
+  } catch (err) {
+    // Database trouble is worth retrying; anything else here is the parser
+    // failing on these bytes, and the same bytes will fail again.
+    if (isDatabaseError(err)) throw err;
+    throw new IngestRejectedError(`The file could not be read: ${err instanceof Error ? err.message.slice(0, 200) : 'unknown error'}`);
+  }
   await finish(item, 'drafted', { ...base, intakeDraftId: row.id }, { draftId: row.id, sha256 });
   await notify(
     item.orgId,
@@ -395,6 +426,15 @@ export async function processAgreementBytes(item: ItemForProcess, buf: Buffer): 
     item.id,
   );
   return { status: 'drafted', itemId: item.id, intakeDraftId: row.id };
+}
+
+function isDatabaseError(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError ||
+    err instanceof Prisma.PrismaClientUnknownRequestError ||
+    err instanceof Prisma.PrismaClientInitializationError ||
+    err instanceof Prisma.PrismaClientRustPanicError
+  );
 }
 
 /** Claim a queued row so two consumers never process the same item. */
@@ -431,11 +471,17 @@ export async function processAgreementIngestItem(
       return { status: 'rejected', itemId, error: err.message };
     }
     const message = err instanceof Error ? err.message : 'Processing failed';
-    // Back to queued so the sweep retries; the attempt counter stops loops.
-    await prisma.agreementIngestItem.update({
-      where: { id: itemId },
+    // Back to queued so the sweep retries, but only while the document itself
+    // is unfinished; a saved outcome is never processed again.
+    const requeued = await prisma.agreementIngestItem.updateMany({
+      where: { id: itemId, orgId, status: 'processing' },
       data: { status: 'queued', error: message.slice(0, 500) },
     });
+    if (requeued.count === 0) {
+      log.warn({ itemId, err: message }, 'agreement ingest error after the outcome was saved; not requeued');
+      const done = await prisma.agreementIngestItem.findFirst({ where: { id: itemId, orgId }, select: { status: true } });
+      return { status: (done?.status as ProcessOutcome['status'] | undefined) ?? 'skipped', itemId };
+    }
     throw err;
   }
 }
