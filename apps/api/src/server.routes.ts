@@ -265,7 +265,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(pluginRoutes, { prefix: '/api/v1' });
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
-await server.register(webhookMessagesRoutes, { prefix: '/api/v1' });
+  await server.register(webhookMessagesRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
   await server.register(accountPeopleRoutes, { prefix: '/api/v1' });
   await server.register(duplicatesRoutes, { prefix: '/api/v1' });

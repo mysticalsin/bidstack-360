@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   migrationJobFindUnique: vi.fn(),
   migrationJobUpdate: vi.fn(),
   webhookDeliveryCreate: vi.fn(),
+  webhookMessageUpsert: vi.fn(),
   webhookSubscriptionFindFirst: vi.fn(),
   webhookSubscriptionFindMany: vi.fn(),
   webhookSubscriptionUpdate: vi.fn(),
@@ -42,6 +43,9 @@ vi.mock('@bidstack/db', () => ({
     },
     webhookDelivery: {
       create: mocks.webhookDeliveryCreate,
+    },
+    webhookMessage: {
+      upsert: mocks.webhookMessageUpsert,
     },
     webhookSubscription: {
       findFirst: mocks.webhookSubscriptionFindFirst,
@@ -218,6 +222,9 @@ describe('worker connector SERUM egress gates', () => {
         ),
       }),
     });
+    expect(mocks.webhookMessageUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ status: 'failed', event: 'lead.created' }) }),
+    );
     expect(mocks.webhookSubscriptionUpdate).not.toHaveBeenCalled();
   });
 });

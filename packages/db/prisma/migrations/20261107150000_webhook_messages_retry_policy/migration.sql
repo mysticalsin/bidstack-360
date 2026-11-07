@@ -15,7 +15,7 @@ ALTER TABLE "webhook_subscriptions" ADD CONSTRAINT "webhook_subs_retry_policy_bo
   "max_attempts" BETWEEN 1 AND 10
   AND "backoff_base_seconds" BETWEEN 5 AND 3600
   AND "timeout_ms" BETWEEN 1000 AND 30000
-);
+) NOT VALID;
 
 CREATE TABLE "webhook_messages" (
     "id" UUID NOT NULL,
@@ -48,11 +48,10 @@ ADD COLUMN "request_headers" JSONB,
 ADD COLUMN "response_body" TEXT,
 ADD COLUMN "response_truncated" BOOLEAN NOT NULL DEFAULT false;
 
-CREATE INDEX "webhook_deliveries_org_created_idx" ON "webhook_deliveries"("org_id", "created_at");
-
-CREATE INDEX "webhook_deliveries_message_attempt_idx" ON "webhook_deliveries"("message_id", "attempt");
-
-ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_message_id_fkey" FOREIGN KEY ("message_id") REFERENCES "webhook_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- The webhook_deliveries indexes are built CONCURRENTLY in the next two
+-- migrations, and both NOT VALID constraints are validated after them, so no
+-- step holds a write lock on a populated table for a full scan.
+ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_message_id_fkey" FOREIGN KEY ("message_id") REFERENCES "webhook_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE NOT VALID;
 
 ALTER TABLE "webhook_outbox" ADD COLUMN "subscription_id" UUID,
 ADD COLUMN "replay_of_id" UUID;

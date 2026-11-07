@@ -286,6 +286,20 @@ describe('POST /webhook-messages/:id/replay', () => {
     expect(list.statusCode).toBe(200);
   });
 
+  it('refuses to replay to a paused endpoint', async () => {
+    await prisma.webhookSubscription.update({ where: { id: subB }, data: { active: false } });
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: `/api/v1/webhook-messages/${messages[1]}/replay`,
+        payload: { requestId: randomUUID() },
+      });
+      expect(res.statusCode, res.body).toBe(409);
+    } finally {
+      await prisma.webhookSubscription.update({ where: { id: subB }, data: { active: true } });
+    }
+  });
+
   it('cannot replay a foreign message and rejects a body without a request id', async () => {
     const foreign = await server.inject({
       method: 'POST',
@@ -383,6 +397,15 @@ describe('POST /webhook-subscriptions/:id/rotate-secret', () => {
     });
     expect(audit).not.toBeNull();
     expect(JSON.stringify(audit?.diff)).not.toContain(signingSecret);
+  });
+
+  it('refuses a second rotation while the overlap window is open', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/v1/webhook-subscriptions/${subB}/rotate-secret`,
+      payload: { overlapHours: 24 },
+    });
+    expect(res.statusCode, res.body).toBe(409);
   });
 
   it('cannot rotate a foreign endpoint', async () => {

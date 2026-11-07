@@ -59,10 +59,15 @@ export function RetryScheduleEditor({ subscriptions }: { subscriptions: Endpoint
   const save = useSaveWebhookRetryPolicy(selected);
   const reset = useResetWebhookRetryPolicy(selected);
   const stats = useWebhookDeliveryStats({ subscriptionId: selected ?? undefined, window: '7d' });
-  // Unsaved edits; null shows the stored policy.
-  const [edits, setEdits] = useState<Draft | null>(null);
-  const draft = edits ?? toDraft(policy.data ?? DEFAULT_WEBHOOK_RETRY_POLICY);
-  const setDraft = (update: (d: Draft) => Draft) => setEdits(update(draft));
+  // Unsaved edits, tied to the endpoint they were made on so they never carry
+  // over to another endpoint; null shows the stored policy.
+  const [edits, setEdits] = useState<{ endpointId: string | null; draft: Draft } | null>(null);
+  const draft =
+    edits && edits.endpointId === selected
+      ? edits.draft
+      : toDraft(policy.data ?? DEFAULT_WEBHOOK_RETRY_POLICY);
+  const setDraft = (update: (d: Draft) => Draft) =>
+    setEdits({ endpointId: selected, draft: update(draft) });
 
   const maxAttempts = inRange(draft.maxAttempts, WEBHOOK_RETRY_LIMITS.maxAttempts);
   const base = inRange(draft.backoffBaseSeconds, WEBHOOK_RETRY_LIMITS.backoffBaseSeconds);
@@ -257,7 +262,7 @@ export function RetryScheduleEditor({ subscriptions }: { subscriptions: Endpoint
             <Button
               size="sm"
               onClick={() => void onSave()}
-              disabled={!valid || save.isPending || !selected}
+              disabled={!valid || save.isPending || !selected || !policy.data}
             >
               {t('webhooks.retry.save', 'Save')}
             </Button>

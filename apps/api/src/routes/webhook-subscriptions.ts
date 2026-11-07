@@ -422,13 +422,22 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     },
     async (req) => {
       const existing = await findOwnedSubscription(req, req.params.id);
+      // A second rotation inside the overlap window would drop the secret
+      // receivers were promised for the whole window.
+      if (existing.previousSecretExpiresAt && existing.previousSecretExpiresAt.getTime() > Date.now()) {
+        throw server.httpErrors.conflict(
+          `A rotation is already in progress until ${existing.previousSecretExpiresAt.toISOString()}`,
+        );
+      }
       const secret = newSigningSecret();
       const overlapHours = req.body.overlapHours;
       const previousSecretExpiresAt =
         overlapHours > 0 ? new Date(Date.now() + overlapHours * 3_600_000) : null;
-      await prisma.$transaction([
-        prisma.webhookSubscription.update({
-          where: { id: existing.id },
+      const [rotated] = await prisma.$transaction([
+        // Conditional on the secret we read, so two concurrent rotations
+        // cannot both copy it into previousSecret.
+        prisma.webhookSubscription.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, secret: existing.secret },
           data: {
             // Encrypted at rest like on create; the plaintext is returned once.
             secret: encryptSecret(secret),
@@ -447,6 +456,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
           }),
         }),
       ]);
+      if (rotated.count === 0) throw server.httpErrors.conflict('The secret changed during rotation; try again');
       return {
         signingSecret: secret,
         previousSecretExpiresAt: previousSecretExpiresAt?.toISOString() ?? null,

@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DeliveryModuleNs from './webhook-delivery.js';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnrecoverableError, type Job } from 'bullmq';
 import type pino from 'pino';
 
@@ -27,7 +28,15 @@ vi.mock('@bidstack/shared/server-crypto', () => ({
 vi.mock('../lib/safe-research-fetch.js', () => ({ createResearchFetch: () => mocks.safeFetch }));
 vi.mock('../lib/serum-connector-policy.js', () => ({ serumConnectorDenialMessage: mocks.serumDenial }));
 
-import { processDeliveryJob, webhookBackoffStrategy } from './webhook-delivery.js';
+type DeliveryModule = typeof DeliveryModuleNs;
+// The worker config runs files with isolate: false, so a static import would
+// keep whichever file loaded the module first bound to that file's mocks.
+let processDeliveryJob: DeliveryModule['processDeliveryJob'];
+let webhookBackoffStrategy: DeliveryModule['webhookBackoffStrategy'];
+beforeAll(async () => {
+  vi.resetModules();
+  ({ processDeliveryJob, webhookBackoffStrategy } = await import('./webhook-delivery.js'));
+});
 
 const log = {
   info: vi.fn(),
@@ -44,6 +53,8 @@ const REPLAY_OF = '44444444-4444-4444-8444-444444444444';
 const TS = '2026-11-07T12:00:00.000Z';
 
 type Sub = Partial<{
+  url: string;
+  failureCount: number;
   maxAttempts: number;
   backoffStrategy: 'exponential' | 'linear' | 'fixed';
   backoffBaseSeconds: number;
@@ -168,6 +179,42 @@ describe('webhook delivery: per-endpoint retry policy', () => {
     const limited = await processDeliveryJob(job(0), log).catch((e: unknown) => e);
     expect((limited as { retryDelayMs?: number }).retryDelayMs).toBe(90_000);
     expect(webhookBackoffStrategy(1, 'webhook-endpoint', limited as Error)).toBe(90_000);
+  });
+
+  it('stops at the job attempt budget when it is lower than the endpoint policy', async () => {
+    mocks.safeFetch.mockResolvedValue(response(500));
+    const j = job(4, { maxAttempts: 8 });
+    (j.opts as { attempts?: number }).attempts = 5;
+    const err = await processDeliveryJob(j, log).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(UnrecoverableError);
+    expect(mocks.messageUpsert.mock.calls[0]![0].update).toMatchObject({ status: 'failed', attempts: 5 });
+  });
+
+  it('keeps the timeout running while the body is read', async () => {
+    mocks.safeFetch.mockImplementation(async (_url: string, init: { signal: AbortSignal }) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"partial":'));
+          init.signal.addEventListener('abort', () => controller.error(new Error('aborted')));
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+    const started = Date.now();
+    await processDeliveryJob(job(0, { timeoutMs: 50 }), log);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(mocks.deliveryCreate.mock.calls[0]![0].data).toMatchObject({ statusCode: 200, responseBody: null });
+  });
+
+  it('auto-disables a dead endpoint on a final non-retryable failure', async () => {
+    mocks.safeFetch.mockResolvedValue(response(410, 'gone'));
+    await processDeliveryJob(job(0, { failureCount: 9 }), log).catch(() => undefined);
+    expect(mocks.subUpdate.mock.calls[0]![0].data).toMatchObject({ active: false });
+  });
+
+  it('does not retry an unsafe URL', async () => {
+    const err = await processDeliveryJob(job(0, { url: 'http://127.0.0.1/hook' }), log).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(UnrecoverableError);
   });
 
   it('falls back to the default curve when an error carries no delay', () => {

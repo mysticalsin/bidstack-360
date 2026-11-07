@@ -35,7 +35,9 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import {
   DEFAULT_WEBHOOK_RETRY_POLICY,
+  WEBHOOK_BODY_CAP_BYTES,
   WEBHOOK_DELIVERY,
+  WEBHOOK_MAX_ATTEMPTS_CEILING,
   assertSafeWebhookUrl,
   capWebhookText,
   isRetryableWebhookStatus,
@@ -148,7 +150,7 @@ async function readCappedBody(res: Response): Promise<{ text: string; truncated:
       if (done) break;
       chunks.push(value);
       size += value.byteLength;
-      if (size > 4096) {
+      if (size > WEBHOOK_BODY_CAP_BYTES) {
         truncated = true;
         break;
       }
@@ -192,6 +194,8 @@ type DeliveryResult = {
   responseBody?: string | null;
   responseTruncated?: boolean;
   retryAfterMs?: number | null;
+  /** The URL failed the safety check, so no retry can succeed. */
+  unsafeUrl?: boolean;
 };
 
 function maskedHeaders(headers: Record<string, string>): Record<string, string> {
@@ -217,6 +221,7 @@ async function deliver(
       durationMs: 0,
       success: false,
       error: err instanceof Error ? `Unsafe webhook URL: ${err.message}` : 'Unsafe webhook URL',
+      unsafeUrl: true,
     };
   }
 
@@ -233,9 +238,13 @@ async function deliver(
 
   try {
     const controller = new AbortController();
+    // The timeout covers the body read too: an endpoint that sends headers and
+    // then stalls the body must not hold a worker slot past timeoutMs.
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     let res: Response;
+    let read: Awaited<ReturnType<typeof readCappedBody>>;
+    let durationMs: number;
     try {
       res = await safeFetch(url, {
         method: 'POST',
@@ -243,13 +252,13 @@ async function deliver(
         body,
         signal: controller.signal,
       });
+      durationMs = Date.now() - start;
+      read = await readCappedBody(res).catch(() => null);
     } finally {
       clearTimeout(timeoutId);
     }
 
-    const durationMs = Date.now() - start;
     const success = res.status >= 200 && res.status < 300;
-    const read = await readCappedBody(res).catch(() => null);
     const retryAfter =
       res.status === 429 || res.status === 503
         ? parseRetryAfterMs((res as Partial<Response>).headers?.get?.('retry-after'))
@@ -370,6 +379,7 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
   });
   if (denial) {
     log.warn({ subscriptionId, event, attempt }, denial);
+    await recordMessage('failed', { statusCode: null, durationMs: 0, success: false, error: denial });
     await prisma.webhookDelivery.create({
       data: {
         subscriptionId,
@@ -378,6 +388,7 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
         statusCode: null,
         success: false,
         durationMs: 0,
+        messageId: stableEventId,
         attempt,
         errorMessage: denial,
       },
@@ -438,8 +449,14 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     result.success ? 'webhook delivery succeeded' : 'webhook delivery failed',
   );
 
+  // The job's own attempt budget wins when it is lower: jobs queued before a
+  // policy change, or by another producer, keep the attempts they were given.
+  const attemptLimit = Math.min(policy.maxAttempts, job.opts?.attempts ?? WEBHOOK_MAX_ATTEMPTS_CEILING);
   const retryable =
-    !unrecoverableDecryptError && attempt < policy.maxAttempts && isRetryableWebhookStatus(result.statusCode);
+    !unrecoverableDecryptError &&
+    !result.unsafeUrl &&
+    attempt < attemptLimit &&
+    isRetryableWebhookStatus(result.statusCode);
   await recordMessage(result.success ? 'succeeded' : retryable ? 'pending' : 'failed', result);
 
   // Record the delivery attempt.
@@ -468,7 +485,9 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     });
   } else {
     const newFailureCount = sub.failureCount + 1;
-    const shouldDisable = newFailureCount >= AUTO_DISABLE_AFTER && attempt >= policy.maxAttempts;
+    // A final failure (last attempt or a status no retry can fix) counts
+    // towards auto-disable, so a 410 Gone endpoint is disabled too.
+    const shouldDisable = newFailureCount >= AUTO_DISABLE_AFTER && !retryable;
 
     await prisma.webhookSubscription.update({
       where: { id: subscriptionId },

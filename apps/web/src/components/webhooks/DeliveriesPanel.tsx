@@ -154,7 +154,7 @@ export function DeliveriesPanel({
               title={t('webhooks.deliveries.successRate', 'Success rate')}
               caption={t('webhooks.deliveries.caption', '{{failed}} of {{total}} failed', {
                 failed: data.messages.failed,
-                total: data.messages.total,
+                total: data.messages.failed + data.messages.succeeded,
               })}
               target={0.99}
               targetLabel="99%"

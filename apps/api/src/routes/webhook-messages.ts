@@ -238,6 +238,11 @@ export const webhookMessagesRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, event: true, payload: true, subscriptionId: true },
       });
       if (!m) throw server.httpErrors.notFound('Message not found');
+      const endpoint = await prisma.webhookSubscription.findFirst({
+        where: { id: m.subscriptionId, orgId: req.auth.orgId, active: true, deletedAt: null },
+        select: { id: true },
+      });
+      if (!endpoint) throw server.httpErrors.conflict('The endpoint is paused or deleted; resume it before replaying');
       const result = await prisma.$transaction(async (tx) => {
         const outbox = await recordWebhookOutboxEvent(tx, {
           orgId: req.auth.orgId,

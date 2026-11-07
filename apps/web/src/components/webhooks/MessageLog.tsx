@@ -177,6 +177,10 @@ function MessageDrawer({ id }: { id: string }) {
   const canReplay = useHasPermission('webhooks:replay');
   const statusLabel = useStatusLabel();
   const [announce, setAnnounce] = useState('');
+  // One request id per drawer open, so a retried request is deduplicated by the
+  // server; a new id is minted only for a deliberate "Replay again".
+  const [requestId, setRequestId] = useState(newRequestId);
+  const [replayed, setReplayed] = useState(false);
   const d = detail.data;
 
   const copyCurl = async () => {
@@ -202,8 +206,11 @@ function MessageDrawer({ id }: { id: string }) {
 
   const doReplay = async () => {
     setAnnounce('');
+    const rid = replayed ? newRequestId() : requestId;
+    if (rid !== requestId) setRequestId(rid);
     try {
-      const result = await replay.mutateAsync({ id, requestId: newRequestId() });
+      const result = await replay.mutateAsync({ id, requestId: rid });
+      setReplayed(true);
       setAnnounce(
         result.duplicate
           ? t('webhooks.log.replayDuplicate', 'Replay was already queued')
@@ -222,12 +229,24 @@ function MessageDrawer({ id }: { id: string }) {
       footer={
         d ? (
           <>
-            <Button variant="secondary" size="sm" onClick={() => void copyCurl()}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void copyCurl()}
+              disabled={d.requestBodyTruncated}
+              title={
+                d.requestBodyTruncated
+                  ? t('webhooks.log.curlTruncated', 'The stored body is cut at 4 KB, so a cURL copy would send a partial body.')
+                  : undefined
+              }
+            >
               {t('webhooks.log.copyCurl', 'Copy cURL')}
             </Button>
             {canReplay ? (
               <Button size="sm" onClick={() => void doReplay()} disabled={replay.isPending}>
-                {t('webhooks.log.replayButton', 'Replay')}
+                {replayed
+                  ? t('webhooks.log.replayAgain', 'Replay again')
+                  : t('webhooks.log.replayButton', 'Replay')}
               </Button>
             ) : null}
           </>
