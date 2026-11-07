@@ -30,7 +30,7 @@ export function SectorPipelineCard() {
           front={[{ id: 'overdue', label: t('sectorView.pipelineIsoOverdue', 'Overdue'), values: data.overdue, color: 'var(--danger)' }]}
           format={fmtCompact}
           empty={t('sectorView.pipelineIsoEmpty', 'No open pipeline yet.')}
-          className="mx-auto max-w-2xl"
+          className="mx-auto max-w-lg"
         />
       )}
     </Card>
