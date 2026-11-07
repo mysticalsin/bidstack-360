@@ -85,15 +85,28 @@ Test paths are relative to the owning app or package (`apps/api/src/...`,
   commitments, meeting intel and attendees, meeting ingest payloads, account
   management sessions, governance meetings, bookings, calls and summaries,
   references, notifications, intel evidence, signatures and the audit log.
+- **Matching is token bounded.** Each subject becomes one PostgreSQL regex:
+  emails must stand alone (erasing `an@` never touches `dan@`), phones need 7
+  digits or more, names need two words and 5 characters or more. Rows are
+  split per store into **linked** (id link or exact identifier column, which
+  get structural erasure) and **mentioned** (free text match only, where just
+  the matched text is replaced with `[erased]`). A third party's record that
+  mentions the subject is redacted, never deleted.
 - **Export:** `POST /api/v1/orgs/:orgId/data-subject-requests` with
   `kind: export` queues a job; `GET .../:id/export` rebuilds the bundle live
-  (it is never stored at rest) and writes `gdpr.export.downloaded`.
+  (it is never stored at rest) and writes `gdpr.export.downloaded`. Linked
+  rows are exported in full; mention only rows are listed as id and field
+  names, so another person's content is not disclosed.
 - **Erase:** same endpoint with `kind: erase`. `dryRun` defaults to `true` and
   reports per store counts without changing anything (`gdpr.erasure.dry_run`).
   A real run tombstones the subject, scrubs or deletes sidecar rows in one
   transaction, runs a residue scan over every org scoped text and JSON column,
-  and writes `gdpr.erasure` with field names and counts only. The older
-  synchronous `POST /orgs/:orgId/erasure` now calls the same engine.
+  and writes `gdpr.erasure` with field names and counts only. If the residue
+  scan itself fails, the erase is still recorded as done and the report
+  carries `residueError`. Stored failure messages are codes only. The older
+  synchronous `POST /orgs/:orgId/erasure` now calls the same engine, but runs
+  inside the HTTP request; prefer the queued endpoint for large subjects.
+  API key callers are recorded with a null user id.
 - **Audit log:** rows are pseudonymised, not deleted. The hash chain covers the
   diff, so diffs cannot change; the subject row they point at is tombstoned,
   the count is reported as `auditRowsPseudonymised`, and the erase test
@@ -113,6 +126,9 @@ The worker `retention-sweep` runs daily (`RETENTION_SWEEP_CRON`, default
 `45 3 * * *`). It only reports until `RETENTION_MODE=enforce`. Users with
 `settings:read` see the same dry run report at `GET /api/v1/compliance/retention`. A missing, zero or
 invalid period falls back to the default, so a typo cannot shorten retention.
+Rows with no end or meeting date age from `created_at`. In enforce mode each
+class that changed rows writes one `retention.sweep` audit row per tenant with
+counts only.
 
 | Data class              | Env var                                | Default (days) | Action                               |
 | ----------------------- | -------------------------------------- | -------------- | ------------------------------------ |
@@ -140,8 +156,10 @@ Settings, Security. It is saved on `org_settings.data_region` and audited.
 What is enforced today:
 
 - **Tenant exports.** The worker uploads the archive to `S3_BUCKET_<REGION>`
-  (region `S3_REGION_<REGION>`) and the API signs downloads against the same
-  bucket. Without a regional bucket the export uses `S3_BUCKET`, unless
+  (region `S3_REGION_<REGION>`) and records the region on
+  `tenant_exports.storage_region`; the API signs downloads against the bucket
+  that row names, so changing the org's region later does not break old
+  downloads. Without a regional bucket the export uses `S3_BUCKET`, unless
   `DATA_RESIDENCY_ENFORCE=true`, in which case it fails instead of leaving the
   region.
 
@@ -160,7 +178,8 @@ Not enforceable yet (stated in the settings screen as well):
 1. No security incident procedure or breach notification runbook (SOC2-CC7.4-INCIDENT, ISO-A.5.24-INCIDENT).
 2. Backup restore self test is not scheduled in CI (SOC2-A1.2-BACKUP, ISO-A.8.13-BACKUP).
 3. Data residency covers tenant exports only (ISO-A.5.23-CLOUD-RESIDENCY).
-4. Audit diffs written before this pack may contain raw personal values; they cannot be rewritten without breaking the chain (SOC2-P4.3-ERASE).
+4. Audit diffs written before this pack may contain raw personal values (contact create and delete diffs carried the name until now); they cannot be rewritten without breaking the chain, and the residue scan reports them as retained (SOC2-P4.3-ERASE).
 5. Owner only visibility for unfiled captured mail depends on the email capture slice, not on main yet (ISO-A.8.12-LEAKAGE).
-6. Free text that mentions a subject by a short or partial name (under five characters, or first name only) is not matched by the erase engine; full name, email and phone are.
+6. Free text that mentions a subject by first name only, a short name (under five characters) or a reformatted phone number is not matched by the erase engine; full name, email and 7 digit or longer phone are.
 7. No audit log retention period is defined.
+8. Accepting or rejecting a contact fact is not audited yet.

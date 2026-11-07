@@ -133,8 +133,8 @@ export const SUBJECT_STORES = [
   {
     model: 'MeetingIngestItem',
     fields: ['payload'],
-    strategy: 'delete',
-    match: 'mention in raw payload',
+    strategy: 'scrub',
+    match: 'mention in a raw payload (redacted in place)',
   },
   {
     model: 'KamSession',
@@ -213,14 +213,14 @@ export const SUBJECT_STORES = [
   {
     model: 'Notification',
     fields: ['title', 'body'],
-    strategy: 'delete',
-    match: 'mention',
+    strategy: 'scrub',
+    match: 'mention (redacted in place)',
   },
   {
     model: 'IntelEvidence',
     fields: ['excerpt', 'label'],
-    strategy: 'delete',
-    match: 'mention in a public-source excerpt',
+    strategy: 'scrub',
+    match: 'mention in a public-source excerpt (redacted in place)',
   },
   {
     model: 'SignatureRequest',
@@ -244,7 +244,7 @@ export const SUBJECT_STORES = [
     strategy: 'pseudonymise',
     match: 'target id',
     basis:
-      'Hash-chained audit rows cannot change without breaking the chain. Rows keep only the subject id, which no longer resolves to a person once the subject row is tombstoned.',
+      'Hash-chained audit rows cannot change without breaking the chain. They point at the subject id, which no longer resolves to a person once the subject row is tombstoned. Diffs written before audit writers were made id-only can still hold a name; the residue scan reports them as retained.',
   },
 ] as const satisfies readonly SubjectStore[];
 

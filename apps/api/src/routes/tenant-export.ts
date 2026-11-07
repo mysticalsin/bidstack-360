@@ -189,11 +189,8 @@ async function freshDownloadUrl(row: TenantExport): Promise<string | null> {
   if (row.status !== 'ready' || !row.storageKey) return null;
   if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return null;
 
-  const settings = await prisma.orgSettings.findFirst({
-    where: { orgId: row.orgId, deletedAt: null },
-    select: { dataRegion: true },
-  });
-  const storage = await getStorageForRegion(DataRegion.safeParse(settings?.dataRegion).data ?? null);
+  // Sign against the bucket the archive was written to, not the org's current region.
+  const storage = await getStorageForRegion(DataRegion.safeParse(row.storageRegion).data ?? null);
   if (storage.driver === 's3') {
     const result = await storage.getDownload(row.storageKey, {
       filename: `polo-presales-export-${row.id}.ndjson.gz`,

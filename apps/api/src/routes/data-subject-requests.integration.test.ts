@@ -542,3 +542,85 @@ describe('data subject engine', () => {
     expect(await scanSubjectResidue(prisma, subject!)).toEqual([]);
   });
 });
+
+describe('data subject matching is bounded to the subject', () => {
+  t('a lookalike address and a third-party record are kept; mentions are redacted', async () => {
+    const o = orgId!;
+    const u = userId!;
+    const tag = randomUUID().slice(0, 8);
+    const email = `an.${tag}@acme.test`;
+    const lookalike = `dan.${tag}@acme.test`;
+    const name = `Ana Bounded${tag}`;
+    const subjectContact = await prisma.contact.create({
+      data: { orgId: o, customer: 'Bounded Co', name, email },
+    });
+    const bystander = await prisma.contact.create({
+      data: { orgId: o, customer: 'Bounded Co', name: `Dan Bystander${tag}`, email: lookalike },
+    });
+    const token = await prisma.integrationToken.upsert({
+      where: { orgId_userId_provider: { orgId: o, userId: u, provider: 'twilio' } },
+      create: { orgId: o, userId: u, provider: 'twilio', accessTokenEncrypted: 'placeholder' },
+      update: {},
+    });
+    // Dan's own mail, which merely mentions the subject.
+    const thirdParty = await prisma.emailMessage.create({
+      data: {
+        orgId: o,
+        userId: u,
+        integrationTokenId: token.id,
+        provider: 'OUTLOOK',
+        externalMessageId: `bounded-${tag}`,
+        fromEmail: lookalike,
+        toEmails: [{ email: 'seller@test.local' }],
+        subject: 'Budget',
+        bodyText: `Looping in ${name} (${email}) on the budget.`,
+        isOutbound: false,
+      },
+    });
+    const mentioning = await prisma.notification.create({
+      data: { orgId: o, userId: u, type: 'mention', title: 'Reply', body: `${name} replied` },
+    });
+    const firstNameOnly = await prisma.notification.create({
+      data: { orgId: o, userId: u, type: 'mention', title: 'Reply', body: 'Ana said thanks' },
+    });
+
+    const subject = await resolveDataSubject(prisma, o, 'contact', subjectContact.id);
+    expect(subject!.emails).toEqual([email]);
+
+    // Export: mention-only rows are listed by id and field, never with content.
+    const bundle = await exportDataSubject(prisma, subject!);
+    const mailRows = JSON.stringify(bundle.stores.EmailMessage ?? []);
+    expect(mailRows).toContain(thirdParty.id);
+    expect(mailRows).not.toContain('Looping in');
+    expect(mailRows).not.toContain(lookalike);
+
+    await eraseDataSubject(prisma, subject!, { dryRun: false, actorUserId: u });
+
+    const dan = await prisma.contact.findUnique({ where: { id: bystander.id } });
+    expect(dan?.email).toBe(lookalike);
+    const mail = await prisma.emailMessage.findFirst({
+      where: { id: thirdParty.id, deletedAt: { not: undefined } },
+    });
+    expect(mail?.deletedAt ?? null).toBeNull();
+    expect(mail?.fromEmail).toBe(lookalike);
+    expect(mail?.bodyText).toContain('[erased]');
+    expect(mail?.bodyText).not.toContain(email);
+    expect(mail?.bodyText).not.toContain(name);
+
+    const n1 = await prisma.notification.findUnique({ where: { id: mentioning.id } });
+    expect(n1?.body).toBe('[erased] replied');
+    const n2 = await prisma.notification.findUnique({ where: { id: firstNameOnly.id } });
+    expect(n2?.body).toBe('Ana said thanks');
+
+    expect(await scanSubjectResidue(prisma, subject!)).toEqual([]);
+  });
+
+  t('a single first name or a short phone is not used as an identifier', async () => {
+    const c = await prisma.contact.create({
+      data: { orgId: orgId!, customer: 'Short Co', name: 'Ana', phone: '12345' },
+    });
+    const subject = await resolveDataSubject(prisma, orgId!, 'contact', c.id);
+    expect(subject!.names).toEqual([]);
+    expect(subject!.phones).toEqual([]);
+  });
+});

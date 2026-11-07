@@ -207,7 +207,7 @@ export async function processTenantExportJob(
     const { body, done } = buildArchiveStream(orgId, exportId, log);
     const storageKey = exportStorageKey(orgId, exportId);
     // Upload consumes the gzip stream; `done` resolves when production finishes.
-    const [{ bytes }, counts] = await Promise.all([
+    const [{ bytes, storageRegion }, counts] = await Promise.all([
       uploadExportArchive({ key: storageKey, body, region }),
       done,
     ]);
@@ -222,6 +222,7 @@ export async function processTenantExportJob(
       data: {
         status: 'ready',
         storageKey,
+        storageRegion,
         sizeBytes: BigInt(bytes),
         expiresAt,
         completedAt: new Date(),

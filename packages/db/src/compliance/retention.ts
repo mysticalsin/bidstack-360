@@ -55,7 +55,7 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
     defaultDays: 730,
     action: 'delete',
     table: 'calendar_events',
-    ageExpr: 'end_at',
+    ageExpr: 'coalesce(end_at, created_at)',
     description: 'Synced calendar events with attendee lists.',
   },
   {
@@ -76,7 +76,7 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
     defaultDays: 365,
     action: 'scrub',
     table: 'meeting_intel',
-    ageExpr: 'held_at',
+    ageExpr: 'coalesce(held_at, created_at)',
     pending: 'transcript_text IS NOT NULL',
     scrub: 'transcript_text = NULL',
     description: 'Meeting intel transcripts. Summaries and extracted next steps stay.',
@@ -87,7 +87,7 @@ export const RETENTION_POLICIES: readonly RetentionPolicy[] = [
     defaultDays: 365,
     action: 'scrub',
     table: 'kam_sessions',
-    ageExpr: 'held_at',
+    ageExpr: 'coalesce(held_at, created_at)',
     pending: 'transcript_text IS NOT NULL OR transcript_structured IS NOT NULL',
     scrub: 'transcript_text = NULL, transcript_structured = NULL',
     description: 'Account management session transcripts. The approved AI note stays.',
@@ -221,16 +221,36 @@ export async function runRetentionSweep(
       );
       rows = Number(r?.n ?? 0);
     } else {
+      const perOrg = new Map<string, number>();
       for (let i = 0; i < MAX_BATCHES; i += 1) {
         const batch = Prisma.sql`ctid IN (SELECT ctid FROM ${table} WHERE ${where} LIMIT ${BATCH})`;
-        const n =
+        const changed =
           p.action === 'delete'
-            ? await db.$executeRaw(Prisma.sql`DELETE FROM ${table} WHERE ${batch}`)
-            : await db.$executeRaw(
-                Prisma.sql`UPDATE ${table} SET ${Prisma.raw(p.scrub ?? '')} WHERE ${batch}`,
-              );
+            ? Prisma.sql`DELETE FROM ${table} WHERE ${batch} RETURNING org_id`
+            : Prisma.sql`UPDATE ${table} SET ${Prisma.raw(p.scrub ?? '')} WHERE ${batch} RETURNING org_id`;
+        const counted = await db.$queryRaw<Array<{ org_id: string; n: bigint }>>(
+          Prisma.sql`WITH c AS (${changed}) SELECT org_id::text AS org_id, count(*) AS n FROM c GROUP BY org_id`,
+        );
+        let n = 0;
+        for (const r of counted) {
+          n += Number(r.n);
+          perOrg.set(r.org_id, (perOrg.get(r.org_id) ?? 0) + Number(r.n));
+        }
         rows += n;
         if (n < BATCH) break;
+      }
+      // One audit row per tenant and class, counts only.
+      for (const [orgId, n] of perOrg) {
+        await db.auditLog.create({
+          data: {
+            orgId,
+            userId: null,
+            action: 'retention.sweep',
+            targetType: 'data_class',
+            targetId: p.dataClass,
+            diff: { dataClass: p.dataClass, action: p.action, days: p.days, rows: n },
+          },
+        });
       }
     }
     classes.push({

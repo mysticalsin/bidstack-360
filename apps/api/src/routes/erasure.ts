@@ -19,6 +19,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { eraseDataSubject, prisma, resolveDataSubject } from '@bidstack/db';
 import { ErasureOrgParams, ErasureRequest, ErasureSummary } from '@bidstack/shared';
 
+import { isApiKeyActor } from '../lib/access-scope.js';
+
 export const erasureRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/orgs/:orgId/erasure',
@@ -41,13 +43,13 @@ export const erasureRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const report = await eraseDataSubject(prisma, subject, {
         dryRun: false,
-        actorUserId: req.auth.userId,
+        actorUserId: isApiKeyActor(req.auth.userId) ? null : req.auth.userId,
       });
       const primary = subjectType === 'contact' ? 'Contact' : 'Lead';
       const relatedScrubbed = Object.fromEntries(
         Object.entries(report.stores)
           .filter(([model]) => model !== primary)
-          .map(([model, v]) => [model, v.rows]),
+          .map(([model, v]) => [model, v.rows + v.mentions]),
       );
       return {
         subjectType,

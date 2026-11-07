@@ -1136,6 +1136,8 @@ model TenantExport {
   // Storage key of the zip object — used by the worker to issue fresh
   // download URLs and by the cleanup job to lifecycle the object.
   storageKey    String?            @map("storage_key")
+  // Data region whose bucket holds the archive; null = default bucket.
+  storageRegion String?            @map("storage_region") @db.VarChar(8)
   startedAt     DateTime?          @map("started_at") @db.Timestamptz(6)
   completedAt   DateTime?          @map("completed_at") @db.Timestamptz(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)

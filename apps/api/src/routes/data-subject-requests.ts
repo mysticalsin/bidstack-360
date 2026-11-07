@@ -27,7 +27,13 @@ import {
   type DataSubjectType,
 } from '@bidstack/shared';
 
+import { isApiKeyActor } from '../lib/access-scope.js';
 import { enqueueDataSubjectRequest } from '../queues/data-subject.js';
+
+/** API-key callers have no users row; their id cannot go into a uuid column. */
+function humanActor(req: FastifyRequest): string | null {
+  return isApiKeyActor(req.auth.userId) ? null : req.auth.userId;
+}
 
 function assertSameOrg(req: FastifyRequest, orgId: string): void {
   if (orgId !== req.auth.orgId) {
@@ -71,12 +77,12 @@ export const dataSubjectRequestRoutes: FastifyPluginAsyncZod = async (server) =>
       if (!subject) throw req.server.httpErrors.notFound('Subject not found');
 
       const row = await prisma.dataSubjectRequest.create({
-        data: { orgId, requestedById: req.auth.userId, kind, subjectType, subjectId, dryRun },
+        data: { orgId, requestedById: humanActor(req), kind, subjectType, subjectId, dryRun },
       });
       await prisma.auditLog.create({
         data: {
           orgId,
-          userId: req.auth.userId,
+          userId: humanActor(req),
           action: 'gdpr.dsr.requested',
           targetType: 'data_subject_request',
           targetId: row.id,
@@ -134,7 +140,7 @@ export const dataSubjectRequestRoutes: FastifyPluginAsyncZod = async (server) =>
       await prisma.auditLog.create({
         data: {
           orgId,
-          userId: req.auth.userId,
+          userId: humanActor(req),
           action: 'gdpr.export.downloaded',
           targetType: 'data_subject_request',
           targetId: row.id,

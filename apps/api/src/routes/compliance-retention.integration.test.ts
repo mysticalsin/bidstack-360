@@ -132,6 +132,18 @@ describe('retention sweep', () => {
     const call = await prisma.callSession.findFirst({ where: { id: ids.call } });
     expect(call).not.toBeNull();
     expect(call?.transcriptText).toBeNull();
+
+    // Each class that changed rows leaves one counts-only audit row for the tenant.
+    const audit = await prisma.auditLog.findMany({
+      where: { orgId: orgId!, action: 'retention.sweep' },
+      orderBy: { at: 'desc' },
+      take: 50,
+    });
+    const classes = new Set(audit.map((a) => a.targetId));
+    for (const c of report.classes.filter((r) => r.rows > 0)) {
+      expect(classes.has(c.dataClass)).toBe(true);
+    }
+    expect(audit.length).toBeGreaterThan(0);
   });
 
   t('a configured period is honoured (env override)', async () => {

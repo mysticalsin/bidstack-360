@@ -24,7 +24,8 @@ export async function processDataSubjectJob(
   const parsed = DataSubjectJob.safeParse(job.data);
   if (!parsed.success) throw new Error('data-subject-request: invalid job data');
   const out = await runDataSubjectRequest(prisma, parsed.data.requestId);
-  log.info(out, 'data subject request processed');
+  if (out.status === 'failed') log.error(out, 'data subject request failed');
+  else log.info(out, 'data subject request processed');
   return out;
 }
 

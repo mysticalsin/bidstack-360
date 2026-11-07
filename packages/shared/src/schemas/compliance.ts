@@ -98,7 +98,13 @@ export const DataSubjectReport = z.object({
   subjectType: DataSubjectType,
   subjectId: z.string(),
   scrubbedFields: z.array(z.string()),
-  stores: z.record(z.object({ action: z.string(), rows: z.number().int().nonnegative() })),
+  stores: z.record(
+    z.object({
+      action: z.string(),
+      rows: z.number().int().nonnegative(),
+      mentions: z.number().int().nonnegative().optional(),
+    }),
+  ),
   retained: z.record(z.object({ rows: z.number().int().nonnegative(), basis: z.string() })),
   auditRowsPseudonymised: z.number().int().nonnegative(),
   residue: z
@@ -111,6 +117,8 @@ export const DataSubjectReport = z.object({
       }),
     )
     .optional(),
+  /** Set when the post-erase residue scan could not run; the erasure itself completed. */
+  residueError: z.string().optional(),
 });
 export type DataSubjectReport = z.infer<typeof DataSubjectReport>;
 

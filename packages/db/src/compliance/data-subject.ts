@@ -16,8 +16,10 @@
  *
  * Audit log: hash chained and append-only (migration
  * 20261107070020_audit_log_hash_chain_triggers). Rows are never rewritten.
- * Erasure pseudonymises them instead: they keep only the subject id, which no
- * longer resolves to a person once the subject row is tombstoned.
+ * Erasure pseudonymises them instead: the subject id they point at no longer
+ * resolves to a person once the subject row is tombstoned. Diffs written
+ * before audit writers were made id-only can still hold a name; the residue
+ * scan reports those as retained.
  */
 import { createHash } from 'node:crypto';
 
@@ -41,8 +43,11 @@ export interface DataSubject {
   nodeIds: string[];
   /** Lowercased email addresses. */
   emails: string[];
+  /** Phone numbers as stored, 7 digits or more. */
   phones: string[];
-  /** Lowercased full names (5 characters or more, to avoid broad matches). */
+  /** The same numbers reduced to digits, for column equality. */
+  phoneDigits: string[];
+  /** Lowercased full names: two words or more, 5 characters or more. */
   names: string[];
 }
 
@@ -65,7 +70,8 @@ export interface EraseReport {
   subjectType: DataSubjectType;
   subjectId: string;
   scrubbedFields: string[];
-  stores: Record<string, { action: string; rows: number }>;
+  /** rows: linked rows erased; mentions: other records where only the matching text was redacted. */
+  stores: Record<string, { action: string; rows: number; mentions: number }>;
   retained: Record<string, { rows: number; basis: string }>;
   auditRowsPseudonymised: number;
 }
@@ -119,52 +125,105 @@ function delegate(db: Db, model: string) {
   )[key]!;
 }
 
-// ─── SQL fragments ───────────────────────────────────────────────────────────
+// ─── Subject pattern ─────────────────────────────────────────────────────────
 
 const FALSE = Prisma.sql`FALSE`;
+export const REDACTED = '[erased]';
 
-function likePatterns(s: DataSubject): string[] {
-  return [...s.emails, ...s.phones, ...s.names].map(
-    (v) => `%${v.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`,
-  );
+/** Escape a literal for a PostgreSQL advanced regular expression. */
+function reEscape(v: string): string {
+  return v.replace(/[\\^$.|?*+()[\]{}]/g, (c) => `\\${c}`);
+}
+
+/**
+ * One case-insensitive PostgreSQL regex for the subject's identifiers. Tokens
+ * carry boundaries: `an@acme.com` never matches `dan@acme.com`, a phone never
+ * matches inside a longer number, and a name matches only as the whole
+ * phrase. Null when the subject has no usable identifier.
+ */
+export function subjectPattern(s: Pick<DataSubject, 'emails' | 'phones' | 'names'>): string | null {
+  const parts = [
+    ...s.emails.map(
+      (e) => `(?<![[:alnum:]._%+-])${reEscape(e)}(?![[:alnum:]_%+-]|\\.[[:alnum:]])`,
+    ),
+    ...s.phones.map((p) => `(?<![[:digit:]])${reEscape(p)}(?![[:digit:]])`),
+    ...s.names.map((n) => `\\m${n.split(/\s+/).map(reEscape).join('\\s+')}\\M`),
+  ];
+  return parts.length ? `(${parts.join('|')})` : null;
+}
+
+function fieldMeta(model: string, field: string) {
+  const f = meta(model).fields.find((x) => x.name === field);
+  if (!f || f.kind === 'object') throw new Error(`data-subject: unknown column ${model}.${field}`);
+  return f;
 }
 
 function uuidIn(model: string, field: string, ids: string[]): Prisma.Sql {
   return ids.length ? Prisma.sql`${C(model, field)} = ANY(${ids}::uuid[])` : FALSE;
 }
 
+/** Exact, case-insensitive equality on an identifier column. */
 function lowerIn(model: string, field: string, values: string[]): Prisma.Sql {
-  return values.length ? Prisma.sql`lower(${C(model, field)}::text) = ANY(${values})` : FALSE;
+  return values.length
+    ? Prisma.sql`lower(${C(model, field)}::text) = ANY(${values}::text[])`
+    : FALSE;
 }
 
-function mentions(model: string, fields: string[], s: DataSubject): Prisma.Sql {
-  const p = likePatterns(s);
-  if (!p.length) return FALSE;
-  return Prisma.join(
-    fields.map((f) => Prisma.sql`lower(${C(model, f)}::text) LIKE ANY(${p})`),
+/** Phone column equal to one of the subject's numbers, compared on digits only. */
+function phoneIn(model: string, field: string, digits: string[]): Prisma.Sql {
+  return digits.length
+    ? Prisma.sql`regexp_replace(${C(model, field)}, '[^0-9]', '', 'g') = ANY(${digits}::text[])`
+    : FALSE;
+}
+
+/** A jsonb array (attendees, recipients) holds an entry whose email is one of the subject's. */
+function jsonHasEmail(model: string, field: string, emails: string[]): Prisma.Sql {
+  if (!emails.length) return FALSE;
+  const col = C(model, field);
+  return Prisma.sql`(jsonb_typeof(${col}) = 'array' AND EXISTS (
+      SELECT 1 FROM jsonb_array_elements(${col}) e
+       WHERE lower(CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE e ->> 'email' END)
+             = ANY(${emails}::text[])))`;
+}
+
+function mentions(model: string, fields: readonly string[], s: DataSubject): Prisma.Sql {
+  const re = subjectPattern(s);
+  if (!re || !fields.length) return FALSE;
+  return Prisma.sql`(${Prisma.join(
+    fields.map((f) => Prisma.sql`${C(model, f)}::text ~* ${re}`),
     ' OR ',
-  );
+  )})`;
 }
 
-/** A jsonb array column without the elements that mention the subject. */
+/** SET expression replacing every match of the subject pattern in a column with REDACTED. */
+function redactExpr(model: string, field: string, re: string): Prisma.Sql {
+  const f = fieldMeta(model, field);
+  const col = C(model, field);
+  if (f.type === 'Json') return Prisma.sql`gdpr_redact_jsonb(${col}, ${re}, ${REDACTED})`;
+  if (f.isList) {
+    return Prisma.sql`array(SELECT regexp_replace(x, ${re}, ${REDACTED}, 'gi')
+                              FROM unnest(${col}) WITH ORDINALITY AS u(x, i) ORDER BY i)`;
+  }
+  return Prisma.sql`regexp_replace(${col}, ${re}, ${REDACTED}, 'gi')`;
+}
+
+/** A jsonb array column without the entries (attendee, recipient) that name the subject. */
 function jsonWithout(model: string, field: string, s: DataSubject): Prisma.Sql {
   const col = C(model, field);
-  const p = likePatterns(s);
+  const re = subjectPattern(s);
+  if (!re) return col;
   return Prisma.sql`CASE WHEN jsonb_typeof(${col}) = 'array' THEN coalesce((
-      SELECT jsonb_agg(e) FROM jsonb_array_elements(${col}) e
-       WHERE NOT (lower(e::text) LIKE ANY(${p}))), '[]'::jsonb) ELSE ${col} END`;
+      SELECT jsonb_agg(e ORDER BY i) FROM jsonb_array_elements(${col}) WITH ORDINALITY AS t(e, i)
+       WHERE NOT (e::text ~* ${re})), '[]'::jsonb) ELSE ${col} END`;
 }
 
-/** A text[] column without the entries that mention the subject. */
+/** A text[] column without the entries that name the subject. */
 function arrayWithout(model: string, field: string, s: DataSubject): Prisma.Sql {
   const col = C(model, field);
-  const p = likePatterns(s);
-  return Prisma.sql`array(SELECT x FROM unnest(${col}) x WHERE NOT (lower(x) LIKE ANY(${p})))`;
-}
-
-function nullIfMention(model: string, field: string, s: DataSubject): Prisma.Sql {
-  const col = C(model, field);
-  return Prisma.sql`CASE WHEN lower(${col}::text) LIKE ANY(${likePatterns(s)}) THEN NULL ELSE ${col} END`;
+  const re = subjectPattern(s);
+  if (!re) return col;
+  return Prisma.sql`array(SELECT x FROM unnest(${col}) WITH ORDINALITY AS u(x, i)
+                           WHERE NOT (x ~* ${re}) ORDER BY i)`;
 }
 
 async function idsWhere(
@@ -185,38 +244,60 @@ function subjectIds(s: DataSubject): string[] {
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
+//
+// Each store separates rows LINKED to the subject (id link or exact identifier
+// column: the subject is a party to the record) from rows that only MENTION
+// them in free text. Linked rows get the structural erasure below (tombstone,
+// delete, drop the attendee or recipient entry). Every matched row then has
+// the subject's identifiers replaced with REDACTED in the store's personal
+// fields (personal-data-map.ts), so a third party's record is never deleted or
+// wiped because it mentions the subject.
 
 interface Handler {
-  find(db: Db, s: DataSubject): Promise<string[]>;
-  /** Apply the erasure to the planned ids. Returns rows kept under a legal basis. */
+  linked(db: Db, s: DataSubject): Promise<string[]>;
+  /** Structural erasure of linked rows. Returns rows kept under a legal basis. */
   erase?(db: Db, s: DataSubject, ids: string[]): Promise<number | void>;
   rows?(db: Db, ids: string[]): Promise<Array<Record<string, unknown>>>;
 }
 
-function callSessionIds(db: Db, s: DataSubject): Promise<string[]> {
+const none = async (): Promise<string[]> => [];
+
+function callSessionLinked(db: Db, s: DataSubject): Promise<string[]> {
   return idsWhere(
     db,
     'CallSession',
     s.orgId,
     Prisma.sql`${uuidIn('CallSession', 'entityId', subjectIds(s))}
-      OR ${mentions('CallSession', ['participantEmails', 'transcriptText', 'summary'], s)}`,
+      OR ${jsonHasEmail('CallSession', 'participantEmails', s.emails)}`,
   );
 }
 
-function emailMessageIds(db: Db, s: DataSubject): Promise<string[]> {
+function emailMessageLinked(db: Db, s: DataSubject): Promise<string[]> {
   return idsWhere(
     db,
     'EmailMessage',
     s.orgId,
     Prisma.sql`${lowerIn('EmailMessage', 'fromEmail', s.emails)}
       OR ${uuidIn('EmailMessage', 'entityId', subjectIds(s))}
-      OR ${mentions('EmailMessage', ['toEmails', 'ccEmails', 'subject', 'bodyText', 'bodyHtml'], s)}`,
+      OR ${jsonHasEmail('EmailMessage', 'toEmails', s.emails)}
+      OR ${jsonHasEmail('EmailMessage', 'ccEmails', s.emails)}`,
+  );
+}
+
+function meetingAttendeeLinked(db: Db, s: DataSubject): Promise<string[]> {
+  return idsWhere(
+    db,
+    'MeetingIntelAttendee',
+    s.orgId,
+    Prisma.sql`${uuidIn('MeetingIntelAttendee', 'contactId', s.contactIds)}
+      OR ${lowerIn('MeetingIntelAttendee', 'email', s.emails)}
+      OR ${lowerIn('MeetingIntelAttendee', 'name', s.names)}`,
   );
 }
 
 const HANDLERS: Record<SubjectStoreModel, Handler> = {
   Contact: {
-    find: async (_db, s) => s.contactIds,
+    linked: async (_db, s) => s.contactIds,
     async erase(db, s, ids) {
       const now = new Date();
       const rows = await inChunks(ids, (chunk) =>
@@ -244,7 +325,7 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   Lead: {
-    find: async (_db, s) => s.leadIds,
+    linked: async (_db, s) => s.leadIds,
     async erase(db, s, ids) {
       const now = new Date();
       const rows = await inChunks(ids, (chunk) =>
@@ -273,7 +354,7 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   OrgChartNode: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'OrgChartNode',
@@ -293,7 +374,7 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   ActivityAttendee: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'ActivityAttendee',
@@ -307,85 +388,61 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   Activity: {
-    find: (db, s) =>
-      idsWhere(
-        db,
-        'Activity',
-        s.orgId,
-        Prisma.sql`${uuidIn('Activity', 'entityId', subjectIds(s))}
-          OR ${mentions('Activity', ['subject', 'description', 'body', 'metadata'], s)}`,
-      ),
-    async erase(db, s, ids) {
+    linked: (db, s) =>
+      idsWhere(db, 'Activity', s.orgId, uuidIn('Activity', 'entityId', subjectIds(s))),
+    async erase(db, _s, ids) {
       const m = 'Activity';
-      const linked = subjectIds(s);
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'subject')} = ${TOMBSTONE.freeText},
           ${C(m, 'description')} = NULL, ${C(m, 'body')} = '{}'::jsonb, ${C(m, 'metadata')} = '{}'::jsonb,
-          ${C(m, 'deletedAt')} = CASE WHEN ${uuidIn(m, 'entityId', linked)}
-            THEN coalesce(${C(m, 'deletedAt')}, now()) ELSE ${C(m, 'deletedAt')} END
+          ${C(m, 'deletedAt')} = coalesce(${C(m, 'deletedAt')}, now())
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   ContactFact: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'ContactFact',
         s.orgId,
         Prisma.sql`${uuidIn('ContactFact', 'contactId', s.contactIds)}
-          OR ${uuidIn('ContactFact', 'reportsToContactId', s.contactIds)}
-          OR ${mentions('ContactFact', ['claim', 'evidenceDetail'], s)}`,
+          OR ${uuidIn('ContactFact', 'reportsToContactId', s.contactIds)}`,
       ),
     async erase(db, s, ids) {
       const m = 'ContactFact';
       await db.$executeRaw`DELETE FROM ${T(m)} WHERE id = ANY(${ids}::uuid[])
-          AND (${uuidIn(m, 'contactId', s.contactIds)} OR ${mentions(m, ['claim', 'evidenceDetail'], s)})`;
+          AND ${uuidIn(m, 'contactId', s.contactIds)}`;
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'reportsToContactId')} = NULL
           WHERE id = ANY(${ids}::uuid[]) AND ${uuidIn(m, 'reportsToContactId', s.contactIds)}`;
     },
   },
   CustomerCommitment: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'CustomerCommitment',
         s.orgId,
-        Prisma.sql`${uuidIn('CustomerCommitment', 'ownerContactId', s.contactIds)}
-          OR ${mentions('CustomerCommitment', ['promise', 'sourceNote'], s)}`,
+        uuidIn('CustomerCommitment', 'ownerContactId', s.contactIds),
       ),
-    async erase(db, s, ids) {
+    async erase(db, _s, ids) {
       const m = 'CustomerCommitment';
-      await db.$executeRaw`UPDATE ${T(m)} SET
-          ${C(m, 'ownerContactId')} = CASE WHEN ${uuidIn(m, 'ownerContactId', s.contactIds)}
-            THEN NULL ELSE ${C(m, 'ownerContactId')} END,
-          ${C(m, 'promise')} = CASE WHEN ${mentions(m, ['promise'], s)}
-            THEN ${TOMBSTONE.freeText} ELSE ${C(m, 'promise')} END,
-          ${C(m, 'sourceNote')} = ${nullIfMention(m, 'sourceNote', s)}
+      await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'ownerContactId')} = NULL
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   OpportunityContact: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'OpportunityContact',
         s.orgId,
-        Prisma.sql`${uuidIn('OpportunityContact', 'contactId', s.contactIds)}
-          OR ${mentions('OpportunityContact', ['notes'], s)}`,
+        uuidIn('OpportunityContact', 'contactId', s.contactIds),
       ),
     async erase(db, _s, ids) {
       await db.$executeRaw`DELETE FROM ${T('OpportunityContact')} WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   MeetingIntelAttendee: {
-    find: (db, s) =>
-      idsWhere(
-        db,
-        'MeetingIntelAttendee',
-        s.orgId,
-        Prisma.sql`${uuidIn('MeetingIntelAttendee', 'contactId', s.contactIds)}
-          OR ${lowerIn('MeetingIntelAttendee', 'email', s.emails)}
-          OR ${lowerIn('MeetingIntelAttendee', 'name', s.names)}`,
-      ),
+    linked: meetingAttendeeLinked,
     async erase(db, _s, ids) {
       const m = 'MeetingIntelAttendee';
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'name')} = ${TOMBSTONE.name},
@@ -394,96 +451,90 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   MeetingIntel: {
-    async find(db, s) {
-      const attended = await HANDLERS.MeetingIntelAttendee.find(db, s);
+    // A meeting the subject attended: the transcript holds their own words, so
+    // it goes. A meeting that only mentions them is redacted in place.
+    async linked(db, s) {
+      const attended = await meetingAttendeeLinked(db, s);
       return idsWhere(
         db,
         'MeetingIntel',
         s.orgId,
         Prisma.sql`id IN (SELECT ${C('MeetingIntelAttendee', 'meetingId')} FROM ${T('MeetingIntelAttendee')}
-                           WHERE id = ANY(${attended}::uuid[]))
-          OR ${mentions('MeetingIntel', ['transcriptText', 'summary'], s)}`,
+                           WHERE id = ANY(${attended}::uuid[]))`,
       );
     },
-    async erase(db, s, ids) {
+    async erase(db, _s, ids) {
       const m = 'MeetingIntel';
-      await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'transcriptText')} = NULL,
-          ${C(m, 'summary')} = ${nullIfMention(m, 'summary', s)}
+      await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'transcriptText')} = NULL
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
-  MeetingIngestItem: {
-    find: (db, s) =>
-      idsWhere(db, 'MeetingIngestItem', s.orgId, mentions('MeetingIngestItem', ['payload'], s)),
-    async erase(db, _s, ids) {
-      await db.$executeRaw`DELETE FROM ${T('MeetingIngestItem')} WHERE id = ANY(${ids}::uuid[])`;
-    },
-  },
+  MeetingIngestItem: { linked: none },
   KamSession: {
-    find: (db, s) =>
-      idsWhere(
+    linked: (db, s) => {
+      const re = subjectPattern(s);
+      if (!re) return Promise.resolve([]);
+      return idsWhere(
         db,
         'KamSession',
         s.orgId,
-        mentions(
-          'KamSession',
-          ['attendees', 'transcriptText', 'transcriptStructured', 'aiNote'],
-          s,
-        ),
-      ),
+        Prisma.sql`EXISTS (SELECT 1 FROM unnest(${C('KamSession', 'attendees')}) a WHERE a ~* ${re})`,
+      );
+    },
     async erase(db, s, ids) {
       const m = 'KamSession';
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'attendees')} = ${arrayWithout(m, 'attendees', s)},
-          ${C(m, 'transcriptText')} = NULL, ${C(m, 'transcriptStructured')} = NULL,
-          ${C(m, 'aiNote')} = ${nullIfMention(m, 'aiNote', s)}
+          ${C(m, 'transcriptText')} = NULL, ${C(m, 'transcriptStructured')} = NULL
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   GovernanceMeeting: {
-    find: (db, s) =>
-      idsWhere(
+    linked: (db, s) => {
+      const re = subjectPattern(s);
+      if (!re) return Promise.resolve([]);
+      return idsWhere(
         db,
         'GovernanceMeeting',
         s.orgId,
-        mentions('GovernanceMeeting', ['participants', 'outcomes'], s),
-      ),
+        Prisma.sql`EXISTS (SELECT 1 FROM unnest(${C('GovernanceMeeting', 'participants')}) a WHERE a ~* ${re})`,
+      );
+    },
     async erase(db, s, ids) {
       const m = 'GovernanceMeeting';
-      await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'participants')} = ${arrayWithout(m, 'participants', s)},
-          ${C(m, 'outcomes')} = ${nullIfMention(m, 'outcomes', s)}
+      await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'participants')} = ${arrayWithout(m, 'participants', s)}
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   CalendarEvent: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'CalendarEvent',
         s.orgId,
         Prisma.sql`${lowerIn('CalendarEvent', 'organizerEmail', s.emails)}
           OR ${uuidIn('CalendarEvent', 'relatedEntityId', subjectIds(s))}
-          OR ${mentions('CalendarEvent', ['attendees', 'subject', 'bodyPreview'], s)}`,
+          OR ${jsonHasEmail('CalendarEvent', 'attendees', s.emails)}`,
       ),
     async erase(db, s, ids) {
       const m = 'CalendarEvent';
-      const about = Prisma.sql`(${uuidIn(m, 'relatedEntityId', subjectIds(s))}
-        OR ${mentions(m, ['subject', 'bodyPreview'], s)})`;
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'attendees')} = ${jsonWithout(m, 'attendees', s)},
           ${C(m, 'organizerEmail')} = CASE WHEN ${lowerIn(m, 'organizerEmail', s.emails)}
             THEN NULL ELSE ${C(m, 'organizerEmail')} END,
-          ${C(m, 'subject')} = CASE WHEN ${about} THEN ${TOMBSTONE.freeText} ELSE ${C(m, 'subject')} END,
-          ${C(m, 'bodyPreview')} = CASE WHEN ${about} THEN NULL ELSE ${C(m, 'bodyPreview')} END
+          ${C(m, 'subject')} = CASE WHEN ${uuidIn(m, 'relatedEntityId', subjectIds(s))}
+            THEN ${TOMBSTONE.freeText} ELSE ${C(m, 'subject')} END,
+          ${C(m, 'bodyPreview')} = CASE WHEN ${uuidIn(m, 'relatedEntityId', subjectIds(s))}
+            THEN NULL ELSE ${C(m, 'bodyPreview')} END
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   Booking: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'Booking',
         s.orgId,
         Prisma.sql`${lowerIn('Booking', 'attendeeEmail', s.emails)}
-          OR ${s.phones.length ? Prisma.sql`${C('Booking', 'attendeePhone')} = ANY(${s.phones})` : FALSE}`,
+          OR ${phoneIn('Booking', 'attendeePhone', s.phoneDigits)}`,
       ),
     async erase(db, s, ids) {
       const m = 'Booking';
@@ -495,7 +546,9 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   EmailMessage: {
-    find: emailMessageIds,
+    // Mail the subject sent, received or that is filed against them is their
+    // correspondence: tombstoned. Mail between other people is only redacted.
+    linked: emailMessageLinked,
     async erase(db, s, ids) {
       const m = 'EmailMessage';
       await db.$executeRaw`UPDATE ${T(m)} SET
@@ -509,8 +562,8 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   EmailTrackingPixel: {
-    async find(db, s) {
-      const messages = await emailMessageIds(db, s);
+    async linked(db, s) {
+      const messages = await emailMessageLinked(db, s);
       return idsWhere(
         db,
         'EmailTrackingPixel',
@@ -524,35 +577,30 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   SmsMessage: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'SmsMessage',
         s.orgId,
-        Prisma.sql`${s.phones.length ? Prisma.sql`${C('SmsMessage', 'toNumber')} = ANY(${s.phones}) OR ${C('SmsMessage', 'fromNumber')} = ANY(${s.phones})` : FALSE}
-          OR ${uuidIn('SmsMessage', 'entityId', subjectIds(s))}
-          OR ${mentions('SmsMessage', ['body'], s)}`,
+        Prisma.sql`${phoneIn('SmsMessage', 'toNumber', s.phoneDigits)}
+          OR ${phoneIn('SmsMessage', 'fromNumber', s.phoneDigits)}
+          OR ${uuidIn('SmsMessage', 'entityId', subjectIds(s))}`,
       ),
     async erase(db, s, ids) {
       const m = 'SmsMessage';
       await db.$executeRaw`UPDATE ${T(m)} SET
-          ${C(m, 'toNumber')} = CASE WHEN ${C(m, 'toNumber')} = ANY(${s.phones}) THEN ${TOMBSTONE.phone} ELSE ${C(m, 'toNumber')} END,
-          ${C(m, 'fromNumber')} = CASE WHEN ${C(m, 'fromNumber')} = ANY(${s.phones}) THEN ${TOMBSTONE.phone} ELSE ${C(m, 'fromNumber')} END,
+          ${C(m, 'toNumber')} = CASE WHEN ${phoneIn(m, 'toNumber', s.phoneDigits)}
+            THEN ${TOMBSTONE.phone} ELSE ${C(m, 'toNumber')} END,
+          ${C(m, 'fromNumber')} = CASE WHEN ${phoneIn(m, 'fromNumber', s.phoneDigits)}
+            THEN ${TOMBSTONE.phone} ELSE ${C(m, 'fromNumber')} END,
           ${C(m, 'body')} = ${TOMBSTONE.freeText},
           ${C(m, 'deletedAt')} = coalesce(${C(m, 'deletedAt')}, now())
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
   SmsConsent: {
-    find: (db, s) =>
-      s.phones.length
-        ? idsWhere(
-            db,
-            'SmsConsent',
-            s.orgId,
-            Prisma.sql`${C('SmsConsent', 'phoneNumber')} = ANY(${s.phones})`,
-          )
-        : Promise.resolve([]),
+    linked: (db, s) =>
+      idsWhere(db, 'SmsConsent', s.orgId, phoneIn('SmsConsent', 'phoneNumber', s.phoneDigits)),
     async erase(db, _s, ids) {
       const m = 'SmsConsent';
       await db.$executeRaw`DELETE FROM ${T(m)} WHERE id = ANY(${ids}::uuid[]) AND NOT ${C(m, 'optedOut')}`;
@@ -562,7 +610,7 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   CallSession: {
-    find: callSessionIds,
+    linked: callSessionLinked,
     async erase(db, s, ids) {
       const m = 'CallSession';
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'participantEmails')} = ${jsonWithout(m, 'participantEmails', s)},
@@ -572,8 +620,8 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   CallSummary: {
-    async find(db, s) {
-      const sessions = await callSessionIds(db, s);
+    async linked(db, s) {
+      const sessions = await callSessionLinked(db, s);
       return idsWhere(db, 'CallSummary', s.orgId, uuidIn('CallSummary', 'callSessionId', sessions));
     },
     async erase(db, _s, ids) {
@@ -581,7 +629,7 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
     },
   },
   Reference: {
-    find: (db, s) =>
+    linked: (db, s) =>
       idsWhere(
         db,
         'Reference',
@@ -593,41 +641,34 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
           ${C('Reference', 'contactEmail')} = NULL WHERE id = ANY(${ids}::uuid[])`;
     },
   },
-  Notification: {
-    find: (db, s) =>
-      idsWhere(db, 'Notification', s.orgId, mentions('Notification', ['title', 'body'], s)),
-    async erase(db, _s, ids) {
-      await db.$executeRaw`DELETE FROM ${T('Notification')} WHERE id = ANY(${ids}::uuid[])`;
-    },
-  },
-  IntelEvidence: {
-    find: (db, s) =>
-      idsWhere(db, 'IntelEvidence', s.orgId, mentions('IntelEvidence', ['excerpt', 'label'], s)),
-    async erase(db, _s, ids) {
-      await db.$executeRaw`DELETE FROM ${T('IntelEvidence')} WHERE id = ANY(${ids}::uuid[])`;
-    },
-  },
+  Notification: { linked: none },
+  IntelEvidence: { linked: none },
   SignatureRequest: {
-    find: (db, s) =>
-      idsWhere(db, 'SignatureRequest', s.orgId, mentions('SignatureRequest', ['recipients'], s)),
+    linked: (db, s) =>
+      idsWhere(
+        db,
+        'SignatureRequest',
+        s.orgId,
+        jsonHasEmail('SignatureRequest', 'recipients', s.emails),
+      ),
   },
   SignatureEvent: {
-    async find(db, s) {
+    async linked(db, s) {
       if (!s.emails.length) return [];
       const rows = await db.$queryRaw<Array<{ id: string }>>`
         SELECT e.id::text AS id FROM ${T('SignatureEvent')} e
           JOIN ${T('SignatureRequest')} r ON r.id = e.${C('SignatureEvent', 'signatureRequestId')}
          WHERE r.${C('SignatureRequest', 'orgId')} = ${s.orgId}::uuid
-           AND lower(e.${C('SignatureEvent', 'recipientEmail')}) = ANY(${s.emails})`;
+           AND lower(e.${C('SignatureEvent', 'recipientEmail')}) = ANY(${s.emails}::text[])`;
       return rows.map((r) => r.id);
     },
   },
   AuditLog: {
-    async find(db, s) {
+    async linked(db, s) {
       const ids = [s.subjectId, ...subjectIds(s)];
       const rows = await db.$queryRaw<Array<{ id: string }>>`
         SELECT id::text AS id FROM ${T('AuditLog')}
-         WHERE ${C('AuditLog', 'orgId')} = ${s.orgId}::uuid AND ${C('AuditLog', 'targetId')} = ANY(${ids})`;
+         WHERE ${C('AuditLog', 'orgId')} = ${s.orgId}::uuid AND ${C('AuditLog', 'targetId')} = ANY(${ids}::text[])`;
       return rows.map((r) => r.id);
     },
     rows: (db, ids) =>
@@ -648,11 +689,27 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
   },
 };
 
+const STORE_FIELDS = new Map<SubjectStoreModel, readonly string[]>(
+  SUBJECT_STORES.map((x) => [x.model, x.fields]),
+);
+
+/** Replace the subject's identifiers with REDACTED in the store's personal fields of these rows. */
+async function redactRows(db: Db, model: SubjectStoreModel, s: DataSubject, ids: string[]) {
+  const re = subjectPattern(s);
+  const fields = STORE_FIELDS.get(model) ?? [];
+  if (!re || !fields.length || !ids.length) return;
+  const sets = fields.map((f) => Prisma.sql`${C(model, f)} = ${redactExpr(model, f, re)}`);
+  await db.$executeRaw`UPDATE ${T(model)} SET ${Prisma.join(sets, ', ')}
+    WHERE id = ANY(${ids}::uuid[]) AND ${mentions(model, fields, s)}`;
+}
+
 // ─── Subject resolution ──────────────────────────────────────────────────────
 
 function isTombstoneEmail(e: string): boolean {
   return e.endsWith('@erased.invalid');
 }
+
+const UNSAFE_TOKEN = /["\\\s]/;
 
 function identity(
   emails: Array<string | null | undefined>,
@@ -661,14 +718,22 @@ function identity(
 ) {
   const clean = (xs: Array<string | null | undefined>) =>
     xs.map((x) => (x ?? '').trim()).filter((x) => x.length > 0);
+  const phoneList = clean(phones).filter((p) => p.replace(/[^0-9]/g, '').length >= 7);
   return {
     emails: clean(emails)
       .map((e) => e.toLowerCase())
-      .filter((e) => !isTombstoneEmail(e)),
-    phones: clean(phones).filter((p) => p !== TOMBSTONE.phone),
+      .filter((e) => /^[^@]+@[^@]+\.[^@]+$/.test(e) && !UNSAFE_TOKEN.test(e) && !isTombstoneEmail(e)),
+    phones: phoneList.filter((p) => !/["\\]/.test(p)),
+    phoneDigits: phoneList.map((p) => p.replace(/[^0-9]/g, '')),
     names: clean(names)
-      .map((n) => n.toLowerCase())
-      .filter((n) => n.length >= 5 && n !== TOMBSTONE.name.toLowerCase()),
+      .map((n) => n.toLowerCase().replace(/\s+/g, ' '))
+      .filter(
+        (n) =>
+          n.length >= 5 &&
+          n.split(' ').length >= 2 &&
+          !/["\\]/.test(n) &&
+          n !== TOMBSTONE.name.toLowerCase(),
+      ),
   };
 }
 
@@ -752,6 +817,7 @@ export async function resolveDataSubject(
     nodeIds: uniq(nodeIds),
     emails: uniq(ids.emails),
     phones: uniq(ids.phones),
+    phoneDigits: uniq(ids.phoneDigits),
     names: uniq(ids.names),
   };
 }
@@ -781,23 +847,64 @@ async function inChunks<T>(ids: string[], read: (chunk: string[]) => Promise<T[]
   return out;
 }
 
-async function plan(db: Db, s: DataSubject): Promise<Map<SubjectStoreModel, string[]>> {
-  const out = new Map<SubjectStoreModel, string[]>();
+interface StorePlan {
+  linked: string[];
+  mentioned: string[];
+}
+
+async function plan(db: Db, s: DataSubject): Promise<Map<SubjectStoreModel, StorePlan>> {
+  const out = new Map<SubjectStoreModel, StorePlan>();
   for (const store of SUBJECT_STORES) {
-    out.set(store.model, uniq(await HANDLERS[store.model].find(db, s)));
+    const linked = uniq(await HANDLERS[store.model].linked(db, s));
+    const linkedSet = new Set(linked);
+    const mentioned =
+      store.fields.length && hasField(store.model, 'orgId')
+        ? (await idsWhere(db, store.model, s.orgId, mentions(store.model, store.fields, s))).filter(
+            (id) => !linkedSet.has(id),
+          )
+        : [];
+    out.set(store.model, { linked, mentioned });
   }
   return out;
 }
 
-/** Everything held about the subject, per store. Personal fields are decrypted by the client middleware. */
+/** Which personal fields of other people's records mention the subject. Content is withheld (Art. 15(4)). */
+async function mentionSummaries(
+  db: Db,
+  model: SubjectStoreModel,
+  s: DataSubject,
+  ids: string[],
+): Promise<Array<Record<string, unknown>>> {
+  const re = subjectPattern(s);
+  const fields = STORE_FIELDS.get(model) ?? [];
+  if (!re || !ids.length || !fields.length) return [];
+  const cols = fields.map(
+    (f) => Prisma.sql`CASE WHEN ${C(model, f)}::text ~* ${re} THEN ${f}::text END`,
+  );
+  const rows = await db.$queryRaw<Array<{ id: string; fields: string[] }>>`
+    SELECT id::text AS id, array_remove(ARRAY[${Prisma.join(cols, ', ')}], NULL) AS fields
+      FROM ${T(model)} WHERE id = ANY(${ids}::uuid[])`;
+  return rows.map((r) => ({ id: r.id, mentionedIn: r.fields }));
+}
+
+/**
+ * Everything held about the subject, per store. Records the subject is linked
+ * to are exported in full (personal fields decrypted by the client
+ * middleware); records that only mention them list the fields, not the
+ * content, because the rest is other people's data.
+ */
 export async function exportDataSubject(db: Db, s: DataSubject): Promise<DataSubjectBundle> {
   const planned = await plan(db, s);
   const stores: DataSubjectBundle['stores'] = {};
-  for (const [model, ids] of planned) {
-    if (!ids.length) continue;
+  for (const [model, { linked, mentioned }] of planned) {
+    if (!linked.length && !mentioned.length) continue;
     const h = HANDLERS[model];
-    const rows = h.rows ? await h.rows(db, ids) : await defaultRows(db, model, ids);
-    stores[model] = rows.map(stripSecrets);
+    const rows = linked.length
+      ? h.rows
+        ? await h.rows(db, linked)
+        : await defaultRows(db, model, linked)
+      : [];
+    stores[model] = [...rows.map(stripSecrets), ...(await mentionSummaries(db, model, s, mentioned))];
   }
   return {
     subject: { type: s.subjectType, id: s.subjectId },
@@ -894,27 +1001,35 @@ export async function eraseDataSubject(
       let auditRowsPseudonymised = 0;
 
       for (const store of SUBJECT_STORES) {
-        const ids = planned.get(store.model) ?? [];
-        if (!ids.length) continue;
+        const { linked, mentioned } = planned.get(store.model) ?? { linked: [], mentioned: [] };
+        if (!linked.length && !mentioned.length) continue;
         const basis = 'basis' in store ? store.basis : undefined;
         if (store.strategy === 'pseudonymise') {
-          auditRowsPseudonymised = ids.length;
+          auditRowsPseudonymised = linked.length;
           continue;
         }
         if (store.strategy === 'retain') {
-          retained[store.model] = { rows: ids.length, basis: basis ?? '' };
+          retained[store.model] = { rows: linked.length + mentioned.length, basis: basis ?? '' };
           continue;
         }
         let kept = 0;
-        if (!opts.dryRun) kept = (await HANDLERS[store.model].erase?.(tx, s, ids)) ?? 0;
-        stores[store.model] = { action: store.strategy, rows: ids.length - kept };
+        if (!opts.dryRun) {
+          if (linked.length) kept = (await HANDLERS[store.model].erase?.(tx, s, linked)) ?? 0;
+          // A row kept under a legal basis keeps its identifier (that is why it is kept).
+          if (!basis) await redactRows(tx, store.model, s, [...linked, ...mentioned]);
+        }
+        stores[store.model] = {
+          action: store.strategy,
+          rows: linked.length - kept,
+          mentions: mentioned.length,
+        };
         if (kept > 0) retained[store.model] = { rows: kept, basis: basis ?? '' };
       }
 
       const relatedScrubbed = Object.fromEntries(
         Object.entries(stores)
           .filter(([model]) => model !== PRIMARY_MODEL[s.subjectType])
-          .map(([model, v]) => [model, v.rows]),
+          .map(([model, v]) => [model, v.rows + v.mentions]),
       );
       await tx.auditLog.create({
         data: {
@@ -977,8 +1092,8 @@ function scanColumns(m: SchemaModel): string[] {
  * model and field names only.
  */
 export async function scanSubjectResidue(db: Db, s: DataSubject): Promise<ResidueHit[]> {
-  const p = likePatterns(s);
-  if (!p.length) return [];
+  const re = subjectPattern(s);
+  if (!re) return [];
   const hits: ResidueHit[] = [];
   for (const m of MODELS) {
     if (SCAN_SKIP_MODELS.has(m.name) || !hasField(m.name, 'orgId')) continue;
@@ -987,7 +1102,7 @@ export async function scanSubjectResidue(db: Db, s: DataSubject): Promise<Residu
     const parts = cols.map(
       (f) => Prisma.sql`SELECT ${f}::text AS field, count(*) AS n FROM ${T(m.name)}
                          WHERE ${C(m.name, 'orgId')} = ${s.orgId}::uuid
-                           AND lower(${C(m.name, f)}::text) LIKE ANY(${p})`,
+                           AND ${C(m.name, f)}::text ~* ${re}`,
     );
     const rows = await db.$queryRaw<Array<{ field: string; n: bigint }>>(
       Prisma.sql`${Prisma.join(parts, ' UNION ALL ')}`,
