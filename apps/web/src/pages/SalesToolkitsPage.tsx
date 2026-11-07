@@ -32,12 +32,6 @@ export default function SalesToolkitsPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">{t('salesToolkits.pageTitle', 'Sales Toolkits')}</h1>
-          <div className="page-sub">
-            {t(
-              'salesToolkits.pageSubtitle',
-              'Stored sales collateral plus live Mantu Academy courses — managed here, readable by the MCP.',
-            )}
-          </div>
         </div>
       </div>
 
@@ -48,9 +42,6 @@ export default function SalesToolkitsPage() {
           <h2 className="page-title" style={{ fontSize: '1.05rem' }}>
             {t('salesToolkits.coursesHeading', 'Mantu Academy courses')}
           </h2>
-          <div className="page-sub">
-            {t('salesToolkits.coursesSub', 'Industry playbooks pulled live from the LMS, filtered by sector.')}
-          </div>
         </div>
       </div>
 

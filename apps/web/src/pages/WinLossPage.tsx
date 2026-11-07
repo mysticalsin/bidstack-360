@@ -101,12 +101,6 @@ export default function WinLossPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">{t('winLoss.title', 'Win/Loss review')}</h1>
-          <div className="page-sub">
-            {t(
-              'winLoss.subtitle',
-              'Quarterly retrospective on closed bids — where we win, why we lose, and which deals to debrief.',
-            )}
-          </div>
         </div>
       </div>
 
@@ -207,7 +201,6 @@ export default function WinLossPage() {
 
           <ChartContainer
             title={t('winLoss.quarterChartTitle', 'Wins vs losses by quarter')}
-            subtitle={t('winLoss.quarterChartSubtitle', 'Bucketed by when the outcome was recorded')}
             empty={data.quarters.length === 0}
           >
             <div data-testid="win-loss-quarter-chart">
@@ -223,7 +216,6 @@ export default function WinLossPage() {
           <div className="grid gap-5 lg:grid-cols-2">
             <ChartContainer
               title={t('winLoss.reasonChartTitle', 'Loss reasons')}
-              subtitle={t('winLoss.reasonChartSubtitle', 'Pareto of recorded lost bids')}
               empty={lossReasons.length === 0}
               emptyMessage={t('winLoss.noLosses', 'No recorded losses in this range.')}
             >
@@ -236,7 +228,6 @@ export default function WinLossPage() {
             </ChartContainer>
             <ChartContainer
               title={t('winLoss.competitorChartTitle', 'Losses by competitor')}
-              subtitle={t('winLoss.competitorChartSubtitle', 'Who is taking the deals we lose')}
               empty={competitorLosses.length === 0}
               emptyMessage={t(
                 'winLoss.noCompetitors',

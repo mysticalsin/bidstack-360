@@ -598,14 +598,16 @@ names or copy into Polo.
 - No em dashes in new copy; no banned AI words (vault `Preferences/dont.md`).
 - **Never cut or reword the pinned consent and safety copy below.** Slice agents must add a test that
   pins these strings (keys in `public/locales/en/*.json` and the inline defaults) before cutting any
-  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept):
+  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept).
+  The three signature lines were realigned to `main` after #304: the page and the PDF say this is an
+  internal approval signature, not a legally binding e-signature.
 
 ```text
 # Signatures (PublicSignPage, signatures.json)
-Your signature is legally binding. This page contains no tracking technologies.
-I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.
+This is an internal approval signature, not a legally binding e-signature. This page contains no tracking technologies.
+I understand this is an internal approval signature, not a legally binding e-signature, and that it represents my intent to approve this document. I have had the opportunity to review its contents.
 {{senderName}} has been notified. A copy of the signed document will be sent to your email address.
-I agree that this electronic signature is legally equivalent to my handwritten signature.
+I understand this electronic signature is an internal approval signature, not a legally binding e-signature.
 
 # SMS (SmsComposerModal)
 This number has requested to stop receiving SMS. Sending is blocked (TCPA compliance).
@@ -688,3 +690,23 @@ One section on the account page, after "What to position": where the company is 
 - News and posts: one list, newest first, each item with a kind label (Product, Partnership, Acquisition, Leadership, Results, Layoffs, Expansion) and origin (company or press).
 - Sources strip at the foot of every tab: Job boards, Company posts, Filings, Registries. Each row shows status as text plus icon, last fetched time, the result (new, updated, failed) and a Refresh button (lucide `RefreshCw`) for users with `account-intel:write`. Not configured rows name the env var to set.
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: signals `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers.
+
+### 9.8 Slice 1 as built (2026-11-06)
+
+Appended by factory slice 1. Values only; no existing token changed.
+
+- Surfaces: `--surface-shell` and `--surface-inset` in both theme blocks, bridged as
+  `bg-surface-shell` and `bg-surface-inset`.
+- Status aliases: `--color-positive(-tint)` and `--color-negative(-tint)` in `@theme` point at
+  `--success(-tint)` and `--danger(-tint)`; `warning` already existed. They exist so vendored chart
+  fills keep one meaning across themes. New code still writes `success` and `danger`.
+- Motion: `--ease-ui-out`, `--ease-ui-in-out`, `--ease-drawer` in `@theme` (utilities `ease-ui-out`
+  and so on), mirrored in `apps/web/src/lib/motion-tokens.ts` with `enter` (210ms), `exit` (150ms),
+  `spring`, `instant` and `motionFor(reduced, transition)`. A contract test keeps CSS and TS equal.
+- Components: `components/vendor/tuffui/status-pill.tsx` (`StatusPill` with filled lucide glyphs,
+  `Tag`) and `surface.tsx` (`Shell`, `Panel`, `Inset`, `IconTile`, `ShellHeader`), plus `LICENSE`.
+- Lint ratchet: `no-foreign-token-vocabulary` now also bans bare `text-foreground`, `bg-foreground`,
+  `text-background`, `bg-background`, `fill-foreground`, `stroke-foreground`. The last live
+  leftovers (funnel-chart, sankey-node, chart-stat-flow) now use `fg-*` tokens.
+- Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
+  that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.

@@ -207,17 +207,12 @@ export function BidNoBidPage() {
           </span>
         }
         description={
-          <>
-            {t(
-              'bidNoBid.subtitle',
-              'Score each criterion to get an AI-powered go/no-go recommendation.',
-            )}
-            {ratedCount > 0 &&
-              ` ${t('bidNoBid.criteriaRated', '{{rated}}/{{total}} criteria rated.', {
+          ratedCount > 0
+            ? t('bidNoBid.criteriaRated', '{{rated}}/{{total}} criteria rated.', {
                 rated: ratedCount,
                 total: CRITERIA.length,
-              })}`}
-          </>
+              })
+            : undefined
         }
         actions={
           opportunityId && canWrite ? (

@@ -82,6 +82,15 @@ const FOREIGN_TOKENS = [
   'bg-accent',
   'text-accent-foreground',
   'bg-secondary',
+  // Bare foreground/background: three chart-kit grafts shipped these and
+  // rendered unstyled. Repo names: text-fg-primary, bg-surface-page,
+  // text-fg-inverted, fill-fg-primary.
+  'text-foreground',
+  'bg-foreground',
+  'text-background',
+  'bg-background',
+  'fill-foreground',
+  'stroke-foreground',
 ];
 
 // Token must sit at a class boundary: start-of-string / whitespace / a variant
