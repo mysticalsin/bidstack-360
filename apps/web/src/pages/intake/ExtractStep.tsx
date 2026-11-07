@@ -72,7 +72,7 @@ export function ExtractStep({
                         {name}
                       </div>
                       {error && (
-                        <div className="truncate text-[10px] text-[var(--danger)]">{error}</div>
+                        <div className="truncate text-xs text-[var(--danger)]">{error}</div>
                       )}
                     </div>
                   </div>
@@ -140,7 +140,7 @@ function StatusBadge({ status }: { status: string }) {
     statusLabels[status] ?? status.charAt(0).toUpperCase() + status.slice(1);
   return (
     <span
-      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${styles[status] ?? 'bg-gray-100 text-gray-700'}`}
+      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] ?? 'bg-gray-100 text-gray-700'}`}
     >
       {status === 'pending' || status === 'running' ? (
         <span className="inline-block h-2 w-2 motion-safe:animate-pulse rounded-full bg-current" />

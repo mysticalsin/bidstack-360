@@ -269,7 +269,7 @@ export function ToolkitStoreSection() {
                       href={t.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-[var(--brand-primary)] hover:underline"
+                      className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                     >
                       Open <Icon name="arrow-up-right" size={13} ariaHidden />
                     </a>
@@ -324,7 +324,7 @@ function FilterChip({
       aria-pressed={active}
       className={`min-h-9 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
         active
-          ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+          ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
           : 'border-[var(--border-default)] text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
       }`}
     >
