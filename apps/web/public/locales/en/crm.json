@@ -474,7 +474,7 @@
     "skipToMain": "Skip to main content",
     "brandSecureSignature": "Secure Signature",
     "mainAriaLabel": "Document signing",
-    "footerLegalNote": "Your signature is legally binding. This page contains no tracking technologies.",
+    "footerLegalNote": "This is an internal approval signature, not a legally binding e-signature. This page contains no tracking technologies.",
     "stepReview": "Review",
     "stepSign": "Sign",
     "stepSubmit": "Submit",
@@ -498,8 +498,8 @@
     "back": "Back",
     "continue": "Continue",
     "submitHeading": "Review and submit",
-    "submitLegalIntro": "By submitting, you legally sign",
-    "termsAgreement": "I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.",
+    "submitLegalIntro": "By submitting, you apply an internal approval signature to",
+    "termsAgreement": "I understand this is an internal approval signature, not a legally binding e-signature, and that it represents my intent to approve this document. I have had the opportunity to review its contents.",
     "submitting": "Submitting…",
     "submitSignatureButton": "Submit signature",
     "confirmHeading": "Signature submitted",
@@ -511,7 +511,8 @@
     "errorLinkExpiredDetail": "This signing link has expired. Please contact the sender to resend the request.",
     "errorLinkInvalidDetail": "This signing link is invalid or has expired. Please contact the sender to resend the request.",
     "errorLinkExpiredTitle": "Link expired",
-    "errorLinkInvalidTitle": "Invalid signing link"
+    "errorLinkInvalidTitle": "Invalid signing link",
+    "errorLinkClosedTitle": "Signing closed"
   },
   "worldMap": {
     "preset": {

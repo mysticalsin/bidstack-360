@@ -36,6 +36,7 @@ import { createLogger } from '../lib/logger.js';
 import {
   ALLOWED_MIME_TYPES,
   RFP_MAX_BYTES,
+  RFP_UPLOAD_BODY_LIMIT_BYTES,
   RFP_UPLOAD_RATE_LIMIT_MAX,
   UploadParams,
   AutofillParams,
@@ -67,9 +68,9 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       // config.permission is observability-only — enforce the gate with a real
       // preHandler so a read-only org member can't start AI/Dust spend.
       preHandler: server.requirePermission('documents:write'),
-      // WHY bodyLimit override: global cap is 10 MiB; RFP documents can be up
-      // to 50 MiB. Override here, not globally, to avoid widening attack surface.
-      bodyLimit: RFP_MAX_BYTES,
+      // The body is two ids; the document bytes go straight to storage and the
+      // 50 MiB cap is checked on the finalized FileAttachment below.
+      bodyLimit: RFP_UPLOAD_BODY_LIMIT_BYTES,
       schema: {
         params: UploadParams,
         body: z.object({
@@ -88,14 +89,6 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true },
       });
       if (!opportunity) throw server.httpErrors.notFound('Opportunity not found');
-
-      // Per-org upload rate limit.
-      const withinLimit = await checkRfpUploadRateLimit(orgId);
-      if (!withinLimit) {
-        throw server.httpErrors.tooManyRequests(
-          `RFP upload limit: ${RFP_UPLOAD_RATE_LIMIT_MAX} uploads per hour per organisation`,
-        );
-      }
 
       // Parse multipart. Fastify's content-type parser handles multipart when
       // @fastify/multipart is registered, but we use the pre-signed URL pattern
@@ -134,6 +127,15 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         // WHY payloadTooLarge: @fastify/sensible maps HTTP 413 to payloadTooLarge.
         throw server.httpErrors.payloadTooLarge(
           `RFP document exceeds the 50 MiB limit (${file.bytes} bytes)`,
+        );
+      }
+
+      // Per-org upload rate limit, counted only once the file is accepted so a
+      // rejected attempt never burns one of the hourly slots.
+      const withinLimit = await checkRfpUploadRateLimit(orgId);
+      if (!withinLimit) {
+        throw server.httpErrors.tooManyRequests(
+          `RFP upload limit: ${RFP_UPLOAD_RATE_LIMIT_MAX} uploads per hour per organisation`,
         );
       }
 
