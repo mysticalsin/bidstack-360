@@ -16,3 +16,4 @@ export * from './workflow-engine.js';
 export * from './llm-catalog/index.js';
 export * from './msa/index.js';
 export * from './list-page.js';
+export * from './comms/index.js';
