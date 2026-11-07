@@ -624,12 +624,12 @@ function SegmentLabel({
   const display = stage.displayValue ?? formatValue(stage.value);
 
   const valueEl = showValues && (
-    <span className="whitespace-nowrap font-semibold text-foreground text-sm">
+    <span className="whitespace-nowrap font-semibold text-fg-primary text-sm">
       {display}
     </span>
   );
   const pctEl = showPercentage && (
-    <span className="rounded-full bg-foreground px-3 py-1 font-bold text-background text-xs shadow-sm">
+    <span className="rounded-full bg-fg-primary px-3 py-1 font-bold text-fg-inverted text-xs shadow-sm">
       {formatPercentage(pct)}
     </span>
   );

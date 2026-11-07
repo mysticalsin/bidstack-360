@@ -117,12 +117,6 @@ export default function CrossSellPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">{t('crossSell.title', 'Cross-sell actions')}</h1>
-          <div className="page-sub">
-            {t(
-              'crossSell.subtitle',
-              'Cross-country and cross-team sales actions on shared accounts. Owned by pre-sales.',
-            )}
-          </div>
         </div>
       </div>
 
@@ -137,9 +131,6 @@ export default function CrossSellPage() {
           >
             {summary.activeCount}
           </p>
-          <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-            {t('crossSell.kpiActiveHint', 'Open or in progress')}
-          </p>
         </Card>
         <Card className="px-4 py-3">
           <p className="text-xs font-medium text-[var(--fg-tertiary)]">
@@ -151,9 +142,6 @@ export default function CrossSellPage() {
           >
             {summary.overdueCount}
           </p>
-          <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-            {t('crossSell.kpiOverdueHint', 'Needs owner attention')}
-          </p>
         </Card>
         <Card className="px-4 py-3">
           <p className="text-xs font-medium text-[var(--fg-tertiary)]">
@@ -164,9 +152,6 @@ export default function CrossSellPage() {
             data-testid="cross-sell-unassigned-count"
           >
             {summary.unassignedCount}
-          </p>
-          <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-            {t('crossSell.kpiUnassignedHint', 'No assignee yet')}
           </p>
         </Card>
         <Card className="px-4 py-3">
@@ -200,12 +185,6 @@ export default function CrossSellPage() {
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {t('crossSell.commandQueueTitle', 'Command queue')}
             </p>
-            <p className="mt-1 max-w-[52ch] text-xs text-[var(--fg-tertiary)]">
-              {t(
-                'crossSell.commandQueueBody',
-                'Prioritize owner gaps, open starts, and in-flight commitments before status review.',
-              )}
-            </p>
           </div>
           <div className="rounded-md border border-[var(--border)] px-3 py-2">
             <p className="text-xl font-semibold text-[var(--fg-primary)]">
@@ -213,9 +192,6 @@ export default function CrossSellPage() {
             </p>
             <p className="text-xs font-medium text-[var(--fg-secondary)]">
               {t('crossSell.queueNeedsOwner', 'Needs owner')}
-            </p>
-            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-              {t('crossSell.queueNeedsOwnerHint', 'Assign before route stalls')}
             </p>
           </div>
           <div className="rounded-md border border-[var(--border)] px-3 py-2">
@@ -225,9 +201,6 @@ export default function CrossSellPage() {
             <p className="text-xs font-medium text-[var(--fg-secondary)]">
               {t('crossSell.queueReadyToStart', 'Ready to start')}
             </p>
-            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-              {t('crossSell.queueReadyHint', 'Open actions waiting on a first move')}
-            </p>
           </div>
           <div className="rounded-md border border-[var(--border)] px-3 py-2">
             <p className="text-xl font-semibold text-[var(--fg-primary)]">
@@ -235,9 +208,6 @@ export default function CrossSellPage() {
             </p>
             <p className="text-xs font-medium text-[var(--fg-secondary)]">
               {t('crossSell.queueInMotion', 'In motion')}
-            </p>
-            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-              {t('crossSell.queueInMotionHint', 'Actions already underway')}
             </p>
           </div>
         </div>

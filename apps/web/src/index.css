@@ -64,6 +64,10 @@
   --surface-soft: #f8f8f8;
   --surface-hover: #f2f2f2;
   --surface-raised: #ffffff;
+  /* Dense panels (DESIGN.md 9.1): a shell holds insets; layers separate by
+     background step, not by border or shadow. */
+  --surface-shell: #f0f0f0;
+  --surface-inset: #ffffff;
 
   /* Foreground */
   --fg-primary: #171717; /* 16.9:1 on white ✅ */
@@ -242,6 +246,8 @@
   --surface-soft: #121214;
   --surface-hover: #18181b;
   --surface-raised: #1c1c1e;
+  --surface-shell: #121214;
+  --surface-inset: #0c0c0e;
 
   /* Foreground — crisp cool whites */
   --fg-primary: #f8fafc;
@@ -387,6 +393,8 @@
   --color-surface-soft: var(--surface-soft);
   --color-surface-hover: var(--surface-hover);
   --color-surface-raised: var(--surface-raised);
+  --color-surface-shell: var(--surface-shell);
+  --color-surface-inset: var(--surface-inset);
 
   --color-fg-primary: var(--fg-primary);
   --color-fg-secondary: var(--fg-secondary);
@@ -407,6 +415,11 @@
   --color-warning-tint: var(--warning-tint);
   --color-danger: var(--danger);
   --color-danger-tint: var(--danger-tint);
+  /* Status aliases for vendored components: values only, no new colours. */
+  --color-positive: var(--success);
+  --color-positive-tint: var(--success-tint);
+  --color-negative: var(--danger);
+  --color-negative-tint: var(--danger-tint);
   --color-info: var(--info);
   --color-info-tint: var(--info-tint);
 
@@ -458,6 +471,11 @@
   --radius-md: 5px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+
+  /* UI easing (DESIGN.md 9.2), mirrored in src/lib/motion-tokens.ts. */
+  --ease-ui-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-ui-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
