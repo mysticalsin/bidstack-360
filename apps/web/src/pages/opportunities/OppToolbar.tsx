@@ -95,7 +95,7 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
           key={kpi.label}
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
         >
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
             {kpi.label}
           </div>
           {/* One line each, so the card height never depends on which values

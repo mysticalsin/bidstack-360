@@ -157,7 +157,7 @@ export const Row = memo(function Row({
         {opp.bidClass ? (
           <Badge
             tone={ROW_BID_CLASS_TONE[opp.bidClass] ?? 'gray'}
-            className="ml-2 align-middle text-[10px]"
+            className="ml-2 align-middle text-xs"
           >
             {opp.bidClass}
           </Badge>

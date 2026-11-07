@@ -284,7 +284,7 @@ export function ForecastList({
                     const val = rowVal(row, cat);
                     return (
                       <div key={cat} className="flex flex-col gap-1">
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
+                        <span className="text-xs font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
                           {CATEGORY_LABELS[cat]}
                         </span>
                         {isEditingCell(row, cat) ? (

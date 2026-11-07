@@ -202,7 +202,7 @@ export default function SectorViewPage() {
           <Card className="overflow-hidden p-0">
             <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
                   {t('sectorView.geoEyebrow', 'Global opportunity map')}
                 </p>
                 <h2 className="text-base font-semibold text-[var(--fg-primary)]">
