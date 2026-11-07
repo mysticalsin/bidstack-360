@@ -43,6 +43,8 @@ const RunBody = z.object({
 
 const RunParams = z.object({ runId: Uuid });
 const ActionParams = z.object({ actionId: Uuid });
+// Confirm and cancel act on the staged args only; a client cannot amend them.
+const ActionBody = z.object({}).strict().nullish();
 
 function owner(req: FastifyRequest) {
   return { orgId: req.auth.orgId, userId: req.auth.userId };
@@ -137,7 +139,7 @@ export const jarvisRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: [requireHuman, requireReader],
-      schema: { params: ActionParams },
+      schema: { params: ActionParams, body: ActionBody },
     },
     async (req) => {
       const who = owner(req);
@@ -176,7 +178,7 @@ export const jarvisRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: [requireHuman, requireReader],
-      schema: { params: ActionParams },
+      schema: { params: ActionParams, body: ActionBody },
     },
     async (req) => {
       const action = await consumeAction(req.params.actionId, owner(req));
