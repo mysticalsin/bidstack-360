@@ -209,7 +209,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   const isLowEnv = config.NODE_ENV === 'development' || config.NODE_ENV === 'test';
 
   await server.register(rateLimit, {
-    max: isLowEnv ? 10_000 : config.API_RATE_LIMIT_MAX,
+    // Low envs keep a 10k floor; a larger API_RATE_LIMIT_MAX lifts it for load runs.
+    max: isLowEnv ? Math.max(10_000, config.API_RATE_LIMIT_MAX) : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     redis: rateLimitRedis,
     // Fail OPEN when the store errors (e.g. the Redis provider's request quota
