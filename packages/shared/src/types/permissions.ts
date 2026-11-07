@@ -2,6 +2,9 @@
 // PERMISSION_SEEDS list in packages/db/src/seed.ts — keep both in sync.
 
 export const PERMISSION_KEYS = [
+  'access-policies:approve',
+  'access-policies:read',
+  'access-policies:write',
   'account-intel:read',
   'account-intel:write',
   'accounts:read',

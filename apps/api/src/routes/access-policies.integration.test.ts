@@ -47,22 +47,22 @@ async function auditCount(action: string): Promise<number> {
 }
 
 async function createDraft(name: string, rules: unknown): Promise<string> {
-  const res = await server.inject({ method: 'POST', url: '/access-policies', payload: { name, rules } });
+  const res = await server.inject({ method: 'POST', url: '/api/v1/access-policies', payload: { name, rules } });
   expect(res.statusCode, res.body).toBe(201);
   return res.json().id as string;
 }
 
 async function publishRules(name: string, rules: unknown): Promise<{ id: string; version: number }> {
   const id = await createDraft(name, rules);
-  expect((await server.inject({ method: 'POST', url: `/access-policies/${id}/submit` })).statusCode).toBe(200);
+  expect((await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit` })).statusCode).toBe(200);
   const approved = await server.inject({
     method: 'POST',
-    url: `/access-policies/${id}/approve`,
+    url: `/api/v1/access-policies/${id}/approve`,
     headers: SECOND_ADMIN,
     payload: { note: 'ok' },
   });
   expect(approved.statusCode, approved.body).toBe(200);
-  const published = await server.inject({ method: 'POST', url: `/access-policies/${id}/publish` });
+  const published = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/publish` });
   expect(published.statusCode, published.body).toBe(200);
   return { id, version: published.json().version as number };
 }
@@ -137,12 +137,12 @@ afterAll(async () => {
 
 describe('access policy permissions', () => {
   it('lets a read-only user list policies but not draft one', async () => {
-    const list = await server.inject({ method: 'GET', url: '/access-policies', headers: READ_ONLY });
+    const list = await server.inject({ method: 'GET', url: '/api/v1/access-policies', headers: READ_ONLY });
     expect(list.statusCode, list.body).toBe(200);
     expect(list.json()).toMatchObject({ enforcement: false, published: null });
     const create = await server.inject({
       method: 'POST',
-      url: '/access-policies',
+      url: '/api/v1/access-policies',
       headers: READ_ONLY,
       payload: { name: 'x', rules: [] },
     });
@@ -150,9 +150,9 @@ describe('access policy permissions', () => {
   });
 
   it('refuses drafting and simulation to a Sales Manager', async () => {
-    const create = await server.inject({ method: 'POST', url: '/access-policies', headers: MANAGER, payload: { name: 'x', rules: [] } });
+    const create = await server.inject({ method: 'POST', url: '/api/v1/access-policies', headers: MANAGER, payload: { name: 'x', rules: [] } });
     expect(create.statusCode).toBe(403);
-    const sim = await server.inject({ method: 'POST', url: '/access-policies/simulate', headers: MANAGER, payload: { rules: [] } });
+    const sim = await server.inject({ method: 'POST', url: '/api/v1/access-policies/simulate', headers: MANAGER, payload: { rules: [] } });
     expect(sim.statusCode).toBe(403);
   });
 });
@@ -167,14 +167,14 @@ describe('drafts and simulation', () => {
 
     const bad = await server.inject({
       method: 'POST',
-      url: '/access-policies',
+      url: '/api/v1/access-policies',
       payload: { name: 'bad', rules: [{ ...DENY_DE_WRITES[0], then: { actions: ['leads:read'], resources: ['companies'] } }] },
     });
     expect(bad.statusCode).toBe(400);
   });
 
   it('simulates a draft against the last 7 days of audit events only', async () => {
-    const res = await server.inject({ method: 'POST', url: '/access-policies/simulate', payload: { rules: DENY_DE_WRITES } });
+    const res = await server.inject({ method: 'POST', url: '/api/v1/access-policies/simulate', payload: { rules: DENY_DE_WRITES } });
     expect(res.statusCode, res.body).toBe(200);
     const body = res.json();
     expect(body.evaluated).toBe(5);
@@ -189,7 +189,7 @@ describe('drafts and simulation', () => {
   });
 
   it('an empty draft against no published policy changes nothing', async () => {
-    const res = await server.inject({ method: 'POST', url: '/access-policies/simulate', payload: { rules: [] } });
+    const res = await server.inject({ method: 'POST', url: '/api/v1/access-policies/simulate', payload: { rules: [] } });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ gained: { count: 0 }, lost: { count: 0 } });
   });
@@ -200,24 +200,24 @@ describe('approval queue, publish and rollback', () => {
 
   it('moves a draft to pending and never lets the author approve it', async () => {
     firstId = await createDraft('First', DENY_DE_WRITES);
-    const submitted = await server.inject({ method: 'POST', url: `/access-policies/${firstId}/submit` });
+    const submitted = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/submit` });
     expect(submitted.statusCode, submitted.body).toBe(200);
     expect(submitted.json().status).toBe('pending');
     expect(await auditCount('access_policy.submit')).toBeGreaterThanOrEqual(1);
 
-    const self = await server.inject({ method: 'POST', url: `/access-policies/${firstId}/approve`, payload: {} });
+    const self = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/approve`, payload: {} });
     expect(self.statusCode).toBe(403);
     expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: firstId } })).status).toBe('pending');
   });
 
   it('refuses to publish before approval, then a second admin approves', async () => {
-    const early = await server.inject({ method: 'POST', url: `/access-policies/${firstId}/publish` });
+    const early = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/publish` });
     expect(early.statusCode).toBe(409);
 
     const before = await auditCount('access_policy.approve');
     const approved = await server.inject({
       method: 'POST',
-      url: `/access-policies/${firstId}/approve`,
+      url: `/api/v1/access-policies/${firstId}/approve`,
       headers: SECOND_ADMIN,
       payload: { note: 'Checked the impact preview' },
     });
@@ -229,7 +229,7 @@ describe('approval queue, publish and rollback', () => {
   });
 
   it('publishes v1, then v2 supersedes it, and rollback republishes v1 rules as v3', async () => {
-    const pub = await server.inject({ method: 'POST', url: `/access-policies/${firstId}/publish` });
+    const pub = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/publish` });
     expect(pub.statusCode, pub.body).toBe(200);
     expect(pub.json()).toMatchObject({ status: 'published', version: 1 });
 
@@ -237,23 +237,23 @@ describe('approval queue, publish and rollback', () => {
     expect(second.version).toBe(2);
     expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: firstId } })).status).toBe('superseded');
 
-    const edit = await server.inject({ method: 'PATCH', url: `/access-policies/${second.id}`, payload: { name: 'Edited' } });
+    const edit = await server.inject({ method: 'PATCH', url: `/api/v1/access-policies/${second.id}`, payload: { name: 'Edited' } });
     expect(edit.statusCode).toBe(409);
 
-    const rollback = await server.inject({ method: 'POST', url: `/access-policies/${firstId}/rollback` });
+    const rollback = await server.inject({ method: 'POST', url: `/api/v1/access-policies/${firstId}/rollback` });
     expect(rollback.statusCode, rollback.body).toBe(200);
     const v3 = rollback.json();
     expect(v3).toMatchObject({ status: 'published', version: 3, rollbackOfId: firstId });
     expect(v3.rules).toEqual((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: firstId } })).rules);
     expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: second.id } })).status).toBe('superseded');
 
-    const list = await server.inject({ method: 'GET', url: '/access-policies' });
+    const list = await server.inject({ method: 'GET', url: '/api/v1/access-policies' });
     expect(list.json().published).toMatchObject({ version: 3 });
     expect(await prisma.accessPolicyVersion.count({ where: { orgId, status: 'published' } })).toBe(1);
   });
 
   it('reports gains when a draft relaxes the published policy', async () => {
-    const res = await server.inject({ method: 'POST', url: '/access-policies/simulate', payload: { rules: [] } });
+    const res = await server.inject({ method: 'POST', url: '/api/v1/access-policies/simulate', payload: { rules: [] } });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ gained: { count: 2 }, lost: { count: 0 }, baselineVersion: 3 });
   });
@@ -270,17 +270,17 @@ describe('approval queue, publish and rollback', () => {
 
   it('records a rejection with its note and returns the draft for edits', async () => {
     const id = await createDraft('To reject', DENY_DE_WRITES);
-    await server.inject({ method: 'POST', url: `/access-policies/${id}/submit` });
+    await server.inject({ method: 'POST', url: `/api/v1/access-policies/${id}/submit` });
     const rejected = await server.inject({
       method: 'POST',
-      url: `/access-policies/${id}/reject`,
+      url: `/api/v1/access-policies/${id}/reject`,
       headers: SECOND_ADMIN,
       payload: { note: 'Too broad' },
     });
     expect(rejected.statusCode, rejected.body).toBe(200);
     expect(rejected.json()).toMatchObject({ status: 'rejected', decisionNote: 'Too broad' });
     expect(await auditCount('access_policy.reject')).toBe(1);
-    const edit = await server.inject({ method: 'PATCH', url: `/access-policies/${id}`, payload: { name: 'Narrower' } });
+    const edit = await server.inject({ method: 'PATCH', url: `/api/v1/access-policies/${id}`, payload: { name: 'Narrower' } });
     expect(edit.statusCode).toBe(200);
     expect(edit.json().status).toBe('draft');
   });
@@ -288,18 +288,18 @@ describe('approval queue, publish and rollback', () => {
 
 describe('tenant isolation', () => {
   it('never exposes or changes another org policy', async () => {
-    const list = await server.inject({ method: 'GET', url: '/access-policies' });
+    const list = await server.inject({ method: 'GET', url: '/api/v1/access-policies' });
     expect(list.json().items.map((p: { id: string }) => p.id)).not.toContain(foreignPolicyId);
     for (const action of ['approve', 'reject', 'publish', 'rollback', 'submit']) {
       const res = await server.inject({
         method: 'POST',
-        url: `/access-policies/${foreignPolicyId}/${action}`,
+        url: `/api/v1/access-policies/${foreignPolicyId}/${action}`,
         headers: SECOND_ADMIN,
-        payload: { note: 'x' },
+        ...(action === 'approve' || action === 'reject' ? { payload: { note: 'x' } } : {}),
       });
       expect(res.statusCode, action).toBe(404);
     }
-    const patch = await server.inject({ method: 'PATCH', url: `/access-policies/${foreignPolicyId}`, payload: { name: 'x' } });
+    const patch = await server.inject({ method: 'PATCH', url: `/api/v1/access-policies/${foreignPolicyId}`, payload: { name: 'x' } });
     expect(patch.statusCode).toBe(404);
     expect((await prisma.accessPolicyVersion.findUniqueOrThrow({ where: { id: foreignPolicyId } })).status).toBe('pending');
   });
@@ -316,10 +316,12 @@ describe('enforcement behind ACCESS_POLICIES_ENFORCE', () => {
         when: { roles: ['Sales Manager'] },
         then: { actions: ['opportunities:write'], resources: ['opportunities'] },
       },
+      // Once an allow rule covers an action, anyone it does not match is
+      // default-denied, so Admin is listed to keep its own access.
       {
         id: 'try-to-widen',
         effect: 'allow',
-        when: { roles: ['Read-Only'] },
+        when: { roles: ['Read-Only', 'Admin'] },
         then: { actions: ['opportunities:write'], resources: ['opportunities'] },
       },
     ]);
@@ -330,24 +332,24 @@ describe('enforcement behind ACCESS_POLICIES_ENFORCE', () => {
   });
 
   it('is off by default: the published deny rule does not block', async () => {
-    const res = await server.inject({ method: 'DELETE', url: `/opportunities/${missing}`, headers: MANAGER });
+    const res = await server.inject({ method: 'DELETE', url: `/api/v1/opportunities/${missing}`, headers: MANAGER });
     expect(res.statusCode).toBe(404);
   });
 
   it('narrows the matrix when the flag is on', async () => {
     process.env.ACCESS_POLICIES_ENFORCE = 'true';
-    const res = await server.inject({ method: 'DELETE', url: `/opportunities/${missing}`, headers: MANAGER });
+    const res = await server.inject({ method: 'DELETE', url: `/api/v1/opportunities/${missing}`, headers: MANAGER });
     expect(res.statusCode).toBe(403);
     expect(res.json().message).toMatch(/access policy/i);
-    const admin = await server.inject({ method: 'DELETE', url: `/opportunities/${missing}` });
+    const admin = await server.inject({ method: 'DELETE', url: `/api/v1/opportunities/${missing}` });
     expect(admin.statusCode).toBe(404);
-    const list = await server.inject({ method: 'GET', url: '/access-policies' });
+    const list = await server.inject({ method: 'GET', url: '/api/v1/access-policies' });
     expect(list.json().enforcement).toBe(true);
   });
 
   it('never widens: an allow rule cannot grant what the matrix denies', async () => {
     process.env.ACCESS_POLICIES_ENFORCE = 'true';
-    const res = await server.inject({ method: 'DELETE', url: `/opportunities/${missing}`, headers: READ_ONLY });
+    const res = await server.inject({ method: 'DELETE', url: `/api/v1/opportunities/${missing}`, headers: READ_ONLY });
     expect(res.statusCode).toBe(403);
     expect(res.json().message).toMatch(/Requires permission: opportunities:write/);
   });

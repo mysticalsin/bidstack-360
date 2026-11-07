@@ -710,3 +710,16 @@ Appended by factory slice 1. Values only; no existing token changed.
   leftovers (funnel-chart, sankey-node, chart-stat-flow) now use `fg-*` tokens.
 - Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
   that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
+
+### 9.9 Slice 5 as built (2026-11-07)
+
+Appended by factory slice 5 (Settings > Access policies).
+
+- Builder: one card per rule with When, Then, Conditions and Except fieldsets, a plain sentence that
+  reads the rule back, and Move up / Move down / Remove buttons (keyboard reorder). MatchField was not
+  vendored: upstream it is a fit chart, not a form, so the rule rows use native checkboxes and inputs.
+- Impact preview: vendored `DivergingBars` (gains above the line in `--success`, losses below in
+  `--danger`) with a "View as table" toggle; people and example events per side, one sentence when
+  nothing changes.
+- Approvals and versions: `StatusPill` for Pending, Approved and Live; the author sees a sentence
+  instead of Approve; "Publish vN" and "Roll back to vN" announce through `aria-live="polite"`.

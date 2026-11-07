@@ -34,6 +34,7 @@ export * from './email-template.js';
 export * from './lead-rot.js';
 export * from './webhooks.js';
 export * from './webhook-delivery-policy.js';
+export * from './access-policy.js';
 export * from './analytics.js';
 export * from './feature-flags.js';
 export * from './serum.js';
