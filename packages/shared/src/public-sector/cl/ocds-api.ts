@@ -15,13 +15,14 @@
 
 import { z } from 'zod';
 
-import { CHILE_LICENCES } from '../attribution.js';
+import { CHILE_LICENCES, CHILECOMPRA_ATTRIBUTION } from '../attribution.js';
 import { computeConfidenceBps, SOURCE_TIER } from '../confidence.js';
 import { PsSourceError } from '../errors.js';
 import { assertAllowedSourceUrl, CHILE_SOURCE_HOSTS } from '../fetch-guard.js';
 import { CHILE_TIME_ZONE } from '../quota.js';
 import { createReviewFlag } from '../review-flags.js';
 import { parseRut } from '../rut.js';
+import { zonedParts } from '../time.js';
 import type {
   PsAdapter,
   PsFetchUnit,
@@ -52,6 +53,9 @@ import {
 } from './common.js';
 
 const SOURCE_KEY = 'cl.mp.ocds';
+
+/** Stream key for records built from OCDS award releases (see `normalize`). */
+export const OCDS_AWARD_SOURCE_KEY = 'cl.mp.ocds.award';
 const OCDS_BASE = 'https://api.mercadopublico.cl/APISOCDS/OCDS';
 const OCID_PREFIX = 'ocds-70d2nz-';
 const DEFAULT_LIMIT = 100;
@@ -276,7 +280,7 @@ function normalizeRelease(
           normalizedName: normalizeEntityName(name),
           sourceSupplierCode: mpCode(party),
           confidenceBps: computeConfidenceBps({ tier: SOURCE_TIER.officialOcds, required: [name] }),
-          raw: who.isNaturalPerson ? { id: party.id, name: party.name } : party,
+          raw: who.isNaturalPerson ? { id: party.id, naturalPerson: true } : party,
         }),
       );
     }
@@ -330,15 +334,17 @@ function normalizeRelease(
     }),
   );
   if (isDirectAward) {
-    col.flag(createReviewFlag('direct_award', { kind: 'opportunity', externalId: code, sourceKey: SOURCE_KEY }));
+    col.flag(createReviewFlag('direct_award', { kind: 'opportunity', externalId: code, sourceKey: prov.sourceKey }));
   }
 
   for (const award of awards) {
     if (award.status !== 'active') continue;
-    for (const s of award.suppliers ?? []) {
+    const awardSuppliers = award.suppliers ?? [];
+    // One award value shared by several suppliers cannot be split honestly.
+    const amount = awardSuppliers.length === 1 ? amountMicros(award.value?.amount) : null;
+    for (const s of awardSuppliers) {
       const supplierExternalId = supplierIds.get(s.id);
       if (!supplierExternalId) continue;
-      const amount = amountMicros(award.value?.amount);
       col.add(
         'offers',
         finalizeRecord<PsOffer>({
@@ -368,20 +374,25 @@ function normalizeRelease(
   }
 }
 
+/** Hard stop for one month's listing (about 1M records at the default page size). */
+export const OCDS_MAX_PAGES = 10_000;
+
 /** The OCDS API adapter. */
 export const ocdsAdapter: PsAdapter<OcdsCursor> = {
   country: 'CL',
   sourceKey: SOURCE_KEY,
   credentialName: null,
   licence: CHILE_LICENCES.ocds,
-  attribution: 'Dirección ChileCompra',
+  attribution: CHILECOMPRA_ATTRIBUTION,
   budget: { timeZone: CHILE_TIME_ZONE },
 
   plan(window, cursor) {
     if (cursor) return [{ sourceKey: SOURCE_KEY, kind: 'ocds.list', url: ocdsListUrl(cursor) }];
     const units: PsFetchUnit[] = [];
-    const end = window.to.getUTCFullYear() * 12 + window.to.getUTCMonth();
-    for (let m = window.from.getUTCFullYear() * 12 + window.from.getUTCMonth(); m <= end; m += 1) {
+    const from = zonedParts(window.from, CHILE_TIME_ZONE);
+    const to = zonedParts(window.to, CHILE_TIME_ZONE);
+    const end = to.year * 12 + (to.month - 1);
+    for (let m = from.year * 12 + (from.month - 1); m <= end; m += 1) {
       const c: OcdsCursor = { year: Math.floor(m / 12), month: (m % 12) + 1, offset: 0, limit: DEFAULT_LIMIT };
       units.push({ sourceKey: SOURCE_KEY, kind: 'ocds.list', url: ocdsListUrl(c) });
     }
@@ -394,22 +405,30 @@ export const ocdsAdapter: PsAdapter<OcdsCursor> = {
   },
 
   normalize(raw, ctx): PsNormalized {
-    const col = new NormalizedCollector();
+    const col = new NormalizedCollector(ctx.hashTaxId);
     if (raw.unit.kind === 'ocds.list') return col.out;
     const pkg = parseJson(Package, raw.body);
     const licence = pkg.license?.includes('publicdomain/zero') ? CHILE_LICENCES.ocds : (str(pkg.license) ?? 'unstated');
-    const prov = provenanceFromRaw(raw, licence);
-    for (const release of pkg.releases) normalizeRelease(release, prov, ctx, col);
+    const base = provenanceFromRaw(raw, licence);
+    // Tender and award endpoints describe the same process from different
+    // releases. Until compiled-release merging lands, each endpoint is its own
+    // stream so the two projections never share one idempotency key.
+    const prov = raw.unit.kind === 'ocds.award' ? { ...base, sourceKey: OCDS_AWARD_SOURCE_KEY } : base;
+    const releases = [...pkg.releases].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+    for (const release of releases) normalizeRelease(release, prov, ctx, col);
     return col.out;
   },
 
   nextCursor(raw) {
     const base = cursorFromUrl(raw.unit.url);
     if (!base) return null;
-    const { pagination } = parseJson(ListPage, raw.body);
-    const offset = pagination.offset + pagination.limit;
-    if (pagination.limit <= 0 || offset >= pagination.total) return null;
-    const next: OcdsCursor = { year: base.year, month: base.month, offset, limit: pagination.limit };
+    const { pagination, data } = parseJson(ListPage, raw.body);
+    // Advance from our own cursor, not the echoed offset, so a server that
+    // repeats `offset: 0` cannot pin the loop. An empty or short page ends it.
+    const offset = base.offset + base.limit;
+    if (base.limit <= 0 || data.length === 0 || data.length < base.limit || offset >= pagination.total) return null;
+    if (offset / base.limit > OCDS_MAX_PAGES) return null;
+    const next: OcdsCursor = { year: base.year, month: base.month, offset, limit: base.limit };
     if (base.variant) next.variant = base.variant;
     return next;
   },

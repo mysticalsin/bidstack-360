@@ -10,18 +10,22 @@
  * `lic-da` has one row per line item per offer received. `oc-da` has one row
  * per purchase order line. POs on the erroneous list are kept and flagged
  * `excludedFromOfficial`, never dropped. These loaders take the CSV member's
- * bytes as a stream; unzipping and storage are the worker's job.
+ * bytes as a stream and parse incrementally, but they hold one month of
+ * normalized records in memory; batching, unzipping and storage are the
+ * worker's job.
  */
 
 import { createHash } from 'node:crypto';
 
 import { CHILE_LICENCES, CHILECOMPRA_ATTRIBUTION } from '../attribution.js';
 import { computeConfidenceBps, SOURCE_TIER } from '../confidence.js';
-import { decodeLatin1, iterateCsvRecords, parseCsvText } from '../csv.js';
+import { decodeLatin1, iterateCsvRecords, normalizeCsvHeader, parseCsvText } from '../csv.js';
+import { PsSourceError } from '../errors.js';
 import { sha256Hex } from '../hash.js';
 import { assertBulkWindow } from '../quota.js';
 import { createReviewFlag } from '../review-flags.js';
 import type {
+  PsFetchContext,
   PsFetchUnit,
   PsNormalizeContext,
   PsNormalized,
@@ -29,12 +33,14 @@ import type {
   PsOpportunity,
   PsPublicEntity,
   PsPurchaseOrder,
+  PsRawPage,
   PsSupplier,
 } from '../types.js';
 import {
   amountMicros,
   buyerUnitUrl,
   chileDate,
+  fetchChileRawPage,
   finalizeRecord,
   int,
   normalizeEntityName,
@@ -70,6 +76,24 @@ export function planBulkMonth(opts: { year: number; month: number; now?: Date })
   ];
 }
 
+/**
+ * Download one bulk unit (the erroneous PO list, or a monthly archive for the
+ * worker to unzip). Refuses outside the quiet window, so a caller cannot load
+ * ChileCompra's blob store during office hours. The parsers below work on
+ * bytes already fetched and do not touch the network.
+ */
+export async function fetchBulkUnit(unit: PsFetchUnit, ctx: PsFetchContext): Promise<PsRawPage> {
+  assertBulkWindow(ctx.now?.() ?? new Date());
+  return fetchChileRawPage(unit, ctx);
+}
+
+/** Columns the loaders cannot work without. A missing one means the export format drifted. */
+export const BULK_REQUIRED_COLUMNS = {
+  lic: ['CodigoExterno', 'Nombre', 'CodigoEstado', 'Estado', 'CodigoUnidad', 'Codigoitem', 'RutProveedor'],
+  oc: ['Codigo', 'Nombre', 'codigoEstado', 'Estado', 'CodigoUnidadCompra', 'RutSucursal', 'MontoTotalOC'],
+  erroneous: ['idoc', 'numoc'],
+} as const;
+
 /** One entry of the erroneous purchase order list. */
 export interface ErroneousPo {
   idoc: string;
@@ -79,7 +103,11 @@ export interface ErroneousPo {
 /** Parse `hist_OC_erroneas.csv` into a map keyed by PO code (`numoc`). */
 export function parseErroneousPoList(bytes: Uint8Array): Map<string, ErroneousPo> {
   const rows = parseCsvText(decodeLatin1(bytes), ';');
-  const header = rows[0] ?? [];
+  const header = normalizeCsvHeader(rows[0] ?? []);
+  const missing = BULK_REQUIRED_COLUMNS.erroneous.filter((c) => !header.includes(c));
+  if (missing.length > 0) {
+    throw new PsSourceError('schema', `Erroneous PO list is missing columns: ${missing.join(', ')}`, { doNotRetry: true });
+  }
   const iId = header.indexOf('idoc');
   const iNum = header.indexOf('numoc');
   const iLic = header.indexOf('NroLicitacion');
@@ -170,7 +198,7 @@ function supplierFromRow(
     normalizedName: normalizeEntityName(display),
     sourceSupplierCode: code,
     confidenceBps: computeConfidenceBps({ tier: SOURCE_TIER.officialBulk, required: [display] }),
-    raw: who.isNaturalPerson ? { name: display, code } : { rut, name, code },
+    raw: who.isNaturalPerson ? { naturalPerson: true, code } : { rut, name, code },
   });
 }
 
@@ -196,11 +224,11 @@ function provenance(sourceKey: string, ctx: BulkLoadContext): ChileProvenance {
 export async function loadLicitacionesCsv(chunks: Chunks, ctx: BulkLoadContext): Promise<PsNormalized> {
   const sourceKey = 'cl.da.lic';
   const prov = provenance(sourceKey, ctx);
-  const col = new NormalizedCollector();
+  const col = new NormalizedCollector(ctx.hashTaxId);
   const hash = createHash('sha256');
   const tenders = new Map<string, { first: Row; unspsc: Set<string> }>();
 
-  for await (const row of iterateCsvRecords(hashing(chunks, hash))) {
+  for await (const row of iterateCsvRecords(hashing(chunks, hash), { requiredColumns: BULK_REQUIRED_COLUMNS.lic })) {
     const code = str(row.CodigoExterno);
     if (!code) continue;
     const t = tenders.get(code) ?? { first: row, unspsc: new Set<string>() };
@@ -221,7 +249,14 @@ export async function loadLicitacionesCsv(chunks: Chunks, ctx: BulkLoadContext):
         kind: 'offer',
         country: 'CL',
         ...prov,
-        externalId: `${code}:${lineId ?? 'na'}:${supplier.externalId}:${sha256Hex(str(row['Nombre de la Oferta']) ?? '').slice(0, 12)}`,
+        externalId: [
+          code,
+          str(row.Correlativo) ?? 'na',
+          lineId ?? 'na',
+          supplier.externalId,
+          str(row.CodigoSucursalProveedor) ?? 'na',
+          sha256Hex(str(row['Nombre de la Oferta']) ?? '').slice(0, 12),
+        ].join(':'),
         sourceUrl: ficha,
         publishedAt: null,
         sourceUpdatedAt: null,
@@ -311,11 +346,11 @@ export async function loadOrdenesCompraCsv(
 ): Promise<PsNormalized> {
   const sourceKey = 'cl.da.oc';
   const prov = provenance(sourceKey, ctx);
-  const col = new NormalizedCollector();
+  const col = new NormalizedCollector(ctx.hashTaxId);
   const hash = createHash('sha256');
   const orders = new Map<string, Row[]>();
 
-  for await (const row of iterateCsvRecords(hashing(chunks, hash))) {
+  for await (const row of iterateCsvRecords(hashing(chunks, hash), { requiredColumns: BULK_REQUIRED_COLUMNS.oc })) {
     const code = str(row.Codigo);
     if (!code) continue;
     const lines = orders.get(code);
@@ -336,7 +371,7 @@ export async function loadOrdenesCompraCsv(
         organismName: str(row.OrganismoPublico),
         sector: str(row.sector),
         region: str(row.RegionUnidadCompra),
-        comuna: str(row.CiudadUnidadCompra),
+        comuna: null,
       },
       SOURCE_TIER.officialBulk,
     );

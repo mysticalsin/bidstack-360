@@ -15,19 +15,21 @@ export interface BackoffOptions {
   random?: () => number;
 }
 
+/** Longest `Retry-After` honoured; a larger value from a server is clamped. */
+export const MAX_RETRY_AFTER_MS = 60 * 60_000;
+
 /**
- * Delay before retry number `attempt` (1-based), with equal jitter: half the
- * exponential ceiling is fixed, the other half random, so parallel workers
- * spread out but never retry faster than the base schedule.
+ * Delay before retry number `attempt` (1-based): the exponential step
+ * (10 s, 20 s, 40 s, ...) plus up to half of it again as jitter, capped at
+ * `maxMs`. Parallel workers spread out but never retry faster than the step.
  */
 export function backoffDelayMs(attempt: number, opts: BackoffOptions = {}): number {
   const base = opts.baseMs ?? BACKOFF_DEFAULTS.baseMs;
   const max = opts.maxMs ?? BACKOFF_DEFAULTS.maxMs;
   const random = opts.random ?? Math.random;
   const exponent = Math.min(Math.max(attempt, 1) - 1, 30);
-  const ceiling = Math.min(max, base * 2 ** exponent);
-  const half = ceiling / 2;
-  return Math.round(half + random() * half);
+  const step = base * 2 ** exponent;
+  return Math.round(Math.min(max, step + random() * (step / 2)));
 }
 
 /** Parse a `Retry-After` header (seconds or HTTP date) into milliseconds. */
@@ -57,7 +59,7 @@ export function decideRetry(err: unknown, attempt: number, opts: BackoffOptions 
   }
   if (attempt >= maxAttempts) return { retry: false, delayMs: 0, pauseSource: false };
   if (err instanceof PsSourceError && err.retryAfterMs !== null) {
-    return { retry: true, delayMs: err.retryAfterMs, pauseSource: false };
+    return { retry: true, delayMs: Math.min(err.retryAfterMs, MAX_RETRY_AFTER_MS), pauseSource: false };
   }
   return { retry: true, delayMs: backoffDelayMs(attempt, opts), pauseSource: false };
 }

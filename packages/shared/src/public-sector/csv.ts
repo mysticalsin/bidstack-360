@@ -3,6 +3,8 @@
  * semicolon-delimited, quoted fields that may contain `;` and newlines.
  */
 
+import { PsSourceError } from './errors.js';
+
 const latin1Decoder = new TextDecoder('latin1');
 
 /** Decode Latin-1 bytes. Single-byte, so chunks can be decoded independently. */
@@ -69,8 +71,11 @@ export class CsvParser {
     return out;
   }
 
-  /** Flush the final row when the input does not end with a newline. */
+  /** Flush the final row when the input does not end with a newline. Throws on an unterminated quote. */
   end(): string[][] {
+    if (this.state === 'quoted') {
+      throw new PsSourceError('schema', 'CSV ended inside a quoted field (truncated file?)', { doNotRetry: true });
+    }
     const out: string[][] = [];
     if (this.rowStarted || this.row.length > 0 || this.field !== '') this.endRow(out);
     return out;
@@ -102,15 +107,40 @@ export function parseCsvText(text: string, delimiter = ';'): string[][] {
 }
 
 /**
- * Stream Latin-1 CSV bytes as header-keyed records. Accepts any sync or async
- * iterable of chunks, so a 287 MB monthly file never sits in memory whole.
+ * Clean a header row: drop a byte order mark, trim names, and suffix repeated
+ * names (`Name`, `Name#2`) so no column silently overwrites another.
+ */
+export function normalizeCsvHeader(row: readonly string[]): string[] {
+  const seen = new Map<string, number>();
+  return row.map((raw, i) => {
+    let name = raw;
+    // A UTF-8 byte order mark reads as U+00EF U+00BB U+00BF once decoded as Latin-1.
+    if (i === 0) name = name.replace(/^(?:\uFEFF|\u00EF\u00BB\u00BF)/, '');
+    name = name.trim();
+    const n = (seen.get(name) ?? 0) + 1;
+    seen.set(name, n);
+    return n === 1 ? name : `${name}#${n}`;
+  });
+}
+
+/**
+ * Stream Latin-1 CSV bytes as header-keyed records. Parsing is incremental, so
+ * the decoded file is never held as one string. `requiredColumns` fails fast
+ * with a `schema` error when the header has drifted.
  */
 export async function* iterateCsvRecords(
   chunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
-  opts: { delimiter?: string } = {},
+  opts: { delimiter?: string; requiredColumns?: readonly string[] } = {},
 ): AsyncGenerator<Record<string, string>> {
   const parser = new CsvParser(opts.delimiter ?? ';');
   let header: string[] | null = null;
+  const setHeader = (row: string[]): void => {
+    header = normalizeCsvHeader(row);
+    const missing = (opts.requiredColumns ?? []).filter((c) => !header!.includes(c));
+    if (missing.length > 0) {
+      throw new PsSourceError('schema', `CSV header is missing columns: ${missing.join(', ')}`, { doNotRetry: true });
+    }
+  };
   const toRecord = (row: string[]): Record<string, string> => {
     const rec: Record<string, string> = {};
     header!.forEach((name, i) => {
@@ -120,12 +150,15 @@ export async function* iterateCsvRecords(
   };
   for await (const chunk of chunks) {
     for (const row of parser.push(decodeLatin1(chunk))) {
-      if (!header) header = row;
+      if (!header) setHeader(row);
       else yield toRecord(row);
     }
   }
   for (const row of parser.end()) {
-    if (!header) header = row;
+    if (!header) setHeader(row);
     else yield toRecord(row);
+  }
+  if (!header && opts.requiredColumns?.length) {
+    throw new PsSourceError('schema', 'CSV is empty', { doNotRetry: true });
   }
 }

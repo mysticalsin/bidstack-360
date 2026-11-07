@@ -50,16 +50,34 @@ function offsetMs(date: Date, timeZone: string): number {
   return asUtc - Math.floor(date.getTime() / 1000) * 1000;
 }
 
-/** The instant at which the wall clock in `timeZone` reads the given local time. */
+const HALF_DAY_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * The instant at which the wall clock in `timeZone` reads the given local
+ * time. On a fall-back day the earlier of the two instants wins. A wall time
+ * inside a spring-forward gap maps to the first valid instant after the gap,
+ * so it stays on the same calendar day.
+ */
 export function zonedTimeToUtc(
-  local: { year: number; month: number; day: number; hour?: number; minute?: number },
+  local: { year: number; month: number; day: number; hour?: number; minute?: number; second?: number },
   timeZone: string,
 ): Date {
-  const wall = Date.UTC(local.year, local.month - 1, local.day, local.hour ?? 0, local.minute ?? 0);
-  let guess = wall - offsetMs(new Date(wall), timeZone);
-  // A second pass settles instants that straddle a DST change.
-  guess = wall - offsetMs(new Date(guess), timeZone);
-  return new Date(guess);
+  const wall = Date.UTC(
+    local.year,
+    local.month - 1,
+    local.day,
+    local.hour ?? 0,
+    local.minute ?? 0,
+    local.second ?? 0,
+  );
+  const before = wall - offsetMs(new Date(wall - HALF_DAY_MS), timeZone);
+  const after = wall - offsetMs(new Date(wall + HALF_DAY_MS), timeZone);
+  const roundTrips = (t: number): boolean => {
+    const p = zonedParts(new Date(t), timeZone);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) === wall;
+  };
+  const candidates = [before, after].filter(roundTrips).sort((a, b) => a - b);
+  return new Date(candidates[0] ?? before);
 }
 
 /** `YYYY-MM-DD` calendar date of `date` in `timeZone`. */

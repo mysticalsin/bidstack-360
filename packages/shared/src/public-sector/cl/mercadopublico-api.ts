@@ -16,7 +16,7 @@
 
 import { z } from 'zod';
 
-import { CHILE_LICENCES } from '../attribution.js';
+import { CHILE_LICENCES, CHILECOMPRA_ATTRIBUTION } from '../attribution.js';
 import { computeConfidenceBps, SOURCE_TIER } from '../confidence.js';
 import { PsSourceError } from '../errors.js';
 import { BULK_QUIET_HOURS, CHILE_TIME_ZONE, MERCADOPUBLICO_DAILY_LIMIT, DEFAULT_QUOTA_SAFETY_MARGIN } from '../quota.js';
@@ -229,7 +229,7 @@ function entityFrom(c: z.infer<typeof Comprador>, prov: ChileProvenance): PsPubl
 }
 
 function normalizeLicitaciones(list: unknown[], prov: ChileProvenance, ctx: PsNormalizeContext): PsNormalized {
-  const col = new NormalizedCollector();
+  const col = new NormalizedCollector(ctx.hashTaxId);
   for (const item of list) {
     const parsed = Licitacion.safeParse(item);
     if (!parsed.success) continue;
@@ -258,7 +258,7 @@ function normalizeLicitaciones(list: unknown[], prov: ChileProvenance, ctx: PsNo
       stage,
       statusCode: l.CodigoEstado,
       statusLabel: str(l.Estado),
-      procurementMethod: 'open',
+      procurementMethod: tenderMethodFromType(str(l.Tipo)),
       procurementMethodDetails: str(l.Tipo),
       isDirectAward: false,
       closesAt,
@@ -297,7 +297,7 @@ function normalizeLicitaciones(list: unknown[], prov: ChileProvenance, ctx: PsNo
           normalizedName: normalizeEntityName(name),
           sourceSupplierCode: null,
           confidenceBps: computeConfidenceBps({ tier: SOURCE_TIER.officialApi, required: [name] }),
-          raw: who.isNaturalPerson ? { NombreProveedor: adj.NombreProveedor } : adj,
+          raw: who.isNaturalPerson ? { naturalPerson: true } : adj,
         }),
       );
       const qty = adj.Cantidad ?? null;
@@ -333,7 +333,7 @@ function normalizeLicitaciones(list: unknown[], prov: ChileProvenance, ctx: PsNo
 }
 
 function normalizeOrdenes(list: unknown[], prov: ChileProvenance, ctx: PsNormalizeContext): PsNormalized {
-  const col = new NormalizedCollector();
+  const col = new NormalizedCollector(ctx.hashTaxId);
   for (const item of list) {
     const parsed = OrdenCompra.safeParse(item);
     if (!parsed.success) continue;
@@ -358,7 +358,7 @@ function normalizeOrdenes(list: unknown[], prov: ChileProvenance, ctx: PsNormali
           normalizedName: normalizeEntityName(name),
           sourceSupplierCode: str(o.Proveedor?.Codigo),
           confidenceBps: computeConfidenceBps({ tier: SOURCE_TIER.officialApi, required: [name] }),
-          raw: who.isNaturalPerson ? { Nombre: o.Proveedor?.Nombre } : o.Proveedor,
+          raw: who.isNaturalPerson ? { naturalPerson: true } : o.Proveedor,
         }),
       );
     }
@@ -399,13 +399,26 @@ function normalizeOrdenes(list: unknown[], prov: ChileProvenance, ctx: PsNormali
   return col.out;
 }
 
+/**
+ * Procurement method from the tender type code (`L1`, `LE`, `LP`, `LQ`, `LR`
+ * and `LS` are public calls; `E2`, `CO`, `B2`, `H2`, `I2` are private calls,
+ * per the API docs). Unknown types stay `null` rather than guessing.
+ */
+function tenderMethodFromType(tipo: string | null): PsOpportunity['procurementMethod'] {
+  if (!tipo) return null;
+  const t = tipo.toUpperCase();
+  if (['L1', 'LE', 'LP', 'LQ', 'LR', 'LS'].includes(t)) return 'open';
+  if (['E2', 'CO', 'B2', 'H2', 'I2'].includes(t)) return 'selective';
+  return null;
+}
+
 /** The Mercado Publico API adapter. */
 export const mercadoPublicoAdapter: PsAdapter<null> = {
   country: 'CL',
   sourceKey: SOURCE_KEY,
   credentialName: MERCADOPUBLICO_TICKET_ENV,
   licence: CHILE_LICENCES.api,
-  attribution: 'Dirección ChileCompra',
+  attribution: CHILECOMPRA_ATTRIBUTION,
   budget: {
     perDay: Math.floor(MERCADOPUBLICO_DAILY_LIMIT * (1 - DEFAULT_QUOTA_SAFETY_MARGIN)),
     quietHoursLocal: BULK_QUIET_HOURS,
@@ -432,18 +445,21 @@ export const mercadoPublicoAdapter: PsAdapter<null> = {
     if (!ctx.secret) {
       throw new PsSourceError('auth', `No ticket configured (${MERCADOPUBLICO_TICKET_ENV})`, { doNotRetry: true });
     }
-    await ctx.quota?.reserve();
+    if (!ctx.quota) {
+      throw new PsSourceError('quota_exhausted', 'A quota guard is required for the ticketed API', { doNotRetry: true });
+    }
+    await ctx.quota.reserve();
     const raw = await fetchChileRawPage(unit, ctx, { ticket: ctx.secret });
+    if (raw.httpStatus === 203) {
+      throw new PsSourceError('auth', 'Mercado Publico rejected the ticket (HTTP 203)', {
+        doNotRetry: true,
+        httpStatus: 203,
+      });
+    }
     let json: unknown;
     try {
       json = JSON.parse(raw.body);
     } catch {
-      if (raw.httpStatus === 203) {
-        throw new PsSourceError('auth', 'Mercado Publico rejected the ticket (HTTP 203)', {
-          doNotRetry: true,
-          httpStatus: 203,
-        });
-      }
       throw new PsSourceError('schema', 'Mercado Publico returned non-JSON', { doNotRetry: true });
     }
     parseMercadoPublicoBody(json, raw.httpStatus);

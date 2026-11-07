@@ -3,7 +3,6 @@
  * mapping, supplier identity, and record finalization (hashes and keys).
  */
 
-import { unitsToMicros } from '../../utils/money.js';
 import { CHILECOMPRA_ATTRIBUTION } from '../attribution.js';
 import { guardedGet, CHILE_SOURCE_HOSTS } from '../fetch-guard.js';
 import { psIdempotencyKey, recordHash, sha256Hex } from '../hash.js';
@@ -63,18 +62,39 @@ export function int(v: unknown): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+const DECIMAL_RE = /^([+-]?)(\d*)(?:\.(\d*))?(?:e([+-]?\d{1,3}))?$/i;
+const THOUSANDS_RE = /^-?\d{1,3}(?:\.\d{3})+$/;
+
 /**
- * Amount to integer micros. Handles comma decimals (`24247,26`), scientific
- * notation from the bulk export (`9,3e+07`) and JSON numbers.
+ * Amount to integer micros, or `null` when the value is not a number. Handles
+ * comma decimals (`24247,26`), dotted thousands (`1.234.567`), leading zeros,
+ * and scientific notation from the bulk export (`9,3e+07`) without passing
+ * through floating point. Digits past the sixth decimal are rounded half up.
  */
 export function amountMicros(v: unknown): bigint | null {
-  if (typeof v === 'number') return Number.isFinite(v) ? unitsToMicros(v) : null;
-  const s = str(v);
+  let s: string | null;
+  if (typeof v === 'number') s = Number.isFinite(v) ? String(v) : null;
+  else s = str(v);
   if (s === null) return null;
-  const normalized = s.replace(',', '.');
-  if (/^-?\d+(\.\d{1,6})?$/.test(normalized)) return unitsToMicros(normalized);
-  const n = Number(normalized);
-  return Number.isFinite(n) ? unitsToMicros(n) : null;
+  s = s.replace(/\s/g, '');
+  if (THOUSANDS_RE.test(s)) s = s.replace(/\./g, '');
+  else if (s.includes(',')) {
+    if (s.includes('.') || s.indexOf(',') !== s.lastIndexOf(',')) return null;
+    s = s.replace(',', '.');
+  }
+  const m = DECIMAL_RE.exec(s);
+  if (!m || (m[2] === '' && (m[3] ?? '') === '')) return null;
+  const digits = `${m[2]}${m[3] ?? ''}`.replace(/^0+(?=\d)/, '');
+  const scale = Number(m[4] ?? 0) - (m[3] ?? '').length + 6;
+  let micros: bigint;
+  if (scale >= 0) {
+    micros = BigInt(digits) * 10n ** BigInt(scale);
+  } else {
+    const divisor = 10n ** BigInt(-scale);
+    const whole = BigInt(digits);
+    micros = whole / divisor + (whole % divisor >= divisor / 2n ? 1n : 0n);
+  }
+  return m[1] === '-' ? -micros : micros;
 }
 
 /**
@@ -88,7 +108,7 @@ export function chileDate(v: unknown): Date | null {
     const t = Date.parse(s);
     return Number.isNaN(t) ? null : new Date(t);
   }
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(s);
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
   if (!m) return null;
   return zonedTimeToUtc(
     {
@@ -97,6 +117,7 @@ export function chileDate(v: unknown): Date | null {
       day: Number(m[3]),
       hour: m[4] ? Number(m[4]) : 0,
       minute: m[5] ? Number(m[5]) : 0,
+      second: m[6] ? Number(m[6]) : 0,
     },
     CHILE_TIME_ZONE,
   );
@@ -174,14 +195,18 @@ const NON_MATERIAL_FIELDS = new Set([
   'confidenceBps',
   'idempotencyKey',
   'attribution',
+  'licence',
 ]);
+
+/** Array fields that are sets: sorted and de-duplicated before hashing. Other arrays keep their order. */
+const SET_FIELDS = new Set(['unspscCodes']);
 
 /** Fill `idempotencyKey` and `recordHash` from the record's material fields. */
 export function finalizeRecord<T extends PsRecordBase>(draft: Omit<T, 'idempotencyKey' | 'recordHash'>): T {
   const projection: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(draft)) {
     if (NON_MATERIAL_FIELDS.has(k)) continue;
-    projection[k] = Array.isArray(v) && v.every((x) => typeof x === 'string') ? [...new Set(v)].sort() : v;
+    projection[k] = SET_FIELDS.has(k) && Array.isArray(v) ? [...new Set(v.map(String))].sort() : v;
   }
   return {
     ...draft,
@@ -226,7 +251,88 @@ export function supplierIdentity(
   return { externalId: `rut:${rut.formatted}`, taxId: rut.formatted, taxIdHash: null, isNaturalPerson: false };
 }
 
-/** Collects records and drops duplicates by idempotency key (first wins). */
+const RUT_IN_TEXT = /\b(\d{1,2}(?:\.\d{3}){2}|\d{7,8})-([\dkK])\b/g;
+/** Person fields on the object that directly carries a natural-person RUT. */
+const DIRECT_PERSON_KEY =
+  /^(nombre(?:proveedor|sucursal|contacto)|nombre de la oferta|razonsocialproveedor|sucursal|descripcionproveedor|direccion|\w*contacto|fono\w*|mail\w*|name|legalName|streetAddress)$/i;
+/** Person fields on an ancestor object (an OCDS party whose identifier holds the RUT). */
+const PARENT_PERSON_KEY = /^(name|legalName|address|contactPoint)$/i;
+const PROCUREMENT_CODE = /^\d+-\d+-[A-Z0-9]{2}\d{2}$/i;
+const PERSON_PLACEHOLDER = '[persona natural]';
+
+function isProcurementRow(obj: Record<string, unknown>): boolean {
+  return ['CodigoExterno', 'CodigoLicitacion', 'Codigo'].some(
+    (k) => typeof obj[k] === 'string' && PROCUREMENT_CODE.test(obj[k]),
+  );
+}
+
+/**
+ * Copy of a raw payload safe to keep next to a normalized record. Every
+ * natural-person RUT becomes `rut-hash:<hmac>`; name, address and contact
+ * fields next to it (or on the OCDS party above it) become a placeholder, and
+ * those names are then removed wherever else they appear in the payload.
+ * Company RUTs and public bodies are left as published.
+ */
+export function redactPersonalRaw(raw: unknown, hashTaxId: (rut: string) => string): unknown {
+  const names = new Set<string>();
+  const walk = (v: unknown): { value: unknown; direct: boolean; found: boolean } => {
+    if (typeof v === 'string') {
+      let direct = false;
+      const value = v.replace(RUT_IN_TEXT, (match: string) => {
+        const rut = parseRut(match);
+        if (!rut || rut.body >= NATURAL_PERSON_RUT_CEILING) return match;
+        direct = true;
+        return `rut-hash:${hashTaxId(rut.formatted)}`;
+      });
+      return { value, direct, found: direct };
+    }
+    if (Array.isArray(v)) {
+      let found = false;
+      const value = v.map((x) => {
+        const r = walk(x);
+        found ||= r.found;
+        return r.value;
+      });
+      return { value, direct: false, found };
+    }
+    if (v && typeof v === 'object' && !(v instanceof Date)) {
+      const obj = v as Record<string, unknown>;
+      const kids = Object.entries(obj).map(([k, x]) => [k, walk(x)] as const);
+      const direct = kids.some(([, r]) => r.direct);
+      const found = kids.some(([, r]) => r.found);
+      const redact = (k: string): boolean => {
+        if (direct) return DIRECT_PERSON_KEY.test(k) || (k === 'Nombre' && !isProcurementRow(obj));
+        return found && PARENT_PERSON_KEY.test(k);
+      };
+      const value = Object.fromEntries(
+        kids.map(([k, r]) => {
+          if (!redact(k) || r.value === null || r.value === '') return [k, r.value];
+          if (typeof r.value === 'string' && r.value.trim().length >= 3) names.add(r.value.trim());
+          return [k, PERSON_PLACEHOLDER];
+        }),
+      );
+      return { value, direct: false, found };
+    }
+    return { value: v, direct: false, found: false };
+  };
+  const first = walk(raw).value;
+  if (names.size === 0) return first;
+  const sweep = (v: unknown): unknown => {
+    if (typeof v === 'string') return names.has(v.trim()) ? PERSON_PLACEHOLDER : v;
+    if (Array.isArray(v)) return v.map(sweep);
+    if (v && typeof v === 'object' && !(v instanceof Date)) {
+      return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, sweep(x)]));
+    }
+    return v;
+  };
+  return sweep(first);
+}
+
+/**
+ * Collects records, drops duplicates by idempotency key (first wins), and
+ * passes every `raw` through {@link redactPersonalRaw} so no natural-person
+ * RUT or name leaves a normalizer in clear.
+ */
 export class NormalizedCollector {
   private readonly seen = new Set<string>();
   readonly out: PsNormalized = {
@@ -238,10 +344,13 @@ export class NormalizedCollector {
     reviewFlags: [],
   };
 
+  constructor(private readonly hashTaxId: (rut: string) => string) {}
+
   /** Add a record unless one with the same key was already added. */
   add<K extends Exclude<keyof PsNormalized, 'reviewFlags'>>(bucket: K, rec: PsNormalized[K][number]): void {
     if (this.seen.has(rec.idempotencyKey)) return;
     this.seen.add(rec.idempotencyKey);
+    rec.raw = redactPersonalRaw(rec.raw, this.hashTaxId);
     (this.out[bucket] as PsRecordBase[]).push(rec);
   }
 
