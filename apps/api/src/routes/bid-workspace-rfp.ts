@@ -27,6 +27,7 @@ import {
 } from '@bidstack/shared';
 
 import { WorkspaceParams, ensureOpportunity } from './bid-workspace.helpers.js';
+import { immutableProposalMessage, proposalIsImmutable } from './proposals.approval.js';
 
 // Crew-board layout = a map of crew memberKey -> station (a pipeline stage or
 // 'oversight'). Sanitized against the shared roster on every read + write so a
@@ -93,13 +94,19 @@ const toDraftSection = (r: SectionRow) => ({
 });
 
 /** The most recent non-deleted proposal for an opportunity (the active draft). */
-async function latestProposalId(orgId: string, opportunityId: string): Promise<string | null> {
-  const proposal = await prisma.proposal.findFirst({
+async function latestProposal(
+  orgId: string,
+  opportunityId: string,
+): Promise<{ id: string; status: string } | null> {
+  return prisma.proposal.findFirst({
     where: { orgId, opportunityId, deletedAt: null },
     orderBy: { updatedAt: 'desc' },
-    select: { id: true },
+    select: { id: true, status: true },
   });
-  return proposal?.id ?? null;
+}
+
+async function latestProposalId(orgId: string, opportunityId: string): Promise<string | null> {
+  return (await latestProposal(orgId, opportunityId))?.id ?? null;
 }
 
 export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -293,8 +300,12 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
       if (!opportunity) return reply.notFound('Opportunity not found');
 
-      const proposalId = await latestProposalId(req.auth.orgId, opportunity.id);
-      if (!proposalId) return reply.notFound('No proposal draft for this opportunity yet');
+      const proposal = await latestProposal(req.auth.orgId, opportunity.id);
+      if (!proposal) return reply.notFound('No proposal draft for this opportunity yet');
+      if (proposalIsImmutable(proposal.status)) {
+        throw server.httpErrors.conflict(immutableProposalMessage());
+      }
+      const proposalId = proposal.id;
 
       const wordCount = req.body.content.trim().split(/\s+/).filter(Boolean).length;
       // Update scoped to org + the resolved proposal so a forged sectionId from
