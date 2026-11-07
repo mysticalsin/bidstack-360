@@ -173,6 +173,29 @@ export type AccountIntelQueueJob =
   | { kind: 'sweep' }
   | { kind: 'financials-scan' };
 
+/**
+ * Consulting partners (slice 15): which consulting firms work with an account.
+ *   'consulting-partners.refresh'  manual Refresh on the account page
+ *   'consulting-partners.sweep'    repeatable daily: rescans our own records for
+ *                                  recently changed accounts and prunes old
+ *                                  evidence; public fetches only when
+ *                                  CONSULTING_PARTNERS_AUTO_REFRESH=true
+ */
+export const CONSULTING_PARTNERS: QueueConfig = {
+  name: 'consulting-partners',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 120_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the consulting-partners queue. */
+export type ConsultingPartnersQueueJob =
+  | { kind: 'refresh'; orgId: string; companyId: string; requestedBy?: string | null }
+  | { kind: 'sweep' };
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;
