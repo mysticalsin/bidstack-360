@@ -28,9 +28,18 @@ import type IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma, Prisma } from '@bidstack/db';
-import { MIGRATION, MigrationJobPayload, type MigrationJobError } from '@bidstack/shared';
+import {
+  ACCOUNT_INTEL,
+  MIGRATION,
+  MigrationJobPayload,
+  type MigrationJobError,
+} from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
+import {
+  queueImportEnrichment,
+  type IntelEnqueueJob,
+} from '../lib/company-intel/import-enrichment.js';
 import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
 
 // ─── Entity normalization ──────────────────────────────────────────────────
@@ -112,7 +121,9 @@ const OPP_STAGES = new Set([
 
 /** Loose source-CRM stage label → canonical OpportunityStage. */
 export function mapStage(v: unknown): string {
-  const s = asTrimmed(v)?.toLowerCase().replace(/[\s-]+/g, '_');
+  const s = asTrimmed(v)
+    ?.toLowerCase()
+    .replace(/[\s-]+/g, '_');
   if (!s) return 's1_lead';
   if (OPP_STAGES.has(s)) return s;
   if (s.includes('won')) return 'closed_won';
@@ -278,10 +289,7 @@ function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
-async function writeOpportunity(
-  ctx: WriteCtx,
-  t: Record<string, unknown>,
-): Promise<string | null> {
+async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Promise<string | null> {
   const name = asTrimmed(t['opportunity.name']);
   if (!name) throw new Error('opportunity.name is required');
   const customer =
@@ -346,10 +354,15 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   const currency = (asTrimmed(t['financial.currency']) ?? 'EUR').toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error('financial.currency must be a 3-letter code');
   const periodType = (asTrimmed(t['financial.periodType']) ?? 'FY').toUpperCase();
-  if (periodType !== 'FY' && periodType !== 'Q') throw new Error('financial.periodType must be FY or Q');
+  if (periodType !== 'FY' && periodType !== 'Q')
+    throw new Error('financial.periodType must be FY or Q');
   const fiscalYear = asInt(t['financial.fiscalYear']) ?? periodEnd.getUTCFullYear();
   const company = await prisma.company.findFirst({
-    where: { orgId: ctx.orgId, name: { equals: companyName, mode: 'insensitive' }, deletedAt: null },
+    where: {
+      orgId: ctx.orgId,
+      name: { equals: companyName, mode: 'insensitive' },
+      deletedAt: null,
+    },
     select: { id: true },
   });
   if (!company) throw new Error(`No account named "${companyName}" — import accounts first`);
@@ -439,9 +452,7 @@ interface StoredHubSpotTokens {
   expiresAt?: unknown;
 }
 
-export async function resolveHubSpotAccessToken(
-  payload: MigrationJobPayload,
-): Promise<string> {
+export async function resolveHubSpotAccessToken(payload: MigrationJobPayload): Promise<string> {
   const meta = payload.meta as Record<string, unknown> | undefined;
   const configId =
     typeof meta?.hubspotIntegrationConfigId === 'string'
@@ -644,6 +655,201 @@ async function maybeComplete(migrationJobId: string, forceTotal?: number): Promi
   }
 }
 
+// ─── Chunk processing ──────────────────────────────────────────────────────
+
+/** What one chunk needs from Redis and the queues; the worker wires the real ones. */
+export interface MigrationChunkDeps {
+  readRows(redisKey: string): Promise<string | null>;
+  enqueueChunk(name: string, data: MigrationJobPayload, opts: { jobId: string }): Promise<unknown>;
+  enqueueIntel(jobs: IntelEnqueueJob[]): Promise<void>;
+  env: Record<string, string | undefined>;
+}
+
+type ChunkLog = Pick<pino.Logger, 'info' | 'warn'>;
+
+/** Company ids every earlier pass of this chunk created (from the undo-trail rows). */
+async function chunkCreatedIds(payload: MigrationJobPayload): Promise<string[]> {
+  const rows = await prisma.auditLog.findMany({
+    where: {
+      orgId: payload.orgId,
+      action: 'migration.chunk.imported',
+      targetType: 'MigrationJob',
+      targetId: payload.migrationJobId,
+      diff: { path: ['chunkOffset'], equals: payload.chunkOffset },
+    },
+    select: { diff: true },
+  });
+  return rows.flatMap((r) => {
+    const ids = (r.diff as { createdIds?: unknown } | null)?.createdIds;
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [];
+  });
+}
+
+/** Import one chunk: acquire rows, write them, commit progress, queue enrichment, page on. */
+export async function processMigrationChunk(
+  payload: MigrationJobPayload,
+  deps: MigrationChunkDeps,
+  log: ChunkLog,
+): Promise<void> {
+  // Respect cancellation between chunks.
+  const jobRow = await prisma.migrationJob.findUnique({
+    where: { id: payload.migrationJobId },
+    select: { status: true },
+  });
+  if (!jobRow || jobRow.status === 'CANCELLED' || jobRow.status === 'FAILED') {
+    log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
+    return;
+  }
+
+  const entity = normalizeEntity(payload.entityType);
+  if (!entity) {
+    // e.g. HubSpot "tasks" — fail the job loudly instead of hanging RUNNING.
+    await prisma.migrationJob.update({
+      where: { id: payload.migrationJobId },
+      data: {
+        status: 'FAILED',
+        completedAt: new Date(),
+        errorSummary: [
+          {
+            row: 0,
+            field: null,
+            message: `Entity type "${payload.entityType}" is not supported by the import worker yet`,
+          },
+        ],
+      },
+    });
+    log.warn('unsupported entity type — job failed honestly');
+    return;
+  }
+
+  // ── Acquire this chunk's rows ──
+  let rows: Record<string, unknown>[];
+  let nextAfter: string | null = null;
+  if (payload.source === 'HUBSPOT_OAUTH') {
+    const accessToken = await resolveHubSpotAccessToken(payload);
+    const page = await fetchHubSpotPage(
+      payload.orgId,
+      payload.entityType,
+      accessToken,
+      Object.keys(payload.mappings),
+      payload.chunkSize,
+      payload.hubspotAfter,
+    );
+    rows = page.rows;
+    nextAfter = page.nextAfter;
+  } else {
+    if (!payload.redisKey) throw new Error('CSV chunk missing redisKey');
+    const raw = await deps.readRows(payload.redisKey);
+    if (!raw) {
+      throw new Error('CSV rows expired from Redis (1h TTL) — restart the import to re-upload');
+    }
+    const all = JSON.parse(raw) as Record<string, unknown>[];
+    rows = all.slice(payload.chunkOffset, payload.chunkOffset + payload.chunkSize);
+  }
+
+  // ── Import rows ──
+  const ctx: WriteCtx = {
+    orgId: payload.orgId,
+    sourceTag: `migration:${payload.migrationJobId}`,
+    dedupStrategy: payload.dedupStrategy,
+  };
+
+  // Retry idempotency: a BullMQ retry re-runs the WHOLE chunk from the start.
+  // For the 'skip'/'update' strategies the per-row dedup check makes that safe,
+  // but 'duplicate' re-inserts every row unconditionally — so a retry after a
+  // partial commit would double-insert. We persist a resume cursor (rows
+  // consumed = processed + errored) in the prior chunk audit row and skip PAST
+  // already-committed rows so a retry resumes instead of restarting.
+  const resumeFrom = await resolveChunkResumeCursor(
+    payload.orgId,
+    payload.migrationJobId,
+    payload.chunkOffset,
+  );
+
+  const createdIds: string[] = [];
+  const errors: MigrationJobError[] = [];
+  let processed = 0;
+
+  for (let i = resumeFrom; i < rows.length; i++) {
+    const absoluteRow = payload.chunkOffset + i;
+    try {
+      const mapped = applyMappings(rows[i]!, payload.mappings);
+      const createdId = await WRITERS[entity](ctx, mapped);
+      if (createdId) createdIds.push(createdId);
+      processed += 1;
+    } catch (err) {
+      errors.push({
+        row: absoluteRow,
+        field: null,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // ── Undo trail: contacts/opportunities have no `source` column, so the
+  // undo route reads these audit rows to find what this job created. The
+  // `rowsConsumed` field doubles as the resume cursor for retry idempotency,
+  // so it commits atomically with the counters (see commitChunkProgress). ──
+  await commitChunkProgress({
+    orgId: payload.orgId,
+    userId: payload.userId,
+    migrationJobId: payload.migrationJobId,
+    entity,
+    chunkOffset: payload.chunkOffset,
+    resumeFrom,
+    createdIds,
+    processed,
+    errors,
+  });
+
+  // ── Import enrichment: queue public intel and Apollo org data per new company.
+  // Prior passes of this chunk are included so a retry after a crash still queues them. ──
+  if (entity === 'company') {
+    const companyIds =
+      resumeFrom > 0 ? [...(await chunkCreatedIds(payload)), ...createdIds] : createdIds;
+    await queueImportEnrichment(
+      {
+        orgId: payload.orgId,
+        userId: payload.userId,
+        migrationJobId: payload.migrationJobId,
+        origin: payload.source === 'HUBSPOT_OAUTH' ? 'hubspot' : 'csv',
+        companyIds,
+        env: deps.env,
+        enqueue: deps.enqueueIntel,
+      },
+      log,
+    );
+  }
+
+  // ── HubSpot pagination: enqueue the next page while there is one. ──
+  if (payload.source === 'HUBSPOT_OAUTH' && nextAfter) {
+    const nextOffset = payload.chunkOffset + rows.length;
+    await deps.enqueueChunk(
+      `${payload.migrationJobId}-chunk-${nextOffset}`,
+      { ...payload, chunkOffset: nextOffset, hubspotAfter: nextAfter },
+      { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
+    );
+  } else if (payload.source === 'HUBSPOT_OAUTH') {
+    // Last page — HubSpot discovery counts are approximate, so completion
+    // is "no more pages", not "processed == discovered total".
+    const jobNow = await prisma.migrationJob.findUnique({
+      where: { id: payload.migrationJobId },
+      select: { processedRows: true, errorRows: true },
+    });
+    await maybeComplete(
+      payload.migrationJobId,
+      (jobNow?.processedRows ?? 0) + (jobNow?.errorRows ?? 0),
+    );
+  } else {
+    await maybeComplete(payload.migrationJobId);
+  }
+
+  log.info(
+    { processed, errored: errors.length, created: createdIds.length },
+    'migration chunk done',
+  );
+}
+
 // ─── Worker ────────────────────────────────────────────────────────────────
 
 let queueSingleton: Queue | null = null;
@@ -666,6 +872,25 @@ export async function startMigrationWorker(
 ): Promise<void> {
   const queue = getMigrationQueue(connection);
   queues.push(queue);
+  const intelQueue = new Queue(ACCOUNT_INTEL.name, {
+    connection,
+    defaultJobOptions: ACCOUNT_INTEL.defaultJobOptions,
+  });
+  queues.push(intelQueue);
+  const chunkDeps: MigrationChunkDeps = {
+    readRows: (key) => connection.get(key),
+    enqueueChunk: (name, data, opts) => queue.add(name, data, opts),
+    enqueueIntel: async (jobs) => {
+      await intelQueue.addBulk(
+        jobs.map((j) => ({
+          name: 'account-intel.full-refresh',
+          data: j.data,
+          opts: { jobId: j.jobId },
+        })),
+      );
+    },
+    env: process.env,
+  };
 
   const worker = new Worker(
     MIGRATION.name,
@@ -676,147 +901,7 @@ export async function startMigrationWorker(
         entityType: payload.entityType,
         chunkOffset: payload.chunkOffset,
       });
-
-      // Respect cancellation between chunks.
-      const jobRow = await prisma.migrationJob.findUnique({
-        where: { id: payload.migrationJobId },
-        select: { status: true },
-      });
-      if (!jobRow || jobRow.status === 'CANCELLED' || jobRow.status === 'FAILED') {
-        childLog.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
-        return;
-      }
-
-      const entity = normalizeEntity(payload.entityType);
-      if (!entity) {
-        // e.g. HubSpot "tasks" — fail the job loudly instead of hanging RUNNING.
-        await prisma.migrationJob.update({
-          where: { id: payload.migrationJobId },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorSummary: [
-              {
-                row: 0,
-                field: null,
-                message: `Entity type "${payload.entityType}" is not supported by the import worker yet`,
-              },
-            ],
-          },
-        });
-        childLog.warn('unsupported entity type — job failed honestly');
-        return;
-      }
-
-      // ── Acquire this chunk's rows ──
-      let rows: Record<string, unknown>[];
-      let nextAfter: string | null = null;
-      if (payload.source === 'HUBSPOT_OAUTH') {
-        const accessToken = await resolveHubSpotAccessToken(payload);
-        const page = await fetchHubSpotPage(
-          payload.orgId,
-          payload.entityType,
-          accessToken,
-          Object.keys(payload.mappings),
-          payload.chunkSize,
-          payload.hubspotAfter,
-        );
-        rows = page.rows;
-        nextAfter = page.nextAfter;
-      } else {
-        if (!payload.redisKey) throw new Error('CSV chunk missing redisKey');
-        const raw = await connection.get(payload.redisKey);
-        if (!raw) {
-          throw new Error(
-            'CSV rows expired from Redis (1h TTL) — restart the import to re-upload',
-          );
-        }
-        const all = JSON.parse(raw) as Record<string, unknown>[];
-        rows = all.slice(payload.chunkOffset, payload.chunkOffset + payload.chunkSize);
-      }
-
-      // ── Import rows ──
-      const ctx: WriteCtx = {
-        orgId: payload.orgId,
-        sourceTag: `migration:${payload.migrationJobId}`,
-        dedupStrategy: payload.dedupStrategy,
-      };
-
-      // Retry idempotency: a BullMQ retry re-runs the WHOLE chunk from the start.
-      // For the 'skip'/'update' strategies the per-row dedup check makes that safe,
-      // but 'duplicate' re-inserts every row unconditionally — so a retry after a
-      // partial commit would double-insert. We persist a resume cursor (rows
-      // consumed = processed + errored) in the prior chunk audit row and skip PAST
-      // already-committed rows so a retry resumes instead of restarting.
-      const resumeFrom = await resolveChunkResumeCursor(
-        payload.orgId,
-        payload.migrationJobId,
-        payload.chunkOffset,
-      );
-
-      const createdIds: string[] = [];
-      const errors: MigrationJobError[] = [];
-      let processed = 0;
-
-      for (let i = resumeFrom; i < rows.length; i++) {
-        const absoluteRow = payload.chunkOffset + i;
-        try {
-          const mapped = applyMappings(rows[i]!, payload.mappings);
-          const createdId = await WRITERS[entity](ctx, mapped);
-          if (createdId) createdIds.push(createdId);
-          processed += 1;
-        } catch (err) {
-          errors.push({
-            row: absoluteRow,
-            field: null,
-            message: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-
-      // ── Undo trail: contacts/opportunities have no `source` column, so the
-      // undo route reads these audit rows to find what this job created. The
-      // `rowsConsumed` field doubles as the resume cursor for retry idempotency,
-      // so it commits atomically with the counters (see commitChunkProgress). ──
-      await commitChunkProgress({
-        orgId: payload.orgId,
-        userId: payload.userId,
-        migrationJobId: payload.migrationJobId,
-        entity,
-        chunkOffset: payload.chunkOffset,
-        resumeFrom,
-        createdIds,
-        processed,
-        errors,
-      });
-
-      // ── HubSpot pagination: enqueue the next page while there is one. ──
-      if (payload.source === 'HUBSPOT_OAUTH' && nextAfter) {
-        const nextOffset = payload.chunkOffset + rows.length;
-        await queue.add(
-          `${payload.migrationJobId}-chunk-${nextOffset}`,
-          { ...payload, chunkOffset: nextOffset, hubspotAfter: nextAfter },
-          { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
-        );
-      } else if (payload.source === 'HUBSPOT_OAUTH') {
-        // Last page — HubSpot discovery counts are approximate, so completion
-        // is "no more pages", not "processed == discovered total".
-        const jobNow = await prisma.migrationJob.findUnique({
-          where: { id: payload.migrationJobId },
-          select: { processedRows: true, errorRows: true },
-        });
-        await maybeComplete(
-          payload.migrationJobId,
-          (jobNow?.processedRows ?? 0) + (jobNow?.errorRows ?? 0),
-        );
-      } else {
-        await maybeComplete(payload.migrationJobId);
-      }
-
-      childLog.info(
-        { processed, errored: errors.length, created: createdIds.length },
-        'migration chunk done',
-      );
+      await processMigrationChunk(payload, chunkDeps, childLog);
     },
     {
       connection,

@@ -25,6 +25,7 @@ import {
 import { seedRolesAndPermissions } from './seed.rbac.js';
 import { seedSigningEntities } from './seed-signing-entities.js';
 import { seedAccountIntel } from './seed-account-intel.js';
+import { seedCompanyIntel } from './seed-company-intel.js';
 
 // PERMISSION_SEEDS, ROLE_SEEDS, LEGACY_ROLE_ASSIGNMENTS, helper functions,
 // and seedRolesAndPermissions() extracted to ./seed.rbac.ts (BS-R1)
@@ -960,6 +961,8 @@ async function main() {
 
   const intelRows = await seedAccountIntel(prisma, org.id);
   console.log(`  ✓ account intel samples: ${intelRows}`);
+  const intelSummaries = await seedCompanyIntel(prisma, org.id);
+  console.log(`  ✓ company intel summaries: ${intelSummaries}`);
 
   console.log('✅ Seed complete.');
 }

@@ -198,3 +198,14 @@ export { seedSigningEntities } from './seed-signing-entities.js';
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+export {
+  intelConnections,
+  loadIntelSummaryInput,
+  markImportBatchCompany,
+  openImportBatch,
+  parseIntelSummary,
+  pruneImportBatches,
+  readCompanyIntelSummaries,
+  readImportBatches,
+  recomputeCompanyIntelSummary,
+} from './company-intel-summary.js';

@@ -214,6 +214,8 @@ model Org {
   intelEvidence                 IntelEvidence[]
   investmentThemes              InvestmentTheme[]
   intelSourceRuns               IntelSourceRun[]
+  intelSummaries                CompanyIntelSummary[]
+  intelImportBatches            IntelImportBatch[]
   enrichmentCreditUsage         EnrichmentCreditUsage[]
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
@@ -399,14 +401,14 @@ model Company {
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  org           Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  parent        Company?         @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children      Company[]        @relation("CompanyHierarchy")
-  contacts      Contact[]
-  opportunities Opportunity[]
-  projectReferences  ProjectReference[]
-  notes         Note[]
-  files         FileAttachment[]
+  org               Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent            Company?           @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Company[]          @relation("CompanyHierarchy")
+  contacts          Contact[]
+  opportunities     Opportunity[]
+  projectReferences ProjectReference[]
+  notes             Note[]
+  files             FileAttachment[]
 
   serviceCases           ServiceCase[]
   accountSolutions       AccountSolution[]
@@ -448,6 +450,7 @@ model Company {
   intelEvidence IntelEvidence[]
   intelThemes   InvestmentTheme[]
   intelRuns     IntelSourceRun[]
+  intelSummary  CompanyIntelSummary?
   orgChart      OrgChart?
 
   @@index([orgId, domain])
@@ -929,26 +932,26 @@ model SyncEvent {
 }
 
 model ApiKey {
-  id         String    @id @default(uuid()) @db.Uuid
-  orgId      String    @map("org_id") @db.Uuid
-  name       String
+  id                String    @id @default(uuid()) @db.Uuid
+  orgId             String    @map("org_id") @db.Uuid
+  name              String
   // SHA-256 hex digest of the raw key. Globally unique by construction, so
   // @unique both prevents hash collisions AND backs the verifyApiKey hot path
   // (findFirst on hashedKey ran a full table scan without an index — P0 #?).
-  hashedKey  String    @unique @map("hashed_key")
-  prefix     String // first 8 chars, displayed
-  scopes     String[]  @default(["read"])
+  hashedKey         String    @unique @map("hashed_key")
+  prefix            String // first 8 chars, displayed
+  scopes            String[]  @default(["read"])
   // Existing keys are backfilled unrestricted + writable. New keys default
   // to deny (empty company/MSA lists) and read-only unless the creator
   // opts in. See docs/enterprise-readiness.md B2.
-  unrestrictedScope Boolean  @default(false) @map("unrestricted_scope")
-  readOnly          Boolean  @default(true) @map("read_only")
-  companyIds        String[] @default([]) @map("company_ids") @db.Uuid
-  msaIds            String[] @default([]) @map("msa_ids") @db.Uuid
-  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
-  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  unrestrictedScope Boolean   @default(false) @map("unrestricted_scope")
+  readOnly          Boolean   @default(true) @map("read_only")
+  companyIds        String[]  @default([]) @map("company_ids") @db.Uuid
+  msaIds            String[]  @default([]) @map("msa_ids") @db.Uuid
+  lastUsedAt        DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -5389,29 +5392,29 @@ model ContractAgreement {
   // Intake + leverage (2026-11). signingEntityId is OUR brand/branch that
   // signed; commercial clause fields stay blank when the document does not
   // contain them. parties/fieldCitations are provenance, never invented.
-  signingEntityId    String?  @map("signing_entity_id") @db.Uuid
-  termMonths         Int?     @map("term_months")
-  renewalTerms       String?  @map("renewal_terms") @db.VarChar(500)
-  ipClause           String?  @map("ip_clause")
-  confidentiality    String?
-  nonSolicit         String?  @map("non_solicit")
-  exclusivity        String?
-  insurance          String?
-  indexation         String?  @db.VarChar(500)
-  scopeOfServices    String?  @map("scope_of_services")
-  affiliatesClause   String?  @map("affiliates_clause")
-  parties            Json     @default("[]")
-  fieldCitations     Json     @default("{}") @map("field_citations")
+  signingEntityId  String? @map("signing_entity_id") @db.Uuid
+  termMonths       Int?    @map("term_months")
+  renewalTerms     String? @map("renewal_terms") @db.VarChar(500)
+  ipClause         String? @map("ip_clause")
+  confidentiality  String?
+  nonSolicit       String? @map("non_solicit")
+  exclusivity      String?
+  insurance        String?
+  indexation       String? @db.VarChar(500)
+  scopeOfServices  String? @map("scope_of_services")
+  affiliatesClause String? @map("affiliates_clause")
+  parties          Json    @default("[]")
+  fieldCitations   Json    @default("{}") @map("field_citations")
 
-  org            Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sourceFile     FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
-  company        Company?              @relation("CompanyContracts", fields: [companyId], references: [id], onDelete: SetNull)
-  parent         ContractAgreement?    @relation("ContractHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children       ContractAgreement[]   @relation("ContractHierarchy")
-  owner          User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  signingEntity  SigningEntity?        @relation(fields: [signingEntityId], references: [id], onDelete: SetNull)
-  fileVersions   ContractFileVersion[]
-  intakeDrafts   MsaIntakeDraft[]
+  org           Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceFile    FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  company       Company?              @relation("CompanyContracts", fields: [companyId], references: [id], onDelete: SetNull)
+  parent        ContractAgreement?    @relation("ContractHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      ContractAgreement[]   @relation("ContractHierarchy")
+  owner         User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  signingEntity SigningEntity?        @relation(fields: [signingEntityId], references: [id], onDelete: SetNull)
+  fileVersions  ContractFileVersion[]
+  intakeDrafts  MsaIntakeDraft[]
 
   @@index([orgId, accountKey], map: "contract_agreements_org_account_idx")
   @@index([orgId, companyId], map: "contract_agreements_org_company_idx")
@@ -5453,28 +5456,28 @@ model SigningEntity {
 // One-drop intake draft. The uploaded file is stored, fields are extracted,
 // and nothing becomes a ContractAgreement until the user confirms.
 model MsaIntakeDraft {
-  id                    String    @id @default(uuid()) @db.Uuid
-  orgId                 String    @map("org_id") @db.Uuid
-  status                String    @default("pending_review") @db.VarChar(24)
-  fileName              String    @map("file_name") @db.VarChar(255)
-  contentType           String    @map("content_type") @db.VarChar(100)
-  bytes                 Int
-  sha256                String    @db.VarChar(64)
-  storageKey            String    @map("storage_key") @db.VarChar(500)
-  fileAttachmentId      String?   @map("file_attachment_id") @db.Uuid
-  extractedText         String?   @map("extracted_text")
-  pageCount             Int?      @map("page_count")
-  needsOcr              Boolean   @default(false) @map("needs_ocr")
-  usedLlm               Boolean   @default(false) @map("used_llm")
-  extractedFields       Json      @default("{}") @map("extracted_fields")
-  accountMatches        Json      @default("[]") @map("account_matches")
-  signingEntityMatches  Json      @default("[]") @map("signing_entity_matches")
-  warnings              Json      @default("[]")
-  confirmedContractId   String?   @map("confirmed_contract_id") @db.Uuid
-  createdById           String    @map("created_by_id") @db.Uuid
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  orgId                String    @map("org_id") @db.Uuid
+  status               String    @default("pending_review") @db.VarChar(24)
+  fileName             String    @map("file_name") @db.VarChar(255)
+  contentType          String    @map("content_type") @db.VarChar(100)
+  bytes                Int
+  sha256               String    @db.VarChar(64)
+  storageKey           String    @map("storage_key") @db.VarChar(500)
+  fileAttachmentId     String?   @map("file_attachment_id") @db.Uuid
+  extractedText        String?   @map("extracted_text")
+  pageCount            Int?      @map("page_count")
+  needsOcr             Boolean   @default(false) @map("needs_ocr")
+  usedLlm              Boolean   @default(false) @map("used_llm")
+  extractedFields      Json      @default("{}") @map("extracted_fields")
+  accountMatches       Json      @default("[]") @map("account_matches")
+  signingEntityMatches Json      @default("[]") @map("signing_entity_matches")
+  warnings             Json      @default("[]")
+  confirmedContractId  String?   @map("confirmed_contract_id") @db.Uuid
+  createdById          String    @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   org            Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
   fileAttachment FileAttachment?    @relation("MsaIntakeDraftFile", fields: [fileAttachmentId], references: [id], onDelete: SetNull)
@@ -6336,6 +6339,11 @@ model CompanyFirmographics {
   locations           Json      @default("[]")
   techStack           String[]  @default([]) @map("tech_stack")
   departmentHeadcount Json?     @map("department_headcount")
+  /// Organization funding as the provider reports it (Apollo total_funding, USD).
+  totalFundingUsd     BigInt?   @map("total_funding_usd")
+  latestFundingStage  String?   @map("latest_funding_stage")
+  latestFundingAt     DateTime? @map("latest_funding_at") @db.Timestamptz(6)
+  foundedYear         Int?      @map("founded_year")
   providerIds         Json      @default("{}") @map("provider_ids")
   provenance          Json      @default("{}")
   providerStatus      Json      @default("{}") @map("provider_status")
@@ -6668,4 +6676,66 @@ model IntelSourceRun {
 
   @@unique([orgId, companyId, source])
   @@map("intel_source_runs")
+}
+
+/// Slice 14: list-level intel summary per company (revenue, headcount growth,
+/// open and new roles, funding, signal, direction). Derived from stored facts
+/// by the worker after each intel or enrichment run; `payload` is the full
+/// CompanyIntelSummary with source, as-of date and method per number. The
+/// scalar columns exist only to filter and sort the Companies list.
+model CompanyIntelSummary {
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  companyId          String   @unique @map("company_id") @db.Uuid
+  /// Approximate USD (static FX table) for filtering and sorting only.
+  revenueUsdApprox   Float?   @map("revenue_usd_approx")
+  revenueGrowthPct   Float?   @map("revenue_growth_pct")
+  headcount          Int?
+  headcountGrowthPct Float?   @map("headcount_growth_pct")
+  openRoles          Int?     @map("open_roles")
+  newRoles30d        Int?     @map("new_roles_30d")
+  fundingUsd         Float?   @map("funding_usd")
+  /// growing | steady | contracting, inferred
+  direction          String?
+  payload            Json
+  sample             Boolean  @default(false)
+  computedAt         DateTime @map("computed_at") @db.Timestamptz(6)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, direction])
+  @@index([orgId, revenueUsdApprox])
+  @@index([orgId, newRoles30d])
+  @@map("company_intel_summaries")
+}
+
+/// Slice 14: one enrichment run over the companies an import created (CSV or
+/// HubSpot). Progress for the Companies page row; one batch per migration job.
+/// Retention: rows older than 90 days are pruned by the account-intel sweep.
+model IntelImportBatch {
+  id             String    @id @default(uuid()) @db.Uuid
+  orgId          String    @map("org_id") @db.Uuid
+  migrationJobId String?   @map("migration_job_id") @db.Uuid
+  /// csv | hubspot
+  origin         String
+  companyIds     String[]  @default([]) @map("company_ids")
+  doneIds        String[]  @default([]) @map("done_ids")
+  failedIds      String[]  @default([]) @map("failed_ids")
+  /// running | complete
+  status         String    @default("running")
+  /// { withRevenue, withHeadcountGrowth, withNewRoles30d, apollo }
+  summary        Json      @default("{}")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, migrationJobId])
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("intel_import_batches")
 }
