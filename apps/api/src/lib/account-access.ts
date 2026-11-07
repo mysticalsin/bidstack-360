@@ -5,7 +5,6 @@ import {
   applyCompanyScope,
   countryVariantsForScope,
   getAccessScope,
-  isApiKeyActor,
   type AccessScope,
 } from './access-scope.js';
 
@@ -72,8 +71,6 @@ async function hasVisibleLegacyOpportunity(
   scope: AccessScope,
   prismaClient: PrismaClient,
 ): Promise<boolean> {
-  // API keys are scoped by their company allowlist (checked above), not by deal ownership.
-  if (isApiKeyActor(userId)) return false;
   const slugs = [...new Set(accountKeys.map(normalizeAccountSlug).filter(Boolean))];
   if (slugs.length === 0) return false;
   const variants = countryVariantsForScope(scope);
