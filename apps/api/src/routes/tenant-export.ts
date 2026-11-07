@@ -18,6 +18,7 @@ import type { AuthContext } from '../plugins/auth.js';
 
 import { prisma, type TenantExport } from '@bidstack/db';
 import {
+  DataRegion,
   TenantExportIdParams,
   TenantExportListPage,
   TenantExportListQuery,
@@ -26,7 +27,7 @@ import {
 } from '@bidstack/shared';
 
 import { enqueueTenantExport } from '../queues/tenant-export.js';
-import { getStorage } from '../storage/index.js';
+import { getStorageForRegion } from '../storage/index.js';
 
 export const tenantExportRoutes: FastifyPluginAsyncZod = async (server) => {
   // POST /orgs/:orgId/export — request a new export.
@@ -188,7 +189,11 @@ async function freshDownloadUrl(row: TenantExport): Promise<string | null> {
   if (row.status !== 'ready' || !row.storageKey) return null;
   if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return null;
 
-  const storage = await getStorage();
+  const settings = await prisma.orgSettings.findFirst({
+    where: { orgId: row.orgId, deletedAt: null },
+    select: { dataRegion: true },
+  });
+  const storage = await getStorageForRegion(DataRegion.safeParse(settings?.dataRegion).data ?? null);
   if (storage.driver === 's3') {
     const result = await storage.getDownload(row.storageKey, {
       filename: `polo-presales-export-${row.id}.ndjson.gz`,

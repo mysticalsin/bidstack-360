@@ -9,11 +9,15 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
 
+import { resolveRegionalBucket, type DataRegion } from '@bidstack/shared';
+
 export interface UploadArchiveArgs {
   /** Org-namespaced storage key, e.g. `orgs/<org>/exports/<id>.ndjson.gz`. */
   key: string;
   /** Gzipped NDJSON body stream. */
   body: Readable;
+  /** Org data residency tag; picks S3_BUCKET_<REGION> when configured. */
+  region?: DataRegion | null;
 }
 
 const CONTENT_TYPE = 'application/gzip';
@@ -77,19 +81,24 @@ async function loadS3(): Promise<{ s3: S3Module; signer: SignerModule }> {
   return { s3, signer };
 }
 
-function s3Client(s3: S3Module) {
+function s3Target(region: DataRegion | null | undefined): { bucket: string; s3Region: string } {
+  const { bucket, s3Region } = resolveRegionalBucket(region ?? null, process.env);
+  if (!bucket) throw new Error('S3_BUCKET env var required when STORAGE_DRIVER=s3');
+  return { bucket, s3Region };
+}
+
+function s3Client(s3: S3Module, s3Region: string) {
   return new s3.S3Client({
-    region: process.env.S3_REGION ?? 'us-east-1',
+    region: s3Region,
     endpoint: process.env.S3_ENDPOINT || undefined,
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
   });
 }
 
-async function uploadS3({ key, body }: UploadArchiveArgs): Promise<{ bytes: number }> {
-  const bucket = process.env.S3_BUCKET;
-  if (!bucket) throw new Error('S3_BUCKET env var required when STORAGE_DRIVER=s3');
+async function uploadS3({ key, body, region }: UploadArchiveArgs): Promise<{ bytes: number }> {
+  const { bucket, s3Region } = s3Target(region);
   const { s3 } = await loadS3();
-  const client = s3Client(s3);
+  const client = s3Client(s3, s3Region);
   // Count bytes as the stream flows so we can record sizeBytes without a HEAD.
   let bytes = 0;
   body.on('data', (chunk: Buffer | string) => {
@@ -117,12 +126,12 @@ export async function uploadExportArchive(args: UploadArchiveArgs): Promise<{ by
 export async function signExportDownloadUrl(
   key: string,
   expiresInSec: number,
+  region?: DataRegion | null,
 ): Promise<string | null> {
   if (driver() !== 's3') return null;
-  const bucket = process.env.S3_BUCKET;
-  if (!bucket) throw new Error('S3_BUCKET env var required when STORAGE_DRIVER=s3');
+  const { bucket, s3Region } = s3Target(region);
   const { s3, signer } = await loadS3();
-  const client = s3Client(s3);
+  const client = s3Client(s3, s3Region);
   const filename = path.basename(key);
   return signer.getSignedUrl(
     client,
