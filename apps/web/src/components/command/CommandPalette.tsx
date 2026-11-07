@@ -34,6 +34,8 @@ import {
   type Item,
 } from './commandPaletteUtils';
 import { buildAskCopilotItem, CopilotPanel, type CopilotKeyHandler } from './CopilotPanel';
+import { buildAskJarvisItem } from './jarvisPaletteItem';
+import { useJarvisStore } from './jarvisStore';
 import { isCopilotQuery, looksLikeCopilotAsk, stripCopilotPrefix } from './copilotActions';
 import { usePaletteItems } from './usePaletteItems';
 
@@ -115,6 +117,15 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     inputRef.current?.focus();
   }, []);
 
+  const openJarvis = useJarvisStore((s) => s.openJarvis);
+  const askJarvis = useCallback(
+    (q: string) => {
+      onClose();
+      openJarvis(q);
+    },
+    [onClose, openJarvis],
+  );
+
   // Sentence-like queries grow an "Ask Copilot" escape hatch APPENDED to the
   // results — never ranked into them, so search ordering/muscle memory hold.
   const displayItems = useMemo(() => {
@@ -122,9 +133,13 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
     // enterCopilot only reads refs when invoked from the item's onSelect
     // handler (a user event), never during render — buildAskCopilotItem stores
     // it, it does not call it. The refs rule can't prove that, so scope it here.
-    // eslint-disable-next-line react-hooks/refs
-    return [...items, buildAskCopilotItem(query, t, enterCopilot)];
-  }, [items, query, copilotMode, t, enterCopilot]);
+    return [
+      ...items,
+      buildAskJarvisItem(query, t, askJarvis),
+      // eslint-disable-next-line react-hooks/refs
+      buildAskCopilotItem(query, t, enterCopilot),
+    ];
+  }, [items, query, copilotMode, t, enterCopilot, askJarvis]);
 
   // Focus the input immediately on mount — both sync (for standard focus) and
   // deferred one frame (for portals that mount slightly after the effect runs).

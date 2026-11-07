@@ -116,6 +116,7 @@ import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
 // Wave 4 — AI assistant
 import { aiAssistantRoutes } from './routes/ai-assistant.js';
+import { jarvisRoutes } from './routes/jarvis.js';
 import { documentTemplatesRoutes } from './routes/document-templates.js';
 import { signaturesRoutes } from './routes/signatures.js';
 import { publicSignRoutes } from './routes/public-sign.js';
@@ -291,6 +292,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 4 — AI Assistant
   await server.register(aiAssistantRoutes, { prefix: '/api/v1' });
+  await server.register(jarvisRoutes, { prefix: '/api/v1' });
   await server.register(documentTemplatesRoutes, { prefix: '/api/v1' });
   await server.register(signaturesRoutes, { prefix: '/api/v1' });
   await server.register(publicSignRoutes, { prefix: '/api/v1' });
