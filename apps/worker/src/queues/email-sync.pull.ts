@@ -59,7 +59,7 @@ export async function pullDelta(
     where: { id: params.integrationTokenId, orgId: params.orgId },
   });
 
-  if (!token || token.status !== 'active') {
+  if (!token || (token.status !== 'active' && token.status !== 'error')) {
     log.warn({ tokenId: params.integrationTokenId }, 'Skipping Graph pull: token inactive');
     return { persisted: 0 };
   }

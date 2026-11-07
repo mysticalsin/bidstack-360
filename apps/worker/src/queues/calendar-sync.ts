@@ -284,7 +284,8 @@ export async function fanoutIncrementalPulls(queue: Queue, log: pino.Logger): Pr
 
   while (true) {
     const batch = await prisma.integrationToken.findMany({
-      where: { status: 'active', deletedAt: null, provider: { in: [...CALENDAR_TOKEN_PROVIDERS] } },
+      // A failed refresh marks the row 'error'; keep pulling so the next refresh can recover it.
+      where: { status: { in: ['active', 'error'] }, deletedAt: null, provider: { in: [...CALENDAR_TOKEN_PROVIDERS] } },
       select: { id: true, orgId: true, userId: true },
       take: FANOUT_BATCH_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -448,7 +449,7 @@ async function runIncrementalPull(
   // callers pass ids from org-scoped fetches today, but the helper must not
   // decrypt a cross-tenant token if a future caller passes a mismatched pair.
   const token = await prisma.integrationToken.findFirst({ where: { id: tokenId, orgId, deletedAt: null } });
-  if (!token || token.status !== 'active') return;
+  if (!token || (token.status !== 'active' && token.status !== 'error')) return;
 
   const isGoogle = token.provider === 'google_workspace' || token.provider === 'gmail';
   const wantsCalendar = grantsCalendarRead(token.scope);

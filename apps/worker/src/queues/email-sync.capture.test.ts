@@ -164,6 +164,14 @@ describe('Outlook inbox capture', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
+  it('still pulls after a failed refresh left the grant in error', async () => {
+    findToken.mockResolvedValueOnce({ ...(tokenRow('microsoft_graph', {}) as object), status: 'error' } as never);
+    const fetchMock = vi.fn(async () => json({ value: [], '@odata.deltaLink': 'delta' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
   it('looks the token up inside the job org only', async () => {
     findToken.mockResolvedValueOnce(null);
     const fetchMock = vi.fn();

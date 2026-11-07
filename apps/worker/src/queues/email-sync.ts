@@ -66,7 +66,7 @@ export function startEmailSync(
           const tokens = await prisma.integrationToken.findMany({
             where: {
               provider: IntegrationProvider.microsoft_graph,
-              status: 'active',
+              status: { in: ['active', 'error'] },
               deletedAt: null,
             },
             select: { id: true, orgId: true, userId: true },
