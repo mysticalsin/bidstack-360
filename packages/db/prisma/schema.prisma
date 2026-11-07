@@ -205,6 +205,7 @@ model Org {
   msaIntakeDrafts               MsaIntakeDraft[]
   agreementSources              AgreementSource[]
   agreementIngestItems          AgreementIngestItem[]
+  agreementConnections          AgreementConnection[]
   msaWhitespaceDecisions        MsaWhitespaceDecision[]
   meetingSourceConnections      MeetingSourceConnection[]
   meetingIngestItems            MeetingIngestItem[]
@@ -5507,16 +5508,54 @@ model AgreementSource {
   lastRunId   String?   @map("last_run_id") @db.VarChar(80)
   lastResult  Json?     @map("last_result")
   createdById String    @map("created_by_id") @db.Uuid
+  /// Org-scoped provider connection the pull uses. Null only in single-tenant mode.
+  connectionId String?  @map("connection_id") @db.Uuid
+  /// Resumable position inside an unfinished pull: { next?: page url, delta?: final link not yet committed }.
+  progress    Json?
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  org   Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  items AgreementIngestItem[]
+  org        Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection AgreementConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  items      AgreementIngestItem[]
 
   @@index([orgId, kind], map: "agreement_sources_org_kind_idx")
   @@index([deletedAt])
   @@map("agreement_sources")
+}
+
+// One org's own grant to a provider for the agreement pull (slice 13a). The
+// deployment env holds only the OAuth app identity; data access always goes
+// through the tenant (Graph admin consent) or account (DocuSign) recorded
+// here, so one org can never read another org's library.
+model AgreementConnection {
+  id               String    @id @default(uuid()) @db.Uuid
+  orgId            String    @map("org_id") @db.Uuid
+  provider         String    @db.VarChar(20)
+  /// pending | connected | revoked
+  status           String    @default("pending") @db.VarChar(20)
+  /// Graph: the Entra tenant id that granted admin consent.
+  externalTenantId String?   @map("external_tenant_id") @db.VarChar(100)
+  /// DocuSign: the account id the consenting user belongs to.
+  accountId        String?   @map("account_id") @db.VarChar(100)
+  accountName      String?   @map("account_name") @db.VarChar(200)
+  baseUri          String?   @map("base_uri") @db.VarChar(300)
+  /// DocuSign refresh token, encrypted with INTEGRATION_TOKEN_KEY.
+  secretEncrypted  String?   @map("secret_encrypted")
+  stateNonce       String?   @map("state_nonce") @db.VarChar(64)
+  createdById      String    @map("created_by_id") @db.Uuid
+  connectedById    String?   @map("connected_by_id") @db.Uuid
+  connectedAt      DateTime? @map("connected_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sources AgreementSource[]
+
+  @@unique([orgId, provider], map: "agreement_connections_org_provider_uq")
+  @@map("agreement_connections")
 }
 
 // One inbound agreement document from any channel (SharePoint, DocuSign, REST,
@@ -5543,6 +5582,10 @@ model AgreementIngestItem {
   status                String    @default("queued") @db.VarChar(20)
   error                 String?   @db.VarChar(500)
   attempts              Int       @default(0)
+  /// Source items: when a retryable failure may be tried again.
+  nextAttemptAt         DateTime? @map("next_attempt_at") @db.Timestamptz(6)
+  /// Set when retries stop; the item stays failed for a person to look at.
+  deadLetteredAt        DateTime? @map("dead_lettered_at") @db.Timestamptz(6)
   intakeDraftId         String?   @map("intake_draft_id") @db.Uuid
   contractId            String?   @map("contract_id") @db.Uuid
   contractFileVersionId String?   @map("contract_file_version_id") @db.Uuid
@@ -5559,6 +5602,7 @@ model AgreementIngestItem {
   @@index([orgId, externalSource, externalId], map: "agreement_ingest_items_org_ext_idx")
   @@index([orgId, sha256], map: "agreement_ingest_items_org_sha_idx")
   @@index([status, createdAt], map: "agreement_ingest_items_status_idx")
+  @@index([sourceId, status], map: "agreement_ingest_items_source_status_idx")
   @@map("agreement_ingest_items")
 }
 

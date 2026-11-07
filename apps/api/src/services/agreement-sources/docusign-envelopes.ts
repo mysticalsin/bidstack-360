@@ -1,13 +1,17 @@
 // DocuSign eSignature read-only client for the agreement pull (slice 13a).
 //
-// JWT grant (DOCUSIGN_INTEGRATION_KEY, DOCUSIGN_USER_ID, DOCUSIGN_PRIVATE_KEY
-// as base64 PEM, DOCUSIGN_ACCOUNT_ID, DOCUSIGN_BASE_URL, DOCUSIGN_OAUTH_HOST).
+// Each org connects its own account with the Authorization Code grant
+// (DOCUSIGN_INTEGRATION_KEY and DOCUSIGN_CLIENT_SECRET name the app; the
+// refresh token and account live on the org's AgreementConnection). The JWT
+// grant on DOCUSIGN_USER_ID / DOCUSIGN_PRIVATE_KEY / DOCUSIGN_ACCOUNT_ID /
+// DOCUSIGN_BASE_URL is only used in single-tenant mode.
 // Lists completed envelopes since the cursor date, narrowed by template,
 // folder or keyword, and downloads the combined PDF with its metadata
 // (counterparty, signed date). Nothing is sent or voided from here.
 import { createSign } from 'node:crypto';
 
 import type { FetchFn } from './graph-drive.js';
+import { readBodyCapped } from './read-capped.js';
 
 const MAX_PAGES = 20;
 const PAGE_SIZE = 100;
@@ -199,7 +203,81 @@ export async function downloadCombinedPdf(
     headers: { authorization: `Bearer ${token}`, accept: 'application/pdf' },
   });
   if (!res.ok) throw new DocuSignError(`DocuSign download failed (${res.status})`, res.status);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > maxBytes) throw new DocuSignError('Envelope PDF is larger than the agreement limit');
+  const buf = await readBodyCapped(res, maxBytes);
+  if (!buf) throw new DocuSignError('Envelope PDF is larger than the agreement limit', 413);
   return buf;
+}
+
+/** The deployment's DocuSign app (not a data-access identity). */
+export interface DocuSignApp {
+  integrationKey: string;
+  clientSecret: string;
+  oauthHost: string;
+}
+
+export function docuSignAppFromEnv(env: NodeJS.ProcessEnv = process.env): DocuSignApp | null {
+  const integrationKey = env.DOCUSIGN_INTEGRATION_KEY?.trim();
+  const clientSecret = env.DOCUSIGN_CLIENT_SECRET?.trim();
+  if (!integrationKey || !clientSecret) return null;
+  return { integrationKey, clientSecret, oauthHost: env.DOCUSIGN_OAUTH_HOST?.trim() || 'account-d.docusign.com' };
+}
+
+export function docuSignConsentUrl(app: DocuSignApp, redirectUri: string, state: string): string {
+  const params = new URLSearchParams({
+    response_type: 'code',
+    scope: 'signature',
+    client_id: app.integrationKey,
+    redirect_uri: redirectUri,
+    state,
+  });
+  return `https://${app.oauthHost}/oauth/auth?${params.toString()}`;
+}
+
+async function tokenCall(fetchFn: FetchFn, app: DocuSignApp, body: Record<string, string>): Promise<{ accessToken: string; refreshToken: string }> {
+  const res = await fetchFn(`https://${app.oauthHost}/oauth/token`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      authorization: `Basic ${Buffer.from(`${app.integrationKey}:${app.clientSecret}`).toString('base64')}`,
+    },
+    body: new URLSearchParams(body).toString(),
+  });
+  if (!res.ok) throw new DocuSignError(`DocuSign token request failed (${res.status})`, res.status);
+  const json = (await res.json()) as { access_token?: string; refresh_token?: string };
+  if (!json.access_token || !json.refresh_token) throw new DocuSignError('DocuSign token response was incomplete');
+  return { accessToken: json.access_token, refreshToken: json.refresh_token };
+}
+
+export function exchangeDocuSignCode(fetchFn: FetchFn, app: DocuSignApp, code: string, redirectUri: string) {
+  return tokenCall(fetchFn, app, { grant_type: 'authorization_code', code, redirect_uri: redirectUri });
+}
+
+export function refreshDocuSignToken(fetchFn: FetchFn, app: DocuSignApp, refreshToken: string) {
+  return tokenCall(fetchFn, app, { grant_type: 'refresh_token', refresh_token: refreshToken });
+}
+
+export interface DocuSignAccount {
+  accountId: string;
+  accountName: string | null;
+  baseUri: string;
+  isDefault: boolean;
+}
+
+/** Accounts the token's user belongs to, from DocuSign's userinfo endpoint. */
+export async function getDocuSignAccounts(fetchFn: FetchFn, oauthHost: string, accessToken: string): Promise<DocuSignAccount[]> {
+  const res = await fetchFn(`https://${oauthHost}/oauth/userinfo`, {
+    headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' },
+  });
+  if (!res.ok) throw new DocuSignError(`DocuSign userinfo failed (${res.status})`, res.status);
+  const json = (await res.json()) as {
+    accounts?: Array<{ account_id?: string; account_name?: string; base_uri?: string; is_default?: boolean | string }>;
+  };
+  return (json.accounts ?? [])
+    .filter((a) => a.account_id && a.base_uri && /^https:\/\/[a-z0-9.-]+\.docusign\.(net|com)$/i.test(a.base_uri.replace(/\/+$/, '')))
+    .map((a) => ({
+      accountId: String(a.account_id),
+      accountName: a.account_name ?? null,
+      baseUri: String(a.base_uri).replace(/\/+$/, ''),
+      isDefault: a.is_default === true || a.is_default === 'true',
+    }));
 }

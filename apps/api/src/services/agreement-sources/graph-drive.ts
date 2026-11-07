@@ -1,11 +1,14 @@
 // Microsoft Graph read-only client for the agreement pull (slice 13a).
 //
-// App-only token (client credentials) for an Entra app granted Sites.Selected
-// or Files.Read.All. Reuses MICROSOFT_TENANT_ID, MICROSOFT_GRAPH_CLIENT_ID and
-// MICROSOFT_GRAPH_CLIENT_SECRET. Lists one drive (optionally one folder) with
+// App-only token (client credentials) for the deployment's Entra app
+// (MICROSOFT_GRAPH_CLIENT_ID, MICROSOFT_GRAPH_CLIENT_SECRET), minted against
+// the tenant that granted admin consent on the org's AgreementConnection.
+// MICROSOFT_TENANT_ID is only used in single-tenant mode. Lists one drive (optionally one folder) with
 // delta so each sync only sees what changed; downloads PDF/DOCX content only.
 // Every call goes to fixed Microsoft hosts; fetch is injected for tests.
 import { isAgreementFileName } from '@bidstack/shared';
+
+import { readBodyCapped } from './read-capped.js';
 
 export const GRAPH_ROOT = 'https://graph.microsoft.com/v1.0';
 const LOGIN_ROOT = 'https://login.microsoftonline.com';
@@ -121,23 +124,29 @@ export function inFolder(parentPath: string | null, folderPath: string | undefin
   return have === want || have.startsWith(`${want}/`);
 }
 
+export interface DriveDeltaStep {
+  /** The URL this page was read from (after a 410 restart, the feed start). */
+  url: string;
+  files: DriveFile[];
+  removedIds: string[];
+  nextLink: string | null;
+  deltaLink: string | null;
+}
+
 /**
- * Walk the delta feed from the stored deltaLink (or from the start) to the
- * new deltaLink. Folders and non PDF/DOCX files are dropped; deleted items are
- * reported so the caller can ignore them (agreements are never auto-removed).
+ * Read one page of the delta feed. Folders and non PDF/DOCX files are dropped;
+ * deleted items are reported so the caller can ignore them (agreements are
+ * never auto-removed). An expired cursor (410) restarts from the feed start.
  */
-export async function listDriveDelta(
+export async function listDriveDeltaPage(
   fetchFn: FetchFn,
   token: string,
-  opts: { driveId: string; folderPath?: string; deltaLink?: string | null },
-): Promise<DriveDeltaPage> {
-  let url = assertGraphUrl(opts.deltaLink ?? deltaStartUrl(opts.driveId));
-  const files: DriveFile[] = [];
-  const removedIds: string[] = [];
-  for (let page = 0; page < MAX_PAGES; page += 1) {
+  opts: { driveId: string; folderPath?: string; url?: string | null },
+): Promise<DriveDeltaStep> {
+  let url = assertGraphUrl(opts.url ?? deltaStartUrl(opts.driveId));
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     const res = await fetchFn(url, { headers: { authorization: `Bearer ${token}`, accept: 'application/json' } });
     if (res.status === 410) {
-      // Graph expired the cursor: restart from the top of the folder.
       url = deltaStartUrl(opts.driveId);
       continue;
     }
@@ -147,6 +156,8 @@ export async function listDriveDelta(
       '@odata.nextLink'?: string;
       '@odata.deltaLink'?: string;
     };
+    const files: DriveFile[] = [];
+    const removedIds: string[] = [];
     for (const item of json.value ?? []) {
       if (item.deleted) {
         removedIds.push(item.id);
@@ -155,13 +166,51 @@ export async function listDriveDelta(
       const file = itemToFile(item);
       if (file && inFolder(file.parentPath, opts.folderPath)) files.push(file);
     }
-    if (json['@odata.deltaLink']) {
-      return { files, removedIds, deltaLink: assertGraphUrl(json['@odata.deltaLink']) };
-    }
-    if (!json['@odata.nextLink']) throw new GraphDriveError('Graph delta ended without a deltaLink');
-    url = assertGraphUrl(json['@odata.nextLink']);
+    const deltaLink = json['@odata.deltaLink'] ? assertGraphUrl(json['@odata.deltaLink']) : null;
+    const nextLink = json['@odata.nextLink'] ? assertGraphUrl(json['@odata.nextLink']) : null;
+    if (!deltaLink && !nextLink) throw new GraphDriveError('Graph delta ended without a deltaLink');
+    return { url, files, removedIds, nextLink: deltaLink ? null : nextLink, deltaLink };
+  }
+  throw new GraphDriveError('Graph delta cursor expired twice');
+}
+
+/** Walk the whole delta feed from the stored deltaLink (or the start) to the new deltaLink. */
+export async function listDriveDelta(
+  fetchFn: FetchFn,
+  token: string,
+  opts: { driveId: string; folderPath?: string; deltaLink?: string | null },
+): Promise<DriveDeltaPage> {
+  let url: string | null = opts.deltaLink ?? null;
+  const files: DriveFile[] = [];
+  const removedIds: string[] = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const step = await listDriveDeltaPage(fetchFn, token, { driveId: opts.driveId, folderPath: opts.folderPath, url });
+    files.push(...step.files);
+    removedIds.push(...step.removedIds);
+    if (step.deltaLink) return { files, removedIds, deltaLink: step.deltaLink };
+    url = step.nextLink;
   }
   throw new GraphDriveError('Graph delta exceeded the page limit');
+}
+
+/**
+ * The drive must live in the connection's tenant. A tenant-bound app token
+ * cannot reach other tenants' drives, and the drive root's sharepointIds
+ * names its tenant, which must match.
+ */
+export async function verifyDriveTenant(fetchFn: FetchFn, token: string, driveId: string, tenantId: string): Promise<void> {
+  const res = await fetchFn(`${GRAPH_ROOT}/drives/${encodeURIComponent(driveId)}/root?$select=id,sharepointIds`, {
+    headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
+  });
+  if (res.status === 401 || res.status === 403 || res.status === 404) {
+    throw new GraphDriveError('The drive is not reachable with this connection', 403);
+  }
+  if (!res.ok) throw new GraphDriveError(`Graph drive lookup failed (${res.status})`, res.status);
+  const json = (await res.json()) as { sharepointIds?: { tenantId?: string } };
+  const owner = json.sharepointIds?.tenantId?.toLowerCase();
+  if (owner && owner !== tenantId.toLowerCase()) {
+    throw new GraphDriveError('The drive belongs to a different Microsoft tenant than this connection', 403);
+  }
 }
 
 /** Download one file's bytes. Graph answers 302 to a short-lived download URL. */
@@ -175,9 +224,7 @@ export async function downloadDriveItem(
     { headers: { authorization: `Bearer ${token}` } },
   );
   if (!res.ok) throw new GraphDriveError(`Graph download failed (${res.status})`, res.status);
-  const declared = Number(res.headers.get('content-length') ?? '0');
-  if (declared > opts.maxBytes) throw new GraphDriveError('File is larger than the agreement limit');
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > opts.maxBytes) throw new GraphDriveError('File is larger than the agreement limit');
+  const buf = await readBodyCapped(res, opts.maxBytes);
+  if (!buf) throw new GraphDriveError('File is larger than the agreement limit', 413);
   return buf;
 }

@@ -74,7 +74,7 @@ export async function sweepQueuedAgreementItems(): Promise<number> {
   const stale = new Date(Date.now() - 30_000);
   // A crash mid-process leaves rows in `processing`. REST and MCP rows still
   // hold their bytes or URL, so they go back to the queue; source rows are
-  // marked failed so the next sync pulls the file again.
+  // marked failed so the next sync retries them by id.
   const stuck = new Date(Date.now() - PROCESSING_STALE_MS);
   await prisma.agreementIngestItem.updateMany({
     where: { status: 'processing', updatedAt: { lt: stuck }, sourceId: null },
@@ -82,7 +82,7 @@ export async function sweepQueuedAgreementItems(): Promise<number> {
   });
   await prisma.agreementIngestItem.updateMany({
     where: { status: 'processing', updatedAt: { lt: stuck }, sourceId: { not: null } },
-    data: { status: 'failed', error: 'Interrupted; the next sync pulls it again', processedAt: new Date() },
+    data: { status: 'failed', error: 'Interrupted; the next sync retries it', processedAt: new Date(), nextAttemptAt: null },
   });
   const rows = await prisma.agreementIngestItem.findMany({
     where: { status: 'queued', attempts: { lt: MAX_ATTEMPTS }, updatedAt: { lt: stale } },

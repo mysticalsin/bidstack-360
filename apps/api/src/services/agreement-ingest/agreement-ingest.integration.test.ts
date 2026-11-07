@@ -2,16 +2,19 @@
  * Agreement pull by API (slice 13a): REST ingest, SharePoint and DocuSign
  * syncs, all landing as MSA intake drafts for human review.
  */
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
+import { _resetIntegrationTokenKey } from '@bidstack/shared/server-crypto';
+import { encryptToken } from '@bidstack/shared/token-crypto';
 
 import { invalidateAccessScope } from '../../lib/access-scope.js';
 import { __setAgreementIngestEnqueueForTest, sweepQueuedAgreementItems } from '../../queues/agreement-ingest.js';
 import { buildServer } from '../../server.js';
+import { __setAgreementConnectionFetchForTest } from '../agreement-sources/connections.js';
 import { __setStorageForTest } from '../../storage/index.js';
 import {
   DOCUSIGN_ENVELOPES,
@@ -78,15 +81,29 @@ async function makeKey(opts: { companyIds?: string[]; readOnly?: boolean; scopes
   return { raw, id: key.id };
 }
 
+const TENANT = '0f0f0f0f-1111-4222-8333-444444444444';
 const GRAPH_ENV = {
-  MICROSOFT_TENANT_ID: 'tenant-fixture',
   MICROSOFT_GRAPH_CLIENT_ID: 'client-fixture',
   MICROSOFT_GRAPH_CLIENT_SECRET: 'not-a-secret',
 };
+const DRIVE_ROOT: [RegExp, () => Response] = [/\/root\?\$select=id,sharepointIds/, () => json({ id: 'root', sharepointIds: { tenantId: TENANT } })];
+const savedEnv = { ...process.env };
 
 beforeAll(async () => {
   process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+  Object.assign(process.env, {
+    INTEGRATION_TOKEN_KEY: randomBytes(32).toString('hex'),
+    ...GRAPH_ENV,
+    DOCUSIGN_INTEGRATION_KEY: 'ik',
+    DOCUSIGN_CLIENT_SECRET: 'not-a-secret',
+  });
+  _resetIntegrationTokenKey();
   org = await createIsolatedOrg('agreement-ingest');
+  const admin = (await prisma.user.findFirstOrThrow({ where: { orgId: org.orgId }, orderBy: { createdAt: 'asc' } })).id;
+  await prisma.agreementConnection.create({ data: { orgId: org.orgId, provider: 'sharepoint', status: 'connected', externalTenantId: TENANT, createdById: admin } });
+  await prisma.agreementConnection.create({
+    data: { orgId: org.orgId, provider: 'docusign', status: 'connected', accountId: 'acct', baseUri: 'https://demo.docusign.net', secretEncrypted: encryptToken('refresh-0'), createdById: admin },
+  });
   restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
   pdf = await syntheticNorthwindMsaPdf();
   __setAgreementIngestEnqueueForTest(async (job, jobId) => {
@@ -98,6 +115,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  __setAgreementConnectionFetchForTest(null);
+  process.env = savedEnv;
+  _resetIntegrationTokenKey();
   __setAgreementIngestEnqueueForTest(null);
   __setStorageForTest(null);
   await server?.close();
@@ -107,6 +127,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+  __setAgreementConnectionFetchForTest(null);
   storage = makeFakeStorage('s3');
   __setStorageForTest(storage);
   enqueued.length = 0;
@@ -286,6 +307,47 @@ describe('POST /ingest/agreements', () => {
     expect((await prisma.agreementIngestItem.findFirstOrThrow({ where: { id: fromSource.id } })).status).toBe('failed');
   });
 
+  it('rejects an Idempotency-Key longer than the 128 character column', async () => {
+    const long = await call({ method: 'POST', url: '/ingest/agreements', payload: ingestBody(), headers: { 'idempotency-key': `k${randomUUID()}`.padEnd(129, 'x') } });
+    expect(long.statusCode, long.body).toBe(400);
+    const max = await call({ method: 'POST', url: '/ingest/agreements', payload: ingestBody(), headers: { 'idempotency-key': `k${randomUUID()}`.padEnd(128, 'x') } });
+    expect(max.statusCode, max.body).toBe(202);
+  });
+
+  it('a notification failure after the outcome is saved neither requeues nor reprocesses the item', async () => {
+    const res = await call({ method: 'POST', url: '/ingest/agreements', payload: ingestBody() });
+    const spy = vi.spyOn(prisma.notification, 'create').mockRejectedValue(new Error('notification store down'));
+    try {
+      const outcome = await processAgreementIngestItem(org.orgId, res.json().id);
+      expect(outcome.status).toBe('drafted');
+    } finally {
+      spy.mockRestore();
+    }
+    const row = await prisma.agreementIngestItem.findFirstOrThrow({ where: { id: res.json().id } });
+    expect(row.status).toBe('drafted');
+    await sweepQueuedAgreementItems();
+    expect(await processAgreementIngestItem(org.orgId, row.id)).toMatchObject({ status: 'skipped' });
+    expect(await prisma.msaIntakeDraft.count({ where: { orgId: org.orgId, sha256: row.sha256! } })).toBe(1);
+  });
+
+  it('a first copy that was a duplicate of an agreement file still lets changed bytes become a new version', async () => {
+    const bytes = uniquePdf();
+    const first = await call({ method: 'POST', url: '/ingest/agreements', payload: ingestBody({ file: { base64: bytes.toString('base64') } }) });
+    await processAgreementIngestItem(org.orgId, first.json().id);
+    const draftId = (await prisma.agreementIngestItem.findFirstOrThrow({ where: { id: first.json().id } })).intakeDraftId!;
+    const companyId = (await prisma.company.findFirstOrThrow({ where: { orgId: org.orgId, deletedAt: null } })).id;
+    const confirm = await call({ method: 'POST', url: `/msa/intake/${draftId}/confirm`, payload: { companyId, status: 'active' } });
+    expect(confirm.statusCode, confirm.body).toBe(201);
+    const { contractId } = confirm.json() as { contractId: string };
+
+    const externalId = `clm-${randomUUID()}`;
+    const dup = await call({ method: 'POST', url: '/ingest/agreements', payload: ingestBody({ externalId, file: { base64: bytes.toString('base64') } }) });
+    expect((await processAgreementIngestItem(org.orgId, dup.json().id)).status).toBe('duplicate');
+    const changed = await call({ method: 'POST', url: '/ingest/agreements', payload: ingestBody({ externalId }) });
+    const outcome = await processAgreementIngestItem(org.orgId, changed.json().id);
+    expect(outcome).toMatchObject({ status: 'versioned', contractId });
+  });
+
   it('keeps ingest items tenant scoped', async () => {
     const other = await prisma.org.create({ data: { clerkOrg: `org_other_${randomUUID().slice(0, 8)}`, name: 'Other tenant' } });
     try {
@@ -314,6 +376,18 @@ describe('agreement sources and Sync now', () => {
   });
 
   it('pulls SharePoint by delta, drafts new files, and skips them on the next run', async () => {
+    const docx = fakeDocx(`Statement of work ${randomUUID()}`);
+    const spPdf = uniquePdf();
+    const { fetch } = fakeFetch([
+      ['https://login.microsoftonline.com/', () => json({ access_token: 'tok' })],
+      DRIVE_ROOT,
+      [/item-msa-pfizer\/content$/, () => new Response(spPdf)],
+      [/item-sow\/content$/, () => new Response(docx)],
+      [/token=page2/, () => json(GRAPH_DELTA_PAGE_2)],
+      [/token=next-cursor/, () => json({ value: [], '@odata.deltaLink': GRAPH_DELTA_PAGE_2['@odata.deltaLink'] })],
+      [/root\/delta/, () => json(GRAPH_DELTA_PAGE_1)],
+    ]);
+    __setAgreementConnectionFetchForTest(fetch);
     const created = await call({
       method: 'POST',
       url: '/msa/sources',
@@ -321,17 +395,6 @@ describe('agreement sources and Sync now', () => {
     });
     expect(created.statusCode, created.body).toBe(201);
     const source = created.json() as { id: string; configured: boolean };
-
-    const docx = fakeDocx(`Statement of work ${randomUUID()}`);
-    const spPdf = uniquePdf();
-    const { fetch } = fakeFetch([
-      ['https://login.microsoftonline.com/', () => json({ access_token: 'tok' })],
-      [/item-msa-pfizer\/content$/, () => new Response(spPdf)],
-      [/item-sow\/content$/, () => new Response(docx)],
-      [/token=page2/, () => json(GRAPH_DELTA_PAGE_2)],
-      [/token=next-cursor/, () => json({ value: [], '@odata.deltaLink': GRAPH_DELTA_PAGE_2['@odata.deltaLink'] })],
-      [/root\/delta/, () => json(GRAPH_DELTA_PAGE_1)],
-    ]);
     const run1 = await runAgreementSourceSync({ orgId: org.orgId, sourceId: source.id, runId: 'run-1' }, { fetch, env: GRAPH_ENV });
     expect(run1.state, run1.reasons.join(';')).toBe('completed');
     expect(run1.result?.new).toBeGreaterThanOrEqual(1);
@@ -353,18 +416,20 @@ describe('agreement sources and Sync now', () => {
   });
 
   it('a failed download keeps the delta cursor so the next run retries it', async () => {
-    const created = await call({
-      method: 'POST',
-      url: '/msa/sources',
-      payload: { kind: 'sharepoint', name: 'Flaky library', config: { siteId: 'site-2', driveId: DRIVE_ID, folderPath: 'MSA' } },
-    });
-    const source = created.json() as { id: string };
     const { fetch } = fakeFetch([
       ['https://login.microsoftonline.com/', () => json({ access_token: 'tok' })],
+      DRIVE_ROOT,
       [/\/content$/, () => new Response('busy', { status: 503 })],
       [/token=page2/, () => json(GRAPH_DELTA_PAGE_2)],
       [/root\/delta/, () => json(GRAPH_DELTA_PAGE_1)],
     ]);
+    __setAgreementConnectionFetchForTest(fetch);
+    const created = await call({
+      method: 'POST',
+      url: '/msa/sources',
+      payload: { kind: 'sharepoint', name: 'Flaky library', config: { siteId: 'site-2', driveId: 'b!fixture-drive-flaky', folderPath: 'MSA' } },
+    });
+    const source = created.json() as { id: string };
     const run = await runAgreementSourceSync({ orgId: org.orgId, sourceId: source.id, runId: 'flaky-1' }, { fetch, env: GRAPH_ENV });
     expect(run.state).toBe('completed');
     expect(run.result?.failed).toBeGreaterThanOrEqual(1);
@@ -372,21 +437,20 @@ describe('agreement sources and Sync now', () => {
   });
 
   it('Sync now answers 202 with a deterministic run per Idempotency-Key', async () => {
+    __setAgreementConnectionFetchForTest(
+      fakeFetch([
+        ['https://account-d.docusign.com/oauth/token', () => json({ access_token: 'ds', refresh_token: `r-${randomUUID()}` })],
+        ['https://account-d.docusign.com/oauth/userinfo', () => json({ accounts: [{ account_id: 'acct', base_uri: 'https://demo.docusign.net', is_default: true }] })],
+      ]).fetch,
+    );
     const created = await call({
       method: 'POST',
       url: '/msa/sources',
       payload: { kind: 'docusign', name: 'Signed MSAs', config: { keyword: 'MSA' } },
     });
+    expect(created.statusCode, created.body).toBe(201);
     const id = (created.json() as { id: string }).id;
-    const saved = { ...process.env };
-    Object.assign(process.env, {
-      DOCUSIGN_INTEGRATION_KEY: 'ik',
-      DOCUSIGN_USER_ID: 'u',
-      DOCUSIGN_PRIVATE_KEY: Buffer.from('fixture').toString('base64'),
-      DOCUSIGN_ACCOUNT_ID: 'acct',
-      DOCUSIGN_BASE_URL: 'https://demo.docusign.net',
-    });
-    try {
+    {
       const key = `sync-${randomUUID()}`;
       const a = await call({ method: 'POST', url: `/msa/sources/${id}/sync`, headers: { 'idempotency-key': key } });
       expect(a.statusCode, a.body).toBe(202);
@@ -402,9 +466,24 @@ describe('agreement sources and Sync now', () => {
       expect(audit).not.toBeNull();
       const denied = await call({ method: 'POST', url: `/msa/sources/${id}/sync`, role: 'sales-manager' });
       expect(denied.statusCode).toBe(403);
-    } finally {
-      process.env = saved;
+      const tooLong = await call({ method: 'POST', url: `/msa/sources/${id}/sync`, headers: { 'idempotency-key': `s${randomUUID()}`.padEnd(129, 'y') } });
+      expect(tooLong.statusCode, tooLong.body).toBe(400);
     }
+  });
+
+  it('run polling shows a run lost for 30 minutes as failed', async () => {
+    const source = await prisma.agreementSource.create({
+      data: { orgId: org.orgId, kind: 'docusign', name: 'Lost run', config: { keyword: 'MSA' }, createdById: (await prisma.user.findFirstOrThrow({ where: { orgId: org.orgId } })).id },
+    });
+    const runId = `lost-${randomUUID().slice(0, 8)}`;
+    await prisma.agreementSource.update({
+      where: { id: source.id },
+      data: { lastRunId: runId, lastResult: { runId, sourceId: source.id, state: 'running', startedAt: null, finishedAt: null, result: null, reasons: [] } },
+    });
+    await prisma.$executeRaw`UPDATE agreement_sources SET updated_at = now() - interval '31 minutes' WHERE id = ${source.id}::uuid`;
+    const poll = await call({ method: 'GET', url: `/msa/sources/${source.id}/runs/${runId}` });
+    expect(poll.statusCode, poll.body).toBe(200);
+    expect(poll.json()).toMatchObject({ state: 'failed', reasons: ['The run did not finish; start it again'] });
   });
 
   it('pulls completed DocuSign envelopes with counterparty and signed date', async () => {
@@ -419,6 +498,7 @@ describe('agreement sources and Sync now', () => {
       DOCUSIGN_PRIVATE_KEY: Buffer.from(pem).toString('base64'),
       DOCUSIGN_ACCOUNT_ID: 'acct',
       DOCUSIGN_BASE_URL: 'https://demo.docusign.net',
+      AGREEMENT_SOURCES_SINGLE_TENANT: 'true',
     };
     const first = uniquePdf();
     const second = uniquePdf();
