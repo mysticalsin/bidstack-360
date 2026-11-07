@@ -49,6 +49,7 @@ async function snapshot(orgId: string, runId: string): Promise<SyncRun | null> {
       completedAt: true,
       errorSummary: true,
     },
+    take: 50,
   });
   if (jobs.length === 0) return null;
   const chunks = await prisma.auditLog.findMany({
@@ -59,6 +60,7 @@ async function snapshot(orgId: string, runId: string): Promise<SyncRun | null> {
       targetId: { in: jobs.map((j) => j.id) },
     },
     select: { diff: true },
+    take: 1000,
   });
   const created = chunks.reduce((n, c) => {
     const ids = (c.diff as { createdIds?: unknown } | null)?.createdIds;

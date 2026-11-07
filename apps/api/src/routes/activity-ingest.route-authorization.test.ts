@@ -70,7 +70,12 @@ const ingestBody = {
 type Row = { method: 'GET' | 'POST'; url: string; permission: PermissionKey; body?: unknown };
 
 const ROUTE_TABLE: Row[] = [
-  { method: 'POST', url: '/api/v1/ingest/activities', permission: 'ingest:write', body: ingestBody },
+  {
+    method: 'POST',
+    url: '/api/v1/ingest/activities',
+    permission: 'ingest:write',
+    body: ingestBody,
+  },
   {
     method: 'GET',
     url: `/api/v1/companies/${COMPANY_ID}/activity-summary`,
@@ -85,11 +90,11 @@ const ROUTE_TABLE: Row[] = [
 ];
 
 type Actor =
-  | { kind: 'key'; scopes: string[]; readOnly: boolean }
-  | { kind: 'user'; permissions: string[] };
+  { kind: 'key'; scopes: string[]; readOnly: boolean } | { kind: 'user'; permissions: string[] };
 
 let actor: Actor = { kind: 'user', permissions: [] };
 const registered: string[] = [];
+const openapiTags = new Map<string, string[]>();
 
 async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
@@ -97,7 +102,14 @@ async function buildApp(): Promise<FastifyInstance> {
   app.setSerializerCompiler(serializerCompiler);
   app.addHook('onRoute', (route) => {
     const methods = Array.isArray(route.method) ? route.method : [route.method];
-    for (const m of methods) if (m !== 'HEAD') registered.push(`${m} ${route.url}`);
+    for (const m of methods) {
+      if (m === 'HEAD') continue;
+      registered.push(`${m} ${route.url}`);
+      openapiTags.set(
+        `${m} ${route.url}`,
+        (route.schema as { tags?: string[] } | undefined)?.tags ?? [],
+      );
+    }
   });
   app.addHook('onRequest', async (req) => {
     (req as unknown as { auth: unknown }).auth =
@@ -134,7 +146,9 @@ beforeEach(() => {
   vi.mocked(prisma.company.findFirst).mockResolvedValue({ id: COMPANY_ID } as never);
   vi.mocked(ingestActivities).mockResolvedValue({
     counts: { accepted: 1, updated: 0, skipped: 0 },
-    accepted: [{ index: 0, externalSource: 'hubspot', externalId: 'call-1', activityId: COMPANY_ID }],
+    accepted: [
+      { index: 0, externalSource: 'hubspot', externalId: 'call-1', activityId: COMPANY_ID },
+    ],
     updated: [],
     skipped: [],
   } as never);
@@ -180,18 +194,41 @@ describe('slice 9 route authorization table', () => {
     const app = await buildApp();
     await app.ready();
     const tableKeys = new Set(
-      ROUTE_TABLE.map((r) => `${r.method} ${r.url.replace(COMPANY_ID, ':id').replace(/\/(dust|hubspot)/, '/:source').replace('run-1', ':runId')}`),
+      ROUTE_TABLE.map(
+        (r) =>
+          `${r.method} ${r.url
+            .replace(COMPANY_ID, ':id')
+            .replace(/\/(dust|hubspot)/, '/:source')
+            .replace('run-1', ':runId')}`,
+      ),
     );
     expect(new Set(registered)).toEqual(tableKeys);
+    await app.close();
+  });
+
+  it('tags every route for the OpenAPI spec', async () => {
+    const app = await buildApp();
+    await app.ready();
+    expect(openapiTags.get('POST /api/v1/ingest/activities')).toContain('Activities');
+    expect(openapiTags.get('GET /api/v1/companies/:id/activity-summary')).toContain('Activities');
+    expect(openapiTags.get('POST /api/v1/sync-now/:source')).toContain('Integrations');
     await app.close();
   });
 
   for (const row of ROUTE_TABLE) {
     describe(`${row.method} ${row.url}`, () => {
       it(`denies an API key without ${row.permission}`, async () => {
-        actor = { kind: 'key', scopes: ['activities:write', 'companies:read'].filter((s) => s !== row.permission), readOnly: false };
+        actor = {
+          kind: 'key',
+          scopes: ['activities:write', 'companies:read'].filter((s) => s !== row.permission),
+          readOnly: false,
+        };
         const app = await buildApp();
-        const res = await app.inject({ method: row.method, url: row.url, payload: row.body as never });
+        const res = await app.inject({
+          method: row.method,
+          url: row.url,
+          payload: row.body as never,
+        });
         expect(res.statusCode).toBe(403);
         await app.close();
       });
@@ -199,7 +236,11 @@ describe('slice 9 route authorization table', () => {
       it(`allows an API key holding ${row.permission}`, async () => {
         actor = { kind: 'key', scopes: [row.permission], readOnly: false };
         const app = await buildApp();
-        const res = await app.inject({ method: row.method, url: row.url, payload: row.body as never });
+        const res = await app.inject({
+          method: row.method,
+          url: row.url,
+          payload: row.body as never,
+        });
         // Sync-now on HubSpot is a human-only action (it records the importing user).
         if (row.url.includes('/sync-now/hubspot') && row.method === 'POST') {
           expect(res.statusCode).toBe(403);
@@ -212,7 +253,11 @@ describe('slice 9 route authorization table', () => {
       it(`denies a user without ${row.permission} and allows one with it`, async () => {
         actor = { kind: 'user', permissions: [] };
         let app = await buildApp();
-        let res = await app.inject({ method: row.method, url: row.url, payload: row.body as never });
+        let res = await app.inject({
+          method: row.method,
+          url: row.url,
+          payload: row.body as never,
+        });
         expect(res.statusCode).toBe(403);
         await app.close();
 
@@ -230,7 +275,11 @@ describe('slice 9 route authorization table', () => {
     vi.mocked(ingestActivities).mockClear();
     actor = { kind: 'key', scopes: ['ingest:write'], readOnly: true };
     const app = await buildApp();
-    const res = await app.inject({ method: 'POST', url: '/api/v1/ingest/activities', payload: ingestBody });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/ingest/activities',
+      payload: ingestBody,
+    });
     expect(res.statusCode).toBe(403);
     expect(ingestActivities).not.toHaveBeenCalledWith(expect.objectContaining({ orgId: ORG_ID }));
     await app.close();
@@ -240,7 +289,11 @@ describe('slice 9 route authorization table', () => {
     vi.mocked(ingestActivities).mockClear();
     actor = { kind: 'key', scopes: ['ingest:write'], readOnly: false };
     const app = await buildApp();
-    const res = await app.inject({ method: 'POST', url: '/api/v1/ingest/activities', payload: ingestBody });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/ingest/activities',
+      payload: ingestBody,
+    });
     expect(res.statusCode).toBe(200);
     expect(ingestActivities).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -259,7 +312,11 @@ describe('slice 9 route authorization table', () => {
     const app = await buildApp();
     const one = ingestBody.activities[0]!;
     const activities = Array.from({ length: 501 }, (_, i) => ({ ...one, externalId: `c-${i}` }));
-    const res = await app.inject({ method: 'POST', url: '/api/v1/ingest/activities', payload: { activities } });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/ingest/activities',
+      payload: { activities },
+    });
     expect(res.statusCode).toBe(400);
     expect(ingestActivities).not.toHaveBeenCalled();
     await app.close();
@@ -269,7 +326,10 @@ describe('slice 9 route authorization table', () => {
     vi.mocked(prisma.company.findFirst).mockResolvedValueOnce(null as never);
     actor = { kind: 'key', scopes: ['activities:read'], readOnly: true };
     const app = await buildApp();
-    const res = await app.inject({ method: 'GET', url: `/api/v1/companies/${COMPANY_ID}/activity-summary` });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/companies/${COMPANY_ID}/activity-summary`,
+    });
     expect(res.statusCode).toBe(404);
     await app.close();
   });

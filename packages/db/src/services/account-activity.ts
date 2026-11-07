@@ -14,9 +14,28 @@ import { prisma } from '../index.js';
 
 const SUMMARY_TYPES: IngestActivityType[] = ['call', 'email', 'meeting', 'note', 'stage_change'];
 const DAY_MS = 24 * 3600 * 1000;
-// Hard ceilings so one huge account can never turn the summary into a scan.
-const MAX_ACTIVITY_ROWS = 20_000;
-const MAX_LINKED_IDS = 2_000;
+// The API query guard rejects any findMany with take > 1000, so reads page in
+// chunks of 1000; ten pages bound one huge account to 10k rows per source.
+const PAGE = 1000;
+const MAX_PAGES = 10;
+
+/** Cursor-paginate a findMany on `id` in bounded pages. */
+async function readPaged<T extends { id: string }>(
+  fetch: (args: { take: number; skip?: number; cursor?: { id: string } }) => Promise<T[]>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const batch = await fetch({
+      take: PAGE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+    cursor = batch[batch.length - 1]!.id;
+  }
+  return rows;
+}
 
 type TypeCounts = Record<IngestActivityType, number>;
 const zeroCounts = (): TypeCounts => ({ call: 0, email: 0, meeting: 0, note: 0, stage_change: 0 });
@@ -140,12 +159,12 @@ export async function getCompanyActivitySummary(input: {
     prisma.opportunity.findMany({
       where: { orgId, companyId, deletedAt: null },
       select: { id: true },
-      take: MAX_LINKED_IDS,
+      take: PAGE,
     }),
     prisma.contact.findMany({
       where: { orgId, companyId, deletedAt: null },
       select: { id: true },
-      take: MAX_LINKED_IDS,
+      take: PAGE,
     }),
   ]);
   const oppIds = opportunities.map((o) => o.id);
@@ -161,40 +180,48 @@ export async function getCompanyActivitySummary(input: {
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
   const [activities, plannedOverdue, tasksOverdue] = await Promise.all([
-    prisma.activity.findMany({
-      where: {
-        orgId,
-        deletedAt: null,
-        type: { in: SUMMARY_TYPES },
-        occurredAt: { gte: since, lte: now },
-        OR: entityScope,
-      },
-      select: { type: true, status: true, occurredAt: true },
-      orderBy: { occurredAt: 'desc' },
-      take: MAX_ACTIVITY_ROWS,
-    }),
-    prisma.activity.findMany({
-      where: {
-        orgId,
-        deletedAt: null,
-        status: 'planned',
-        startTime: { lt: now },
-        OR: entityScope,
-      },
-      select: { startTime: true },
-      take: MAX_ACTIVITY_ROWS,
-    }),
-    prisma.task.findMany({
-      where: {
-        orgId,
-        deletedAt: null,
-        status: { in: ['open', 'in_progress', 'blocked'] },
-        dueDate: { lt: startOfToday },
-        OR: [{ accountId: companyId }, ...(oppIds.length ? [{ oppId: { in: oppIds } }] : [])],
-      },
-      select: { dueDate: true },
-      take: MAX_ACTIVITY_ROWS,
-    }),
+    readPaged((page) =>
+      prisma.activity.findMany({
+        where: {
+          orgId,
+          deletedAt: null,
+          type: { in: SUMMARY_TYPES },
+          occurredAt: { gte: since, lte: now },
+          OR: entityScope,
+        },
+        select: { id: true, type: true, status: true, occurredAt: true },
+        orderBy: { id: 'asc' },
+        ...page,
+      }),
+    ),
+    readPaged((page) =>
+      prisma.activity.findMany({
+        where: {
+          orgId,
+          deletedAt: null,
+          status: 'planned',
+          startTime: { lt: now },
+          OR: entityScope,
+        },
+        select: { id: true, startTime: true },
+        orderBy: { id: 'asc' },
+        ...page,
+      }),
+    ),
+    readPaged((page) =>
+      prisma.task.findMany({
+        where: {
+          orgId,
+          deletedAt: null,
+          status: { in: ['open', 'in_progress', 'blocked'] },
+          dueDate: { lt: startOfToday },
+          OR: [{ accountId: companyId }, ...(oppIds.length ? [{ oppId: { in: oppIds } }] : [])],
+        },
+        select: { id: true, dueDate: true },
+        orderBy: { id: 'asc' },
+        ...page,
+      }),
+    ),
   ]);
 
   const overdue = [
