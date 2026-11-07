@@ -137,3 +137,22 @@ describe('SectorViewPage load resilience', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('SectorViewPage selection state', () => {
+  it('exposes the active sector and country as pressed buttons in labelled groups', () => {
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    renderPage();
+
+    const countries = screen.getByRole('group', { name: 'Country filter' });
+    const all = countries.querySelector('button');
+    expect(all?.getAttribute('aria-pressed')).toBe('true');
+    const france = Array.from(countries.querySelectorAll('button'))[1];
+    expect(france?.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(france!);
+    expect(france?.getAttribute('aria-pressed')).toBe('true');
+    expect(all?.getAttribute('aria-pressed')).toBe('false');
+
+    const sectors = screen.getByRole('group', { name: 'Sectors' });
+    expect(sectors.querySelector('[aria-pressed="true"]')).toBeTruthy();
+  });
+});
