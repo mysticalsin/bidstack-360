@@ -145,7 +145,7 @@ export async function loadCompanyIntel(db: Db, orgId: string, companyId: string,
     .map((r) => ({ evidenceId: `ev:${r.id}`, text: r.excerpt, stance: r.stance as StatementInput['stance'], theme: (r.theme ?? null) as StatementInput['theme'] }));
   const registry = ledger
     .filter((r) => r.kind === 'registry' && r.label)
-    .map((r) => ({ label: r.label!, value: r.excerpt.startsWith(`${r.label}: `) ? r.excerpt.slice(r.label!.length + 2) : r.excerpt, source: r.source, sourceUrl: r.url, fetchedAt: r.fetchedAt.toISOString() }));
+    .map((r) => ({ label: r.label!, value: r.excerpt.startsWith(`${r.label}: `) ? r.excerpt.slice(r.label!.length + 2) : r.excerpt, source: LEDGER_LABEL[r.source] ?? r.source, sourceUrl: r.url, fetchedAt: r.fetchedAt.toISOString() }));
 
   const sources: IntelSourceStatus[] = runs
     .filter((r) => IntelSourceKey.safeParse(r.source).success)
