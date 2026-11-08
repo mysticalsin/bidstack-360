@@ -32,10 +32,43 @@ export interface OpenCompanyProfile {
   employeeCount: number | null;
   incorporationDate: string | null;
   industryLabels: string[];
+  /** Wikidata P2123 total revenue, latest point in time. Absent for Seamless profiles. */
+  revenue?: OpenRevenue | null;
   confidenceBps: number;
   sourceAttribution: SourceAttribution[];
   providerMetadata: Record<string, unknown>;
 }
+
+/** A public revenue figure with the link that proves it. Amount in major units of `currency`. */
+export interface OpenRevenue {
+  amount: number;
+  currency: string;
+  /** As precise as Wikidata states it: YYYY, YYYY-MM or YYYY-MM-DD. */
+  pointInTime: string;
+  year: number;
+  sourceUrl: string;
+  sourceLabel: 'Wikidata';
+}
+
+/** Wikidata currency items for the currencies Polo formats. Unknown units are dropped, never guessed. */
+const CURRENCY_QID: Record<string, string> = {
+  Q4917: 'USD',
+  Q4916: 'EUR',
+  Q25224: 'GBP',
+  Q25344: 'CHF',
+  Q8146: 'JPY',
+  Q132643: 'NOK',
+  Q122922: 'SEK',
+  Q25417: 'DKK',
+  Q1104069: 'CAD',
+  Q259502: 'AUD',
+  Q39099: 'CNY',
+  Q80524: 'INR',
+  Q173117: 'BRL',
+  Q202040: 'KRW',
+  Q4730: 'MXN',
+  Q123213: 'PLN',
+};
 
 interface WikidataSearchResult {
   id?: string;
@@ -44,7 +77,7 @@ interface WikidataSearchResult {
   concepturi?: string;
 }
 
-interface WikidataEntity {
+export interface WikidataEntity {
   id?: string;
   labels?: Record<string, { value?: string }>;
   descriptions?: Record<string, { value?: string }>;
@@ -70,6 +103,8 @@ const PROPERTY = {
   inception: 'P571',
   employeeCount: 'P1128',
   industry: 'P452',
+  totalRevenue: 'P2123',
+  pointInTime: 'P585',
 } as const;
 
 export async function fetchOpenCompanyProfile({
@@ -117,6 +152,7 @@ export async function fetchOpenCompanyProfile({
     wikimediaImageUrl ?? summary?.thumbnail?.source ?? summary?.originalimage?.source ?? null;
   const pageUrl = summary?.content_urls?.desktop?.page ?? entity.sitelinks?.enwiki?.url ?? null;
   const industryLabels = claimEntityIds(entity, PROPERTY.industry);
+  const revenue = latestWikidataRevenue(entity);
   const confidence = Math.min(0.94, Math.max(0.68, best.score));
 
   return {
@@ -134,6 +170,7 @@ export async function fetchOpenCompanyProfile({
       ...(description ? [description] : []),
       ...industryLabels.map((id) => `Wikidata industry ${id}`),
     ].slice(0, 6),
+    revenue,
     confidenceBps: Math.round(confidence * 10_000),
     sourceAttribution: [
       attribution({
@@ -173,9 +210,41 @@ export async function fetchOpenCompanyProfile({
       logoFile,
       imageFile,
       companyImageUrl: imageUrl,
+      revenue,
       openDataProvider: 'wikidata_wikimedia',
     },
   };
+}
+
+/** Latest non-deprecated P2123 statement that has a point in time and a known currency. */
+export function latestWikidataRevenue(entity: WikidataEntity): OpenRevenue | null {
+  const id = entity.id;
+  if (!id) return null;
+  let best: { raw: string; preferred: boolean; value: OpenRevenue } | null = null;
+  for (const claim of entity.claims?.[PROPERTY.totalRevenue] ?? []) {
+    if (!isRecord(claim) || claim.rank === 'deprecated') continue;
+    const value = isRecord(claim.mainsnak) && isRecord(claim.mainsnak.datavalue) ? claim.mainsnak.datavalue.value : null;
+    if (!isRecord(value) || typeof value.amount !== 'string' || typeof value.unit !== 'string') continue;
+    const amount = Number(value.amount);
+    const currency = CURRENCY_QID[value.unit.split('/').pop() ?? ''];
+    if (!Number.isFinite(amount) || amount <= 0 || !currency) continue;
+    const raw = qualifierTime(claim, PROPERTY.pointInTime);
+    const match = raw?.match(/^\+?(\d{4})-(\d{2})-(\d{2})/);
+    if (!raw || !match) continue;
+    const [, y, m, d] = match;
+    const pointInTime = m === '00' ? y! : d === '00' ? `${y}-${m}` : `${y}-${m}-${d}`;
+    const preferred = claim.rank === 'preferred';
+    const candidate = { raw, preferred, value: { amount, currency, pointInTime, year: Number(y), sourceUrl: `https://www.wikidata.org/wiki/${id}#${PROPERTY.totalRevenue}`, sourceLabel: 'Wikidata' as const } };
+    if (!best || raw > best.raw || (raw === best.raw && preferred && !best.preferred)) best = candidate;
+  }
+  return best?.value ?? null;
+}
+
+function qualifierTime(claim: Record<string, unknown>, property: string): string | null {
+  const q = isRecord(claim.qualifiers) ? claim.qualifiers[property] : null;
+  const first = Array.isArray(q) ? q[0] : null;
+  const dv = isRecord(first) && isRecord(first.datavalue) ? first.datavalue.value : null;
+  return isRecord(dv) && typeof dv.time === 'string' ? dv.time : null;
 }
 
 export function faviconProfile({
