@@ -74,7 +74,7 @@ export function ContactDialog({
           description={
             contact
               ? t('contact.editDescription', 'Patch updates the record and writes an audit entry.')
-              : t('contact.newDescription', 'Add a person to the decision unit.')
+              : t('contact.newDescription', 'Add a contact. A job title is not a buying role.')
           }
         >
           <ContactForm

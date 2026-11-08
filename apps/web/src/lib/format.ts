@@ -1,3 +1,7 @@
+import { formatMicrosAmount } from '@bidstack/shared';
+
+import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
+
 // Locale-aware formatters used across cards and tables. All public functions
 // accept an optional `locale` string so they're safe to call from both React
 // (thread locale via useUserLocale) and non-React callsites (selectors, loaders,
@@ -57,6 +61,15 @@ export function formatMoney(value: number, currency?: string, locale?: string): 
   }).format(value);
 }
 
+/** Full integer when compact rounding or a zero-decimal format would move the cent. */
+export function formatConvertedMicros(micros: bigint, currency: string): string {
+  const plain = headlineMicrosLabel(micros);
+  if (plain === formatMicrosAmount(micros)) {
+    return formatMoneyMicros(micros, currency, { compact: false });
+  }
+  return formatMoneyMicros(micros, currency);
+}
+
 export function formatDate(iso: string | null | undefined, locale?: string): string {
   if (!iso) return '—';
   const resolvedLocale = locale ?? detectLocale();
@@ -85,6 +98,41 @@ export function formatStage(stage: string): string {
  * Compacts ≥ 1M as `$1.2M`, ≥ 1k as `$12k`, otherwise full currency.
  * The string-encoded micros preserve BigInt precision over JSON.
  */
+/** A number Intl can compact. Huge unit counts keep their leading digits instead of a rounded float. */
+function compactValue(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const units = abs / 1_000_000n;
+  const remainder = abs % 1_000_000n;
+  let magnitude: number;
+  if (units <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    magnitude = Number(units) + Number(remainder) / 1_000_000;
+  } else {
+    const digits = units.toString();
+    const significant = digits.slice(0, 15);
+    const exponent = digits.length - significant.length;
+    magnitude = Number(significant) * 10 ** exponent;
+  }
+  return negative ? -magnitude : magnitude;
+}
+
+function currencyAffix(currency: string, locale: string): { symbol: string; symbolFirst: boolean } {
+  try {
+    const parts = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0);
+    const symbol = parts.find((part) => part.type === 'currency')?.value ?? currency;
+    const symbolFirst =
+      parts.findIndex((part) => part.type === 'currency') <
+      parts.findIndex((part) => part.type === 'integer');
+    return { symbol, symbolFirst };
+  } catch {
+    return { symbol: currency, symbolFirst: false };
+  }
+}
+
 export function formatMoneyMicros(
   micros: string | number | bigint,
   currency?: string,
@@ -98,17 +146,36 @@ export function formatMoneyMicros(
       : typeof micros === 'number'
         ? BigInt(Math.trunc(micros))
         : BigInt(micros);
-  const million = BigInt(1_000_000);
-  const whole = asBigInt / million;
-  const remainder = asBigInt % million;
-  const value = Number(whole) + Number(remainder) / 1_000_000;
-  const compact = options.compact ?? Math.abs(value) >= 1000;
+  const abs = asBigInt < 0n ? -asBigInt : asBigInt;
+  const compact = options.compact ?? abs >= 1_000n * 1_000_000n;
+  if (!compact) {
+    const text = formatMicrosAmount(asBigInt);
+    const { symbol, symbolFirst } = currencyAffix(resolvedCurrency, resolvedLocale);
+    return symbolFirst ? `${symbol}${text}` : `${text} ${symbol}`;
+  }
+  const value = compactValue(asBigInt);
   return new Intl.NumberFormat(resolvedLocale, {
     style: 'currency',
     currency: resolvedCurrency,
-    notation: compact ? 'compact' : 'standard',
-    maximumFractionDigits: compact ? 1 : 2,
+    notation: 'compact',
+    maximumFractionDigits: 2,
   }).format(value);
+}
+
+/** USD from integer micros, including sub-cent digits. A 4-decimal float prints a small cost as zero. */
+export function formatUsdMicros(micros: number | bigint | string): string {
+  let value: bigint;
+  try {
+    value = typeof micros === 'bigint' ? micros : BigInt(micros);
+  } catch {
+    return '0';
+  }
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const whole = abs / 1_000_000n;
+  const frac = (abs % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  const text = frac ? `${whole.toString()}.${frac}` : whole.toString();
+  return negative ? `-${text}` : text;
 }
 
 /** Same as formatMoneyMicros but always returns full-precision (e.g. tooltips). */
@@ -167,7 +234,10 @@ export function relativeTime(iso: string, locale?: string): string {
 export function formatBytes(bytes: number, locale?: string): string {
   const resolvedLocale = locale ?? detectLocale();
   const safe = Math.max(0, bytes);
-  const units: Array<{ unit: 'byte' | 'kilobyte' | 'megabyte' | 'gigabyte' | 'terabyte'; threshold: number }> = [
+  const units: Array<{
+    unit: 'byte' | 'kilobyte' | 'megabyte' | 'gigabyte' | 'terabyte';
+    threshold: number;
+  }> = [
     { unit: 'terabyte', threshold: 1024 ** 4 },
     { unit: 'gigabyte', threshold: 1024 ** 3 },
     { unit: 'megabyte', threshold: 1024 ** 2 },

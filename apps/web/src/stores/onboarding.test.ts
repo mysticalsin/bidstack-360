@@ -10,6 +10,7 @@ function resetStore() {
     dismissed: false,
     tourSeen: false,
     completedChecklist: [],
+    quickStartVisible: false,
     hasSampleData: false,
     templatePickerOpen: false,
   });
@@ -66,5 +67,23 @@ describe('onboarding store', () => {
     expect(state.dismissed).toBe(true);
     expect(state.completedChecklist).toEqual(['profile', 'first_lead']);
     expect(state.tourActive).toBe(false);
+    expect(state.quickStartVisible).toBe(false);
+  });
+
+  it('keeps Quick Start hidden until this person turns it on', () => {
+    // Why: the nav item is not a default. An older saved session that never
+    // stored the flag must stay hidden, and the setting must stick.
+    const userId = 'quiet-user';
+    localStorage.setItem(
+      `bidstack-onboarding.v1:${encodeURIComponent(userId)}`,
+      JSON.stringify({ completedChecklist: ['profile'] }),
+    );
+
+    useOnboardingStore.getState().hydrate(userId);
+    expect(useOnboardingStore.getState().quickStartVisible).toBe(false);
+
+    useOnboardingStore.getState().setQuickStartVisible(true);
+    useOnboardingStore.getState().hydrate(userId);
+    expect(useOnboardingStore.getState().quickStartVisible).toBe(true);
   });
 });

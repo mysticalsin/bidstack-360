@@ -12,12 +12,17 @@ import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { formatDate, relativeTime } from '@/lib/format';
-import { springSoft } from '@/lib/motion';
+import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
-import { labelForBand } from './_tokens';
+import { labelForBand, SIGNAL_COVERAGE_WEIGHTS } from './_tokens';
+
+function readableLabel(value: string | null): string | null {
+  if (!value) return null;
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -63,7 +68,13 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
   const favorites = useAccountHistory((s) => s.favorites);
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
-  const subtitleParts = [cockpit.company.industry, cockpit.company.domain].filter(Boolean);
+  const subtitleParts = [
+    cockpit.company.legalName && cockpit.company.legalName !== cockpit.company.name
+      ? cockpit.company.legalName
+      : null,
+    readableLabel(cockpit.company.industry),
+    cockpit.company.domain,
+  ].filter(Boolean);
   const subtitle = accountView
     ? subtitleParts.length > 0
       ? subtitleParts.join(' - ')
@@ -72,14 +83,14 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
         date: formatDate(new Date().toISOString()),
         company: cockpit.company.name,
       });
-  const confidence = Math.round(cockpit.company.confidence * 100);
+  const confidence = recordedConfidencePercent(cockpit.company.confidence);
 
   return (
     <motion.div
       className="page-head motion-page-head cockpit-page-head"
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}
-      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={springSoft}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={reducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.2, 0, 0, 1] }}
     >
       <div
         className="account-heading-cluster"
@@ -99,16 +110,30 @@ export const PageHead = memo(function PageHead({ cockpit, accountView }: Props) 
             {accountView ? cockpit.company.name : t('pageHead.dashboardTitle', 'Dashboard')}
           </h1>
           <div className="page-sub">{subtitle}</div>
+          {accountView && cockpit.company.publicFacts?.description ? (
+            <p className="mt-1 max-w-2xl text-sm text-[var(--fg-secondary)]">
+              {cockpit.company.publicFacts.description}
+            </p>
+          ) : null}
           {accountView ? (
             <div
               className="account-meta-chips"
               aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}
             >
-              <span data-tone="health">{labelForBand(cockpit.health.band)}</span>
-              <span data-tone="confidence">
-                {t('pageHead.attributionConfidence', '{{percent}}% attribution confidence', {
-                  percent: confidence,
+              <span
+                data-tone="health"
+                title={t('pageHead.signalCoverageHint', SIGNAL_COVERAGE_WEIGHTS)}
+              >
+                {t('pageHead.signalCoverage', 'Signal coverage · {{band}}', {
+                  band: labelForBand(cockpit.health.band),
                 })}
+              </span>
+              <span data-tone="confidence">
+                {confidence === null
+                  ? t('pageHead.confidenceNotScored', 'Confidence not scored')
+                  : t('pageHead.attributionConfidence', '{{percent}}% recorded confidence on this account', {
+                      percent: confidence,
+                    })}
               </span>
               <span data-tone="muted">
                 {t('pageHead.refreshed', 'Refreshed {{time}}', {
@@ -245,6 +270,12 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   if (c.industry) rows.push([t('pageHead.briefIndustry', 'Industry'), c.industry]);
   if (c.employeeCount)
     rows.push([t('pageHead.briefHeadcount', 'Headcount'), c.employeeCount.toLocaleString()]);
+  if (c.publicFacts?.headquarters)
+    rows.push([t('pageHead.briefHeadquarters', 'Headquarters'), c.publicFacts.headquarters]);
+  if (c.publicFacts?.revenueLabel)
+    rows.push([t('pageHead.briefRevenue', 'Revenue'), c.publicFacts.revenueLabel]);
+  if (c.publicFacts?.chiefExecutive)
+    rows.push([t('pageHead.briefChiefExecutive', 'Chief executive'), c.publicFacts.chiefExecutive]);
   if (c.domain) rows.push([t('pageHead.briefDomain', 'Domain'), c.domain]);
   if (c.legalName && c.legalName !== c.name)
     rows.push([t('pageHead.briefLegalName', 'Legal name'), c.legalName]);
@@ -283,9 +314,11 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
         </dl>
       ) : null}
       <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
-          percent: Math.round(c.confidence * 100),
-        })}
+        {recordedConfidencePercent(c.confidence) === null
+          ? t('pageHead.confidenceNotScored', 'Confidence not scored')
+          : t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
+              percent: recordedConfidencePercent(c.confidence),
+            })}
       </div>
     </div>
   );

@@ -101,7 +101,7 @@ export type EntityTagsResponse = z.infer<typeof EntityTagsResponse>;
 export const TagSuggestion = z.object({
   name: TagName,
   reason: z.string().max(280),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
   existingTagId: z.string().uuid().nullable(),
 });
 export type TagSuggestion = z.infer<typeof TagSuggestion>;

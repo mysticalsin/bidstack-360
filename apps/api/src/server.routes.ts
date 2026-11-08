@@ -78,6 +78,7 @@ import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
+import { accountPeopleRoutes } from './routes/account-people.js';
 import { duplicatesRoutes } from './routes/duplicates.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
 import { roleRoutes } from './routes/roles.js';
@@ -234,6 +235,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
+  await server.register(accountPeopleRoutes, { prefix: '/api/v1' });
   await server.register(duplicatesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
   await server.register(roleRoutes, { prefix: '/api/v1' });

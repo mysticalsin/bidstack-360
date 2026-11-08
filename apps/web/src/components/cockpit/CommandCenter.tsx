@@ -4,14 +4,10 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
-import { Badge, type BadgeTone } from '@/components/ui/Badge';
-import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import type { BadgeTone } from '@/components/ui/Badge';
 import { springSnap, springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
-
-import { labelForBand } from './_tokens';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -21,155 +17,120 @@ interface CommandSignal {
   label: string;
   value: string;
   detail: string;
-  progress: number;
+  progress: number | null;
   tone: BadgeTone;
 }
 
 export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoneyMicros } = useFormatMoney();
   const { t } = useTranslation('crm');
   const readiness = deriveReadiness(cockpit);
   const nextMove = deriveNextMove(cockpit, t);
   const committee = deriveCommittee(cockpit, t);
+  const recordedRisks = cockpit.risks.length;
   const openRisks = cockpit.risks.filter((risk) => risk.status !== 'mitigated').length;
   const criticalRisks = cockpit.risks.filter(
     (risk) => risk.severity === 'critical' || risk.severity === 'high',
   ).length;
-  const proofCount = cockpit.company.sourceAttribution.length + (cockpit.company.logo ? 1 : 0);
-  const stackCount = cockpit.technicalStack.reduce((acc, row) => acc + row.items.length, 0);
-  const primaryKpi = cockpit.kpis[0];
+  const attributionCount = cockpit.company.sourceAttribution.length;
+  const hasLogo = Boolean(cockpit.company.logo);
+  const proofCount = sourceReceiptTotal(attributionCount, hasLogo);
 
   const signals: CommandSignal[] = [
     {
-      label: t('commandCenter.signal.readiness.label', 'Bid readiness estimate'),
+      label: t('commandCenter.signal.readiness.label', 'Bid readiness proxy'),
       value: `${readiness}%`,
-      detail:
-        readiness >= 85
-          ? t('commandCenter.signal.readiness.detailReady', 'ready for exec review')
-          : t('commandCenter.signal.readiness.detailFocus', 'needs presales focus'),
+      detail: t(
+        'commandCenter.signal.readiness.detail',
+        'weighted mix of recorded signals on this account, not a measured score',
+      ),
       progress: readiness,
       tone: readiness >= 85 ? 'jade' : readiness >= 68 ? 'blue' : 'amber',
     },
     {
-      label: t('commandCenter.signal.source.label', 'Source coverage'),
+      label: t('commandCenter.signal.source.label', 'Source receipts'),
       value: proofCount.toLocaleString(),
-      detail: t(
-        'commandCenter.signal.source.detail',
-        '{{count}} attributed source',
-        { count: cockpit.company.sourceAttribution.length },
-      ),
-      progress: Math.min(100, proofCount * 16),
+      detail: hasLogo
+        ? t(
+            'commandCenter.signal.source.detailWithLogo',
+            '{{attribution}} attribution receipt and 1 stored logo. Not a coverage percent.',
+            { attribution: attributionCount },
+          )
+        : t(
+            'commandCenter.signal.source.detail',
+            '{{count}} attribution receipts. Not a coverage percent.',
+            { count: proofCount },
+          ),
+      progress: null,
       tone: proofCount >= 5 ? 'jade' : proofCount >= 3 ? 'blue' : 'amber',
     },
     {
-      label: t('commandCenter.signal.decision.label', 'Decision coverage'),
-      value: `${committee.influence}/5`,
+      label: t('commandCenter.signal.decision.label', 'Influence map'),
+      value: t('commandCenter.signal.decision.value', '{{score}}/5 proxy', {
+        score: committee.influence,
+      }),
       detail: committee.summary,
       progress: committee.influence * 20,
       tone: committee.influence >= 4 ? 'jade' : committee.influence >= 3 ? 'blue' : 'amber',
     },
     {
       label: t('commandCenter.signal.risk.label', 'Open risk load'),
-      value: criticalRisks
-        ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
-        : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
-      detail: criticalRisks
-        ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
-        : t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up'),
-      progress: Math.max(8, 100 - criticalRisks * 26 - openRisks * 7),
-      tone: criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
+      value: recordedRisks === 0
+        ? t('commandCenter.signal.risk.valueNone', 'None recorded')
+        : criticalRisks
+          ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
+          : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
+      detail: recordedRisks === 0
+        ? t('commandCenter.signal.risk.detailNone', 'no risk rows on this account')
+        : criticalRisks
+          ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
+          : openRisks
+            ? t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up')
+            : t('commandCenter.signal.risk.detailNoneOpen', 'recorded register has no open risks'),
+      progress: recordedRisks === 0 ? null : riskLoadProgress(openRisks, criticalRisks),
+      tone: recordedRisks === 0 ? 'amber' : criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
     },
   ];
 
   return (
     <motion.section
-      className="command-center"
+      className="command-center command-center-graphic"
       role="region"
       aria-label={t('commandCenter.region.ariaLabel', 'Polo PreSales command center')}
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={springSoft}
     >
-      <div className="command-center-hero">
-        <div className="command-center-orbit" aria-hidden>
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="command-center-kicker">
-          <Icon name="sparkle" size={14} />
-          <span>{t('commandCenter.kicker', 'Polo PreSales command center')}</span>
-        </div>
-        <h2>{cockpit.company.name}</h2>
-        <p>{nextMove}</p>
-        <div
-          className="command-center-actions"
-          aria-label={t('commandCenter.actions.ariaLabel', 'Account decision signals')}
-        >
-          <Badge tone={readiness >= 85 ? 'jade' : 'blue'}>
-            {t('commandCenter.badge.ready', '{{count}}% ready', { count: readiness })}
-          </Badge>
-          <Badge tone={healthTone(cockpit.health.band)}>{labelForBand(cockpit.health.band)}</Badge>
-          <Badge tone={stackCount >= 12 ? 'purple' : 'gray'}>
-            {t('commandCenter.badge.stackSignals', '{{count}} stack signals', { count: stackCount })}
-          </Badge>
-        </div>
-      </div>
-
       <div className="command-center-metrics">
         {signals.map((signal, index) => (
           <motion.div
             key={signal.label}
             className="command-signal"
+            data-tone={signal.tone}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.045 }}
           >
             <div className="command-signal-head">
               <span>{signal.label}</span>
-              <Badge tone={signal.tone}>{signal.detail}</Badge>
             </div>
             <strong>
               <AnimatedMetric value={signal.value} />
             </strong>
-            <span className="command-progress" aria-hidden>
-              <motion.span
-                initial={{ width: reducedMotion ? `${signal.progress}%` : '0%' }}
-                animate={{ width: `${signal.progress}%` }}
-                transition={{ ...springSnap, delay: reducedMotion ? 0 : 0.14 + index * 0.04 }}
-              />
-            </span>
+            {signal.progress != null ? (
+              <span className="command-progress" aria-hidden>
+                <motion.span
+                  initial={{ width: reducedMotion ? `${signal.progress}%` : '0%' }}
+                  animate={{ width: `${signal.progress}%` }}
+                  transition={{ ...springSnap, delay: reducedMotion ? 0 : 0.14 + index * 0.04 }}
+                />
+              </span>
+            ) : null}
+            <span className="command-signal-detail">{signal.detail}</span>
           </motion.div>
         ))}
       </div>
-
-      <div className="command-center-footer">
-        <div>
-          <span>{t('commandCenter.footer.primarySignal.label', 'Primary commercial signal')}</span>
-          <strong>
-            {primaryKpi
-              ? `${primaryKpi.label}: ${primaryKpi.value}`
-              : t('commandCenter.footer.primarySignal.pending', 'Pipeline pending')}
-          </strong>
-        </div>
-        <div>
-          <span>{t('commandCenter.footer.weightedValue.label', 'Weighted account value')}</span>
-          <strong>
-            {cockpit.company.annualRevenueMicros
-              ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
-              : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
-          </strong>
-        </div>
-        <div>
-          <span>{t('commandCenter.footer.ownerMap.label', 'Decision owner map')}</span>
-          <strong>
-            {t('commandCenter.footer.ownerMap.contacts', '{{count}} contacts mapped', {
-              count: committee.contacts,
-            })}
-          </strong>
-        </div>
-      </div>
+      <p className="command-center-next">{nextMove}</p>
     </motion.section>
   );
 });
@@ -178,14 +139,17 @@ function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
   const health = cockpit.health.score;
   const compliance =
     cockpit.compliance.length === 0
-      ? 54
+      ? 0
       : (cockpit.compliance.filter((item) => item.status === 'compliant').length /
           cockpit.compliance.length) *
         100;
-  const sources = Math.min(100, (cockpit.company.sourceAttribution.length + 1) * 18);
+  const sources = Math.min(
+    100,
+    sourceReceiptTotal(cockpit.company.sourceAttribution.length, Boolean(cockpit.company.logo)) * 18,
+  );
   const contacts = Math.min(
     100,
-    cockpit.keyContacts.reduce((acc, person) => acc + (person.influence ?? 1), 0) * 12,
+    cockpit.keyContacts.reduce((acc, person) => acc + (person.influence ?? 0), 0) * 12,
   );
   const riskPenalty = cockpit.risks.reduce((acc, risk) => acc + riskPenaltyFor(risk), 0);
   return clamp(
@@ -248,13 +212,7 @@ function deriveCommittee(
   summary: string;
 } {
   const contacts = cockpit.keyContacts.length;
-  const influence = Math.min(
-    5,
-    Math.max(
-      1,
-      Math.round(cockpit.keyContacts.reduce((acc, person) => acc + (person.influence ?? 1), 0) / 2),
-    ),
-  );
+  const influence = influenceProxyScore(cockpit.keyContacts);
   const champions = cockpit.keyContacts.filter(
     (person) => person.roleInDecision === 'champion',
   ).length;
@@ -272,19 +230,32 @@ function deriveCommittee(
   return { contacts, influence, summary };
 }
 
+/** A stored logo is one receipt. The number matches the sentence under it. */
+export function sourceReceiptTotal(attributionCount: number, hasLogo: boolean): number {
+  return attributionCount + (hasLogo ? 1 : 0);
+}
+
+/** An empty buying group is 0. Missing influence is not a point. */
+export function influenceProxyScore(
+  people: readonly { influence: number | null }[],
+): number {
+  const total = people.reduce((acc, person) => acc + (person.influence ?? 0), 0);
+  if (people.length === 0 || total === 0) return 0;
+  return Math.min(5, Math.round(total / 2));
+}
+
+/** Bar fill follows open load. Zero open risks is an empty bar. */
+export function riskLoadProgress(openRisks: number, criticalRisks: number): number {
+  return Math.min(100, criticalRisks * 26 + openRisks * 7);
+}
+
 function riskPenaltyFor(risk: RiskItem): number {
   if (risk.status === 'mitigated' || risk.status === 'accepted') return 0;
   if (risk.severity === 'critical') return 14;
   if (risk.severity === 'high') return 9;
   if (risk.severity === 'medium') return 4;
-  return 1;
-}
-
-function healthTone(band: AccountCockpitSnapshot['health']['band']): BadgeTone {
-  if (band === 'strong') return 'jade';
-  if (band === 'good') return 'blue';
-  if (band === 'needs_attention') return 'amber';
-  return 'tomato';
+  if (risk.severity === 'low') return 1;
+  return 0;
 }
 
 function clamp(value: number): number {

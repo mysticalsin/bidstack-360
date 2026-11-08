@@ -12,6 +12,7 @@ export interface KeyAccount {
   keyAccountOwnerId: string | null;
   keyAccountNotes: string | null;
   totalValue: number;
+  totalValueMicros?: string;
   openDeals: number;
   contactCount: number;
   opportunityCount: number;

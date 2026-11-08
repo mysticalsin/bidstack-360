@@ -1,4 +1,6 @@
 export * from './schemas/index.js';
+export * from './people/standing.js';
+export * from './people/commitment.js';
 export * from './types/index.js';
 export * from './queue-config.js';
 export * from './utils/index.js';
@@ -7,3 +9,4 @@ export * from './rfp-crew.js';
 export * from './competitor-intel/index.js';
 export * from './document-category.js';
 export * from './workflow-engine.js';
+export * from './intel/present-opportunity-intel.js';

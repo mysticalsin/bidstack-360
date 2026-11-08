@@ -11,11 +11,12 @@ import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
+import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
 import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
 
-type TabKey = 'contacts' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
+type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
 type View = 'overview' | 'details';
 
 const VIEW_KEY = 'companyDetailView';
@@ -85,7 +86,7 @@ export function CompanyDetailPage() {
         <div className="flex items-center gap-3">
           <CompanyLogo name={c.name} companyId={c.id} domain={c.domain} size={48} />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">{c.name}</h1>
+            <h1 className="text-[28px] font-medium text-[var(--fg-primary)]">{c.name}</h1>
             {c.legalName && c.legalName !== c.name && (
               <p className="text-sm text-[var(--fg-secondary)]">{c.legalName}</p>
             )}
@@ -107,7 +108,7 @@ export function CompanyDetailPage() {
               role="radio"
               aria-checked={view === v}
               onClick={() => setView(v)}
-              className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
                 view === v
                   ? 'bg-[var(--brand-primary)] text-white'
                   : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
@@ -171,6 +172,10 @@ export function CompanyDetailPage() {
                   label: t('companyDetail.tab.contacts', 'Contacts ({{count}})', { count: c.contacts.length }),
                 },
                 {
+                  key: 'people',
+                  label: t('companyDetail.tab.people', 'People'),
+                },
+                {
                   key: 'opportunities',
                   label: t('companyDetail.tab.opportunities', 'Opportunities ({{count}})', {
                     count: c.opportunities.length,
@@ -196,7 +201,7 @@ export function CompanyDetailPage() {
                 tabIndex={tab === tabItem.key ? 0 : -1}
                 onClick={() => setTab(tabItem.key)}
                 onKeyDown={(e) => {
-                  const keys = ['contacts', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
+                  const keys = ['contacts', 'people', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
                   const idx = keys.indexOf(tabItem.key);
                   if (e.key === 'ArrowRight') {
                     e.preventDefault();
@@ -221,6 +226,17 @@ export function CompanyDetailPage() {
             ))}
           </div>
 
+          {tab === 'people' && (
+            <div role="tabpanel" id={panelId('people')} aria-labelledby={tabId('people')}>
+              <AccountPeopleSection
+                companyId={c.id}
+                deals={c.opportunities.map((opportunity) => ({
+                  id: opportunity.id,
+                  name: opportunity.name,
+                }))}
+              />
+            </div>
+          )}
           {tab === 'contacts' && (
             <div role="tabpanel" id={panelId('contacts')} aria-labelledby={tabId('contacts')}>
               <ContactTab contacts={c.contacts} />

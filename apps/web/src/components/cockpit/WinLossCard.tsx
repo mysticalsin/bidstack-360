@@ -1,8 +1,9 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+import { formatMicrosAmount } from '@bidstack/shared';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { useDisplayMoneyMicros } from '@/hooks/useDisplayMoney';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -20,14 +21,20 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
   const { t } = useTranslation('crm');
   const flags = useFeatureFlags();
   const wl = cockpit.winLoss;
-  const wonValue = useDisplayMoneyMicros(wl?.wonValueMicros ?? 0, 'EUR', { compact: true });
-  if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0) return null;
+  const wonValue = formatMicrosAmount(BigInt(wl?.wonValueMicros ?? 0));
+  if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0 || wl.winRate == null) {
+    return null;
+  }
 
   return (
     <Card role="region" aria-label={t('winLoss.regionLabel', 'Win / loss')}>
       <SectionHeader
         title={t('winLoss.title', 'Win / loss')}
-        caption={t('winLoss.caption', 'Decided deals on this account')}
+        caption={t(
+          'winLoss.caption',
+          'Decided deals on this account. Win rate is won ÷ decided. {{basis}}',
+          { basis: UNSPECIFIED_CURRENCY_BASIS },
+        )}
       />
       <div className="px-5 pb-5">
         <div className="flex items-end justify-between">

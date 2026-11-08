@@ -332,7 +332,7 @@ export function ContactsPage() {
             {t('contacts.title', 'Contacts')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('contacts.subtitle', '{{count}} people in the decision unit.', {
+            {t('contacts.subtitle', '{{count}} contacts on this page.', {
               count: items.length,
             })}
           </p>

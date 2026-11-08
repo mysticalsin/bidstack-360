@@ -76,8 +76,11 @@ describe('dust integration routes', () => {
     expect(res.json()).toMatchObject({
       // Per-org resolver: with no org IntegrationConfig and no DUST_* env, the
       // status is honestly "Not configured" rather than a hardcoded workspace.
+      // nextSyncAt stays null so a stub tick is not advertised as a live sync.
       workspace: 'Not configured',
       configured: false,
+      connectionState: 'stub',
+      nextSyncAt: null,
       agentsError: null,
       agents: [],
     });
@@ -89,6 +92,9 @@ describe('dust integration routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.mcp.publicUrl).toMatch(/\/mcp$/);
+    expect(body.mcp.configured).toBe(false);
+    expect(body.mcp.localOnly).toBe(true);
+    expect(body.dust.spaceConfigured).toBe(false);
     expect(body.rest.authHeader).toBe('x-api-key: <BIDSTACK_API_KEY>');
     expect(body.rest.recommendedScopes).toEqual([
       'opportunities:read',
@@ -99,6 +105,25 @@ describe('dust integration routes', () => {
     expect(body.mcp.readScopes).toEqual(['mcp', 'read']);
     expect(body.mcp.writeScopes).toEqual(['mcp', 'write']);
     expect(JSON.stringify(body)).not.toContain('DUST_API_KEY');
+  });
+
+  skipIfNoDb('a localhost MCP URL stays local-only and is not Dust-cloud configured', async () => {
+    // WHY: Dust cloud cannot register localhost. Advertising it as configured
+    // would tell an operator the connection is ready when Dust can never call it.
+    const previous = process.env.DUST_MCP_PUBLIC_URL;
+    process.env.DUST_MCP_PUBLIC_URL = 'http://localhost:4001';
+    try {
+      const res = await server.inject({ method: 'GET', url: '/api/integrations/setup-guide' });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.mcp.configured).toBe(false);
+      expect(body.mcp.localOnly).toBe(true);
+      expect(body.mcp.publicUrl).toBe('http://localhost:4001/mcp');
+      expect(JSON.stringify(body)).not.toMatch(/healthy/i);
+    } finally {
+      if (previous === undefined) delete process.env.DUST_MCP_PUBLIC_URL;
+      else process.env.DUST_MCP_PUBLIC_URL = previous;
+    }
   });
 
   skipIfNoDb('POST /api/integrations/dust/resync records the enqueue attempt', async () => {

@@ -26,11 +26,13 @@ export function attribution({
   label,
   sourceUrl,
   confidence,
+  providerMetadata = {},
 }: {
   source: string;
   label: string;
   sourceUrl: string | null;
-  confidence: number;
+  confidence: number | null;
+  providerMetadata?: Record<string, unknown>;
 }): SourceAttributionType {
   return {
     source,
@@ -38,7 +40,7 @@ export function attribution({
     sourceUrl,
     fetchedAt: new Date().toISOString(),
     confidence,
-    providerMetadata: {},
+    providerMetadata,
   };
 }
 
@@ -58,11 +60,11 @@ export function latestAttributionDate(items: SourceAttributionType[]) {
 // ─── Enum coercers ────────────────────────────────────────────────────────────
 
 export function asRiskSeverity(
-  value: string,
+  value: string | null,
 ): z.infer<typeof AccountCockpitSnapshot>['risks'][number]['severity'] {
   return value === 'critical' || value === 'high' || value === 'medium' || value === 'low'
     ? value
-    : 'medium';
+    : null;
 }
 
 export function asRiskStatus(
@@ -77,18 +79,22 @@ export function asRiskStatus(
 }
 
 export function asComplianceStatus(
-  value: string,
+  value: string | null,
 ): z.infer<typeof AccountCockpitSnapshot>['compliance'][number]['status'] {
   return value === 'compliant' ||
     value === 'in_progress' ||
     value === 'blocked' ||
     value === 'not_started'
     ? value
-    : 'not_started';
+    : null;
 }
 
 export function asProviderStatus(value: string): z.infer<typeof ProviderHealth>['status'] {
-  return value === 'healthy' || value === 'degraded' || value === 'disabled' || value === 'down'
+  return value === 'healthy' ||
+    value === 'degraded' ||
+    value === 'disabled' ||
+    value === 'down' ||
+    value === 'unverified'
     ? value
     : 'degraded';
 }
@@ -133,11 +139,16 @@ export function titleCase(value: string) {
     .join(' ');
 }
 
+/** Company revenue has no currency column. A dollar sign would invent one. */
 export function formatMicrosCompact(micros: number) {
-  const units = micros / 1_000_000;
-  if (units >= 1_000_000_000) return `$${(units / 1_000_000_000).toFixed(1)}B`;
-  if (units >= 1_000_000) return `$${(units / 1_000_000).toFixed(1)}M`;
-  return `$${units.toLocaleString()}`;
+  const whole = Number.isSafeInteger(micros) ? BigInt(micros) / 1_000_000n : 0n;
+  const remainder = Number.isSafeInteger(micros) ? BigInt(micros) % 1_000_000n : 0n;
+  const units = Number(whole) + Number(remainder) / 1_000_000;
+  const compact = new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(Number.isFinite(units) ? units : 0);
+  return `${compact} unspecified`;
 }
 
 // ─── Normalizers ─────────────────────────────────────────────────────────────
@@ -197,8 +208,41 @@ export function mapDealStage(stage: string): z.infer<typeof CrmDeal>['stage'] {
     case 'closed_lost':
       return 'closed_lost';
     default:
-      return 'new';
+      // A custom key is not a new lead. The account bar uses the stage name.
+      return 'unspecified';
   }
+}
+
+/** A soft-deleted stage row does not close the deal or rename its key. */
+export function livePipelineStage<T extends { deletedAt?: Date | null }>(
+  stage: T | null | undefined,
+): T | null {
+  if (!stage || stage.deletedAt) return null;
+  return stage;
+}
+
+/**
+ * A lost or won flag closes the deal on the account list. The mapped key
+ * alone turned a custom lost stage into "new", so its value stayed in the
+ * open pipeline. Lost wins when both flags are set. A deleted stage does not.
+ */
+export function recordedDealStage(opportunity: {
+  stage: string;
+  pipelineStage: {
+    key: string;
+    isWon: boolean;
+    isLost: boolean;
+    deletedAt?: Date | null;
+  } | null;
+}): z.infer<typeof CrmDeal>['stage'] {
+  const stage = livePipelineStage(opportunity.pipelineStage);
+  const key = stage?.key ?? opportunity.stage;
+  const lost =
+    stage?.isLost === true || opportunity.stage === 'closed_lost' || key === 'closed_lost';
+  if (lost) return 'closed_lost';
+  const won = stage?.isWon === true || opportunity.stage === 'closed_won' || key === 'closed_won';
+  if (won) return 'closed_won';
+  return mapDealStage(key);
 }
 
 // ─── Technical stack parser ───────────────────────────────────────────────────
@@ -236,7 +280,10 @@ export function mergeTechnicalStack(
     for (const item of category.items) {
       const key = item.name.toLowerCase();
       const existing = items.get(key);
-      items.set(key, existing && existing.confidence > item.confidence ? existing : item);
+      items.set(
+        key,
+        existing && (existing.confidence ?? -1) > (item.confidence ?? -1) ? existing : item,
+      );
     }
     byCategory.set(category.label, items);
   }

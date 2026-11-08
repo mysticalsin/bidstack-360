@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import SectorViewPage from './SectorViewPage';
+import SectorViewPage, { labeledCount, sectorDetailMeta, sectorRadarMeta } from './SectorViewPage';
 import { useSectorView, type SectorViewResponse } from '@/hooks/useSectorView';
 import { useTerritoryAnalytics, useTerritorySegments } from '@/hooks/useTerritories';
 
@@ -78,6 +78,8 @@ describe('SectorViewPage load resilience', () => {
     renderPage();
 
     expect(screen.getByText('Sector momentum')).toBeTruthy();
+    expect(screen.getAllByText('Technology').length).toBeGreaterThan(0);
+    expect(screen.queryByText('technology')).toBeNull();
     expect(screen.queryByText('Could not load the sector view')).toBeNull();
   });
 
@@ -135,5 +137,67 @@ describe('SectorViewPage load resilience', () => {
     expect(screen.getByText('Could not load the sector view')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the world map and labels industry pipeline as unspecified', () => {
+    // WHY: opportunity totals have no stored currency. An industry chart that
+    // prints euros would invent a forecast the sector rollup does not have.
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    vi.mocked(useTerritoryAnalytics).mockReturnValue({
+      data: {
+        items: [
+          {
+            countryCode: 'FR',
+            countryCodeA3: 'FRA',
+            opportunityCount: 2,
+            totalValueMicros: 1_500_000_000_000,
+            avgProbability: 40,
+            territories: [],
+            ownerNames: [],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as never);
+    vi.mocked(useTerritorySegments).mockReturnValue({
+      data: {
+        items: [
+          {
+            key: 'technology',
+            label: 'technology',
+            opportunityCount: 2,
+            totalValueMicros: 1_500_000_000_000,
+            avgProbability: 40,
+            ownerNames: [],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as never);
+    renderPage();
+
+    expect(screen.getByTestId('world-map')).toBeTruthy();
+    expect(screen.getByText('currency not recorded; not a euro forecast')).toBeTruthy();
+    expect(screen.getByText(/As of/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'By industry' }));
+    expect(screen.getAllByText('Technology').length).toBeGreaterThan(0);
+    expect(screen.getByText(/unspecified/)).toBeTruthy();
+    expect(document.body.textContent ?? '').not.toMatch(/€|\$|\bEUR\b/);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'By country' }));
+    expect(screen.getByTestId('world-map')).toBeTruthy();
+  });
+});
+
+describe('sector count wording', () => {
+  it('uses the singular when a sector has one account or one country', () => {
+    expect(sectorRadarMeta(1, 1)).toBe('1 account / 1 country');
+    expect(sectorRadarMeta(2, 3)).toBe('2 accounts / 3 countries');
+    expect(sectorDetailMeta(1, 2)).toBe('1 account across 2 countries');
+    expect(labeledCount(1, 'account', 'accounts')).toBe('1 account');
+    expect(labeledCount(9, 'account', 'accounts')).toBe('9 accounts');
   });
 });

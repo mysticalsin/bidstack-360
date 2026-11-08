@@ -15,8 +15,16 @@ export function AnimatedMetric({ value, duration = 0.85 }: Props) {
   if (!match) return <>{value}</>;
   const literal = match[1] ?? '';
   const index = match.index ?? 0;
-  const target = Number(literal.replace(/,/g, ''));
-  if (!Number.isFinite(target)) return <>{value}</>;
+  const plain = literal.replace(/,/g, '');
+  const target = Number(plain);
+  // Past the point where a double keeps the written cent, show the text.
+  if (!Number.isFinite(target) || !Number.isSafeInteger(Math.trunc(target))) return <>{value}</>;
+  if (plain.includes('.')) {
+    const [whole, frac = ''] = plain.split('.');
+    const digits = Math.min(frac.length, 2);
+    const expected = `${whole}.${frac.slice(0, digits).padEnd(digits, '0')}`;
+    if (target.toFixed(digits) !== expected) return <>{value}</>;
+  }
 
   const prefix = value.slice(0, index);
   const suffix = value.slice(index + literal.length);

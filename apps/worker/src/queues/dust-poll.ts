@@ -117,14 +117,20 @@ export function resetDustCircuitBreakerForTest(): void {
 export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
   const { client: dust, creds } = await getOrgDust(orgId, log.child({ orgId, kind: 'dust' }));
   const dataSourceId = creds?.dataSourceId;
-  if (!dust || !dataSourceId) {
+  // Current Dust document APIs require the space sId. A data source id alone
+  // would call a path docs.dust.tt no longer documents.
+  if (!dust || !dataSourceId || !creds?.spaceId) {
+    const reason =
+      dust && dataSourceId && !creds?.spaceId
+        ? 'Dust space id missing — set DUST_SPACE_ID to the space sId, not the space name'
+        : 'Dust not configured for org — add credentials + data source in Settings';
     await prisma.syncEvent.create({
       data: {
         orgId,
         source: 'dust.poll',
         eventType: 'tick.stub',
         payload: {
-          reason: 'Dust not configured for org — add credentials + data source in Settings',
+          reason,
         },
         status: 'processed',
         processedAt: new Date(),

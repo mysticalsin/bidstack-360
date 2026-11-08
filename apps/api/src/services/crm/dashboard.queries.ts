@@ -21,9 +21,9 @@ import type {
 } from '@bidstack/shared';
 
 import { buildCompanies } from './company-enrichment.service.js';
-import { buildCockpit, type AccountPerformance } from './dashboard.cockpit.js';
+import { buildCockpit, microsText, type AccountPerformance } from './dashboard.cockpit.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
-import { asProviderStatus, mapDealStage, normalizeName, record } from './dashboard.utils.js';
+import { asProviderStatus, normalizeName, record, recordedDealStage } from './dashboard.utils.js';
 import {
   applyOpportunityScope,
   countryVariantsForScope,
@@ -36,6 +36,7 @@ import { canReadAccount } from '../../lib/account-access.js';
 export function serializeDeal(opportunity: {
   id: string;
   customer: string;
+  companyId?: string | null;
   name: string;
   stage: string;
   pipelineStage: {
@@ -45,6 +46,7 @@ export function serializeDeal(opportunity: {
     color: string | null;
     isWon: boolean;
     isLost: boolean;
+    deletedAt?: Date | null;
   } | null;
   valueMicros: bigint | number | unknown;
   probability: number;
@@ -52,17 +54,27 @@ export function serializeDeal(opportunity: {
   ownerId: string | null;
   owner: { name: string | null; email: string } | null;
   updatedAt: Date;
+  /** Opportunity has no currency column. Callers must not invent one. */
+  currencyCode?: string | null;
 }): z.infer<typeof CrmDeal> {
+  const recorded = opportunity.currencyCode?.trim();
+  const liveStage = opportunity.pipelineStage?.deletedAt ? null : opportunity.pipelineStage;
   return {
     id: opportunity.id,
     source: 'external_crm',
-    companyId: normalizeName(opportunity.customer),
+    companyId: opportunity.companyId ?? null,
     companyName: opportunity.customer,
     name: opportunity.name,
-    stage: mapDealStage(opportunity.pipelineStage?.key ?? opportunity.stage),
-    amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
-    currencyCode: 'EUR',
-    probability: opportunity.probability,
+    stage: recordedDealStage(opportunity),
+    stageName: liveStage?.name ?? null,
+    amountMicros: microsText(
+      typeof opportunity.valueMicros === 'bigint' || typeof opportunity.valueMicros === 'number'
+        ? opportunity.valueMicros
+        : null,
+    ),
+    currencyCode: recorded && recorded.length === 3 ? recorded : null,
+    // A blank probability is stored as 0. That is not a measured win chance.
+    probability: opportunity.probability === 0 ? null : opportunity.probability,
     closeDate: opportunity.dueDate ? opportunity.dueDate.toISOString().slice(0, 10) : null,
     ownerId: opportunity.ownerId,
     ownerName: opportunity.owner?.name ?? opportunity.owner?.email ?? null,
@@ -264,7 +276,7 @@ export async function resolveCockpitCompany(
     // enrichment for richer fields, then stamp the authoritative id/domain.
     const company = await prisma.company.findFirst({
       where: { orgId, deletedAt: null, id: companyId },
-      select: { id: true, name: true, domain: true, logoUrl: true },
+      select: { id: true, name: true, domain: true, logoUrl: true, legalName: true },
     });
     if (!company) return null;
     const byNameEnrichment = await prisma.companyEnrichment.findFirst({
@@ -334,20 +346,20 @@ export async function buildCompanyCockpit(
   }
 
   const opportunityWhere = scope
-    ? applyOpportunityScope({ orgId, customer: company.name, deletedAt: null }, scope)
-    : { orgId, customer: company.name, deletedAt: null };
+    ? applyOpportunityScope({ orgId, companyId: company.id, deletedAt: null }, scope)
+    : { orgId, companyId: company.id, deletedAt: null };
   const taskOpportunityWhere = scope
-    ? applyOpportunityScope({ customer: company.name, deletedAt: null }, scope)
-    : { customer: company.name, deletedAt: null };
+    ? applyOpportunityScope({ companyId: company.id, deletedAt: null }, scope)
+    : { companyId: company.id, deletedAt: null };
 
   // Step 2: load company-specific data in parallel (filtered by company)
-  const [opportunities, contacts, tasks, riskRows, complianceRows, performance, fieldOverrides] =
-    await Promise.all([
+  const [opportunities, contacts, tasks, performance, fieldOverrides] = await Promise.all([
       prismaClient.opportunity.findMany({
         where: opportunityWhere,
         select: {
           id: true,
           customer: true,
+          companyId: true,
           name: true,
           stage: true,
           valueMicros: true,
@@ -362,6 +374,7 @@ export async function buildCompanyCockpit(
               color: true,
               isWon: true,
               isLost: true,
+              deletedAt: true,
             },
           },
         },
@@ -369,10 +382,11 @@ export async function buildCompanyCockpit(
         take: 100,
       }),
       prismaClient.contact.findMany({
-        where: { orgId, customer: company.name },
+        where: { orgId, companyId, deletedAt: null },
         select: {
           id: true,
           customer: true,
+          companyId: true,
           name: true,
           role: true,
           email: true,
@@ -380,54 +394,29 @@ export async function buildCompanyCockpit(
           influence: true,
           createdAt: true,
         },
-        orderBy: { name: 'asc' },
+        orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
         take: 20,
       }),
       prismaClient.task.findMany({
-        where: { orgId, deletedAt: null, opportunity: taskOpportunityWhere },
+        where: {
+          orgId,
+          deletedAt: null,
+          OR: [{ accountId: company.id }, { opportunity: taskOpportunityWhere }],
+        },
         select: {
           id: true,
           title: true,
           status: true,
           createdAt: true,
           dueDate: true,
-          opportunity: { select: { id: true, customer: true, name: true } },
+          accountId: true,
+          opportunity: { select: { id: true, customer: true, companyId: true, name: true } },
           assignee: { select: { name: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: 50,
       }),
-      // WHY: risks and compliance can't be cheaply filtered at DB layer — risks may have
-      // casing variations and compliance uses JSON attribution metadata. Load the full org
-      // set (take: 50) and let buildCockpit's in-memory filter select the right rows.
-      prismaClient.riskRegisterItem.findMany({
-        where: { orgId },
-        select: {
-          id: true,
-          title: true,
-          severity: true,
-          owner: true,
-          mitigation: true,
-          dueDate: true,
-          status: true,
-          companyName: true,
-        },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-        take: 50,
-      }),
-      prismaClient.complianceCheck.findMany({
-        where: { orgId },
-        select: {
-          id: true,
-          label: true,
-          status: true,
-          owner: true,
-          sourceAttribution: true,
-        },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-        take: 50,
-      }),
-      fetchAccountPerformance(orgId, company.name, prismaClient, scope),
+      fetchAccountPerformance(orgId, company.id, prismaClient, scope),
       // WHY: folded into the Promise.all (was a 7th serial query after it) so the
       // cockpit's per-company reads all run in parallel. company.name is already
       // resolved above. Mirrors the shipped pattern in dashboard.service.ts.
@@ -437,6 +426,45 @@ export async function buildCompanyCockpit(
         take: 10,
       }),
     ]);
+
+  const accountOpportunityIds = opportunities.map((opportunity) => opportunity.id);
+  const contactIds = contacts.map((contact) => contact.id);
+  const [riskRows, complianceRows, buyingRoleFacts] = await Promise.all([
+    accountOpportunityIds.length === 0
+      ? []
+      : prismaClient.riskRegisterItem.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            title: true,
+            severity: true,
+            owner: true,
+            mitigation: true,
+            dueDate: true,
+            status: true,
+            companyName: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    accountOpportunityIds.length === 0
+      ? []
+      : prismaClient.complianceCheck.findMany({
+          where: { orgId, deletedAt: null, opportunityId: { in: accountOpportunityIds } },
+          select: {
+            id: true,
+            opportunityId: true,
+            label: true,
+            status: true,
+            owner: true,
+            sourceAttribution: true,
+          },
+          orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+          take: 50,
+        }),
+    fetchBuyingRoleFacts(orgId, contactIds, prismaClient),
+  ]);
 
   return buildCockpit({
     company,
@@ -448,9 +476,25 @@ export async function buildCompanyCockpit(
     tasks,
     risks: riskRows,
     compliance: complianceRows,
+    buyingRoleFacts,
     fieldOverrides,
     winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
     performance,
+  });
+}
+
+export function fetchBuyingRoleFacts(orgId: string, contactIds: string[], prismaClient: PrismaClient) {
+  if (contactIds.length === 0) return Promise.resolve([]);
+  return prismaClient.contactFact.findMany({
+    where: { orgId, deletedAt: null, kind: 'buying_role', contactId: { in: contactIds } },
+    select: {
+      contactId: true,
+      status: true,
+      linkLabel: true,
+      opportunityId: true,
+      observedAt: true,
+    },
+    take: 200,
   });
 }
 
@@ -458,78 +502,101 @@ export async function buildCompanyCockpit(
  * Exact win/loss + revenue-by-month for ONE account, computed in Postgres so
  * the numbers are correct regardless of how many opportunities the account has
  * (the cockpit's opportunity list is take-capped for display; aggregates must
- * not be). Sums are BigInt in SQL, returned as Number micros at the edge.
+ * not be). Sums stay integer micros strings so a large book is not rounded.
  */
+function isCompanyUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
+const EMPTY_ACCOUNT_PERFORMANCE: AccountPerformance = {
+  winLoss: {
+    wonCount: 0,
+    lostCount: 0,
+    wonValueMicros: '0',
+    lostValueMicros: '0',
+    winRate: null,
+  },
+  revenueEvolution: [],
+};
+
 export async function fetchAccountPerformance(
   orgId: string,
-  customer: string,
+  companyId: string,
   prismaClient: PrismaClient,
   scope?: AccessScope,
 ): Promise<AccountPerformance> {
-  const byStageWhere: Prisma.OpportunityWhereInput = scope
-    ? applyOpportunityScope(
-        {
-          orgId,
-          customer,
-          deletedAt: null,
-          stage: { in: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
-        },
-        scope,
-      )
-    : {
-        orgId,
-        customer,
-        deletedAt: null,
-        stage: { in: [OpportunityStage.closed_won, OpportunityStage.closed_lost] },
-      };
-  const [byStage, revenueRows] = await Promise.all([
-    prismaClient.opportunity.groupBy({
-      by: ['stage'],
-      where: byStageWhere,
+  // A customer string is not a company. Placeholder accounts use a slug id.
+  if (!isCompanyUuid(companyId)) return EMPTY_ACCOUNT_PERFORMANCE;
+  const base = { orgId, companyId, deletedAt: null };
+  const lostWhere: Prisma.OpportunityWhereInput = {
+    ...base,
+    OR: [
+      { stage: OpportunityStage.closed_lost },
+      { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+    ],
+  };
+  const wonWhere: Prisma.OpportunityWhereInput = {
+    ...base,
+    NOT: {
+      OR: [
+        { stage: OpportunityStage.closed_lost },
+        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
+      ],
+    },
+    OR: [
+      { stage: OpportunityStage.closed_won },
+      { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+    ],
+  };
+  const scoped = (where: Prisma.OpportunityWhereInput) =>
+    scope ? applyOpportunityScope(where, scope) : where;
+  const [won, lost, revenueRows] = await Promise.all([
+    prismaClient.opportunity.aggregate({
+      where: scoped(wonWhere),
       _sum: { valueMicros: true },
       _count: { _all: true },
     }),
-    fetchRevenueRows(orgId, customer, prismaClient, scope),
+    prismaClient.opportunity.aggregate({
+      where: scoped(lostWhere),
+      _sum: { valueMicros: true },
+      _count: { _all: true },
+    }),
+    fetchRevenueRows(orgId, companyId, prismaClient, scope),
   ]);
 
-  const won = byStage.find((r) => r.stage === OpportunityStage.closed_won);
-  const lost = byStage.find((r) => r.stage === OpportunityStage.closed_lost);
-  const wonCount = countGroupRow(won);
-  const lostCount = countGroupRow(lost);
+  const wonCount = won._count._all;
+  const lostCount = lost._count._all;
   const decided = wonCount + lostCount;
 
   return {
     winLoss: {
       wonCount,
       lostCount,
-      wonValueMicros: sumGroupValueMicros(won),
-      lostValueMicros: sumGroupValueMicros(lost),
-      winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : 0,
+      wonValueMicros: microsText(won._sum.valueMicros),
+      lostValueMicros: microsText(lost._sum.valueMicros),
+      winRate: decided > 0 ? Math.round((wonCount / decided) * 100) : null,
     },
     // Raw query returns newest-first (for the LIMIT 12 window); the chart wants
     // oldest-first.
     revenueEvolution: revenueRows
-      .map((r) => ({ period: r.period, revenueMicros: Number(r.revenue ?? 0) }))
+      .map((r) => ({
+        period: r.period,
+        revenueMicros: microsText(
+          typeof r.revenue === 'bigint' || typeof r.revenue === 'number' || typeof r.revenue === 'string'
+            ? r.revenue
+            : null,
+        ),
+      }))
       .reverse(),
   };
 }
 
-function countGroupRow(row: { _count?: true | { _all?: number } } | undefined): number {
-  return row && typeof row._count === 'object' ? (row._count._all ?? 0) : 0;
-}
-
-function sumGroupValueMicros(
-  row: { _sum?: { valueMicros?: bigint | number | null } } | undefined,
-): number {
-  return Number(row?._sum?.valueMicros ?? 0);
-}
-
 async function fetchRevenueRows(
   orgId: string,
-  customer: string,
+  companyId: string,
   prismaClient: PrismaClient,
   scope?: AccessScope,
-): Promise<Array<{ period: string; revenue: bigint | number | null }>> {
+): Promise<Array<{ period: string; revenue: string | null }>> {
   if (!scope?.unrestricted && scope) {
     // Aggregate in Postgres for the scoped path too — a JS findMany summed in
     // app code was take-capped (5k rows), so an account with >5k closed_won opps
@@ -545,15 +612,31 @@ async function fetchRevenueRows(
             OR t.country_codes && ARRAY[${Prisma.join(variants)}]::text[]
             OR`
         : Prisma.empty;
-    return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
+    return prismaClient.$queryRaw<Array<{ period: string; revenue: string | null }>>(Prisma.sql`
       SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
-             SUM(o.value_micros) AS revenue
+             SUM(o.value_micros)::text AS revenue
       FROM opportunities o
       LEFT JOIN territories t ON t.id = o.territory_id
       WHERE o.org_id = ${orgId}::uuid
-        AND o.customer = ${customer}
-        AND o.stage = 'closed_won'
+        AND o.company_id = ${companyId}::uuid
         AND o.deleted_at IS NULL
+        AND o.stage <> 'closed_lost'
+        AND NOT EXISTS (
+          SELECT 1 FROM pipeline_stages ps
+          WHERE ps.id = o.pipeline_stage_id
+            AND ps.deleted_at IS NULL
+            AND ps.is_lost
+        )
+        AND (
+          o.stage = 'closed_won'
+          OR EXISTS (
+            SELECT 1 FROM pipeline_stages ps
+            WHERE ps.id = o.pipeline_stage_id
+              AND ps.deleted_at IS NULL
+              AND ps.is_won
+              AND NOT ps.is_lost
+          )
+        )
         AND o.due_date IS NOT NULL
         AND (
           ${countryScopeSql}
@@ -565,15 +648,31 @@ async function fetchRevenueRows(
     `);
   }
 
-  return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
-    SELECT to_char(date_trunc('month', due_date), 'YYYY-MM') AS period,
-           SUM(value_micros) AS revenue
-    FROM opportunities
-    WHERE org_id = ${orgId}::uuid
-      AND customer = ${customer}
-      AND stage = 'closed_won'
-      AND deleted_at IS NULL
-      AND due_date IS NOT NULL
+  return prismaClient.$queryRaw<Array<{ period: string; revenue: string | null }>>(Prisma.sql`
+    SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
+           SUM(o.value_micros)::text AS revenue
+    FROM opportunities o
+    WHERE o.org_id = ${orgId}::uuid
+      AND o.company_id = ${companyId}::uuid
+      AND o.deleted_at IS NULL
+      AND o.due_date IS NOT NULL
+      AND o.stage <> 'closed_lost'
+      AND NOT EXISTS (
+        SELECT 1 FROM pipeline_stages ps
+        WHERE ps.id = o.pipeline_stage_id
+          AND ps.deleted_at IS NULL
+          AND ps.is_lost
+      )
+      AND (
+        o.stage = 'closed_won'
+        OR EXISTS (
+          SELECT 1 FROM pipeline_stages ps
+          WHERE ps.id = o.pipeline_stage_id
+            AND ps.deleted_at IS NULL
+            AND ps.is_won
+            AND NOT ps.is_lost
+        )
+      )
     GROUP BY 1
     ORDER BY 1 DESC
     LIMIT 12

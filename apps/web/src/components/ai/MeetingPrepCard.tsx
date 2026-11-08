@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
+import { formatUsdMicros } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { AiFeedback } from './ai-feedback';
 import { useMeetingPrep, type MeetingPrepResult } from '@/hooks/useAiAssistant';
@@ -50,7 +51,11 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
 
       {/* Pending skeleton */}
       {mutation.isPending ? (
-        <div className="space-y-2 animate-pulse" aria-label={t('meetingPrep.generatingAriaLabel', 'Generating meeting brief…')} aria-live="polite">
+        <div
+          className="space-y-2 animate-pulse"
+          aria-label={t('meetingPrep.generatingAriaLabel', 'Generating meeting brief…')}
+          aria-live="polite"
+        >
           {[80, 60, 70, 50].map((w, i) => (
             <div
               key={i}
@@ -83,8 +88,12 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
                 {result.attendees.map((a, i) => (
                   <li key={i} className="text-xs text-[var(--fg-primary)]">
                     <span className="font-medium">{a.name}</span>
-                    {a.role ? <span className="text-[var(--fg-secondary)]"> — {a.role}</span> : null}
-                    {a.company ? <span className="text-[var(--fg-tertiary)]">, {a.company}</span> : null}
+                    {a.role ? (
+                      <span className="text-[var(--fg-secondary)]"> — {a.role}</span>
+                    ) : null}
+                    {a.company ? (
+                      <span className="text-[var(--fg-tertiary)]">, {a.company}</span>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -160,7 +169,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
 
           <p className="text-[10px] text-[var(--fg-muted)]">
             {t('meetingPrep.cost', 'Cost: ${{amount}}', {
-              amount: (result.costMicros / 1_000_000).toFixed(4),
+              amount: formatUsdMicros(result.costMicros),
             })}
           </p>
 

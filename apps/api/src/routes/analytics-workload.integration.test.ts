@@ -152,6 +152,36 @@ describe('analytics workload route', () => {
           ownerId: aliceId,
         },
       }),
+      // The enum still says an open stage. The stage row is marked lost, so
+      // this value must not land on Alice's open book.
+      (async () => {
+        const pipeline = await prisma.pipeline.create({
+          data: { orgId, name: `Workload lost ${ns}` },
+        });
+        const stage = await prisma.pipelineStage.create({
+          data: {
+            orgId,
+            pipelineId: pipeline.id,
+            key: 'price_lost',
+            name: 'Price lost',
+            isLost: true,
+          },
+        });
+        await prisma.opportunity.create({
+          data: {
+            orgId,
+            code: 'OP-9708',
+            customer: 'Nordbahn AG',
+            name: 'Marked lost',
+            stage: 's2_sent',
+            pipelineStageId: stage.id,
+            valueMicros: 80_000_000n,
+            probability: 90,
+            ownerId: aliceId,
+            dueDate: inWeek,
+          },
+        });
+      })(),
       prisma.opportunity.create({
         data: {
           orgId,
@@ -259,7 +289,8 @@ describe('analytics workload route', () => {
 
     const alice = owners.find((o) => o.ownerId === aliceId);
     expect(alice).toBeDefined();
-    // Closed and soft-deleted bids excluded; 10M×50% + 30M×10% = 8M weighted.
+    // Closed, soft-deleted, and lost-flagged bids excluded. The lost-flagged
+    // row is still stage s2_sent. 10M×50% + 30M×10% = 8M weighted.
     expect(alice).toMatchObject({
       name: 'Alice Bidlead',
       openBids: 2,
@@ -280,6 +311,34 @@ describe('analytics workload route', () => {
       openTasks: 1,
       overdueTasks: 0,
     });
+  });
+
+  skipIfNoSeed('a large weighted amount stays on the exact micros', async (app) => {
+    // WHY: value_micros * probability / 100.0 promoted the product to float.
+    // This amount then came back one cent high once the web divided it.
+    const micros = 8_598_204_328_457_184_962n;
+    const before = (await fetchOwners(app)).find((row) => row.ownerId === aliceId);
+    const deal = await prisma.opportunity.create({
+      data: {
+        orgId: orgId!,
+        ownerId: aliceId,
+        code: `OP-WL-${Date.now()}`,
+        customer: 'Wide desk',
+        name: 'Large open',
+        stage: 's1_lead',
+        valueMicros: micros,
+        probability: 100,
+        intel: {},
+      },
+    });
+    try {
+      const after = (await fetchOwners(app)).find((row) => row.ownerId === aliceId);
+      expect(after).toBeDefined();
+      expect(BigInt(after!.weightedValueMicros) - BigInt(before!.weightedValueMicros)).toBe(micros);
+      expect(after!.weightedValueMicros.includes('.')).toBe(false);
+    } finally {
+      await prisma.opportunity.delete({ where: { id: deal.id } });
+    }
   });
 
   skipIfNoSeed('a task due today is open but not overdue until the day ends', async (app) => {

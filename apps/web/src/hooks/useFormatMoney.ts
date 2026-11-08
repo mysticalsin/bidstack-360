@@ -1,16 +1,89 @@
 import { useEffect } from 'react';
 
+import { unitsToMicros } from '@bidstack/shared';
+
+import {
+  formatExactUnspecified,
+  formatUnspecifiedAmount,
+  formatUnspecifiedCompact,
+  unitsFromMicros,
+  unspecifiedMicrosLabel,
+} from '@/components/dashboard/unspecified-currency';
 import { useCurrencyStore } from '@/stores/currency';
-import { formatMoney, formatMoneyMicros } from '@/lib/format';
+import { formatConvertedMicros, formatMoney, formatMoneyMicros } from '@/lib/format';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
+
+function microsBigInt(micros: string | number | bigint): bigint | null {
+  try {
+    if (typeof micros === 'bigint') return micros;
+    if (typeof micros === 'number') {
+      // A JSON number past the safe integer is already one unit low.
+      if (!Number.isSafeInteger(micros)) return null;
+      return BigInt(micros);
+    }
+    return BigInt(micros);
+  } catch {
+    return null;
+  }
+}
+
+function fitsSafeUnitCount(micros: bigint): boolean {
+  const abs = micros < 0n ? -micros : micros;
+  return abs / 1_000_000n <= BigInt(Number.MAX_SAFE_INTEGER);
+}
+
+/** A converted JavaScript number still has its cent. Above 2^42 the float step is coarser. */
+function convertedCentSurvives(amount: number): boolean {
+  if (!Number.isFinite(amount)) return false;
+  if (Number.isInteger(amount)) return Number.isSafeInteger(amount);
+  return Math.abs(amount) < 2 ** 42 && Number.isSafeInteger(Math.round(Math.abs(amount) * 100));
+}
+
+/** Format stored micros. An unchanged FX result keeps the integer. A count past the safe range is not converted through a JavaScript number. */
+export function formatStoredMicros(
+  micros: string | number | bigint,
+  sourceCurrency: string | null | undefined,
+  convert: (amount: number, from: string) => number,
+  displayCurrency: string,
+  options?: { compact?: boolean },
+  convertMicros?: (micros: bigint, from: string) => bigint,
+): string {
+  const asBigInt = microsBigInt(micros);
+  if (asBigInt == null) return formatUnspecifiedCompact(0);
+  const source = sourceCurrency?.trim();
+  if (!source) {
+    return options?.compact === false
+      ? formatExactUnspecified(asBigInt)
+      : unspecifiedMicrosLabel(asBigInt);
+  }
+  if (convertMicros) {
+    const converted = convertMicros(asBigInt, source);
+    if (options?.compact === false) {
+      return formatMoneyMicros(converted.toString(), displayCurrency, { compact: false });
+    }
+    return formatConvertedMicros(converted, displayCurrency);
+  }
+  // No integer converter. A unit count past the safe range has already lost digits
+  // inside a JavaScript number, so print the stored integer in its own currency.
+  const exactSource = () => formatMoneyMicros(asBigInt.toString(), source, { compact: false });
+  if (!fitsSafeUnitCount(asBigInt)) return exactSource();
+  const value = unitsFromMicros(asBigInt);
+  const converted = convert(value, source);
+  if (!Number.isFinite(converted) || converted === value) {
+    return formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
+  }
+  const convertedMicros = unitsToMicros(converted);
+  if (convertedMicros == null || !convertedCentSurvives(converted)) return exactSource();
+  return formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
+}
 
 /**
  * Hook that returns currency formatting functions with automatic conversion
  * based on the user's selected display currency.
  */
 export function useFormatMoney() {
-  const { currency, convert, fetchRates } = useCurrencyStore();
+  const { currency, convert, convertAmountMicros, convertMicros, fetchRates } = useCurrencyStore();
 
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
@@ -20,28 +93,18 @@ export function useFormatMoney() {
   return {
     currency,
     convert,
-    formatMoney: (value: number, sourceCurrency = 'EUR') =>
-      formatMoney(convert(value, sourceCurrency), currency),
+    formatMoney: (value: number, sourceCurrency?: string | null) => {
+      const source = sourceCurrency?.trim();
+      if (!source) return formatUnspecifiedAmount(value);
+      const converted = convertAmountMicros(value, source);
+      if (converted == null) return formatMoney(value, currency);
+      return formatConvertedMicros(converted, currency);
+    },
     formatMoneyMicros: (
       micros: string | number | bigint,
-      // Micros are EUR-denominated at rest (CLAUDE.md money convention) — the
-      // default source must match or every dashboard figure gets FX-skewed.
-      sourceCurrency = 'EUR',
+      // No source currency means the amount is unspecified. Do not assume EUR.
+      sourceCurrency?: string | null,
       options?: { compact?: boolean },
-    ) => {
-      const asBigInt =
-        typeof micros === 'bigint'
-          ? micros
-          : typeof micros === 'number'
-            ? BigInt(Math.trunc(micros))
-            : BigInt(micros);
-      const million = BigInt(1_000_000);
-      const whole = asBigInt / million;
-      const remainder = asBigInt % million;
-      const value = Number(whole) + Number(remainder) / 1_000_000;
-      const converted = convert(value, sourceCurrency);
-      const convertedMicros = String(BigInt(Math.round(converted * 1_000_000)));
-      return formatMoneyMicros(convertedMicros, currency, options);
-    },
+    ) => formatStoredMicros(micros, sourceCurrency, convert, currency, options, convertMicros),
   };
 }

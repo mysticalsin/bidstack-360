@@ -1,0 +1,61 @@
+import { describe, expect, it } from 'vitest';
+
+import { countRecordedDealOutcomes, formatDealForPrompt } from './ai-assistant.context.js';
+
+describe('formatDealForPrompt', () => {
+  it('does not invent a dollar amount, and a lost flag is lost', () => {
+    // WHY: the email and account briefs used to prefix the amount with $,
+    // and a stage key that still looked open hid a lost flag.
+    const line = formatDealForPrompt({
+      name: 'Landing zone',
+      stage: 's2_sent',
+      valueMicros: 2_000_000n,
+      pipelineStage: { isWon: false, isLost: true, deletedAt: null },
+    });
+    expect(line).toBe(
+      '"Landing zone" (stage s2_sent, outcome lost, value 2 (currency not recorded))',
+    );
+    expect(line).not.toContain('$');
+  });
+
+  it('prints a large amount from integer micros', () => {
+    // WHY: Number(micros) / 1e6 moved this amount to the next cent in the brief.
+    const line = formatDealForPrompt({
+      name: 'Large book',
+      stage: 's4_negotiation',
+      valueMicros: 8_598_204_328_457_184_962n,
+      pipelineStage: null,
+    });
+    expect(line).toContain('value 8,598,204,328,457.18 (currency not recorded)');
+    expect(line).not.toContain('457.19');
+  });
+
+  it('treats a deleted stage as open and omits a zero amount', () => {
+    const line = formatDealForPrompt({
+      name: 'Back in play',
+      stage: 's2_sent',
+      valueMicros: 0n,
+      pipelineStage: { isWon: false, isLost: true, deletedAt: new Date('2026-02-01') },
+    });
+    expect(line).toBe('"Back in play" (stage s2_sent, outcome open)');
+  });
+
+  it('counts a both-flagged deal once, as lost', () => {
+    // WHY: the account stub counted closed_won keys only. A live lost flag
+    // on an open key, or on a won key, was left out of the lost total.
+    const counts = countRecordedDealOutcomes([
+      { name: 'Open', stage: 's2_sent', pipelineStage: null },
+      {
+        name: 'Flagged',
+        stage: 's3_technical_iteration',
+        pipelineStage: { isWon: false, isLost: true, deletedAt: null },
+      },
+      {
+        name: 'Both',
+        stage: 'closed_won',
+        pipelineStage: { isWon: true, isLost: true, deletedAt: null },
+      },
+    ]);
+    expect(counts).toEqual({ open: 1, won: 0, lost: 2 });
+  });
+});

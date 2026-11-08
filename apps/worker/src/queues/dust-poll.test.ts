@@ -86,6 +86,25 @@ describe('pollOrgDust', () => {
     });
   });
 
+  // WHY: current Dust document APIs require the space sId. Polling with only
+  // a data source id would call a path that docs.dust.tt no longer documents.
+  it('writes a stub tick and does not list documents when the space id is missing', async () => {
+    const dustClient = { listDocuments: vi.fn(), getDocument: vi.fn() };
+    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
+
+    await pollOrgDust(ORG_A, log);
+
+    expect(dustClient.listDocuments).not.toHaveBeenCalled();
+    expect(mocks.syncEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'tick.stub',
+        payload: expect.objectContaining({
+          reason: expect.stringMatching(/space/i),
+        }),
+      }),
+    });
+  });
+
   it('routes each doc by metadata to the matching upsert helper, org-scoped, and tallies a completed sync_event', async () => {
     const dustClient = {
       listDocuments: vi.fn().mockResolvedValue([
@@ -107,7 +126,7 @@ describe('pollOrgDust', () => {
         }
       }),
     };
-    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
+    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1', spaceId: 'space-1' } });
     mocks.upsertOpportunityFromDust.mockResolvedValue({ id: 'opp-1', created: true, skipped: false });
     mocks.upsertLeadFromDust.mockResolvedValue({ id: 'lead-1', created: true, skipped: false });
     mocks.upsertCompanyFromDust.mockResolvedValue({ id: 'ce-1', created: true });
@@ -158,7 +177,7 @@ describe('pollOrgDust', () => {
         metadata: { opportunity_code: 'OPP-1', company_name: 'Acme' },
       }),
     };
-    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
+    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1', spaceId: 'space-1' } });
     mocks.upsertOpportunityFromDust.mockResolvedValue({ id: 'opp-1', created: true, skipped: false });
 
     await pollOrgDust(ORG_A, log);
@@ -175,7 +194,7 @@ describe('pollOrgDust', () => {
         metadata: id === 'doc-bad' ? { opportunity_code: '' } : { lead_email: 'ok@x.com' },
       })),
     };
-    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
+    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1', spaceId: 'space-1' } });
     mocks.upsertOpportunityFromDust.mockRejectedValue(
       new Error('Missing opportunity_code in Dust document metadata'),
     );
@@ -207,7 +226,7 @@ describe('pollOrgDust', () => {
         listDocuments: vi.fn().mockRejectedValue(new Error('Dust GET /documents failed with 500')),
         getDocument: vi.fn(),
       },
-      creds: { dataSourceId: 'ds-1' },
+      creds: { dataSourceId: 'ds-1', spaceId: 'space-1' },
     });
 
     await expect(pollOrgDust(ORG_A, log)).rejects.toThrow(/500/);

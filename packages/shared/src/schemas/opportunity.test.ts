@@ -24,6 +24,7 @@ describe('Opportunity', () => {
     id: '00000000-0000-4000-8000-000000000001',
     code: 'OP-2041',
     customer: 'CI Financial',
+    companyId: null,
     name: 'CI Financial — IT Modernization',
     stage: 's1_ongoing',
     pipelineStageId: '00000000-0000-0000-0000-000000000002',
@@ -106,5 +107,9 @@ describe('OpportunityFilter', () => {
   it('defaults limit to 50 and caps at 200', () => {
     expect(OpportunityFilter.parse({}).limit).toBe(50);
     expect(() => OpportunityFilter.parse({ limit: 500 })).toThrow();
+  });
+
+  it('coerces excludeClosed from a query string', () => {
+    expect(OpportunityFilter.parse({ excludeClosed: 'true' }).excludeClosed).toBe(true);
   });
 });

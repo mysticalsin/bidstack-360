@@ -814,4 +814,235 @@ export async function seedOrgData(
   await seedContacts(prisma, orgId, opts.namespace, companyByName);
   await seedLeads(prisma, orgId, byInitials, opts.namespace);
   await seedTasks(prisma, orgId, byInitials, oppByCode);
+  await seedPeopleEvidence(prisma, orgId);
+}
+
+const EVIDENCED_CLAIM = 'Accepted company link: Klaus Vogt works at Siemens.';
+const REVIEW_CLAIM = 'A procurement note did not name who signs. Left for review.';
+const COMMITMENT_PROMISE = 'Return the signed security appendix before the technical review.';
+
+/**
+ * One evidenced person, one needs-review person, and one unknown person on
+ * Siemens, plus a customer promise that is not an internal task. Safe to
+ * re-run: each row is skipped when its claim or promise is already stored.
+ */
+export async function seedPeopleEvidence(prisma: SeedClient, orgId: string): Promise<void> {
+  const company = await prisma.company.findFirst({
+    where: { orgId, name: 'Siemens', deletedAt: null },
+    select: { id: true },
+  });
+  const klaus = await prisma.contact.findFirst({
+    where: { orgId, name: 'Klaus Vogt', deletedAt: null },
+    select: { id: true },
+  });
+  const lena = await prisma.contact.findFirst({
+    where: { orgId, name: 'Lena Fischer', deletedAt: null },
+    select: { id: true },
+  });
+  if (!company || !klaus || !lena) {
+    await linkSampleBuyingGroup(prisma, orgId);
+    return;
+  }
+
+  let anika = await prisma.contact.findFirst({
+    where: { orgId, companyId: company.id, name: 'Anika Berg', deletedAt: null },
+    select: { id: true },
+  });
+  if (!anika) {
+    anika = await prisma.contact.create({
+      data: {
+        orgId,
+        customer: 'Siemens',
+        companyId: company.id,
+        name: 'Anika Berg',
+        role: 'Procurement lead',
+        email: `anika.berg.${orgId}@example.com`,
+      },
+      select: { id: true },
+    });
+  }
+
+  const evidenced = await prisma.contactFact.findFirst({
+    where: { orgId, contactId: klaus.id, claim: EVIDENCED_CLAIM, deletedAt: null },
+    select: { id: true },
+  });
+  if (!evidenced) {
+    await prisma.contactFact.create({
+      data: {
+        orgId,
+        contactId: klaus.id,
+        kind: 'company_link',
+        status: 'accepted',
+        claim: EVIDENCED_CLAIM,
+        companyId: company.id,
+        evidenceDetail: 'Named on the ERP introduction and accepted on the account.',
+        observedAt: new Date(),
+        decidedAt: new Date(),
+      },
+    });
+  }
+
+  const review = await prisma.contactFact.findFirst({
+    where: { orgId, contactId: anika.id, claim: REVIEW_CLAIM, deletedAt: null },
+    select: { id: true },
+  });
+  if (!review) {
+    await prisma.contactFact.create({
+      data: {
+        orgId,
+        contactId: anika.id,
+        kind: 'buying_role',
+        status: 'needs_review',
+        claim: REVIEW_CLAIM,
+      },
+    });
+  }
+
+  const opportunity = await prisma.opportunity.findFirst({
+    where: { orgId, code: 'OP-0001', deletedAt: null },
+    select: { id: true },
+  });
+  if (!opportunity) return;
+
+  const links: Array<{ contactId: string; role: string; isPrimary: boolean }> = [
+    { contactId: klaus.id, role: 'Economic buyer', isPrimary: true },
+    { contactId: lena.id, role: 'Technical reviewer', isPrimary: false },
+    { contactId: anika.id, role: 'Procurement', isPrimary: false },
+  ];
+  for (const link of links) {
+    await prisma.opportunityContact.upsert({
+      where: {
+        orgId_opportunityId_contactId: {
+          orgId,
+          opportunityId: opportunity.id,
+          contactId: link.contactId,
+        },
+      },
+      create: {
+        orgId,
+        opportunityId: opportunity.id,
+        contactId: link.contactId,
+        role: link.role,
+        isPrimary: link.isPrimary,
+      },
+      update: {},
+    });
+  }
+
+  const commitment = await prisma.customerCommitment.findFirst({
+    where: { orgId, companyId: company.id, promise: COMMITMENT_PROMISE, deletedAt: null },
+    select: { id: true },
+  });
+  if (!commitment) {
+    await prisma.customerCommitment.create({
+      data: {
+        orgId,
+        companyId: company.id,
+        opportunityId: opportunity.id,
+        promise: COMMITMENT_PROMISE,
+        ownerContactId: klaus.id,
+        status: 'open',
+        sourceNote: 'Said on the discovery call. This is their promise, not our task.',
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+}
+
+/** When the Siemens demo rows are absent, link an existing account's people. */
+async function linkSampleBuyingGroup(prisma: SeedClient, orgId: string): Promise<void> {
+  const companies = await prisma.company.findMany({
+    where: { orgId, deletedAt: null },
+    select: { id: true },
+    orderBy: { name: 'asc' },
+    take: 50,
+  });
+  for (const company of companies) {
+    const people = await prisma.contact.findMany({
+      where: { orgId, companyId: company.id, deletedAt: null },
+      select: { id: true, role: true },
+      orderBy: { name: 'asc' },
+      take: 3,
+    });
+    if (people.length < 2) continue;
+    const opportunity = await prisma.opportunity.findFirst({
+      where: { orgId, companyId: company.id, deletedAt: null },
+      select: { id: true },
+      orderBy: { code: 'asc' },
+    });
+    if (!opportunity) continue;
+
+    const factCount = await prisma.contactFact.count({
+      where: { orgId, contactId: { in: people.map((person) => person.id) }, deletedAt: null },
+    });
+    if (factCount === 0) {
+      const lead = people[0];
+      if (!lead) continue;
+      await prisma.contactFact.create({
+        data: {
+          orgId,
+          contactId: lead.id,
+          kind: 'company_link',
+          status: 'accepted',
+          claim: 'Accepted company link recorded for the sample buying group.',
+          companyId: company.id,
+          observedAt: new Date(),
+          decidedAt: new Date(),
+        },
+      });
+      const third = people[2];
+      if (third) {
+        await prisma.contactFact.create({
+          data: {
+            orgId,
+            contactId: third.id,
+            kind: 'buying_role',
+            status: 'needs_review',
+            claim: 'A note did not name the buying role. Left for review.',
+          },
+        });
+      }
+    }
+
+    for (const [index, person] of people.entries()) {
+      await prisma.opportunityContact.upsert({
+        where: {
+          orgId_opportunityId_contactId: {
+            orgId,
+            opportunityId: opportunity.id,
+            contactId: person.id,
+          },
+        },
+        create: {
+          orgId,
+          opportunityId: opportunity.id,
+          contactId: person.id,
+          role: person.role ?? 'Stakeholder',
+          isPrimary: index === 0,
+        },
+        update: {},
+      });
+    }
+
+    const existingCommitment = await prisma.customerCommitment.findFirst({
+      where: { orgId, companyId: company.id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!existingCommitment) {
+      const owner = people[0];
+      if (!owner) return;
+      await prisma.customerCommitment.create({
+        data: {
+          orgId,
+          companyId: company.id,
+          opportunityId: opportunity.id,
+          promise: 'Confirm the scope in writing before the next review.',
+          ownerContactId: owner.id,
+          status: 'open',
+          sourceNote: 'Sample customer promise. Not an internal task.',
+        },
+      });
+    }
+    return;
+  }
 }

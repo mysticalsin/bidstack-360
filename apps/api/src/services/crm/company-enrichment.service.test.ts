@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { serializeCompany } from './company-enrichment.service.js';
+import { buildCompanies, fallbackCompany, serializeCompany } from './company-enrichment.service.js';
 import { canQueueApolloEnrichment } from './enrichment.service.js';
 
 describe('canQueueApolloEnrichment', () => {
@@ -120,8 +120,8 @@ describe('serializeCompany', () => {
       {
         label: 'Seamless technologies',
         items: [
-          { name: 'SAP', source: 'enrichment:seamless', confidence: 0.9 },
-          { name: 'Salesforce', source: 'enrichment:seamless', confidence: 0.9 },
+          { name: 'SAP', source: 'enrichment:seamless', confidence: null },
+          { name: 'Salesforce', source: 'enrichment:seamless', confidence: null },
         ],
       },
     ]);
@@ -161,12 +161,12 @@ describe('serializeCompany', () => {
           {
             name: 'Cloudflare',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
           {
             name: 'Segment',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
         ],
       },
@@ -213,12 +213,12 @@ describe('serializeCompany', () => {
           {
             name: 'Cloudflare',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
           {
             name: 'Segment',
             source: 'enrichment:tech_stack_mcp:builtwith_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
         ],
       },
@@ -228,7 +228,7 @@ describe('serializeCompany', () => {
           {
             name: 'Datadog',
             source: 'enrichment:tech_stack_mcp:wappalyzer_mcp',
-            confidence: 0.86,
+            confidence: null,
           },
         ],
       },
@@ -277,5 +277,208 @@ describe('serializeCompany', () => {
     );
     expect(new Set(names)).toEqual(new Set(['Salesforce', 'Snowflake', 'SAP']));
     expect(names?.filter((name) => name === 'Salesforce')).toHaveLength(1);
+  });
+});
+
+describe('unscored company shells', () => {
+  it('does not turn an opportunity customer name into a confidence score', () => {
+    const [company] = buildCompanies(
+      [
+        {
+          customer: 'Northwind',
+          industry: 'logistics',
+          logoUrl: null,
+          updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+        },
+      ],
+      [],
+      [],
+    ).filter((row) => row.name === 'Northwind');
+
+    expect(company?.legalName).toBeNull();
+    expect(company?.confidence).toBeNull();
+    expect(company?.sourceAttribution[0]?.confidence).toBeNull();
+    expect(company?.sourceAttribution[0]?.providerMetadata.confidenceBasis).toBe('not_scored');
+    expect(company?.employeeCount).toBeNull();
+    expect(company?.annualRevenueMicros).toBeNull();
+    expect(company?.domain).toBeNull();
+    expect(company?.website).toBeNull();
+  });
+
+  it('keeps a stored public logo when the company row has no logo of its own', () => {
+    const [company] = buildCompanies(
+      [],
+      [
+        {
+          id: 'enrich-1',
+          tradeName: 'DNB Bank',
+          legalName: 'DNB Bank ASA',
+          domain: 'dnb.no',
+          website: 'https://www.dnb.no/',
+          industryCodes: ['financial services'],
+          providerMetadata: {
+            publicFacts: {
+              description: 'DNB Bank is a Norwegian bank.',
+              headquarters: 'Oslo, Norway',
+              chiefExecutive: 'Rune Bjerke',
+              stockExchange: 'Oslo Stock Exchange',
+              revenueLabel: '54,857,000,000 NOK',
+              revenueCurrency: 'NOK',
+            },
+          },
+          employeeCount: 9020,
+          annualRevenueMicros: null,
+          status: 'active',
+          registryIds: {},
+          formerNames: [],
+          incorporationDate: null,
+          logoUrl: 'https://commons.wikimedia.org/wiki/Special:Redirect/file/DNB_Logo.svg',
+          logoSource: 'wikimedia',
+          confidenceBps: 8000,
+          sourceAttribution: [],
+          updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+        },
+      ],
+      [
+        {
+          id: 'company-1',
+          name: 'DNB Bank',
+          domain: 'dnb.no',
+          logoUrl: null,
+          legalName: 'DNB Bank',
+        },
+      ],
+    );
+
+    expect(company?.logo.url).toContain('DNB_Logo.svg');
+    expect(company?.logo.source).toBe('wikimedia');
+    expect(company?.id).toBe('company-1');
+    expect(company?.publicFacts?.headquarters).toBe('Oslo, Norway');
+    expect(company?.employeeCount).toBe(9020);
+    expect(company?.legalName).toBe('DNB Bank ASA');
+    expect(company?.legalNameSource).toBe('public');
+  });
+
+  it('lets a saved account legal name replace the public official name', () => {
+    const [company] = buildCompanies(
+      [],
+      [
+        {
+          id: 'enrich-1',
+          tradeName: 'DNB Bank',
+          legalName: 'DNB Bank ASA',
+          domain: 'dnb.no',
+          website: 'https://www.dnb.no/',
+          industryCodes: ['financial services'],
+          providerMetadata: {
+            publicFacts: {
+              description: 'DNB Bank is a Norwegian bank.',
+              headquarters: 'Oslo, Norway',
+              chiefExecutive: null,
+              stockExchange: null,
+              revenueLabel: null,
+              revenueCurrency: null,
+            },
+          },
+          employeeCount: null,
+          annualRevenueMicros: null,
+          status: 'active',
+          registryIds: {},
+          formerNames: [],
+          incorporationDate: null,
+          logoUrl: null,
+          logoSource: null,
+          confidenceBps: 0,
+          sourceAttribution: [],
+          updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+        },
+      ],
+      [
+        {
+          id: 'company-1',
+          name: 'DNB Bank',
+          domain: 'dnb.no',
+          logoUrl: null,
+          legalName: 'DNB Bank Group',
+        },
+      ],
+    );
+
+    expect(company?.legalName).toBe('DNB Bank Group');
+    expect(company?.legalNameSource).toBe('account');
+  });
+
+  it('does not present a meeting-note name as a legal name', () => {
+    // WHY: the enrichment column cannot be empty, so an import stores the
+    // typed company name there. Without public facts that string is not a
+    // registry name.
+    const [company] = buildCompanies(
+      [],
+      [
+        {
+          id: 'enrich-meeting',
+          tradeName: 'Linked Import',
+          legalName: 'Linked Import',
+          domain: null,
+          website: null,
+          industryCodes: [],
+          providerMetadata: { meetingTechStack: [] },
+          employeeCount: null,
+          annualRevenueMicros: null,
+          status: null,
+          registryIds: {},
+          formerNames: [],
+          incorporationDate: null,
+          logoUrl: null,
+          logoSource: null,
+          confidenceBps: 0,
+          sourceAttribution: [],
+          updatedAt: new Date('2026-11-01T00:00:00.000Z'),
+        },
+      ],
+      [],
+    );
+    expect(company?.name).toBe('Linked Import');
+    expect(company?.legalName).toBeNull();
+    expect(company?.legalNameSource).toBeNull();
+  });
+
+  it('does not invent Mantu headcount or revenue on the placeholder account', () => {
+    const mantu = fallbackCompany('Mantu');
+    expect(mantu.legalName).toBeNull();
+    expect(mantu.confidence).toBeNull();
+    expect(mantu.employeeCount).toBeNull();
+    expect(mantu.annualRevenueMicros).toBeNull();
+    expect(mantu.domain).toBeNull();
+    expect(mantu.website).toBeNull();
+    expect(mantu.logo.url).toBeNull();
+  });
+});
+
+describe('stored public revenue', () => {
+  it('keeps a large revenue as text instead of a rounded number', () => {
+    // WHY: Number(54_857_000_000_000_000n) is not the stored integer.
+    const company = serializeCompany({
+      id: 'enrich-dnb',
+      tradeName: 'DNB Bank',
+      legalName: 'DNB Bank ASA',
+      domain: 'dnb.no',
+      website: 'https://www.dnb.no/',
+      industryCodes: ['financial services'],
+      providerMetadata: {},
+      employeeCount: 9020,
+      annualRevenueMicros: 54_857_000_000_000_000n,
+      status: 'active',
+      registryIds: {},
+      formerNames: [],
+      incorporationDate: null,
+      logoUrl: null,
+      logoSource: null,
+      confidenceBps: 0,
+      sourceAttribution: [],
+      updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+    });
+    expect(company.annualRevenueMicros).toBeNull();
+    expect(company.annualRevenueMicrosText).toBe('54857000000000000');
   });
 });

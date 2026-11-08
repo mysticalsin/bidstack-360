@@ -13,13 +13,30 @@ import { Icon } from '@/components/ui/Icon';
 import { staggerParent, staggerChild } from '@/lib/motion';
 
 interface Props {
-  accountId: string;
+  accountId: string | null | undefined;
 }
 
 export function OpportunityAccountIntel({ accountId }: Props) {
-  const intel = useAccountIntel(accountId);
+  const intel = useAccountIntel(accountId ?? undefined);
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
+
+  if (!accountId) {
+    return (
+      <Card>
+        <SectionHeader title={t('opportunityAccountIntel.title', 'Account intel')} />
+        <div className="p-4">
+          <EmptyState
+            title={t('opportunityAccountIntel.unlinkedTitle', 'Not linked to a company')}
+            message={t(
+              'opportunityAccountIntel.unlinkedMessage',
+              'A customer name is not a company link.',
+            )}
+          />
+        </div>
+      </Card>
+    );
+  }
 
   if (intel.isError) {
     return (
@@ -52,7 +69,7 @@ export function OpportunityAccountIntel({ accountId }: Props) {
   if (solutions.length === 0 && products.length === 0) {
     return (
       <Card>
-        <SectionHeader title={t('opportunityAccountIntel.title', 'Account intel')} caption={accountId} />
+        <SectionHeader title={t('opportunityAccountIntel.title', 'Account intel')} />
         <div className="p-4">
           <EmptyState
             title={t('opportunityAccountIntel.emptyTitle', 'No intelligence yet')}

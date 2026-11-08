@@ -18,10 +18,13 @@
 // is a no-op for them), never an error.
 //
 // Scope (deliberately conservative — Rule 2 / Rule 3): only PII the route can
-// reach via a CLEAR foreign key is touched. Contact/Lead Notes, FileAttachments
-// and Activities attach to an account via a free-text `accountId` / `companyId`,
-// NOT to the person — scrubbing them would over-reach and could erase another
-// subject's data, so they are intentionally left alone.
+// reach via a CLEAR foreign key is touched. Contact facts are keyed by
+// contactId and can repeat the person's name in claim or evidenceDetail, so
+// erasure tombstones that text and soft-deletes the fact. Contact/Lead Notes,
+// FileAttachments and Activities attach to an account via a free-text
+// `accountId` / `companyId`, NOT to the person — scrubbing them would
+// over-reach and could erase another subject's data, so they are intentionally
+// left alone.
 
 import { createHash } from 'node:crypto';
 
@@ -31,11 +34,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { Prisma, prisma } from '@bidstack/db';
 import { ErasureOrgParams, ErasureRequest, ErasureSummary } from '@bidstack/shared';
 
+import { contactFactNeedsScrub, ERASED_FACT_CLAIM } from './contact-fact-erasure.js';
+
 // Deterministic tombstones. Stable across re-runs so a second erasure is a
 // no-op and the audit trail reads identically.
 const TOMBSTONE = {
   name: 'Erased subject',
-  freeText: '[erased]',
+  freeText: ERASED_FACT_CLAIM,
 } as const;
 
 /**
@@ -129,7 +134,18 @@ async function eraseContact(
       where: { orgId, contactId: contact.id, email: { not: null } },
       data: { email: null },
     });
-    const related = { activityAttendeeEmails: attendee.count };
+    const facts = await tx.contactFact.findMany({
+      where: { orgId, contactId: contact.id, deletedAt: { not: undefined } },
+      select: { id: true, claim: true, evidenceDetail: true, deletedAt: true },
+    });
+    const dirtyFacts = facts.filter(contactFactNeedsScrub);
+    if (dirtyFacts.length > 0) {
+      await tx.contactFact.updateMany({
+        where: { orgId, id: { in: dirtyFacts.map((fact) => fact.id) }, deletedAt: { not: undefined } },
+        data: { claim: TOMBSTONE.freeText, evidenceDetail: null, deletedAt: now },
+      });
+    }
+    const related = { activityAttendeeEmails: attendee.count, contactFacts: dirtyFacts.length };
     await tx.auditLog.create({
       data: {
         orgId,

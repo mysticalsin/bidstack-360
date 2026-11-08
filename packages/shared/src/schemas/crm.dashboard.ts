@@ -59,7 +59,7 @@ export type CompanyHealth = z.infer<typeof CompanyHealth>;
 export const RiskItem = z.object({
   id: z.string(),
   title: z.string().min(1),
-  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  severity: z.enum(['low', 'medium', 'high', 'critical']).nullable(),
   owner: z.string().nullable(),
   mitigation: z.string().nullable(),
   dueDate: z.string().date().nullable(),
@@ -70,7 +70,7 @@ export type RiskItem = z.infer<typeof RiskItem>;
 export const ComplianceCheck = z.object({
   id: z.string(),
   label: z.string().min(1),
-  status: z.enum(['compliant', 'in_progress', 'blocked', 'not_started']),
+  status: z.enum(['compliant', 'in_progress', 'blocked', 'not_started']).nullable(),
   owner: z.string().nullable(),
   sourceAttribution: z.array(SourceAttribution).default([]),
 });
@@ -95,6 +95,8 @@ export const BidOpportunity = z.object({
   status: z.string().min(1),
   dueDate: z.string().datetime().nullable(),
   estimatedValueMicros: z.number().int().nonnegative().nullable(),
+  /** Exact integer. The number is only exact while it fits a safe integer. */
+  estimatedValueMicrosText: z.string().regex(/^\d+$/).nullable().optional(),
   currencyCode: z.string().length(3).nullable(),
   url: z.string().url().nullable(),
   recommendation: z.enum(['bid', 'review', 'no_bid']).nullable(),
@@ -103,7 +105,13 @@ export const BidOpportunity = z.object({
 });
 export type BidOpportunity = z.infer<typeof BidOpportunity>;
 
-export const ProviderStatus = z.enum(['healthy', 'degraded', 'disabled', 'down']);
+export const ProviderStatus = z.enum([
+  'healthy',
+  'degraded',
+  'disabled',
+  'down',
+  'unverified',
+]);
 export type ProviderStatus = z.infer<typeof ProviderStatus>;
 
 export const ProviderHealth = z.object({
@@ -208,16 +216,16 @@ export const AccountCockpitSnapshot = z.object({
   // is on AND points exist, so an account with no won deals shows nothing
   // rather than an empty chart.
   revenueEvolution: z
-    .array(z.object({ period: z.string().min(1), revenueMicros: z.number().int().nonnegative() }))
+    .array(z.object({ period: z.string().min(1), revenueMicros: z.string().regex(/^\d+$/) }))
     .optional(),
   // Won/lost summary derived from the account's own opportunity pipeline.
   winLoss: z
     .object({
       wonCount: z.number().int().nonnegative(),
       lostCount: z.number().int().nonnegative(),
-      wonValueMicros: z.number().int().nonnegative(),
-      lostValueMicros: z.number().int().nonnegative(),
-      winRate: z.number().int().min(0).max(100),
+      wonValueMicros: z.string().regex(/^\d+$/),
+      lostValueMicros: z.string().regex(/^\d+$/),
+      winRate: z.number().int().min(0).max(100).nullable(),
     })
     .optional(),
   technicalStack: z.array(TechnicalStackCategory),
@@ -254,10 +262,24 @@ export const CompanyLookupMatch = z.enum([
 ]);
 export type CompanyLookupMatch = z.infer<typeof CompanyLookupMatch>;
 
+export const CompanyPublicPreview = z.object({
+  name: z.string(),
+  legalName: z.string().nullable(),
+  domain: z.string().nullable(),
+  website: z.string().nullable(),
+  description: z.string().nullable(),
+  headquarters: z.string().nullable(),
+  employeeCount: z.number().int().nonnegative().nullable(),
+  revenueLabel: z.string().nullable(),
+  industry: z.string().nullable(),
+});
+export type CompanyPublicPreview = z.infer<typeof CompanyPublicPreview>;
+
 export const CompanyLookupResponse = z.object({
   match: CompanyLookupMatch,
   company: CrmCompany.nullable(),
   alternatives: z.array(CrmCompany),
+  preview: CompanyPublicPreview.nullable().default(null),
 });
 export type CompanyLookupResponse = z.infer<typeof CompanyLookupResponse>;
 

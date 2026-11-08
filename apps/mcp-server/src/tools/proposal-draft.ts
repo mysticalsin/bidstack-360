@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { formatMicrosAmount } from '@bidstack/shared';
 
 import { searchReferences, type RankedReference } from '../lib/reference-search.js';
 
@@ -32,6 +33,9 @@ export const proposalDraft: Tool<typeof Input> = {
   handler: async (args, ctx) => {
     const opp = await prisma.opportunity.findFirst({
       where: { id: args.oppId, orgId: ctx.orgId, deletedAt: null },
+      include: {
+        pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
+      },
     });
     if (!opp) throw new Error('Opportunity not found');
 
@@ -54,33 +58,29 @@ export const proposalDraft: Tool<typeof Input> = {
         take: 5,
         select: { id: true, title: true, status: true, dueDate: true },
       }),
-      prisma.contact.findMany({
-        where: {
-          orgId: ctx.orgId,
-          deletedAt: null,
-          OR: [{ customer: opp.customer }, ...(opp.companyId ? [{ companyId: opp.companyId }] : [])],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          name: true,
-          role: true,
-          influence: true,
-          sentiment: true,
-          aiOptOut: true,
-        },
-      }),
-      prisma.note.findMany({
-        where: {
-          orgId: ctx.orgId,
-          deletedAt: null,
-          OR: [{ accountId: opp.customer }, ...(opp.companyId ? [{ companyId: opp.companyId }] : [])],
-        },
-        orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-        take: 3,
-        select: { id: true, title: true, bodyMd: true, pinned: true, updatedAt: true },
-      }),
+      opp.companyId
+        ? prisma.contact.findMany({
+            where: { orgId: ctx.orgId, deletedAt: null, companyId: opp.companyId },
+            orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
+            take: 5,
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              influence: true,
+              sentiment: true,
+              aiOptOut: true,
+            },
+          })
+        : Promise.resolve([]),
+      opp.companyId
+        ? prisma.note.findMany({
+            where: { orgId: ctx.orgId, deletedAt: null, companyId: opp.companyId },
+            orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+            take: 3,
+            select: { id: true, title: true, bodyMd: true, pinned: true, updatedAt: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     return buildGroundedProposalDraft({
@@ -89,7 +89,12 @@ export const proposalDraft: Tool<typeof Input> = {
         code: opp.code,
         customer: opp.customer,
         name: opp.name,
-        stage: opp.stage,
+        stage:
+          opp.pipelineStage && opp.pipelineStage.deletedAt == null
+            ? opp.pipelineStage.name?.trim() || opp.stage
+            : opp.stage,
+        stageKey: opp.stage,
+        pipelineStage: opp.pipelineStage,
         valueMicros: opp.valueMicros,
         probability: opp.probability,
         dueDate: opp.dueDate,
@@ -107,12 +112,23 @@ export const proposalDraft: Tool<typeof Input> = {
   },
 };
 
+interface DraftStage {
+  isWon: boolean;
+  isLost: boolean;
+  deletedAt: Date | null;
+}
+
 interface DraftOpportunity {
   id: string;
   code: string;
   customer: string;
   name: string;
+  /** Display label, or the stored key when no live stage name exists. */
   stage: string;
+  /** Stored stage key. Lost wins over a display name. */
+  stageKey?: string;
+  /** Live flags close the deal. A deleted stage does not. */
+  pipelineStage?: DraftStage | null;
   valueMicros: bigint | number;
   probability: number;
   dueDate: Date | null;
@@ -163,12 +179,7 @@ interface DraftCitation {
 }
 
 function formatMoneyMicros(valueMicros: bigint | number): string {
-  const value = Number(valueMicros) / 1_000_000;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
+  return `${formatMicrosAmount(valueMicros)} unspecified`;
 }
 
 function formatDate(value: Date | null): string {
@@ -185,15 +196,54 @@ function formatStakeholder(contact: DraftContact): string {
   return [
     contact.name,
     contact.role ? `(${contact.role})` : '',
-    contact.influence !== null ? `influence ${contact.influence}/100` : '',
+    contact.influence !== null ? `influence ${contact.influence}/5` : '',
     contact.sentiment ? `sentiment ${contact.sentiment}` : '',
   ]
     .filter(Boolean)
     .join(' ');
 }
 
+function stageWords(stage: string): string {
+  return stage
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+/** Blank probability is stored as 0. That is not a measured win chance. */
+function probabilityClause(probability: number): string {
+  if (probability === 0) return 'no probability is recorded';
+  return `stored probability is ${probability}%`;
+}
+
+function probabilityLabel(probability: number): string {
+  return probability === 0 ? 'not recorded' : `${probability}%`;
+}
+
+/** Lost wins when the enum and a live stage flag disagree. A deleted stage does not close the deal. */
+function draftOutcome(opportunity: DraftOpportunity): 'open' | 'won' | 'lost' {
+  const stage =
+    opportunity.pipelineStage && opportunity.pipelineStage.deletedAt == null
+      ? opportunity.pipelineStage
+      : null;
+  const key = opportunity.stageKey ?? opportunity.stage;
+  if (key === 'closed_lost' || stage?.isLost === true) return 'lost';
+  if (key === 'closed_won' || stage?.isWon === true) return 'won';
+  return 'open';
+}
+
+function displayStage(opportunity: DraftOpportunity): string {
+  if (opportunity.pipelineStage?.deletedAt != null && opportunity.stageKey) {
+    return stageWords(opportunity.stageKey);
+  }
+  return stageWords(opportunity.stage);
+}
+
 function sectionBody(input: GroundedDraftInput): string[] {
   const { opportunity, references, tasks, contacts, notes } = input;
+  const stage = displayStage(opportunity);
+  const outcome = draftOutcome(opportunity);
   const value = formatMoneyMicros(opportunity.valueMicros);
   const due = formatDate(opportunity.dueDate);
   const refLine = references[0]
@@ -206,7 +256,13 @@ function sectionBody(input: GroundedDraftInput): string[] {
 
   if (input.section === 'executive_summary') {
     return [
-      `${opportunity.customer} is evaluating "${opportunity.name}" at the ${opportunity.stage} stage. The current CRM value is ${value}, probability is ${opportunity.probability}%, and the response deadline is ${due}.`,
+      `${
+        outcome === 'lost'
+          ? `${opportunity.customer} recorded "${opportunity.name}" as lost`
+          : outcome === 'won'
+            ? `${opportunity.customer} recorded "${opportunity.name}" as won`
+            : `${opportunity.customer} is evaluating "${opportunity.name}"`
+      } at the ${stage} stage. The current CRM value is ${value}, ${probabilityClause(opportunity.probability)}, and the response deadline is ${due}.`,
       `Mantu should lead with a concise business case: reduce delivery risk, accelerate decision-making, and give ${opportunity.customer} a governed implementation path that executives can trust.`,
       `${refLine} ${stakeholderLine}`,
       `Recommended next step: align the proposal narrative to the open pursuit tasks${
@@ -251,10 +307,16 @@ function sectionBody(input: GroundedDraftInput): string[] {
   }
 
   return [
-    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${opportunity.stage}), win probability (${opportunity.probability}%), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
-    opportunity.probability < 40
-      ? 'Win probability is below 40%, so the bid/no-bid decision should be challenged before major drafting effort continues.'
-      : 'Win probability is workable, but assumptions must still be tested against legal, finance, delivery, and procurement gates.',
+    `Primary pursuit risks for ${opportunity.customer}: stage maturity (${stage}), stored probability (${probabilityLabel(opportunity.probability)}), deadline (${due}), and completeness of stakeholder/proof-point evidence.`,
+    outcome === 'lost'
+      ? 'The deal is recorded as lost, so do not draft it as an open pursuit.'
+      : outcome === 'won'
+        ? 'The deal is recorded as won, so do not draft it as an open pursuit.'
+        : opportunity.probability === 0
+          ? 'No probability is recorded. Do not treat that as a measured chance below 40%.'
+          : opportunity.probability < 40
+            ? 'Stored probability is below 40%. Challenge the bid/no-bid decision before major drafting continues.'
+            : 'Stored probability is recorded. Test assumptions against legal, finance, delivery, and procurement gates.',
     `${stakeholderLine} ${refLine}`,
     activeTasks.some((task) => task.status === 'blocked')
       ? 'At least one task is blocked; unblock it or mark the proposal risk as high.'
@@ -288,14 +350,18 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
   ];
 
   const evidenceLines = [
-    `- Opportunity: ${input.opportunity.code}, ${input.opportunity.stage}, ${formatMoneyMicros(
+    `- Opportunity: ${input.opportunity.code}, ${displayStage(input.opportunity)}, ${formatMoneyMicros(
       input.opportunity.valueMicros,
-    )}, ${input.opportunity.probability}% probability.`,
+    )}, ${
+      input.opportunity.probability === 0
+        ? 'probability not recorded'
+        : `${input.opportunity.probability}% probability`
+    }.`,
     input.references.length
       ? `- References: ${input.references.map((reference) => reference.title).join('; ')}.`
       : '- References: none selected yet.',
     input.tasks.length
-      ? `- Pursuit tasks: ${input.tasks.map((task) => `${task.title} (${task.status})`).join('; ')}.`
+      ? `- Pursuit tasks: ${input.tasks.map((task) => `${task.title} (${stageWords(task.status)})`).join('; ')}.`
       : '- Pursuit tasks: none found.',
     input.contacts.length
       ? `- Stakeholders: ${input.contacts.map(formatStakeholder).join('; ')}.`

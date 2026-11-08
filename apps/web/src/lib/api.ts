@@ -52,7 +52,10 @@ function getE2eRoleHeader(): Record<string, string> {
   return role ? { 'x-bidstack-e2e-role': role } : {};
 }
 
-function buildHeaders(token: string | null, hasJsonBody: boolean): Record<string, string> | undefined {
+function buildHeaders(
+  token: string | null,
+  hasJsonBody: boolean,
+): Record<string, string> | undefined {
   const headers: Record<string, string> = {
     ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -63,7 +66,8 @@ function buildHeaders(token: string | null, hasJsonBody: boolean): Record<string
 }
 
 async function parseJsonResponse(res: Response): Promise<unknown> {
-  const text = await res.text();
+  const raw = await res.text();
+  const text = raw.replace(/^\uFEFF/, '').trim();
   try {
     return text ? JSON.parse(text) : null;
   } catch {

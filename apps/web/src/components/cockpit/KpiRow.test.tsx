@@ -107,7 +107,7 @@ function cockpit(kpis: CockpitKpi[]): AccountCockpitSnapshot {
     externalLastSyncedAt: '2026-06-01T12:00:00.000Z',
     kpis,
     revenueEvolution: [],
-    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: 0, lostValueMicros: 0, winRate: 0 },
+    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: '0', lostValueMicros: '0', winRate: 0 },
     technicalStack: [],
     health: { score: 80, band: 'good', counts: {}, factors: [] },
     keyContacts: [],

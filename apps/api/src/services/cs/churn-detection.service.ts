@@ -125,31 +125,17 @@ async function detectSupportVolumeSpike(
   );
 }
 
-async function detectUnresolvedFeatureRequests(
-  orgId: string,
-  accountId: string,
-  log: PinoLogger,
-): Promise<boolean> {
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-  const count = await prisma.serviceCase.count({
-    where: {
-      orgId,
-      companyId: accountId,
-      // Match feature request cases that are still open after 60d
-      status: { in: ['open', 'waiting_internal'] },
-      createdAt: { lte: sixtyDaysAgo },
-    },
-  });
-  if (count === 0) return false;
+/** Cases have no feature-request type, so an old open case is not this signal. */
+export function featureRequestChurnKind(): null {
+  return null;
+}
 
-  return upsertSignal(
-    orgId,
-    accountId,
-    'FEATURE_REQUEST_UNRESOLVED',
-    'MEDIUM',
-    { openCases: count, olderThanDays: 60 },
-    log,
-  );
+async function detectUnresolvedFeatureRequests(
+  _orgId: string,
+  _accountId: string,
+  _log: PinoLogger,
+): Promise<boolean> {
+  return featureRequestChurnKind() !== null;
 }
 
 async function detectCompetitorMentions(
@@ -227,7 +213,12 @@ export async function runOrgChurnDetection(
   return total;
 }
 
-/** Create a churn signal from NPS detractor response. Called by nps.service.ts. */
+/** An NPS detractor is not a usage drop. There is no churn kind for it. */
+export function churnKindForNpsDetractor(): null {
+  return null;
+}
+
+/** NPS detractor responses stay on the survey. They are not written as LOW_USAGE. */
 export async function createNpsDetractorSignal(
   orgId: string,
   accountId: string,
@@ -235,12 +226,9 @@ export async function createNpsDetractorSignal(
   score11: number,
   log: PinoLogger,
 ): Promise<void> {
-  await upsertSignal(
-    orgId,
-    accountId,
-    'LOW_USAGE', // closest proxy — NPS detractor is surfaced as low-satisfaction signal
-    score11 <= 3 ? 'CRITICAL' : 'HIGH',
-    { surveyId, score11, source: 'nps_detractor' },
-    log,
+  if (churnKindForNpsDetractor() !== null) return;
+  log.info(
+    { orgId, accountId, surveyId, score11 },
+    'cs: NPS detractor is not a usage drop; no churn row written',
   );
 }

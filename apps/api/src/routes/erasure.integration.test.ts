@@ -59,6 +59,7 @@ afterAll(async () => {
     if (createdContactIds.length > 0) {
       // Attendee rows FK to the contact — clear them first.
       await prisma.activityAttendee.deleteMany({ where: { contactId: { in: createdContactIds } } });
+      await prisma.contactFact.deleteMany({ where: { orgId, contactId: { in: createdContactIds } } });
       await prisma.contact.deleteMany({ where: { orgId, id: { in: createdContactIds } } });
     }
     if (createdLeadIds.length > 0) {
@@ -133,6 +134,16 @@ function findErasedContact(id: string) {
 describe('GDPR Art. 17 erasure route', () => {
   t('admin erases a contact → 200, PII tombstoned in DB, audit row written', async () => {
     const contactId = await seedContact();
+    const fact = await prisma.contactFact.create({
+      data: {
+        orgId: orgId!,
+        contactId,
+        kind: 'buying_role',
+        claim: 'Jane Subject owns the purchase',
+        evidenceDetail: 'jane.subject@example.com',
+      },
+      select: { id: true },
+    });
     const res = await server.inject({
       method: 'POST',
       url: `/api/v1/orgs/${orgId}/erasure`,
@@ -158,6 +169,15 @@ describe('GDPR Art. 17 erasure route', () => {
     expect(row?.email).not.toBe('jane.subject@example.com');
     expect(row?.email).toMatch(/^erased\+[0-9a-f]+@erased\.invalid$/);
     expect(row?.deletedAt).not.toBeNull();
+
+    const storedFact = await prisma.contactFact.findFirst({
+      where: { id: fact.id, deletedAt: { not: undefined } },
+      select: { claim: true, evidenceDetail: true, deletedAt: true },
+    });
+    expect(storedFact?.claim).toBe('[erased]');
+    expect(storedFact?.evidenceDetail).toBeNull();
+    expect(storedFact?.deletedAt).not.toBeNull();
+    expect(body.relatedScrubbed.contactFacts).toBe(1);
 
     // The compliance record must exist with the right shape.
     const audit = await prisma.auditLog.findFirst({

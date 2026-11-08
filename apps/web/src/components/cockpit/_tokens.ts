@@ -27,7 +27,8 @@ export const KPI_TONE_FG: Record<KpiTone, string> = {
 
 export function iconForKpi(label: string) {
   const l = label.toLowerCase();
-  if (l.includes('pipeline') || l.includes('revenue') || l.includes('arr')) return 'dollar';
+  // Revenue and pipeline have no stored currency. A dollar glyph reads as USD.
+  if (l.includes('pipeline') || l.includes('revenue') || l.includes('arr')) return 'briefcase';
   if (l.includes('win') || l.includes('won')) return 'trophy';
   if (l.includes('risk') || l.includes('overdue')) return 'warning';
   if (l.includes('growth') || l.includes('forecast')) return 'growth';
@@ -47,44 +48,33 @@ export function severityBg(s: RiskItem['severity']): string {
 }
 
 export function severityShort(s: RiskItem['severity']): string {
-  return s === 'critical' ? 'C' : s === 'high' ? 'H' : s === 'medium' ? 'M' : 'L';
+  if (s === 'critical') return 'C';
+  if (s === 'high') return 'H';
+  if (s === 'medium') return 'M';
+  if (s === 'low') return 'L';
+  return '–';
 }
+
+/** Weights in computeSignalCoverage. The account-list health band is a different scale. */
+export const SIGNAL_COVERAGE_WEIGHTS =
+  'Weighted mix: firmographics 30%, contacts 25%, engagement 20%, open-deal completeness 25%. Not measured relationship health.';
 
 export function labelForBand(b: AccountCockpitSnapshot['health']['band']): string {
   return b === 'strong'
-    ? 'Strong'
+    ? 'Strong, proxy'
     : b === 'good'
-      ? 'Good'
+      ? 'Good, proxy'
       : b === 'needs_attention'
-        ? 'Watch'
-        : 'At risk';
+        ? 'Watch, proxy'
+        : 'At risk, proxy';
 }
 
-// Static fixtures used by the BusinessSnapshotCard when the company row's
-// fields are sparse (older seed data, accounts without verified data).
-// These dictionaries belong in the seeder long-term; for now they live with
-// the card that consumes them so the dashboard isn't reaching into an
-// unrelated module for a literal lookup.
-export function headquartersFor(companyName: string): string | null {
-  const normalized = companyName.toLowerCase();
-  if (normalized.includes('mantu')) return 'Paris, France';
-  if (normalized.includes('rush')) return 'Chicago, United States';
-  if (normalized.includes('dnb')) return 'Oslo, Norway';
-  if (normalized.includes('mapfre')) return 'Madrid, Spain';
-  if (normalized.includes('mahle')) return 'Stuttgart, Germany';
-  if (normalized.includes('aritzia')) return 'Vancouver, Canada';
-  if (normalized.includes('nos')) return 'Lisbon, Portugal';
+/** A trade name is not a headquarters and not a ticker. */
+export function headquartersFor(_companyName: string): string | null {
   return null;
 }
 
-export function tickerForCompany(companyName: string): string | null {
-  const normalized = companyName.toLowerCase();
-  if (normalized.includes('apple')) return 'AAPL';
-  if (normalized.includes('microsoft')) return 'MSFT';
-  if (normalized.includes('dnb')) return 'OSL:DNB';
-  if (normalized.includes('aritzia')) return 'TSX:ATZ';
-  if (normalized.includes('mapfre')) return 'BME:MAP';
-  if (normalized.includes('ci financial')) return 'TSX:CIX';
+export function tickerForCompany(_companyName: string): string | null {
   return null;
 }
 

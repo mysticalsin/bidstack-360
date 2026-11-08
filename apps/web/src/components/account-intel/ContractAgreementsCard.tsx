@@ -26,6 +26,9 @@ import {
 import { useUploadFile, downloadFileUrl } from '@/hooks/useFiles';
 import {
   FILE_INPUT_ACCEPT,
+  microsToUnits,
+  microsToUnitsText,
+  unitsTextToMicros,
   type ContractAgreement,
   type ContractFieldProvenance,
   type ContractExtractionApproval,
@@ -49,6 +52,21 @@ const KIND_LABEL: Record<ContractKind, string> = {
   other: 'Other',
 };
 
+/** Rate cards are denominated. A blank field must not be stored as euros. */
+export function contractCurrencyCode(raw: string): string | null {
+  const code = raw.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : null;
+}
+
+const MAX_RATE_MICROS = 1_000_000_000_000n;
+
+/** Typed day rate → integer micros. Rejects text that is not an amount. */
+export function agreementRateMicros(text: string): number | null {
+  const micros = unitsTextToMicros(text);
+  if (micros == null || micros > MAX_RATE_MICROS) return null;
+  return Number(micros);
+}
+
 const UNIT_LABEL: Record<RateCardUnit, string> = {
   day: '/day',
   hour: '/hr',
@@ -58,15 +76,16 @@ const UNIT_LABEL: Record<RateCardUnit, string> = {
 };
 
 function formatRate(rateMicros: number, currency: string, unit: RateCardUnit): string {
+  const units = microsToUnits(rateMicros);
   let amount: string;
   try {
     amount = new Intl.NumberFormat(undefined, {
       style: 'currency',
       currency,
-      maximumFractionDigits: 0,
-    }).format(rateMicros / 1_000_000);
+      maximumFractionDigits: 2,
+    }).format(units);
   } catch {
-    amount = `${(rateMicros / 1_000_000).toLocaleString()} ${currency}`;
+    amount = `${units.toLocaleString()} ${currency}`;
   }
   return `${amount}${UNIT_LABEL[unit]}`;
 }
@@ -80,8 +99,7 @@ function confidenceTone(bps: number | null): 'jade' | 'amber' | 'gray' {
   return bps >= 8000 ? 'jade' : 'amber';
 }
 
-const inputCls =
-  'rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm';
+const inputCls = 'rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm';
 
 type ContractFieldKey =
   | 'reference'
@@ -260,7 +278,10 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
         ) : agreements.isError ? (
           <ErrorState
             title={t('contractAgreements.loadErrorTitle', 'Could not load contractual agreements')}
-            message={agreements.error?.message ?? t('contractAgreements.tryAgainShortly', 'Try again shortly.')}
+            message={
+              agreements.error?.message ??
+              t('contractAgreements.tryAgainShortly', 'Try again shortly.')
+            }
           />
         ) : items.length === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
@@ -272,7 +293,10 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
         ) : (
           <ul className="divide-y divide-[var(--border)]">
             {items.map((a) => (
-              <li key={a.id} className="rounded-lg px-2 py-3 transition-colors hover:bg-[var(--surface-sunken)]">
+              <li
+                key={a.id}
+                className="rounded-lg px-2 py-3 transition-colors hover:bg-[var(--surface-sunken)]"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2 text-sm text-[var(--fg-primary)]">
@@ -428,7 +452,8 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       kind: d.kind ?? f.kind,
       reference: d.reference ?? f.reference,
       countries: d.countries.length ? d.countries.join(', ') : f.countries,
-      globalRebatePct: d.globalRebateBps != null ? String(d.globalRebateBps / 100) : f.globalRebatePct,
+      globalRebatePct:
+        d.globalRebateBps != null ? String(d.globalRebateBps / 100) : f.globalRebatePct,
       currency: d.currency ?? f.currency,
       expiryDate: d.expiryDate ? d.expiryDate.slice(0, 10) : f.expiryDate,
       rateReviewSchedule: d.rateReviewSchedule ?? f.rateReviewSchedule,
@@ -437,13 +462,16 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       setRateLines(
         d.rateCard.map((l) => ({
           role: l.role,
-          rate: String(l.rateMicros / 1_000_000),
+          rate: microsToUnitsText(l.rateMicros),
           unit: l.unit,
         })),
       );
     }
     toast.success(
-      t('contractAgreements.toastExtractApplied', 'Extracted fields applied — review before saving'),
+      t(
+        'contractAgreements.toastExtractApplied',
+        'Extracted fields applied — review before saving',
+      ),
     );
   }
   const [form, setForm] = useState({
@@ -451,7 +479,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
     reference: '',
     countries: '',
     globalRebatePct: '',
-    currency: 'EUR',
+    currency: '',
     expiryDate: '',
     rateReviewSchedule: 'annual' as ContractAgreement['rateReviewSchedule'],
   });
@@ -461,8 +489,10 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
     [],
   );
   const addLine = () => setRateLines((ls) => [...ls, { role: '', rate: '', unit: 'day' }]);
-  const updateLine = (i: number, patch: Partial<{ role: string; rate: string; unit: RateCardUnit }>) =>
-    setRateLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const updateLine = (
+    i: number,
+    patch: Partial<{ role: string; rate: string; unit: RateCardUnit }>,
+  ) => setRateLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const removeLine = (i: number) => setRateLines((ls) => ls.filter((_, idx) => idx !== i));
 
   const resetForm = () => {
@@ -472,7 +502,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       reference: '',
       countries: '',
       globalRebatePct: '',
-      currency: 'EUR',
+      currency: '',
       expiryDate: '',
       rateReviewSchedule: 'annual',
     });
@@ -519,13 +549,23 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       .map((c) => c.trim().toUpperCase())
       .filter((c) => c.length === 2);
     const pct = form.globalRebatePct.trim();
-    const rateCard: RateCardLine[] = rateLines
-      .filter((l) => l.role.trim() && l.rate.trim() && Number.isFinite(Number(l.rate)))
-      .map((l) => ({
-        role: l.role.trim(),
-        rateMicros: Math.round(Number(l.rate) * 1_000_000),
-        unit: l.unit,
-      }));
+    const rateCard: RateCardLine[] = [];
+    for (const line of rateLines) {
+      const role = line.role.trim();
+      const rateText = line.rate.trim();
+      if (!role && !rateText) continue;
+      const rateMicros = agreementRateMicros(rateText);
+      if (!role || rateMicros == null) {
+        toast.error(t('contractAgreements.toastInvalidRateTitle', 'Check the rate card'), {
+          description: t(
+            'contractAgreements.toastInvalidRateDesc',
+            'Each rate line needs a role and an amount with up to 6 decimal places.',
+          ),
+        });
+        return;
+      }
+      rateCard.push({ role, rateMicros, unit: line.unit });
+    }
     if (extractionBusy) {
       toast.error(t('contractAgreements.toastExtractionStillRunning', 'Extraction still running'), {
         description: t(
@@ -536,13 +576,23 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
       return;
     }
 
+    const currency = contractCurrencyCode(form.currency);
+    if (!currency) {
+      toast.error(t('contractAgreements.toastMissingCurrencyTitle', 'Currency required'), {
+        description: t(
+          'contractAgreements.toastMissingCurrencyDesc',
+          'Enter the 3-letter code printed on the agreement.',
+        ),
+      });
+      return;
+    }
     const payload: ContractExtractionApproval = {
       accountKey,
       kind: form.kind,
       reference: form.reference.trim(),
       countries,
       globalRebateBps: pct ? Math.round(Number(pct) * 100) : null,
-      currency: form.currency.trim().toUpperCase() || 'EUR',
+      currency,
       rateCard,
       expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
       rateReviewSchedule: form.rateReviewSchedule,
@@ -599,7 +649,10 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
           required
           value={form.reference}
           onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
-          placeholder={t('contractAgreements.placeholderReference', 'Reference (e.g. MSA-2026-001)')}
+          placeholder={t(
+            'contractAgreements.placeholderReference',
+            'Reference (e.g. MSA-2026-001)',
+          )}
           className={inputCls}
           aria-label={t('contractAgreements.fieldReference', 'Contract reference')}
         />
@@ -631,10 +684,18 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
           className={inputCls}
           aria-label={t('contractAgreements.fieldRateReviewSchedule', 'Rate review schedule')}
         >
-          <option value="annual">{t('contractAgreements.scheduleAnnual', 'Annual rate review')}</option>
-          <option value="biannual">{t('contractAgreements.scheduleBiannual', 'Biannual rate review')}</option>
-          <option value="quarterly">{t('contractAgreements.scheduleQuarterly', 'Quarterly rate review')}</option>
-          <option value="adhoc">{t('contractAgreements.scheduleAdhoc', 'Ad-hoc rate review')}</option>
+          <option value="annual">
+            {t('contractAgreements.scheduleAnnual', 'Annual rate review')}
+          </option>
+          <option value="biannual">
+            {t('contractAgreements.scheduleBiannual', 'Biannual rate review')}
+          </option>
+          <option value="quarterly">
+            {t('contractAgreements.scheduleQuarterly', 'Quarterly rate review')}
+          </option>
+          <option value="adhoc">
+            {t('contractAgreements.scheduleAdhoc', 'Ad-hoc rate review')}
+          </option>
         </select>
         <input
           type="date"
@@ -646,7 +707,7 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
         <input
           value={form.currency}
           onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
-          placeholder={t('contractAgreements.placeholderCurrency', 'Currency (EUR)')}
+          placeholder={t('contractAgreements.placeholderCurrency', '3-letter currency code')}
           maxLength={3}
           className={inputCls}
           aria-label={t('contractAgreements.fieldCurrency', 'Currency')}
@@ -673,7 +734,10 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
                   setSourceFile(null);
                   setExtractionId(null);
                 }}
-                aria-label={t('contractAgreements.removeAttachedDocument', 'Remove attached document')}
+                aria-label={t(
+                  'contractAgreements.removeAttachedDocument',
+                  'Remove attached document',
+                )}
               >
                 <Icon name="x" size={14} />
               </Button>
@@ -691,7 +755,10 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
                     onSuccess: (r) => setExtractionId(r.id),
                     onError: (err: Error) =>
                       toast.error(
-                        t('contractAgreements.toastExtractStartFailed', 'Could not start extraction'),
+                        t(
+                          'contractAgreements.toastExtractStartFailed',
+                          'Could not start extraction',
+                        ),
                         { description: err.message },
                       ),
                   })
@@ -706,9 +773,11 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
               <div className="mt-3 space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={confidenceTone(extraction.data.confidenceBps)}>
-                    {t('contractAgreements.extractionConfidence', '{{pct}}% confidence', {
-                      pct: ((extraction.data.confidenceBps ?? 0) / 100).toFixed(0),
-                    })}
+                    {extraction.data.confidenceBps == null
+                      ? t('contractAgreements.extractionNotScored', 'Not scored')
+                      : t('contractAgreements.extractionConfidence', '{{pct}}% confidence', {
+                          pct: (extraction.data.confidenceBps / 100).toFixed(0),
+                        })}
                   </Badge>
                   <Badge tone={extraction.data.source === 'llm' ? 'purple' : 'gray'}>
                     {extraction.data.source === 'llm'
@@ -814,23 +883,27 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
               onChange={(e) => updateLine(i, { role: e.target.value })}
               placeholder={t('contractAgreements.placeholderRoleProfile', 'Role / profile')}
               className={`${inputCls} flex-1`}
-              aria-label={t('contractAgreements.rateLineRole', 'Rate line {{n}} role', { n: i + 1 })}
+              aria-label={t('contractAgreements.rateLineRole', 'Rate line {{n}} role', {
+                n: i + 1,
+              })}
             />
             <input
-              type="number"
-              min="0"
-              step="1"
+              inputMode="decimal"
               value={line.rate}
               onChange={(e) => updateLine(i, { rate: e.target.value })}
               placeholder={t('contractAgreements.placeholderRate', 'Rate')}
-              className={`${inputCls} w-24`}
-              aria-label={t('contractAgreements.rateLineRate', 'Rate line {{n}} rate', { n: i + 1 })}
+              className={`${inputCls} w-28`}
+              aria-label={t('contractAgreements.rateLineRate', 'Rate line {{n}} rate', {
+                n: i + 1,
+              })}
             />
             <select
               value={line.unit}
               onChange={(e) => updateLine(i, { unit: e.target.value as RateCardUnit })}
               className={inputCls}
-              aria-label={t('contractAgreements.rateLineUnit', 'Rate line {{n}} unit', { n: i + 1 })}
+              aria-label={t('contractAgreements.rateLineUnit', 'Rate line {{n}} unit', {
+                n: i + 1,
+              })}
             >
               <option value="day">/day</option>
               <option value="hour">/hr</option>
@@ -844,7 +917,9 @@ function CreateAgreement({ accountKey }: { accountKey: string }) {
               size="sm"
               onClick={() => removeLine(i)}
               className="min-w-[44px] text-[var(--fg-tertiary)] hover:text-[var(--danger)]"
-              aria-label={t('contractAgreements.removeRateLine', 'Remove rate line {{n}}', { n: i + 1 })}
+              aria-label={t('contractAgreements.removeRateLine', 'Remove rate line {{n}}', {
+                n: i + 1,
+              })}
             >
               <Icon name="x" size={14} />
             </Button>

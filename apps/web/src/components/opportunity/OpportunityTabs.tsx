@@ -14,6 +14,7 @@ import { useCalls } from '@/hooks/useCalls';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
+import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
@@ -56,6 +57,7 @@ export function OpportunityTabs({
   return (
     <Tabs defaultValue="decision-unit">
       <TabsList aria-label={t('opportunityTabs.sectionsAriaLabel', 'Opportunity sections')}>
+        <TabsTrigger value="people">{t('opportunityTabs.tabPeople', 'People')}</TabsTrigger>
         <TabsTrigger value="decision-unit">
           {t('opportunityTabs.tabDecisionUnit', 'Decision unit')}
         </TabsTrigger>
@@ -68,6 +70,12 @@ export function OpportunityTabs({
         <TabsTrigger value="activity">{t('opportunityTabs.tabActivity', 'Activity')}</TabsTrigger>
       </TabsList>
 
+      <TabsContent value="people">
+        <AccountPeopleSection
+          opportunityId={oppId}
+          deals={[{ id: oppId, name: customer }]}
+        />
+      </TabsContent>
       <TabsContent value="decision-unit">
         <DecisionUnitPanel customer={customer} intelDecisionUnit={intelDecisionUnit} />
       </TabsContent>
@@ -167,7 +175,7 @@ function DecisionUnitPanel({
         title={t('opportunityTabs.decisionUnitEmptyTitle', 'No decision-unit members yet')}
         message={t(
           'opportunityTabs.decisionUnitEmptyMessage',
-          'Add a contact from the Contacts page or sync from Dust.',
+          'Link a contact to this opportunity. A job title is not a buying role.',
         )}
       />
     );
@@ -192,37 +200,10 @@ function DecisionUnitPanel({
               </div>
               <div className="text-xs text-[var(--fg-tertiary)]">{r.role}</div>
               {r.email ? (
-                <div className="text-[10px] font-mono text-[var(--fg-tertiary)] mt-0.5">
+                <div className="text-xs font-mono text-[var(--fg-tertiary)] mt-0.5">
                   {r.email}
                 </div>
               ) : null}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge
-                tone={
-                  r.sentiment === 'hot'
-                    ? 'tomato'
-                    : r.sentiment === 'warm'
-                      ? 'amber'
-                      : r.sentiment === 'cold'
-                        ? 'blue'
-                        : 'gray'
-                }
-              >
-                {r.sentiment}
-              </Badge>
-              <div
-                className="text-xs font-semibold tabular-nums text-[var(--fg-primary)]"
-                aria-label={t(
-                  'opportunityTabs.influenceAriaLabel',
-                  'Influence {{value}} out of 5',
-                  {
-                    value: r.influence,
-                  },
-                )}
-              >
-                {r.influence}/5
-              </div>
             </div>
           </li>
         ))}

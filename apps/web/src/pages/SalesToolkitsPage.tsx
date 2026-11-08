@@ -64,6 +64,13 @@ export default function SalesToolkitsPage() {
             t('salesToolkits.errorMessage', 'The LMS did not respond. Try again shortly.')
           }
         />
+      ) : toolkits.data?.preview ? (
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t(
+            'salesToolkits.previewHidden',
+            'Mantu Academy is not connected. Sample courses are not listed.',
+          )}
+        </p>
       ) : toolkits.data && toolkits.data.items.length === 0 ? (
         <EmptyState
           title={
@@ -78,7 +85,6 @@ export default function SalesToolkitsPage() {
         />
       ) : (
         <>
-          {toolkits.data?.preview ? <SampleBanner /> : null}
           {/* Announce the filtered result count to assistive tech when a sector chip changes. */}
           <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
             {sector
@@ -171,26 +177,5 @@ function SectorChip({
     >
       {label}
     </button>
-  );
-}
-
-function SampleBanner() {
-  const { t } = useTranslation('crm');
-  return (
-    <div
-      role="status"
-      className="flex items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-sm text-[var(--fg-primary)]"
-    >
-      <Icon name="info" size={16} aria-hidden />
-      <div>
-        <strong className="font-semibold">{t('salesToolkits.sampleDataLabel', 'Sample data.')}</strong>{' '}
-        {t('salesToolkits.sampleDataIntro', 'These are illustrative toolkits. Set')}{' '}
-        <code className="text-xs">LMS_360L_ENABLED</code>{' '}
-        {t(
-          'salesToolkits.sampleDataOutro',
-          '+ credentials to pull live courses from Mantu Academy.',
-        )}
-      </div>
-    </div>
   );
 }

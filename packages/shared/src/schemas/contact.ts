@@ -4,6 +4,10 @@ import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js'
 export const Sentiment = z.enum(['hot', 'warm', 'neutral', 'cold']);
 export type Sentiment = z.infer<typeof Sentiment>;
 
+/** linked = companyId is a real org company. needs_review = no safe unique link. */
+export const ContactLinkState = z.enum(['linked', 'needs_review']);
+export type ContactLinkState = z.infer<typeof ContactLinkState>;
+
 export const Contact = z.object({
   id: z.string().uuid(),
   customer: z.string().min(1).max(255),
@@ -14,11 +18,20 @@ export const Contact = z.object({
   influence: z.number().int().min(1).max(5).nullable(),
   sentiment: Sentiment.nullable(),
   createdAt: z.string().datetime(),
+  companyId: z.string().uuid().nullable(),
+  linkState: ContactLinkState,
   customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type Contact = z.infer<typeof Contact>;
 
-export const ContactCreate = Contact.omit({ id: true, createdAt: true });
+export const ContactCreate = Contact.omit({
+  id: true,
+  createdAt: true,
+  companyId: true,
+  linkState: true,
+}).extend({
+  companyId: z.string().uuid().optional(),
+});
 export type ContactCreate = z.infer<typeof ContactCreate>;
 
 // PATCH body — every field optional but at least one must be present.

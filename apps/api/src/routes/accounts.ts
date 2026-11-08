@@ -8,9 +8,14 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
-import { TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
+import { microsToUnits, TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
 
 import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
+
+/** A SQL `::text` bigint sum. Anything else is not an amount. */
+function sqlMicros(text: string): string {
+  return /^\d+$/.test(text) ? text : '0';
+}
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 
 const KeyAccountResponse = z.object({
@@ -24,6 +29,7 @@ const KeyAccountResponse = z.object({
   keyAccountOwnerId: z.string().nullable(),
   keyAccountNotes: z.string().nullable(),
   totalValue: z.number(),
+  totalValueMicros: z.string(),
   openDeals: z.number(),
   contactCount: z.number(),
   opportunityCount: z.number(),
@@ -32,6 +38,7 @@ const KeyAccountResponse = z.object({
 const TopAccountResponse = KeyAccountResponse.extend({
   topAccountRank: z.number(),
   wonValue: z.number(),
+  wonValueMicros: z.string(),
 });
 
 export const accountsRoutes: FastifyPluginAsync = async (server) => {
@@ -114,6 +121,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           keyAccountOwnerId: c.keyAccountOwnerId,
           keyAccountNotes: c.keyAccountNotes,
           totalValue: o.totalValue,
+          totalValueMicros: o.totalValueMicros,
           openDeals: o.openDeals,
           contactCount: o.contactCount,
           opportunityCount: o.opportunityCount,
@@ -190,7 +198,9 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
             // topAccountRank is non-null by the where clause above; ?? 0 keeps TS honest.
             topAccountRank: c.topAccountRank ?? 0,
             totalValue: s.totalValue,
+            totalValueMicros: s.totalValueMicros,
             wonValue: s.wonValue,
+            wonValueMicros: s.wonValueMicros,
             openDeals: s.openDeals,
             contactCount: s.contactCount,
             opportunityCount: s.opportunityCount,
@@ -254,8 +264,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         keyAccountOwnerId: string | null;
         keyAccountNotes: string | null;
         topAccountRank: number | null;
-        totalValue: number;
-        wonValue: number;
+        openValueMicros: string;
+        wonValueMicros: string;
         openDeals: bigint; // Postgres COUNT → BigInt
         opportunityCount: bigint;
       };
@@ -272,13 +282,52 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           c.key_account_owner_id AS "keyAccountOwnerId",
           c.key_account_notes    AS "keyAccountNotes",
           c.top_account_rank     AS "topAccountRank",
-          COALESCE(SUM(o.value_micros), 0)::float8 / 1000000.0 AS "totalValue",
-          COALESCE(SUM(CASE WHEN o.stage = 'closed_won'::opportunity_stage
-                            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0
-                                                                         AS "wonValue",
-          COUNT(CASE WHEN o.stage NOT IN ('closed_won'::opportunity_stage,
-                                          'closed_lost'::opportunity_stage)
-                     THEN 1 ELSE NULL END)                               AS "openDeals",
+          COALESCE(SUM(CASE
+            WHEN o.stage NOT IN ('closed_won'::opportunity_stage, 'closed_lost'::opportunity_stage)
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND (ps.is_lost OR ps.is_won)
+             )
+            THEN o.value_micros ELSE 0 END), 0) AS "openValueSort",
+          COALESCE(SUM(CASE
+            WHEN o.stage NOT IN ('closed_won'::opportunity_stage, 'closed_lost'::opportunity_stage)
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND (ps.is_lost OR ps.is_won)
+             )
+            THEN o.value_micros ELSE 0 END), 0)::text AS "openValueMicros",
+          COALESCE(SUM(CASE
+            WHEN o.stage <> 'closed_lost'::opportunity_stage
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND ps.is_lost
+             )
+             AND (
+               o.stage = 'closed_won'::opportunity_stage
+               OR EXISTS (
+                 SELECT 1 FROM pipeline_stages ps
+                 WHERE ps.id = o.pipeline_stage_id
+                   AND ps.deleted_at IS NULL
+                   AND ps.is_won
+                   AND NOT ps.is_lost
+               )
+             )
+            THEN o.value_micros ELSE 0 END), 0)::text AS "wonValueMicros",
+          COUNT(CASE
+            WHEN o.stage NOT IN ('closed_won'::opportunity_stage, 'closed_lost'::opportunity_stage)
+             AND NOT EXISTS (
+               SELECT 1 FROM pipeline_stages ps
+               WHERE ps.id = o.pipeline_stage_id
+                 AND ps.deleted_at IS NULL
+                 AND (ps.is_lost OR ps.is_won)
+             )
+            THEN 1 ELSE NULL END) AS "openDeals",
           COUNT(o.id)                                                    AS "opportunityCount"
         FROM companies c
         LEFT JOIN opportunities o
@@ -293,7 +342,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           AND (${industryVal}::text IS NULL OR c.industry ILIKE ${industryVal})
           ${accountScopeSql}
         GROUP BY c.id
-        ORDER BY "totalValue" DESC
+        ORDER BY "openValueSort" DESC
         LIMIT ${limit}
       `;
 
@@ -306,23 +355,29 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       });
       const contactMap = new Map(contacts.map((c) => [c.companyId, c._count.id]));
 
-      const items = rows.map((row, index) => ({
-        id: row.id,
-        name: row.name,
-        domain: row.domain,
-        industry: row.industry,
-        logoUrl: row.logoUrl,
-        tier: row.tier,
-        keyAccountSince: row.keyAccountSince?.toISOString() ?? null,
-        keyAccountOwnerId: row.keyAccountOwnerId,
-        keyAccountNotes: row.keyAccountNotes,
-        topAccountRank: index + 1, // rank = position in result (sorted by totalValue DESC)
-        totalValue: row.totalValue,
-        wonValue: row.wonValue,
-        openDeals: Number(row.openDeals),
-        contactCount: contactMap.get(row.id) ?? 0,
-        opportunityCount: Number(row.opportunityCount),
-      }));
+      const items = rows.map((row, index) => {
+        const openMicros = sqlMicros(row.openValueMicros);
+        const wonMicros = sqlMicros(row.wonValueMicros);
+        return {
+          id: row.id,
+          name: row.name,
+          domain: row.domain,
+          industry: row.industry,
+          logoUrl: row.logoUrl,
+          tier: row.tier,
+          keyAccountSince: row.keyAccountSince?.toISOString() ?? null,
+          keyAccountOwnerId: row.keyAccountOwnerId,
+          keyAccountNotes: row.keyAccountNotes,
+          topAccountRank: index + 1, // rank = position in result (sorted by totalValue DESC)
+          totalValueMicros: openMicros,
+          wonValueMicros: wonMicros,
+          totalValue: microsToUnits(BigInt(openMicros)),
+          wonValue: microsToUnits(BigInt(wonMicros)),
+          openDeals: Number(row.openDeals),
+          contactCount: contactMap.get(row.id) ?? 0,
+          opportunityCount: Number(row.opportunityCount),
+        };
+      });
 
       return reply.send({ items, source: 'auto' as const });
     },

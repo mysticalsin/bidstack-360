@@ -15,7 +15,6 @@ import {
   KpiSidebar,
   OpenIssuesCard,
   PageHead,
-  PipelineByStageCard,
   RecentOpportunitiesCard,
   RevenueEvolutionCard,
   WinLossCard,
@@ -36,14 +35,16 @@ import {
   WinLossReasonsCard,
   type ClosedOpp,
 } from '@/components/account-intel/WinLossReasonsCard';
+import { recentItemsFromDeals } from '@/components/cockpit/RecentOpportunitiesCard';
+import { AccountStageBars } from '@/components/cockpit/AccountStageBars';
+import { AccountWorkstreamBoard } from '@/components/cockpit/AccountWorkstreamBoard';
+import { unitsFromMicros } from '@/components/dashboard/unspecified-currency';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import { useOpportunities } from '@/hooks/useOpportunities';
-import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -72,8 +73,6 @@ export function DashboardPage() {
 function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
-  const report = usePipelineReport();
-  const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
   // any early returns below. The visit-tracker reads the resolved company
@@ -179,15 +178,19 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  const accountOpps = opps.data?.items.filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
+  // A matching customer name is not a link. The snapshot deals for this
+  // account are the rows whose companyId points here.
+  const companyDeals = snapshot.deals.filter((deal) => deal.companyId === cockpit.company.id);
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.
-  const closedOpps: ClosedOpp[] = (accountOpps ?? [])
-    .filter((o) => o.stage === 'closed_won' || o.stage === 'closed_lost')
-    .map((o) => ({ id: o.id, name: o.name, outcome: o.stage === 'closed_won' ? 'won' : 'lost' }));
+  const closedOpps: ClosedOpp[] = companyDeals
+    .filter((deal) => deal.stage === 'closed_won' || deal.stage === 'closed_lost')
+    .map((deal) => ({
+      id: deal.id,
+      name: deal.name,
+      outcome: deal.stage === 'closed_won' ? 'won' : 'lost',
+    }));
 
   return (
     <>
@@ -202,24 +205,60 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
       )}
       <PageHead cockpit={cockpit} accountView={isAccountView} />
+      <CommandCenter cockpit={cockpit} />
+      {(show('revenueEvolution') || show('winLoss') || show('pipelineStage')) && (
+        <div className="mb-4 grid items-start gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+          {show('revenueEvolution') && <RevenueEvolutionCard cockpit={cockpit} />}
+          {show('winLoss') && <WinLossCard cockpit={cockpit} />}
+          {show('pipelineStage') && <AccountStageBars deals={companyDeals} />}
+        </div>
+      )}
+      {isAccountView && (
+        <AccountWorkStrip
+          people={cockpit.keyContacts}
+          overdueCount={overdueCount}
+          deals={companyDeals.filter(
+            (deal) => deal.stage !== 'closed_won' && deal.stage !== 'closed_lost',
+          )}
+        />
+      )}
+      {isAccountView && (
+        <AccountWorkstreamBoard
+          deals={companyDeals.map((deal) => ({
+            id: deal.id,
+            name: deal.name,
+            stage: deal.stage,
+            value: unitsFromMicros(deal.amountMicros),
+            valueMicros: deal.amountMicros,
+            owner: deal.ownerName,
+          }))}
+          people={cockpit.keyContacts.map((person) => ({
+            id: person.id,
+            name: person.name,
+            roleInDecision: person.roleInDecision,
+          }))}
+        />
+      )}
       {isAccountView && (
         <div className="flex justify-end">
           <CockpitCustomizeMenu />
         </div>
       )}
       <KpiRow cockpit={cockpit} />
-      <CommandCenter cockpit={cockpit} />
 
-      <div className="mt-1 flex flex-col gap-1">
-        <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
-          {t('dashboard.portfolioIntelTitle', 'Portfolio sales intelligence')}
-        </h2>
-        <p className="text-xs text-[var(--fg-tertiary)]">
-          {t('dashboard.portfolioIntelSubtitle', 'Pipeline, risks, contacts, and records for this account.')}
-        </p>
-      </div>
       <section className="cockpit-grid" aria-label={t('dashboard.accountCockpitAria', 'Account cockpit')}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          {(show('businessSnapshot') || show('openIssues')) && (
+            <Reveal delay={0.04}>
+              <div className="dash-row-3">
+                {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
+                {show('openIssues') && (
+                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
+                )}
+              </div>
+            </Reveal>
+          )}
+
           {show('techStack') && (
             <Reveal>
               <TechStackCard cockpit={cockpit} />
@@ -232,24 +271,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
             </Reveal>
           )}
 
-          {(show('businessSnapshot') || show('openIssues') || show('pipelineStage')) && (
-            <Reveal delay={0.04}>
-              <div className="dash-row-3">
-                {show('businessSnapshot') && <BusinessSnapshotCard cockpit={cockpit} />}
-                {show('openIssues') && (
-                  <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
-                )}
-                {show('pipelineStage') && <PipelineByStageCard report={report.data} />}
-              </div>
-            </Reveal>
-          )}
-
           {show('recentOpportunities') && (
             <Reveal delay={0.12}>
               <RecentOpportunitiesCard
-                opps={opps}
                 accountName={cockpit.company.name}
-                items={accountOpps}
+                items={recentItemsFromDeals(companyDeals)}
               />
             </Reveal>
           )}
@@ -292,21 +318,6 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         </div>
 
         <aside className="cockpit-side" aria-label={t('dashboard.cockpitDetailsAria', 'Cockpit details')}>
-          {show('healthScore') && (
-            <Reveal>
-              <HealthScoreCard cockpit={cockpit} />
-            </Reveal>
-          )}
-          {show('revenueEvolution') && (
-            <Reveal delay={0.02}>
-              <RevenueEvolutionCard cockpit={cockpit} />
-            </Reveal>
-          )}
-          {show('winLoss') && (
-            <Reveal delay={0.03}>
-              <WinLossCard cockpit={cockpit} />
-            </Reveal>
-          )}
           {show('winLossReasons') && (
             <Reveal delay={0.03}>
               <WinLossReasonsCard closedOpps={closedOpps} />
@@ -323,6 +334,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
                 snapshot={snapshot}
                 overdueCount={overdueCount}
                 tasksLoading={tasks.isLoading}
+                account
               />
             </Reveal>
           )}
@@ -355,8 +367,113 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
               <AccountIntelPanel accountId={accountId} />
             </Reveal>
           )}
+          {show('healthScore') && (
+            <Reveal delay={0.3}>
+              <HealthScoreCard cockpit={cockpit} />
+            </Reveal>
+          )}
         </aside>
       </section>
     </>
+  );
+}
+
+function AccountWorkStrip({
+  people,
+  overdueCount,
+  deals,
+}: {
+  people: Array<{
+    id: string;
+    name: string;
+    title: string | null;
+    email: string | null;
+    source: string;
+  }>;
+  overdueCount: number;
+  deals: Array<{ id: string; name: string; stage: string | null }>;
+}) {
+  const { t } = useTranslation('crm');
+  const shownPeople = people.slice(0, 4);
+  const shownDeals = deals.slice(0, 4);
+  return (
+    <section
+      aria-label={t('dashboard.accountWorkLabel', 'People, deals, and tasks')}
+      className="mt-6 grid gap-8 border-b border-[var(--border-subtle)] pb-6 md:grid-cols-3"
+    >
+      <div>
+        <h2 className="text-sm text-[var(--fg-secondary)]">{t('dashboard.workPeople', 'People')}</h2>
+        {shownPeople.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--fg-tertiary)]">
+            {t('dashboard.workPeopleEmpty', 'No people recorded')}
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {shownPeople.map((person) => {
+              const recorded = person.title ?? person.email;
+              const evidenced = person.source === 'verified_data';
+              return (
+                <li key={person.id} className="min-h-11">
+                  <div className="text-sm text-[var(--fg-primary)]">{person.name}</div>
+                  <div className="text-sm">
+                    {evidenced ? (
+                      <span className="text-[var(--brand-primary)]">
+                        {t('dashboard.workEvidenced', 'Evidenced')}
+                      </span>
+                    ) : null}
+                    {recorded ? (
+                      <span className="text-[var(--fg-primary)]">
+                        {evidenced ? ' · ' : ''}
+                        {recorded}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--fg-tertiary)]">
+                        {evidenced ? ' · ' : ''}
+                        {t('dashboard.workUnknown', 'Unknown')}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h2 className="text-sm text-[var(--fg-secondary)]">{t('dashboard.workDeals', 'Open deals')}</h2>
+        {shownDeals.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--fg-tertiary)]">
+            {t('dashboard.workDealsEmpty', 'No open deals')}
+          </p>
+        ) : (
+          <ul className="mt-2">
+            {shownDeals.map((deal) => (
+              <li key={deal.id}>
+                <Link
+                  to={`/opportunities/${deal.id}`}
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-md text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                >
+                  <span className="truncate">{deal.name}</span>
+                  <span className="shrink-0 text-[var(--fg-secondary)]">
+                    {deal.stage ?? t('dashboard.workUnknown', 'Unknown')}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h2 className="text-sm text-[var(--fg-secondary)]">{t('dashboard.workTasks', 'Tasks')}</h2>
+        <Link
+          to={overdueCount > 0 ? '/tasks?filter=overdue' : '/tasks'}
+          className="mt-2 inline-flex min-h-11 items-center text-sm text-[var(--fg-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+        >
+          {overdueCount > 0
+            ? t('dashboard.workTasksOverdue', '{{count}} overdue', { count: overdueCount })
+            : t('dashboard.workTasksClear', 'No overdue tasks')}
+        </Link>
+      </div>
+    </section>
   );
 }

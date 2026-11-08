@@ -28,6 +28,7 @@ import {
   loadCompanyNameIndex,
   mintNextCode,
   mintNextCodes,
+  patchedValueMicros,
   resolveCompanyIdByName,
 } from './opportunities.helpers.js';
 
@@ -131,7 +132,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                 name: body.name,
                 stage: stageKey,
                 pipelineStageId,
-                valueMicros: BigInt(Math.round(body.value * 1_000_000)),
+                valueMicros: patchedValueMicros(body) ?? 0n,
                 probability: body.probability,
                 dueDate: body.dueDate ? new Date(body.dueDate) : null,
                 industry: body.industry,
@@ -187,6 +188,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
               color: true,
               isWon: true,
               isLost: true,
+              deletedAt: true,
             },
           },
         },
@@ -373,7 +375,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                     name: vr.row.name,
                     stage: vr.stageKey,
                     pipelineStageId: vr.pipelineStageId ?? undefined,
-                    valueMicros: BigInt(Math.round(vr.row.value * 1_000_000)),
+                    valueMicros: patchedValueMicros(vr.row) ?? 0n,
                     probability: vr.row.probability,
                     dueDate: vr.row.dueDate ? new Date(vr.row.dueDate) : null,
                     industry: vr.row.industry ?? null,

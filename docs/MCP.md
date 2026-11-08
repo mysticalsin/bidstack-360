@@ -38,7 +38,9 @@ Required scopes:
 These are MCP tool-class scopes. Production REST routes use exact permission
 scopes instead, for example `opportunities:read` or `integrations:write`.
 
-Missing, revoked, or malformed keys return `401`. Keys without the required tool scope return `403`.
+Missing, revoked, or malformed keys return `401`. A key that lacks the `mcp` scope is rejected when the session is authenticated, with HTTP `403`.
+
+A key that already has `mcp` but lacks the tool scope (`read`, `write`, or `kam`) stays on that session. The tool result is an MCP error (`isError: true`) whose text is `API key lacks write scope` (or `read` / `kam`). It is not an HTTP 403. A JSON-RPC 200 with `isError: true` is a denied tool call, and the handler does not run.
 
 ## Tool Scopes
 
@@ -73,7 +75,11 @@ curl -s http://localhost:4001/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq
 ```
 
-Read-only keys should be tested by minting a key with `["mcp","read"]` and confirming write tools return `403`.
+Read-only keys should be tested by minting a key with `["mcp","read"]` and confirming a write tool such as `crm_create_deal` returns an MCP tool error (`API key lacks write scope`) and does not insert a row. Streamable HTTP needs an `initialize` request first; later calls send the `mcp-session-id` header.
+
+`notes.list` `accountId` is a UUID (`Company.id` or the stored note account id). A company name is not resolved. `tasks.list` accepts `accountId` as `Task.accountId` (company UUID). `crm_search_companies` searches the Company table and returns that id; opportunity customer text that is not a company row is `matchKind: opportunity_text_only` with `confidence: null`. `opportunities.list` returns `currency: null`, `currencyBasis: unspecified`, `companyId`, and `health: not_account_health` because probability is not account health.
+
+Dust cloud cannot call `localhost`. In Dust, open Spaces > Tools > Add Tool > Add MCP Server and paste the public HTTPS URL that ends in `/mcp`. Choose Bearer token and use a Polo key scoped `mcp` and `read`. Until that URL and `DUST_API_KEY` / `DUST_WORKSPACE_ID` exist, Polo stays in stub / unverified mode.
 
 ## Release Evidence
 
@@ -87,10 +93,11 @@ The command requires a non-local `BIDSTACK_MCP_CONNECTIVITY_TARGET`, a bearer to
 
 ## Registering with Dust
 
-Dust -> Workspace -> Tools -> External MCP:
+Dust docs: Spaces > Tools > Add Tool > Add MCP Server. Streamable HTTP is the transport Dust tries first. Do not register the legacy `/mcp/sse` URL.
 
-- URL: `${DUST_MCP_PUBLIC_URL}/mcp`
-- Auth: bearer token from the API key creation response.
-- Transport: Streamable HTTP.
+- URL: the public HTTPS URL ending in `/mcp` (`DUST_MCP_PUBLIC_URL` plus `/mcp` when the origin has no path).
+- Auth: Bearer token. Paste a Polo API key with scopes `mcp` and `read`. Dust sends `Authorization: Bearer`.
+- Do not choose Automatic OAuth or Static OAuth. Polo’s MCP server has no Dust OAuth callback. Dust’s finalize URLs are `https://app.dust.tt/oauth/mcp/finalize` and `https://app.dust.tt/oauth/mcp_static/finalize`.
+- **localhost cannot be registered with Dust cloud.** A loopback URL stays local-only and `mcp.configured` stays false.
 
-Dust discovers tools through `tools/list`. Keep Claude/Dust provider keys server-side; agents should use BidStack MCP/API keys rather than embedding provider secrets in browser-visible configuration.
+Dust discovers tools through `tools/list`. Keep the Dust API key server-side. Agents call Polo with the Polo bearer, not with the Dust key.

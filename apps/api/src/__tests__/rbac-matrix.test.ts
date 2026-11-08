@@ -13,7 +13,12 @@ import sensible from '@fastify/sensible';
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { RBAC_MATRIX, SYSTEM_ROLE_NAMES, type SystemRoleName } from '@bidstack/shared';
+import {
+  PROPOSAL_APPROVE_PERMISSION,
+  RBAC_MATRIX,
+  SYSTEM_ROLE_NAMES,
+  type SystemRoleName,
+} from '@bidstack/shared';
 
 // ─── Mock @bidstack/db so we can control the result of userRole.findMany ─────
 vi.mock('@bidstack/db', () => ({
@@ -161,6 +166,16 @@ describe('RBAC_MATRIX', () => {
   it('SDR can write leads', () => {
     const perms = RBAC_MATRIX['SDR'];
     expect(perms).toContain('leads:write');
+  });
+
+  it('Admin is not the commercial approver', () => {
+    // WHY: proposals:approve must not ride along with ALL_WRITE. A tenant
+    // administrator can draft, but cannot attest a proposal Dust would read
+    // as approved.
+    expect(RBAC_MATRIX.Admin).not.toContain(PROPOSAL_APPROVE_PERMISSION);
+    for (const role of SYSTEM_ROLE_NAMES) {
+      expect(RBAC_MATRIX[role]).not.toContain(PROPOSAL_APPROVE_PERMISSION);
+    }
   });
 
   it('Account Executive can write proposals', () => {

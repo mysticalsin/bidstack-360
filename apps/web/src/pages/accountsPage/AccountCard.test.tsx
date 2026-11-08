@@ -82,7 +82,7 @@ function deal(overrides: Partial<CrmDeal> = {}): CrmDeal {
     companyName: 'Acme',
     name: 'Expansion',
     stage: 'proposal',
-    amountMicros: 1_000_000_000_000,
+    amountMicros: '1000000000000',
     currencyCode: 'EUR',
     probability: 50,
     closeDate: null,

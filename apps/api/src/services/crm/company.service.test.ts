@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { autopopulateCompanies, isFreshCompanyEnrichment } from './company.service.js';
+import {
+  autopopulateCompanies,
+  isFreshCompanyEnrichment,
+  mergeSalesCompanyCandidates,
+} from './company.service.js';
 import { queueApolloEnrichment, upsertVerifiedCompanyEnrichment } from './enrichment.service.js';
 
 vi.mock('./enrichment.service.js', () => ({
@@ -194,5 +198,34 @@ describe('isFreshCompanyEnrichment', () => {
         now,
       ),
     ).toBe(false);
+  });
+});
+
+describe('mergeSalesCompanyCandidates', () => {
+  it('ranks a larger book first when the unit numbers collapse', () => {
+    // WHY: Number(micros) made these two companies a tie, so the smaller one
+    // kept the autopopulate slot when it was listed first.
+    const smaller = 9007199254740992n;
+    const larger = 9007199254740993n;
+    expect(Number(smaller)).toBe(Number(larger));
+    const ranked = mergeSalesCompanyCandidates([
+      {
+        name: 'Smaller Co',
+        domain: null,
+        website: null,
+        countryCode: null,
+        reason: 'External CRM opportunity',
+        score: smaller,
+      },
+      {
+        name: 'Larger Co',
+        domain: null,
+        website: null,
+        countryCode: null,
+        reason: 'External CRM opportunity',
+        score: larger,
+      },
+    ]);
+    expect(ranked.map((row) => row.name)).toEqual(['Larger Co', 'Smaller Co']);
   });
 });

@@ -191,7 +191,9 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
                   title={t('crm.meetingImport.risksTitle', 'Risks and actions')}
                   empty={t('crm.meetingImport.risksEmpty', 'No risks or actions detected')}
                   items={[
-                    ...result.extracted.risks.map((risk) => `${risk.severity}: ${risk.title}`),
+                    ...result.extracted.risks.map((risk) =>
+                      risk.severity ? `${risk.severity}: ${risk.title}` : risk.title,
+                    ),
                     ...result.extracted.tasks.map(
                       (task) => `${t('crm.meetingImport.actionPrefix', 'Action')}: ${task.title}`,
                     ),

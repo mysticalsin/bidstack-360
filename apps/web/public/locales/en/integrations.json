@@ -158,6 +158,8 @@
     "header": {
       "title": "Connectors catalog",
       "caption": "External data sources Polo PreSales can reach. Open feeds run without keys; licensed feeds need credentials.",
+      "sourcesBadge_one": "{{count}} source",
+      "sourcesBadge_other": "{{count}} sources",
       "sourcesBadge": "{{count}} sources"
     },
     "error": {
@@ -449,7 +451,7 @@
     "eyebrowBadge": "Integration fabric",
     "eyebrowChannels": "MCP, REST, webhooks, Dust",
     "title": "Integrations",
-    "subtitle": "Connect agents, APIs, ERP systems and event streams with clear setup paths, scoped credentials and live health checks that fit the rest of the platform.",
+    "subtitle": "Connect Dust, MCP, REST, and webhooks. Dust stays unverified until a public URL and API key exist.",
     "posture": {
       "refreshing": "Refreshing integration posture..."
     },

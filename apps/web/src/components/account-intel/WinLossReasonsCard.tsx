@@ -73,10 +73,21 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
         ) : (
           <div>
             <p className="text-sm text-[var(--fg-secondary)]">
-              {t('winLossReasons.recordedCount', '{{won}} won · {{lost}} lost recorded', {
-                won: patterns.data!.totalWon,
-                lost: patterns.data!.totalLost,
-              })}
+              {t(
+                'winLossReasons.recordedCount',
+                '{{won}} won and {{lost}} lost reason records across the org',
+                {
+                  won: patterns.data!.totalWon,
+                  lost: patterns.data!.totalLost,
+                },
+              )}
+            </p>
+            <p className="mt-1 text-sm text-[var(--fg-tertiary)]">
+              {t(
+                'winLossReasons.accountClosed',
+                'This account has {{count}} closed deals. A closed stage is not a reason.',
+                { count: closedOpps.length },
+              )}
             </p>
             {patterns.data!.topLossReason ? (
               <p className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-primary)]">

@@ -12,7 +12,8 @@ const Input = z.object({
 });
 
 export const notesCreate: Tool<typeof Input> = {
-  description: 'Create a note on a customer account.',
+  description:
+    'Create a note. accountId must be a UUID. When it is a company id, the note is linked to that company. A company name is not a link.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -32,10 +33,18 @@ export const notesCreate: Tool<typeof Input> = {
     });
     if (!author) throw new Error('No user found in org to author the note');
 
+    if (!z.string().uuid().safeParse(args.accountId).success) {
+      throw new Error('accountId must be a UUID. A company name is not a note link.');
+    }
+    const company = await prisma.company.findFirst({
+      where: { id: args.accountId, orgId: ctx.orgId, deletedAt: null },
+      select: { id: true },
+    });
     const created = await prisma.note.create({
       data: {
         orgId: ctx.orgId,
-        accountId: args.accountId,
+        accountId: args.accountId.toLowerCase(),
+        companyId: company?.id ?? null,
         authorUserId: author.id,
         title: args.title,
         bodyMd: args.bodyMd,
@@ -57,6 +66,7 @@ export const notesCreate: Tool<typeof Input> = {
     return {
       id: created.id,
       accountId: created.accountId,
+      companyId: created.companyId,
       title: created.title,
       bodyMd: created.bodyMd,
       pinned: created.pinned,

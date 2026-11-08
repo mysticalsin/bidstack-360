@@ -20,7 +20,7 @@ import { prisma } from '@bidstack/db';
 import type { Logger as PinoLogger } from 'pino';
 import { DustClient } from '@bidstack/dust-client';
 import { encryptSecret } from '@bidstack/shared/server-crypto';
-import { createSafeFetch } from '@bidstack/shared/server';
+import { canonicalDustSpaceId, canonicalDustWorkspaceId, createSafeFetch } from '@bidstack/shared/server';
 
 import { isPublicHostname } from '../lib/ssrf-guard.js';
 
@@ -36,6 +36,7 @@ const DustCredentialsSummary = z.object({
   source: z.enum(['org', 'env']).nullable(),
   workspaceId: z.string().nullable(),
   baseUrl: z.string().nullable(),
+  spaceId: z.string().nullable(),
   dataSourceId: z.string().nullable(),
   agentIds: z.record(z.string()),
   apiKeyMasked: z.string().nullable(),
@@ -43,8 +44,9 @@ const DustCredentialsSummary = z.object({
 
 const PutCredentialsBody = z.object({
   apiKey: z.string().min(10).max(200),
-  workspaceId: z.string().min(1).max(100),
+  workspaceId: z.string().min(1).max(300),
   baseUrl: z.string().url().max(300).optional(),
+  spaceId: z.string().max(200).optional(),
   dataSourceId: z.string().max(200).optional(),
   /** Optional purpose -> Dust agent id map (e.g. { crew, sectionDraft, qaReview }). */
   agentIds: z.record(z.string().max(200)).optional(),
@@ -58,6 +60,7 @@ function toSummary(creds: DustCredentials | null): z.infer<typeof DustCredential
       source: null,
       workspaceId: null,
       baseUrl: null,
+      spaceId: null,
       dataSourceId: null,
       agentIds: {},
       apiKeyMasked: null,
@@ -68,6 +71,7 @@ function toSummary(creds: DustCredentials | null): z.infer<typeof DustCredential
     source: creds.source,
     workspaceId: creds.workspaceId,
     baseUrl: creds.baseUrl ?? null,
+    spaceId: creds.spaceId ?? null,
     dataSourceId: creds.dataSourceId ?? null,
     agentIds: creds.agentIds,
     // Only ever mask the org's OWN key — never expose the shared env key's tail
@@ -97,7 +101,19 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { body: PutCredentialsBody, response: { 200: DustCredentialsSummary } },
     },
     async (req) => {
-      const { apiKey, workspaceId, baseUrl, dataSourceId, agentIds } = req.body;
+      const { apiKey, baseUrl, dataSourceId, agentIds } = req.body;
+      const workspaceId = canonicalDustWorkspaceId(req.body.workspaceId);
+      if (!workspaceId) {
+        throw server.httpErrors.badRequest(
+          'Workspace ID is the id in https://dust.tt/w/<id> or https://eu.dust.tt/w/<id>, not the workspace display name.',
+        );
+      }
+      const spaceId = req.body.spaceId ? canonicalDustSpaceId(req.body.spaceId) : undefined;
+      if (req.body.spaceId && !spaceId) {
+        throw server.httpErrors.badRequest(
+          'Space ID is the Dust space sId, not the space display name.',
+        );
+      }
 
       // SSRF guard: baseUrl is admin-supplied and the server fetches it now (and
       // on every later Dust call), so it must be a public https endpoint — never
@@ -120,6 +136,7 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
         const probe = new DustClient({
           apiKey,
           workspaceId,
+          spaceId,
           baseUrl,
           timeoutMs: 10_000,
           // The string check above can't stop a host that redirects or
@@ -142,6 +159,7 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
       const encrypted = encryptSecret(JSON.stringify({ apiKey }));
       const config: Record<string, unknown> = { workspaceId };
       if (baseUrl) config.baseUrl = baseUrl;
+      if (spaceId) config.spaceId = spaceId;
       if (dataSourceId) config.dataSourceId = dataSourceId;
       if (agentIds) config.agentIds = agentIds;
 
@@ -183,6 +201,7 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
             diff: {
               workspaceId,
               hasBaseUrl: Boolean(baseUrl),
+              hasSpaceId: Boolean(spaceId),
               hasDataSourceId: Boolean(dataSourceId),
               agentCount: agentIds ? Object.keys(agentIds).length : 0,
             },
@@ -194,6 +213,7 @@ export const dustCredentialsRoutes: FastifyPluginAsyncZod = async (server) => {
         apiKey,
         workspaceId,
         baseUrl,
+        spaceId,
         dataSourceId,
         agentIds: agentIds ?? {},
         source: 'org',

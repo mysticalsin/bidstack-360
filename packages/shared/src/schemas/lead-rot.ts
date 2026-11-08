@@ -60,7 +60,7 @@ export const RecoveryPlay = z.object({
   rationale: z.string().max(280),
   /** Optional one-click hint payload (e.g. emailTemplateId for re-engagement). */
   payload: z.record(z.unknown()).default({}),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1).nullable(),
 });
 export type RecoveryPlay = z.infer<typeof RecoveryPlay>;
 

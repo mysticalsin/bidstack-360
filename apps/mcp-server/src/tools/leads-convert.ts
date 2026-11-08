@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 
 import type { Tool } from './index.js';
+import { storedMicros } from './crm-tools.helpers.js';
 
 const Input = z.object({
   id: z.string().uuid(),
   opportunityName: z.string().min(1).max(255).optional(),
-  opportunityValueMicros: z.number().min(0).optional(),
+  opportunityValueMicros: z.union([z.number().nonnegative(), z.string().regex(/^\d+$/)]).optional(),
   stage: z
     .enum([
       's1_lead',
@@ -31,7 +32,12 @@ export const leadsConvert: Tool<typeof Input> = {
     properties: {
       id: { type: 'string', format: 'uuid' },
       opportunityName: { type: 'string', minLength: 1, maxLength: 255 },
-      opportunityValueMicros: { type: 'number', minimum: 0 },
+      opportunityValueMicros: {
+        anyOf: [
+          { type: 'number', minimum: 0 },
+          { type: 'string', pattern: '^\\d+$' },
+        ],
+      },
       stage: {
         type: 'string',
         enum: STAGE_OPTIONS,
@@ -55,16 +61,19 @@ export const leadsConvert: Tool<typeof Input> = {
       ? `OP-${(Number(last.code.slice(3)) + 1).toString().padStart(4, '0')}`
       : 'OP-2001';
 
+    const linked = await linkedCompany(ctx.orgId, lead.companyId, lead.companyName);
     const [opp, contact] = await prisma.$transaction([
       prisma.opportunity.create({
         data: {
           orgId: ctx.orgId,
           code,
-          customer: lead.companyName,
+          customer: linked?.name ?? lead.companyName,
+          companyId: linked?.id ?? null,
           name: args.opportunityName ?? `${lead.companyName} — ${lead.firstName} ${lead.lastName}`,
           stage: (args.stage ?? 's1_lead') as PrismaStage,
-          valueMicros: BigInt(Math.round(args.opportunityValueMicros ?? 0)),
-          probability: 25,
+          valueMicros: storedMicros(args.opportunityValueMicros),
+          // 0 adds nothing to weighted pipeline. 25 used to be written for every conversion.
+          probability: 0,
           industry: null,
           intel: {},
         },
@@ -72,7 +81,8 @@ export const leadsConvert: Tool<typeof Input> = {
       prisma.contact.create({
         data: {
           orgId: ctx.orgId,
-          customer: lead.companyName,
+          customer: linked?.name ?? lead.companyName,
+          companyId: linked?.id ?? null,
           name: `${lead.firstName} ${lead.lastName}`,
           role: lead.title,
           email: lead.email,
@@ -112,6 +122,26 @@ export const leadsConvert: Tool<typeof Input> = {
       leadId: lead.id,
       opportunityId: opp.id,
       contactId: contact.id,
+      companyId: linked?.id ?? null,
     };
   },
 };
+
+async function linkedCompany(
+  orgId: string,
+  companyId: string | null,
+  companyName: string,
+): Promise<{ id: string; name: string } | null> {
+  if (companyId) {
+    return prisma.company.findFirst({
+      where: { id: companyId, orgId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+  }
+  const matches = await prisma.company.findMany({
+    where: { orgId, deletedAt: null, name: { equals: companyName, mode: 'insensitive' } },
+    select: { id: true, name: true },
+    take: 2,
+  });
+  return matches.length === 1 ? (matches[0] ?? null) : null;
+}
