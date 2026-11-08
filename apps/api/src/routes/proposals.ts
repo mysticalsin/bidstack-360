@@ -21,6 +21,7 @@ import {
   proposalApprovalRoutes,
   proposalIsImmutable,
 } from './proposals.approval.js';
+import { writeProposalSectionIfMutable } from './proposal-section-write.js';
 import { DEFAULT_SECTIONS, opportunityDraftLines, serializeProposal } from './proposals.helpers.js';
 
 // DEFAULT_SECTIONS and serializeProposal extracted to ./proposals.helpers.ts (BS-R1)
@@ -362,15 +363,21 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const content = req.body.content ?? section.content;
       const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
-
-      const updated = await prisma.proposalSection.update({
-        where: { id: req.params.sectionId },
-        data: {
-          ...(req.body.title !== undefined ? { title: req.body.title } : {}),
-          ...(req.body.content !== undefined ? { content, wordCount } : {}),
-        },
-      });
-      return { id: updated.id, wordCount: updated.wordCount };
+      const data = {
+        ...(req.body.title !== undefined ? { title: req.body.title } : {}),
+        ...(req.body.content !== undefined ? { content, wordCount } : {}),
+      };
+      const written = await prisma.$transaction((tx) =>
+        writeProposalSectionIfMutable(tx, {
+          orgId: req.auth.orgId,
+          proposalId: proposal.id,
+          sectionId: section.id,
+          data,
+        }),
+      );
+      if (written === 'immutable') throw server.httpErrors.conflict(immutableProposalMessage());
+      if (written === 'missing') return reply.notFound('Section not found');
+      return { id: section.id, wordCount: req.body.content !== undefined ? wordCount : section.wordCount };
     },
   );
 
@@ -460,10 +467,16 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const wordCount = draft.content.trim().split(/\s+/).filter(Boolean).length;
 
-      await prisma.proposalSection.update({
-        where: { id: section.id },
-        data: { content: draft.content, wordCount, aiDrafted: true },
-      });
+      const written = await prisma.$transaction((tx) =>
+        writeProposalSectionIfMutable(tx, {
+          orgId: req.auth.orgId,
+          proposalId: proposal.id,
+          sectionId: section.id,
+          data: { content: draft.content, wordCount, aiDrafted: true },
+        }),
+      );
+      if (written === 'immutable') throw server.httpErrors.conflict(immutableProposalMessage());
+      if (written === 'missing') return reply.notFound('Section not found');
 
       return {
         sectionKey: req.body.sectionKey,

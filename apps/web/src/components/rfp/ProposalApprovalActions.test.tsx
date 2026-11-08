@@ -1,11 +1,15 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ProposalApprovalActions } from './ProposalApprovalActions';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
 }));
+
+afterEach(() => {
+  cleanup();
+});
 
 describe('ProposalApprovalActions', () => {
   it('does not offer approve to a writer who lacks the approval permission', () => {
@@ -38,5 +42,38 @@ describe('ProposalApprovalActions', () => {
     );
     expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy();
     expect(screen.getByLabelText('Attestation')).toBeTruthy();
+  });
+
+  it('sends the attestation with the ordinary approve action', () => {
+    const onApprove = vi.fn();
+    render(
+      <ProposalApprovalActions
+        status="review"
+        canApprove
+        pending={false}
+        error={null}
+        onApprove={onApprove}
+        onSubmit={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Attestation'), { target: { value: 'I checked the price' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(onApprove).toHaveBeenCalledWith('I checked the price');
+  });
+
+  it('offers submit for an approved proposal when the session may approve', () => {
+    const onSubmit = vi.fn();
+    render(
+      <ProposalApprovalActions
+        status="approved"
+        canApprove
+        pending={false}
+        error={null}
+        onApprove={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Submit this version' }));
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 });
