@@ -39,10 +39,21 @@ export const CrmLogo = z.object({
 });
 export type CrmLogo = z.infer<typeof CrmLogo>;
 
+/** What a public source showed for one technology: the URL or record and when. */
+export const TechnicalStackEvidence = z.object({
+  url: z.string().url().nullable(),
+  record: z.string().max(500).nullable(),
+  observedAt: z.string().datetime(),
+});
+export type TechnicalStackEvidence = z.infer<typeof TechnicalStackEvidence>;
+
 export const TechnicalStackItem = z.object({
   name: z.string().min(1),
   source: z.string().min(1),
   confidence: z.number().min(0).max(1),
+  evidence: TechnicalStackEvidence.optional(),
+  /** Demo fixture, shown with a Sample tag. */
+  sample: z.boolean().optional(),
 });
 export type TechnicalStackItemType = z.infer<typeof TechnicalStackItem>;
 
@@ -60,6 +71,31 @@ export const TechnicalStackSuggestion = z.object({
 });
 export type TechnicalStackSuggestion = z.infer<typeof TechnicalStackSuggestion>;
 
+/** Open data lanes: DNS records, certificate transparency, homepage, job postings, GitHub. */
+export const OpenTechLane = z.enum(['dns', 'ct', 'web', 'jobs', 'github']);
+export type OpenTechLane = z.infer<typeof OpenTechLane>;
+
+/** What one open data lane found on its last run. */
+export const TechnicalStackCoverageLane = z.object({
+  lane: OpenTechLane,
+  status: z.enum(['found', 'empty', 'failed', 'skipped']),
+  count: z.number().int().min(0),
+  detail: z.string().max(300).nullable(),
+  checkedAt: z.string().datetime().nullable(),
+});
+export type TechnicalStackCoverageLane = z.infer<typeof TechnicalStackCoverageLane>;
+
+export const TechnicalStackCoverage = z.object({
+  checkedAt: z.string().datetime().nullable(),
+  lanes: z.array(TechnicalStackCoverageLane),
+  openItems: z.number().int().min(0),
+  /** Apollo is a fallback: queued only when open lanes find fewer than the threshold. */
+  apolloFallback: z.enum(['queued', 'not_needed', 'not_configured', 'unavailable']).nullable(),
+  apolloThreshold: z.number().int().min(0),
+  sample: z.boolean(),
+});
+export type TechnicalStackCoverage = z.infer<typeof TechnicalStackCoverage>;
+
 export const TechnicalStackState = z.object({
   companyKey: z.string().min(1),
   manualStack: z.array(TechnicalStackCategory),
@@ -67,16 +103,19 @@ export const TechnicalStackState = z.object({
   effectiveStack: z.array(TechnicalStackCategory),
   suggestions: z.array(TechnicalStackSuggestion),
   updatedAt: z.string().datetime().nullable(),
+  coverage: TechnicalStackCoverage.nullable().optional(),
 });
 export type TechnicalStackState = z.infer<typeof TechnicalStackState>;
 
 export const TechnicalStackRefreshProvider = z.object({
   id: z.enum(['apollo', 'seamless', 'tech_intel', 'open_data']),
   label: z.string().min(1),
-  status: z.enum(['synced', 'queued', 'disabled', 'unavailable']),
+  status: z.enum(['synced', 'queued', 'disabled', 'unavailable', 'skipped']),
   transport: z.enum(['mcp', 'api', 'open_data', 'queue']).nullable(),
   message: z.string().min(1),
   lastCheckedAt: z.string().datetime(),
+  /** Open data only: per lane counts from this run. */
+  lanes: z.array(TechnicalStackCoverageLane).optional(),
 });
 export type TechnicalStackRefreshProvider = z.infer<typeof TechnicalStackRefreshProvider>;
 

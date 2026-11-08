@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
@@ -135,5 +135,33 @@ describe('AccountCard coverage explainability', () => {
 
     expect(screen.getByText('All account list signals are present.')).toBeTruthy();
     expect(screen.getByText('Next: Open the cockpit to review strategy and activity.')).toBeTruthy();
+  });
+});
+
+describe('AccountCard tech logos', () => {
+  beforeEach(cleanup);
+
+  it('shows the top three technologies with their logos and names the rest in the tooltip', () => {
+    const row = deriveAccount(
+      company({
+        technicalStack: [
+          { label: 'Cloud', items: [{ name: 'Azure', source: 'open_data:dns', confidence: 0.95 }, { name: 'AWS', source: 'open_data:dns', confidence: 0.6 }] },
+          { label: 'CRM', items: [{ name: 'Salesforce', source: 'apollo_io', confidence: 0.82 }] },
+          { label: 'Collaboration', items: [{ name: 'Microsoft 365', source: 'open_data:dns', confidence: 0.9 }] },
+        ],
+      }),
+      [],
+    );
+
+    renderCard(row);
+
+    const tech = screen.getByTestId('account-card-tech');
+    expect([...tech.querySelectorAll('[data-tech-name]')].map((el) => el.getAttribute('data-tech-name'))).toEqual(['Azure', 'Microsoft 365', 'Salesforce']);
+    expect(tech.getAttribute('title')).toBe('Azure, Microsoft 365, Salesforce, AWS');
+  });
+
+  it('keeps the pending label when the stack is empty', () => {
+    renderCard();
+    expect(screen.getByText('Tech stack pending')).toBeTruthy();
   });
 });

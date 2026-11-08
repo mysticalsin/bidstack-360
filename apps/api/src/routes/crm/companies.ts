@@ -32,6 +32,11 @@ import {
   type RouteLog,
 } from '../../services/crm/enrichment.service.js';
 import { techStackMcpSourceConfigsFromEnv } from '../../providers/company-tech-stack-mcp.js';
+import {
+  loadOpenTechCoverage,
+  refreshOpenTechStack,
+  type OpenTechRefreshResult,
+} from '../../services/crm/open-tech-stack.service.js';
 import { autopopulateCompanies } from '../../services/crm/company.service.js';
 import {
   TECHNICAL_STACK_FIELD_KEY,
@@ -84,7 +89,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   const TechnicalStackBody = z.object({
     stack: z.array(TechnicalStackCategory).max(16),
   });
-  const TechnicalStackRefreshBody = z.object({}).nullish().default({});
+  const TechnicalStackRefreshBody = z.object({}).strict().nullish();
   const TechnicalStackParams = z.object({ companyKey: z.string().min(1).max(255) });
   const TechnicalStackSuggestionParams = TechnicalStackParams.extend({
     suggestionId: z.string().min(1).max(180),
@@ -125,12 +130,14 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
       select: { value: true, updatedAt: true },
     });
+    const coverage = await loadOpenTechCoverage(prisma, orgId, company.name);
     const state = buildTechnicalStackState({
       companyKey,
       providerStack: company.technicalStack ?? [],
       overrideValue: override?.value,
       overrideUpdatedAt: override?.updatedAt ?? null,
       providerUpdatedAt: company.updatedAt,
+      coverage,
     });
     return {
       company,
@@ -254,8 +261,11 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { company, companyKey, state, overrideValue, overrideUpdatedAt } =
-        await loadTechnicalStackContext(req.auth.orgId, req.auth.userId, req.params.companyKey);
+      const { company } = await loadTechnicalStackContext(
+        req.auth.orgId,
+        req.auth.userId,
+        req.params.companyKey,
+      );
       const refreshed = await upsertVerifiedCompanyEnrichment({
         orgId: req.auth.orgId,
         userId: req.auth.userId,
@@ -267,28 +277,28 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         log: req.log,
         prisma,
       });
-      const apolloJobId = await queueApolloEnrichment({
+      // Open data first; Apollo only as a fallback when open lanes come back thin.
+      const openData = await refreshOpenTechStack({
+        prisma,
         orgId: req.auth.orgId,
         companyName: company.name,
-        ...(refreshed.domain ?? company.domain
-          ? { domain: refreshed.domain ?? company.domain ?? undefined }
-          : {}),
+        domain: refreshed.domain ?? company.domain,
+        website: company.website ?? refreshed.company.website,
         log: req.log,
       });
-      const refreshedState = buildTechnicalStackState({
-        companyKey,
-        providerStack: refreshed.company.technicalStack ?? state.providerStack,
-        overrideValue,
-        overrideUpdatedAt,
-        providerUpdatedAt: refreshed.company.updatedAt,
-      });
+      const { state: refreshedState } = await loadTechnicalStackContext(
+        req.auth.orgId,
+        req.auth.userId,
+        req.params.companyKey,
+      );
       const nowIso = new Date().toISOString();
       return {
         state: refreshedState,
         providers: await buildTechnicalStackRefreshProviders({
           orgId: req.auth.orgId,
-          apolloJobId,
-          refreshedStack: refreshed.company.technicalStack ?? [],
+          apolloJobId: openData.apolloJobId,
+          openData,
+          refreshedStack: refreshedState.providerStack,
           refreshedSources: refreshed.company.sourceAttribution,
           log: req.log,
           nowIso,
@@ -675,6 +685,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
 async function buildTechnicalStackRefreshProviders({
   orgId,
   apolloJobId,
+  openData,
   refreshedStack,
   refreshedSources,
   log,
@@ -682,6 +693,7 @@ async function buildTechnicalStackRefreshProviders({
 }: {
   orgId: string;
   apolloJobId: string | null;
+  openData: OpenTechRefreshResult;
   refreshedStack: TechnicalStackCategoryType[];
   refreshedSources: Array<{ source: string }>;
   log: RouteLog;
@@ -719,28 +731,35 @@ async function buildTechnicalStackRefreshProviders({
     );
   const techIntelLabel = techIntelProviderLabel(techIntelSources);
   const openDataDisabled = process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED === '1';
+  const apolloSkipped = openData.apolloFallback === 'not_needed' && apolloConfigured;
+  const openLanes = openData.coverage.lanes;
+  const openFound = openLanes.some((lane) => lane.status === 'found');
 
   return [
     {
       id: 'apollo',
       label: 'Apollo',
-      status: apolloConfigured
-        ? apolloJobId
-          ? 'queued'
-          : 'unavailable'
-        : apolloMcpPartial
-          ? 'unavailable'
-          : 'disabled',
-      transport: apolloConfigured ? apolloTransport : null,
-      message: apolloConfigured
-        ? apolloJobId
-          ? apolloMcpConfigured
-            ? 'Apollo company intelligence queued through the configured MCP lane.'
-            : 'Apollo company intelligence queued through the REST API lane.'
-          : 'Apollo is configured but the enrichment queue did not accept the job.'
-        : apolloMcpPartial
-          ? 'Apollo MCP is partially configured; set both APOLLO_MCP_URL and APOLLO_MCP_BEARER_TOKEN, or set APOLLO_API_KEY.'
-        : 'Apollo MCP/API credentials are not configured.',
+      status: apolloSkipped
+        ? 'skipped'
+        : apolloConfigured
+          ? apolloJobId
+            ? 'queued'
+            : 'unavailable'
+          : apolloMcpPartial
+            ? 'unavailable'
+            : 'disabled',
+      transport: apolloConfigured && !apolloSkipped ? apolloTransport : null,
+      message: apolloSkipped
+        ? `Not needed: open data found ${openData.coverage.openItems} technologies.`
+        : apolloConfigured
+          ? apolloJobId
+            ? apolloMcpConfigured
+              ? 'Apollo company intelligence queued through the configured MCP lane.'
+              : 'Apollo company intelligence queued through the REST API lane.'
+            : 'Apollo is configured but the enrichment queue did not accept the job.'
+          : apolloMcpPartial
+            ? 'Apollo MCP is partially configured; set both APOLLO_MCP_URL and APOLLO_MCP_BEARER_TOKEN, or set APOLLO_API_KEY.'
+            : 'Apollo MCP/API credentials are not configured.',
       lastCheckedAt: nowIso,
     },
     {
@@ -770,12 +789,11 @@ async function buildTechnicalStackRefreshProviders({
     {
       id: 'open_data',
       label: 'Open data',
-      status: openDataDisabled ? 'disabled' : 'synced',
-      transport: openDataDisabled ? null : 'open_data',
-      message: openDataDisabled
-        ? 'Open company verification is disabled for this environment.'
-        : 'Open company verification checked domain, logo, and public profile sources.',
+      status: openFound ? 'synced' : openDataDisabled ? 'disabled' : 'unavailable',
+      transport: openDataDisabled && !openFound ? null : 'open_data',
+      message: openDataMessage(openData.coverage),
       lastCheckedAt: nowIso,
+      lanes: openLanes,
     },
   ];
 }
@@ -789,4 +807,20 @@ function techIntelProviderLabel(
   if (labels.length === 0) return process.env.TECH_STACK_MCP_LABEL ?? 'Tech Intel MCP';
   if (labels.length <= 2) return labels.join(' + ');
   return `${labels.slice(0, 2).join(' + ')} + ${labels.length - 2} more`;
+}
+
+const OPEN_LANE_LABELS: Record<string, string> = { dns: 'DNS', ct: 'Cert', web: 'Website', jobs: 'Jobs', github: 'GitHub' };
+
+function openDataMessage(coverage: OpenTechRefreshResult['coverage']): string {
+  const found = coverage.lanes.filter((lane) => lane.count > 0);
+  const empty = coverage.lanes.filter((lane) => lane.count === 0 && lane.status !== 'failed');
+  const failed = coverage.lanes.filter((lane) => lane.status === 'failed');
+  const parts = [
+    found.length
+      ? `Open data found ${coverage.openItems} technologies: ${found.map((l) => `${OPEN_LANE_LABELS[l.lane]} ${l.count}`).join(', ')}.`
+      : 'Open data found no technologies.',
+  ];
+  if (empty.length) parts.push(`Nothing found in ${empty.map((l) => OPEN_LANE_LABELS[l.lane]).join(', ')}.`);
+  if (failed.length) parts.push(`Unavailable: ${failed.map((l) => OPEN_LANE_LABELS[l.lane]).join(', ')}.`);
+  return parts.join(' ');
 }
