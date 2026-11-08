@@ -43,7 +43,7 @@ const JOB = {
 const deps = {
   env: {},
   now: () => NOW,
-  intel: {} as never,
+  intel: { env: {} } as never,
   apollo: {} as never,
 } as FullRefreshNs.FullRefreshDeps;
 
