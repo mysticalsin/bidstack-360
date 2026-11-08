@@ -58,7 +58,7 @@ function RefileSelect({
       </label>
       <select
         id={id}
-        className="max-w-[12rem] truncate rounded-md border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+        className="max-w-[12rem] truncate rounded-md border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs text-[var(--fg-primary)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
         value={item.opportunity?.id ?? ACCOUNT_ONLY}
         disabled={refile.isPending}
         onChange={(e) =>

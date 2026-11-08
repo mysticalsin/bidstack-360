@@ -35,6 +35,26 @@ vi.mock('../lib/access-scope.js', () => ({
   })),
   isApiKeyActor: (userId: string) => userId.startsWith('apikey:'),
   applyCompanyScope: (where: unknown) => where,
+  applyOpportunityScope: (
+    where: unknown,
+    scope: { unrestricted: boolean; userId: string; countries: string[] },
+  ) => {
+    if (scope.unrestricted) return where;
+    const variants = [...new Set(scope.countries.flatMap((c) => [c.toUpperCase(), c.toLowerCase()]))];
+    return {
+      AND: [
+        where,
+        {
+          OR: [
+            ...(variants.length
+              ? [{ country: { in: variants } }, { territory: { countryCodes: { hasSome: variants } } }]
+              : []),
+            { ownerId: scope.userId },
+          ],
+        },
+      ],
+    };
+  },
 }));
 
 vi.mock('../services/sync-now/index.js', () => ({
@@ -45,6 +65,8 @@ vi.mock('../services/sync-now/index.js', () => ({
 }));
 
 import { getCompanyActivitySummary, ingestActivities, listAccountConversations, prisma } from '@bidstack/db';
+
+import { getAccessScope } from '../lib/access-scope.js';
 
 import { clearRbacDecisionCacheForTest } from '../lib/rbac-decision-cache.js';
 import { rbacPlugin } from '../plugins/rbac.js';
@@ -225,6 +247,42 @@ describe('slice 9 route authorization table', () => {
     expect(openapiTags.get('GET /api/v1/companies/:id/activity-summary')).toContain('Activities');
     expect(openapiTags.get('GET /api/v1/companies/:id/conversations')).toContain('Activities');
     expect(openapiTags.get('POST /api/v1/sync-now/:source')).toContain('Integrations');
+    await app.close();
+  });
+
+  it('limits conversation opportunities to the viewer access scope', async () => {
+    vi.mocked(getAccessScope).mockResolvedValueOnce({
+      unrestricted: false,
+      countries: ['NO'],
+      userId: USER_ID,
+      companyIds: [],
+      msaIds: [],
+    });
+    actor = { kind: 'user', permissions: ['activities:read'] };
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/companies/${COMPANY_ID}/conversations`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(listAccountConversations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: COMPANY_ID,
+        viewerUserId: USER_ID,
+        opportunityWhere: {
+          AND: [
+            { orgId: ORG_ID, companyId: COMPANY_ID, deletedAt: null },
+            {
+              OR: [
+                { country: { in: ['NO', 'no'] } },
+                { territory: { countryCodes: { hasSome: ['NO', 'no'] } } },
+                { ownerId: USER_ID },
+              ],
+            },
+          ],
+        },
+      }),
+    );
     await app.close();
   });
 

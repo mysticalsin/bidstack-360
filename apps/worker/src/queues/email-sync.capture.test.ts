@@ -15,7 +15,7 @@ vi.mock('@bidstack/db', () => ({
   EmailProvider: { GMAIL: 'GMAIL', OUTLOOK: 'OUTLOOK' },
   prisma: {
     integrationToken: { findFirst: vi.fn(), update: vi.fn() },
-    emailMessage: { upsert: vi.fn() },
+    emailMessage: { upsert: vi.fn(async () => ({ id: 'row-1' })) },
   },
   syncEmailMessageActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
 }));
@@ -162,6 +162,15 @@ describe('Outlook inbox capture', () => {
     expect(result.persisted).toBe(2);
     expect(syncEmailMessageActivity).toHaveBeenCalledWith(orgId, 'row-1');
     expect(syncEmailMessageActivity).toHaveBeenCalledWith(orgId, 'row-2');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as {
+      data: { deltaState: Record<string, unknown> };
+    };
+    // Inbox bridge failed, so that folder's delta link stays unset and the
+    // page is kept for another attempt. Sent mail, which bridged, may advance.
+    expect(saved.data.deltaState.calendarDeltaLink).toBe('cal-keep');
+    expect(saved.data.deltaState.mailDeltaLink).toBeUndefined();
+    expect(saved.data.deltaState.mailNextLink).toEqual(expect.stringContaining('mailFolders/inbox'));
+    expect(saved.data.deltaState.mailSentDeltaLink).toBe('delta');
   });
 
   it('does not store mail that matches no contact, company or opportunity', async () => {

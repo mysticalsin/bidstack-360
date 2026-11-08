@@ -188,7 +188,20 @@ export async function pullMicrosoftIncremental(
     };
     const items = body.value ?? [];
     count += items.length;
-    await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
+    const bridged = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
+    if (!bridged) {
+      // The calendar row is already saved. Holding this page lets the next
+      // tick retry the activity write before Graph moves past the item.
+      await prisma.integrationToken.update({
+        where: { id: tokenId },
+        data: {
+          deltaState: { ...deltaState, calendarNextLink: url },
+          lastSyncedAt: new Date(),
+        },
+      });
+      log.warn({ tokenId }, 'Account activity bridge failed; calendar page will be retried before the cursor advances');
+      return;
+    }
 
     if (body['@odata.deltaLink']) {
       const { calendarNextLink: _n, ...rest } = deltaState;
@@ -235,7 +248,8 @@ async function upsertMicrosoftEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<void> {
+): Promise<boolean> {
+  let bridged = true;
   for (const item of items) {
     if (!item.id) continue;
 
@@ -244,7 +258,8 @@ async function upsertMicrosoftEvents(
         where: { provider: 'microsoft_graph', externalId: item.id, orgId, ownerId: userId },
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
-      await syncRemovedEvents(orgId, userId, 'microsoft_graph', item.id, log);
+      const removed = await syncRemovedEvents(orgId, userId, 'microsoft_graph', item.id, log);
+      if (!removed) bridged = false;
       continue;
     }
 
@@ -300,15 +315,17 @@ async function upsertMicrosoftEvents(
         select: { id: true },
       });
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'microsoft_graph', externalId: item.id }, filing);
-      await bridgeActivity(
+      const ok = await bridgeActivity(
         () => syncCalendarEventActivity(orgId, saved.id, { hints: graphMeetingHints(item) }),
         log,
         { eventId: item.id },
       );
+      if (!ok) bridged = false;
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert MS event; skipping');
     }
   }
+  return bridged;
 }
 
 /** Cancel the activity of an event the provider removed. */
@@ -318,8 +335,8 @@ export async function syncRemovedEvents(
   provider: 'microsoft_graph' | 'google_workspace',
   externalId: string,
   log: pino.Logger,
-): Promise<void> {
-  await bridgeActivity(
+): Promise<boolean> {
+  return bridgeActivity(
     async () => {
       const rows = await prisma.calendarEvent.findMany({
         where: { orgId, ownerId, provider, externalId },

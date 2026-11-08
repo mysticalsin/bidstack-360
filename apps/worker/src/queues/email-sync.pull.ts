@@ -72,6 +72,7 @@ export async function pullDelta(
   for (const f of FOLDERS) {
     let url = (deltaState[f.next] as string | undefined) ?? (deltaState[f.link] as string | undefined) ?? initialUrl(f.folder);
     let done = false;
+    let holdCursor = false;
 
     for (let page = 0; page < MAX_PAGES_PER_FOLDER; page++) {
       const res = await providerFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } }, { provider: 'Microsoft Graph' });
@@ -134,12 +135,19 @@ export async function pullDelta(
             update: {},
             select: { id: true },
           });
-          await bridgeActivity(() => syncEmailMessageActivity(params.orgId, saved.id), log, { msgId: msg.id });
+          const bridged = await bridgeActivity(
+            () => syncEmailMessageActivity(params.orgId, saved.id),
+            log,
+            { msgId: msg.id },
+          );
           persisted++;
+          if (!bridged) holdCursor = true;
         } catch (err) {
           log.warn({ err, msgId: msg.id }, 'Failed to persist Graph message');
         }
       }
+
+      if (holdCursor) break;
 
       if (data['@odata.deltaLink']) {
         deltaState[f.link] = data['@odata.deltaLink'];
@@ -154,7 +162,13 @@ export async function pullDelta(
       url = data['@odata.nextLink'];
     }
 
-    if (!done) {
+    if (holdCursor) {
+      deltaState[f.next] = url;
+      log.warn(
+        { tokenId: token.id, folder: f.folder },
+        'Account activity bridge failed; mail page will be retried before the cursor advances',
+      );
+    } else if (!done) {
       deltaState[f.next] = url;
       log.info({ tokenId: token.id, folder: f.folder }, 'Graph mail pull paused at page cap; resuming next tick');
     }

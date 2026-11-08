@@ -233,15 +233,21 @@ export function googleMeetingHints(item: GoogleMeetingFields): MeetingHints {
   };
 }
 
-/** Run the activity bridge for a synced item; a failure never undoes the capture. */
+/**
+ * Run the activity bridge for a synced item. A failure never undoes the
+ * capture. Callers that advance an incremental cursor must keep the current
+ * page when this returns false, or the provider will not offer the item again.
+ */
 export async function bridgeActivity(
   run: () => Promise<unknown>,
   log: pino.Logger,
   ctx: Record<string, unknown>,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await run();
+    return true;
   } catch (err) {
     log.warn({ err, ...ctx }, 'Could not update the account activity for a synced item');
+    return false;
   }
 }

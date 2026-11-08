@@ -126,6 +126,8 @@ describe('AccountConversations', () => {
     render(<AccountConversations companyId={COMPANY} />);
 
     const select = screen.getByLabelText('File to opportunity') as HTMLSelectElement;
+    expect(select.className).toContain('pointer-coarse:min-h-11');
+    expect(select.className).toContain('pointer-coarse:min-w-11');
     expect(select.value).toBe(OPP_A);
     fireEvent.change(select, { target: { value: OPP_B } });
     expect(mutate).toHaveBeenLastCalledWith({ calendarEventId: EVENT, opportunityId: OPP_B });

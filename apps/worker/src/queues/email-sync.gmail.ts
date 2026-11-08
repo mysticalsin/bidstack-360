@@ -159,6 +159,7 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
   }
 
   let persisted = 0;
+  let holdHistory = false;
   for (const id of ids.slice(0, MAX_MESSAGES_PER_RUN)) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) continue;
@@ -207,11 +208,25 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
         update: {},
         select: { id: true },
       });
-      await bridgeActivity(() => syncEmailMessageActivity(token.orgId, saved.id), log, { msgId: msg.id });
+      const bridged = await bridgeActivity(
+        () => syncEmailMessageActivity(token.orgId, saved.id),
+        log,
+        { msgId: msg.id },
+      );
       persisted++;
+      if (!bridged) holdHistory = true;
     } catch (err) {
       log.warn({ err, msgId: msg.id }, 'Failed to persist Gmail message');
     }
+  }
+
+  if (holdHistory) {
+    log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
+    await prisma.integrationToken.update({
+      where: { id: token.id },
+      data: { lastSyncedAt: new Date() },
+    });
+    return persisted;
   }
 
   await prisma.integrationToken.update({

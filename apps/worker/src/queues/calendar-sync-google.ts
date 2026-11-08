@@ -217,7 +217,18 @@ export async function pullGoogleIncremental(
     const body = (await res.json()) as { items?: GoogleEventItem[]; nextSyncToken?: string; nextPageToken?: string };
     const items = body.items ?? [];
     count += items.length;
-    await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
+    const bridged = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
+    if (!bridged) {
+      await prisma.integrationToken.update({
+        where: { id: tokenId },
+        data: {
+          deltaState: { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
+          lastSyncedAt: new Date(),
+        },
+      });
+      log.warn({ tokenId }, 'Account activity bridge failed; calendar page will be retried before the cursor advances');
+      return;
+    }
 
     if (body.nextSyncToken) {
       const { calendarPageToken: _p, ...rest } = deltaState;
@@ -245,7 +256,8 @@ async function upsertGoogleEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<void> {
+): Promise<boolean> {
+  let bridged = true;
   for (const item of items) {
     if (!item.id) continue;
 
@@ -254,7 +266,8 @@ async function upsertGoogleEvents(
         where: { provider: 'google_workspace', externalId: item.id, orgId, ownerId: userId },
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
-      await syncRemovedEvents(orgId, userId, 'google_workspace', item.id, log);
+      const removed = await syncRemovedEvents(orgId, userId, 'google_workspace', item.id, log);
+      if (!removed) bridged = false;
       continue;
     }
 
@@ -304,15 +317,17 @@ async function upsertGoogleEvents(
         select: { id: true },
       });
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'google_workspace', externalId: item.id }, filing);
-      await bridgeActivity(
+      const ok = await bridgeActivity(
         () => syncCalendarEventActivity(orgId, saved.id, { hints: googleMeetingHints(item) }),
         log,
         { eventId: item.id },
       );
+      if (!ok) bridged = false;
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
     }
   }
+  return bridged;
 }
 
 // ─── Google watch channel renewal ─────────────────────────────────────────

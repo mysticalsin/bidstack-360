@@ -185,23 +185,58 @@ describe('comms activity bridge: meetings', () => {
     expect(db.activity.rows).toHaveLength(0);
   });
 
-  it('skips private meetings and removes one that turned private', async () => {
+  it('remembers a private meeting so a hintless sync cannot publish it', async () => {
     const db = fakeDb({ events: [event()] });
     const bridge = bridgeFor(db);
-    expect((await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: true } })).action).toBe('skipped');
-    expect(db.activity.rows).toHaveLength(0);
+
+    // The first pull never creates a visible activity, but it must store the
+    // privacy flag. The calendar route and removal sync call the bridge again
+    // without hints; forgetting the flag would put the subject back on the account.
+    const skipped = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: true, channel: 'teams' } });
+    expect(skipped).toMatchObject({ action: 'skipped', reason: 'private' });
+    expect(db.activity.rows).toHaveLength(1);
+    expect(db.activity.rows[0]!.deletedAt).toBeInstanceOf(Date);
+    expect(db.activity.rows[0]!.subject).toBeNull();
+    expect(meta(db.activity.rows[0])).toMatchObject({ isPrivate: true, removedBy: 'sync', channel: 'teams' });
+    expect(db.activityAttendee.rows).toHaveLength(0);
+
+    const hintless = await bridge.syncCalendarEvent(ORG, EVENT);
+    expect(hintless).toMatchObject({ action: 'skipped', reason: 'private' });
+    expect(db.activity.rows[0]!.deletedAt).toBeInstanceOf(Date);
+    expect(db.activity.rows[0]!.subject).toBeNull();
 
     const created = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: false } });
+    expect(created).toEqual({ action: 'created', activityId: skipped.activityId });
+    expect(db.activity.rows).toHaveLength(1);
+    expect(db.activity.rows[0]!.deletedAt).toBeNull();
+    expect(db.activity.rows[0]!.subject).toBe('Discovery call');
+
     const removed = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: true } });
     expect(removed).toEqual({ action: 'removed', activityId: created.activityId });
     expect(db.activity.rows[0]!.deletedAt).toBeInstanceOf(Date);
-    expect(meta(db.activity.rows[0]).removedBy).toBe('sync');
+    expect(db.activity.rows[0]!.subject).toBeNull();
+    expect(meta(db.activity.rows[0])).toMatchObject({ isPrivate: true, removedBy: 'sync' });
+    expect(db.activityAttendee.rows).toHaveLength(0);
 
-    // Back to normal: the sync-removed row comes back, no duplicate.
-    const back = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: false } });
-    expect(back).toEqual({ action: 'created', activityId: created.activityId });
-    expect(db.activity.rows).toHaveLength(1);
-    expect(db.activity.rows[0]!.deletedAt).toBeNull();
+    // Filing the same event through the calendar route has no privacy hint.
+    const again = await bridge.syncCalendarEvent(ORG, EVENT, { actorUserId: OWNER });
+    expect(again).toMatchObject({ action: 'skipped', reason: 'private' });
+    expect(db.activity.rows[0]!.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('hides a meeting that becomes private and cancelled in the same pull', async () => {
+    const db = fakeDb({ events: [event()] });
+    const bridge = bridgeFor(db);
+    const created = await bridge.syncCalendarEvent(ORG, EVENT);
+    db.calendarEvent.rows[0]!.isCancelled = true;
+    const out = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: true } });
+    expect(out).toEqual({ action: 'removed', activityId: created.activityId });
+    expect(db.activity.rows[0]!.deletedAt).toBeInstanceOf(Date);
+    expect(meta(db.activity.rows[0]).isPrivate).toBe(true);
+    // A later hintless pull still must not leave a cancelled row on the account page.
+    const hintless = await bridge.syncCalendarEvent(ORG, EVENT);
+    expect(hintless).toMatchObject({ action: 'skipped', reason: 'private' });
+    expect(db.activity.rows[0]!.deletedAt).toBeInstanceOf(Date);
   });
 
   it('never creates a declined or cancelled meeting, and cancels an existing one in place', async () => {

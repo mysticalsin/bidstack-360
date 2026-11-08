@@ -14,7 +14,12 @@ import { ProviderRateLimitError } from '../lib/provider-http.js';
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
-    calendarEvent: { update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn(async () => []) },
+    calendarEvent: {
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      upsert: vi.fn(async () => ({ id: 'row-1' })),
+      findMany: vi.fn(async () => []),
+    },
     integrationToken: { update: vi.fn() },
   },
   syncCalendarEventActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
@@ -238,6 +243,13 @@ describe('Microsoft calendar pull', () => {
     expect(syncCalendarEventActivity).toHaveBeenNthCalledWith(2, orgId, 'row-1', {
       hints: { channel: 'in_person_or_other', isPrivate: true, ownerDeclined: true },
     });
+    // The first bridge failed. The saved events stay, but the delta link must
+    // not advance or Graph will never offer those unchanged items again.
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as {
+      data: { deltaState: Record<string, unknown> };
+    };
+    expect(saved.data.deltaState.calendarDeltaLink).toBeUndefined();
+    expect(saved.data.deltaState.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
   });
 
   it('raises a rate limit error with the Retry-After wait on 429', async () => {

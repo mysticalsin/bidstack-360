@@ -23,7 +23,7 @@ import {
   IngestActivitiesResponse,
 } from '@bidstack/shared';
 
-import { applyCompanyScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
+import { applyCompanyScope, applyOpportunityScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
 
 const INGEST_RATE_LIMIT_PER_MINUTE = 60;
 
@@ -151,6 +151,12 @@ export const activityIngestRoutes: FastifyPluginAsyncZod = async (server) => {
         viewerUserId: userId,
         cursor: req.query.cursor,
         limit: req.query.limit,
+        // Company visibility is not deal visibility. Hidden opportunities must
+        // not contribute names or their meeting and email subjects.
+        opportunityWhere: applyOpportunityScope(
+          { orgId, companyId: company.id, deletedAt: null },
+          scope,
+        ),
       });
     },
   );

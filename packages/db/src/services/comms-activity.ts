@@ -11,10 +11,13 @@
 // - Only external conversations: an item whose participants are all on org
 //   user domains (or are org users) is skipped. Private items are skipped.
 // - Declined or cancelled meetings never create an activity; an existing one
-//   is set to cancelled. An item that stops qualifying (unfiled, private,
-//   internal only, deleted email) soft-deletes its activity with
-//   removedBy "sync", so it can come back if the item qualifies again. A row
-//   a person deleted stays deleted.
+//   is set to cancelled. Private beats cancelled: a private meeting is
+//   suppressed even when it is also cancelled or declined, and the privacy
+//   flag is stored on a hidden activity so a later sync without hints cannot
+//   publish the subject or participants. An item that stops qualifying
+//   (unfiled, private, internal only, deleted email) soft-deletes its
+//   activity with removedBy "sync", so it can come back if the item qualifies
+//   again. A row a person deleted stays deleted.
 // - Refiling moves the activity: opportunity when there is one, else the
 //   account. Several open opportunities and none picked: account only, with
 //   needsOpportunity set rather than a guess.
@@ -239,13 +242,14 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
 
     const hints: Required<MeetingHints> = {
       channel: n.hints.channel ?? prior?.channel ?? 'in_person_or_other',
+      // A missing hint must not forget a privacy flag stored on an earlier pull.
       isPrivate: n.hints.isPrivate ?? prior?.isPrivate ?? false,
       ownerDeclined: n.hints.ownerDeclined ?? prior?.ownerDeclined ?? false,
     };
     const channel = n.kind === 'meeting' ? hints.channel : null;
 
     const remove = async (reason: CommsSkipReason): Promise<CommsBridgeResult> => {
-      if (!live) return { action: 'skipped', reason, activityId: null };
+      if (!live) return { action: 'skipped', reason, activityId: tomb?.id ?? null };
       await db.activity.updateMany({
         where: { id: live.id, orgId },
         data: {
@@ -255,6 +259,85 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
       });
       return { action: 'removed', activityId: live.id };
     };
+
+    // Privacy is decided before cancellation. A cancelled private meeting would
+    // otherwise stay on the account page, because cancelled rows are listed.
+    if (hints.isPrivate) {
+      // A person already deleted this row. Remember privacy, but do not stamp
+      // removedBy "sync" or the next public pull would bring their deletion back.
+      const userDeleted = Boolean(tomb && prior && prior.removedBy !== 'sync');
+      const hidden: CommsCaptureMeta = {
+        version: 1,
+        kind: n.kind,
+        provider: n.provider,
+        source: prior?.source ?? commsSourceFor(n.provider, channel),
+        channel,
+        sourceType: n.sourceType,
+        sourceId: n.sourceId,
+        ownerUserId: n.ownerUserId,
+        companyId: n.companyId,
+        opportunityId: n.opportunityId,
+        contactId: n.contactId,
+        filedManually: n.filedManually,
+        needsOpportunity: false,
+        direction: n.direction,
+        participantCount: 0,
+        isPrivate: true,
+        ownerDeclined: hints.ownerDeclined,
+        ...(userDeleted ? {} : { removedBy: 'sync' as const }),
+      };
+      const hiddenData = {
+        subject: null,
+        description: null,
+        metadata: { commsCapture: hidden } as unknown as Prisma.InputJsonObject,
+      };
+      if (live) {
+        await db.$transaction(async (tx) => {
+          await tx.activity.updateMany({
+            where: { id: live.id, orgId },
+            data: { ...hiddenData, deletedAt: new Date() },
+          });
+          await tx.activityAttendee.deleteMany({ where: { orgId, activityId: live.id } });
+        });
+        return { action: 'removed', activityId: live.id };
+      }
+      if (tomb) {
+        await db.activity.updateMany({
+          where: { id: tomb.id, orgId, deletedAt: { not: null } },
+          data: hiddenData,
+        });
+        return {
+          action: 'skipped',
+          reason: userDeleted ? 'deleted_by_user' : 'private',
+          activityId: tomb.id,
+        };
+      }
+      try {
+        const created = await db.activity.create({
+          data: {
+            orgId,
+            idempotencyKey: key,
+            type: n.kind,
+            status: 'cancelled',
+            entityType: n.opportunityId ? 'opportunity' : 'company',
+            entityId: n.opportunityId ?? n.companyId ?? n.sourceId,
+            ownerId: n.ownerUserId,
+            actorId: null,
+            actorType: 'system',
+            occurredAt: n.occurredAt,
+            deletedAt: new Date(),
+            ...hiddenData,
+          },
+          select: { id: true },
+        });
+        return { action: 'skipped', reason: 'private', activityId: created.id };
+      } catch (err) {
+        if ((err as { code?: string }).code === 'P2002') {
+          return { action: 'skipped', reason: 'concurrent', activityId: null };
+        }
+        throw err;
+      }
+    }
 
     if (n.kind === 'meeting' && (n.gone || n.cancelled || hints.ownerDeclined)) {
       const reason: CommsSkipReason = hints.ownerDeclined && !n.gone && !n.cancelled ? 'declined' : 'cancelled';
@@ -270,7 +353,6 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
     }
     if (n.gone) return remove('not_found');
     if (!n.companyId) return remove('not_filed');
-    if (hints.isPrivate) return remove('private');
 
     const dir = await directory(orgId);
     const isInternal = (email: string) => dir.users.has(email) || dir.domains.has(domainOf(email));
