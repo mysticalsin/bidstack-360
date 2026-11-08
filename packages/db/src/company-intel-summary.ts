@@ -69,26 +69,29 @@ const POSTING_CEILING = 20_000;
  * Every posting in the reporting window, paged. The ceiling is a memory stop,
  * not a claim that the board ended. `truncated` is true when more rows exist.
  */
+const POSTING_SELECT = {
+  id: true,
+  source: true,
+  title: true,
+  url: true,
+  function: true,
+  skills: true,
+  department: true,
+  postedAt: true,
+  lastSeenAt: true,
+  fetchedAt: true,
+  sample: true,
+} as const;
+type QualifyingPosting = Prisma.CompanyJobPostingGetPayload<{ select: typeof POSTING_SELECT }>;
+
 async function loadQualifyingPostings(
   db: Db,
   orgId: string,
   companyId: string,
   since: Date,
-): Promise<{ rows: Awaited<ReturnType<Db['companyJobPosting']['findMany']>>; truncated: boolean }> {
-  const select = {
-    id: true,
-    source: true,
-    title: true,
-    url: true,
-    function: true,
-    skills: true,
-    department: true,
-    postedAt: true,
-    lastSeenAt: true,
-    fetchedAt: true,
-    sample: true,
-  } as const;
-  const all = [];
+): Promise<{ rows: QualifyingPosting[]; truncated: boolean }> {
+  const select = POSTING_SELECT;
+  const all: QualifyingPosting[] = [];
   let truncated = false;
   for (let cursor: string | undefined; all.length < POSTING_CEILING; ) {
     const page = await db.companyJobPosting.findMany({
