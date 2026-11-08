@@ -5,6 +5,8 @@
  */
 import { randomUUID } from 'node:crypto';
 
+import { mcpCallFailed } from './mcp-result.mjs';
+
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
 async function api(apiUrl, role, method, url, body) {
@@ -78,6 +80,7 @@ export async function buildScenarios({ apiUrl, mcpUrl, role }) {
   });
 
   const mcp = await mcpSession(apiUrl, mcpUrl, role);
+  const mcpAppErrors = { count: 0 };
   const tool = (name, args) => ({
     method: 'POST',
     path: '/mcp',
@@ -87,6 +90,9 @@ export async function buildScenarios({ apiUrl, mcpUrl, role }) {
       method: 'tools/call',
       params: { name, arguments: args },
     }),
+    onResponse: (status, body) => {
+      if (status < 400 && mcpCallFailed(body)) mcpAppErrors.count += 1;
+    },
   });
 
   return [
@@ -154,6 +160,7 @@ export async function buildScenarios({ apiUrl, mcpUrl, role }) {
       url: mcpUrl,
       skip: mcp.skip,
       headers: mcp.headers,
+      appErrors: mcpAppErrors,
       requests: [
         tool('opportunities.list', { limit: 50 }),
         tool('contacts.list', { limit: 50 }),
