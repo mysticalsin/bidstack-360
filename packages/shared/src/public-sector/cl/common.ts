@@ -207,6 +207,9 @@ export function finalizeRecord<T extends PsRecordBase>(draft: Omit<T, 'idempoten
   const projection: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(draft)) {
     if (NON_MATERIAL_FIELDS.has(k)) continue;
+    // A supplier's link points at whichever procurement listed it first, so it
+    // depends on row order and is provenance, not a supplier fact.
+    if (k === 'sourceUrl' && draft.kind === 'supplier') continue;
     projection[k] = SET_FIELDS.has(k) && Array.isArray(v) ? [...new Set(v.map(String))].sort() : v;
   }
   return {
@@ -381,11 +384,15 @@ export class NormalizedCollector {
 export async function fetchChileRawPage(
   unit: PsFetchUnit,
   ctx: PsFetchContext,
-  opts: { ticket?: string } = {},
+  opts: { ticket?: string; binary?: boolean; maxBytes?: number } = {},
 ): Promise<PsRawPage> {
   const url = new URL(unit.url);
   if (opts.ticket) url.searchParams.set('ticket', opts.ticket);
-  const res = await guardedGet(ctx.fetch, url.toString(), { allowedHosts: CHILE_SOURCE_HOSTS, now: ctx.now });
+  const res = await guardedGet(ctx.fetch, url.toString(), {
+    allowedHosts: CHILE_SOURCE_HOSTS,
+    now: ctx.now,
+    ...(opts.maxBytes ? { maxBytes: opts.maxBytes } : {}),
+  });
   return {
     unit,
     httpStatus: res.httpStatus,
@@ -394,6 +401,8 @@ export async function fetchChileRawPage(
     contentType: res.contentType,
     rawPayloadHash: sha256Hex(res.body),
     bytes: res.body.byteLength,
-    body: new TextDecoder('utf-8').decode(res.body),
+    // A UTF-8 decode replaces invalid bytes, so archives keep their bytes.
+    body: opts.binary ? '' : new TextDecoder('utf-8').decode(res.body),
+    ...(opts.binary ? { bodyBytes: res.body } : {}),
   };
 }

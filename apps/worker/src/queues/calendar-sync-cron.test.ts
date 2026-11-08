@@ -5,12 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
+import { checkSerumConnectorRuntimePolicy } from '@bidstack/db/serum-runtime-policy';
+
 import {
   fanoutIncrementalPulls,
   fanoutWatchRenewals,
+  runIncrementalPull,
   sweepStrandedPushes,
 } from './calendar-sync.js';
 import { claimCalendarPush } from './calendar-sync-claim.js';
+import { pullGmail } from './email-sync.gmail.js';
+import { getWorkspaceAccessToken } from '../lib/workspace-token.js';
 
 // WHY mock the DB: these are the cron fan-out / recovery paths. We drive the
 // paginated reads and the enqueue side-effects; no real Postgres or Redis.
@@ -40,6 +45,12 @@ vi.mock('@bidstack/db/serum-runtime-policy', () => ({
     .fn()
     .mockResolvedValue({ allowed: true, status: 'allowed', reason: 'allowed by test stub' }),
 }));
+
+vi.mock('../lib/workspace-token.js', () => ({
+  GrantRevokedError: class GrantRevokedError extends Error {},
+  getWorkspaceAccessToken: vi.fn(async () => 'access-token'),
+}));
+vi.mock('./email-sync.gmail.js', () => ({ pullGmail: vi.fn(async () => 0) }));
 
 const tokenFindMany = vi.mocked(prisma.integrationToken.findMany);
 const eventFindMany = vi.mocked(prisma.calendarEvent.findMany);
@@ -222,5 +233,40 @@ describe('stranded-push recovery sweep', () => {
     await expect(
       claimCalendarPush(redis.connection, freshJobId, strandedEvent.id, log),
     ).resolves.toBe(true);
+  });
+});
+
+describe('Gmail capture honours the SERUM connector policy', () => {
+  const gmailOnly = {
+    id: 'tok-gmail',
+    orgId: 'org-1',
+    userId: 'user-1',
+    provider: 'gmail',
+    status: 'active',
+    scope: ['https://www.googleapis.com/auth/gmail.readonly'],
+    externalAccountEmail: 'owner@amaris.com',
+    deltaState: {},
+  };
+
+  it('skips a Gmail-only grant before any token refresh when the policy denies email.pull', async () => {
+    vi.mocked(prisma.integrationToken.findFirst).mockResolvedValue(gmailOnly as never);
+    vi.mocked(checkSerumConnectorRuntimePolicy).mockResolvedValueOnce({ allowed: false, status: 'denied', reason: 'connector disabled' } as never);
+
+    await runIncrementalPull('tok-gmail', 'org-1', 'user-1', log);
+
+    expect(checkSerumConnectorRuntimePolicy).toHaveBeenCalledWith(
+      expect.objectContaining({ orgId: 'org-1', connectorId: 'gmail', operation: 'email.pull', writeRequested: false }),
+    );
+    expect(getWorkspaceAccessToken).not.toHaveBeenCalled();
+    expect(pullGmail).not.toHaveBeenCalled();
+  });
+
+  it('pulls Gmail when the policy allows it', async () => {
+    vi.mocked(prisma.integrationToken.findFirst).mockResolvedValue(gmailOnly as never);
+
+    await runIncrementalPull('tok-gmail', 'org-1', 'user-1', log);
+
+    expect(getWorkspaceAccessToken).toHaveBeenCalled();
+    expect(pullGmail).toHaveBeenCalledTimes(1);
   });
 });

@@ -84,6 +84,16 @@ describe('job boards (public ATS APIs)', () => {
     expect(jobs[0]!.postedAt?.toISOString().slice(0, 10)).toBe('2026-10-28');
   });
 
+  it('gives JSON-LD postings without an id or URL distinct, stable keys', () => {
+    const ld = (title: string) => ({ '@type': 'JobPosting', title, datePosted: '2026-10-28', jobLocation: { address: { addressLocality: 'Oslo', addressCountry: 'NO' } } });
+    const html = `<script type="application/ld+json">${JSON.stringify([ld('Data Engineer'), ld('Cloud Architect')])}</script>`;
+    const jobs = parseJobPostingJsonLd(html, 'https://www.acme.example/careers');
+    expect(jobs).toHaveLength(2);
+    expect(new Set(jobs.map((j) => j.externalId)).size).toBe(2);
+    expect(jobs.every((j) => j.externalId !== 'https://www.acme.example/careers')).toBe(true);
+    expect(parseJobPostingJsonLd(html, 'https://www.acme.example/careers').map((j) => j.externalId)).toEqual(jobs.map((j) => j.externalId));
+  });
+
   it.each([
     ['greenhouse', 'gitlab', 'greenhouse-jobs.json', 'https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true'],
     ['lever', 'palantir', 'lever-postings.json', 'https://api.lever.co/v0/postings/palantir?mode=json'],

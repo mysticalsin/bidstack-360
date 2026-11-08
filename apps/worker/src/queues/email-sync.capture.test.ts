@@ -274,6 +274,74 @@ describe('Gmail inbox capture', () => {
     );
   });
 
+  it('carries messages past the per-run cap to the next run', async () => {
+    const added = Array.from({ length: 501 }, (_, i) => ({ id: String(100 + i), messagesAdded: [{ message: { id: `h-${i}` } }] }));
+    const detailCalls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/history?')) return json({ history: added, historyId: '999' });
+        const id = decodeURIComponent(url.split('/messages/')[1]!.split('?')[0]!);
+        detailCalls.push(id);
+        return json({ id, threadId: 't', internalDate: '1762437600000', labelIds: ['INBOX'], payload: { headers: [{ name: 'From', value: 'buyer@acme.com' }] } });
+      }),
+    );
+    expect(await pullGmail(tokenRow('gmail', { gmailHistoryId: '10' }), 'at', log)).toBe(500);
+    expect(tokenUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '999', gmailPendingIds: ['h-500'] } }) }),
+    );
+
+    detailCalls.length = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/history?')) return json({ historyId: '1000' });
+        const id = decodeURIComponent(url.split('/messages/')[1]!.split('?')[0]!);
+        detailCalls.push(id);
+        return json({ id, threadId: 't', internalDate: '1762437600000', labelIds: ['INBOX'], payload: { headers: [{ name: 'From', value: 'buyer@acme.com' }] } });
+      }),
+    );
+    expect(await pullGmail(tokenRow('gmail', { gmailHistoryId: '999', gmailPendingIds: ['h-500'] }), 'at', log)).toBe(1);
+    expect(detailCalls).toEqual(['h-500']);
+    expect(tokenUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '1000' } }) }),
+    );
+  });
+
+  it('resumes after the last history record read when paging stops early', async () => {
+    let page = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/history?')) {
+          page++;
+          const recs = Array.from({ length: 500 }, (_, i) => ({ id: String(page * 1000 + i), messagesAdded: [{ message: { id: `p${page}-${i}` } }] }));
+          return json({ history: recs, historyId: '999999', nextPageToken: `tok-${page}` });
+        }
+        const id = decodeURIComponent(url.split('/messages/')[1]!.split('?')[0]!);
+        return json({ id, labelIds: ['INBOX'], payload: { headers: [{ name: 'From', value: 'buyer@acme.com' }] } });
+      }),
+    );
+    await pullGmail(tokenRow('gmail', { gmailHistoryId: '10' }), 'at', log);
+    const state = (tokenUpdate.mock.calls.at(-1)![0] as unknown as { data: { deltaState: Record<string, unknown> } }).data.deltaState;
+    expect(state.gmailHistoryId).toBe('1499');
+  });
+
+  it('retries a message whose detail read failed instead of skipping it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/history?')) return json({ history: [{ id: '11', messagesAdded: [{ message: { id: 'm-500' } }, { message: { id: 'm-gone' } }] }], historyId: '12' });
+        if (url.includes('m-gone')) return json({ error: 'not found' }, 404);
+        return json({ error: 'backend' }, 500);
+      }),
+    );
+    expect(await pullGmail(tokenRow('gmail', { gmailHistoryId: '10' }), 'at', log)).toBe(0);
+    expect(tokenUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '12', gmailPendingIds: ['m-500'] } }) }),
+    );
+  });
+
   it('reads history pages incrementally and resets only its own cursor on 404', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => json({ error: 'gone' }, 404)));
     const persisted = await pullGmail(tokenRow('gmail', { gmailHistoryId: '10', calendarSyncToken: 'keep' }), 'at', log);

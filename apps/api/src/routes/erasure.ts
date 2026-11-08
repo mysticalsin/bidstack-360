@@ -20,6 +20,7 @@ import { eraseDataSubject, prisma, resolveDataSubject } from '@bidstack/db';
 import { ErasureOrgParams, ErasureRequest, ErasureSummary } from '@bidstack/shared';
 
 import { isApiKeyActor } from '../lib/access-scope.js';
+import { getStorage } from '../storage/index.js';
 
 export const erasureRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
@@ -45,6 +46,13 @@ export const erasureRoutes: FastifyPluginAsyncZod = async (server) => {
         dryRun: false,
         actorUserId: isApiKeyActor(req.auth.userId) ? null : req.auth.userId,
       });
+      if (report.storageKeys.length) {
+        const storage = await getStorage();
+        for (const key of report.storageKeys) {
+          // Keys are storage paths, not personal data; logged so ops can finish a failed delete.
+          await storage.delete(key).catch((err: unknown) => req.log.error({ err, key }, 'erasure: stored portrait delete failed'));
+        }
+      }
       const primary = subjectType === 'contact' ? 'Contact' : 'Lead';
       const relatedScrubbed = Object.fromEntries(
         Object.entries(report.stores)

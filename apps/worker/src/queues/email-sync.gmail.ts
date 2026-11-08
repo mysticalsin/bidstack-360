@@ -4,7 +4,9 @@
  * First run: read the mailbox historyId from the profile BEFORE listing the
  * last 30 days, so nothing that arrives during the seed is missed. Later runs:
  * history.list from the stored historyId (messageAdded only). Messages are
- * deduped by provider message id and filed by participants.
+ * deduped by provider message id and filed by participants. Ids past the
+ * per-run cap and failed detail reads stay in `gmailPendingIds` and are read
+ * first on the next run.
  */
 import type pino from 'pino';
 
@@ -18,6 +20,7 @@ const MAX_LIST_PAGES = 5;
 const MAX_MESSAGES_PER_RUN = 500;
 const MAX_BODY_CHARS = 200_000;
 const SKIP_LABELS = new Set(['DRAFT', 'SPAM', 'TRASH']);
+const PENDING_KEY = 'gmailPendingIds';
 
 interface GmailTokenRow {
   id: string;
@@ -115,23 +118,30 @@ async function historyIds(
 ): Promise<{ ids: string[]; historyId: string | null; expired: boolean }> {
   const ids: string[] = [];
   let latest: string | null = null;
+  let lastRecord: string | null = null;
   let pageToken: string | undefined;
   for (let page = 0; page < MAX_LIST_PAGES * 4 && ids.length < MAX_MESSAGES_PER_RUN; page++) {
     const params = new URLSearchParams({ startHistoryId, historyTypes: 'messageAdded', maxResults: '500' });
     if (pageToken) params.set('pageToken', pageToken);
     const res = await getJson<{
-      history?: Array<{ messagesAdded?: Array<{ message: { id: string } }> }>;
+      history?: Array<{ id?: string; messagesAdded?: Array<{ message: { id: string } }> }>;
       historyId?: string;
       nextPageToken?: string;
     }>(`${API}/history?${params.toString()}`, accessToken);
     if (res.status === 404) return { ids: [], historyId: null, expired: true };
     if (!res.body) throw new Error(`Gmail history failed: ${res.status}`);
-    for (const h of res.body.history ?? []) for (const m of h.messagesAdded ?? []) ids.push(m.message.id);
+    for (const h of res.body.history ?? []) {
+      for (const m of h.messagesAdded ?? []) ids.push(m.message.id);
+      if (h.id) lastRecord = h.id;
+    }
     latest = res.body.historyId ?? latest;
-    if (!res.body.nextPageToken) break;
     pageToken = res.body.nextPageToken;
+    if (!pageToken) break;
   }
-  return { ids: [...new Set(ids)], historyId: latest, expired: false };
+  // The response historyId is the mailbox head. When paging stopped early,
+  // resume after the last record collected so unread pages are not skipped.
+  const historyId = pageToken ? (lastRecord ?? startHistoryId) : latest;
+  return { ids: [...new Set(ids)], historyId, expired: false };
 }
 
 /** Pull new Gmail messages for one grant. Returns how many were stored. */
@@ -158,10 +168,19 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
     nextHistoryId = res.historyId;
   }
 
+  // Messages past the cap and failed detail reads are carried to the next run,
+  // since the cursor below moves past them.
+  const pending = Array.isArray(deltaState[PENDING_KEY]) ? (deltaState[PENDING_KEY] as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+  const queue = [...new Set([...pending, ...ids])];
+  const carry = queue.slice(MAX_MESSAGES_PER_RUN);
   let persisted = 0;
-  for (const id of ids.slice(0, MAX_MESSAGES_PER_RUN)) {
+  for (const id of queue.slice(0, MAX_MESSAGES_PER_RUN)) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
-    if (!detail.body) continue;
+    if (!detail.body) {
+      // 404 and 410: the message was deleted. Anything else is retried next run.
+      if (detail.status !== 404 && detail.status !== 410) carry.unshift(id);
+      continue;
+    }
     const msg = detail.body;
     if ((msg.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) continue;
 
@@ -212,13 +231,18 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
     }
   }
 
+  const { [PENDING_KEY]: _pending, ...kept } = deltaState;
   await prisma.integrationToken.update({
     where: { id: token.id },
     data: {
-      deltaState: { ...deltaState, ...(nextHistoryId ? { gmailHistoryId: nextHistoryId } : {}) },
+      deltaState: {
+        ...kept,
+        ...(nextHistoryId ? { gmailHistoryId: nextHistoryId } : {}),
+        ...(carry.length ? { [PENDING_KEY]: carry } : {}),
+      },
       lastSyncedAt: new Date(),
     },
   });
-  log.info({ tokenId: token.id, persisted }, 'Gmail pull complete');
+  log.info({ tokenId: token.id, persisted, carried: carry.length }, 'Gmail pull complete');
   return persisted;
 }

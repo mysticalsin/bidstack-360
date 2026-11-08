@@ -176,6 +176,9 @@ export {
   KamHandoffStatus,
 } from '../generated/client/index.js';
 
+// Lets integration tests build a client with the guard forced to `enforce`.
+export { makeTenantScopeGuardMiddleware };
+
 // Curated multi-tenant demo seeding — shared by the `db:seed:demo` CLI and the
 // runtime demo sign-in door, which populates a fresh per-visitor org on sign-in.
 export { seedOrgData } from './seed-org-data.js';

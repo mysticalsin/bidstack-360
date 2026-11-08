@@ -6886,22 +6886,25 @@ model IntelEvidence {
 /// each refresh. Each row cites evidence ids; next12 rows are always
 /// basis=inferred. Derived data, safe to drop and rebuild.
 model InvestmentTheme {
-  id          String   @id @default(uuid()) @db.Uuid
-  orgId       String   @map("org_id") @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
   /// investing | cutting | next12
-  direction   String
-  area        String
-  theme       String?
-  label       String
-  amount      Float?
-  currency    String?
-  trendPct    Float?   @map("trend_pct")
+  direction    String
+  area         String
+  theme        String?
+  label        String
+  /// Monetary lines only, in micros of `currency`.
+  amountMicros BigInt?  @map("amount_micros")
+  /// Headcount lines only.
+  headcount    Int?
+  currency     String?
+  trendPct     Float?   @map("trend_pct")
   /// observed | stated | inferred
-  basis       String
-  summary     String
-  evidenceIds String[] @default([]) @map("evidence_ids")
-  computedAt  DateTime @map("computed_at") @db.Timestamptz(6)
+  basis        String
+  summary      String
+  evidenceIds  String[] @default([]) @map("evidence_ids")
+  computedAt   DateTime @map("computed_at") @db.Timestamptz(6)
 
   org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)

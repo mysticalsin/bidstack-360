@@ -4,6 +4,8 @@
  * company's careers site. No login, no scraping of rendered pages, no
  * candidate data. Descriptions are read for nothing and never stored.
  */
+import { createHash } from 'node:crypto';
+
 import type { IntelClient } from '../http.js';
 
 /** Job boards with a public posting feed. */
@@ -252,12 +254,15 @@ export function parseJobPostingJsonLd(html: string, pageUrl: string): RawPosting
     const title = str(n.title);
     if (!title) continue;
     const ident = n.identifier;
-    const url = httpsUrl(n.url) ?? httpsUrl(new URL(pageUrl).toString());
-    const externalId = (typeof ident === 'object' ? str(obj(ident).value) : str(ident)) ?? url ?? title;
+    const ownUrl = httpsUrl(n.url);
+    const url = ownUrl ?? httpsUrl(new URL(pageUrl).toString());
     const loc = obj(Array.isArray(n.jobLocation) ? n.jobLocation[0] : n.jobLocation);
     const addr = obj(loc.address);
     const city = str(addr.addressLocality);
     const country = str(addr.addressCountry) ?? str(obj(addr.addressCountry).name);
+    // Postings without an id or URL share the page URL, which is not a key.
+    const fallbackId = `${url ?? pageUrl}#${createHash('sha256').update([title, city, country, str(n.datePosted)].join('|')).digest('hex').slice(0, 16)}`;
+    const externalId = (typeof ident === 'object' ? str(obj(ident).value) : str(ident)) ?? ownUrl ?? fallbackId;
     out.push({ ...base('careers_jsonld', externalId, title), url, city, state: str(addr.addressRegion), country, location: [city, country].filter(Boolean).join(', ') || null, department: str(n.occupationalCategory) ?? str(n.industry), postedAt: date(n.datePosted) });
   }
   return out;

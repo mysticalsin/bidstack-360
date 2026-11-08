@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 
 import { loadCompanyIntel, prisma, type Prisma } from '@bidstack/db';
-import { composeAccountIntel, type IntelSourceKey } from '@bidstack/shared';
+import { composeAccountIntel, unitsToMicros, type IntelSourceKey, type InvestmentThemeItem } from '@bidstack/shared';
 
 import { completeChat, resolveLlmFromEnv, type ResolvedLlm } from '../llm-provider.js';
 import { resolveOrgLlm } from '../org-llm.js';
@@ -29,6 +29,13 @@ const PRUNABLE_POSTING_SOURCES = ['greenhouse', 'lever', 'ashby', 'workable', 's
 const keyOf = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 24);
 
 const IDENTIFIER_FIELDS: Array<keyof IntelIdentifiers> = ['lei', 'secCik', 'companiesHouseNumber', 'brregOrgNumber', 'frSiren', 'careersUrl', 'atsProvider', 'atsBoard', 'newsroomUrl', 'irFeedUrl'];
+
+/** A plan line's amount as stored: money in micros, headcount as a count. */
+export function themeAmount(t: Pick<InvestmentThemeItem, 'area' | 'amount' | 'currency'>): { amountMicros: bigint | null; headcount: number | null } {
+  if (t.amount == null || !Number.isFinite(t.amount)) return { amountMicros: null, headcount: null };
+  if (t.area === 'headcount' || t.currency == null) return { amountMicros: null, headcount: t.area === 'headcount' ? Math.round(t.amount) : null };
+  return { amountMicros: unitsToMicros(t.amount), headcount: null };
+}
 
 async function saveEvidenceRows(s: IntelSubject, rows: EvidenceRow[]): Promise<string[]> {
   const ids: string[] = [];
@@ -151,7 +158,7 @@ export function prismaIntelStore(): IntelStore {
         area: t.area,
         theme: t.theme,
         label: t.label,
-        amount: t.amount,
+        ...themeAmount(t),
         currency: t.currency,
         trendPct: t.trendPct,
         basis: t.basis,

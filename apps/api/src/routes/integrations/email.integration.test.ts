@@ -151,6 +151,28 @@ describe('GET /email/threads/:threadId', () => {
     expect(body.messages[0]?.bodyHtml).toBe('<p>Hello</p>');
   });
 
+  it('keeps the oldest outbound message when the thread is over the 200 cap', async () => {
+    const base = { orgId, userId, integrationTokenId: randomUUID(), provider: EmailProvider.GMAIL, threadId: 'long-thread', toEmails: [], fromEmail: 'buyer@acme.test', bodyHtml: null };
+    await prisma.emailMessage.create({
+      data: { ...base, externalMessageId: `ext-${randomUUID()}`, fromEmail: 'tony@example.test', subject: 'Opening note', sentAt: new Date('2026-10-01T09:00:00Z'), isOutbound: true },
+    });
+    await prisma.emailMessage.createMany({
+      data: Array.from({ length: 200 }, (_, i) => ({
+        ...base,
+        externalMessageId: `ext-${randomUUID()}`,
+        subject: `Reply ${i}`,
+        receivedAt: new Date(Date.parse('2026-10-02T00:00:00Z') + i * 60_000),
+        isOutbound: false,
+      })),
+    });
+    const res = await server.inject({ method: 'GET', url: '/api/v1/email/threads/long-thread' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ messages: Array<{ subject: string }> }>();
+    expect(body.messages).toHaveLength(200);
+    expect(body.messages[0]?.subject).toBe('Opening note');
+    expect(body.messages.at(-1)?.subject).toBe('Reply 198');
+  });
+
   it('returns 404 for a colleague\'s unfiled thread', async () => {
     await seedMessage({ user: colleagueId, thread: 'colleague-thread' });
     const res = await server.inject({ method: 'GET', url: '/api/v1/email/threads/colleague-thread' });

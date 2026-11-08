@@ -21,6 +21,7 @@ import { CHILE_LICENCES, CHILECOMPRA_ATTRIBUTION } from '../attribution.js';
 import { computeConfidenceBps, SOURCE_TIER } from '../confidence.js';
 import { decodeLatin1, iterateCsvRecords, normalizeCsvHeader, parseCsvText } from '../csv.js';
 import { PsSourceError } from '../errors.js';
+import { BULK_MAX_RESPONSE_BYTES } from '../fetch-guard.js';
 import { sha256Hex } from '../hash.js';
 import { assertBulkWindow } from '../quota.js';
 import { createReviewFlag } from '../review-flags.js';
@@ -84,7 +85,7 @@ export function planBulkMonth(opts: { year: number; month: number; now?: Date })
  */
 export async function fetchBulkUnit(unit: PsFetchUnit, ctx: PsFetchContext): Promise<PsRawPage> {
   assertBulkWindow(ctx.now?.() ?? new Date());
-  return fetchChileRawPage(unit, ctx);
+  return fetchChileRawPage(unit, ctx, { binary: true, maxBytes: BULK_MAX_RESPONSE_BYTES });
 }
 
 /** Columns the loaders cannot work without. A missing one means the export format drifted. */
