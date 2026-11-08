@@ -223,13 +223,13 @@ export {
   serializeIngestItem,
   stageAgreementIngest,
 } from './agreements/stage.js';
+export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
+export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
 export type {
   IngestActor as AgreementIngestActor,
   StageAgreementInput,
   StageAgreementResult,
 } from './agreements/stage.js';
-export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
-export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';
 export {
