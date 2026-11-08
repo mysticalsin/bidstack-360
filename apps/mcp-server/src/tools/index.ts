@@ -113,6 +113,8 @@ export const tools = {
   // MSA whitespace and who works with them (slice 13b).
   msa_whitespace: agentTools.msa_whitespace,
   relationship_map: agentTools.relationship_map,
+  // Open data technology stack (slice 16).
+  company_tech_stack: agentTools.company_tech_stack,
   // Agreement pull (slice 13a): stages a document for MSA intake review.
   agreements_ingest: agreementsIngest,
   // Account activity (Dust, CRMs): additive, defined in activity-tools.ts
@@ -175,6 +177,7 @@ export const toolScopes = {
   account_news: 'read',
   msa_whitespace: 'read',
   relationship_map: 'read',
+  company_tech_stack: 'read',
   agreements_ingest: 'write',
   ...activityToolScopes,
   consulting_partners: 'read',

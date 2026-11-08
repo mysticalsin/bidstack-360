@@ -200,6 +200,16 @@ export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+
+// Open data technology stack refresh (slice 16), shared by the API and worker.
+export {
+  apolloOrgEnrichmentConfigured,
+  loadOpenTechCoverage,
+  normalizeEnrichmentName,
+  openTechNetworkEnabled,
+  refreshCompanyOpenTechStack,
+} from './open-tech-refresh.js';
+export type { ApolloFallbackDecision, OpenTechApolloJob, OpenTechRefreshResult } from './open-tech-refresh.js';
 // Inbound activity API + account activity aggregates. One service behind the
 // REST route (apps/api) and the MCP tools (apps/mcp-server).
 export {
