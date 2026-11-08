@@ -69,6 +69,8 @@ export function lastRunText(s: AgreementSource): string {
 export interface MoneyTotal {
   currency: string;
   valueMicros: number;
+  /** Present when the currency was not recorded. Those amounts are not added together. */
+  unknownCount?: number;
 }
 
 export interface WhoRow {
@@ -86,7 +88,14 @@ const WORK_KINDS = new Set(['msa', 'opportunity', 'project', 'revenue']);
 export function addToTotals(totals: MoneyTotal[], valueMicros: number | null | undefined, currency: string | null | undefined): void {
   if (valueMicros == null || valueMicros === 0) return;
   // A missing currency is not zero and is not a guessed code.
-  const code = currency?.trim() ? currency.toUpperCase() : 'unspecified';
+  const recorded = currency?.trim() ?? '';
+  if (!recorded) {
+    const existing = totals.find((x) => x.currency === 'unspecified');
+    if (existing) existing.unknownCount = (existing.unknownCount ?? 1) + 1;
+    else totals.push({ currency: 'unspecified', valueMicros: 0, unknownCount: 1 });
+    return;
+  }
+  const code = recorded.toUpperCase();
   const t = totals.find((x) => x.currency === code);
   if (t) t.valueMicros += valueMicros;
   else totals.push({ currency: code, valueMicros });

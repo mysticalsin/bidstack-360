@@ -10,9 +10,10 @@ import type { WhitespaceFlag } from '@bidstack/shared';
 
 let filterWhitespace: typeof import('./msa-whitespace.js').filterWhitespace;
 let whitespaceFacets: typeof import('./msa-whitespace.js').whitespaceFacets;
+let whitespaceFlagLines: typeof import('./msa-whitespace.js').whitespaceFlagLines;
 
 beforeAll(async () => {
-  ({ filterWhitespace, whitespaceFacets } = await import('./msa-whitespace.js'));
+  ({ filterWhitespace, whitespaceFacets, whitespaceFlagLines } = await import('./msa-whitespace.js'));
 });
 
 const id = '00000000-0000-4000-8000-000000000001';
@@ -74,10 +75,17 @@ describe('whitespace line filters', () => {
     expect(matched).toHaveLength(1);
     const byLine = new Map<string, number>();
     for (const row of matched) {
-      for (const line of [...row.lines, ...row.decisions.map((decision) => decision.line)]) {
-        byLine.set(line, (byLine.get(line) ?? 0) + 1);
-      }
+      for (const line of whitespaceFlagLines(row, 'all')) byLine.set(line, (byLine.get(line) ?? 0) + 1);
     }
     expect(byLine.get('cloud')).toBe(1);
+    expect(filterWhitespace(rows, { line: 'cloud', state: 'new', limit: 10 })).toHaveLength(0);
+    const fresh = filterWhitespace(rows, { line: 'data', state: 'new', limit: 10 });
+    expect(fresh).toHaveLength(1);
+    const counted = new Map<string, number>();
+    for (const row of fresh) {
+      for (const line of whitespaceFlagLines(row, 'new')) counted.set(line, (counted.get(line) ?? 0) + 1);
+    }
+    expect(counted.get('cloud')).toBeUndefined();
+    expect(counted.get('data')).toBe(1);
   });
 });

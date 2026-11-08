@@ -60,9 +60,20 @@ async function nextDecidedAt(tx: Prisma.TransactionClient, orgId: string, contra
   return later(latest?.decidedAt);
 }
 
-/** Lines a person can filter, including a decision whose line is not on `lines`. */
-export function whitespaceFlagLines(flag: WhitespaceFlagT): string[] {
-  return [...new Set([...flag.lines, ...flag.decisions.map((decision) => decision.line)])];
+/** Lines a person can filter. A decision counts only in its own state. */
+export function whitespaceFlagLines(
+  flag: WhitespaceFlagT,
+  state: 'all' | 'new' | 'accepted' | 'dismissed' = 'all',
+): string[] {
+  if (state === 'all') {
+    return [...new Set([...flag.lines, ...flag.decisions.map((decision) => decision.line)])];
+  }
+  const here = flag.decisions.filter((decision) => decision.state === state).map((decision) => decision.line);
+  if (flag.state !== state) return [...new Set(here)];
+  const elsewhere = new Set(
+    flag.decisions.filter((decision) => decision.state !== state).map((decision) => decision.line),
+  );
+  return [...new Set([...flag.lines.filter((line) => !elsewhere.has(line)), ...here])];
 }
 
 export function whitespaceFacets(flags: WhitespaceFlagT[]): WhitespaceFacetsT {
@@ -74,7 +85,7 @@ export function whitespaceFacets(flags: WhitespaceFlagT[]): WhitespaceFacetsT {
     entities.set(f.signingEntity.id, f.signingEntity.name);
     if (f.owner) owners.set(f.owner.id, f.owner.name);
     f.countries.forEach((c) => countries.add(c));
-    whitespaceFlagLines(f).forEach((l) => lines.add(l));
+    whitespaceFlagLines(f, 'all').forEach((l) => lines.add(l));
   }
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
   return {
@@ -89,7 +100,7 @@ export function filterWhitespace(flags: WhitespaceFlagT[], q: z.infer<typeof Whi
   return flags.filter(
     (f) =>
       (q.state === 'all' || f.state === q.state) &&
-      (!q.line || whitespaceFlagLines(f).includes(q.line)) &&
+      (!q.line || whitespaceFlagLines(f, q.state).includes(q.line)) &&
       (!q.signingEntityId || f.signingEntity.id === q.signingEntityId) &&
       (!q.country || f.global || f.countries.includes(q.country)) &&
       (!q.ownerId || f.owner?.id === q.ownerId) &&
@@ -126,7 +137,7 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
       const filtered = filterWhitespace(all, req.query);
       const byLine = new Map<string, { count: number; topScore: number }>();
       for (const f of filtered) {
-        for (const line of whitespaceFlagLines(f)) {
+        for (const line of whitespaceFlagLines(f, req.query.state)) {
           const row = byLine.get(line) ?? { count: 0, topScore: 0 };
           row.count += 1;
           row.topScore = Math.max(row.topScore, f.score);
