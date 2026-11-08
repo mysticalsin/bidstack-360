@@ -72,12 +72,22 @@ function bool(v: unknown, fallback: boolean): boolean {
 /** Read the stored JSON defensively; anything missing or malformed falls back to defaults. */
 export function resolveChannelGroups(raw: unknown): NotificationChannelGroups {
   const src = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const groups = (src.groups && typeof src.groups === 'object' ? src.groups : {}) as Record<string, unknown>;
+  const groups = (src.groups && typeof src.groups === 'object' ? src.groups : {}) as Record<
+    string,
+    unknown
+  >;
   const out = {} as NotificationChannelGroups;
   for (const key of Object.keys(DEFAULT_CHANNEL_PREFS.groups) as NotificationKindGroup[]) {
-    const g = (groups[key] && typeof groups[key] === 'object' ? groups[key] : {}) as Record<string, unknown>;
+    const g = (groups[key] && typeof groups[key] === 'object' ? groups[key] : {}) as Record<
+      string,
+      unknown
+    >;
     const d = DEFAULT_CHANNEL_PREFS.groups[key];
-    out[key] = { in_app: bool(g.in_app, d.in_app), email: bool(g.email, d.email), teams: bool(g.teams, d.teams) };
+    out[key] = {
+      in_app: bool(g.in_app, d.in_app),
+      email: bool(g.email, d.email),
+      teams: bool(g.teams, d.teams),
+    };
   }
   return out;
 }
@@ -112,7 +122,11 @@ export function computeAccountAudience(input: AudienceInput): string[] {
 }
 
 /** True when an earlier unread alert on the same account is still inside the window. */
-export function shouldCoalesce(lastEventAt: Date | null, now: Date, windowMs = ACCOUNT_ALERT_COALESCE_MS): boolean {
+export function shouldCoalesce(
+  lastEventAt: Date | null,
+  now: Date,
+  windowMs = ACCOUNT_ALERT_COALESCE_MS,
+): boolean {
   if (!lastEventAt) return false;
   const age = now.getTime() - lastEventAt.getTime();
   return age >= 0 && age <= windowMs;
@@ -169,7 +183,9 @@ export function buildTeamsAdaptiveCard(input: TeamsCardInput): Record<string, un
     { type: 'TextBlock', text: input.title, weight: 'Bolder', size: 'Medium', wrap: true },
   ];
   if (input.body) body.push({ type: 'TextBlock', text: input.body, wrap: true, isSubtle: true });
-  const actions = input.url ? [{ type: 'Action.OpenUrl', title: 'Open in Polo', url: input.url }] : [];
+  const actions = input.url
+    ? [{ type: 'Action.OpenUrl', title: 'Open in Polo', url: input.url }]
+    : [];
   return {
     type: 'message',
     attachments: [
@@ -188,7 +204,8 @@ export function buildTeamsAdaptiveCard(input: TeamsCardInput): Record<string, un
   };
 }
 
-export type TeamsPostResult = { ok: true; status: number } | { ok: false; status: number | null; reason: string };
+export type TeamsPostResult =
+  { ok: true; status: number } | { ok: false; status: number | null; reason: string };
 
 /** Post a card. Redirects are refused so a valid host cannot bounce the request elsewhere. */
 export async function postTeamsCard(
@@ -197,7 +214,8 @@ export async function postTeamsCard(
   fetchImpl: typeof fetch = fetch,
   timeoutMs = 10_000,
 ): Promise<TeamsPostResult> {
-  if (!isAllowedTeamsWebhookUrl(webhookUrl)) return { ok: false, status: null, reason: 'invalid_webhook_url' };
+  if (!isAllowedTeamsWebhookUrl(webhookUrl))
+    return { ok: false, status: null, reason: 'invalid_webhook_url' };
   try {
     const res = await fetchImpl(webhookUrl, {
       method: 'POST',

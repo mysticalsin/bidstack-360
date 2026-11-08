@@ -36,7 +36,11 @@ function todayUtc(): Date {
 
 /** Active memberships only: no end date, or an end date today or later. */
 function activeWhere(orgId: string): Prisma.AccountTeamMemberWhereInput {
-  return { orgId, OR: [{ endDate: null }, { endDate: { gte: todayUtc() } }], company: { deletedAt: null } };
+  return {
+    orgId,
+    OR: [{ endDate: null }, { endDate: { gte: todayUtc() } }],
+    company: { deletedAt: null },
+  };
 }
 
 async function totalsFor(orgId: string, userIds: string[]): Promise<Map<string, number>> {
@@ -49,9 +53,14 @@ async function totalsFor(orgId: string, userIds: string[]): Promise<Map<string, 
   return new Map(rows.map((r) => [r.userId, r._sum.allocationPct ?? 0]));
 }
 
-type MemberRow = Prisma.AccountTeamMemberGetPayload<{ include: { user: { select: { name: true; email: true } } } }>;
+type MemberRow = Prisma.AccountTeamMemberGetPayload<{
+  include: { user: { select: { name: true; email: true } } };
+}>;
 
-function serializeMember(m: MemberRow, totals: Map<string, number>): z.infer<typeof AccountTeamMember> {
+function serializeMember(
+  m: MemberRow,
+  totals: Map<string, number>,
+): z.infer<typeof AccountTeamMember> {
   return {
     id: m.id,
     companyId: m.companyId,
@@ -78,7 +87,12 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
     return company;
   }
 
-  async function audit(req: { auth: { orgId: string; userId: string } }, action: string, companyId: string, diff: Record<string, unknown>) {
+  async function audit(
+    req: { auth: { orgId: string; userId: string } },
+    action: string,
+    companyId: string,
+    diff: Record<string, unknown>,
+  ) {
     await prisma.auditLog.create({
       data: {
         orgId: req.auth.orgId,
@@ -93,7 +107,10 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/companies/:id/team',
-    { config: { permission: 'companies:read' }, schema: { params: IdParam, response: { 200: AccountTeam } } },
+    {
+      config: { permission: 'companies:read' },
+      schema: { params: IdParam, response: { 200: AccountTeam } },
+    },
     async (req) => {
       const company = await visibleCompany(req.auth.orgId, req.auth.userId, req.params.id);
       const [members, owner] = await Promise.all([
@@ -110,7 +127,10 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
             })
           : Promise.resolve(null),
       ]);
-      const totals = await totalsFor(req.auth.orgId, members.map((m) => m.userId));
+      const totals = await totalsFor(
+        req.auth.orgId,
+        members.map((m) => m.userId),
+      );
       return {
         keyAccountOwner: owner ? { userId: owner.id, name: owner.name, email: owner.email } : null,
         members: members.map((m) => serializeMember(m, totals)),
@@ -122,7 +142,11 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
     '/companies/:id/team',
     {
       preHandler: [server.requirePermission('companies:write')],
-      schema: { params: IdParam, body: AccountTeamMemberCreate, response: { 201: AccountTeamMember } },
+      schema: {
+        params: IdParam,
+        body: AccountTeamMemberCreate,
+        response: { 201: AccountTeamMember },
+      },
     },
     async (req, reply) => {
       const company = await visibleCompany(req.auth.orgId, req.auth.userId, req.params.id);
@@ -165,7 +189,11 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
     '/companies/:id/team/:memberId',
     {
       preHandler: [server.requirePermission('companies:write')],
-      schema: { params: MemberParam, body: AccountTeamMemberPatch, response: { 200: AccountTeamMember } },
+      schema: {
+        params: MemberParam,
+        body: AccountTeamMemberPatch,
+        response: { 200: AccountTeamMember },
+      },
     },
     async (req) => {
       const company = await visibleCompany(req.auth.orgId, req.auth.userId, req.params.id);
@@ -220,7 +248,9 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, userId: true, role: true, allocationPct: true },
       });
       if (!existing) throw server.httpErrors.notFound('Team member not found');
-      await prisma.accountTeamMember.deleteMany({ where: { id: existing.id, orgId: req.auth.orgId } });
+      await prisma.accountTeamMember.deleteMany({
+        where: { id: existing.id, orgId: req.auth.orgId },
+      });
       await audit(req, 'account_team.remove', company.id, {
         memberId: existing.id,
         userId: existing.userId,
@@ -235,7 +265,10 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
     '/companies/allocations/:userId',
     {
       config: { permission: 'companies:read' },
-      schema: { params: z.object({ userId: z.string().uuid() }), response: { 200: UserAllocation } },
+      schema: {
+        params: z.object({ userId: z.string().uuid() }),
+        response: { 200: UserAllocation },
+      },
     },
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
@@ -264,11 +297,24 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
-  async function followState(orgId: string, userId: string, company: { id: string; keyAccountOwnerId: string | null }) {
+  async function followState(
+    orgId: string,
+    userId: string,
+    company: { id: string; keyAccountOwnerId: string | null },
+  ) {
     const [follow, member, ownsOpp] = await Promise.all([
-      prisma.accountFollow.findFirst({ where: { orgId, companyId: company.id, userId }, select: { muted: true } }),
-      prisma.accountTeamMember.findFirst({ where: { ...activeWhere(orgId), companyId: company.id, userId }, select: { id: true } }),
-      prisma.opportunity.findFirst({ where: { orgId, companyId: company.id, ownerId: userId, deletedAt: null }, select: { id: true } }),
+      prisma.accountFollow.findFirst({
+        where: { orgId, companyId: company.id, userId },
+        select: { muted: true },
+      }),
+      prisma.accountTeamMember.findFirst({
+        where: { ...activeWhere(orgId), companyId: company.id, userId },
+        select: { id: true },
+      }),
+      prisma.opportunity.findFirst({
+        where: { orgId, companyId: company.id, ownerId: userId, deletedAt: null },
+        select: { id: true },
+      }),
     ]);
     const reasons: AccountFollowReason[] = [];
     if (member) reasons.push('team');
@@ -281,7 +327,10 @@ export const accountTeamRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/companies/:id/follow',
-    { config: { permission: 'companies:read' }, schema: { params: IdParam, response: { 200: AccountFollowState } } },
+    {
+      config: { permission: 'companies:read' },
+      schema: { params: IdParam, response: { 200: AccountFollowState } },
+    },
     async (req) => {
       const company = await visibleCompany(req.auth.orgId, req.auth.userId, req.params.id);
       return followState(req.auth.orgId, req.auth.userId, company);

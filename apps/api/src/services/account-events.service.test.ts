@@ -53,7 +53,12 @@ const base = {
   title: (company: string) => `New meeting on ${company}`,
 };
 
-function setup(opts: { follows?: Array<{ userId: string; muted: boolean }>; prefs?: Array<Record<string, unknown>> } = {}) {
+function setup(
+  opts: {
+    follows?: Array<{ userId: string; muted: boolean }>;
+    prefs?: Array<Record<string, unknown>>;
+  } = {},
+) {
   m.companyFindFirst.mockResolvedValue({ id: 'c1', name: 'Pfizer', keyAccountOwnerId: 'kam' });
   m.teamFindMany.mockResolvedValue([{ userId: 'team1' }, { userId: 'actor' }]);
   m.oppFindMany.mockResolvedValue([{ ownerId: 'owner1' }, { ownerId: null }]);
@@ -65,7 +70,10 @@ function setup(opts: { follows?: Array<{ userId: string; muted: boolean }>; pref
   m.prefFindMany.mockResolvedValue(opts.prefs ?? []);
   m.notifFindFirst.mockResolvedValue(null);
   m.notifCount.mockResolvedValue(0);
-  m.notifCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: `n-${data.userId}`, ...data }));
+  m.notifCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+    id: `n-${data.userId}`,
+    ...data,
+  }));
   m.notifUpdateMany.mockResolvedValue({ count: 1 });
 }
 
@@ -86,11 +94,20 @@ describe('emitAccountEvent', () => {
     expect(row.title).toBe('New meeting on Pfizer');
     expect(row.body).toBe('Ana Actor: New meeting on Pfizer');
     expect(row.type).toBe('account_activity');
-    expect(m.publish).toHaveBeenCalledWith('notification:user:kam', 'notification', expect.objectContaining({ title: 'New meeting on Pfizer' }));
+    expect(m.publish).toHaveBeenCalledWith(
+      'notification:user:kam',
+      'notification',
+      expect.objectContaining({ title: 'New meeting on Pfizer' }),
+    );
   });
 
   it('a muted follower gets nothing; an explicit follower gets the alert', async () => {
-    setup({ follows: [{ userId: 'kam', muted: true }, { userId: 'fan', muted: false }] });
+    setup({
+      follows: [
+        { userId: 'kam', muted: true },
+        { userId: 'fan', muted: false },
+      ],
+    });
     await emitAccountEvent(base, NOW);
     const recipients = m.notifCreate.mock.calls.map((c) => c[0].data.userId).sort();
     expect(recipients).toEqual(['fan', 'owner1', 'team1']);
@@ -98,7 +115,11 @@ describe('emitAccountEvent', () => {
 
   it('coalesces a repeat on the same account within 10 minutes into one counted row', async () => {
     setup();
-    m.notifFindFirst.mockResolvedValue({ id: 'existing', eventCount: 2, lastEventAt: new Date('2026-11-07T11:55:00Z') });
+    m.notifFindFirst.mockResolvedValue({
+      id: 'existing',
+      eventCount: 2,
+      lastEventAt: new Date('2026-11-07T11:55:00Z'),
+    });
     const res = await emitAccountEvent(base, NOW);
     expect(m.notifCreate).not.toHaveBeenCalled();
     expect(res.coalesced).toBe(3);
@@ -112,7 +133,9 @@ describe('emitAccountEvent', () => {
       prefs: [
         {
           userId: 'kam',
-          channelPrefs: { groups: { account_activity: { in_app: false, email: true, teams: true } } },
+          channelPrefs: {
+            groups: { account_activity: { in_app: false, email: true, teams: true } },
+          },
           teamsWebhookEnc: 'enc',
         },
       ],
@@ -126,14 +149,35 @@ describe('emitAccountEvent', () => {
   });
 
   it('Teams is not queued without a saved webhook', async () => {
-    setup({ prefs: [{ userId: 'kam', channelPrefs: { groups: { account_activity: { in_app: true, email: false, teams: true } } }, teamsWebhookEnc: null }] });
+    setup({
+      prefs: [
+        {
+          userId: 'kam',
+          channelPrefs: {
+            groups: { account_activity: { in_app: true, email: false, teams: true } },
+          },
+          teamsWebhookEnc: null,
+        },
+      ],
+    });
     await emitAccountEvent(base, NOW);
     expect(m.enqueue).not.toHaveBeenCalled();
   });
 
   it('deal events follow the deals group, not account activity', async () => {
-    setup({ prefs: [{ userId: 'kam', channelPrefs: { groups: { deals: { in_app: false, email: false, teams: false } } }, teamsWebhookEnc: null }] });
-    await emitAccountEvent({ ...base, kind: 'opportunity_stage_changed', title: 'Stage moved to Proposal on Pfizer' }, NOW);
+    setup({
+      prefs: [
+        {
+          userId: 'kam',
+          channelPrefs: { groups: { deals: { in_app: false, email: false, teams: false } } },
+          teamsWebhookEnc: null,
+        },
+      ],
+    });
+    await emitAccountEvent(
+      { ...base, kind: 'opportunity_stage_changed', title: 'Stage moved to Proposal on Pfizer' },
+      NOW,
+    );
     expect(m.notifCreate.mock.calls.map((c) => c[0].data.userId)).not.toContain('kam');
   });
 
@@ -154,6 +198,29 @@ describe('emitAccountEvent', () => {
   it('does nothing for a company outside the org', async () => {
     setup();
     m.companyFindFirst.mockResolvedValue(null);
-    expect(await emitAccountEvent(base, NOW)).toEqual({ recipients: 0, created: 0, coalesced: 0, skipped: 0 });
+    expect(await emitAccountEvent(base, NOW)).toEqual({
+      recipients: 0,
+      created: 0,
+      coalesced: 0,
+      skipped: 0,
+    });
+  });
+
+  it('bounds every findMany so the request query guard never rejects the caller', async () => {
+    setup();
+    await emitAccountEvent(base, NOW);
+    const calls = [
+      m.teamFindMany,
+      m.oppFindMany,
+      m.followFindMany,
+      m.userFindMany,
+      m.prefFindMany,
+    ].flatMap((fn) => fn.mock.calls);
+    expect(calls.length).toBe(5);
+    for (const [args] of calls) {
+      const take = (args as { take?: number }).take;
+      expect(take).toBeGreaterThan(0);
+      expect(take).toBeLessThanOrEqual(1000);
+    }
   });
 });

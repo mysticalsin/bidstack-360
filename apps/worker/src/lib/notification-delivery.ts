@@ -24,11 +24,23 @@ export interface DeliveryLog {
 }
 
 export interface DeliveryStore {
-  findUser(orgId: string, userId: string): Promise<{ email: string | null; name: string | null } | null>;
+  findUser(
+    orgId: string,
+    userId: string,
+  ): Promise<{ email: string | null; name: string | null } | null>;
   findTeamsWebhookEnc(orgId: string, userId: string): Promise<string | null>;
-  markSent(input: { orgId: string; notificationId: string; channel: 'email' | 'teams'; at: Date }): Promise<void>;
+  markSent(input: {
+    orgId: string;
+    notificationId: string;
+    channel: 'email' | 'teams';
+    at: Date;
+  }): Promise<void>;
   digestRecipients(limit: number): Promise<Array<{ orgId: string; userId: string }>>;
-  digestItems(orgId: string, userId: string, since: Date): Promise<Array<{ title: string; body: string | null; url: string | null }>>;
+  digestItems(
+    orgId: string,
+    userId: string,
+    since: Date,
+  ): Promise<Array<{ title: string; body: string | null; url: string | null }>>;
 }
 
 export interface DeliveryLimiter {
@@ -61,13 +73,19 @@ export type DeliveryOutcome =
 export class DeliveryRetryError extends Error {}
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 export async function sendPlatformEmail(
   deps: Pick<DeliveryDeps, 'env' | 'fetchImpl'>,
   msg: { to: string; subject: string; html: string; text: string },
-): Promise<{ ok: true } | { ok: false; reason: 'not_configured' | 'rejected' | 'retry'; status?: number }> {
+): Promise<
+  { ok: true } | { ok: false; reason: 'not_configured' | 'rejected' | 'retry'; status?: number }
+> {
   const apiKey = deps.env.RESEND_API_KEY;
   const from = deps.env.NOTIFICATION_FROM_EMAIL;
   if (!apiKey || !from) return { ok: false, reason: 'not_configured' };
@@ -76,24 +94,40 @@ export async function sendPlatformEmail(
     res = await deps.fetchImpl(RESEND_ENDPOINT, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [msg.to], subject: msg.subject, html: msg.html, text: msg.text }),
+      body: JSON.stringify({
+        from,
+        to: [msg.to],
+        subject: msg.subject,
+        html: msg.html,
+        text: msg.text,
+      }),
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
     return { ok: false, reason: 'retry' };
   }
   if (res.ok) return { ok: true };
-  return { ok: false, reason: res.status >= 500 || res.status === 429 ? 'retry' : 'rejected', status: res.status };
+  return {
+    ok: false,
+    reason: res.status >= 500 || res.status === 429 ? 'retry' : 'rejected',
+    status: res.status,
+  };
 }
 
 function alertEmail(title: string, body: string | null, link: string | null) {
   const html = [
     `<p style="font:600 16px system-ui,sans-serif;margin:0 0 8px">${escapeHtml(title)}</p>`,
-    body ? `<p style="font:14px system-ui,sans-serif;color:#444;margin:0 0 16px">${escapeHtml(body)}</p>` : '',
-    link ? `<p><a href="${escapeHtml(link)}" style="font:600 14px system-ui,sans-serif">Open in Polo</a></p>` : '',
+    body
+      ? `<p style="font:14px system-ui,sans-serif;color:#444;margin:0 0 16px">${escapeHtml(body)}</p>`
+      : '',
+    link
+      ? `<p><a href="${escapeHtml(link)}" style="font:600 14px system-ui,sans-serif">Open in Polo</a></p>`
+      : '',
     '<p style="font:12px system-ui,sans-serif;color:#888">You get this because you follow this account in Polo. Change it in Settings, Notifications.</p>',
   ].join('');
-  const text = [title, body ?? '', link ? `Open in Polo: ${link}` : ''].filter(Boolean).join('\n\n');
+  const text = [title, body ?? '', link ? `Open in Polo: ${link}` : '']
+    .filter(Boolean)
+    .join('\n\n');
   return { html, text };
 }
 
@@ -118,9 +152,15 @@ export async function deliverOne(
     );
     if (!fresh) return 'coalesced';
   }
-  const sentThisHour = await deps.limiter.incr(`notif:rl:${job.channel}:${job.userId}:${hourBucket(now)}`, 3600);
+  const sentThisHour = await deps.limiter.incr(
+    `notif:rl:${job.channel}:${job.userId}:${hourBucket(now)}`,
+    3600,
+  );
   if (sentThisHour > ACCOUNT_ALERT_EXTERNAL_HOURLY_LIMIT) {
-    deps.log.info({ userId: job.userId, channel: job.channel }, 'notification delivery rate limit reached');
+    deps.log.info(
+      { userId: job.userId, channel: job.channel },
+      'notification delivery rate limit reached',
+    );
     return 'rate_limited';
   }
 
@@ -150,9 +190,16 @@ export async function deliverOne(
       deps.log.warn({ userId: job.userId }, 'teams webhook could not be decrypted');
       return 'no_webhook';
     }
-    const res = await postTeamsCard(url, buildTeamsAdaptiveCard({ title: job.title, body: job.body, url: link }), deps.fetchImpl);
+    const res = await postTeamsCard(
+      url,
+      buildTeamsAdaptiveCard({ title: job.title, body: job.body, url: link }),
+      deps.fetchImpl,
+    );
     if (!res.ok) {
-      if (res.reason === 'network_error' || (res.status !== null && (res.status >= 500 || res.status === 429))) {
+      if (
+        res.reason === 'network_error' ||
+        (res.status !== null && (res.status >= 500 || res.status === 429))
+      ) {
         throw new DeliveryRetryError('teams webhook unavailable');
       }
       deps.log.warn({ userId: job.userId, status: res.status }, 'teams alert rejected');
@@ -161,13 +208,20 @@ export async function deliverOne(
   }
 
   if (job.notificationId) {
-    await deps.store.markSent({ orgId: job.orgId, notificationId: job.notificationId, channel: job.channel, at: now });
+    await deps.store.markSent({
+      orgId: job.orgId,
+      notificationId: job.notificationId,
+      channel: job.channel,
+      at: now,
+    });
   }
   return 'sent';
 }
 
 /** One email per opted-in user summarising the last day of account alerts. */
-export async function sendDailyDigest(deps: DeliveryDeps): Promise<{ sent: number; skipped: number }> {
+export async function sendDailyDigest(
+  deps: DeliveryDeps,
+): Promise<{ sent: number; skipped: number }> {
   const now = deps.now();
   const since = new Date(now.getTime() - 24 * 60 * 60_000);
   const baseUrl = deps.env.PUBLIC_BASE_URL ?? 'http://localhost:5173';
@@ -193,7 +247,9 @@ export async function sendDailyDigest(deps: DeliveryDeps): Promise<{ sent: numbe
       })
       .join('');
     const html = `<p style="font:600 16px system-ui,sans-serif">${escapeHtml(subject)}</p><ul style="font:14px system-ui,sans-serif;padding-left:18px">${list}</ul><p style="font:12px system-ui,sans-serif;color:#888">Turn the digest off in Settings, Notifications.</p>`;
-    const text = [subject, ...items.map((i) => `- ${i.title}${i.body ? ` (${i.body})` : ''}`)].join('\n');
+    const text = [subject, ...items.map((i) => `- ${i.title}${i.body ? ` (${i.body})` : ''}`)].join(
+      '\n',
+    );
     const res = await sendPlatformEmail(deps, { to: user.email, subject, html, text });
     if (res.ok) sent++;
     else skipped++;

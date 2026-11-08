@@ -22,10 +22,16 @@ const DAY_MS = 24 * 60 * 60_000;
 
 export const prismaDeliveryStore: DeliveryStore = {
   async findUser(orgId, userId) {
-    return prisma.user.findFirst({ where: { id: userId, orgId, deletedAt: null }, select: { email: true, name: true } });
+    return prisma.user.findFirst({
+      where: { id: userId, orgId, deletedAt: null },
+      select: { email: true, name: true },
+    });
   },
   async findTeamsWebhookEnc(orgId, userId) {
-    const row = await prisma.notificationPref.findFirst({ where: { orgId, userId }, select: { teamsWebhookEnc: true } });
+    const row = await prisma.notificationPref.findFirst({
+      where: { orgId, userId },
+      select: { teamsWebhookEnc: true },
+    });
     return row?.teamsWebhookEnc ?? null;
   },
   async markSent({ orgId, notificationId, channel, at }) {
@@ -76,7 +82,10 @@ export async function startNotificationDelivery(
   queues: Queue[],
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
-  const queue = new Queue(NOTIFICATION_DELIVERY.name, { connection, defaultJobOptions: NOTIFICATION_DELIVERY.defaultJobOptions });
+  const queue = new Queue(NOTIFICATION_DELIVERY.name, {
+    connection,
+    defaultJobOptions: NOTIFICATION_DELIVERY.defaultJobOptions,
+  });
   queues.push(queue);
   const deps: DeliveryDeps = {
     store: prismaDeliveryStore,
@@ -93,7 +102,10 @@ export async function startNotificationDelivery(
     async (job: Job<NotificationDeliveryJob>) => {
       if (job.data.kind === 'digest') return sendDailyDigest(deps);
       const outcome = await deliverOne(job.data, deps, String(job.id));
-      log.info({ jobId: job.id, channel: job.data.channel, outcome }, 'notification delivery finished');
+      log.info(
+        { jobId: job.id, channel: job.data.channel, outcome },
+        'notification delivery finished',
+      );
       return outcome;
     },
     { connection, concurrency: 4, limiter: { max: 30, duration: 1000 } },
@@ -103,6 +115,16 @@ export async function startNotificationDelivery(
   });
   workers.push(worker);
 
-  await queue.add('notification-delivery.digest', { kind: 'digest' }, { repeat: { every: DAY_MS }, jobId: 'notification-delivery-digest' });
-  log.info({ queue: NOTIFICATION_DELIVERY.name, emailConfigured: !!(env.RESEND_API_KEY && env.NOTIFICATION_FROM_EMAIL) }, 'notification delivery worker started');
+  await queue.add(
+    'notification-delivery.digest',
+    { kind: 'digest' },
+    { repeat: { every: DAY_MS }, jobId: 'notification-delivery-digest' },
+  );
+  log.info(
+    {
+      queue: NOTIFICATION_DELIVERY.name,
+      emailConfigured: !!(env.RESEND_API_KEY && env.NOTIFICATION_FROM_EMAIL),
+    },
+    'notification delivery worker started',
+  );
 }

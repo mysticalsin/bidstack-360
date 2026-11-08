@@ -100,7 +100,10 @@ async function canSeeCompany(orgId: string, userId: string, companyId: string): 
   return n > 0;
 }
 
-export async function emitAccountEvent(input: AccountEventInput, now = new Date()): Promise<AccountEventResult> {
+export async function emitAccountEvent(
+  input: AccountEventInput,
+  now = new Date(),
+): Promise<AccountEventResult> {
   const followers = await loadAccountFollowers(input.orgId, input.companyId, now);
   if (!followers) return EMPTY;
   const audience = computeAccountAudience({
@@ -116,13 +119,18 @@ export async function emitAccountEvent(input: AccountEventInput, now = new Date(
     prisma.user.findMany({
       where: { orgId: input.orgId, id: { in: audience }, deletedAt: null },
       select: { id: true },
+      take: audience.length,
     }),
     prisma.notificationPref.findMany({
       where: { orgId: input.orgId, userId: { in: audience } },
       select: { userId: true, channelPrefs: true, teamsWebhookEnc: true },
+      take: audience.length,
     }),
     input.actorUserId
-      ? prisma.user.findFirst({ where: { id: input.actorUserId, orgId: input.orgId }, select: { name: true, email: true } })
+      ? prisma.user.findFirst({
+          where: { id: input.actorUserId, orgId: input.orgId },
+          select: { name: true, email: true },
+        })
       : Promise.resolve(null),
   ]);
   const prefByUser = new Map(prefs.map((p) => [p.userId, p]));
@@ -130,9 +138,15 @@ export async function emitAccountEvent(input: AccountEventInput, now = new Date(
   const group = groupForAccountEvent(input.kind);
   const groupKey = accountGroupKey(input.companyId);
   const itemUrl = input.sourceUrl ?? companyPath(input.companyId);
-  const title = typeof input.title === 'function' ? input.title(followers.company.name) : input.title;
+  const title =
+    typeof input.title === 'function' ? input.title(followers.company.name) : input.title;
   const body = alertBody(actorName, title);
-  const result: AccountEventResult = { recipients: users.length, created: 0, coalesced: 0, skipped: 0 };
+  const result: AccountEventResult = {
+    recipients: users.length,
+    created: 0,
+    coalesced: 0,
+    skipped: 0,
+  };
 
   for (const { id: userId } of users) {
     try {
@@ -177,7 +191,10 @@ export async function emitAccountEvent(input: AccountEventInput, now = new Date(
       });
     } catch (err) {
       result.skipped++;
-      log.warn({ err, orgId: input.orgId, userId, kind: input.kind }, 'account alert for one user failed');
+      log.warn(
+        { err, orgId: input.orgId, userId, kind: input.kind },
+        'account alert for one user failed',
+      );
     }
   }
   return result;
@@ -249,7 +266,10 @@ async function writeInAppAlert(
     },
   });
   if (recent >= ACCOUNT_ALERT_IN_APP_HOURLY_LIMIT) {
-    log.info({ orgId: a.orgId, userId: a.userId }, 'account alert rate limit reached; in-app alert skipped');
+    log.info(
+      { orgId: a.orgId, userId: a.userId },
+      'account alert rate limit reached; in-app alert skipped',
+    );
     return { kind: 'skipped', id: null };
   }
 
@@ -283,7 +303,10 @@ async function writeInAppAlert(
 /** Fire and forget from a route: logs, never throws, never delays the response. */
 export function emitAccountEventSafe(input: AccountEventInput): void {
   void emitAccountEvent(input).catch((err) =>
-    log.warn({ err, orgId: input.orgId, companyId: input.companyId, kind: input.kind }, 'emitAccountEvent failed'),
+    log.warn(
+      { err, orgId: input.orgId, companyId: input.companyId, kind: input.kind },
+      'emitAccountEvent failed',
+    ),
   );
 }
 
@@ -333,13 +356,22 @@ export function emitActivitiesAccountEventsSafe(input: {
     const rows = await prisma.activity.findMany({
       where: { orgId: input.orgId, id: { in: input.activityIds.slice(0, 500) }, deletedAt: null },
       select: { id: true, type: true, entityType: true, entityId: true },
+      take: 500,
     });
     const alertable = rows.filter((r) => ALERTABLE_ACTIVITY_TYPES.has(r.type));
     if (alertable.length === 0) return;
     const ids = (t: string) => alertable.filter((r) => r.entityType === t).map((r) => r.entityId);
     const [opps, contacts] = await Promise.all([
-      prisma.opportunity.findMany({ where: { orgId: input.orgId, id: { in: ids('opportunity') } }, select: { id: true, companyId: true } }),
-      prisma.contact.findMany({ where: { orgId: input.orgId, id: { in: ids('contact') } }, select: { id: true, companyId: true } }),
+      prisma.opportunity.findMany({
+        where: { orgId: input.orgId, id: { in: ids('opportunity') } },
+        select: { id: true, companyId: true },
+        take: 500,
+      }),
+      prisma.contact.findMany({
+        where: { orgId: input.orgId, id: { in: ids('contact') } },
+        select: { id: true, companyId: true },
+        take: 500,
+      }),
     ]);
     const parent = new Map<string, string | null>([
       ...opps.map((o) => [o.id, o.companyId] as const),
@@ -361,7 +393,10 @@ export function emitActivitiesAccountEventsSafe(input: {
         actorUserId: input.actorUserId,
         entityType: 'activity',
         entityId: first.id,
-        title: (company) => (items.length > 1 ? `${items.length} new activities on ${company}` : `${label} on ${company}`),
+        title: (company) =>
+          items.length > 1
+            ? `${items.length} new activities on ${company}`
+            : `${label} on ${company}`,
         weight: items.length,
       });
     }
@@ -378,7 +413,12 @@ export function emitTaskAccountEventSafe(input: {
   void (async () => {
     const task = await prisma.task.findFirst({
       where: { id: input.taskId, orgId: input.orgId },
-      select: { title: true, accountId: true, oppId: true, opportunity: { select: { companyId: true } } },
+      select: {
+        title: true,
+        accountId: true,
+        oppId: true,
+        opportunity: { select: { companyId: true } },
+      },
     });
     const companyId = task?.accountId ?? task?.opportunity?.companyId ?? null;
     if (!task || !companyId) return;
@@ -394,12 +434,20 @@ export function emitTaskAccountEventSafe(input: {
       sourceUrl: `/tasks/${input.taskId}`,
     });
   })().catch((err) =>
-    log.warn({ err, orgId: input.orgId, taskId: input.taskId, kind: input.kind }, 'emitAccountEvent failed'),
+    log.warn(
+      { err, orgId: input.orgId, taskId: input.taskId, kind: input.kind },
+      'emitAccountEvent failed',
+    ),
   );
 }
 
-export function emitOpportunityAccountEventSafe(input: Parameters<typeof emitOpportunityAccountEvent>[0]): void {
+export function emitOpportunityAccountEventSafe(
+  input: Parameters<typeof emitOpportunityAccountEvent>[0],
+): void {
   void emitOpportunityAccountEvent(input).catch((err) =>
-    log.warn({ err, orgId: input.orgId, opportunityId: input.opportunityId, kind: input.kind }, 'emitAccountEvent failed'),
+    log.warn(
+      { err, orgId: input.orgId, opportunityId: input.opportunityId, kind: input.kind },
+      'emitAccountEvent failed',
+    ),
   );
 }

@@ -41,12 +41,16 @@ function getQueue(): Queue {
 /** Fail-open: a queue outage never blocks the write that raised the alert. */
 export async function enqueueNotificationDelivery(job: DeliverJob): Promise<string | null> {
   if (enqueueOverride) return enqueueOverride(job);
-  if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
+  if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true')
+    return null;
   try {
     const queued = await getQueue().add('notification-delivery.deliver', job);
     return queued.id ?? null;
   } catch (err) {
-    log.error({ err, orgId: job.orgId, userId: job.userId, channel: job.channel }, 'Failed to enqueue notification delivery');
+    log.error(
+      { err, orgId: job.orgId, userId: job.userId, channel: job.channel },
+      'Failed to enqueue notification delivery',
+    );
     return null;
   }
 }

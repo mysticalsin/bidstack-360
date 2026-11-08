@@ -7,7 +7,11 @@ import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
 import { __setTeamsPosterForTest } from './notifications.js';
-import { createIsolatedOrg, dropIsolatedOrg, useIsolatedOrgAuth } from '../test-support/isolated-org.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
@@ -32,7 +36,11 @@ beforeAll(async () => {
   const org = await createIsolatedOrg('account-team');
   orgId = org.orgId;
   restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
-  const users = await prisma.user.findMany({ where: { orgId }, orderBy: { createdAt: 'asc' }, take: 2 });
+  const users = await prisma.user.findMany({
+    where: { orgId },
+    orderBy: { createdAt: 'asc' },
+    take: 2,
+  });
   actorId = users[0]?.id ?? null;
   mateId = users[1]?.id ?? null;
   const [a, b] = await Promise.all([
@@ -92,7 +100,10 @@ describe('account team routes', () => {
     });
     expect(second.statusCode).toBe(201);
 
-    const alloc = await server.inject({ method: 'GET', url: `/api/v1/companies/allocations/${mateId}` });
+    const alloc = await server.inject({
+      method: 'GET',
+      url: `/api/v1/companies/allocations/${mateId}`,
+    });
     expect(alloc.statusCode).toBe(200);
     expect((alloc.json() as { totalPct: number }).totalPct).toBe(120);
 
@@ -117,7 +128,9 @@ describe('account team routes', () => {
     expect(edit.statusCode).toBe(200);
     expect((edit.json() as { totalAllocationPct: number }).totalAllocationPct).toBe(90);
 
-    const audits = await prisma.auditLog.count({ where: { orgId: orgId!, targetId: companyA!, action: { startsWith: 'account_team.' } } });
+    const audits = await prisma.auditLog.count({
+      where: { orgId: orgId!, targetId: companyA!, action: { startsWith: 'account_team.' } },
+    });
     expect(audits).toBe(2);
 
     const tooHigh = await server.inject({
@@ -127,15 +140,23 @@ describe('account team routes', () => {
     });
     expect(tooHigh.statusCode).toBe(400);
 
-    const del = await server.inject({ method: 'DELETE', url: `/api/v1/companies/${companyB}/team/${(second.json() as { id: string }).id}` });
+    const del = await server.inject({
+      method: 'DELETE',
+      url: `/api/v1/companies/${companyB}/team/${(second.json() as { id: string }).id}`,
+    });
     expect(del.statusCode).toBe(204);
   });
 
   t('team routes 404 for a company in another org', async () => {
-    const other = await prisma.org.create({ data: { clerkOrg: `org_s21_other_${Date.now()}`, name: 'Other S21' } });
+    const other = await prisma.org.create({
+      data: { clerkOrg: `org_s21_other_${Date.now()}`, name: 'Other S21' },
+    });
     const foreign = await prisma.company.create({ data: { orgId: other.id, name: 'Foreign S21' } });
     try {
-      const res = await server.inject({ method: 'GET', url: `/api/v1/companies/${foreign.id}/team` });
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${foreign.id}/team`,
+      });
       expect(res.statusCode).toBe(404);
       const add = await server.inject({
         method: 'POST',
@@ -151,16 +172,31 @@ describe('account team routes', () => {
 
 describe('follow routes', () => {
   t('follow, mute, unmute and unfollow update the caller state', async () => {
-    const get0 = await server.inject({ method: 'GET', url: `/api/v1/companies/${companyB}/follow` });
+    const get0 = await server.inject({
+      method: 'GET',
+      url: `/api/v1/companies/${companyB}/follow`,
+    });
     expect(get0.json()).toEqual({ following: false, muted: false, reasons: [] });
 
-    const follow = await server.inject({ method: 'PUT', url: `/api/v1/companies/${companyB}/follow`, payload: { action: 'follow' } });
+    const follow = await server.inject({
+      method: 'PUT',
+      url: `/api/v1/companies/${companyB}/follow`,
+      payload: { action: 'follow' },
+    });
     expect(follow.json()).toEqual({ following: true, muted: false, reasons: ['explicit'] });
 
-    const mute = await server.inject({ method: 'PUT', url: `/api/v1/companies/${companyB}/follow`, payload: { action: 'mute' } });
+    const mute = await server.inject({
+      method: 'PUT',
+      url: `/api/v1/companies/${companyB}/follow`,
+      payload: { action: 'mute' },
+    });
     expect(mute.json()).toMatchObject({ following: false, muted: true });
 
-    const unfollow = await server.inject({ method: 'PUT', url: `/api/v1/companies/${companyB}/follow`, payload: { action: 'unfollow' } });
+    const unfollow = await server.inject({
+      method: 'PUT',
+      url: `/api/v1/companies/${companyB}/follow`,
+      payload: { action: 'unfollow' },
+    });
     expect(unfollow.json()).toEqual({ following: false, muted: false, reasons: [] });
   });
 
@@ -180,11 +216,15 @@ describe('alerts end to end', () => {
     });
     expect(res.statusCode).toBe(201);
     const alert = await waitFor(() =>
-      prisma.notification.findFirst({ where: { orgId: orgId!, userId: mateId!, type: 'account_activity' } }),
+      prisma.notification.findFirst({
+        where: { orgId: orgId!, userId: mateId!, type: 'account_activity' },
+      }),
     );
     expect(alert?.title).toBe('New note on Pfizer S21');
     expect(alert?.url).toBe(`/companies/${companyA}`);
-    const own = await prisma.notification.count({ where: { orgId: orgId!, userId: actorId!, type: 'account_activity' } });
+    const own = await prisma.notification.count({
+      where: { orgId: orgId!, userId: actorId!, type: 'account_activity' },
+    });
     expect(own).toBe(0);
   });
 });
@@ -193,14 +233,20 @@ describe('channel prefs and Teams webhook', () => {
   t('defaults are in-app only; updates persist', async () => {
     const get = await server.inject({ method: 'GET', url: '/api/v1/notifications/channels' });
     expect(get.statusCode).toBe(200);
-    const body = get.json() as { groups: Record<string, { in_app: boolean; email: boolean; teams: boolean }>; dailyDigest: boolean };
+    const body = get.json() as {
+      groups: Record<string, { in_app: boolean; email: boolean; teams: boolean }>;
+      dailyDigest: boolean;
+    };
     expect(body.groups.account_activity).toEqual({ in_app: true, email: false, teams: false });
     expect(body.dailyDigest).toBe(false);
 
     const put = await server.inject({
       method: 'PUT',
       url: '/api/v1/notifications/channels',
-      payload: { groups: { ...body.groups, deals: { in_app: true, email: true, teams: false } }, dailyDigest: true },
+      payload: {
+        groups: { ...body.groups, deals: { in_app: true, email: true, teams: false } },
+        dailyDigest: true,
+      },
     });
     expect(put.statusCode).toBe(200);
     expect((put.json() as typeof body).groups.deals.email).toBe(true);
@@ -208,13 +254,25 @@ describe('channel prefs and Teams webhook', () => {
   });
 
   t('refuses a non-Microsoft webhook, stores a valid one encrypted, and sends a test', async () => {
-    const bad = await server.inject({ method: 'PUT', url: '/api/v1/notifications/teams-webhook', payload: { url: 'https://evil.example/hook' } });
+    const bad = await server.inject({
+      method: 'PUT',
+      url: '/api/v1/notifications/teams-webhook',
+      payload: { url: 'https://evil.example/hook' },
+    });
     expect(bad.statusCode).toBe(400);
 
-    const url = 'https://prod-1.westeurope.logic.azure.com/workflows/s21/triggers/manual/paths/invoke?sig=abc';
-    const ok = await server.inject({ method: 'PUT', url: '/api/v1/notifications/teams-webhook', payload: { url } });
+    const url =
+      'https://prod-1.westeurope.logic.azure.com/workflows/s21/triggers/manual/paths/invoke?sig=abc';
+    const ok = await server.inject({
+      method: 'PUT',
+      url: '/api/v1/notifications/teams-webhook',
+      payload: { url },
+    });
     expect(ok.statusCode).toBe(200);
-    expect((ok.json() as { teamsWebhook: unknown }).teamsWebhook).toEqual({ configured: true, host: 'prod-1.westeurope.logic.azure.com' });
+    expect((ok.json() as { teamsWebhook: unknown }).teamsWebhook).toEqual({
+      configured: true,
+      host: 'prod-1.westeurope.logic.azure.com',
+    });
     const row = await prisma.notificationPref.findUnique({ where: { userId: actorId! } });
     expect(row?.teamsWebhookEnc).toBeTruthy();
     expect(row?.teamsWebhookEnc).not.toContain('logic.azure.com');
@@ -224,11 +282,20 @@ describe('channel prefs and Teams webhook', () => {
       posted.push(u);
       return { ok: true, status: 202 };
     });
-    const test = await server.inject({ method: 'POST', url: '/api/v1/notifications/teams-webhook/test' });
+    const test = await server.inject({
+      method: 'POST',
+      url: '/api/v1/notifications/teams-webhook/test',
+    });
     expect(test.json()).toMatchObject({ ok: true, status: 202 });
     expect(posted).toEqual([url]);
 
-    const clear = await server.inject({ method: 'DELETE', url: '/api/v1/notifications/teams-webhook' });
-    expect((clear.json() as { teamsWebhook: unknown }).teamsWebhook).toEqual({ configured: false, host: null });
+    const clear = await server.inject({
+      method: 'DELETE',
+      url: '/api/v1/notifications/teams-webhook',
+    });
+    expect((clear.json() as { teamsWebhook: unknown }).teamsWebhook).toEqual({
+      configured: false,
+      host: null,
+    });
   });
 });

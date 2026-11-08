@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DeliveryRetryError, deliverOne, sendDailyDigest, type DeliveryDeps } from './notification-delivery.js';
+import {
+  DeliveryRetryError,
+  deliverOne,
+  sendDailyDigest,
+  type DeliveryDeps,
+} from './notification-delivery.js';
 
 const TEAMS_URL = 'https://prod-1.westeurope.logic.azure.com/workflows/abc';
 
@@ -15,7 +20,9 @@ function fakeDeps(over: Partial<DeliveryDeps> = {}, env: NodeJS.ProcessEnv = {})
       findTeamsWebhookEnc: vi.fn(async () => 'enc'),
       markSent,
       digestRecipients: vi.fn(async () => [{ orgId: 'o', userId: 'u' }]),
-      digestItems: vi.fn(async () => [{ title: 'New meeting on Pfizer', body: 'Bo: New meeting on Pfizer', url: '/companies/c' }]),
+      digestItems: vi.fn(async () => [
+        { title: 'New meeting on Pfizer', body: 'Bo: New meeting on Pfizer', url: '/companies/c' },
+      ]),
     },
     limiter: {
       claim: async (key, _ttl, owner) => {
@@ -66,10 +73,14 @@ describe('deliverOne email', () => {
   it('sends through the fake provider with an absolute Open link and marks the row', async () => {
     const { deps, fetchImpl, markSent } = fakeDeps({}, MAIL_ENV);
     expect(await deliverOne(job('email'), deps, 'j1')).toBe('sent');
-    const body = JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    const body = JSON.parse(
+      (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    );
     expect(body.to).toEqual(['ana@polo.test']);
     expect(body.html).toContain('https://polo.test/companies/c1');
-    expect(markSent).toHaveBeenCalledWith(expect.objectContaining({ channel: 'email', notificationId: 'n1' }));
+    expect(markSent).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'email', notificationId: 'n1' }),
+    );
   });
 
   it('coalesces a second alert on the same account inside the window', async () => {
@@ -106,7 +117,9 @@ describe('deliverOne Teams', () => {
     expect(await deliverOne(job('teams'), deps, 'j1')).toBe('sent');
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(TEAMS_URL);
-    expect(JSON.parse(init.body as string).attachments[0].contentType).toBe('application/vnd.microsoft.card.adaptive');
+    expect(JSON.parse(init.body as string).attachments[0].contentType).toBe(
+      'application/vnd.microsoft.card.adaptive',
+    );
   });
 
   it('skips when the user has no webhook', async () => {
@@ -133,7 +146,9 @@ describe('sendDailyDigest', () => {
   it('sends one summary per opted-in user', async () => {
     const { deps, fetchImpl } = fakeDeps({}, MAIL_ENV);
     expect(await sendDailyDigest(deps)).toEqual({ sent: 1, skipped: 0 });
-    const body = JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    const body = JSON.parse(
+      (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    );
     expect(body.subject).toBe('Polo: 1 account update in the last day');
   });
 });

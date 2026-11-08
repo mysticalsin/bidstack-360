@@ -56,7 +56,10 @@ export const AccountTeamMemberCreate = z
     startDate: IsoDay.nullable().optional(),
     endDate: IsoDay.nullable().optional(),
   })
-  .refine(datesInOrder, { message: 'End date must be on or after the start date', path: ['endDate'] });
+  .refine(datesInOrder, {
+    message: 'End date must be on or after the start date',
+    path: ['endDate'],
+  });
 export type AccountTeamMemberCreate = z.infer<typeof AccountTeamMemberCreate>;
 
 export const AccountTeamMemberPatch = z
@@ -66,7 +69,10 @@ export const AccountTeamMemberPatch = z
     startDate: IsoDay.nullable().optional(),
     endDate: IsoDay.nullable().optional(),
   })
-  .refine(datesInOrder, { message: 'End date must be on or after the start date', path: ['endDate'] });
+  .refine(datesInOrder, {
+    message: 'End date must be on or after the start date',
+    path: ['endDate'],
+  });
 export type AccountTeamMemberPatch = z.infer<typeof AccountTeamMemberPatch>;
 
 export const UserAllocation = z.object({
@@ -82,7 +88,12 @@ export const UserAllocation = z.object({
 });
 export type UserAllocation = z.infer<typeof UserAllocation>;
 
-export const AccountFollowReason = z.enum(['team', 'key_account_owner', 'opportunity_owner', 'explicit']);
+export const AccountFollowReason = z.enum([
+  'team',
+  'key_account_owner',
+  'opportunity_owner',
+  'explicit',
+]);
 export type AccountFollowReason = z.infer<typeof AccountFollowReason>;
 
 export const AccountFollowState = z.object({

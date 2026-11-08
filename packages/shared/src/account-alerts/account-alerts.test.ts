@@ -25,7 +25,13 @@ describe('computeAccountAudience', () => {
   };
 
   it('notifies team, key account owner, opp owners and followers, deduped', () => {
-    const out = computeAccountAudience({ ...base, follows: [{ userId: 'f1', muted: false }, { userId: 't1', muted: false }] });
+    const out = computeAccountAudience({
+      ...base,
+      follows: [
+        { userId: 'f1', muted: false },
+        { userId: 't1', muted: false },
+      ],
+    });
     expect(out.sort()).toEqual(['f1', 'kam', 'o1', 't1', 't2']);
   });
 
@@ -35,7 +41,13 @@ describe('computeAccountAudience', () => {
   });
 
   it('a muted follow row silences an automatic follower', () => {
-    const out = computeAccountAudience({ ...base, follows: [{ userId: 'kam', muted: true }, { userId: 't2', muted: true }] });
+    const out = computeAccountAudience({
+      ...base,
+      follows: [
+        { userId: 'kam', muted: true },
+        { userId: 't2', muted: true },
+      ],
+    });
     expect(out.sort()).toEqual(['o1', 't1']);
   });
 
@@ -63,7 +75,9 @@ describe('channel prefs', () => {
     expect(DEFAULT_CHANNEL_PREFS.dailyDigest).toBe(false);
   });
   it('keeps stored choices and ignores junk', () => {
-    const g = resolveChannelGroups({ groups: { deals: { email: true, in_app: 'yes' }, tasks: 'bad' } });
+    const g = resolveChannelGroups({
+      groups: { deals: { email: true, in_app: 'yes' }, tasks: 'bad' },
+    });
     expect(g.deals).toEqual({ in_app: true, email: true, teams: false });
     expect(g.tasks).toEqual({ in_app: true, email: false, teams: false });
   });
@@ -97,22 +111,36 @@ describe('isAllowedTeamsWebhookUrl', () => {
 
 describe('Teams card', () => {
   it('builds an Adaptive Card message with an Open action', () => {
-    const card = buildTeamsAdaptiveCard({ title: 'New meeting on Pfizer', body: 'Ana: kickoff', url: 'https://polo.example/companies/1' });
-    const content = (card.attachments as Array<{ content: { actions: Array<{ url: string }> } }>)[0]!.content;
+    const card = buildTeamsAdaptiveCard({
+      title: 'New meeting on Pfizer',
+      body: 'Ana: kickoff',
+      url: 'https://polo.example/companies/1',
+    });
+    const content = (
+      card.attachments as Array<{ content: { actions: Array<{ url: string }> } }>
+    )[0]!.content;
     expect(card.type).toBe('message');
     expect(content.actions[0]!.url).toBe('https://polo.example/companies/1');
   });
 
   it('refuses to post to a non-Microsoft host without calling fetch', async () => {
     const fetchImpl = vi.fn();
-    const res = await postTeamsCard('https://evil.example/hook', {}, fetchImpl as unknown as typeof fetch);
+    const res = await postTeamsCard(
+      'https://evil.example/hook',
+      {},
+      fetchImpl as unknown as typeof fetch,
+    );
     expect(res.ok).toBe(false);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('posts with redirects refused', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
-    const res = await postTeamsCard('https://prod.logic.azure.com/x', { a: 1 }, fetchImpl as unknown as typeof fetch);
+    const res = await postTeamsCard(
+      'https://prod.logic.azure.com/x',
+      { a: 1 },
+      fetchImpl as unknown as typeof fetch,
+    );
     expect(res).toEqual({ ok: true, status: 202 });
     expect(fetchImpl.mock.calls[0]![1].redirect).toBe('error');
   });
@@ -124,7 +152,9 @@ describe('misc', () => {
     expect(isOverAllocated(120)).toBe(true);
   });
   it('builds absolute links', () => {
-    expect(absoluteAppUrl('https://polo.example/', '/companies/1')).toBe('https://polo.example/companies/1');
+    expect(absoluteAppUrl('https://polo.example/', '/companies/1')).toBe(
+      'https://polo.example/companies/1',
+    );
     expect(absoluteAppUrl('https://polo.example', null)).toBeNull();
   });
 });
