@@ -167,6 +167,12 @@ export const SUBJECT_STORES = [
     match: 'sender, recipient, entity link or mention',
   },
   {
+    model: 'EmailDraft',
+    fields: ['toEmails', 'ccEmails', 'subject', 'bodyText'],
+    strategy: 'delete',
+    match: 'recipient or linked contact',
+  },
+  {
     model: 'EmailTrackingPixel',
     fields: ['firstOpenedIp'],
     strategy: 'scrub',
