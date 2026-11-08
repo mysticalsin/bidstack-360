@@ -67,6 +67,7 @@ vi.mock('@/hooks/useCompanyIntel', () => ({
   useRefreshIntelSource: () => ({ mutate: refresh, isPending: false, variables: undefined }),
 }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
+vi.mock('@/hooks/useSourcedFigures', async (orig) => ({ ...(await orig<Record<string, unknown>>()), useSourcedFigures: () => ({ revenue: null, employees: null, companyName: '' }) }));
 
 import { AccountDirectionSection } from './AccountDirectionSection';
 
