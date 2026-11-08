@@ -773,3 +773,15 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
 - Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
 - Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.
+
+### 9.11 Sourced company figures (slice 22, 2026-11-08)
+
+Revenue, employees, industry and registry identifiers on the account page show where each number came from, and the user can correct them. Additive only: no existing section is removed or moved.
+
+- Source chip: every revenue, employees and registry value shows a small visible chip under it, `Label · Year` (for example `SEC EDGAR · FY2025`, `Wikidata · 2024`, `Manual · source`). The chip is a link when a source URL exists (new tab, `rel="noopener noreferrer"`), plain text otherwise. 12px, `--fg-tertiary`, underline on hover and focus.
+- Precedence, one rule everywhere: filed statements, then a manual value that carries a source link, then Wikidata (P2123 with its point in time), then a manual value without a source, then the data provider (Apollo or Seamless). The tile names whichever won.
+- Edit: a quiet `Edit` text button (24 x 24 minimum hit area) next to the chip opens a small inline form: value, source URL (http or https only), source label. Save and Cancel; Escape closes; focus returns to `Edit`. Revenue is entered in EUR. Saved values are audited and show as `Manual`.
+- Empty states say what is missing ("No filed revenue and no public figure found") and offer two actions: `Refresh from public sources` (queues registry and filings refresh plus the Wikidata lookup) and `Add manually` (opens the same form). Never a bare "No data", "Not known" or "Not verified" where an action is possible.
+- Industry never renders as a bare one or two character code: NACE sections, NAICS sectors and SIC divisions map to their names; an unmapped short code shows as "Not known".
+- Registry block (Financials panel): registration number and jurisdiction rows, each with its source chip and Edit; identifiers already matched (LEI, SIREN, Companies House, Brreg, SEC CIK) link to their public register page.
+- Layout: no overlap or spill at 390, 768, 1024 and 1440. Value and chip containers use `min-width: 0`; long values wrap (`overflow-wrap: anywhere`), chips truncate with the full text in `title`; strips and grids collapse to fewer columns. Pinned by `sourced-figures.contract.test.ts`.
