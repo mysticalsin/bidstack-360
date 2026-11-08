@@ -1,17 +1,12 @@
 /**
- * Microsoft Graph Mail OAuth routes.
+ * Microsoft 365 OAuth routes (Outlook mail + calendar, read-only).
  *
- * WHY separate from the existing microsoft.ts: the existing file only handles
- * the legacy microsoftAccountJson blob on the User model. This module uses
- * the IntegrationToken table (same as calendar + Gmail) and requests the
- * correct mail scopes from MS Graph.
+ * Uses the IntegrationToken `microsoft_graph` row shared by mail and calendar
+ * sync. The legacy microsoft.ts only reports the old microsoftAccountJson blob.
  *
- * Scopes:
- *  - Mail.Send     — send email on behalf of the user
- *  - Mail.Read     — read inbox for incremental pull (delta query)
- *  - offline_access — obtain refresh_token for long-lived access
- *  WHY not Mail.ReadWrite: least-privilege — we never need to delete or move
- *  messages. Send + read covers all send-log-pull requirements.
+ * Scopes (WORKSPACE_READ_SCOPES.microsoft): openid, email, offline_access,
+ * User.Read, Mail.Read, Calendars.Read. No Mail.Send, no ReadWrite: Polo
+ * captures mail and meetings and never acts on the user's behalf.
  *
  * Tenant: "common" — works for both personal and work accounts.
  * For orgs with strict Conditional Access, override via MICROSOFT_TENANT_ID.
@@ -21,26 +16,28 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
+import { readOnlyScopes } from '@bidstack/shared';
 import { encryptToken } from '@bidstack/shared/token-crypto';
 import { outlookHistoricalQueue } from '../../queues/email-outlook.js';
 import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 import {
   consumeOAuthState,
-  issueOAuthState,
   OAuthStateError,
   oauthStateHttpStatus,
 } from '../../lib/oauth-state.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
-import { getAccessToken } from '../../services/microsoft-graph-auth.service.js';
+import { createSubscription } from '../../services/microsoft-graph-subscription.service.js';
 import {
-  createSubscription,
-  deleteSubscription,
-} from '../../services/microsoft-graph-subscription.service.js';
+  NotConfigured,
+  WorkspaceNotConfiguredError,
+  buildConnectUrl,
+  disconnectWorkspace,
+  notConfiguredBody,
+  microsoftRedirectUri,
+  microsoftTenant,
+} from '../../services/workspace-connect.service.js';
 
-function tenant(): string {
-  return process.env.MICROSOFT_TENANT_ID ?? 'common';
-}
 function clientId(): string {
   const v = process.env.MICROSOFT_GRAPH_CLIENT_ID;
   if (!v) throw new Error('MICROSOFT_GRAPH_CLIENT_ID is not set');
@@ -51,18 +48,6 @@ function clientSecret(): string {
   if (!v) throw new Error('MICROSOFT_GRAPH_CLIENT_SECRET is not set');
   return v;
 }
-function redirectUri(): string {
-  return (
-    process.env.MICROSOFT_GRAPH_MAIL_REDIRECT_URI ??
-    `${process.env.PUBLIC_API_URL ?? 'http://localhost:4000'}/api/v1/integrations/microsoft/mail/oauth/callback`
-  );
-}
-
-const MAIL_SCOPES = [
-  'https://graph.microsoft.com/Mail.Send',
-  'https://graph.microsoft.com/Mail.Read',
-  'offline_access',
-].join(' ');
 
 export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
@@ -72,45 +57,16 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
     schema: {
       response: {
         200: z.object({ authUrl: z.string().url() }),
+        503: NotConfigured,
       },
     },
     handler: async (req, reply) => {
-      const { userId, orgId } = req.auth;
-
-      // Sealed state (org, user, nonce, expiry); the nonce is stored below so
-      // the public callback can bind it to this user and use it only once.
-      const { state, nonce } = issueOAuthState('microsoft_mail', { orgId, userId });
-
-      await prisma.integrationToken.upsert({
-        where: {
-          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
-        },
-        create: {
-          orgId,
-          userId,
-
-          provider: IntegrationProvider.microsoft_graph,
-          accessTokenEncrypted: encryptToken('pending'),
-          status: 'revoked',
-          deltaState: { mailOAuthNonce: nonce },
-        },
-        update: {
-          deltaState: { mailOAuthNonce: nonce },
-        },
-      });
-
-      const params = new URLSearchParams({
-        client_id: clientId(),
-        response_type: 'code',
-        redirect_uri: redirectUri(),
-        scope: MAIL_SCOPES,
-        state,
-        response_mode: 'query',
-      });
-
-      return reply.send({
-        authUrl: `https://login.microsoftonline.com/${tenant()}/oauth2/v2.0/authorize?${params.toString()}`,
-      });
+      try {
+        return reply.send({ authUrl: await buildConnectUrl('microsoft', req.auth.orgId, req.auth.userId) });
+      } catch (err) {
+        if (err instanceof WorkspaceNotConfiguredError) return reply.status(503).send(notConfiguredBody(err));
+        throw err;
+      }
     },
   });
 
@@ -166,7 +122,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
       }
 
       const tokenRes = await fetchWithTimeout(
-        `https://login.microsoftonline.com/${tenant()}/oauth2/v2.0/token`,
+        `https://login.microsoftonline.com/${microsoftTenant()}/oauth2/v2.0/token`,
         {
           provider: 'Microsoft Graph',
           operation: 'oauth.exchange',
@@ -177,7 +133,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
             client_id: clientId(),
             client_secret: clientSecret(),
             code,
-            redirect_uri: redirectUri(),
+            redirect_uri: microsoftRedirectUri(),
             grant_type: 'authorization_code',
           }).toString(),
         },
@@ -232,9 +188,10 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
           refreshTokenEncrypted: tokens.refresh_token
             ? encryptToken(tokens.refresh_token)
             : undefined,
-          scope: tokens.scope?.split(' ') ?? [],
+          scope: readOnlyScopes(tokens.scope?.split(' ') ?? []),
           expiresAt,
           status: 'active',
+          errorMessage: null,
           externalAccountEmail: externalEmail,
           deltaState: {},
           lastRefreshedAt: new Date(),
@@ -291,47 +248,7 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
   app.delete('/integrations/microsoft/mail/disconnect', {
     schema: { response: { 204: z.null() } },
     handler: async (req, reply) => {
-      const { userId, orgId } = req.auth;
-
-      // Find token record first so we can read the access token for subscription cleanup
-      const token = await prisma.integrationToken.findUnique({
-        where: {
-          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.microsoft_graph },
-        },
-        include: {
-          graphSubscriptions: { select: { subscriptionId: true } },
-        },
-      });
-
-      // Best-effort: delete all active Graph subscriptions before revoking
-      if (token && token.status === 'active') {
-        try {
-          const accessToken = await getAccessToken(token, server.log);
-          const subs =
-            (token as typeof token & { graphSubscriptions?: { subscriptionId: string }[] })
-              .graphSubscriptions ?? [];
-          await Promise.all(
-            subs.map((sub) => deleteSubscription(sub.subscriptionId, accessToken, server.log)),
-          );
-        } catch (err) {
-          // Non-fatal — continue to revoke token even if subscription cleanup fails
-          server.log.warn(
-            { err, orgId, userId },
-            'Could not clean up Graph subscriptions on disconnect',
-          );
-        }
-      }
-
-      await prisma.integrationToken.updateMany({
-        where: {
-          orgId,
-          userId,
-
-          provider: IntegrationProvider.microsoft_graph,
-        },
-        data: { status: 'revoked', deletedAt: new Date() },
-      });
-
+      await disconnectWorkspace('microsoft', req.auth.orgId, req.auth.userId, req.log);
       return reply.status(204).send(null);
     },
   });

@@ -11,7 +11,7 @@ import {
   buildBookingConfirmationHtml,
   buildBookingConfirmationText,
 } from './booking-email.js';
-import { sendEmail } from '../services/email-integration.service.js';
+import { sendTransactionalEmail } from '../services/transactional-email.service.js';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -68,9 +68,9 @@ export type BookingLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn
 
 /**
  * Fire-and-forget confirmation email to the attendee.
- * WHY fail-open: email failure must never block booking creation.
- * WHY send via owner's integration: attendee has no account; owner's
- * Gmail/Outlook connection is the only outbound email path available.
+ * WHY fail-open: email failure must never block booking creation; the owner
+ * is notified in-app instead, since the cancel link only exists in this mail.
+ * WHY the transactional sender: the owner's mailbox is connected read-only.
  */
 export async function sendBookingConfirmationEmail(
   params: BookingEmailParams,
@@ -86,25 +86,28 @@ export async function sendBookingConfirmationEmail(
   const organizer = params.ownerName ?? 'your host';
 
   try {
-    await sendEmail(
+    const result = await sendTransactionalEmail(
       {
         orgId: params.orgId,
-        userId: params.userId,
+        notifyUserId: params.userId,
         to: [{ email: params.attendeeEmail, name: params.attendeeName }],
         subject: `Booking confirmed: ${params.pageName}`,
         html: buildBookingConfirmationHtml({ greeting, organizer, cancelUrl, ...params }),
         text: buildBookingConfirmationText({ greeting, organizer, cancelUrl, ...params }),
         entityType: 'booking',
         entityId: params.bookingId,
+        failureTitle: `Booking confirmation not sent to ${params.attendeeName}`,
       },
       log,
     );
-    log.info({ bookingId: params.bookingId }, 'bookings: confirmation email sent to attendee');
+    if (result.sent) {
+      log.info({ bookingId: params.bookingId }, 'bookings: confirmation email sent to attendee');
+    }
   } catch (err) {
     // WHY fail-open: email failure must never block booking creation.
-    log.warn(
+    log.error(
       { err, bookingId: params.bookingId },
-      'bookings: confirmation email failed (non-fatal)',
+      'bookings: confirmation email failed (booking kept)',
     );
   }
 }

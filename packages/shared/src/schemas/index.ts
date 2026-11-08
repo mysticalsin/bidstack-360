@@ -71,3 +71,4 @@ export * from './people-map.js';
 export * from './enrichment-watchdog.js';
 export * from './org-chart.js';
 export * from './mars.js';
+export * from './activity-ingest.js';
