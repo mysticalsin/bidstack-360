@@ -142,7 +142,11 @@ export function AccountDirectionSection({ companyId }: { companyId: string }) {
         ) : tab === 'direction' && direction.data ? (
           <DirectionPanel d={direction.data} />
         ) : tab === 'hiring' && hiring.data ? (
-          <HiringPanel h={hiring.data} />
+          <HiringPanel
+            h={hiring.data}
+            onRefresh={canRefresh ? () => refresh.mutate('hiring') : undefined}
+            refreshing={refresh.isPending && refresh.variables === 'hiring'}
+          />
         ) : tab === 'financials' && financials.data ? (
           <FinancialsPanel f={financials.data} />
         ) : tab === 'news' && news.data ? (

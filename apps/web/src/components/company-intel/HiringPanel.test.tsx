@@ -1,6 +1,6 @@
 import type { AccountHiringIntel } from '@bidstack/shared';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HiringPanel } from './IntelPanels';
 
@@ -110,5 +110,33 @@ describe('HiringPanel shares and company changes', () => {
 
     expect(screen.queryByText('Roles: Azure')).toBeNull();
     expect(within(screen.getByTestId('hiring-postings')).getByText('Account executive')).toBeTruthy();
+  });
+});
+
+describe('HiringPanel with no postings', () => {
+  afterEach(cleanup);
+
+  const none: AccountHiringIntel = {
+    ...hiring,
+    summary: { ...hiring.summary, openRoles: 0, posted30: 0, posted90: 0, monthly: [0, 0, 0, 0, 0, 0], byFunction: [], skills: [], sources: [] },
+    postings: [],
+  };
+
+  it('says there were no postings instead of drawing six blank bars and empty headers', () => {
+    render(<HiringPanel h={none} />);
+    expect(screen.getByTestId('hiring-monthly-empty').textContent).toBe('No postings in the last 6 months');
+    expect(screen.getByRole('img', { name: 'No postings in the last 6 months' })).toBeTruthy();
+    expect(screen.queryByText('Function mix')).toBeNull();
+    expect(screen.queryByText('Skills')).toBeNull();
+    expect(screen.getByTestId('hiring-empty').textContent).toContain('No postings in the last 6 months');
+  });
+
+  it('offers a refresh from job boards only when the user may refresh', () => {
+    const onRefresh = vi.fn();
+    const { rerender } = render(<HiringPanel h={none} />);
+    expect(screen.queryByRole('button', { name: 'Refresh from job boards' })).toBeNull();
+    rerender(<HiringPanel h={none} onRefresh={onRefresh} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh from job boards' }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });

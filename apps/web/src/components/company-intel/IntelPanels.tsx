@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import {
   compactAmount,
+  formatCompactMoney,
   FUNCTION_THEME,
   hiringBreakdown,
   OFFERING_HOOKS,
@@ -25,7 +26,7 @@ import {
 
 import { fmtDate, safeHref } from './intel-format';
 
-const money = (n: number | null, currency: string | null) => (n === null ? null : `${compactAmount(n)}${currency ? ` ${currency}` : ''}`);
+const money = (n: number | null, currency: string | null) => (n === null ? null : currency ? formatCompactMoney(n, currency) : compactAmount(n));
 const pct = (n: number | null) => (n === null ? null : `${n > 0 ? '+' : ''}${Math.round(n)}%`);
 
 function Basis({ basis }: { basis: IntelBasis }) {
@@ -155,14 +156,22 @@ export function DirectionPanel({ d }: { d: AccountDirection }) {
 }
 
 /** Hiring: open roles, trend, monthly strip, function mix, skills, postings. */
-export function HiringPanel({ h }: { h: AccountHiringIntel }) {
+export function HiringPanel(props: HiringPanelProps) {
   // Keyed so a role filter picked on one account never carries to the next.
-  return <HiringPanelBody key={h.companyId} h={h} />;
+  return <HiringPanelBody key={props.h.companyId} {...props} />;
 }
 
-function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
+interface HiringPanelProps {
+  h: AccountHiringIntel;
+  /** Set only for users who may refresh sources; shown in the empty state. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}
+
+function HiringPanelBody({ h, onRefresh, refreshing = false }: HiringPanelProps) {
   const s = h.summary;
   const max = Math.max(1, ...s.monthly);
+  const noMonthly = s.monthly.every((n) => n === 0);
   const [filter, setFilter] = useState<HiringFilter | null>(null);
   const [all, setAll] = useState(false);
   const b = useMemo(() => hiringBreakdown(h.summary, h.postings, (t) => OFFERING_HOOKS[t]?.label ?? t), [h.summary, h.postings]);
@@ -204,11 +213,21 @@ function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
         </div>
         <div className="ci-stat">
           <span className="ci-k">Last 6 months</span>
-          <span className="ci-bars" role="img" aria-label={`Postings per month: ${s.monthly.join(', ')}`}>
+          <span
+            className="ci-bars"
+            data-empty={noMonthly || undefined}
+            role="img"
+            aria-label={noMonthly ? 'No postings in the last 6 months' : `Postings per month: ${s.monthly.join(', ')}`}
+          >
             {s.monthly.map((n, i) => (
-              <span key={i} className="ci-bar" style={{ height: `${Math.max(4, (n / max) * 100)}%` }} />
+              <span key={i} className="ci-bar" style={{ height: noMonthly ? 0 : `${Math.max(4, (n / max) * 100)}%` }} />
             ))}
           </span>
+          {noMonthly ? (
+            <span className="ci-meta" data-testid="hiring-monthly-empty">
+              No postings in the last 6 months
+            </span>
+          ) : null}
         </div>
       </div>
       {focus ? (
@@ -224,22 +243,41 @@ function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
           </p>
         </div>
       ) : null}
-      <div className="ci-plan">
-        <div className="ci-col">
-          <h4 className="ci-k">Function mix</h4>
-          <ShareList rows={b.functions} kind="function" filter={filter} onFilter={pick} unit="of open roles" />
+      {b.functions.length || s.skills.length ? (
+        <div className="ci-plan">
+          <div className="ci-col">
+            <h4 className="ci-k">Function mix</h4>
+            {b.functions.length ? (
+              <ShareList rows={b.functions} kind="function" filter={filter} onFilter={pick} unit="of open roles" />
+            ) : (
+              <p className="ci-none">No function listed on the open roles</p>
+            )}
+          </div>
+          <div className="ci-col">
+            <h4 className="ci-k">Skills</h4>
+            {s.skills.length ? (
+              <ul className="ci-chips">
+                {s.skills.map((k) => (
+                  <li key={k.skill} className="ci-chip">
+                    {k.skill}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="ci-none">No skills named on the open roles</p>
+            )}
+          </div>
         </div>
-        <div className="ci-col">
-          <h4 className="ci-k">Skills</h4>
-          <ul className="ci-chips">
-            {s.skills.map((k) => (
-              <li key={k.skill} className="ci-chip">
-                {k.skill}
-              </li>
-            ))}
-          </ul>
+      ) : (
+        <div className="ci-empty" data-testid="hiring-empty">
+          <p className="ci-none">{noMonthly ? 'No postings in the last 6 months' : 'No open roles to break down yet'}</p>
+          {onRefresh ? (
+            <button type="button" className="ci-link" onClick={onRefresh} disabled={refreshing}>
+              {refreshing ? 'Refreshing from job boards' : 'Refresh from job boards'}
+            </button>
+          ) : null}
         </div>
-      </div>
+      )}
       {b.tech.length || b.themes.length || b.seniority.length ? (
         <div className="ci-plan ci-block" data-testid="hiring-breakdown">
           {b.tech.length ? (
@@ -402,6 +440,14 @@ function ShareList({
   );
 }
 
+function NotDisclosed({ source }: { source: string }) {
+  return (
+    <span className="ci-nd" title={`Not disclosed in ${source}`}>
+      Not disclosed
+    </span>
+  );
+}
+
 /** Financials: one row per fiscal year with its source, registry facts and fallback. */
 export function FinancialsPanel({ f }: { f: AccountFinancialsIntel }) {
   return (
@@ -425,12 +471,12 @@ export function FinancialsPanel({ f }: { f: AccountFinancialsIntel }) {
               {f.years.map((y) => (
                 <tr key={y.fiscalYear} data-testid={`intel-fin-year-${y.fiscalYear}`}>
                   <th scope="row">FY{y.fiscalYear}</th>
-                  <td>{money(y.revenue, y.currency) ?? '-'}</td>
-                  <td>{y.operatingMargin === null ? '-' : `${y.operatingMargin.toFixed(1)}%`}</td>
-                  <td>{money(y.capex, y.currency) ?? '-'}</td>
-                  <td>{money(y.rnd, y.currency) ?? '-'}</td>
-                  <td>{money(y.acquisitions, y.currency) ?? '-'}</td>
-                  <td>{y.headcount === null ? '-' : y.headcount.toLocaleString('en-GB')}</td>
+                  <td>{money(y.revenue, y.currency) ?? <NotDisclosed source={y.source} />}</td>
+                  <td>{y.operatingMargin === null ? <NotDisclosed source={y.source} /> : `${y.operatingMargin.toFixed(1)}%`}</td>
+                  <td>{money(y.capex, y.currency) ?? <NotDisclosed source={y.source} />}</td>
+                  <td>{money(y.rnd, y.currency) ?? <NotDisclosed source={y.source} />}</td>
+                  <td>{money(y.acquisitions, y.currency) ?? <NotDisclosed source={y.source} />}</td>
+                  <td>{y.headcount === null ? <NotDisclosed source={y.source} /> : y.headcount.toLocaleString('en-GB')}</td>
                   <td>
                     {safeHref(y.sourceUrl) ? (
                       <a href={safeHref(y.sourceUrl)} target="_blank" rel="noopener noreferrer">
