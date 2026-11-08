@@ -12,6 +12,7 @@ import {
 } from '@bidstack/shared';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
+import { queueFirstAccountIntel } from '../queues/account-intel.js';
 import { queueCompanyTechDetect } from '../queues/company-tech-detect.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
@@ -207,6 +208,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       queueCompanyTechDetect([{ kind: 'refresh', orgId: req.auth.orgId, companyId: c.id, reason: 'create' }]);
+      await queueFirstAccountIntel(prisma, { orgId: req.auth.orgId, companyId: c.id, requestedBy: req.auth.userId });
       reply.status(201);
       return serializeCompany(c);
     },
