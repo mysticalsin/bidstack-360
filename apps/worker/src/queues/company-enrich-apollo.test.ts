@@ -9,6 +9,7 @@ import {
   fetchCompanyNewsCrossCheck,
   mapApolloOrganization,
   normalizeName,
+  preservedProviderMetadata,
   resolveApolloEnrichmentTransport,
   sanitizeApolloPayload,
   verifyApolloEnrichJobSignature,
@@ -634,5 +635,29 @@ describe('callApolloMcpCompanyIntel', () => {
       .filter((body) => body.method === 'tools/call')
       .map((body) => body.params.name);
     expect(toolCalls).toEqual(['search_companies', 'get_company', 'search_people']);
+  });
+});
+
+describe('open data fallback jobs', () => {
+  it('keeps other providers metadata when Apollo rewrites its own keys', () => {
+    const kept = preservedProviderMetadata({
+      apollo: { lastSyncedAt: 'x' },
+      apolloOrganization: {},
+      mappedIndustry: 'Pharma',
+      meetingTechStack: [],
+      openTechStack: { version: 1 },
+      seamless: { ok: true },
+      githubOrg: 'acme',
+    });
+    expect(kept).toEqual({ openTechStack: { version: 1 }, seamless: { ok: true }, githubOrg: 'acme' });
+    expect(preservedProviderMetadata(null)).toEqual({});
+    expect(preservedProviderMetadata(['x'])).toEqual({});
+  });
+
+  it('accepts the orgOnly flag and keeps the signature over the same fields', () => {
+    const job = ApolloEnrichJobData.parse({ orgId: '00000000-0000-4000-8000-000000000001', companyName: 'Acme', domain: 'acme.com', orgOnly: true });
+    expect(job.orgOnly).toBe(true);
+    const signature = createApolloEnrichJobSignature(job, 'secret');
+    expect(verifyApolloEnrichJobSignature({ ...job, signature }, { secret: 'secret', nodeEnv: 'production' })).toBe(true);
   });
 });

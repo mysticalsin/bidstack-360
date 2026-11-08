@@ -282,7 +282,8 @@ export async function resolveCockpitCompany(
           [],
           [company],
         );
-    const resolved = list[0];
+    // buildCompanies always appends a Mantu fallback and sorts by name, so pick by name, not position.
+    const resolved = list.find((c) => normalizeName(c.name) === normalizeName(company.name)) ?? null;
     if (resolved) {
       resolved.id = company.id;
       if (company.domain) resolved.domain = company.domain;
