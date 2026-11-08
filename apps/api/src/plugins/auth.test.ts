@@ -27,7 +27,7 @@ vi.mock('@bidstack/db', () => ({
     user: { findUnique: vi.fn(), upsert: vi.fn() },
     role: { findFirst: vi.fn() },
     userRole: { upsert: vi.fn() },
-    apiKey: { findFirst: vi.fn(), update: vi.fn() },
+    apiKey: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   },
 }));
 
@@ -147,6 +147,33 @@ describe('auth plugin', () => {
     await expect(server.register(authPlugin)).rejects.toThrow(
       'CLERK_SECRET_KEY required in production',
     );
+  });
+
+  // BIDSTACK_TENANT_SCOPE_GUARD=enforce rejects updateMany without orgId, and
+  // the fire-and-forget catch would hide it: lastUsedAt would never move.
+  it('scopes the API key lastUsedAt write to the key org', async () => {
+    process.env.NODE_ENV = 'development';
+    mockedApiKeyFindFirst.mockResolvedValue({
+      id: 'key-1',
+      orgId: 'org-1',
+      scopes: ['read'],
+      readOnly: true,
+      expiresAt: null,
+      lastUsedAt: null,
+    } as never);
+    const updateMany = vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 1 });
+    const server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(authPlugin);
+    server.get('/probe', async (req) => ({ orgId: req.auth.orgId }));
+    try {
+      const res = await server.inject({ method: 'GET', url: '/probe', headers: { 'x-api-key': 'bs_probe' } });
+      expect(res.statusCode).toBe(200);
+      expect(updateMany).toHaveBeenCalledTimes(1);
+      expect(updateMany.mock.calls[0]?.[0]?.where).toMatchObject({ id: 'key-1', orgId: 'org-1' });
+    } finally {
+      await server.close();
+    }
   });
 
   it('normalizes configured SSO domains before policy comparison', () => {

@@ -109,7 +109,7 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
   if (!key.lastUsedAt || key.lastUsedAt < fresh) {
     prisma.apiKey
       .updateMany({
-        where: { id: key.id, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: fresh } }] },
+        where: { id: key.id, orgId: key.orgId, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: fresh } }] },
         data: { lastUsedAt: now },
       })
       .catch((err) => req.log.warn({ err, keyId: key.id }, 'apiKey lastUsedAt write failed'));
