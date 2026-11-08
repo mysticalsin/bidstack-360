@@ -14,6 +14,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useUiStore } from '@/stores/ui';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { CurrencySelector } from './CurrencySelector';
+import { OrgCurrencySync } from './OrgCurrencySync';
 import { SearchBar } from './topbar/TopbarSearch';
 import { NotificationsBell } from './topbar/TopbarNotifications';
 
@@ -161,6 +162,7 @@ export function Topbar() {
       <NotificationsBell />
 
       <CurrencySelector />
+      <OrgCurrencySync />
 
       <Tooltip content={`${t('topbar.help', 'Help & shortcuts')} (?)`}>
         <button

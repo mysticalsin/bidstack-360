@@ -19,6 +19,8 @@ export function CurrencySelector() {
     setCurrency,
     enableAutoDetect,
     autoDetect,
+    followOrg,
+    followOrgDefault,
     fetchRates,
     rates,
     ratesLoading,
@@ -183,6 +185,27 @@ export function CurrencySelector() {
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{statusText}</p>
               </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                title={t(
+                  'currencySelector.workspaceButtonTitle',
+                  'Use the workspace currency from Settings',
+                )}
+                aria-pressed={followOrg}
+                onClick={() => {
+                  followOrgDefault();
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+                className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${
+                  followOrg
+                    ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]'
+                    : 'border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]'
+                }`}
+              >
+                {t('currencySelector.workspaceButton', 'Workspace')}
+              </button>
               <button
                 type="button"
                 title={t(
@@ -203,6 +226,7 @@ export function CurrencySelector() {
                 <Icon name="globe" size={13} ariaHidden />
                 {t('currencySelector.autoButton', 'Auto')}
               </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               {SUPPORTED_CURRENCIES.map((c, index) => {
