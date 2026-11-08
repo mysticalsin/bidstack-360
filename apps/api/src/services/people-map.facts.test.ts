@@ -153,6 +153,7 @@ describe('contact fact query scope', () => {
     const account = accountClassificationFactListArgs(orgId, [contactId]);
     expect(account.where.status.in).toEqual(['accepted', 'needs_review']);
     expect(account.distinct).toContain('observedAt');
+    expect(account.distinct).toContain('companyId');
     const crowded = Array.from({ length: PEOPLE_MAP_FACT_TAKE }, (_, index) => ({
       id: `new-${index}`,
       contactId,

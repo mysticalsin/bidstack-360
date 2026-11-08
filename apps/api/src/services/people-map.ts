@@ -125,7 +125,7 @@ export function accountClassificationFactListArgs(orgId: string, contactIds: rea
       status: { in: ['accepted', 'needs_review'] as const },
       OR: [{ kind: 'reports_to' as const }, { kind: 'company_link' as const }],
     },
-    distinct: ['contactId', 'kind', 'status', 'linkLabel', 'reportsToContactId', 'observedAt'] as const,
+    distinct: ['contactId', 'kind', 'status', 'companyId', 'linkLabel', 'reportsToContactId', 'observedAt'] as const,
     select: FACT_SELECT,
   };
 }
