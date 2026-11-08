@@ -45,6 +45,11 @@ export interface McpAuthCtx {
   orgId: string;
   keyId: string;
   scopes: string[];
+  /** Connection grant: a read-only key may call read tools only. Always set by mcpAuth. */
+  readOnly?: boolean;
+  /** false = the key is limited to `companyIds` (same allowlist as REST). */
+  unrestrictedScope?: boolean;
+  companyIds?: string[];
 }
 
 // `kam` is the dedicated KAM staging scope — distinct from `write` so a KAM
@@ -130,5 +135,12 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
       });
   }
 
-  return { orgId: key.orgId, keyId: key.id, scopes: key.scopes };
+  return {
+    orgId: key.orgId,
+    keyId: key.id,
+    scopes: key.scopes,
+    readOnly: key.readOnly,
+    unrestrictedScope: key.unrestrictedScope,
+    companyIds: key.companyIds,
+  };
 }
