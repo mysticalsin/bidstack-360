@@ -480,12 +480,11 @@ export async function buildDashboardSnapshot(
     fetchBuyingRoleFacts(orgId, contactIds, prisma),
   ]);
 
-  // `sampleDeals` is the org page the accounts board totals. `accountDeals` is
-  // the selected account's own list. `deals` keeps both, with the sample first,
-  // so a client that only reads `deals` still sees that account's older deals.
+  // `sampleDeals` and `deals` are the same org page. An older account row stays
+  // on `accountDeals` only. Appending it to `deals` made a client that totals
+  // `deals` under "latest 100" count money outside that page.
   const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
-  const sampleIds = new Set(sampleDeals.map((deal) => deal.id));
-  const deals = [...sampleDeals, ...accountDeals.filter((deal) => !sampleIds.has(deal.id))];
+  const deals = sampleDeals;
 
   return {
     generatedAt: new Date().toISOString(),

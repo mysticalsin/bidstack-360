@@ -100,11 +100,10 @@ describe('dashboard deal window', () => {
     expect(snapshot.dealsSampleCapped).toBe(true);
     expect(snapshot.sampleDeals).toHaveLength(DASHBOARD_DEAL_SAMPLE);
     expect(snapshot.sampleDeals?.some((deal) => deal.id === oldId)).toBe(false);
-    // Older clients read `deals` only. The account deal is appended after the sample.
-    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(true);
-    expect(snapshot.deals.slice(0, DASHBOARD_DEAL_SAMPLE).some((deal) => deal.id === oldId)).toBe(false);
+    // `deals` stays the sample. The older account row is only on `accountDeals`.
+    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(false);
+    expect(snapshot.deals).toEqual(snapshot.sampleDeals);
     expect(snapshot.accountDeals?.some((deal) => deal.id === oldId)).toBe(true);
-    expect(snapshot.sampleDeals).not.toEqual(snapshot.deals);
     expect(snapshot.accountDeals).not.toEqual(snapshot.deals);
     const sampledOpen = snapshot.sampleDeals?.filter((deal) => deal.stage !== 'closed_won' && deal.stage !== 'closed_lost');
     expect(sampledOpen).toHaveLength(DASHBOARD_DEAL_SAMPLE);
@@ -118,7 +117,7 @@ describe('dashboard deal window', () => {
       { warn() {}, info() {} },
     );
     expect(snapshot.sampleDeals?.some((deal) => deal.id === oldId)).toBe(false);
-    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(true);
+    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(false);
     expect(snapshot.accountDeals?.map((deal) => deal.id)).toEqual([older.id, oldId]);
     expect(snapshot.dealsSampleCapped).toBe(true);
   });

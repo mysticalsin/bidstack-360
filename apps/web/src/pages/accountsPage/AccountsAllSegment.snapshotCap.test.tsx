@@ -186,7 +186,12 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     // deals array the server returned.
     setDashboard(1);
     const current = dashboardState.current as {
-      data: { dealsSampleCapped?: boolean; deals: Array<Record<string, unknown>>; companies: Array<{ id: string }> };
+      data: {
+        dealsSampleCapped?: boolean;
+        deals: Array<Record<string, unknown>>;
+        sampleDeals?: Array<Record<string, unknown>>;
+        companies: Array<{ id: string }>;
+      };
     };
     current.data.dealsSampleCapped = true;
     const sample = [
@@ -206,8 +211,10 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
       probability: 100,
     };
     current.data.sampleDeals = sample;
-    // `deals` still carries the older account deal for a client that cannot read sampleDeals.
-    current.data.deals = [...sample, olderAccountOnly];
+    // The board totals the sample. An older account deal on `deals` would be
+    // counted under "latest 100" by a client that has not read sampleDeals.
+    current.data.deals = sample;
+    expect(current.data.deals.some((deal) => deal.id === olderAccountOnly.id)).toBe(false);
     renderSegment();
     expect(screen.getByText(/1 open deals in the latest 100/)).toBeTruthy();
     expect(screen.queryByText(/9 open deals/)).toBeNull();
