@@ -31,7 +31,7 @@ export class PreviewOrigin extends Container {
     this.preparing = null;
   }
 
-  async state() {
+  async bootState() {
     const res = await this.containerFetch(internal(this.env, '/__internal/state'));
     return res.json();
   }
@@ -40,7 +40,7 @@ export class PreviewOrigin extends Container {
   prepare() {
     if (!this.preparing) {
       this.preparing = (async () => {
-        const state = await this.state();
+        const state = await this.bootState();
         if (state.phase === 'booting') {
           this.preparing = null;
           return state;
@@ -54,7 +54,7 @@ export class PreviewOrigin extends Container {
         } else {
           await this.containerFetch(internal(this.env, '/__internal/seed', { method: 'POST' }));
         }
-        return this.state();
+        return this.bootState();
       })().catch((err) => {
         this.preparing = null;
         throw err;
@@ -70,7 +70,7 @@ export class PreviewOrigin extends Container {
 
   // Cron: keep the container awake, finish boot, and save changed data to R2.
   async tick() {
-    const state = await this.prepare().then(() => this.state());
+    const state = await this.prepare().then(() => this.bootState());
     if (state.phase !== 'ready') return { phase: state.phase, snapshot: 'skipped' };
     const last = (await this.ctx.storage.get('snapshot')) || {};
     const since = last.bootId === state.bootId ? last.counter : -1;
@@ -87,7 +87,7 @@ export class PreviewOrigin extends Container {
   }
 
   async health() {
-    const state = await this.state();
+    const state = await this.bootState();
     const snapshot = (await this.ctx.storage.get('snapshot')) || null;
     return { ...state, lastSnapshot: snapshot };
   }

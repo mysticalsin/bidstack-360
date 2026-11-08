@@ -169,6 +169,11 @@ describe('worker wiring', () => {
     expect(toml).toMatch(/tag = "v2"\nnew_sqlite_classes = \["PreviewOrigin"\]/);
     expect(toml).toMatch(/\[\[containers\]\]\nclass_name = "PreviewOrigin"/);
     expect(toml).toMatch(/max_instances = 1/);
+    expect(toml).toMatch(/^preview_urls = false$/m);
+    const container = readFileSync(join(here, 'polo-container.js'), 'utf8');
+    for (const taken of ['state', 'ctx', 'env', 'container', 'start', 'stop', 'destroy']) {
+      expect(container, `PreviewOrigin must not shadow Container.${taken}`).not.toMatch(new RegExp(`^  (async )?${taken}\\(`, 'm'));
+    }
     expect(toml).toMatch(/crons = \["\*\/5 \* \* \* \*"\]/);
   });
 

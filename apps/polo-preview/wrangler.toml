@@ -28,6 +28,7 @@ main = "src/index.js"
 compatibility_date = "2026-10-01"
 account_id = "294885a27b3cc0a1cbe5d0ccbe38de4f"
 workers_dev = true
+preview_urls = false
 
 [vars]
 ACCESS_AUD = "826c47f72e2aa2bb7973d533363fcc2b536137578c33a3f1972afb90584e686c"
