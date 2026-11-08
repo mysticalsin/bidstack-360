@@ -36,3 +36,42 @@ describe('CreateEventModal accessibility', () => {
     expect(screen.getByRole('dialog').getAttribute('aria-describedby')).toBeNull();
   });
 });
+
+describe('CreateEventModal time zone', () => {
+  afterEach(() => cleanup());
+
+  it('creates the event at the clicked wall time in the calendar time zone', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    const onSave = vi.fn();
+    render(
+      <CreateEventModal
+        onClose={vi.fn()}
+        onSave={onSave}
+        loading={false}
+        initialDayKey="2026-11-09"
+        initialHour={21}
+        timeZone="America/Toronto"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Late call' } });
+    fireEvent.submit(screen.getByLabelText('Title').closest('form') as HTMLFormElement);
+
+    const body = onSave.mock.calls[0]?.[0] as { startAt: string; endAt: string; clientRequestId?: string };
+    // 21:00 Toronto on 9 Nov is 02:00 UTC on 10 Nov, not a UTC-shifted date.
+    expect(body.startAt).toBe('2026-11-10T02:00:00.000Z');
+    expect(body.endAt).toBe('2026-11-10T02:30:00.000Z');
+    expect(body.clientRequestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('refuses an end time before the start time', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    const onSave = vi.fn();
+    render(<CreateEventModal onClose={vi.fn()} onSave={onSave} loading={false} timeZone="America/Toronto" />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'x' } });
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '10:00' } });
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '09:00' } });
+    fireEvent.submit(screen.getByLabelText('Title').closest('form') as HTMLFormElement);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toMatch(/end/i);
+  });
+});

@@ -83,6 +83,7 @@ jobs:
           --exclude src/queues/calendar-sync-push-idempotency.test.ts
           --exclude src/queues/document-extract.contract.test.ts
           --exclude src/queues/msa-reminders.test.ts
+          --exclude src/queues/msa-whitespace-digest.test.ts
           --exclude src/queues/msa-text-extract.test.ts
           --exclude src/queues/queues.test.ts
           --exclude src/queues/sms.test.ts
@@ -129,6 +130,12 @@ jobs:
 
       - name: Build
         run: pnpm -r build
+
+      - name: Route inventory ratchet (permission + schema)
+        # Boots the API route table without a database and fails on any route
+        # that lacks a permission gate or input schema and is not already in
+        # scripts/route-inventory.baseline.json (shrink-only).
+        run: pnpm routes:inventory --check
 
       - name: Verify PWA manifest exists
         run: |
