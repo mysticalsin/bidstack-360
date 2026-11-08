@@ -91,28 +91,47 @@ async function loadQualifyingPostings(
   since: Date,
 ): Promise<{ rows: QualifyingPosting[]; truncated: boolean }> {
   const select = POSTING_SELECT;
+  const window = {
+    orgId,
+    companyId,
+    OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }],
+  };
+  const live = await db.companyJobPosting.findFirst({
+    where: { ...window, sample: false },
+    select: { id: true },
+  });
+  const where = live ? { ...window, sample: false } : window;
+  const orderBy = [{ postedAt: 'desc' as const }, { id: 'desc' as const }];
   const all: QualifyingPosting[] = [];
   let truncated = false;
   for (let cursor: string | undefined; all.length < POSTING_CEILING; ) {
     const page = await db.companyJobPosting.findMany({
-      where: {
-        orgId,
-        companyId,
-        OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }],
-      },
-      orderBy: [{ postedAt: 'desc' }, { id: 'desc' }],
+      where,
+      orderBy,
       take: POSTING_PAGE,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select,
     });
     const room = POSTING_CEILING - all.length;
     all.push(...page.slice(0, room));
-    if (page.length < POSTING_PAGE) break;
-    if (all.length >= POSTING_CEILING) {
+    if (page.length > room) {
       truncated = true;
       break;
     }
+    if (page.length < POSTING_PAGE) break;
     cursor = page[page.length - 1]!.id;
+    if (all.length >= POSTING_CEILING) {
+      const extra = await db.companyJobPosting.findMany({
+        where,
+        orderBy,
+        take: 1,
+        cursor: { id: cursor },
+        skip: 1,
+        select: { id: true },
+      });
+      truncated = extra.length > 0;
+      break;
+    }
   }
   return { rows: all, truncated };
 }

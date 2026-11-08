@@ -561,7 +561,7 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
     hiringTrend = {
       monthly: h.monthly,
       source: base.source,
-      sourceLabel: label,
+      sourceLabel: input.postingsTruncated ? `${label}.${ceiling}` : label,
       asOf,
       sample: allSample,
     };
@@ -640,7 +640,7 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
     if (revenueGrowth.value >= 5) plus.push(text);
     else if (revenueGrowth.value <= -5) minus.push(text);
   }
-  if (newRoles30d) {
+  if (newRoles30d && !input.postingsTruncated) {
     const t = newRoles30d.trend30Pct;
     if (
       newRoles30d.value >= 3 &&

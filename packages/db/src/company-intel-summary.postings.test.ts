@@ -22,14 +22,18 @@ function posting(id: string) {
   };
 }
 
-function dbFor(pages: string[][]) {
+function dbFor(pages: string[][], live = true) {
   let call = 0;
+  const wheres: Array<{ sample?: boolean } | undefined> = [];
   const companyJobPosting = {
-    findMany: async () => {
+    findFirst: async () => (live ? { id: 'live' } : null),
+    findMany: async (args: { where?: { sample?: boolean } }) => {
+      wheres.push(args.where);
       const ids = pages[call] ?? [];
       call += 1;
       return ids.map(posting);
     },
+    wheres,
   };
   const empty = { findMany: async () => [], findFirst: async () => null };
   return new Proxy(
@@ -72,5 +76,35 @@ describe('qualifying posting reads', () => {
     });
     expect(loaded?.postings).toHaveLength(1);
     expect(loaded?.postingsTruncated).toBe(false);
+  });
+
+  it('does not call an exact ceiling truncated when nothing follows it', async () => {
+    const page = Array.from({ length: 500 }, (_, index) => `p-${index}`);
+    const pages = Array.from({ length: 40 }, () => page);
+    const loaded = await loadIntelSummaryInput(dbFor(pages) as never, orgId, companyId, {
+      now: new Date('2026-11-08T00:00:00.000Z'),
+      connections: { publicSources: true, apollo: false },
+    });
+    expect(loaded?.postings).toHaveLength(20_000);
+    expect(loaded?.postingsTruncated).toBe(false);
+  });
+
+  it('asks for live rows when any live posting is in the window', async () => {
+    const db = dbFor([['only']], true) as unknown as {
+      companyJobPosting: { wheres: Array<{ sample?: boolean }> };
+    };
+    await loadIntelSummaryInput(db as never, orgId, companyId, {
+      now: new Date('2026-11-08T00:00:00.000Z'),
+      connections: { publicSources: true, apollo: false },
+    });
+    expect(db.companyJobPosting.wheres[0]?.sample).toBe(false);
+    const samples = dbFor([['only']], false) as unknown as {
+      companyJobPosting: { wheres: Array<{ sample?: boolean }> };
+    };
+    await loadIntelSummaryInput(samples as never, orgId, companyId, {
+      now: new Date('2026-11-08T00:00:00.000Z'),
+      connections: { publicSources: true, apollo: false },
+    });
+    expect(samples.companyJobPosting.wheres[0]?.sample).toBeUndefined();
   });
 });
