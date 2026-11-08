@@ -651,3 +651,18 @@ describe('activity bridge commit lock', () => {
     expect(OUTLOOK_PULL_HISTORICAL.defaultJobOptions.backoff).toEqual({ type: 'fixed', delay: 30_000 });
   });
 });
+
+describe('noteActivityBridgeFailures with a full pending queue', () => {
+  it('keeps an unseen id in the retry map and reports backpressure instead of throwing', () => {
+    const state: Record<string, unknown> = {
+      activityBridgeRetryById: { unseen: 1 },
+      activityBridgePending: Array.from({ length: ACTIVITY_BRIDGE_PENDING_CAP }, (_, i) => ({
+        id: `queued-${i}`,
+        attempts: 1,
+      })),
+    };
+    const out = noteActivityBridgeFailures(state, 'page-2', [], '2026-11-08T00:00:00.000Z', ['visited']);
+    expect(out).toMatchObject({ hold: true, backpressure: true, pending: ACTIVITY_BRIDGE_PENDING_CAP });
+    expect(state.activityBridgeRetryById).toEqual({ unseen: 1 });
+  });
+});

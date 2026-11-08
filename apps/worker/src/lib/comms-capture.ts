@@ -409,6 +409,7 @@ export function noteActivityBridgeFailures(
   const counts = readRetryIds(state);
   const pending = readPending(state);
   const observed = new Set<string>([...(seenIds ?? []), ...failed, ...settled]);
+  let backpressure = false;
   if (parkUnseen) {
     for (const [id, attempts] of Object.entries(counts)) {
       if (observed.has(id)) continue;
@@ -423,7 +424,7 @@ export function noteActivityBridgeFailures(
     delete counts[id];
     removePending(pending, id);
   }
-  let backpressure = pending.length > ACTIVITY_BRIDGE_PENDING_CAP;
+  backpressure ||= pending.length > ACTIVITY_BRIDGE_PENDING_CAP;
   if (failed.length === 0) {
     writeRetryIds(state, counts);
     writePending(state, pending);
