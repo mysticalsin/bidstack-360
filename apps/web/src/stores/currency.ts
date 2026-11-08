@@ -27,7 +27,7 @@ export const SUPPORTED_CURRENCIES = [
 
 export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]['code'];
 
-interface ExchangeRates {
+export interface ExchangeRateTable {
   base: string;
   rates: Record<string, number>;
   date: string;
@@ -41,7 +41,7 @@ interface CurrencyStore {
   followOrg: boolean;
   /** Last workspace currency seen from Settings, Currency and locale. */
   orgCurrency: CurrencyCode | null;
-  rates: ExchangeRates | null;
+  rates: ExchangeRateTable | null;
   ratesLoading: boolean;
   ratesError: string | null;
   setCurrency: (c: CurrencyCode) => void;
@@ -89,6 +89,35 @@ export function migratePersistedCurrency(persisted: PersistedCurrency): Persiste
 
 function isUsableRate(rate: unknown): rate is number {
   return typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
+}
+
+export type ConversionOutcome = { ok: true; amount: number } | { ok: false };
+
+/**
+ * Whether `amount` in `from` can be shown in `to`.
+ * Same currency is success. A missing or unusable rate is failure.
+ * The number returned on success is the converted amount, including a real
+ * 1:1 rate. Failure does not invent an amount.
+ */
+export function conversionOutcome(
+  amount: number,
+  from: string,
+  to: string,
+  rates: ExchangeRateTable | null,
+): ConversionOutcome {
+  const source = normalizeCurrencyCode(from);
+  const target = normalizeCurrencyCode(to);
+  if (!Number.isFinite(amount) || !source || !target) return { ok: false };
+  if (source === target) return { ok: true, amount };
+  if (!rates?.rates) return { ok: false };
+  const base = normalizeCurrencyCode(rates.base);
+  if (!base) return { ok: false };
+  const fromRate = source === base ? 1.0 : rates.rates[source];
+  const toRate = target === base ? 1.0 : rates.rates[target];
+  if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return { ok: false };
+  const converted = (amount / fromRate) * toRate;
+  if (!Number.isFinite(converted)) return { ok: false };
+  return { ok: true, amount: converted };
 }
 
 const REGION_TO_CURRENCY: Partial<Record<string, CurrencyCode>> = {
@@ -247,7 +276,7 @@ async function detectCurrencyFromGeolocation(): Promise<CurrencyCode | null> {
   });
 }
 
-function normalizeExchangeRates(data: unknown): ExchangeRates | null {
+function normalizeExchangeRates(data: unknown): ExchangeRateTable | null {
   if (!data || typeof data !== 'object') return null;
   const raw = data as { base?: unknown; rates?: unknown; date?: unknown };
   if (!raw.rates || typeof raw.rates !== 'object') return null;
@@ -296,7 +325,7 @@ export function detectLocalCurrency(): CurrencyCode {
   return 'EUR';
 }
 
-function loadCachedRates(): ExchangeRates | null {
+function loadCachedRates(): ExchangeRateTable | null {
   try {
     const ts = localStorage.getItem(RATES_TS_KEY);
     if (!ts) return null;
@@ -407,16 +436,11 @@ export const useCurrencyStore = create<CurrencyStore>()(
 
       convert: (amount, from) => {
         const { currency: to, rates } = get();
-        const source = normalizeCurrencyCode(from);
-        if (!rates || !rates.rates) return amount;
-        if (!Number.isFinite(amount) || !source) return amount;
-        if (source === to) return amount;
-        const base = normalizeCurrencyCode(rates.base);
-        const fromRate = source === base ? 1.0 : rates.rates[source];
-        const toRate = to === base ? 1.0 : rates.rates[to];
-        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return amount;
-        // Convert through the provider base: amount / fromRate * toRate.
-        return (amount / fromRate) * toRate;
+        const outcome = conversionOutcome(amount, from, to, rates);
+        // Callers of convert() still receive a number. A failed conversion
+        // returns the original amount; the formatters decide the label.
+        if (outcome.ok) return outcome.amount;
+        return amount;
       },
     }),
     {

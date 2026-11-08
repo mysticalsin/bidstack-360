@@ -183,6 +183,41 @@ describe('meeting hints', () => {
 });
 
 describe('activity bridge retry bound', () => {
+  it('does not lower an attempt budget when the same id is replayed', () => {
+    // WHY: a second look at an id must not restart its budget at 1. Main
+    // counts by provider id. A page URL is not a new budget, and a quarantine
+    // row already at the limit stays at the limit.
+    const now = '2026-11-08T03:00:00.000Z';
+    const pending: Record<string, unknown> = {
+      activityBridgePending: [{ id: 'poison', attempts: 2, kind: 'email' }],
+    };
+    const fromPending = noteActivityBridgeFailures(pending, 'replay', ['poison'], now, [], true, ['poison'], 'email');
+    expect(fromPending.quarantined).toEqual(['poison']);
+    expect(pending.activityBridgeQuarantine).toEqual([
+      expect.objectContaining({ id: 'poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
+    ]);
+    noteActivityBridgeFailures(pending, 'replay-again', ['poison'], now);
+    const listed = pending.activityBridgeQuarantine as Array<{ id: string; attempts: number }>;
+    expect(listed.filter((entry) => entry.id === 'poison')).toHaveLength(1);
+    expect(listed[0]?.attempts).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+
+    const folded: Record<string, unknown> = {
+      activityBridgeRetryById: { poison: 1 },
+      activityBridgeRetryByPage: { 'https://graph/old': { poison: 2 } },
+    };
+    const fromFold = noteActivityBridgeFailures(folded, 'https://graph/new', ['poison'], now);
+    expect(fromFold.quarantined).toEqual(['poison']);
+    expect((folded.activityBridgeQuarantine as Array<{ attempts: number }>)[0]?.attempts).toBe(
+      ACTIVITY_BRIDGE_RETRY_LIMIT,
+    );
+
+    const parked: Record<string, unknown> = {
+      activityBridgePending: [{ id: 'poison', attempts: 2 }],
+    };
+    noteActivityBridgeFailures(parked, 'empty', [], now);
+    expect(parked.activityBridgePending).toEqual([{ id: 'poison', attempts: 2 }]);
+  });
+
   it('holds one failing id until the bound, then quarantines it without the subject', () => {
     const state: Record<string, unknown> = {};
     const now = '2026-11-08T03:00:00.000Z';

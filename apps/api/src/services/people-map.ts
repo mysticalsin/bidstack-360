@@ -2,6 +2,12 @@ import type { FastifyInstance } from 'fastify';
 
 import { prisma } from '@bidstack/db';
 import {
+  contactsForCompanyWhere,
+  contactsForOpportunityWhere,
+  factsForContactsWhere,
+  factsForListedPeople,
+} from './people-map-scope.js';
+import {
   applyFactDecision,
   connectionStanding,
   factIsStale,
@@ -95,7 +101,10 @@ export function assemblePeopleMap(input: {
   now: Date;
 }) {
   const factsByContact = new Map<string, FactRow[]>();
-  for (const fact of input.facts) {
+  for (const fact of factsForListedPeople(
+    input.people.map((person) => person.id),
+    input.facts,
+  )) {
     const list = factsByContact.get(fact.contactId) ?? [];
     list.push(fact);
     factsByContact.set(fact.contactId, list);
@@ -165,7 +174,7 @@ export async function peopleMapForCompany(orgId: string, companyId: string, now 
   });
   if (!company) return null;
   const people = await prisma.contact.findMany({
-    where: { orgId, companyId, deletedAt: null },
+    where: contactsForCompanyWhere(orgId, companyId),
     select: { id: true, name: true, role: true },
     orderBy: { name: 'asc' },
     take: 200,
@@ -180,7 +189,7 @@ export async function peopleMapForOpportunity(orgId: string, opportunityId: stri
   });
   if (!opportunity) return null;
   const links = await prisma.opportunityContact.findMany({
-    where: { orgId, opportunityId, deletedAt: null },
+    where: contactsForOpportunityWhere(orgId, opportunityId),
     select: {
       contact: { select: { id: true, name: true, role: true } },
     },
@@ -202,7 +211,7 @@ async function finishMap(
     ids.length === 0
       ? Promise.resolve([] as FactRow[])
       : prisma.contactFact.findMany({
-          where: { orgId, contactId: { in: ids }, deletedAt: null },
+          where: factsForContactsWhere(orgId, ids),
           select: FACT_SELECT,
           orderBy: { createdAt: 'asc' },
           take: 1000,

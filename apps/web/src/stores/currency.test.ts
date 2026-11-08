@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useCurrencyStore } from './currency';
+import { useDisplayMoney } from '../hooks/useDisplayMoney';
+import { conversionOutcome, useCurrencyStore } from './currency';
 import { useFormatMoney } from '../hooks/useFormatMoney';
 
 async function loadCurrency() {
@@ -448,6 +449,85 @@ describe('useFormatMoney hook integration', () => {
 
     expect(formatted).toContain('€');
     expect(formatted).not.toContain('CA$');
+  });
+
+  it('keeps the source currency when no rate can convert', () => {
+    // WHY: convert() returns the original number when rates are missing.
+    // Labeling that number with the display currency shows an unconverted
+    // CAD amount as USD.
+    localStorage.setItem('bidstack-locale', 'en-US');
+    useCurrencyStore.setState({ currency: 'USD', rates: null });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoney(100, 'CAD');
+    expect(formatted).toContain('CA$');
+    expect(formatted).not.toBe('$100');
+  });
+
+  it('labels an exact rate parity with the display currency', () => {
+    // WHY: a real 1:1 rate is a successful conversion. The display currency
+    // is the right label even though the number did not change.
+    localStorage.setItem('bidstack-locale', 'en-US');
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: {
+        base: 'EUR',
+        rates: { USD: 1, CAD: 1.5 },
+        date: 'parity',
+      },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const formatted = result.current.formatMoney(100, 'EUR');
+    expect(formatted).toContain('$');
+    expect(formatted).not.toContain('€');
+    expect(formatted).not.toContain('CA$');
+  });
+
+  it('does not throw when micros cannot be parsed', () => {
+    // WHY: BigInt() throws on a bad micros string and the page would crash
+    // instead of leaving the amount unlabeled.
+    localStorage.setItem('bidstack-locale', 'en-US');
+    useCurrencyStore.setState({ currency: 'USD', rates: null });
+    const { result } = renderHook(() => useFormatMoney());
+    expect(() => result.current.formatMoneyMicros('not-a-number', 'CAD')).not.toThrow();
+    expect(result.current.formatMoneyMicros('not-a-number', 'CAD')).toBe('—');
+  });
+
+  it('keeps the source currency when the loaded table has no rate for the pair', () => {
+    localStorage.setItem('bidstack-locale', 'en-US');
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 1.1, CAD: 1.5 }, date: 'partial' },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    expect(result.current.formatMoney(100, 'GBP')).toContain('£');
+    expect(useCurrencyStore.getState().convert(100, 'GBP')).toBe(100);
+  });
+
+  it('useDisplayMoney uses the same source-currency fallback', () => {
+    localStorage.setItem('bidstack-locale', 'en-US');
+    useCurrencyStore.setState({ currency: 'USD', rates: null });
+    const { result } = renderHook(() => useDisplayMoney(100, 'CAD'));
+    expect(result.current).toContain('CA$');
+  });
+});
+
+describe('conversionOutcome', () => {
+  it('succeeds for the same currency and for a real parity rate, and fails when the rate is missing', () => {
+    expect(conversionOutcome(100, 'CAD', 'USD', null)).toEqual({ ok: false });
+    expect(conversionOutcome(100, 'EUR', 'EUR', null)).toEqual({ ok: true, amount: 100 });
+    expect(
+      conversionOutcome(100, 'EUR', 'USD', { base: 'EUR', rates: { USD: 1 }, date: 'parity' }),
+    ).toEqual({ ok: true, amount: 100 });
+    const converted = conversionOutcome(100, 'EUR', 'USD', {
+      base: 'EUR',
+      rates: { USD: 1.1 },
+      date: 'live',
+    });
+    expect(converted.ok).toBe(true);
+    if (converted.ok) expect(converted.amount).toBeCloseTo(110, 10);
+    expect(
+      conversionOutcome(100, 'GBP', 'USD', { base: 'EUR', rates: { USD: 1.1 }, date: 'partial' }),
+    ).toEqual({ ok: false });
   });
 });
 
