@@ -16,7 +16,9 @@ let connectionSingleton: IORedis | null = null;
 
 /** One account refresh request. */
 export type AccountIntelRefreshJob = Extract<AccountIntelQueueJob, { kind: 'refresh' }>;
-type Enqueue = (job: AccountIntelRefreshJob) => Promise<string | null>;
+/** Every public source plus Apollo organization data for one company (slice 14). */
+export type CompanyFullRefreshJob = Extract<AccountIntelQueueJob, { kind: 'full-refresh' }>;
+type Enqueue = (job: AccountIntelRefreshJob | CompanyFullRefreshJob) => Promise<string | null>;
 let enqueueOverride: Enqueue | null = null;
 
 /** Tests capture enqueues instead of talking to Redis. Pass null to reset. */
@@ -81,6 +83,24 @@ export async function enqueueAccountIntel(job: AccountIntelRefreshJob): Promise<
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue account intel refresh');
+    return null;
+  }
+}
+
+/** One full refresh per company and minute, so double clicks collapse. */
+export function companyFullRefreshJobId(job: CompanyFullRefreshJob, now = Date.now()): string {
+  return `${job.orgId}--intel-full--${job.companyId}--${Math.floor(now / 60_000)}`;
+}
+
+/** Fail-open like enqueueAccountIntel. */
+export async function enqueueCompanyFullRefresh(job: CompanyFullRefreshJob): Promise<string | null> {
+  if (enqueueOverride) return enqueueOverride(job);
+  if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
+  try {
+    const queued = await getQueue().add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) });
+    return queued.id ?? null;
+  } catch (err) {
+    log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue company intel full refresh');
     return null;
   }
 }

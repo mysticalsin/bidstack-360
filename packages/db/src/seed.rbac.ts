@@ -44,6 +44,21 @@ function writeKeys(...resources: string[]) {
 
 const PERMISSION_SEEDS = [
   permission(
+    'access-policies:approve',
+    'Approve access policies',
+    'Approve or reject an access policy another admin submitted. Never your own.',
+  ),
+  permission(
+    'access-policies:read',
+    'Read access policies',
+    'View access policy drafts, the approval queue and published versions.',
+  ),
+  permission(
+    'access-policies:write',
+    'Manage access policies',
+    'Draft, simulate, submit, publish and roll back access policies that narrow the RBAC matrix.',
+  ),
+  permission(
     'account-intel:read',
     'Read account intelligence',
     'View hiring, company posts, financials, investment themes and direction for an account.',
@@ -204,7 +219,10 @@ const PERMISSION_SEEDS = [
 ] as const;
 
 export const ALL_PERMISSION_KEYS = PERMISSION_SEEDS.map((p) => p.key);
-const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter((key) => key.endsWith(':read'));
+// access-policies:read stays Admin-only: the rule set shows how access is restricted.
+const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => key.endsWith(':read') && key !== 'access-policies:read',
+);
 // Administrator is not the commercial approver. proposals:approve is granted
 // only to Manager (below), whose description already covers approvals.
 export const ADMIN_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(

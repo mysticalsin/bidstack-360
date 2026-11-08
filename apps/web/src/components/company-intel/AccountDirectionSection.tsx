@@ -83,8 +83,8 @@ function SourcesStrip({ sources, canRefresh, onRefresh, pending }: {
 }
 
 /** Account page section: where the company is heading, with cited evidence. */
-export function AccountDirectionSection({ companyId }: { companyId: string }) {
-  const [tab, setTab] = useState<TabKey>('direction');
+export function AccountDirectionSection({ companyId, initialTab = 'direction' }: { companyId: string; initialTab?: TabKey }) {
+  const [tab, setTab] = useState<TabKey>(initialTab);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const canRefresh = useHasPermission('account-intel:write');
   const refresh = useRefreshIntelSource(companyId);
