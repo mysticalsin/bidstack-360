@@ -1,7 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
-import { Workflow, WorkflowRun, WorkflowCreate, runWorkflowActions } from '@bidstack/shared';
+import {
+  QueryBoolean,
+  Workflow,
+  WorkflowRun,
+  WorkflowCreate,
+  runWorkflowActions,
+} from '@bidstack/shared';
 import type { WorkflowActionKind, WorkflowTriggerKind } from '@bidstack/shared';
 
 import { apiWorkflowEffects } from '../services/workflows/workflow-engine.service.js';
@@ -20,10 +26,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          active: z
-            .enum(['true', 'false'])
-            .transform((v) => v === 'true')
-            .optional(),
+          active: QueryBoolean.optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
         }),
         response: {
