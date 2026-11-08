@@ -148,6 +148,7 @@ export type {
   KamSessionDraft,
   KamHandoff,
   KamProspection,
+  AccessPolicyVersion,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes

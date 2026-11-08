@@ -20,6 +20,7 @@ import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { AuditLogSection } from '@/components/settings/AuditLogSection';
 import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
 import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
+import { AccessPoliciesSection } from '@/components/settings/AccessPoliciesSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
@@ -44,6 +45,7 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   'data-import': ['sectionDataImport', 'Data import'],
   'top-accounts': ['sectionTopAccounts', 'Top accounts'],
   groups: ['sectionGroups', 'Access groups'],
+  'access-policies': ['sectionAccessPolicies', 'Access policies'],
   'opportunity-filters': ['sectionOpportunityFilters', 'Opportunity filters'],
   'rfp-analytics': ['sectionRfpAnalytics', 'RFP Analytics'],
   modules: ['sectionModules', 'Modules'],
@@ -66,6 +68,7 @@ const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'data-import',
   'top-accounts',
   'groups',
+  'access-policies',
   'opportunity-filters',
   'rfp-analytics',
   'modules',
@@ -137,6 +140,7 @@ export function SettingsPage() {
     'data-import': <DataImportSection />,
     'top-accounts': <TopAccountsSection />,
     groups: <AccessGroupsSection />,
+    'access-policies': <AccessPoliciesSection />,
     'opportunity-filters': <OpportunityFiltersSection />,
     'rfp-analytics': <RfpAnalyticsSection />,
     modules: <ModulesSection />,

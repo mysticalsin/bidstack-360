@@ -47,6 +47,7 @@ model Org {
   webhookSubs        WebhookSubscription[]
   webhookOutbox      WebhookOutbox[]
   webhookMessages    WebhookMessage[]
+  accessPolicies     AccessPolicyVersion[]
   auditLogs          AuditLog[]
   notes              Note[]
   fileAttachments    FileAttachment[]
@@ -1090,6 +1091,52 @@ model WebhookMessage {
   @@index([orgId, createdAt(sort: Desc), id(sort: Desc)], map: "webhook_messages_org_created_idx")
   @@index([subscriptionId, createdAt(sort: Desc)], map: "webhook_messages_sub_created_idx")
   @@map("webhook_messages")
+}
+
+enum AccessPolicyStatus {
+  draft
+  pending
+  approved
+  rejected
+  published
+  superseded
+
+  @@map("access_policy_status")
+}
+
+/// One version of an org's access policy (When / Then / Except rules over the
+/// RBAC matrix). draft -> pending -> approved by a second admin -> published
+/// as vN. At most one row per org is published; rollback copies an earlier
+/// version into a new pending row that points back through rollbackOfId.
+/// Raw SQL in 20261107180100_access_policy_versions adds what Prisma cannot
+/// express: the access_policy_versions_no_self_approval CHECK and the
+/// access_policy_versions_one_published_idx partial unique index. An
+/// integration test asserts both exist; keep them out of any drop.
+model AccessPolicyVersion {
+  id            String             @id @default(uuid()) @db.Uuid
+  orgId         String             @map("org_id") @db.Uuid
+  /// Set on publish (max + 1 per org); null until then.
+  version       Int?
+  name          String
+  status        AccessPolicyStatus @default(draft)
+  rules         Json               @default("[]")
+  createdById   String             @map("created_by_id") @db.Uuid
+  submittedById String?            @map("submitted_by_id") @db.Uuid
+  submittedAt   DateTime?          @map("submitted_at") @db.Timestamptz(6)
+  approvedById  String?            @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime?          @map("approved_at") @db.Timestamptz(6)
+  decisionNote  String?            @map("decision_note")
+  publishedById String?            @map("published_by_id") @db.Uuid
+  publishedAt   DateTime?          @map("published_at") @db.Timestamptz(6)
+  rollbackOfId  String?            @map("rollback_of_id") @db.Uuid
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, version], map: "access_policy_versions_org_version_key")
+  @@index([orgId, status, createdAt(sort: Desc)], map: "access_policy_versions_org_status_idx")
+  @@map("access_policy_versions")
 }
 
 enum WebhookOutboxStatus {
