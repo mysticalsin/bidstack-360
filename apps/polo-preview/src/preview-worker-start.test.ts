@@ -54,7 +54,7 @@ describe('preview process lifecycle', () => {
       preview_install_trap
       sleep 30 & a=$!; preview_track "$a"
       sleep 30 & b=$!; preview_track "$b"
-      ( exit 9 ) & preview_track "$!"
+      ( sleep 0.2; exit 9 ) & preview_track "$!"
       set +e
       preview_watch_children
       status=$?
@@ -161,6 +161,33 @@ describe('preview process lifecycle', () => {
     expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${leader}`);
     expect(spawnSync('kill', ['-0', String(leader)]).status).toBe(0);
     spawnSync('kill', ['-9', String(leader)]);
+  });
+
+  it('returns unresolved for the production node listener when its stat cannot be read', () => {
+    const started = Date.now();
+    const result = run(`
+      preview_install_trap
+      nohup sleep 30 >/dev/null 2>&1 &
+      unrelated=\$!
+      disown || true
+      preview_start_node_listener
+      echo NODE:\$node_pid
+      echo UNRELATED:\$unrelated
+      preview_read_start() { return 1; }
+      preview_cleanup
+    `);
+    const nodePid = /NODE:(\d+)/.exec(result.stdout)?.[1];
+    const unrelated = /UNRELATED:(\d+)/.exec(result.stdout)?.[1];
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(result.status).toBe(2);
+    expect(Number(nodePid)).toBeGreaterThan(0);
+    expect(Number(unrelated)).toBeGreaterThan(0);
+    expect(readFileSync(result.reap, 'utf8')).toContain(`unresolved ${nodePid} identity`);
+    expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${nodePid}`);
+    expect(spawnSync('kill', ['-0', String(nodePid)]).status).toBe(0);
+    expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
+    spawnSync('kill', ['-9', String(nodePid)]);
+    spawnSync('kill', ['-9', String(unrelated)]);
   });
 
   it('returns while a direct child with a log and an unreadable stat is still alive', () => {

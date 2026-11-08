@@ -304,33 +304,11 @@ preview_wait_postgres() {
   return 1
 }
 
-# The first child to exit fails the container. The EXIT trap reaps the rest.
-preview_watch_children() {
-  local status=0
-  wait -n || status=$?
-  if [[ "${status}" -eq 0 ]]; then
-    log "a preview process exited"
-    status=1
-  else
-    log "a preview process exited (${status})"
-  fi
-  return "${status}"
-}
-
-preview_main() {
-# The trap is installed before preparation so a failed password or URL check
-# still runs cleanup. The image ENV may still contain the known preview
-# database default; this script replaces that shell value before children
-# start and does not write it to the log.
-preview_install_trap
-if [[ "${HOST}" != "127.0.0.1" && "${HOST}" != "localhost" ]]; then
-  log "HOST must be 127.0.0.1 or localhost"
-  exit 1
-fi
-preview_prepare_database
-preview_stop_redis=1
-
-node --input-type=module <<'JS' &
+# Static files and the API proxy. Stdout and stderr go to the preview log, same
+# as postgres, redis, the API, and the worker. An inherited pipe would keep a
+# consumer waiting if this process outlived an unresolved identity check.
+preview_start_node_listener() {
+  node --input-type=module >>"$LOG" 2>&1 <<'JS' &
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -407,8 +385,38 @@ const server = http.createServer((req, res) => {
 
 server.listen(8080, '0.0.0.0');
 JS
-node_pid=$!
-preview_track "${node_pid}"
+  node_pid=$!
+  preview_track "${node_pid}"
+}
+
+# The first child to exit fails the container. The EXIT trap reaps the rest.
+preview_watch_children() {
+  local status=0
+  wait -n || status=$?
+  if [[ "${status}" -eq 0 ]]; then
+    log "a preview process exited"
+    status=1
+  else
+    log "a preview process exited (${status})"
+  fi
+  return "${status}"
+}
+
+preview_main() {
+# The trap is installed before preparation so a failed password or URL check
+# still runs cleanup. The image ENV may still contain the known preview
+# database default; this script replaces that shell value before children
+# start and does not write it to the log.
+preview_install_trap
+if [[ "${HOST}" != "127.0.0.1" && "${HOST}" != "localhost" ]]; then
+  log "HOST must be 127.0.0.1 or localhost"
+  exit 1
+fi
+preview_prepare_database
+preview_stop_redis=1
+
+preview_start_node_listener
+node_pid="${node_pid}"
 
 log "node listener $node_pid"
 log "id $(id)"
