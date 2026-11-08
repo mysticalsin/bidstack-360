@@ -232,8 +232,9 @@ test.describe('SERUM and account experience controls', () => {
 
     try {
       await gotoAndWait(`/accounts/${accountId}`);
-      // The cockpit cards sit behind the "Account details" fold.
-      await page.getByRole('main').getByRole('button', { name: /^Account details/ }).click();
+      // The cockpit cards sit in the "Account details" fold, open by default.
+      const fold = page.getByRole('main').getByRole('button', { name: /^Account details/ });
+      if ((await fold.getAttribute('aria-expanded')) !== 'true') await fold.click();
       const contracts = page.getByRole('region', { name: 'Contractual agreements' });
       await expect(contracts).toBeVisible({ timeout: 30_000 });
 

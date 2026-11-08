@@ -115,7 +115,7 @@ export async function refreshCompanyOpenTechStack({
   ]);
   const postings = company
     ? await prisma.companyJobPosting.findMany({
-        where: { orgId, companyId: company.id },
+        where: { orgId, companyId: company.id, sample: false },
         select: { title: true, department: true, skills: true, url: true, fetchedAt: true },
         orderBy: { fetchedAt: 'desc' },
         take: 300,
