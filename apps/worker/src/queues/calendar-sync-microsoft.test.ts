@@ -9,12 +9,14 @@ import { handleMicrosoftPush, pullMicrosoftIncremental } from './calendar-sync-m
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
+    unlockedCursorTestAdapter: true,
     calendarEvent: {
       update: vi.fn(),
       updateMany: vi.fn(),
       upsert: vi.fn(),
     },
     integrationToken: {
+      findFirst: vi.fn().mockResolvedValue(null),
       update: vi.fn(),
     },
   },

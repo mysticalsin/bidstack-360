@@ -139,6 +139,28 @@ export function readOnlyScopes(scopes: readonly string[]): string[] {
   });
 }
 
+/**
+ * Scopes for a Microsoft refresh_token request. Write scopes from an older
+ * grant are dropped (a ReadWrite grant becomes its Read twin), offline_access
+ * is kept, and an empty or write-only grant falls back to the read-only set.
+ */
+export function microsoftRefreshScopes(granted: readonly string[]): string[] {
+  const out: string[] = [];
+  const add = (s: string) => {
+    if (!out.includes(s)) out.push(s);
+  };
+  for (const scope of granted) {
+    const s = bare(scope);
+    if (s === 'Calendars.ReadWrite') add(`${GRAPH}Calendars.Read`);
+    else if (s === 'Mail.ReadWrite') add(`${GRAPH}Mail.Read`);
+    else if (readOnlyScopes([scope]).length === 1) add(scope);
+  }
+  const base = out.some((s) => grantsMailRead([s]) || grantsCalendarRead([s]))
+    ? out
+    : [...WORKSPACE_READ_SCOPES.microsoft];
+  return base.includes('offline_access') ? base : [...base, 'offline_access'];
+}
+
 /** Sending mail and changing provider calendars stay off whatever the stored grant says. */
 const PROVIDER_WRITES_ENABLED = false;
 
