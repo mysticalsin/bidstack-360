@@ -4,7 +4,7 @@ import './figures.css';
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 
-import { isHttpUrl, provenanceText, type CompanyFieldOverrideKey, type FigureProvenance } from '@bidstack/shared';
+import { isHttpUrl, MANUAL_REVENUE_CURRENCIES, provenanceText, type CompanyFieldOverrideKey, type FigureProvenance, type ManualRevenueCurrency } from '@bidstack/shared';
 
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { isCompanyId, useRefreshPublicSources, useSaveFigureOverride } from '@/hooks/useSourcedFigures';
@@ -12,23 +12,23 @@ import { isCompanyId, useRefreshPublicSources, useSaveFigureOverride } from '@/h
 /** "Wikidata · 2024" under the value; a link when the source has one. */
 export function SourceChip({ p, testId }: { p: FigureProvenance; testId?: string }) {
   const text = provenanceText(p);
-  const title = `Source: ${text}${p.url ? `, ${p.url}` : ''}`;
+  const title = `Source: ${text}${p.url ? `, ${p.url}` : ''}${p.unverified ? '. Not checked against a public source' : ''}`;
   if (p.url && isHttpUrl(p.url)) {
     return (
-      <a className="sf-chip" href={p.url} target="_blank" rel="noopener noreferrer" title={title} data-testid={testId}>
+      <a className="sf-chip" href={p.url} target="_blank" rel="noopener noreferrer" title={title} data-testid={testId} data-unverified={p.unverified ? 'true' : undefined}>
         {text}
       </a>
     );
   }
   return (
-    <span className="sf-chip" title={title} data-testid={testId}>
+    <span className="sf-chip" title={title} data-testid={testId} data-unverified={p.unverified ? 'true' : undefined}>
       {text}
     </span>
   );
 }
 
 const VALUE_LABEL: Record<CompanyFieldOverrideKey, string> = {
-  annualRevenueMicros: 'Revenue (EUR)',
+  annualRevenueMicros: 'Revenue',
   employeeCount: 'Employees',
   industry: 'Industry',
   registryId: 'Registration number',
@@ -41,7 +41,7 @@ function parseValue(fieldKey: CompanyFieldOverrideKey, raw: string): string | nu
   if (fieldKey === 'annualRevenueMicros' || fieldKey === 'employeeCount') {
     const n = Number(v.replace(/[,\s]/g, ''));
     if (!Number.isFinite(n) || n <= 0) return null;
-    // Revenue is typed in currency units; the API stores micros.
+    // Revenue is typed in major units of the chosen currency; the API stores micros.
     return fieldKey === 'annualRevenueMicros' ? Math.round(n * 1_000_000) : Math.round(n);
   }
   return v;
@@ -51,6 +51,7 @@ function parseValue(fieldKey: CompanyFieldOverrideKey, raw: string): string | nu
 export function FigureEditForm({ companyKey, fieldKey, label, onClose }: { companyKey: string; fieldKey: CompanyFieldOverrideKey; label: string; onClose: () => void }) {
   const id = useId();
   const [value, setValue] = useState('');
+  const [currency, setCurrency] = useState<ManualRevenueCurrency>('EUR');
   const [sourceUrl, setSourceUrl] = useState('');
   const [sourceLabel, setSourceLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export function FigureEditForm({ companyKey, fieldKey, label, onClose }: { compa
     const url = sourceUrl.trim();
     if (url && !isHttpUrl(url)) return setError('The source must be an http or https link.');
     setError(null);
-    save.mutate({ fieldKey, value: parsed, sourceUrl: url || null, sourceLabel: sourceLabel.trim() || null }, { onSuccess: onClose, onError: (err) => setError(err.message) });
+    save.mutate({ fieldKey, value: parsed, ...(fieldKey === 'annualRevenueMicros' ? { currency } : {}), sourceUrl: url || null, sourceLabel: sourceLabel.trim() || null }, { onSuccess: onClose, onError: (err) => setError(err.message) });
   };
   return (
     <form
@@ -81,6 +82,18 @@ export function FigureEditForm({ companyKey, fieldKey, label, onClose }: { compa
         {VALUE_LABEL[fieldKey]}
         <input id={`${id}-v`} autoFocus value={value} onChange={(e) => setValue(e.target.value)} inputMode={fieldKey === 'annualRevenueMicros' || fieldKey === 'employeeCount' ? 'decimal' : 'text'} />
       </label>
+      {fieldKey === 'annualRevenueMicros' ? (
+        <label htmlFor={`${id}-c`}>
+          Currency
+          <select id={`${id}-c`} value={currency} onChange={(e) => setCurrency(e.target.value as ManualRevenueCurrency)}>
+            {MANUAL_REVENUE_CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label htmlFor={`${id}-u`}>
         Source URL
         <input id={`${id}-u`} type="url" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="https://" />

@@ -466,7 +466,7 @@ export function FinancialsPanel({ f, company }: { f: AccountFinancialsIntel; com
                 <span className="ci-registry-label">{r.label}</span>
                 <span className="ci-meta ci-registry-value">
                   <span className="ci-registry-text" title={r.value}>{r.value}</span>
-                  <SourceChip p={{ origin: r.fieldKey ? 'manual_sourced' : 'record', label: r.source, year: r.fetchedAt ? r.fetchedAt.slice(0, 4) : null, url: safeHref(r.sourceUrl) ?? null }} />
+                  <SourceChip p={{ origin: r.fieldKey ? 'manual_sourced' : 'provider', label: r.source, year: r.fetchedAt ? r.fetchedAt.slice(0, 4) : null, url: safeHref(r.sourceUrl) ?? null }} />
                   {company && r.fieldKey ? <FigureActions companyId={company.id} companyName={company.name} fieldKey={r.fieldKey} label={r.label} /> : null}
                 </span>
               </li>

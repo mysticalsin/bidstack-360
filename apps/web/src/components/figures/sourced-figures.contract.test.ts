@@ -52,6 +52,7 @@ describe('sourced figures layout', () => {
     for (const sel of ['.sf-line', '.sf-empty', '.sf-form']) expect(has(figuresCss, sel, /min-width: 0/), sel).toBe(true);
     expect(has(figuresCss, '.sf-empty-text', /overflow-wrap: anywhere/)).toBe(true);
     expect(has(figuresCss, '.sf-form input', /min-width: 0/)).toBe(true);
+    expect(has(figuresCss, '.sf-form select', /min-width: 0/)).toBe(true);
     expect(knCss).toMatch(/\.kn-tile, \.kn-label, \.kn-value, \.kn-sub, \.kn-prov \{ min-width: 0; \}/);
     expect(has(enCss, '.en-fact', /overflow-wrap: anywhere/)).toBe(true);
     for (const sel of ['.ci-registry-value', '.ci-registry-text', '.ci-registry-label']) expect(has(ciCss, sel, /min-width: 0/), sel).toBe(true);
@@ -79,6 +80,17 @@ describe('sourced figures layout', () => {
     expect(strong).toContain('text-overflow: ellipsis');
     expect(indexCss).toMatch(/@media \(max-width: 720px\) \{[\s\S]*?\.command-center-footer \{\s*grid-template-columns: 1fr;/);
     expect(has(figuresCss, '.command-center-footer .sf-chip', /text-transform: none/)).toBe(true);
+  });
+
+  it('tech stack buttons and fields meet the 44px touch target', () => {
+    const src = read('components/company/CompanyTechStackSection.tsx');
+    const btn = /const SECONDARY_BTN =\s*'([^']*)'/.exec(src)?.[1] ?? '';
+    const input = /const INPUT =\s*'([^']*)'/.exec(src)?.[1] ?? '';
+    expect(btn).toContain('min-h-11');
+    expect(input).toContain('min-h-11');
+    // The remove control on a chip is a button too.
+    expect(src).toMatch(/aria-label=\{`Remove \$\{item\.name\}`\}\s*className="[^"]*min-h-11 min-w-11/);
+    for (const m of src.matchAll(/<button[\s\S]*?className=\{?["'`]([^"'`]*)/g)) expect(m[1], m[1]).not.toMatch(/min-h-(6|8|9|10)\b/);
   });
 
   it('business snapshot rows wrap when the edit form opens', () => {

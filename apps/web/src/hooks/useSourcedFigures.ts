@@ -2,7 +2,7 @@
 // the public sources (registries, filings, Wikidata) to look again.
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
-import type { CompanyFieldOverrideKey, KeyNumber } from '@bidstack/shared';
+import type { CompanyFieldOverrideKey, KeyNumber, ManualRevenueCurrency } from '@bidstack/shared';
 
 import { api } from '@/lib/api';
 
@@ -14,6 +14,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export interface FigureOverrideInput {
   fieldKey: CompanyFieldOverrideKey;
   value: string | number;
+  /** ISO 4217 code; only sent for revenue. */
+  currency?: ManualRevenueCurrency;
   sourceUrl: string | null;
   sourceLabel: string | null;
 }
@@ -35,6 +37,7 @@ export function useSaveFigureOverride(companyKey: string) {
         body: {
           fieldKey: input.fieldKey,
           value: input.value,
+          ...(input.currency ? { currency: input.currency } : {}),
           ...(input.sourceUrl ? { sourceUrl: input.sourceUrl } : {}),
           ...(input.sourceLabel ? { sourceLabel: input.sourceLabel } : {}),
         },
@@ -90,10 +93,10 @@ function fmtMoneyShort(amount: number, currency: string): string {
   return `${currency} ${v.toLocaleString('en-GB', { maximumFractionDigits: 1 })}${s}`;
 }
 
-/** A sourced public or manual figure beats provider or sample data on the cards. */
+/** Filed, manual or Wikidata figures beat provider, CRM and sample data on the cards. */
 export function beatsProvider(n: KeyNumber | null): boolean {
   const o = n?.provenance?.origin;
-  return n?.value != null && (o === 'filed' || o === 'manual_sourced' || o === 'wikidata');
+  return n?.value != null && (o === 'filed' || o === 'manual_sourced' || o === 'wikidata' || o === 'manual');
 }
 
 export const isCompanyId = (id: string | undefined | null): id is string => Boolean(id && UUID_RE.test(id));

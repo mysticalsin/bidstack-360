@@ -50,6 +50,14 @@ describe('SourceChip', () => {
     expect(chip.getAttribute('title')).toContain('https://www.wikidata.org/wiki/Q1#P2123');
   });
 
+  it('marks a CRM figure as unverified in the chip text and the title', () => {
+    render(<SourceChip p={{ origin: 'crm', label: 'CRM record', year: null, url: null, unverified: true }} testId="c" />);
+    const chip = screen.getByTestId('c');
+    expect(chip.textContent).toBe('CRM record · unverified');
+    expect(chip.getAttribute('data-unverified')).toBe('true');
+    expect(chip.getAttribute('title')).toContain('Not checked against a public source');
+  });
+
   it('renders plain text for a missing or unsafe URL', () => {
     render(<SourceChip p={{ origin: 'manual_sourced', label: 'Annual report', year: null, url: 'javascript:alert(1)' }} testId="c" />);
     expect(screen.getByTestId('c').tagName).toBe('SPAN');
@@ -74,14 +82,40 @@ describe('FigureActions', () => {
     wrap(<FigureActions companyId={ID} companyName="Acme" fieldKey="annualRevenueMicros" label="Revenue" missing="Missing" />);
     fireEvent.click(screen.getByRole('button', { name: 'Add Revenue manually' }));
     const form = screen.getByTestId('sf-form-annualRevenueMicros');
-    fireEvent.change(within(form).getByLabelText('Revenue (EUR)'), { target: { value: '1,250,000' } });
+    fireEvent.change(within(form).getByLabelText('Revenue'), { target: { value: '1,250,000' } });
     fireEvent.change(within(form).getByLabelText('Source URL'), { target: { value: 'https://acme.example/report-2025.pdf' } });
     fireEvent.change(within(form).getByLabelText('Source label'), { target: { value: 'Annual report 2025' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true));
     const put = calls.find((c) => c.method === 'PUT')!;
     expect(put.path).toBe(`/api/crm/companies/${ID}/field-overrides`);
-    expect(put.body).toEqual({ fieldKey: 'annualRevenueMicros', value: 1_250_000_000_000, sourceUrl: 'https://acme.example/report-2025.pdf', sourceLabel: 'Annual report 2025' });
+    expect(put.body).toEqual({ fieldKey: 'annualRevenueMicros', value: 1_250_000_000_000, currency: 'EUR', sourceUrl: 'https://acme.example/report-2025.pdf', sourceLabel: 'Annual report 2025' });
+  });
+
+  it('saves revenue in the chosen currency, and offers the currencies the account page needs', async () => {
+    wrap(<FigureActions companyId={ID} companyName="Acme" fieldKey="annualRevenueMicros" label="Revenue" missing="Missing" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add Revenue manually' }));
+    const form = screen.getByTestId('sf-form-annualRevenueMicros');
+    const select = within(form).getByLabelText('Currency') as HTMLSelectElement;
+    const codes = Array.from(select.options).map((o) => o.value);
+    for (const c of ['EUR', 'USD', 'GBP', 'CAD', 'CHF', 'NOK', 'SEK', 'DKK', 'BRL']) expect(codes).toContain(c);
+    expect(select.value).toBe('EUR');
+    fireEvent.change(select, { target: { value: 'CAD' } });
+    fireEvent.change(within(form).getByLabelText('Revenue'), { target: { value: '1.2' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true));
+    expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({ fieldKey: 'annualRevenueMicros', value: 1_200_000, currency: 'CAD' });
+  });
+
+  it('has no currency select on a headcount form and sends no currency', async () => {
+    wrap(<FigureActions companyId={ID} companyName="Acme" fieldKey="employeeCount" label="Employees" />);
+    fireEvent.click(screen.getByTestId('sf-edit-employeeCount'));
+    const form = screen.getByTestId('sf-form-employeeCount');
+    expect(within(form).queryByLabelText('Currency')).toBeNull();
+    fireEvent.change(within(form).getByLabelText('Employees'), { target: { value: '420' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true));
+    expect(calls.find((c) => c.method === 'PUT')!.body).toEqual({ fieldKey: 'employeeCount', value: 420 });
   });
 
   it('rejects a non-http source and Escape returns focus to Edit', async () => {
@@ -120,6 +154,51 @@ describe('KeyNumbersStrip with sourced figures', () => {
     expect(within(emp).getByRole('button', { name: 'Refresh from public sources' })).toBeTruthy();
     expect(within(emp).getByRole('button', { name: 'Add Employees manually' })).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
+  });
+
+  it('shows a Wikidata headcount chip with year and entity link, and a CRM revenue as unverified', async () => {
+    state.kn = {
+      companyId: ID,
+      companyName: 'Acme',
+      computedAt: '2026-11-08T00:00:00Z',
+      items: [
+        kn({ id: 'revenue', label: 'Revenue', unit: 'money_micros', value: 1.2e15, source: 'CRM record', editKey: 'annualRevenueMicros', provenance: { origin: 'crm', label: 'CRM record', year: null, url: null, unverified: true } }),
+        kn({ id: 'employees', label: 'Employees', value: 12000, source: 'Wikidata', period: 'Headcount, point in time 2024', sourceUrl: 'https://www.wikidata.org/wiki/Q1#P1128', editKey: 'employeeCount', provenance: { origin: 'wikidata', label: 'Wikidata', year: '2024', url: 'https://www.wikidata.org/wiki/Q1#P1128' } }),
+      ],
+    };
+    wrap(<KeyNumbersStrip companyId={ID} />);
+    const emp = await screen.findByTestId('kn-employees');
+    const chip = within(emp).getByTestId('kn-chip-employees');
+    expect(chip.textContent).toBe('Wikidata · 2024');
+    expect(chip.getAttribute('href')).toBe('https://www.wikidata.org/wiki/Q1#P1128');
+    expect(within(screen.getByTestId('kn-revenue')).getByTestId('kn-chip-revenue').textContent).toBe('CRM record · unverified');
+  });
+
+  it('never prints n/a: a missing tile has no period line and no empty tooltip', async () => {
+    state.kn = {
+      companyId: ID,
+      companyName: 'Acme',
+      computedAt: '2026-11-08T00:00:00Z',
+      items: [
+        kn({ id: 'revenue', label: 'Revenue', source: 'None', period: null, editKey: 'annualRevenueMicros', missing: 'No public revenue figure found yet' }),
+        // An older cached response still carries the placeholder.
+        kn({ id: 'open_jobs', label: 'Open jobs', source: 'None', period: 'n/a', missing: 'No job postings tracked yet' }),
+        kn({ id: 'momentum', group: 'health', label: 'Momentum', source: 'Polo account pulse', period: null, missing: 'Not enough signals yet' }),
+        kn({ id: 'margin', label: 'Margin', value: 18, unit: 'pct', source: 'ESEF', period: 'FY2025' }),
+      ],
+    };
+    wrap(<KeyNumbersStrip companyId={ID} />);
+    const rev = await screen.findByTestId('kn-revenue');
+    expect(rev.querySelector('[role="tooltip"]')).toBeNull();
+    expect(rev.hasAttribute('aria-describedby')).toBe(false);
+    const jobs = screen.getByTestId('kn-open_jobs');
+    expect(jobs.querySelector('[role="tooltip"]')).toBeNull();
+    const mom = screen.getByTestId('kn-momentum').querySelector('[role="tooltip"]')!;
+    expect(mom.textContent).toContain('Polo account pulse');
+    expect(mom.textContent).not.toContain('Period');
+    const margin = screen.getByTestId('kn-margin').querySelector('[role="tooltip"]')!;
+    expect(margin.textContent).toContain('Period: FY2025');
+    expect(document.body.textContent).not.toMatch(/n\/a/i);
   });
 });
 

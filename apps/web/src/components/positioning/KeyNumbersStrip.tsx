@@ -33,6 +33,12 @@ interface TileCompany {
   name: string;
 }
 
+/** Placeholder text from older cached responses is treated as no text at all. */
+const real = (text: string | null | undefined): string | null => {
+  const t = text?.trim();
+  return t && !/^(n\/a|none)$/i.test(t) ? t : null;
+};
+
 function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormatter; company: TileCompany }) {
   const tipId = useId();
   const dir = directionOf(n);
@@ -40,8 +46,11 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
   const delta = formatDelta(n);
   const Arrow = dir ? ARROW[dir] : null;
   const missing = n.value === null;
+  const tipSource = real(n.source);
+  const tipPeriod = real(n.period);
+  const hasTip = Boolean(tipSource || tipPeriod);
   return (
-    <li className="kn-tile" data-missing={missing} data-testid={`kn-${n.id}`} tabIndex={0} aria-describedby={tipId}>
+    <li className="kn-tile" data-missing={missing} data-testid={`kn-${n.id}`} tabIndex={0} aria-describedby={hasTip ? tipId : undefined}>
       <span className="kn-label">
         {n.label}
         {n.sample ? <span className="sg-sample">Sample</span> : null}
@@ -70,19 +79,27 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
         )
       ) : null}
       {n.editKey && missing ? null : <span className="kn-sub">{missing ? n.missing : n.sub}</span>}
-      <span className="kn-tip" role="tooltip" id={tipId}>
-        <b>Source:</b> {n.source}
-        <br />
-        <b>Period:</b> {n.period}
-        {n.sourceUrl ? (
-          <>
-            <br />
-            <a href={n.sourceUrl} target="_blank" rel="noopener noreferrer">
-              Open source
-            </a>
-          </>
-        ) : null}
-      </span>
+      {hasTip ? (
+        <span className="kn-tip" role="tooltip" id={tipId}>
+          {tipSource ? (
+            <span className="kn-tip-line">
+              <b>Source:</b> {tipSource}
+            </span>
+          ) : null}
+          {tipPeriod ? (
+            <span className="kn-tip-line">
+              <b>Period:</b> {tipPeriod}
+            </span>
+          ) : null}
+          {n.sourceUrl ? (
+            <span className="kn-tip-line">
+              <a href={n.sourceUrl} target="_blank" rel="noopener noreferrer">
+                Open source
+              </a>
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </li>
   );
 }
