@@ -333,7 +333,9 @@ function latestIso(values: Array<string | Date | null | undefined>): string | nu
   return best === null ? null : new Date(best).toISOString();
 }
 
-/** Best period per fiscal year (filings before registries before imports before samples). */
+/** Best period per fiscal year (filings before registries before imports before samples).
+ * Callers filter to records carrying the metric first, so a preferred record
+ * missing that metric never hides a lower-priority one that has it. */
 function bestYears(years: IntelSummaryYear[]): IntelSummaryYear[] {
   const by = new Map<number, IntelSummaryYear>();
   for (const y of years) {
@@ -356,12 +358,11 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
   const fAsOf = (field: string) => f?.provenance[field]?.fetchedAt ?? f?.fetchedAt ?? null;
   const fSource = (field: string) => f?.provenance[field]?.source ?? 'apollo';
   const isSampleSource = (s: string) => s === 'fixture';
-  const years = bestYears(input.years);
 
   // Revenue: filings and registries first, the provider estimate as a labelled fallback.
   let revenue: CompanyIntelSummary['revenue'] = null;
   let revenueGrowth: CompanyIntelSummary['revenueGrowth'] = null;
-  const withRevenue = years.filter((y) => y.revenue != null && y.revenue > 0);
+  const withRevenue = bestYears(input.years.filter((y) => y.revenue != null && y.revenue > 0));
   const latest = withRevenue[0];
   if (latest) {
     revenue = {
@@ -433,7 +434,7 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       : (gaps.revenue ?? { reason: 'no_public_data', detail: 'No revenue' });
 
   // Headcount and growth: provider org data, then filed headcount, then the CRM record.
-  const filedHead = years.filter((y) => y.headcount != null && y.headcount > 0);
+  const filedHead = bestYears(input.years.filter((y) => y.headcount != null && y.headcount > 0));
   let headcount: CompanyIntelSummary['headcount'] = null;
   if (f?.employeeCount != null) {
     const src = fSource('employeeCount');
@@ -523,12 +524,15 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
   let hiringTrend: CompanyIntelSummary['hiringTrend'] = null;
   let hiringMix: CompanyIntelSummary['hiringMix'] = [];
   let topSkills: string[] = [];
-  if (input.postings.length) {
-    const h = summarizeHiring(input.postings, now);
+  // Sample postings stay after a live refresh; once live postings exist they alone count.
+  const livePostings = input.postings.filter((p) => !p.sample);
+  const postings = livePostings.length ? livePostings : input.postings;
+  if (postings.length) {
+    const h = summarizeHiring(postings, now);
     const sources = h.sources;
-    const allSample = input.postings.every((p) => p.sample);
+    const allSample = postings.every((p) => p.sample);
     const label = sources.map((s) => POSTING_LABEL[s] ?? s).join(', ');
-    const asOf = latestIso(input.postings.map((p) => p.fetchedAt ?? p.lastSeenAt));
+    const asOf = latestIso(postings.map((p) => p.fetchedAt ?? p.lastSeenAt));
     const base = {
       source: allSample ? 'fixture' : 'job_boards',
       sourceLabel: label,

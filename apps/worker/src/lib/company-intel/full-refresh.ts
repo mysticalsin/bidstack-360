@@ -129,6 +129,7 @@ export async function runCompanyFullRefresh(
     }
 
     let apollo = 'not_configured';
+    let retryLater: EnrichmentRateLimitedError | null = null;
     if (deps.apollo) {
       try {
         const r = await runAccountEnrichment(
@@ -144,6 +145,9 @@ export async function runCompanyFullRefresh(
       } catch (err) {
         if (!(err instanceof EnrichmentRateLimitedError)) throw err;
         apollo = 'rate_limited';
+        // A queued attempt with retries left rethrows after saving the public
+        // data, so the queue fetches Apollo again; the last attempt settles.
+        if (opts.finalAttempt === false) retryLater = err;
       }
     }
 
@@ -151,6 +155,7 @@ export async function runCompanyFullRefresh(
       now,
       connections: intelConnections(deps.env),
     });
+    if (retryLater) throw retryLater;
     if (job.batchId)
       await markImportBatchCompany(prisma, {
         orgId: job.orgId,

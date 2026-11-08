@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
-import { openImportBatch, prisma, recomputeCompanyIntelSummary } from '@bidstack/db';
+import { markImportBatchCompany, openImportBatch, prisma, recomputeCompanyIntelSummary } from '@bidstack/db';
 import { CompanyIntelSummary } from '@bidstack/shared';
 
 import { __setAccountIntelEnqueueForTest } from '../queues/account-intel.js';
@@ -136,6 +138,51 @@ describe('companies list intel', () => {
     expect(queued.at(-1)).toMatchObject({ kind: 'full-refresh', companyId: ids.empty, force: true, batchId: null });
     const ro = await server.inject({ method: 'POST', url: `/api/v1/companies/${ids.empty}/intel/refresh-all`, headers: { 'x-bidstack-e2e-role': 'read-only' } });
     expect(ro.statusCode).toBe(403);
+  });
+
+  skipIfNoDb('counts every qualifying posting, past the first page of 500', async () => {
+    const now = Date.now();
+    const big = await prisma.company.create({ data: { orgId: orgId!, name: `Megahire ${now}` } });
+    await prisma.companyJobPosting.createMany({
+      data: Array.from({ length: 520 }, (_, i) => ({
+        orgId: orgId!, companyId: big.id, source: 'greenhouse', externalId: `mh-${i}`, title: `Engineer ${i}`, region: 'emea', function: 'engineering', seniority: 'mid', skills: [], postedAt: new Date(now - 2 * DAY), lastSeenAt: new Date(now - DAY), fetchedAt: new Date(now - DAY),
+      })),
+    });
+    const summary = await recomputeCompanyIntelSummary(prisma, orgId!, big.id, { now: new Date(now), connections });
+    expect(summary?.openRoles?.value).toBe(520);
+    expect(summary?.newRoles30d?.value).toBe(520);
+  });
+
+  skipIfNoDb('a chunk appended while the last company settles keeps the batch running', async () => {
+    const migrationJobId = randomUUID();
+    const open = (companyIds: string[]) =>
+      openImportBatch(prisma, { orgId: orgId!, migrationJobId, origin: 'csv', companyIds, createdById: null });
+    const batchId = await open([ids.big]);
+    let appended = false;
+    // Appends the next chunk between the settle check and the completion update.
+    const racing = new Proxy(prisma, {
+      get(target, prop) {
+        if (prop === 'companyIntelSummary') {
+          return {
+            findMany: async (args: Parameters<typeof prisma.companyIntelSummary.findMany>[0]) => {
+              if (!appended) {
+                appended = true;
+                await open([ids.hiring]);
+              }
+              return prisma.companyIntelSummary.findMany(args);
+            },
+          };
+        }
+        const value = Reflect.get(target, prop);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    expect(await markImportBatchCompany(racing, { orgId: orgId!, batchId, companyId: ids.big, ok: true })).toBe('running');
+    expect((await prisma.intelImportBatch.findUniqueOrThrow({ where: { id: batchId } })).status).toBe('running');
+    expect(await markImportBatchCompany(prisma, { orgId: orgId!, batchId, companyId: ids.hiring, ok: true })).toBe('complete');
+    const done = await prisma.intelImportBatch.findUniqueOrThrow({ where: { id: batchId } });
+    expect(done.status).toBe('complete');
+    expect(done.companyIds.sort()).toEqual([ids.big, ids.hiring].sort());
   });
 
   skipIfNoDb('import batches list progress for this org only', async () => {

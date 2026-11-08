@@ -61,6 +61,45 @@ export function intelConnections(
   return { publicSources: /@/.test(ua), apollo: Boolean(env.APOLLO_API_KEY?.trim()) };
 }
 
+const POSTING_PAGE = 500;
+/** Hard stop so one runaway board cannot exhaust memory; far above any real employer. */
+const POSTING_CEILING = 20_000;
+
+/** Every posting in the reporting window, paged, so hiring totals are never cut at a page size. */
+async function loadQualifyingPostings(db: Db, orgId: string, companyId: string, since: Date) {
+  const select = {
+    id: true,
+    source: true,
+    title: true,
+    url: true,
+    function: true,
+    skills: true,
+    department: true,
+    postedAt: true,
+    lastSeenAt: true,
+    fetchedAt: true,
+    sample: true,
+  } as const;
+  const all = [];
+  for (let cursor: string | undefined; all.length < POSTING_CEILING; ) {
+    const page = await db.companyJobPosting.findMany({
+      where: {
+        orgId,
+        companyId,
+        OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }],
+      },
+      orderBy: [{ postedAt: 'desc' }, { id: 'desc' }],
+      take: POSTING_PAGE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select,
+    });
+    all.push(...page);
+    if (page.length < POSTING_PAGE) break;
+    cursor = page[page.length - 1]!.id;
+  }
+  return all;
+}
+
 /** Load everything the summary is built from. Null when the company is not in the org. */
 export async function loadIntelSummaryInput(
   db: Db,
@@ -89,28 +128,7 @@ export async function loadIntelSummaryInput(
         updatedAt: true,
       },
     }),
-    db.companyJobPosting.findMany({
-      where: {
-        orgId,
-        companyId,
-        OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }],
-      },
-      orderBy: { postedAt: 'desc' },
-      take: 500,
-      select: {
-        id: true,
-        source: true,
-        title: true,
-        url: true,
-        function: true,
-        skills: true,
-        department: true,
-        postedAt: true,
-        lastSeenAt: true,
-        fetchedAt: true,
-        sample: true,
-      },
-    }),
+    loadQualifyingPostings(db, orgId, companyId, since),
     db.companyPost.findMany({
       where: { orgId, companyId },
       orderBy: { publishedAt: 'desc' },
@@ -333,11 +351,24 @@ export async function markImportBatchCompany(
     withNewRoles30d: list.filter((s) => s.newRoles30d).length,
     withDirection: list.filter((s) => s.direction).length,
   };
-  await db.intelImportBatch.updateMany({
-    where: { id: args.batchId, orgId: args.orgId, status: 'running' },
-    data: { status: 'complete', summary, completedAt: args.now ?? new Date() },
+  // Completes only if the membership is still the one counted above and every
+  // member is settled; a chunk appended meanwhile keeps the batch running.
+  const completed = await db.$queryRaw<Array<{ status: string }>>`
+    UPDATE intel_import_batches SET
+      status = 'complete',
+      summary = ${JSON.stringify(summary)}::jsonb,
+      completed_at = ${args.now ?? new Date()},
+      updated_at = now()
+    WHERE id = ${args.batchId}::uuid AND org_id = ${args.orgId}::uuid AND status = 'running'
+      AND company_ids = ${b.company_ids}::text[]
+      AND company_ids <@ (done_ids || failed_ids)
+    RETURNING status`;
+  if (completed.length > 0) return 'complete';
+  const current = await db.intelImportBatch.findFirst({
+    where: { id: args.batchId, orgId: args.orgId },
+    select: { status: true },
   });
-  return 'complete';
+  return current?.status === 'complete' ? 'complete' : 'running';
 }
 
 /** Recent import batches for this org, newest first. */

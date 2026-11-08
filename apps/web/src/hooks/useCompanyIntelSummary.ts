@@ -72,7 +72,10 @@ export function useIntelImports(enabled = true) {
       const res = await api<{ items: IntelImportBatchView[] }>('/api/companies/intel-imports', {
         signal,
       });
-      if (res.items.some((b) => b.status === 'running'))
+      // The poll that sees a batch finish still refreshes the list, since polling stops after it.
+      const prev = qc.getQueryData<{ items: IntelImportBatchView[] }>(['company-intel-imports']);
+      const wasRunning = new Set(prev?.items.filter((b) => b.status === 'running').map((b) => b.id));
+      if (res.items.some((b) => b.status === 'running' || wasRunning.has(b.id)))
         void qc.invalidateQueries({ queryKey: ['companies'] });
       return res;
     },

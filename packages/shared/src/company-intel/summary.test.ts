@@ -212,3 +212,39 @@ describe('buildIntelSummary: direction and signal', () => {
     expect(() => CompanyIntelSummary.parse(s)).not.toThrow();
   });
 });
+
+describe('buildIntelSummary: source priority per metric', () => {
+  it('keeps imported revenue and filed headcount when the preferred record for that year lacks the metric', () => {
+    const s = buildIntelSummary(
+      input({
+        years: [
+          { fiscalYear: 2025, periodEnd: '2025-12-31', currency: 'USD', source: 'sec_edgar', revenue: null, headcount: null, fetchedAt: daysAgo(3) },
+          { fiscalYear: 2025, periodEnd: '2025-12-31', currency: 'USD', source: 'manual_import', revenue: 7.1e8, headcount: 2_400, fetchedAt: daysAgo(4) },
+        ],
+      }),
+    );
+    expect(s.revenue).toMatchObject({ value: 7.1e8, source: 'manual_import', fiscalYear: 2025 });
+    expect(s.headcount).toMatchObject({ value: 2_400, source: 'manual_import' });
+  });
+});
+
+describe('buildIntelSummary: sample and live postings', () => {
+  it('counts only live postings once a refresh has found some, and marks them live', () => {
+    const s = buildIntelSummary(
+      input({
+        postings: [
+          posting(1, 2),
+          posting(2, 3, 'data', { sample: true, source: 'fixture' }),
+          posting(3, 4, 'data', { sample: true, source: 'fixture' }),
+        ],
+      }),
+    );
+    expect(s.openRoles).toMatchObject({ value: 1, sample: false });
+    expect(s.newRoles30d).toMatchObject({ value: 1, sample: false });
+  });
+
+  it('keeps sample-only hiring marked as sample', () => {
+    const s = buildIntelSummary(input({ postings: [posting(1, 2, 'data', { sample: true, source: 'fixture' })] }));
+    expect(s.openRoles).toMatchObject({ value: 1, sample: true });
+  });
+});
