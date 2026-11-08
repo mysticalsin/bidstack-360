@@ -87,8 +87,9 @@ describe('container front proxy', () => {
     const front = await frontServer(await apiLikeUpstream());
     const reply = await new Promise<string>((resolve, reject) => {
       const socket = net.connect(front, '127.0.0.1', () => {
+        const nonce = Buffer.from('the sample nonce').toString('base64');
         socket.write(
-          'GET /api/v1/realtime HTTP/1.1\r\nhost: x\r\nconnection: Upgrade\r\nupgrade: websocket\r\nsec-websocket-version: 13\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n',
+          `GET /api/v1/realtime HTTP/1.1\r\nhost: x\r\nconnection: Upgrade\r\nupgrade: websocket\r\nsec-websocket-version: 13\r\nsec-websocket-key: ${nonce}\r\n\r\n`,
         );
       });
       let data = '';
