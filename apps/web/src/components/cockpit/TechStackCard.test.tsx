@@ -204,6 +204,25 @@ describe('TechStackCard provenance', () => {
     });
   });
 
+  it('keeps an existing stack name when the editor is opened and saved', async () => {
+    const named = cockpit();
+    named.technicalStack = [
+      {
+        stack: 'Oncology R&D',
+        label: 'Cloud',
+        items: [{ name: 'Azure', source: 'manual', confidence: 1 }],
+      },
+    ];
+    render(<TechStackCard cockpit={named} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save technical stack' }));
+    await waitFor(() => {
+      expect(hookMocks.saveStack).toHaveBeenCalledWith([
+        expect.objectContaining({ stack: 'Oncology R&D', label: 'Cloud' }),
+      ]);
+    });
+  });
+
   it('keeps a named stack when a category moves to another business unit', async () => {
     render(<TechStackCard cockpit={cockpit()} />);
 

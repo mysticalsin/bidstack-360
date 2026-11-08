@@ -99,6 +99,41 @@ describe('CompanyTechStackSection', () => {
     await waitFor(() => expect(screen.queryByTestId('tech-stack-editor')).toBeNull());
   });
 
+  it('drops an open draft when the company changes so it cannot be saved onto the next account', () => {
+    canWrite.value = true;
+    stackHook.mockReturnValue({
+      isLoading: false,
+      data: {
+        effectiveStack: [{ label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] }],
+      },
+    });
+    const view = render(<CompanyTechStackSection companyId="company-a" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByTestId('tech-stack-editor')).toBeTruthy();
+    view.rerender(<CompanyTechStackSection companyId="company-b" />);
+    expect(screen.queryByTestId('tech-stack-editor')).toBeNull();
+    expect(saveStack).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending technology with its category when another category is removed', () => {
+    canWrite.value = true;
+    stackHook.mockReturnValue({
+      isLoading: false,
+      data: {
+        effectiveStack: [
+          { label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] },
+          { label: 'Data', items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }] },
+        ],
+      },
+    });
+    render(<CompanyTechStackSection companyId="company-a" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByLabelText('Add technology to category 1'), { target: { value: 'AWS' } });
+    fireEvent.change(screen.getByLabelText('Add technology to category 2'), { target: { value: 'BigQuery' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove category Cloud' }));
+    expect((screen.getByLabelText('Add technology to category 1') as HTMLInputElement).value).toBe('BigQuery');
+  });
+
   it('looks the stack up by company id, which resolves accounts without an enrichment row', () => {
     stackHook.mockReturnValue({ data: undefined, isLoading: false });
 

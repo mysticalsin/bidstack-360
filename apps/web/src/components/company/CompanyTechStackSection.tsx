@@ -27,21 +27,27 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
   const { data, isLoading, isError, refetch } = useCompanyTechnicalStack(companyId);
   const save = useSaveCompanyTechnicalStack(companyId);
   const canEdit = useHasPermission('companies:write');
-  const [draft, setDraft] = useState<TechnicalStackCategory[] | null>(null);
+  const [draft, setDraft] = useState<{ companyId: string; stack: TechnicalStackCategory[] } | null>(null);
   const [saveError, setSaveError] = useState(false);
+  // The account page can keep this section mounted across company routes.
+  // A draft is only editable for the company it was opened on.
+  const activeDraft = draft?.companyId === companyId ? draft.stack : null;
   const categories = (data?.effectiveStack ?? []).filter((cat) => cat.items.length > 0);
   const groups = groupByStack(categories);
-  const editing = draft !== null;
+  const editing = activeDraft !== null;
 
   const startEdit = () => {
     setSaveError(false);
-    setDraft(categories.map((cat) => ({ ...cat, items: [...cat.items] })));
+    setDraft({
+      companyId,
+      stack: categories.map((cat) => ({ ...cat, items: [...cat.items] })),
+    });
   };
   const commit = async () => {
-    if (!draft) return;
+    if (!activeDraft || draft?.companyId !== companyId) return;
     setSaveError(false);
     try {
-      await save.mutateAsync(cleanDraft(draft));
+      await save.mutateAsync(cleanDraft(activeDraft));
       setDraft(null);
     } catch {
       setSaveError(true);
@@ -76,8 +82,12 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
         ) : null}
       </div>
       <div className="p-4">
-        {editing ? (
-          <TechStackEditor draft={draft} onChange={setDraft} saveError={saveError} />
+        {activeDraft ? (
+          <TechStackEditor
+            draft={activeDraft}
+            onChange={(stack) => setDraft({ companyId, stack })}
+            saveError={saveError && draft?.companyId === companyId}
+          />
         ) : isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : isError && !data ? (
@@ -199,7 +209,10 @@ function TechStackEditor({
               </label>
               <button
                 type="button"
-                onClick={() => onChange(draft.filter((_, i) => i !== index))}
+                onClick={() => {
+                  onChange(draft.filter((_, i) => i !== index));
+                  setAdding((prev) => reindexPending(prev, index));
+                }}
                 aria-label={`Remove category ${cat.label || n}`}
                 className={SECONDARY_BTN}
               >
@@ -280,6 +293,16 @@ function groupByStack(categories: TechnicalStackCategory[]) {
   return [...groups.entries()]
     .sort(([a], [b]) => (a === MAIN_STACK ? -1 : b === MAIN_STACK ? 1 : 0))
     .map(([stack, cats]) => ({ stack, categories: cats }));
+}
+
+function reindexPending(pending: Record<number, string>, removedIndex: number): Record<number, string> {
+  const next: Record<number, string> = {};
+  for (const [key, value] of Object.entries(pending)) {
+    const index = Number(key);
+    if (index < removedIndex) next[index] = value;
+    else if (index > removedIndex) next[index - 1] = value;
+  }
+  return next;
 }
 
 function cleanDraft(draft: TechnicalStackCategory[]): TechnicalStackCategory[] {

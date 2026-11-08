@@ -2514,7 +2514,7 @@ function isReadableStackFile(file: File): boolean {
 
 function cloneStack(stack: TechnicalStackCategory[]): TechnicalStackCategory[] {
   return stack.map((category) => ({
-    label: category.label,
+    ...category,
     items: category.items.map((item) => ({ ...item })),
   }));
 }

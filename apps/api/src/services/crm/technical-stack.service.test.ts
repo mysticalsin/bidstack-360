@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptTechnicalStackSuggestion,
   buildTechnicalStackState,
+  normalizeTechnicalStack,
   suggestionId,
   technicalStackOverrideValue,
 } from './technical-stack.service.js';
@@ -68,6 +69,16 @@ describe('technical stack overrides', () => {
         ],
       },
     ]);
+  });
+
+  it('keeps Unicode stack names distinct from each other and from the main stack', () => {
+    const stack = normalizeTechnicalStack([
+      { stack: '日本', label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] },
+      { stack: '中国', label: 'Cloud', items: [{ name: 'AWS', source: 'manual', confidence: 1 }] },
+      { label: 'Cloud', items: [{ name: 'GCP', source: 'manual', confidence: 1 }] },
+    ]);
+    expect(stack.map((category) => category.stack ?? '')).toEqual(['日本', '中国', '']);
+    expect(stack.map((category) => category.items[0]?.name)).toEqual(['Azure', 'AWS', 'GCP']);
   });
 
   it('keeps dismissed provider deltas hidden across refreshes', () => {
