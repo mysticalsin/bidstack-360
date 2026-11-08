@@ -195,7 +195,7 @@ preview_cleanup() {
   local status=$?
   local why="${1:-exit}"
   trap - EXIT INT TERM
-  local pid waits grouped leader alive
+  local pid waits grouped leader alive unresolved=0
   for pid in "${preview_group_pids[@]}"; do
     [[ -n "${pid}" ]] || continue
     preview_signal_group "${pid}" TERM
@@ -250,14 +250,18 @@ preview_cleanup() {
       wait "${pid}" 2>/dev/null || wait_status=$?
       printf 'wait %s %s\n' "${pid}" "${wait_status}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
     elif kill -0 "${pid}" 2>/dev/null; then
-      # No signal and no wait. This bash still delays process exit while a
-      # direct child remains; that limit is not closed by guessing a signal.
+      # Still our child, but not a proved identity. Do not signal it.
       printf 'unresolved %s identity\n' "${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+      unresolved=1
     else
       wait "${pid}" 2>/dev/null || wait_status=$?
       printf 'wait %s %s\n' "${pid}" "${wait_status}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
     fi
   done
+  if [[ "${unresolved}" == "1" ]]; then
+    # Ownership was not proved. Exit is the failure. The child is not signaled.
+    exit 2
+  fi
   if [[ "${why}" == "INT" ]]; then exit 130; fi
   if [[ "${why}" == "TERM" ]]; then exit 143; fi
   exit "${status}"

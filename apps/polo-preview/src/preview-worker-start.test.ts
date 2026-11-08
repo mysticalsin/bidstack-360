@@ -144,12 +144,10 @@ describe('preview process lifecycle', () => {
     spawnSync('kill', ['-9', String(unrelated)]);
   });
 
-  it('reports unresolved ownership and returns while a live child stat cannot be read', () => {
-    const started = Date.now();
+  it('records an unresolved receipt for a sleeper that is not this shell child', () => {
+    // Receipt only. This does not prove the direct-child launcher returns.
     const result = run(`
       preview_install_trap
-      # The sleeper is not this shell's child. This bash waits for its own
-      # children at exit even after cleanup refuses to wait or signal them.
       leader=\$(bash -c 'setsid sleep 30 >/dev/null 2>&1 & echo \$!')
       preview_track_leader "\$leader"
       preview_read_start() { return 1; }
@@ -157,12 +155,42 @@ describe('preview process lifecycle', () => {
       preview_cleanup
     `);
     const leader = /LEADER:(\d+)/.exec(result.stdout)?.[1];
-    expect(Date.now() - started).toBeLessThan(5_000);
     expect(Number(leader)).toBeGreaterThan(0);
+    expect(result.status).toBe(2);
     expect(readFileSync(result.reap, 'utf8')).toContain(`unresolved ${leader} identity`);
     expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${leader}`);
     expect(spawnSync('kill', ['-0', String(leader)]).status).toBe(0);
     spawnSync('kill', ['-9', String(leader)]);
+  });
+
+  it('returns while a direct child with a log and an unreadable stat is still alive', () => {
+    const started = Date.now();
+    const result = run(`
+      preview_install_trap
+      nohup sleep 30 >/dev/null 2>&1 &
+      unrelated=\$!
+      disown || true
+      sleep 30 >>"\$LOG" 2>&1 &
+      leader=\$!
+      preview_track "\$leader"
+      preview_read_start() { return 1; }
+      echo LEADER:\$leader
+      echo UNRELATED:\$unrelated
+      preview_cleanup
+    `);
+    const leader = /LEADER:(\d+)/.exec(result.stdout)?.[1];
+    const unrelated = /UNRELATED:(\d+)/.exec(result.stdout)?.[1];
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(result.status).toBe(2);
+    expect(Number(leader)).toBeGreaterThan(0);
+    expect(Number(unrelated)).toBeGreaterThan(0);
+    expect(readFileSync(result.reap, 'utf8')).toContain(`unresolved ${leader} identity`);
+    expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${leader}`);
+    expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${unrelated}`);
+    expect(spawnSync('kill', ['-0', String(leader)]).status).toBe(0);
+    expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
+    spawnSync('kill', ['-9', String(leader)]);
+    spawnSync('kill', ['-9', String(unrelated)]);
   });
 
   it('rejects a remote host hidden after an at-sign in the path', () => {
