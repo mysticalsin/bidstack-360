@@ -102,7 +102,12 @@ function apiEnv() {
     WORKER_HEALTH_PORT: '4030',
     ACCOUNT_INTEL_AUTO_REFRESH: 'true',
     ...(process.env.POLO_INTEL_USER_AGENT
-      ? { ACCOUNT_INTEL_USER_AGENT: process.env.POLO_INTEL_USER_AGENT, SEC_USER_AGENT: process.env.POLO_INTEL_USER_AGENT }
+      ? {
+          ACCOUNT_INTEL_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+          SEC_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+          FINANCIALS_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+          BIDSTACK_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+        }
       : {}),
   };
 }
