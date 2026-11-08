@@ -122,7 +122,7 @@ describe('preview process lifecycle', () => {
       nohup sleep 30 >/dev/null 2>&1 &
       unrelated=\$!
       disown || true
-      setsid bash -c 'sleep 30 & echo GRAND:\$!; wait' &
+      setsid bash -c 'sleep 30 & echo GRAND:\$!; exit 0' &
       child=\$!
       echo UNRELATED:\$unrelated
       preview_track_leader "\$child"

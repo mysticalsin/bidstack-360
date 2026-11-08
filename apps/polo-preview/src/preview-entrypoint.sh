@@ -55,6 +55,14 @@ preview_require_local_database() {
     log "DATABASE_URL must point at the preview Postgres on 127.0.0.1 or localhost"
     exit 1
   fi
+  local pathpart="${url#*://}"
+  pathpart="${pathpart%%\?*}"
+  pathpart="${pathpart%%#*}"
+  pathpart="${pathpart#*/}"
+  if [[ -n "${pathpart}" && "${pathpart}" != "${POSTGRES_DB}" ]]; then
+    log "DATABASE_URL database does not match POSTGRES_DB"
+    exit 1
+  fi
   if [[ -n "${port}" && "${port}" != "5432" ]]; then
     log "DATABASE_URL must use the preview Postgres port"
     exit 1
@@ -109,17 +117,12 @@ preview_track_leader() {
   preview_group_pids+=("$1")
 }
 
-preview_signal_pid() {
+# Signal the process group we created. There is no fallback to the positive
+# pid: that number can be reused by an unrelated process after the leader exits.
+preview_signal_group() {
   local pid="$1"
   local sig="$2"
-  local leader=""
-  for leader in "${preview_group_pids[@]}"; do
-    if [[ "${leader}" == "${pid}" ]]; then
-      kill "-${sig}" -- "-${pid}" 2>/dev/null || kill "-${sig}" "${pid}" 2>/dev/null || true
-      return
-    fi
-  done
-  kill "-${sig}" "${pid}" 2>/dev/null || true
+  kill "-${sig}" -- "-${pid}" 2>/dev/null || true
 }
 
 preview_require_file() {
@@ -146,27 +149,43 @@ preview_cleanup() {
   local status=$?
   local why="${1:-exit}"
   trap - EXIT INT TERM
-  local pid waits
-  for pid in "${preview_child_pids[@]}"; do
-    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-      preview_signal_pid "${pid}" TERM
-    fi
+  local pid waits grouped leader alive
+  for pid in "${preview_group_pids[@]}"; do
+    [[ -n "${pid}" ]] || continue
+    preview_signal_group "${pid}" TERM
   done
   for pid in "${preview_child_pids[@]}"; do
     [[ -n "${pid}" ]] || continue
-    # Poll. A blocking wait here never reaches kill -9 if the child ignores TERM.
-    waits=0
-    while kill -0 "${pid}" 2>/dev/null && [[ "${waits}" -lt 20 ]]; do
-      sleep 0.1
-      waits=$((waits + 1))
+    grouped=0
+    for leader in "${preview_group_pids[@]}"; do
+      if [[ "${leader}" == "${pid}" ]]; then grouped=1; fi
     done
-    if kill -0 "${pid}" 2>/dev/null; then
-      preview_signal_pid "${pid}" KILL
-      waits=0
-      while kill -0 "${pid}" 2>/dev/null && [[ "${waits}" -lt 10 ]]; do
-        sleep 0.1
-        waits=$((waits + 1))
-      done
+    if [[ "${grouped}" == "0" ]] && kill -0 "${pid}" 2>/dev/null; then
+      kill -TERM "${pid}" 2>/dev/null || true
+    fi
+  done
+  waits=0
+  while [[ "${waits}" -lt 20 ]]; do
+    alive=0
+    for pid in "${preview_group_pids[@]}" "${preview_child_pids[@]}"; do
+      if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then alive=1; fi
+    done
+    if [[ "${alive}" == "0" ]]; then break; fi
+    sleep 0.1
+    waits=$((waits + 1))
+  done
+  for pid in "${preview_group_pids[@]}"; do
+    [[ -n "${pid}" ]] || continue
+    preview_signal_group "${pid}" KILL
+  done
+  for pid in "${preview_child_pids[@]}"; do
+    [[ -n "${pid}" ]] || continue
+    grouped=0
+    for leader in "${preview_group_pids[@]}"; do
+      if [[ "${leader}" == "${pid}" ]]; then grouped=1; fi
+    done
+    if [[ "${grouped}" == "0" ]] && kill -0 "${pid}" 2>/dev/null; then
+      kill -KILL "${pid}" 2>/dev/null || true
     fi
     if ! kill -0 "${pid}" 2>/dev/null; then
       wait "${pid}" 2>/dev/null || true
@@ -229,8 +248,16 @@ preview_watch_children() {
 }
 
 preview_main() {
-preview_prepare_database
+# The trap is installed before preparation so a failed password or URL check
+# still runs cleanup. The image ENV may still contain the known preview
+# database default; this script replaces that shell value before children
+# start and does not write it to the log.
 preview_install_trap
+if [[ "${HOST}" != "127.0.0.1" && "${HOST}" != "localhost" ]]; then
+  log "HOST must be 127.0.0.1 or localhost"
+  exit 1
+fi
+preview_prepare_database
 preview_stop_redis=1
 
 node --input-type=module <<'JS' &
