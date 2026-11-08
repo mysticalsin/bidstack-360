@@ -58,6 +58,8 @@ export const TechnicalStackItem = z.object({
 export type TechnicalStackItemType = z.infer<typeof TechnicalStackItem>;
 
 export const TechnicalStackCategory = z.object({
+  /** Named stack for companies that run more than one (a business unit, region or entity). Absent means the main stack. */
+  stack: z.string().max(80).optional(),
   label: z.string().min(1),
   items: z.array(TechnicalStackItem),
 });

@@ -10,6 +10,7 @@ import {
 } from './account-intel.js';
 import { consultingPartners } from './consulting-partners.js';
 import { bidsOverdue, proposalSectionDraft, proposalStatus } from './bids.js';
+import { msaWhitespace, relationshipMap } from './msa-whitespace.js';
 import { opportunitiesGet, opportunitiesList, opportunityUpdate } from './opportunities.js';
 import { accountUpdates, recordsResolve } from './records.js';
 import { rfpSummary } from './rfp.js';
@@ -32,6 +33,8 @@ export const agentTools = {
   account_hiring: accountHiring,
   account_financials_summary: accountFinancialsSummary,
   account_news: accountNews,
+  msa_whitespace: msaWhitespace,
+  relationship_map: relationshipMap,
   company_tech_stack: companyTechStack,
   consulting_partners: consultingPartners,
 } as const satisfies Record<string, AgentTool>;
@@ -47,6 +50,7 @@ export {
   accountNews,
   accountUpdates,
   bidsOverdue,
+  msaWhitespace,
   companyTechStack,
   consultingPartners,
   opportunitiesGet,
@@ -55,6 +59,7 @@ export {
   proposalSectionDraft,
   proposalStatus,
   recordsResolve,
+  relationshipMap,
   rfpSummary,
   tasksCreate,
 };

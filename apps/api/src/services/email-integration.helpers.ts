@@ -8,7 +8,7 @@
  */
 
 import { prisma } from '@bidstack/db';
-import { WORKSPACE_READ_SCOPES } from '@bidstack/shared';
+import { microsoftRefreshScopes } from '@bidstack/shared';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
@@ -62,7 +62,7 @@ const REVOKED_MESSAGE = 'Access was revoked at the provider. Reconnect to resume
 
 /**
  * Exchange a refresh token. Stores rotated refresh tokens (Microsoft rotates
- * on every refresh), asks Microsoft only for the scopes the user granted, and
+ * on every refresh), asks Microsoft only for the read scopes the user granted, and
  * marks the grant revoked on invalid_grant so the card offers a reconnect.
  */
 async function refreshToken(
@@ -71,7 +71,6 @@ async function refreshToken(
   log: ServiceLogger,
 ): Promise<string> {
   const google = token.provider === 'gmail' || token.provider === 'google_workspace';
-  const granted = token.scope.length > 0 ? token.scope : [...WORKSPACE_READ_SCOPES.microsoft];
   const url = google
     ? 'https://oauth2.googleapis.com/token'
     : `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID ?? 'common'}/oauth2/v2.0/token`;
@@ -87,7 +86,7 @@ async function refreshToken(
         client_secret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET ?? '',
         refresh_token: refresh,
         grant_type: 'refresh_token',
-        scope: (granted.includes('offline_access') ? granted : [...granted, 'offline_access']).join(' '),
+        scope: microsoftRefreshScopes(token.scope).join(' '),
       });
 
   const res = await fetchWithTimeout(url, {

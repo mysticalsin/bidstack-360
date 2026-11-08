@@ -35,6 +35,15 @@ describe('MCP registry reuses the shared agent tools', () => {
     }
   });
 
+  it('serves the MSA whitespace and relationship map tools from the shared registry', () => {
+    for (const name of ['msa_whitespace', 'relationship_map'] as const) {
+      expect(AGENT_TOOL_NAMES).toContain(name);
+      expect(tools[name]).toBe(agentTools[name]);
+      expect(toolScopes[name]).toBe('read');
+      expect(agentTools[name].permission).toBe('msa:read');
+    }
+  });
+
   it('serves consulting_partners from the shared registry as a read tool', () => {
     expect(AGENT_TOOL_NAMES).toContain('consulting_partners');
     expect(tools.consulting_partners).toBe(agentTools.consulting_partners);

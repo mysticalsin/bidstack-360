@@ -778,3 +778,54 @@ Internal staffing on an account plus alerts when someone else acts on it. Recipi
 - Toast for a new alert: the existing `Toast` stack, tone info, title from the alert, description is actor and item, one "Open" action that navigates in-app. Motion follows the toast system, which already respects `prefers-reduced-motion`. A coalesced alert refreshes the same toast instead of stacking.
 - Settings, Notifications: below the existing toggles, a "Delivery" grid. Rows: Account activity, Deals, Tasks, Mentions. Columns: In-app, Email, Teams (checkboxes with visible labels for screen readers). A "Daily digest email" toggle under the grid. Teams block: webhook URL field (password-style, never echoed back; shows the saved host), Save, Send test, Remove. Copy explains to paste the URL from a Teams Workflows "post to a chat or channel when a webhook request is received" flow.
 - Tokens: `.sg` variables, both themes, 12px card radius, tabular numbers for percentages, lucide icons only. Nothing overlaps at 1440, 1024 or 390.
+### 9.11 Conversations on the account page (slice 20)
+
+Synced Outlook, Teams and Gmail meetings and emails filed to the account, shown under the activity charts on the account page. Read-only: Polo never sends mail or writes calendars.
+
+- Section "Conversations": header with the count shown and the source line "From your connected Outlook and Google calendars and mailboxes". One row per meeting or email, newest first, 25 rows, "Show more" pages by 25.
+- Row: lucide icon (`Video` for Teams, `CalendarDays` for other meetings, `Mail` for email), subject (truncates, full text in `title`), date and time in the browser zone, participant count, direction for email (Received, Sent).
+- Source chip on every row, so each fact names its source: `Outlook`, `Teams`, `Gmail`, `Google Calendar`; rows logged in Polo or pushed by the ingest API show `Logged in Polo` or the ingest source name.
+- Filing hint after the chip: "Filed automatically" (matched by attendee or domain) or "Filed by you". When the account has more than one open opportunity and none was picked, a "Needs opportunity" tag shows instead of a guess.
+- Re-file: meetings you own get a "File to opportunity" select (open opportunities on this account plus "Account only"). It calls the existing `PATCH /calendar/events/:id`; emails have no re-file route yet, so no control.
+- Cancelled meetings stay in the list with a "Cancelled" tag and struck subject.
+- Empty: one line, "No synced meetings or emails yet." Error: one line plus Retry. Loading: skeleton rows.
+- Tokens: `--fg-*`, `--border-subtle`, `--brand-primary`; `Badge` for chips; both themes; nothing overlaps at 1440, 1024 or 390.
+### 9.11 Company intel on the Companies page (slice 14)
+
+Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.
+
+- List columns, after Company and Domain: Revenue, Revenue growth, Headcount, Headcount growth (6m), Open roles, New roles (30d), Hiring trend, Funding, Signal, Direction. All sortable on the loaded page; filters run on the server.
+- Saved views as a segmented row above the table: Hiring fast (5 or more new postings in 30 days), Revenue over 1B (USD equivalent), Contracting. `aria-pressed` on the active one; one click again clears it. A Direction select sits beside them.
+- Columns button (lucide `Columns3`) opens a checkbox menu; hidden columns persist per browser in `localStorage` key `polo.companies.columns.v1`.
+- Every number names its source, year or as-of date and method in its hover title and accessible label. Derived numbers (revenue growth, filed headcount growth, direction) say "inferred"; growth values render italic when inferred.
+- Empty values render an en dash with the reason on hover: Not connected, Private company, No public data, plus one line of detail.
+- New roles (30d) is the hiring proxy: postings first published in the last 30 days, with the delta against the prior 30 days. It is never called hires.
+- Hiring trend: vendored TUFFUI sparkline (72 x 28), six monthly points, last point dotted; success tone when the 30 day trend is up, danger when down, tertiary when flat.
+- Direction: `StatusPill` sm with lucide `TrendingUp`, `Minus` or `TrendingDown` and the word Growing, Steady or Contracting; reasons in a tooltip ending with "Inferred". Signal: `StatusPill` with the post kind.
+- Import progress: one row above the table while an import's companies are enriched: origin, done of total, then the result counts when complete (with revenue, headcount growth, new roles 30d).
+- Account header: a compact strip under the name with five buttons: Revenue (with FY), Headcount (with 6m growth), Open roles (with 30 day delta), Funding, Direction. Each opens the matching Intel tab (financials, hiring, hiring, financials, direction). A Refresh button (lucide `RefreshCw`) for `account-intel:write` queues every source.
+- Intel tab on the account page mounts the slice 12 section (9.7).
+- Widths: the table scrolls horizontally inside its card; the strip wraps to two rows at 1024 and stacks at 390. No overlapping text at 1440, 1024 and 390.
+- No taglines or helper text. Tokens only, both themes, tabular numbers, sample data tagged.
+### 9.11 Slice 5 as built (2026-11-07)
+
+Appended by factory slice 5 (Settings > Access policies).
+
+- Builder: one card per rule with When, Then, Conditions and Except fieldsets, a plain sentence that
+  reads the rule back, and Move up / Move down / Remove buttons (keyboard reorder). MatchField was not
+  vendored: upstream it is a fit chart, not a form, so the rule rows use native checkboxes and inputs.
+- Impact preview: the shared `DivergingBars` from `components/charts/tuffui` (gains above the line in `--success`, losses below in
+  `--danger`) with a "View as table" toggle; people and example events per side, one sentence when
+  nothing changes.
+- Approvals and versions: `StatusPill` for Pending, Approved and Live; the author sees a sentence
+  instead of Approve; "Publish vN" and "Roll back to vN" announce through `aria-live="polite"`.
+- Review fixes: the author or submitter sees Withdraw instead of Approve; checkbox groups are named
+  groups; hour inputs say UTC. "Roll back to vN" files a pending request that a second admin approves
+  before it can be published. The preview headline counts people, the sub-line counts actions, and
+  two sentences say what it cannot show: changes that depend on the record country (not enforced at
+  route level yet) and reads (not in the audit log). The tab and its API are Admin only.
+### 9.x Hiring detail and source rules (2026-11-07)
+
+- Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
+- Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
+- Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.

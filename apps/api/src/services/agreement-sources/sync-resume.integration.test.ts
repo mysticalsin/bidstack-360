@@ -99,6 +99,7 @@ beforeAll(async () => {
   _resetIntegrationTokenKey();
   const org = await createIsolatedOrg('agreement-sync-resume');
   orgId = org.orgId;
+  await prisma.org.update({ where: { id: orgId }, data: { microsoftTenantId: TENANT } });
   userId = (await prisma.user.findFirstOrThrow({ where: { orgId }, orderBy: { createdAt: 'asc' } })).id;
   pdf = await syntheticNorthwindMsaPdf();
 });

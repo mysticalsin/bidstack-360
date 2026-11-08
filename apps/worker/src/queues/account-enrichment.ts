@@ -10,6 +10,7 @@ import { type Job, Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
+import { intelConnections, prisma, recomputeCompanyIntelSummary } from '@bidstack/db';
 import { ACCOUNT_ENRICHMENT, type AccountEnrichmentJob } from '@bidstack/shared';
 
 import {
@@ -55,6 +56,11 @@ export async function startAccountEnrichment(
       }
       try {
         const res = await runAccountEnrichment(data, deps);
+        if (res.outcome === 'refreshed') {
+          await recomputeCompanyIntelSummary(prisma, data.orgId, data.companyId, { now: new Date(), connections: intelConnections(env) }).catch((err: Error) =>
+            log.warn({ companyId: data.companyId, err: err.message }, 'intel summary not rebuilt'),
+          );
+        }
         log.info({ jobId: job.id, orgId: data.orgId, companyId: data.companyId, ...res }, 'account enrichment finished');
         return res;
       } catch (err) {

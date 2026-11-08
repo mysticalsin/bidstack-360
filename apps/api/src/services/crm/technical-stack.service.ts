@@ -30,7 +30,8 @@ function slug(value: string): string {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '');
 }
 
@@ -57,12 +58,13 @@ export function normalizeTechnicalStack(
   stack: TechnicalStackCategoryType[],
 ): TechnicalStackCategoryType[] {
   const byLabel = new Map<string, Map<string, TechnicalStackItemType>>();
-  const labels = new Map<string, string>();
+  const labels = new Map<string, { stack: string; label: string }>();
 
   for (const category of stack) {
     const label = category.label.trim() || 'Other';
-    const labelKey = slug(label) || 'other';
-    labels.set(labelKey, labels.get(labelKey) ?? label);
+    const stackName = category.stack?.trim() ?? '';
+    const labelKey = `${slug(stackName)}|${slug(label) || 'other'}`;
+    labels.set(labelKey, labels.get(labelKey) ?? { stack: stackName, label });
     const items = byLabel.get(labelKey) ?? new Map<string, TechnicalStackItemType>();
 
     for (const rawItem of category.items) {
@@ -77,10 +79,14 @@ export function normalizeTechnicalStack(
   }
 
   return [...byLabel.entries()]
-    .map(([labelKey, items]) => ({
-      label: labels.get(labelKey) ?? 'Other',
-      items: [...items.values()],
-    }))
+    .map(([labelKey, items]) => {
+      const named = labels.get(labelKey);
+      return {
+        ...(named?.stack ? { stack: named.stack } : {}),
+        label: named?.label ?? 'Other',
+        items: [...items.values()],
+      };
+    })
     .filter((category) => category.items.length > 0);
 }
 
@@ -163,7 +169,9 @@ export function acceptTechnicalStackSuggestion(
   if (!suggestion) return null;
   const next = normalizeTechnicalStack(state.manualStack);
   const labelKey = slug(suggestion.label);
-  const existing = next.find((category) => slug(category.label) === labelKey);
+  const existing = next.find(
+    (category) => !category.stack && slug(category.label) === labelKey,
+  );
   const acceptedItem: TechnicalStackItemType = {
     name: suggestion.item.name,
     source: `manual:accepted:${suggestion.item.source}`,
