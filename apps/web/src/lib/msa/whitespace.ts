@@ -84,8 +84,9 @@ export interface WhoRow {
 const WORK_KINDS = new Set(['msa', 'opportunity', 'project', 'revenue']);
 
 export function addToTotals(totals: MoneyTotal[], valueMicros: number | null | undefined, currency: string | null | undefined): void {
-  if (!valueMicros || !currency) return;
-  const code = currency.toUpperCase();
+  if (valueMicros == null || valueMicros === 0) return;
+  // A missing currency is not zero and is not a guessed code.
+  const code = currency?.trim() ? currency.toUpperCase() : 'unspecified';
   const t = totals.find((x) => x.currency === code);
   if (t) t.valueMicros += valueMicros;
   else totals.push({ currency: code, valueMicros });

@@ -60,6 +60,11 @@ async function nextDecidedAt(tx: Prisma.TransactionClient, orgId: string, contra
   return later(latest?.decidedAt);
 }
 
+/** Lines a person can filter, including a decision whose line is not on `lines`. */
+export function whitespaceFlagLines(flag: WhitespaceFlagT): string[] {
+  return [...new Set([...flag.lines, ...flag.decisions.map((decision) => decision.line)])];
+}
+
 export function whitespaceFacets(flags: WhitespaceFlagT[]): WhitespaceFacetsT {
   const entities = new Map<string, string>();
   const owners = new Map<string, string>();
@@ -69,8 +74,7 @@ export function whitespaceFacets(flags: WhitespaceFlagT[]): WhitespaceFacetsT {
     entities.set(f.signingEntity.id, f.signingEntity.name);
     if (f.owner) owners.set(f.owner.id, f.owner.name);
     f.countries.forEach((c) => countries.add(c));
-    f.lines.forEach((l) => lines.add(l));
-    f.decisions.forEach((d) => lines.add(d.line));
+    whitespaceFlagLines(f).forEach((l) => lines.add(l));
   }
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
   return {
@@ -85,7 +89,7 @@ export function filterWhitespace(flags: WhitespaceFlagT[], q: z.infer<typeof Whi
   return flags.filter(
     (f) =>
       (q.state === 'all' || f.state === q.state) &&
-      (!q.line || f.lines.includes(q.line)) &&
+      (!q.line || whitespaceFlagLines(f).includes(q.line)) &&
       (!q.signingEntityId || f.signingEntity.id === q.signingEntityId) &&
       (!q.country || f.global || f.countries.includes(q.country)) &&
       (!q.ownerId || f.owner?.id === q.ownerId) &&
@@ -122,7 +126,7 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
       const filtered = filterWhitespace(all, req.query);
       const byLine = new Map<string, { count: number; topScore: number }>();
       for (const f of filtered) {
-        for (const line of f.lines) {
+        for (const line of whitespaceFlagLines(f)) {
           const row = byLine.get(line) ?? { count: 0, topScore: 0 };
           row.count += 1;
           row.topScore = Math.max(row.topScore, f.score);
