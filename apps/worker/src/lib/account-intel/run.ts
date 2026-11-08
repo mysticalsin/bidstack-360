@@ -17,7 +17,7 @@ import { fetchOwnPosts, type OwnPost } from './posts/own-posts.js';
 import { brregEntityPage, fetchBrreg } from './registries/brreg.js';
 import { fetchCompaniesHouseProfile } from './registries/companies-house-profile.js';
 import { annuairePage, fetchFrance } from './registries/france.js';
-import { gleifRecordPage, matchLei, readLei } from './registries/gleif.js';
+import { gleifRecordPage, matchLei, readLei, type LeiRecord } from './registries/gleif.js';
 import { fetchOpenCorporates } from './registries/opencorporates.js';
 import type { RegistryFact, RegistryPeriod } from './registries/types.js';
 
@@ -171,7 +171,9 @@ async function runRegistry(s: IntelSubject, client: IntelClient, deps: IntelRunD
   try {
     const patch: Partial<IntelIdentifiers> = {};
     const evidence: EvidenceRow[] = [];
-    const found = id.lei ? { record: await readLei(client, id.lei), url: gleifRecordPage(id.lei) } : await matchLei(client, s.companyName, country);
+    const found: { record: LeiRecord | null; url: string; matches?: LeiRecord[] } = id.lei
+      ? { record: await readLei(client, id.lei), url: gleifRecordPage(id.lei) }
+      : await matchLei(client, s.companyName, country);
     const r = found.record;
     if (r) {
       if (!id.lei) patch.lei = r.lei;
@@ -186,7 +188,12 @@ async function runRegistry(s: IntelSubject, client: IntelClient, deps: IntelRunD
         saved++;
       }
     } else if (!id.lei) {
-      notes.push('GLEIF: no unique LEI match on legal name and country');
+      const options = (found.matches ?? []).slice(0, 5);
+      notes.push(
+        options.length > 1
+          ? `GLEIF: ${options.length} entities share this name, confirm one: ${options.map((m) => `${m.legalName} (${m.country ?? '?'}) ${gleifRecordPage(m.lei)}`).join('; ')}`
+          : 'GLEIF: no LEI record with this legal name; add the registered legal name or LEI',
+      );
     }
   } catch (err) {
     errors.push(`GLEIF: ${(err as Error).message}`);
