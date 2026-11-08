@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 
 import { describe, expect, it } from 'vitest';
 
-import { SIGNATURE_SNIPPETS } from './SignatureGuide';
+import { SIGNATURE_SNIPPETS } from './signature-snippets';
 
 const nodeRequire = createRequire(import.meta.url);
 
