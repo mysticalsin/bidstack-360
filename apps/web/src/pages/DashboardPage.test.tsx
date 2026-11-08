@@ -42,7 +42,9 @@ vi.mock('@/components/cockpit', () => ({
     <div data-testid="page-head">{cockpit.company.name}</div>
   ),
   PipelineByStageCard: () => <div data-testid="pipeline-card" />,
-  RecentOpportunitiesCard: () => <div data-testid="recent-opps" />,
+  RecentOpportunitiesCard: ({ items }: { items?: Array<{ name: string }> }) => (
+    <div data-testid="recent-opps">{items?.map((item) => item.name).join('|')}</div>
+  ),
   RevenueEvolutionCard: () => <div data-testid="revenue-card" />,
   WinLossCard: () => <div data-testid="winloss-card" />,
   TechStackCard: () => <div data-testid="tech-card" />,
@@ -212,6 +214,8 @@ function dashboardSnapshot(freshness: 'fresh' | 'stale' | 'never' = 'fresh') {
     },
     companies: [],
     deals: [],
+    sampleDeals: [],
+    accountDeals: [],
     activities: [],
     insights: [],
     widgets: [],
@@ -274,6 +278,40 @@ describe('DashboardPage account cockpit', () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it('shows the account deal list, not the org sample, on the account page', () => {
+    const snapshot = dashboardSnapshot('fresh');
+    snapshot.deals = [
+      {
+        id: 'org-only',
+        name: 'Org sample deal',
+        companyId: 'someone-else',
+        companyName: 'Other',
+        stage: 'qualification',
+        amountMicros: '1000000',
+      },
+    ] as never;
+    snapshot.accountDeals = [
+      {
+        id: 'account-only',
+        name: 'Older account deal',
+        companyId: 'acme',
+        companyName: 'Acme',
+        stage: 'qualification',
+        amountMicros: '2000000',
+      },
+    ] as never;
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: snapshot,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+    renderAccountRoute();
+    expect(screen.getByTestId('recent-opps').textContent).toContain('Older account deal');
+    expect(screen.getByTestId('recent-opps').textContent).not.toContain('Org sample deal');
   });
 
   it('keeps the last verified cockpit visible when a background dashboard refresh fails', () => {

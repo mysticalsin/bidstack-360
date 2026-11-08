@@ -242,9 +242,14 @@ export const CrmDashboardSnapshot = z.object({
   generatedAt: z.string().datetime(),
   cockpit: AccountCockpitSnapshot,
   companies: z.array(CrmCompany),
-  /** Org deal sample. Account totals use this list, not one account's own query. */
+  /**
+   * Org sample, then any selected-account deals that are not in that sample.
+   * Older clients only read this list. The accounts board totals `sampleDeals`.
+   */
   deals: z.array(CrmDeal),
-  /** The selected account's own recent deals. Separate from `deals`. */
+  /** The org deal sample alone. Absent on an older payload, which only has `deals`. */
+  sampleDeals: z.array(CrmDeal).optional(),
+  /** The selected account's own recent deals. Separate from the org sample. */
   accountDeals: z.array(CrmDeal).optional(),
   /** True when the org deal sample stopped at 100 and at least one more deal exists. */
   dealsSampleCapped: z.boolean().optional(),

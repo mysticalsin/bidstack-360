@@ -189,7 +189,7 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
       data: { dealsSampleCapped?: boolean; deals: Array<Record<string, unknown>>; companies: Array<{ id: string }> };
     };
     current.data.dealsSampleCapped = true;
-    current.data.deals = [
+    const sample = [
       {
         id: 'in-sample',
         companyId: current.data.companies[0].id,
@@ -198,6 +198,16 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
         probability: 100,
       },
     ];
+    const olderAccountOnly = {
+      id: 'older-account',
+      companyId: current.data.companies[0].id,
+      stage: 'qualification',
+      amountMicros: '9000000',
+      probability: 100,
+    };
+    current.data.sampleDeals = sample;
+    // `deals` still carries the older account deal for a client that cannot read sampleDeals.
+    current.data.deals = [...sample, olderAccountOnly];
     renderSegment();
     expect(screen.getByText(/1 open deals in the latest 100/)).toBeTruthy();
     expect(screen.queryByText(/9 open deals/)).toBeNull();

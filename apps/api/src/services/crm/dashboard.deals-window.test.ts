@@ -98,10 +98,15 @@ describe('dashboard deal window', () => {
       { warn() {}, info() {} },
     );
     expect(snapshot.dealsSampleCapped).toBe(true);
-    expect(snapshot.deals).toHaveLength(DASHBOARD_DEAL_SAMPLE);
-    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(false);
+    expect(snapshot.sampleDeals).toHaveLength(DASHBOARD_DEAL_SAMPLE);
+    expect(snapshot.sampleDeals?.some((deal) => deal.id === oldId)).toBe(false);
+    // Older clients read `deals` only. The account deal is appended after the sample.
+    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(true);
+    expect(snapshot.deals.slice(0, DASHBOARD_DEAL_SAMPLE).some((deal) => deal.id === oldId)).toBe(false);
     expect(snapshot.accountDeals?.some((deal) => deal.id === oldId)).toBe(true);
-    const sampledOpen = snapshot.deals.filter((deal) => deal.stage !== 'closed_won' && deal.stage !== 'closed_lost');
+    expect(snapshot.sampleDeals).not.toEqual(snapshot.deals);
+    expect(snapshot.accountDeals).not.toEqual(snapshot.deals);
+    const sampledOpen = snapshot.sampleDeals?.filter((deal) => deal.stage !== 'closed_won' && deal.stage !== 'closed_lost');
     expect(sampledOpen).toHaveLength(DASHBOARD_DEAL_SAMPLE);
   });
 
@@ -112,8 +117,24 @@ describe('dashboard deal window', () => {
       dbFor([older, old]) as never,
       { warn() {}, info() {} },
     );
-    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(false);
+    expect(snapshot.sampleDeals?.some((deal) => deal.id === oldId)).toBe(false);
+    expect(snapshot.deals.some((deal) => deal.id === oldId)).toBe(true);
     expect(snapshot.accountDeals?.map((deal) => deal.id)).toEqual([older.id, oldId]);
     expect(snapshot.dealsSampleCapped).toBe(true);
+  });
+
+  it('asks the database for a unique deal order', async () => {
+    const orders: unknown[] = [];
+    const db = dbFor([older, old]);
+    const original = db.opportunity.findMany;
+    db.opportunity.findMany = async (args: { orderBy?: unknown; where?: { companyId?: string } }) => {
+      orders.push(args.orderBy);
+      return original(args);
+    };
+    await buildDashboardSnapshot(orgId, ciId, db as never, { warn() {}, info() {} });
+    expect(orders).toEqual([
+      [{ updatedAt: 'desc' }, { id: 'asc' }],
+      [{ updatedAt: 'desc' }, { id: 'asc' }],
+    ]);
   });
 });

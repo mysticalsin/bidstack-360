@@ -70,7 +70,9 @@ export function AccountsAllSegment() {
     // org should not surface test residue; fresh orgs seed none.
     return dashboard.data.companies
       .filter((company) => !isSyntheticAccountName(company.name))
-      .map((company) => deriveAccount(company, dashboard.data!.deals));
+      .map((company) =>
+        deriveAccount(company, dashboard.data!.sampleDeals ?? dashboard.data!.deals),
+      );
   }, [dashboard.data]);
 
   const leverageIds = useMemo(

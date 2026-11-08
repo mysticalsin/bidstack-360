@@ -142,7 +142,7 @@ export async function buildDashboardSnapshot(
           },
         },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
       take: DASHBOARD_DEAL_SAMPLE + 1,
     }),
     prisma.task.findMany({
@@ -300,7 +300,7 @@ export async function buildDashboardSnapshot(
     const sparse = await findSparseAccount(prisma, orgId, accountId, scope);
     if (sparse) companies.push(companyFromRow(sparse));
   }
-  const deals = sampledOpportunities.map((opportunity) => serializeDeal(opportunity));
+  const sampleDeals = sampledOpportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
   const visibleInsights = visibleOpportunityIds
     ? persistedInsights.filter(
@@ -412,7 +412,7 @@ export async function buildDashboardSnapshot(
               },
             },
           },
-          orderBy: { updatedAt: 'desc' },
+          orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
           take: 100,
         })
       : Promise.resolve([]),
@@ -480,10 +480,12 @@ export async function buildDashboardSnapshot(
     fetchBuyingRoleFacts(orgId, contactIds, prisma),
   ]);
 
-  // The accounts board sums `deals` and, when the org sample is full, labels that
-  // sum as the latest 100. The selected account's own query can include older
-  // deals, so those rows stay on `accountDeals` and are not folded into `deals`.
+  // `sampleDeals` is the org page the accounts board totals. `accountDeals` is
+  // the selected account's own list. `deals` keeps both, with the sample first,
+  // so a client that only reads `deals` still sees that account's older deals.
   const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
+  const sampleIds = new Set(sampleDeals.map((deal) => deal.id));
+  const deals = [...sampleDeals, ...accountDeals.filter((deal) => !sampleIds.has(deal.id))];
 
   return {
     generatedAt: new Date().toISOString(),
@@ -502,6 +504,7 @@ export async function buildDashboardSnapshot(
     }),
     companies,
     deals,
+    sampleDeals,
     accountDeals,
     dealsSampleCapped,
     activities,
