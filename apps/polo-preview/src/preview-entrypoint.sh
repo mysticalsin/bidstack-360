@@ -111,13 +111,15 @@ declare -A preview_leader_start=()
 
 preview_read_start() {
   local line
+  local -a fields
   [[ -r "/proc/${1}/stat" ]] || return 1
   IFS= read -r line < "/proc/${1}/stat" || return 1
   line="${line#*) }"
-  # starttime is the 20th field after the command name.
-  # One read, not set --: a negative stat field passed to set leaves bash
-  # unable to signal a still-live process group.
-  read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PREVIEW_START_TOKEN _ <<< "${line}"
+  # Field 20 after the command name is starttime. An array keeps a negative
+  # stat field from becoming a shell option the way set -- did.
+  # shellcheck disable=SC2206
+  fields=( ${line} )
+  PREVIEW_START_TOKEN="${fields[19]:-}"
   [[ -n "${PREVIEW_START_TOKEN}" ]] || return 1
   return 0
 }
@@ -129,18 +131,16 @@ preview_note_identity() {
   preview_leader_start["${pid}"]="${PREVIEW_START_TOKEN}"
 }
 
-# The recorded start token still matches. A reused pid has a different token
-# and is not ours. A gone pid has no stat; that is not a reuse, so the group
-# we created can still be signaled. An empty recorded token is not identity.
+# Identity is the recorded start token still present in /proc. An empty token,
+# an unreadable stat, or a different token is not identity. Do not signal a
+# PGID from a guess: a recycled number can name a new group once ours is gone.
 preview_identity_ok() {
-  local pid="$1" token now
+  local pid="$1" token
   token="${preview_leader_start[${pid}]:-}"
   [[ -n "${token}" ]] || return 1
   PREVIEW_START_TOKEN=""
-  if preview_read_start "${pid}"; then
-    now="${PREVIEW_START_TOKEN}"
-    [[ "${now}" == "${token}" ]] || return 1
-  fi
+  preview_read_start "${pid}" || return 1
+  [[ "${PREVIEW_START_TOKEN}" == "${token}" ]] || return 1
   return 0
 }
 
@@ -243,8 +243,11 @@ preview_cleanup() {
     if [[ "${grouped}" == "0" ]] && preview_identity_ok "${pid}" && kill -0 "${pid}" 2>/dev/null; then
       kill -KILL "${pid}" 2>/dev/null || true
     fi
-    wait "${pid}" 2>/dev/null || true
-    echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+    # Record wait's own status. A line written only after the shell exits
+    # would also be true of a child the kernel reaped for us.
+    local wait_status=0
+    wait "${pid}" 2>/dev/null || wait_status=$?
+    printf 'wait %s %s\n' "${pid}" "${wait_status}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
   done
   if [[ "${why}" == "INT" ]]; then exit 130; fi
   if [[ "${why}" == "TERM" ]]; then exit 143; fi

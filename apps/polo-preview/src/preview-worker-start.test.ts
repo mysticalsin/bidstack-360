@@ -70,8 +70,8 @@ describe('preview process lifecycle', () => {
     const b = /B:(\d+)/.exec(result.stdout)?.[1];
     expect(a).toBeTruthy();
     expect(b).toBeTruthy();
-    expect(reaped).toContain(`reaped ${a}`);
-    expect(reaped).toContain(`reaped ${b}`);
+    expect(reaped).toMatch(new RegExp(`wait ${a} (137|143)`));
+    expect(reaped).toMatch(new RegExp(`wait ${b} (137|143)`));
     expect(result.log).toContain('a preview process exited (9)');
     expect(Number(a)).toBeGreaterThan(0);
     expect(Number(b)).toBeGreaterThan(0);
@@ -116,7 +116,7 @@ describe('preview process lifecycle', () => {
     expect(result.log).toContain('password generation failed');
   });
 
-  it('kills a grandchild of a tracked leader and leaves an unrelated process', () => {
+  it('leaves a grandchild when the leader stat cannot be read', () => {
     const result = run(`
       preview_install_trap
       nohup sleep 30 >/dev/null 2>&1 &
@@ -128,6 +128,7 @@ describe('preview process lifecycle', () => {
       preview_track_leader "\$child"
       sleep 0.2
       echo CHILD:\$child
+      preview_read_start() { return 1; }
       preview_cleanup
     `);
     const unrelated = /UNRELATED:(\d+)/.exec(result.stdout)?.[1];
@@ -136,9 +137,9 @@ describe('preview process lifecycle', () => {
     expect(Number(child)).toBeGreaterThan(0);
     expect(Number(grand)).toBeGreaterThan(0);
     expect(Number(unrelated)).toBeGreaterThan(0);
-    expect(spawnSync('kill', ['-0', String(child)]).status).toBe(1);
-    expect(spawnSync('kill', ['-0', String(grand)]).status).toBe(1);
+    expect(spawnSync('kill', ['-0', String(grand)]).status).toBe(0);
     expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
+    spawnSync('kill', ['-9', String(grand)]);
     spawnSync('kill', ['-9', String(unrelated)]);
   });
 
@@ -150,6 +151,38 @@ describe('preview process lifecycle', () => {
     `);
     expect(result.status).toBe(1);
     expect(result.stdout).not.toContain('CONTINUED');
+  });
+
+  it('does not signal when the start token is empty or stat cannot be read', () => {
+    const result = run(`
+      setsid sleep 30 & empty=\$!
+      preview_track_leader "\$empty"
+      preview_leader_start["\$empty"]=""
+      setsid sleep 30 & missing=\$!
+      preview_track_leader "\$missing"
+      preview_read_start() { return 1; }
+      if preview_identity_ok "\$empty"; then echo EMPTY_OK; else echo EMPTY_REFUSED; fi
+      if preview_group_live "\$empty"; then echo EMPTY_POLLED; else echo EMPTY_UNPOLLED; fi
+      preview_signal_group "\$empty" KILL
+      if preview_identity_ok "\$missing"; then echo MISSING_OK; else echo MISSING_REFUSED; fi
+      preview_signal_group "\$missing" KILL
+      if /bin/kill -s 0 -- "-\$empty" 2>/dev/null; then echo EMPTY_ALIVE; fi
+      if /bin/kill -s 0 -- "-\$missing" 2>/dev/null; then echo MISSING_ALIVE; fi
+      echo EMPTY:\$empty
+      echo MISSING:\$missing
+      /bin/kill -s KILL -- "-\$empty" 2>/dev/null || true
+      /bin/kill -s KILL -- "-\$missing" 2>/dev/null || true
+      wait "\$empty" 2>/dev/null || true
+      wait "\$missing" 2>/dev/null || true
+    `);
+    expect(result.stdout).toContain('EMPTY_REFUSED');
+    expect(result.stdout).toContain('EMPTY_UNPOLLED');
+    expect(result.stdout).toContain('EMPTY_ALIVE');
+    expect(result.stdout).toContain('MISSING_REFUSED');
+    expect(result.stdout).toContain('MISSING_ALIVE');
+    expect(result.stdout).not.toContain('EMPTY_OK');
+    expect(result.stdout).not.toContain('MISSING_OK');
+    expect(result.stdout).not.toContain('EMPTY_POLLED');
   });
 
   it('does not signal a tracked pid after its start token changes', () => {
@@ -200,8 +233,8 @@ describe('preview process lifecycle', () => {
     expect(Number(child)).toBeGreaterThan(0);
     expect(Number(unrelated)).toBeGreaterThan(0);
     expect(spawnSync('kill', ['-0', String(child)]).status).toBe(1);
-    expect(readFileSync(result.reap, 'utf8')).toContain(`reaped ${child}`);
-    expect(readFileSync(result.reap, 'utf8')).not.toContain(`reaped ${unrelated}`);
+    expect(readFileSync(result.reap, 'utf8')).toMatch(new RegExp(`wait ${child} (137|143)`));
+    expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${unrelated}`);
     expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
     spawnSync('kill', ['-9', String(unrelated)]);
   });
