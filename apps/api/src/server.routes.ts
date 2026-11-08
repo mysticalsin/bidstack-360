@@ -128,6 +128,7 @@ import { publicSignRoutes } from './routes/public-sign.js';
 import { gmailOAuthRoutes } from './routes/integrations/gmail.js';
 import { microsoftMailOAuthRoutes } from './routes/integrations/microsoft-mail.js';
 import { emailRoutes } from './routes/integrations/email.js';
+import { workspaceRoutes } from './routes/integrations/workspace.js';
 import { microsoftWebhookRoutes } from './routes/integrations/microsoft-webhook.js';
 import { slackOAuthRoutes } from './routes/integrations/slack.js';
 import { slackCommandsPlugin } from './routes/integrations/slack-commands.js';
@@ -250,6 +251,14 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
       const target = req.url.replace('/odoo/', '/erp/');
       return reply.redirect(target, 307);
     });
+  } else {
+    // Only the status probe answers, so the settings card can say "not
+    // configured" instead of logging a 404 for every visitor.
+    server.get(
+      '/api/v1/integrations/erp/status',
+      { preHandler: server.requirePermission('integrations:read') },
+      async () => ({ configured: false, url: null, database: null, reachable: false, toolCount: null, lastError: null }),
+    );
   }
 
   await server.register(webhooksRoutes, { prefix: '/webhooks' });
@@ -317,6 +326,7 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
   // OAuth redirect_uri and the web client pointing at 404s.)
   await server.register(gmailOAuthRoutes, { prefix: '/api/v1' });
   await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1' });
+  await server.register(workspaceRoutes, { prefix: '/api/v1' });
   await server.register(slackOAuthRoutes, { prefix: '/api/v1' });
   await server.register(slackCommandsPlugin, { prefix: '/api/v1' });
   await server.register(emailRoutes, { prefix: '/api/v1' });

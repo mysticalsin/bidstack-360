@@ -1,7 +1,7 @@
-// Microsoft 365 integration routes.
-// Reads/writes connection status from the User model. Email/Calendar
-// connect/disconnect are placeholders — the actual Microsoft Graph OAuth
-// flow will be wired in a future iteration.
+// Microsoft 365 settings routes. Mail and calendar share one read-only Graph
+// grant (the `microsoft_graph` IntegrationToken row), so connect and
+// disconnect act on that grant for either service. SSO status still comes
+// from the User model.
 
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -11,7 +11,16 @@ import {
   MicrosoftConnectionStatus,
   MicrosoftConnectRequest,
   MicrosoftDisconnectRequest,
+  grantsCalendarRead,
+  grantsMailRead,
 } from '@bidstack/shared';
+import {
+  NotConfigured,
+  WorkspaceNotConfiguredError,
+  buildConnectUrl,
+  disconnectWorkspace,
+  notConfiguredBody,
+} from '../services/workspace-connect.service.js';
 
 const MicrosoftConnectResponse = z.object({
   authUrl: z.string().url(),
@@ -37,22 +46,27 @@ export const microsoftRoutes: FastifyPluginAsync = async (server) => {
         throw server.httpErrors.notFound('User not found');
       }
 
-      const account = user.microsoftAccountJson as
-        | { email?: string; emailConnected?: boolean; calendarConnected?: boolean; emailLastSync?: string; calendarLastSync?: string; emailError?: string; calendarError?: string }
-        | undefined;
-
+      const account = user.microsoftAccountJson as { email?: string } | undefined;
       const ssoConnected = Boolean(user.microsoftEmail ?? account?.email);
+
+      const grant = await prisma.integrationToken.findFirst({
+        where: { orgId, userId, provider: 'microsoft_graph' },
+        select: { status: true, scope: true, lastSyncedAt: true, errorMessage: true },
+      });
+      const active = grant?.status === 'active';
+      const lastSync = grant?.lastSyncedAt?.toISOString() ?? null;
+      const error = grant && grant.status !== 'active' ? grant.errorMessage : null;
 
       return reply.send({
         ssoConnected,
         ssoEmail: user.microsoftEmail ?? account?.email ?? null,
         ssoMethod: (user.org.microsoftSsoMethod as 'oauth' | 'saml') ?? 'oauth',
-        emailConnected: account?.emailConnected ?? false,
-        emailLastSync: account?.emailLastSync ?? null,
-        emailError: account?.emailError ?? null,
-        calendarConnected: account?.calendarConnected ?? false,
-        calendarLastSync: account?.calendarLastSync ?? null,
-        calendarError: account?.calendarError ?? null,
+        emailConnected: active && grantsMailRead(grant.scope),
+        emailLastSync: lastSync,
+        emailError: error,
+        calendarConnected: active && grantsCalendarRead(grant.scope),
+        calendarLastSync: lastSync,
+        calendarError: error,
       });
     },
   });
@@ -61,28 +75,15 @@ export const microsoftRoutes: FastifyPluginAsync = async (server) => {
   app.post('/settings/microsoft/connect', {
     schema: {
       body: MicrosoftConnectRequest,
-      response: { 200: MicrosoftConnectResponse },
+      response: { 200: MicrosoftConnectResponse, 503: NotConfigured },
     },
-    handler: async (req) => {
-      const { userId, orgId } = req.auth;
-      const { service } = req.body;
-
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-      });
-      if (!user || user.orgId !== orgId) {
-        throw server.httpErrors.notFound('User not found');
+    handler: async (req, reply) => {
+      try {
+        return reply.send({ authUrl: await buildConnectUrl('microsoft', req.auth.orgId, req.auth.userId) });
+      } catch (err) {
+        if (err instanceof WorkspaceNotConfiguredError) return reply.status(503).send(notConfiguredBody(err));
+        throw err;
       }
-
-      if (service === 'email') {
-        throw server.httpErrors.serviceUnavailable(
-          'Use the Outlook mail OAuth connector at /api/v1/integrations/microsoft/mail/oauth/start.',
-        );
-      }
-
-      throw server.httpErrors.serviceUnavailable(
-        'Microsoft calendar OAuth is not configured yet. Enable it before exposing this action.',
-      );
     },
   });
 
@@ -92,34 +93,7 @@ export const microsoftRoutes: FastifyPluginAsync = async (server) => {
       body: MicrosoftDisconnectRequest,
     },
     handler: async (req, reply) => {
-      const { userId, orgId } = req.auth;
-      const { service } = req.body;
-
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-      });
-      if (!user || user.orgId !== orgId) {
-        return reply.status(404).send({ error: 'User not found' });
-      }
-
-      const account = (user.microsoftAccountJson ?? {}) as Record<string, unknown>;
-      const nextAccount = { ...account };
-
-      if (service === 'email') {
-        nextAccount.emailConnected = false;
-        nextAccount.emailLastSync = null;
-        nextAccount.emailError = null;
-      } else {
-        nextAccount.calendarConnected = false;
-        nextAccount.calendarLastSync = null;
-        nextAccount.calendarError = null;
-      }
-
-      await prisma.user.update({
-        where: { id: userId },
-        data: { microsoftAccountJson: nextAccount as unknown as Parameters<typeof prisma.user.update>[0]['data']['microsoftAccountJson'] },
-      });
-
+      await disconnectWorkspace('microsoft', req.auth.orgId, req.auth.userId, req.log);
       return reply.status(204).send();
     },
   });

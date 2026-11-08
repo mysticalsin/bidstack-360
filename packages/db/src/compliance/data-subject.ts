@@ -620,6 +620,21 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
         WHERE id = ANY(${ids}::uuid[])`;
     },
   },
+  EmailDraft: {
+    // An unsent draft to the subject or about them as a contact is never sent: deleted.
+    linked: (db, s) =>
+      idsWhere(
+        db,
+        'EmailDraft',
+        s.orgId,
+        Prisma.sql`${uuidIn('EmailDraft', 'contactId', s.contactIds)}
+          OR ${jsonHasEmail('EmailDraft', 'toEmails', s.emails)}
+          OR ${jsonHasEmail('EmailDraft', 'ccEmails', s.emails)}`,
+      ),
+    async erase(db, _s, ids) {
+      await db.$executeRaw`DELETE FROM ${T('EmailDraft')} WHERE id = ANY(${ids}::uuid[])`;
+    },
+  },
   EmailTrackingPixel: {
     async linked(db, s) {
       const messages = await emailMessageLinked(db, s);

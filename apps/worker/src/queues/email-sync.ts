@@ -7,7 +7,7 @@
  *  email.outlook.subscription-renew — daily cron renews expiring Graph subs
  *
  * Implementation split:
- *   email-sync.helpers.ts      — schemas, RateLimitError, token utilities
+ *   email-sync.helpers.ts      — job schema, token accessor
  *   email-sync.pull.ts         — pullDelta (delta link pagination + upsert)
  *   email-sync.subscriptions.ts — renewSub (PATCH + 404-recreate)
  *
@@ -15,7 +15,7 @@
  * Cross-app imports create circular build dependencies. If this diverges too
  * far, extract to a @bidstack/email-sync package.
  */
-import { Queue, Worker } from 'bullmq';
+import { DelayedError, Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
@@ -26,7 +26,9 @@ import {
   OUTLOOK_SUBSCRIPTION_RENEW,
 } from '@bidstack/shared';
 
-import { PullJobData, RateLimitError } from './email-sync.helpers.js';
+import { PullJobData } from './email-sync.helpers.js';
+import { ProviderRateLimitError } from '../lib/provider-http.js';
+import { GrantRevokedError } from '../lib/workspace-token.js';
 import { pullDelta } from './email-sync.pull.js';
 import { renewSub } from './email-sync.subscriptions.js';
 
@@ -56,28 +58,36 @@ export function startEmailSync(
     OUTLOOK_PULL_INCREMENTAL.name,
     async (job) => {
       if (job.name === 'email.outlook.fanout') {
-        // Fan-out: enqueue one pull job per active Outlook token
-        const tokens = await prisma.integrationToken.findMany({
-          where: {
-            provider: IntegrationProvider.microsoft_graph,
-            status: 'active',
-            deletedAt: null,
-          },
-          select: { id: true, orgId: true, userId: true },
-        });
-
-        for (const token of tokens) {
-          await pullQueue.add(
-            OUTLOOK_PULL_INCREMENTAL.name,
-            { orgId: token.orgId, userId: token.userId, integrationTokenId: token.id },
-            {
-              // Dedup within the current 1-minute window
-              jobId: `incremental-${token.id}-${Math.floor(Date.now() / 60_000)}`,
+        // Fan-out: enqueue one pull job per active Outlook token, in bounded pages.
+        const windowBucket = Math.floor(Date.now() / 60_000);
+        let cursor: string | undefined;
+        let count = 0;
+        while (true) {
+          const tokens = await prisma.integrationToken.findMany({
+            where: {
+              provider: IntegrationProvider.microsoft_graph,
+              status: { in: ['active', 'error'] },
+              deletedAt: null,
             },
-          );
+            select: { id: true, orgId: true, userId: true },
+            take: 200,
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            orderBy: { id: 'asc' },
+          });
+          for (const token of tokens) {
+            await pullQueue.add(
+              OUTLOOK_PULL_INCREMENTAL.name,
+              { orgId: token.orgId, userId: token.userId, integrationTokenId: token.id },
+              // Dedup within the current 1-minute window
+              { jobId: `incremental-${token.id}-${windowBucket}` },
+            );
+          }
+          count += tokens.length;
+          if (tokens.length < 200) break;
+          cursor = tokens[tokens.length - 1]!.id;
         }
 
-        log.info({ count: tokens.length }, 'outlook pull fanout dispatched');
+        log.info({ count }, 'outlook pull fanout dispatched');
         return;
       }
 
@@ -88,9 +98,14 @@ export function startEmailSync(
         const { persisted } = await pullDelta(data, log);
         log.info({ jobId: job.id, persisted }, 'outlook pull-incremental complete');
       } catch (err) {
-        if (err instanceof RateLimitError) {
-          log.warn({ jobId: job.id, delayMs: err.retryAfterMs }, 'Graph 429 — delaying job');
+        if (err instanceof ProviderRateLimitError) {
+          log.warn({ jobId: job.id, delayMs: err.retryAfterMs }, 'Graph throttled; delaying job');
           await job.moveToDelayed(Date.now() + err.retryAfterMs, job.token);
+          // BullMQ needs DelayedError after moveToDelayed, or it tries to complete the job.
+          throw new DelayedError();
+        }
+        if (err instanceof GrantRevokedError) {
+          log.warn({ jobId: job.id }, 'Outlook grant revoked; skipping until reconnect');
           return;
         }
         throw err;
@@ -110,10 +125,22 @@ export function startEmailSync(
       const data = PullJobData.parse(job.data);
       log.info({ jobId: job.id, orgId: data.orgId }, 'outlook pull-historical start');
 
-      // Reset delta link to force full pull
+      // Reset only the mail cursors to force a full pull; calendar cursors stay.
+      const row = await prisma.integrationToken.findFirst({
+        where: { id: data.integrationTokenId, orgId: data.orgId },
+        select: { deltaState: true },
+      });
+      if (!row) return;
+      const {
+        mailDeltaLink: _a,
+        mailNextLink: _b,
+        mailSentDeltaLink: _c,
+        mailSentNextLink: _d,
+        ...rest
+      } = (row.deltaState ?? {}) as Record<string, unknown>;
       await prisma.integrationToken.update({
         where: { id: data.integrationTokenId },
-        data: { deltaState: {} },
+        data: { deltaState: rest as object },
       });
 
       const { persisted } = await pullDelta(data, log);
