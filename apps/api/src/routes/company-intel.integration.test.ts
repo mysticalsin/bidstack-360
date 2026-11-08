@@ -23,7 +23,7 @@ beforeAll(async () => {
   previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
   process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
   __setAccountIntelEnqueueForTest(async (job) => {
-    queued.push({ companyId: job.companyId, sources: job.sources });
+    queued.push({ companyId: job.companyId, sources: job.kind === 'refresh' ? job.sources : [] });
     return `job-${queued.length}`;
   });
   try {

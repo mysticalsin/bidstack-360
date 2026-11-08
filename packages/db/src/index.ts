@@ -245,6 +245,17 @@ export type {
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';
 export {
+  intelConnections,
+  loadIntelSummaryInput,
+  markImportBatchCompany,
+  openImportBatch,
+  parseIntelSummary,
+  pruneImportBatches,
+  readCompanyIntelSummaries,
+  readImportBatches,
+  recomputeCompanyIntelSummary,
+} from './company-intel-summary.js';
+export {
   countPartnerEngagements,
   isInternalPartnerRow,
   loadOrgFirmCatalog,

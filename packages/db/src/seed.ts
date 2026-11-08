@@ -25,6 +25,7 @@ import {
 import { seedRolesAndPermissions } from './seed.rbac.js';
 import { seedSigningEntities } from './seed-signing-entities.js';
 import { seedAccountIntel } from './seed-account-intel.js';
+import { seedCompanyIntel } from './seed-company-intel.js';
 import { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 import { seedTechStacks } from './seed-tech-stack.js';
 import { seedBidChartDemo } from './seed-bid-charts.js';
@@ -882,6 +883,8 @@ async function main() {
 
   const intelRows = await seedAccountIntel(prisma, org.id);
   console.log(`  ✓ account intel samples: ${intelRows}`);
+  const intelSummaries = await seedCompanyIntel(prisma, org.id);
+  console.log(`  ✓ company intel summaries: ${intelSummaries}`);
 
   const techStacks = await seedTechStacks(prisma, org.id);
   console.log(`  ✓ sample tech stacks: ${techStacks}`);
