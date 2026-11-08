@@ -71,6 +71,17 @@ export class PreviewOrigin extends Container {
   // Cron: keep the container awake, finish boot, and save changed data to R2.
   async tick() {
     const state = await this.prepare().then(() => this.bootState());
+    if (state.phase === 'failed') {
+      // A failed boot never recovers in place; restart it, at most every 15 minutes.
+      const lastRestart = (await this.ctx.storage.get('lastFailRestart')) || 0;
+      const restart = Date.now() - lastRestart > 15 * 60_000;
+      if (restart) {
+        await this.ctx.storage.put('lastFailRestart', Date.now());
+        this.preparing = null;
+        await this.destroy();
+      }
+      return { phase: 'failed', detail: state.detail, recent: state.recent, restarted: restart };
+    }
     if (state.phase !== 'ready') return { phase: state.phase, snapshot: 'skipped' };
     const last = (await this.ctx.storage.get('snapshot')) || {};
     const since = last.bootId === state.bootId ? last.counter : -1;

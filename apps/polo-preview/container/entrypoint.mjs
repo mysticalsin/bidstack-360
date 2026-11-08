@@ -9,6 +9,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { createReadStream, createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
+import { networkInterfaces } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
@@ -27,6 +28,8 @@ const INTERNAL_KEY = process.env.POLO_INTERNAL_KEY || '';
 const PG_USER = 'bidstack';
 const DB = 'bidstack';
 const DATABASE_URL = `postgres://${PG_USER}:${PG_USER}@127.0.0.1:5432/${DB}`;
+const REDIS_PASS = randomUUID().replaceAll('-', '');
+let redisHost = 'polo-redis';
 
 let phase = 'booting';
 let detail = '';
@@ -34,8 +37,21 @@ let apiChild = null;
 let apiRestarts = 0;
 let selfSeeded = false;
 
+// Container stdout is not reachable from outside, so the last lines are kept
+// and returned with a failed state for the Worker to log.
+const recent = [];
+function remember(text) {
+  for (const line of String(text).split('\n')) {
+    if (!line.trim()) continue;
+    recent.push(line.slice(0, 500));
+    if (recent.length > 80) recent.shift();
+  }
+}
+
 function log(message) {
-  console.log(`[polo-container] ${new Date().toISOString()} ${message}`);
+  const line = `[polo-container] ${new Date().toISOString()} ${message}`;
+  remember(line);
+  console.log(line);
 }
 
 function setPhase(next, why = '') {
@@ -51,8 +67,13 @@ function pgUid() {
 }
 
 function runSync(cmd, args, opts = {}) {
-  const res = spawnSync(cmd, args, { stdio: 'inherit', ...opts });
-  if (res.status !== 0) throw new Error(`${cmd} ${args.join(' ')} exited ${res.status}`);
+  const res = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
+  if (res.stdout) process.stdout.write(res.stdout);
+  if (res.stderr) process.stderr.write(res.stderr);
+  if (res.status !== 0) {
+    remember(`${res.stdout || ''}\n${res.stderr || ''}`.split('\n').slice(-40).join('\n'));
+    throw new Error(`${cmd} ${args.join(' ')} exited ${res.status}${res.error ? ` (${res.error.message})` : ''}`);
+  }
 }
 
 function apiEnv() {
@@ -64,7 +85,7 @@ function apiEnv() {
     PORT_API: String(API_PORT),
     DATABASE_URL,
     DATABASE_URL_UNPOOLED: DATABASE_URL,
-    REDIS_URL: 'redis://polo-redis:6379',
+    REDIS_URL: `redis://:${REDIS_PASS}@${redisHost}:6379`,
     CF_ACCESS_AUTH: 'true',
     CF_ACCESS_TEAM_DOMAIN: 'tony-walteur.cloudflareaccess.com',
     CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'true',
@@ -82,7 +103,19 @@ function apiEnv() {
 function startDatabase() {
   // The API refuses a loopback REDIS_URL in production; Redis is a sidecar in
   // this same container, reached through a named alias.
-  writeFileSync('/etc/hosts', '127.0.0.1 polo-redis\n', { flag: 'a' });
+  // Some runtimes lock /etc/hosts; then Redis listens on the private interface.
+  const bind = ['127.0.0.1'];
+  try {
+    writeFileSync('/etc/hosts', '127.0.0.1 polo-redis\n', { flag: 'a' });
+  } catch (err) {
+    const ip = Object.values(networkInterfaces())
+      .flat()
+      .find((a) => a && a.family === 'IPv4' && !a.internal)?.address;
+    if (!ip) throw new Error(`cannot write /etc/hosts (${err.message}) and no private IPv4 for Redis`);
+    redisHost = ip;
+    bind.push(ip);
+    log(`/etc/hosts is read-only; Redis on ${ip}`);
+  }
   const { uid, gid } = pgUid();
   mkdirSync(PGDATA, { recursive: true });
   mkdirSync(STORAGE, { recursive: true });
@@ -99,7 +132,7 @@ function startDatabase() {
     log(`postgres exited ${code}; stopping the container so it restarts clean`);
     process.exit(1);
   });
-  const redis = spawn('redis-server', ['--bind', '127.0.0.1', '--port', '6379', '--save', '', '--appendonly', 'no'], {
+  const redis = spawn('redis-server', ['--bind', ...bind, '--port', '6379', '--requirepass', REDIS_PASS, '--save', '', '--appendonly', 'no'], {
     stdio: 'inherit',
   });
   redis.on('exit', (code) => {
@@ -131,7 +164,12 @@ function seed() {
 }
 
 function startApi() {
-  apiChild = spawn(process.execPath, ['apps/api/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: 'inherit' });
+  apiChild = spawn(process.execPath, ['apps/api/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  apiChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
+  apiChild.stderr.on('data', (chunk) => {
+    process.stderr.write(chunk);
+    remember(chunk);
+  });
   apiChild.on('exit', (code) => {
     apiChild = null;
     if (phase !== 'ready') return;
@@ -231,7 +269,13 @@ function sendJson(res, status, body, extra = {}) {
 async function handleInternal(req, res, url) {
   if (!authorized(req)) return sendJson(res, 404, { error: 'not_found' });
   if (url.pathname === '/__internal/state') {
-    return sendJson(res, 200, { phase, detail, bootId: BOOT_ID, apiUp: Boolean(apiChild) });
+    return sendJson(res, 200, {
+      phase,
+      detail,
+      bootId: BOOT_ID,
+      apiUp: Boolean(apiChild),
+      ...(phase === 'failed' ? { recent: recent.slice(-40) } : {}),
+    });
   }
   if (url.pathname === '/__internal/restore' && req.method === 'PUT') {
     if (phase !== 'awaiting-data') return sendJson(res, 409, { phase });
