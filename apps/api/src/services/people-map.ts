@@ -30,33 +30,42 @@ export function contactFactListArgs(
   contactIds: string[],
   opportunityId: string | null,
   companyId: string | null,
-  linkedOpportunityIds: readonly string[] = [],
 ) {
   const accountEvidence = companyId
     ? { opportunityId: null, OR: [{ companyId: null }, { companyId }] }
     : { opportunityId: null };
-  // Deal links on this map still need their own buying-role facts. Those
-  // deals are part of the scope. A deal this contact is not linked to stays
-  // out, so it cannot crowd the take.
-  const linked = [
-    ...new Set(
-      linkedOpportunityIds.filter((id): id is string => typeof id === 'string' && id.length > 0 && id !== opportunityId),
-    ),
-  ];
   return {
     where: {
       orgId,
       contactId: { in: contactIds },
       deletedAt: null,
-      ...(opportunityId
-        ? {
-            OR: [
-              { opportunityId },
-              ...(linked.length > 0 ? [{ opportunityId: { in: linked } }] : []),
-              accountEvidence,
-            ],
-          }
-        : {}),
+      ...(opportunityId ? { OR: [{ opportunityId }, accountEvidence] } : {}),
+    },
+    select: FACT_SELECT,
+    orderBy: { createdAt: 'desc' as const },
+    take: PEOPLE_MAP_FACT_TAKE,
+  };
+}
+
+/** Buying-role facts for the exact contact/deal pairs this map will label. */
+export function linkedDealFactListArgs(
+  orgId: string,
+  pairs: readonly { contactId: string; opportunityId: string }[],
+) {
+  const unique = new Map<string, { contactId: string; opportunityId: string }>();
+  for (const pair of pairs) {
+    if (!pair.contactId || !pair.opportunityId) continue;
+    unique.set(`${pair.contactId}:${pair.opportunityId}`, pair);
+  }
+  return {
+    where: {
+      orgId,
+      deletedAt: null,
+      kind: 'buying_role' as const,
+      OR: [...unique.values()].map((pair) => ({
+        contactId: pair.contactId,
+        opportunityId: pair.opportunityId,
+      })),
     },
     select: FACT_SELECT,
     orderBy: { createdAt: 'desc' as const },
@@ -261,18 +270,23 @@ async function finishMap(
           },
           take: 1000,
         });
-  const facts =
+  const primary =
     ids.length === 0
       ? ([] as FactRow[])
-      : await prisma.contactFact.findMany(
-          contactFactListArgs(
-            orgId,
-            ids,
-            opportunityId,
-            companyId,
-            deals.map((deal) => deal.opportunityId),
-          ),
-        );
+      : await prisma.contactFact.findMany(contactFactListArgs(orgId, ids, opportunityId, companyId));
+  const supplementalPairs = deals
+    .filter((deal) => deal.contactId && deal.opportunityId && deal.opportunityId !== opportunityId)
+    .map((deal) => ({ contactId: deal.contactId, opportunityId: deal.opportunityId }));
+  const supplemental =
+    supplementalPairs.length === 0
+      ? ([] as FactRow[])
+      : await prisma.contactFact.findMany(linkedDealFactListArgs(orgId, supplementalPairs));
+  const seenFact = new Set<string>();
+  const facts = [...primary, ...supplemental].filter((fact) => {
+    if (seenFact.has(fact.id)) return false;
+    seenFact.add(fact.id);
+    return true;
+  });
   const reportIds = facts
     .map((fact) => fact.reportsToContactId)
     .filter((id): id is string => Boolean(id));

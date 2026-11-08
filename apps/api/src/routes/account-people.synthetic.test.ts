@@ -102,13 +102,11 @@ describe('account people routes without a database', () => {
     };
     expect(where.orgId).toBe(orgId);
     expect(where.OR.some((branch) => branch.opportunityId === dealId)).toBe(true);
-    const linked = where.OR.find(
-      (branch) =>
-        branch.opportunityId !== null &&
-        typeof branch.opportunityId === 'object' &&
-        'in' in (branch.opportunityId as object),
-    ) as { opportunityId: { in: string[] } } | undefined;
-    expect(linked?.opportunityId.in).toContain(otherDeal);
+    expect(JSON.stringify(where)).not.toContain(otherDeal);
+    const supplemental = db.contactFact.findMany.mock.calls[1]?.[0].where as {
+      OR: Array<{ contactId: string; opportunityId: string }>;
+    };
+    expect(supplemental.OR).toEqual([{ contactId, opportunityId: otherDeal }]);
     await app.close();
   });
 
