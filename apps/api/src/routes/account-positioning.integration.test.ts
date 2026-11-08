@@ -250,6 +250,26 @@ describe('GET /accounts/:id/key-numbers', () => {
     expect(await figure(id, 'revenue')).toMatchObject({ value: 2_500_000_000_000_000, unit: 'money_micros', currency: null });
   });
 
+  it('a revenue the user enters wins over sample statements, which a real filing does not', async () => {
+    const name = `${TAG} SampleFiled`;
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name, tier: 'top' } })).id;
+    const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const period = (source: string, revenue: number) =>
+      prisma.accountFinancialPeriod.create({
+        data: { orgId: orgA.orgId, companyId: id, source, entityId: 'x', periodType: 'FY', fiscalYear: 2025, periodStart: new Date('2025-01-01'), periodEnd: new Date('2025-12-31'), currency: 'NOK', sourceUrl: 'https://example.com/', metrics: { revenue: { value: revenue } } },
+      });
+    await period('fixture', 85_300_000_000);
+    const user = await prisma.user.findFirst({ where: { orgId: orgA.orgId }, select: { id: true } });
+    await prisma.companyFieldOverride.create({
+      data: { orgId: orgA.orgId, companyKey: key, fieldKey: 'annualRevenueMicros', value: 86_100_000_000 * 1_000_000, currency: 'NOK', overriddenById: user!.id },
+    });
+    expect(await figure(id, 'revenue')).toMatchObject({ value: 86_100_000_000, currency: 'NOK', provenance: { origin: 'manual' } });
+
+    await prisma.accountFinancialPeriod.deleteMany({ where: { companyId: id } });
+    await period('esef', 87_000_000_000);
+    expect(await figure(id, 'revenue')).toMatchObject({ value: 87_000_000_000, provenance: { origin: 'filed' } });
+  });
+
   it('says what is missing and stays editable when no source has revenue', async () => {
     const by = Object.fromEntries((await get(`/accounts/${c.empty}/key-numbers`)).json<AccountKeyNumbers>().items.map((i) => [i.id, i]));
     expect(by.revenue).toMatchObject({ value: null, editKey: 'annualRevenueMicros' });

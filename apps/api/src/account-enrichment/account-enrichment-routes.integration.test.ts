@@ -92,6 +92,8 @@ beforeAll(async () => {
     });
   await post('j1', 'Data Engineer', 'data', 'EMEA');
   await post('j2', 'Account Executive', 'sales', 'AMER');
+  await post('j3', 'Platform Engineer', 'Infrastructure', 'emea', c.de!);
+  await post('j4', 'Data Analyst', 'analytics', 'North America', c.de!);
   await prisma.enrichmentCreditUsage.createMany({
     data: [
       { orgId: orgA.orgId, provider: 'apollo', operation: 'organizations.enrich', credits: 3, at: new Date() },
@@ -185,6 +187,15 @@ describe('GET /companies/:id/enrichment/hiring', () => {
     ]);
     expect((await call('GET', `/companies/${c.fr}/enrichment/hiring?region=AMER`)).json().postingsTotal).toBe(1);
     expect((await call('GET', `/companies/${c.fr}/enrichment/hiring?function=nope`)).statusCode).toBe(400);
+  });
+
+  it('normalises free-text regions and functions from older data instead of failing', async () => {
+    const res = await call('GET', `/companies/${c.de}/enrichment/hiring`);
+    expect(res.statusCode, res.body).toBe(200);
+    const byTitle = Object.fromEntries(res.json().postings.map((p: { title: string }) => [p.title, p]));
+    expect(byTitle['Platform Engineer']).toMatchObject({ region: 'EMEA', function: 'infrastructure' });
+    expect(byTitle['Data Analyst']).toMatchObject({ region: 'AMER', function: 'other' });
+    expect((await call('GET', `/companies/${c.de}/enrichment/hiring?region=EMEA`)).json().postingsTotal).toBe(1);
   });
 });
 

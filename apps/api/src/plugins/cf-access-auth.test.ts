@@ -90,6 +90,27 @@ describe('Cloudflare Access identity mapping', () => {
     );
   });
 
+  it('links a seeded or imported user with the same email instead of inserting a duplicate', async () => {
+    userFind.mockImplementation((async (args: { where: { email?: string } }) =>
+      args.where.email ? { id: 'seeded-ada', orgId: 'org-1' } : null) as never);
+    await verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' }));
+    expect(userUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'seeded-ada' },
+        update: expect.objectContaining({ clerkUser: 'cfaccess:ada@mantu.com' }),
+      }),
+    );
+  });
+
+  it('refuses an Access email whose user row belongs to another organization', async () => {
+    userFind.mockImplementation((async (args: { where: { email?: string } }) =>
+      args.where.email ? { id: 'other-ada', orgId: 'org-2' } : null) as never);
+    await expect(
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(userUpsert).not.toHaveBeenCalled();
+  });
+
   it('refuses an Access email that is not on the Polo allowlist', async () => {
     await expect(
       verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'stranger@mantu.com' })),

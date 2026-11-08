@@ -190,7 +190,7 @@ function SourcedRevenue({ companyId, companyName, crmValue }: { companyId: strin
   const text = figureText(revenue);
   const shown = text && (!crmValue || beatsProvider(revenue)) ? text : crmValue;
   if (!shown) {
-    return <FigureActions companyId={companyId} companyName={companyName} fieldKey="annualRevenueMicros" label="Revenue" missing={revenue?.missing ?? 'No revenue on record or in public sources'} />;
+    return <FigureActions companyId={companyId} companyName={companyName} fieldKey="annualRevenueMicros" label="Revenue" currency={revenue?.currency} missing={revenue?.missing ?? 'No revenue on record or in public sources'} />;
   }
   return (
     <>

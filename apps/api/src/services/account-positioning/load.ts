@@ -309,9 +309,11 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const crmRevenueMicros = extra.crm.annualRevenueMicros;
   const CRM_LABEL = 'CRM record';
   const CRM_PROVENANCE: FigureProvenance = { origin: 'crm', label: CRM_LABEL, year: null, url: null, unverified: true };
+  // Sample statements are fixtures, not filings: any figure a user enters must win over them.
+  const filedRank: FigureOrigin = latest && latest.source === FINANCIAL_SOURCE_LABEL.fixture ? 'provider' : 'filed';
   const employees = pickFigure<{ origin: FigureOrigin; item: () => KeyNumber }>([
     hc && latest
-      ? { origin: 'filed', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: hc.value, delta: pctChange(hc.value, prev?.metrics.headcount?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.headcount?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
+      ? { origin: filedRank, item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: hc.value, delta: pctChange(hc.value, prev?.metrics.headcount?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.headcount?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
       : null,
     empOverride && typeof empOverride.value === 'number'
       ? { origin: manualOrigin(empOverride), item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: empOverride.value as number, source: empOverride.sourceLabel ?? 'Manual entry', period: `Entered ${empOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: empOverride.sourceUrl, provenance: manualProvenance(empOverride) }) }
@@ -337,7 +339,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const wiki = extra.wikidataRevenue;
   const revenue = pickFigure<{ origin: FigureOrigin; item: () => KeyNumber }>([
     rev && latest
-      ? { origin: 'filed', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: latest.source === FINANCIAL_SOURCE_LABEL.fixture, provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
+      ? { origin: filedRank, item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: latest.source === FINANCIAL_SOURCE_LABEL.fixture, provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
       : null,
     revOverride && typeof revOverride.value === 'number'
       ? { origin: manualOrigin(revOverride), item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', ...manualRevenueUnit(revOverride), source: revOverride.sourceLabel ?? 'Manual entry', period: `Annual, entered ${revOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: revOverride.sourceUrl, provenance: manualProvenance(revOverride) }) }

@@ -13,6 +13,7 @@ import { networkInterfaces } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
+import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { isApiPath } from '../src/protocol.js';
 
 const APP = '/app';
@@ -101,6 +102,8 @@ function apiEnv() {
     PUPPETEER_SKIP_DOWNLOAD: 'true',
     WORKER_HEALTH_PORT: '4030',
     ACCOUNT_INTEL_AUTO_REFRESH: 'true',
+    // An account page fans out to about 30 API calls, so the API's default 120 per user per minute starves widgets after a few accounts.
+    API_RATE_LIMIT_MAX: process.env.API_RATE_LIMIT_MAX || '1200',
     ...(process.env.POLO_INTEL_USER_AGENT
       ? {
           ACCOUNT_INTEL_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
@@ -387,21 +390,7 @@ function serveStatic(req, res, pathname) {
   createReadStream(file).pipe(res);
 }
 
-function proxyApi(req, res) {
-  const headers = { ...req.headers };
-  delete headers['x-forwarded-for'];
-  delete headers['x-real-ip'];
-  delete headers['x-polo-internal-key'];
-  const upstream = http.request(
-    { host: '127.0.0.1', port: API_PORT, path: req.url, method: req.method, headers },
-    (up) => {
-      res.writeHead(up.statusCode || 502, up.headers);
-      up.pipe(res);
-    },
-  );
-  upstream.on('error', () => sendJson(res, 503, { error: 'api_restarting', retryAfterSeconds: 5 }, { 'retry-after': '5' }));
-  req.pipe(upstream);
-}
+const proxyApi = makeApiProxy({ port: API_PORT });
 
 function startingPage(req, res, pathname) {
   const accept = String(req.headers.accept || '');
@@ -426,6 +415,7 @@ http
     if (isApiPath(url.pathname)) return proxyApi(req, res);
     return serveStatic(req, res, url.pathname);
   })
+  .on('upgrade', rejectUpgrade)
   .listen(PORT, '0.0.0.0', () => log(`listening on ${PORT}, boot ${BOOT_ID}`));
 
 try {

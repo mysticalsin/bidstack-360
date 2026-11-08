@@ -158,7 +158,7 @@ export async function seedPfizerWhitespaceFixture(
         title: p.title,
         url: `https://careers.pfizer-fixture.example/jobs/${p.externalId}`,
         country: 'US',
-        region: 'North America',
+        region: 'AMER',
         function: p.fn,
         seniority: 'senior',
         skills: p.skills,

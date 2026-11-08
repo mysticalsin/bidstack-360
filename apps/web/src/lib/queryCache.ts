@@ -214,7 +214,11 @@ export function watchAuthForCacheClear(queryClient: QueryClient): () => void {
     const nextFingerprint = currentAuthFingerprint();
     if (previousFingerprint !== null && previousFingerprint !== nextFingerprint) {
       clearPersistedCache();
-      queryClient.clear();
+      // Not queryClient.clear(): mounted observers would stay subscribed to the
+      // destroyed queries, so a page whose fetch was in flight keeps its
+      // skeleton forever. Reset drops the old identity's data and refetches.
+      queryClient.removeQueries({ type: 'inactive' });
+      void queryClient.resetQueries({ type: 'active' });
     }
     sessionStorage.setItem(AUTH_FINGERPRINT_KEY, nextFingerprint);
   };

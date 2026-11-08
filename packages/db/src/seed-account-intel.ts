@@ -29,7 +29,7 @@ const ACCOUNTS: FixtureAccount[] = [
     name: 'DNB Bank',
     domain: 'dnb.no',
     currency: 'NOK',
-    region: 'emea',
+    region: 'EMEA',
     years: [
       { fy: 2023, revenue: 79_500e6, operatingIncome: 48_200e6, capex: 1_150e6, headcount: 10_400 },
       { fy: 2024, revenue: 82_800e6, operatingIncome: 50_100e6, capex: 1_420e6, headcount: 10_700 },
@@ -60,7 +60,7 @@ const ACCOUNTS: FixtureAccount[] = [
     name: 'MAHLE',
     domain: 'mahle.com',
     currency: 'EUR',
-    region: 'emea',
+    region: 'EMEA',
     years: [
       { fy: 2023, revenue: 12_800e6, operatingIncome: 330e6, capex: 610e6, rnd: 780e6, headcount: 72_000 },
       { fy: 2024, revenue: 11_700e6, operatingIncome: 290e6, capex: 520e6, rnd: 760e6, headcount: 68_000 },
@@ -91,7 +91,7 @@ const ACCOUNTS: FixtureAccount[] = [
     name: 'MAPFRE',
     domain: 'mapfre.com',
     currency: 'EUR',
-    region: 'emea',
+    region: 'EMEA',
     years: [
       { fy: 2024, revenue: 28_400e6, operatingIncome: 1_800e6, capex: 230e6, headcount: 31_000 },
       { fy: 2025, revenue: 29_900e6, operatingIncome: 2_000e6, capex: 270e6, headcount: 31_500 },
