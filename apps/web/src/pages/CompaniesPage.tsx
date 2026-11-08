@@ -22,6 +22,7 @@ import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useHasAdminPermission } from '@/hooks/useCapabilities';
 import { useCompanies, useCreateCompany, useDeleteCompany } from '@/hooks/useCompanies';
+import { useIntelImports } from '@/hooks/useCompanyIntelSummary';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { CursorPager } from '@/components/ui/CursorPager';
@@ -30,7 +31,21 @@ import { downloadCsv, rowsToCsv } from '@/lib/csv';
 
 import { DuplicatesDialog } from '@/components/company/DuplicatesDialog';
 
+import { CompanyIntelView, IntelDirection } from '@bidstack/shared';
+
 import { CompanyRow } from './companiesPage/CompanyRow';
+import { INTEL_COLUMNS } from './companiesPage/IntelCells';
+import { IntelImportProgress } from './companiesPage/IntelImportProgress';
+import { IntelViewsBar } from './companiesPage/IntelViewsBar';
+import { useColumnVisibility } from './companiesPage/useColumnVisibility';
+
+const BASE_COLUMNS = [
+  { key: 'domain', label: 'Domain' },
+  { key: 'industry', label: 'Industry' },
+  { key: 'countryCode', label: 'Country' },
+] as const;
+const TOGGLE_COLUMNS = [...BASE_COLUMNS, ...INTEL_COLUMNS];
+const DIRECTION_RANK = { contracting: 0, steady: 1, growing: 2 } as const;
 import { NewCompanyDialog } from './companiesPage/NewCompanyDialog';
 
 export function CompaniesPage() {
@@ -45,15 +60,36 @@ export function CompaniesPage() {
   // 100k-company scale). The raw URL param still drives the input for responsive
   // typing. Same pattern Round 1 used for KeyAccountsPage.
   const debouncedSearch = useDebouncedValue(searchParam, 250);
-  const pager = useCursorPagination(debouncedSearch ?? '');
+  const viewParse = CompanyIntelView.safeParse(params.get('view'));
+  const view = viewParse.success ? viewParse.data : null;
+  const directionParse = IntelDirection.safeParse(params.get('direction'));
+  const direction = directionParse.success ? directionParse.data : null;
+  const pager = useCursorPagination(`${debouncedSearch ?? ''}|${view ?? ''}|${direction ?? ''}`);
   const filter = useMemo(
     () => ({
       search: debouncedSearch,
       limit: 50,
+      ...(view ? { view } : {}),
+      ...(direction ? { direction } : {}),
       ...(pager.cursor ? { cursor: pager.cursor } : {}),
     }),
-    [debouncedSearch, pager.cursor],
+    [debouncedSearch, view, direction, pager.cursor],
   );
+  const setParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
+  };
+  const columns = useColumnVisibility();
+  const BASE_I18N: Record<string, string> = {
+    domain: 'companies.table.domain',
+    industry: 'companies.table.industry',
+    countryCode: 'companies.table.country',
+  };
+  const columnLabel = (c: { key: string; label: string }) =>
+    BASE_I18N[c.key] ? t(BASE_I18N[c.key]!, c.label) : c.label;
+  const imports = useIntelImports();
 
   const companies = useCompanies(filter);
   const createCompany = useCreateCompany();
@@ -68,14 +104,24 @@ export function CompaniesPage() {
   // Column sorting (parity with Opportunities/Contacts/Leads). Sorts the current
   // page client-side; URL-persisted so a sorted view is shareable.
   type CompanyItem = (typeof rawItems)[number];
-  type CompanySortKey = 'name' | 'domain' | 'industry' | 'employeeCount' | 'countryCode';
+  type CompanySortKey =
+    'name' | 'domain' | 'industry' | 'countryCode' | (typeof INTEL_COLUMNS)[number]['key'];
   const accessors = useMemo(
     (): Record<CompanySortKey, (c: CompanyItem) => string | number | null> => ({
       name: (c) => c.name,
       domain: (c) => c.domain ?? null,
       industry: (c) => c.industry ?? null,
-      employeeCount: (c) => c.employeeCount ?? null,
       countryCode: (c) => c.countryCode ?? null,
+      revenue: (c) => c.intel?.revenue?.approxUsd ?? null,
+      revenueGrowth: (c) => c.intel?.revenueGrowth?.value ?? null,
+      headcount: (c) => c.intel?.headcount?.value ?? c.employeeCount ?? null,
+      headcountGrowth: (c) => c.intel?.headcountGrowth?.value ?? null,
+      openRoles: (c) => c.intel?.openRoles?.value ?? null,
+      newRoles30d: (c) => c.intel?.newRoles30d?.value ?? null,
+      hiringTrend: (c) => c.intel?.newRoles30d?.trend30Pct ?? null,
+      funding: (c) => c.intel?.funding?.value ?? null,
+      signal: (c) => c.intel?.signal?.publishedAt ?? null,
+      direction: (c) => (c.intel?.direction ? DIRECTION_RANK[c.intel.direction.value] : null),
     }),
     [],
   );
@@ -92,7 +138,10 @@ export function CompaniesPage() {
     else p.set('sort', `${next.key}.${next.dir}`);
     setParams(p, { replace: true });
   };
-  const { sorted } = useTableSort(rawItems, accessors, { state: sortState, onChange: setSortState });
+  const { sorted } = useTableSort(rawItems, accessors, {
+    state: sortState,
+    onChange: setSortState,
+  });
   // ReadonlyArray -> mutable for the bulk-selection/consumers; identity stable.
   const items = sorted as CompanyItem[];
   const bulk = useBulkSelection(items);
@@ -274,6 +323,15 @@ export function CompaniesPage() {
               className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
             />
           </label>
+          <IntelViewsBar
+            view={view}
+            direction={direction}
+            onView={(v) => setParam('view', v)}
+            onDirection={(d) => setParam('direction', d)}
+            columns={TOGGLE_COLUMNS.map((c) => ({ key: c.key, label: columnLabel(c) }))}
+            isVisible={columns.isVisible}
+            onToggleColumn={columns.toggle}
+          />
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--fg-tertiary)]">
             <span role="status" aria-live="polite">
               {searchTerm
@@ -333,6 +391,8 @@ export function CompaniesPage() {
       )}
 
       <DuplicatesDialog entity="company" open={showDuplicates} onOpenChange={setShowDuplicates} />
+
+      <IntelImportProgress batches={imports.data?.items ?? []} />
 
       <BulkActionBar
         count={bulk.count}
@@ -406,7 +466,7 @@ export function CompaniesPage() {
         <Card className="overflow-hidden p-3">
           <SpotlightTable
             query={searchTerm}
-            minWidth={820}
+            minWidth={1640}
             className="[&_tr[data-selected=true]]:bg-[var(--brand-primary-tint)]/60"
           >
             <thead>
@@ -434,26 +494,19 @@ export function CompaniesPage() {
                     {t('companies.table.company', 'Company')}
                   </SortableHeader>
                 </th>
-                <th scope="col" aria-sort={getSortableHeaderAriaSort('domain', sortState)}>
-                  <SortableHeader columnKey="domain" state={sortState} onChange={setSortState}>
-                    {t('companies.table.domain', 'Domain')}
-                  </SortableHeader>
-                </th>
-                <th scope="col" aria-sort={getSortableHeaderAriaSort('industry', sortState)}>
-                  <SortableHeader columnKey="industry" state={sortState} onChange={setSortState}>
-                    {t('companies.table.industry', 'Industry')}
-                  </SortableHeader>
-                </th>
-                <th scope="col" aria-sort={getSortableHeaderAriaSort('employeeCount', sortState)}>
-                  <SortableHeader columnKey="employeeCount" state={sortState} onChange={setSortState}>
-                    {t('companies.table.employees', 'Employees')}
-                  </SortableHeader>
-                </th>
-                <th scope="col" aria-sort={getSortableHeaderAriaSort('countryCode', sortState)}>
-                  <SortableHeader columnKey="countryCode" state={sortState} onChange={setSortState}>
-                    {t('companies.table.country', 'Country')}
-                  </SortableHeader>
-                </th>
+                {TOGGLE_COLUMNS.filter((c) => columns.isVisible(c.key)).map((c) => (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    aria-label={columnLabel(c)}
+                    aria-sort={getSortableHeaderAriaSort(c.key, sortState)}
+                    className="whitespace-nowrap"
+                  >
+                    <SortableHeader columnKey={c.key} state={sortState} onChange={setSortState}>
+                      {columnLabel(c)}
+                    </SortableHeader>
+                  </th>
+                ))}
                 <th scope="col" className="text-right">
                   {t('companies.table.actions', 'Actions')}
                 </th>
@@ -469,6 +522,7 @@ export function CompaniesPage() {
                   onDelete={deleteCompany.mutate}
                   canDelete={canWrite}
                   query={searchTerm}
+                  isVisible={columns.isVisible}
                 />
               ))}
             </tbody>

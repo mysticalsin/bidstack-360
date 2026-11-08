@@ -370,7 +370,7 @@ export async function buildDashboardSnapshot(
   const [fieldOverrides, performance] = await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },
-      select: { fieldKey: true, value: true },
+      select: { fieldKey: true, value: true, currency: true },
       take: 10,
     }),
     // Account-scoped aggregate — the org-wide `opportunities` array above is

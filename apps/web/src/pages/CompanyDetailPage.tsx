@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -10,18 +11,31 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
+import { useScrollableTabs } from '@/hooks/useScrollableTabs';
+import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
+import { AccountConversations } from '@/components/company/AccountConversations';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
+import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
+import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCompanyIntelSummary, useRefreshCompanyIntel } from '@/hooks/useCompanyIntelSummary';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
-import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
+import {
+  ContactTab,
+  OpportunityTab,
+  CasesTab,
+  NotesTab,
+  HierarchyTab,
+} from './companyDetail/CompanyTabs';
+import { IntelStrip, type IntelTab } from './companyDetail/IntelStrip';
 import { relatedCount } from './companyDetail/relatedCount';
 
-type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
+type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy' | 'intel';
 type View = 'overview' | 'details';
 
 const VIEW_KEY = 'companyDetailView';
@@ -39,6 +53,29 @@ export function CompanyDetailPage() {
   const company = useCompany(id);
   const hierarchy = useCompanyHierarchy(id);
   const [tab, setTab] = useState<TabKey>('contacts');
+  const [intelTab, setIntelTab] = useState<IntelTab>('direction');
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const scrollableTabs = useScrollableTabs(tab);
+  // One stable ref feeds both the scroll-into-view target and the fade wiring.
+  const tabStrip = useCallback(
+    (el: HTMLDivElement | null) => {
+      tabsRef.current = el;
+      scrollableTabs(el);
+    },
+    [scrollableTabs],
+  );
+  const canReadIntel = useHasPermission('account-intel:read');
+  const canRefreshIntel = useHasPermission('account-intel:write');
+  const refreshIntel = useRefreshCompanyIntel(id ?? '');
+  const intelSummary = useCompanyIntelSummary(
+    canReadIntel ? id : undefined,
+    refreshIntel.pollUntil,
+  );
+  const openIntel = (next: IntelTab) => {
+    setIntelTab(next);
+    setTab('intel');
+    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const tabId = (key: TabKey) => `company-tab-${key}`;
   const panelId = (key: TabKey) => `company-panel-${key}`;
   const [view, setViewState] = useState<View>(initialView);
@@ -145,10 +182,12 @@ export function CompanyDetailPage() {
               </a>
             )}
             {c.countryCode && <span>{c.countryCode}</span>}
-            {c.employeeCount && (
+            {!canReadIntel && c.employeeCount ? (
               <span>{t('companyDetail.meta.employees', '{{count}} employees', { count: c.employeeCount })}</span>
+            ) : null}
+            {c.taxId && (
+              <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>
             )}
-            {c.taxId && <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>}
             {c.parent && (
               <span className="flex items-center gap-1">
                 <Icon name="git-branch" size={12} />
@@ -167,13 +206,42 @@ export function CompanyDetailPage() {
             )}
           </div>
 
+          {canReadIntel && (
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
+              <div className="min-w-0 flex-1">
+                <IntelStrip
+                  summary={intelSummary.data?.summary ?? null}
+                  onOpen={openIntel}
+                  crmEmployees={c.employeeCount ?? null}
+                />
+              </div>
+              {canRefreshIntel && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="self-start lg:self-center"
+                  onClick={() => refreshIntel.mutate()}
+                  disabled={refreshIntel.isPending || Boolean(refreshIntel.pollUntil)}
+                  aria-label="Refresh company intel"
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${refreshIntel.isPending || refreshIntel.pollUntil ? 'animate-spin motion-reduce:animate-none' : ''}`}
+                    aria-hidden
+                  />
+                  Refresh
+                </Button>
+              )}
+            </div>
+          )}
           <AccountActivityCharts companyId={c.id} />
+          <AccountConversations companyId={c.id} />
 
           <CompanyTechStackSection companyId={c.id} />
           <ConsultingPartnersSection companyId={c.id} />
 
           <div
-            className="flex gap-2 border-b border-[var(--border-subtle)]"
+            ref={tabStrip}
+            className="tab-scroll gap-2 border-b border-[var(--border-subtle)]"
             role="tablist"
             aria-label={t('companyDetail.tabs.label', 'Company sections')}
           >
@@ -181,7 +249,9 @@ export function CompanyDetailPage() {
               [
                 {
                   key: 'contacts',
-                  label: t('companyDetail.tab.contacts', 'Contacts ({{shown}})', { shown: relatedCount(c.contacts.length) }),
+                  label: t('companyDetail.tab.contacts', 'Contacts ({{shown}})', {
+                    shown: relatedCount(c.contacts.length),
+                  }),
                 },
                 {
                   key: 'people',
@@ -195,13 +265,18 @@ export function CompanyDetailPage() {
                 },
                 {
                   key: 'cases',
-                  label: t('companyDetail.tab.cases', 'Cases ({{shown}})', { shown: relatedCount(c.openCases.length) }),
+                  label: t('companyDetail.tab.cases', 'Cases ({{shown}})', {
+                    shown: relatedCount(c.openCases.length),
+                  }),
                 },
                 {
                   key: 'notes',
-                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', { count: c.notes.length }),
+                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', {
+                    count: c.notes.length,
+                  }),
                 },
                 { key: 'hierarchy', label: t('companyDetail.tab.hierarchy', 'Hierarchy') },
+                { key: 'intel', label: t('companyDetail.tab.intel', 'Intel') },
               ] as { key: TabKey; label: string }[]
             ).map((tabItem) => (
               <button
@@ -213,7 +288,15 @@ export function CompanyDetailPage() {
                 tabIndex={tab === tabItem.key ? 0 : -1}
                 onClick={() => setTab(tabItem.key)}
                 onKeyDown={(e) => {
-                  const keys = ['contacts', 'people', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
+                  const keys = [
+                    'contacts',
+                    'people',
+                    'opportunities',
+                    'cases',
+                    'notes',
+                    'hierarchy',
+                    'intel',
+                  ] as const;
                   const idx = keys.indexOf(tabItem.key);
                   if (e.key === 'ArrowRight') {
                     e.preventDefault();
@@ -227,7 +310,7 @@ export function CompanyDetailPage() {
                     document.getElementById(tabId(prev))?.focus();
                   }
                 }}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
+                className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
                   tab === tabItem.key
                     ? 'border-[var(--brand-primary)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                     : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
@@ -255,7 +338,11 @@ export function CompanyDetailPage() {
             </div>
           )}
           {tab === 'opportunities' && (
-            <div role="tabpanel" id={panelId('opportunities')} aria-labelledby={tabId('opportunities')}>
+            <div
+              role="tabpanel"
+              id={panelId('opportunities')}
+              aria-labelledby={tabId('opportunities')}
+            >
               <OpportunityTab opportunities={c.opportunities} />
             </div>
           )}
@@ -275,6 +362,13 @@ export function CompanyDetailPage() {
             </div>
           )}
 
+          {tab === 'intel' && (
+            <div role="tabpanel" id={panelId('intel')} aria-labelledby={tabId('intel')}>
+              <AccountDirectionSection key={intelTab} companyId={c.id} initialTab={intelTab} />
+            </div>
+          )}
+
+          <EmailPanel filter={{ companyId: c.id }} />
           <CustomFieldValuesSection entityType="company" entityId={id!} />
         </>
       )}

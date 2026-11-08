@@ -131,3 +131,67 @@ export function hiringThemes(summary: HiringSummary): Map<InitiativeTheme, numbe
   for (const s of summary.skills) if (s.theme) out.set(s.theme, Math.max(out.get(s.theme) ?? 0, s.count));
   return out;
 }
+
+/** One row of a hiring breakdown: how many roles and their share of the base. */
+export interface HiringShare {
+  key: string;
+  label: string;
+  count: number;
+  pct: number;
+}
+
+/** Drill-down behind the open roles count, for the hiring panel. */
+export interface HiringRoleBreakdown {
+  /** Function mix over every open role. */
+  functions: HiringShare[];
+  /** Tech and skills over every open role; a role can name several, so shares do not add up to 100. */
+  tech: HiringShare[];
+  /** Practice areas the postings point to, counted once per posting. */
+  themes: (HiringShare & { theme: InitiativeTheme })[];
+  /** Seniority over the postings listed. */
+  seniority: HiringShare[];
+  /** Postings the theme and seniority shares are read from. */
+  postingsBase: number;
+}
+
+const share = (count: number, base: number) => (base > 0 ? Math.round((count / base) * 100) : 0);
+
+function rank(counts: Map<string, number>, base: number, label: (k: string) => string): HiringShare[] {
+  return [...counts.entries()]
+    .map(([key, count]) => ({ key, label: label(key), count, pct: share(count, base) }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+}
+
+/** Skills a posting names, from its stored skills and its title and department. */
+export function postingSkills(p: { title: string; department: string | null; skills: string[] }): string[] {
+  return [...new Set([...p.skills, ...extractSkills(`${p.title} ${p.department ?? ''}`)])];
+}
+
+/** Shares behind the open roles count: function, tech, practice area and seniority. */
+export function hiringBreakdown(
+  summary: HiringSummary,
+  postings: { title: string; department: string | null; function: string; seniority: string | null; skills: string[] }[],
+  themeLabel: (theme: InitiativeTheme) => string,
+): HiringRoleBreakdown {
+  const open = summary.openRoles;
+  const functions = summary.byFunction.map((f) => ({ key: f.key, label: f.label, count: f.count, pct: share(f.count, open) }));
+  const tech = summary.skills.map((s) => ({ key: s.skill, label: s.skill, count: s.count, pct: share(s.count, open) }));
+
+  const themeCount = new Map<string, number>();
+  const seniorityCount = new Map<string, number>();
+  for (const p of postings) {
+    const themes = new Set<InitiativeTheme>();
+    const fnTheme = FUNCTION_THEME[p.function];
+    if (fnTheme) themes.add(fnTheme);
+    for (const s of postingSkills(p)) {
+      const th = themeForSkill(s);
+      if (th) themes.add(th);
+    }
+    for (const th of themes) themeCount.set(th, (themeCount.get(th) ?? 0) + 1);
+    const level = p.seniority?.trim() || 'Not stated';
+    seniorityCount.set(level, (seniorityCount.get(level) ?? 0) + 1);
+  }
+  const themes = rank(themeCount, postings.length, (k) => themeLabel(k as InitiativeTheme)).map((r) => ({ ...r, theme: r.key as InitiativeTheme }));
+  const seniority = rank(seniorityCount, postings.length, (k) => k);
+  return { functions, tech, themes, seniority, postingsBase: postings.length };
+}

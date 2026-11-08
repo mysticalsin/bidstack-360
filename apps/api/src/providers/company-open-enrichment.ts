@@ -12,7 +12,7 @@ import {
 
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
-interface OpenCompanyInput {
+export interface OpenCompanyInput {
   name: string;
   domain?: string | null;
   website?: string | null;
@@ -32,10 +32,94 @@ export interface OpenCompanyProfile {
   employeeCount: number | null;
   incorporationDate: string | null;
   industryLabels: string[];
+  /** Wikidata P2123 total revenue, latest point in time. Absent for Seamless profiles. */
+  revenue?: OpenRevenue | null;
+  /** Wikidata P1128 employees, with the year it states when it has one. Absent for Seamless profiles. */
+  employees?: OpenEmployees | null;
   confidenceBps: number;
   sourceAttribution: SourceAttribution[];
   providerMetadata: Record<string, unknown>;
 }
+
+/** A public revenue figure with the link that proves it. Amount in major units of `currency`. */
+export interface OpenRevenue {
+  amount: number;
+  currency: string;
+  /** As precise as Wikidata states it: YYYY, YYYY-MM or YYYY-MM-DD. */
+  pointInTime: string;
+  year: number;
+  sourceUrl: string;
+  sourceLabel: 'Wikidata';
+}
+
+/** A public headcount with the link that proves it. `year` is null when Wikidata gives no point in time. */
+export interface OpenEmployees {
+  count: number;
+  pointInTime: string | null;
+  year: number | null;
+  sourceUrl: string;
+  sourceLabel: 'Wikidata';
+}
+
+/**
+ * The Wikidata facts Polo keeps whichever profile provider wins the profile.
+ * Seamless replaces the profile, never these.
+ */
+export interface WikidataFacts {
+  wikidataId: string | null;
+  revenue: OpenRevenue | null;
+  employees: OpenEmployees | null;
+}
+
+export function wikidataFactsOf(profile: OpenCompanyProfile | null | undefined): WikidataFacts | null {
+  if (!profile || profile.providerMetadata.openDataProvider !== 'wikidata_wikimedia') return null;
+  const id = profile.providerMetadata.wikidataId;
+  return { wikidataId: typeof id === 'string' ? id : null, revenue: profile.revenue ?? null, employees: profile.employees ?? null };
+}
+
+/**
+ * Wikidata facts for the profile that won. When Seamless won the profile, the
+ * keyless Wikidata lookup still runs (unless `enabled` is false) so a public,
+ * linked revenue figure is not lost. A failed lookup returns null and the
+ * caller keeps what it stored before.
+ */
+export async function resolveWikidataFacts({
+  profile,
+  seamlessWon,
+  enabled,
+  input,
+  fetchOpen = fetchOpenCompanyProfile,
+}: {
+  profile: OpenCompanyProfile | null;
+  seamlessWon: boolean;
+  enabled: boolean;
+  input: OpenCompanyInput;
+  fetchOpen?: (input: OpenCompanyInput) => Promise<OpenCompanyProfile | null>;
+}): Promise<WikidataFacts | null> {
+  if (!seamlessWon) return wikidataFactsOf(profile);
+  if (!enabled) return null;
+  return wikidataFactsOf(await fetchOpen(input).catch(() => null));
+}
+
+/** Wikidata currency items for the currencies Polo formats. Unknown units are dropped, never guessed. */
+const CURRENCY_QID: Record<string, string> = {
+  Q4917: 'USD',
+  Q4916: 'EUR',
+  Q25224: 'GBP',
+  Q25344: 'CHF',
+  Q8146: 'JPY',
+  Q132643: 'NOK',
+  Q122922: 'SEK',
+  Q25417: 'DKK',
+  Q1104069: 'CAD',
+  Q259502: 'AUD',
+  Q39099: 'CNY',
+  Q80524: 'INR',
+  Q173117: 'BRL',
+  Q202040: 'KRW',
+  Q4730: 'MXN',
+  Q123213: 'PLN',
+};
 
 interface WikidataSearchResult {
   id?: string;
@@ -44,7 +128,7 @@ interface WikidataSearchResult {
   concepturi?: string;
 }
 
-interface WikidataEntity {
+export interface WikidataEntity {
   id?: string;
   labels?: Record<string, { value?: string }>;
   descriptions?: Record<string, { value?: string }>;
@@ -70,6 +154,8 @@ const PROPERTY = {
   inception: 'P571',
   employeeCount: 'P1128',
   industry: 'P452',
+  totalRevenue: 'P2123',
+  pointInTime: 'P585',
 } as const;
 
 export async function fetchOpenCompanyProfile({
@@ -117,6 +203,8 @@ export async function fetchOpenCompanyProfile({
     wikimediaImageUrl ?? summary?.thumbnail?.source ?? summary?.originalimage?.source ?? null;
   const pageUrl = summary?.content_urls?.desktop?.page ?? entity.sitelinks?.enwiki?.url ?? null;
   const industryLabels = claimEntityIds(entity, PROPERTY.industry);
+  const revenue = latestWikidataRevenue(entity);
+  const employees = latestWikidataEmployees(entity);
   const confidence = Math.min(0.94, Math.max(0.68, best.score));
 
   return {
@@ -134,6 +222,8 @@ export async function fetchOpenCompanyProfile({
       ...(description ? [description] : []),
       ...industryLabels.map((id) => `Wikidata industry ${id}`),
     ].slice(0, 6),
+    revenue,
+    employees,
     confidenceBps: Math.round(confidence * 10_000),
     sourceAttribution: [
       attribution({
@@ -173,9 +263,65 @@ export async function fetchOpenCompanyProfile({
       logoFile,
       imageFile,
       companyImageUrl: imageUrl,
+      revenue,
+      employees,
       openDataProvider: 'wikidata_wikimedia',
     },
   };
+}
+
+/** Latest non-deprecated P2123 statement that has a point in time and a known currency. */
+export function latestWikidataRevenue(entity: WikidataEntity): OpenRevenue | null {
+  const id = entity.id;
+  if (!id) return null;
+  let best: { raw: string; preferred: boolean; value: OpenRevenue } | null = null;
+  for (const claim of entity.claims?.[PROPERTY.totalRevenue] ?? []) {
+    if (!isRecord(claim) || claim.rank === 'deprecated') continue;
+    const value = isRecord(claim.mainsnak) && isRecord(claim.mainsnak.datavalue) ? claim.mainsnak.datavalue.value : null;
+    if (!isRecord(value) || typeof value.amount !== 'string' || typeof value.unit !== 'string') continue;
+    const amount = Number(value.amount);
+    const currency = CURRENCY_QID[value.unit.split('/').pop() ?? ''];
+    if (!Number.isFinite(amount) || amount <= 0 || !currency) continue;
+    const raw = qualifierTime(claim, PROPERTY.pointInTime);
+    const match = raw?.match(/^\+?(\d{4})-(\d{2})-(\d{2})/);
+    if (!raw || !match) continue;
+    const [, y, m, d] = match;
+    const pointInTime = m === '00' ? y! : d === '00' ? `${y}-${m}` : `${y}-${m}-${d}`;
+    const preferred = claim.rank === 'preferred';
+    const candidate = { raw, preferred, value: { amount, currency, pointInTime, year: Number(y), sourceUrl: `https://www.wikidata.org/wiki/${id}#${PROPERTY.totalRevenue}`, sourceLabel: 'Wikidata' as const } };
+    if (!best || raw > best.raw || (raw === best.raw && preferred && !best.preferred)) best = candidate;
+  }
+  return best?.value ?? null;
+}
+
+/** Latest non-deprecated P1128 statement: dated ones by point in time, an undated one only when nothing is dated. */
+export function latestWikidataEmployees(entity: WikidataEntity): OpenEmployees | null {
+  const id = entity.id;
+  if (!id) return null;
+  let best: { raw: string; preferred: boolean; value: OpenEmployees } | null = null;
+  for (const claim of entity.claims?.[PROPERTY.employeeCount] ?? []) {
+    if (!isRecord(claim) || claim.rank === 'deprecated') continue;
+    const value = isRecord(claim.mainsnak) && isRecord(claim.mainsnak.datavalue) ? claim.mainsnak.datavalue.value : null;
+    if (!isRecord(value) || typeof value.amount !== 'string') continue;
+    const amount = Number(value.amount);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const raw = qualifierTime(claim, PROPERTY.pointInTime);
+    const match = raw?.match(/^\+?(\d{4})-(\d{2})-(\d{2})/);
+    const preferred = claim.rank === 'preferred';
+    const [, y, m, d] = match ?? [];
+    const pointInTime = !match ? null : m === '00' ? y! : d === '00' ? `${y}-${m}` : `${y}-${m}-${d}`;
+    const sortKey = match ? raw! : '';
+    const candidate = { raw: sortKey, preferred, value: { count: Math.trunc(amount), pointInTime, year: match ? Number(y) : null, sourceUrl: `https://www.wikidata.org/wiki/${id}#${PROPERTY.employeeCount}`, sourceLabel: 'Wikidata' as const } };
+    if (!best || sortKey > best.raw || (sortKey === best.raw && preferred && !best.preferred)) best = candidate;
+  }
+  return best?.value ?? null;
+}
+
+function qualifierTime(claim: Record<string, unknown>, property: string): string | null {
+  const q = isRecord(claim.qualifiers) ? claim.qualifiers[property] : null;
+  const first = Array.isArray(q) ? q[0] : null;
+  const dv = isRecord(first) && isRecord(first.datavalue) ? first.datavalue.value : null;
+  return isRecord(dv) && typeof dv.time === 'string' ? dv.time : null;
 }
 
 export function faviconProfile({

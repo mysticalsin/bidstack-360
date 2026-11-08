@@ -5,54 +5,9 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 
-const SIGNATURE_SNIPPETS = {
-  'Node.js': `const crypto = require('crypto');
+import { SIGNATURE_SNIPPETS, type SignatureLang } from './signature-snippets';
 
-function verifySignature(rawBody, header, secret) {
-  const [tPart, v1Part] = header.split(',');
-  const t = tPart.replace('t=', '');
-  const v1 = v1Part.replace('v1=', '');
-
-  if (Math.abs(Date.now() / 1000 - Number(t)) > 300) return false;
-
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(\`\${t}.\${rawBody}\`)
-    .digest('hex');
-
-  return crypto.timingSafeEqual(
-    Buffer.from(v1, 'hex'),
-    Buffer.from(expected, 'hex'),
-  );
-}`,
-  Python: `import hmac, hashlib, time
-
-def verify_signature(raw_body: bytes, header: str, secret: str) -> bool:
-    parts = dict(item.split("=", 1) for item in header.split(","))
-    t, v1 = parts.get("t", ""), parts.get("v1", "")
-
-    if abs(time.time() - int(t)) > 300:
-        return False
-
-    expected = hmac.new(
-        secret.encode(), f"{t}.".encode() + raw_body, hashlib.sha256
-    ).hexdigest()
-
-    return hmac.compare_digest(v1, expected)`,
-  Ruby: `require 'openssl'
-
-def verify_signature(raw_body, header, secret)
-  parts = Hash[header.split(',').map { |p| p.split('=', 2) }]
-  t, v1 = parts['t'], parts['v1']
-
-  return false if (Time.now.to_i - t.to_i).abs > 300
-
-  expected = OpenSSL::HMAC.hexdigest('sha256', secret, "#{t}.#{raw_body}")
-  ActiveSupport::SecurityUtils.secure_compare(v1, expected)
-end`,
-};
-
-type Lang = keyof typeof SIGNATURE_SNIPPETS;
+type Lang = SignatureLang;
 
 export function SignatureGuide() {
   const { t } = useTranslation('signatures');

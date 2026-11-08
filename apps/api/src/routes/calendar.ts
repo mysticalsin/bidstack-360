@@ -10,7 +10,7 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { CALENDAR_PUSH, mayWriteCalendar } from '@bidstack/shared';
 import { Queue } from 'bullmq';
 import { redis } from '../redis.js';
@@ -28,9 +28,9 @@ const CalendarEventBase = z.object({
     .default([]),
   /** Which provider calendar to push to. Defaults to the user's primary integration. */
   provider: z.enum(['google_workspace', 'microsoft_graph']).optional(),
-  contactId: z.string().uuid().optional(),
-  companyId: z.string().uuid().optional(),
-  opportunityId: z.string().uuid().optional(),
+  contactId: z.string().uuid().nullable().optional(),
+  companyId: z.string().uuid().nullable().optional(),
+  opportunityId: z.string().uuid().nullable().optional(),
   /** Retry key: a repeated create with the same id returns the first event. */
   clientRequestId: z.string().min(8).max(64).optional(),
 });
@@ -147,7 +147,55 @@ async function findCalendarGrant(
   return pool.find((g) => g.canWrite) ?? pool[0] ?? null;
 }
 
+type Filing = { contactId?: string | null; companyId?: string | null; opportunityId?: string | null };
+
+/**
+ * Filing fields after tenant checks. An opportunity brings its account when
+ * the body names none; an account that disagrees with the opportunity is
+ * rejected. Returns an error message instead of throwing so each route
+ * picks its status.
+ */
+async function checkedFiling(orgId: string, body: Filing): Promise<Filing | { error: string }> {
+  const out: Filing = {};
+  if (body.contactId !== undefined) {
+    if (body.contactId && !(await prisma.contact.count({ where: { id: body.contactId, orgId, deletedAt: null } }))) {
+      return { error: 'Contact not found' };
+    }
+    out.contactId = body.contactId;
+  }
+  if (body.companyId !== undefined) {
+    if (body.companyId && !(await prisma.company.count({ where: { id: body.companyId, orgId, deletedAt: null } }))) {
+      return { error: 'Company not found' };
+    }
+    out.companyId = body.companyId;
+  }
+  if (body.opportunityId !== undefined) {
+    if (body.opportunityId) {
+      const opp = await prisma.opportunity.findFirst({
+        where: { id: body.opportunityId, orgId, deletedAt: null },
+        select: { companyId: true },
+      });
+      if (!opp) return { error: 'Opportunity not found' };
+      if (body.companyId && opp.companyId && body.companyId !== opp.companyId) {
+        return { error: 'Opportunity belongs to another company' };
+      }
+      if (body.companyId === undefined && opp.companyId) out.companyId = opp.companyId;
+    }
+    out.opportunityId = body.opportunityId;
+  }
+  return out;
+}
+
 export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
+  /** Keep the account activity for a synced meeting in line; never fails the request. */
+  async function syncActivity(orgId: string, eventId: string, actorUserId: string): Promise<void> {
+    try {
+      await syncCalendarEventActivity(orgId, eventId, { actorUserId });
+    } catch (err) {
+      server.log.warn({ err, eventId }, 'Could not update the account activity for a calendar event');
+    }
+  }
+
   let pushQueue: Queue | null = null;
   function getPushQueue(): Queue {
     pushQueue ??= new Queue(CALENDAR_PUSH.name, {
@@ -232,6 +280,9 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
         if (existing) return reply.code(200).send(toResponse(existing));
       }
 
+      const filing = await checkedFiling(orgId, req.body);
+      if ('error' in filing) throw server.httpErrors.notFound(filing.error);
+
       const grant = await findCalendarGrant(orgId, userId, req.body.provider);
       const provider: CalendarProvider = grant?.provider ?? req.body.provider ?? 'google_workspace';
       const push = grant?.canWrite === true;
@@ -252,9 +303,9 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
             isAllDay: req.body.isAllDay,
             isCancelled: false,
             attendees: req.body.attendees,
-            contactId: req.body.contactId ?? null,
-            companyId: req.body.companyId ?? null,
-            opportunityId: req.body.opportunityId ?? null,
+            contactId: filing.contactId ?? null,
+            companyId: filing.companyId ?? null,
+            opportunityId: filing.opportunityId ?? null,
             filedManually: isFiling(req.body),
             clientRequestId: clientRequestId ?? null,
             syncState: push ? 'PENDING_PUSH' : 'SYNCED',
@@ -309,6 +360,9 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.badRequest('endAt must not be before startAt');
       }
 
+      const filing = await checkedFiling(orgId, req.body);
+      if ('error' in filing) throw server.httpErrors.notFound(filing.error);
+
       const grant = await findCalendarGrant(orgId, userId, existing.provider as CalendarProvider);
       const push = grant?.canWrite === true;
 
@@ -322,9 +376,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.body.location !== undefined ? { location: req.body.location } : {}),
           ...(req.body.isAllDay !== undefined ? { isAllDay: req.body.isAllDay } : {}),
           ...(req.body.attendees !== undefined ? { attendees: req.body.attendees } : {}),
-          ...(req.body.contactId !== undefined ? { contactId: req.body.contactId } : {}),
-          ...(req.body.companyId !== undefined ? { companyId: req.body.companyId } : {}),
-          ...(req.body.opportunityId !== undefined ? { opportunityId: req.body.opportunityId } : {}),
+          ...filing,
           ...(isFiling(req.body) ? { filedManually: true } : {}),
           syncState: push ? 'PENDING_PUSH' : 'SYNCED',
         },
@@ -339,6 +391,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
           operation: existing.externalId ? 'update' : 'push',
         });
       }
+      await syncActivity(orgId, event.id, userId);
 
       return reply.send(toResponse(event));
     },
@@ -375,6 +428,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
       });
 
       if (push) await enqueuePush({ orgId, userId, calendarEventId: event.id, operation: 'delete' });
+      await syncActivity(orgId, event.id, userId);
 
       return reply.code(204).send(null);
     },

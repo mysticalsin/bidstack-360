@@ -11,6 +11,7 @@ import {
   outboxDeliveryJobId,
   relayWebhookOutboxOnce,
   webhookOutboxRelayEnabled,
+  webhookOutboxRelayMode,
   type OutboxDeliveryJob,
   type OutboxRelayDeps,
 } from './webhook-outbox-relay.js';
@@ -27,6 +28,7 @@ function deps(overrides: Partial<OutboxRelayDeps> = {}) {
   const base: OutboxRelayDeps = {
     claim: vi.fn(async () => [row('r1')]),
     subscriptionIds: vi.fn(async () => ['s1', 's2']),
+    targetActive: vi.fn(async () => true),
     enqueue: vi.fn(async (jobs) => {
       enqueued.push(jobs);
     }),
@@ -103,5 +105,37 @@ describe('webhook outbox relay', () => {
     expect(webhookOutboxRelayEnabled({})).toBe(false);
     expect(webhookOutboxRelayEnabled({ WEBHOOK_OUTBOX_ENABLED: '1' })).toBe(false);
     expect(webhookOutboxRelayEnabled({ WEBHOOK_OUTBOX_ENABLED: 'true' })).toBe(true);
+  });
+
+  it('relays only targeted replays while the domain outbox flag is off', () => {
+    // WHY: replay must work on every tenant, but turning the relay on must not
+    // start delivering domain rows the API never wrote with the flag off.
+    expect(webhookOutboxRelayMode({})).toBe('replays');
+    expect(webhookOutboxRelayMode({ WEBHOOK_OUTBOX_ENABLED: 'true' })).toBe('all');
+  });
+
+  it('sends a targeted replay row to its one subscription and links the original message', async () => {
+    const subscriptionIds = vi.fn(async () => ['s1', 's2']);
+    const { d, enqueued } = deps({
+      subscriptionIds,
+      claim: vi.fn(async () => [
+        { ...row('r9'), subscriptionId: 's2', replayOfId: 'm-original' },
+      ]),
+    });
+    await relayWebhookOutboxOnce(d);
+    expect(subscriptionIds).not.toHaveBeenCalled();
+    expect(enqueued[0]).toHaveLength(1);
+    expect(enqueued[0]![0]!.opts.jobId).toBe(outboxDeliveryJobId('r9', 's2'));
+    expect(enqueued[0]![0]!.data).toMatchObject({ subscriptionId: 's2', replayOfId: 'm-original' });
+  });
+
+  it('drops a targeted replay whose subscription is gone or paused', async () => {
+    const { d, enqueued } = deps({
+      targetActive: vi.fn(async () => false),
+      claim: vi.fn(async () => [{ ...row('r9'), subscriptionId: 's2', replayOfId: 'm-original' }]),
+    });
+    const result = await relayWebhookOutboxOnce(d);
+    expect(enqueued).toHaveLength(0);
+    expect(result.dispatched).toBe(1);
   });
 });

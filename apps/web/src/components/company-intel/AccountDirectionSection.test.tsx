@@ -67,6 +67,7 @@ vi.mock('@/hooks/useCompanyIntel', () => ({
   useRefreshIntelSource: () => ({ mutate: refresh, isPending: false, variables: undefined }),
 }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
+vi.mock('@/hooks/useSourcedFigures', async (orig) => ({ ...(await orig<Record<string, unknown>>()), useSourcedFigures: () => ({ revenue: null, employees: null, companyName: '' }) }));
 
 import { AccountDirectionSection } from './AccountDirectionSection';
 
@@ -91,7 +92,7 @@ describe('AccountDirectionSection', () => {
     render(<AccountDirectionSection companyId="c1" />);
     fireEvent.click(screen.getByRole('tab', { name: 'Hiring' }));
     expect(screen.getByTestId('intel-open-roles').textContent).toContain('3');
-    expect(screen.getByText('Databricks')).toBeTruthy();
+    expect(screen.getAllByText('Databricks').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('tab', { name: 'Financials' }));
     expect(screen.getByTestId('intel-fin-year-2025')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'News and posts' }));

@@ -1594,6 +1594,44 @@ select:focus-visible {
   align-items: center;
   gap: 6px;
 }
+/* Horizontally scrollable tab strip (DESIGN.md 9.11). useScrollableTabs sets
+   the fade attributes while tabs are hidden past an edge. */
+.tab-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+.tab-scroll > [role='tab'] {
+  flex: none;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+.tab-scroll[data-fade-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.tab-scroll[data-fade-start] {
+  mask-image: linear-gradient(to right, transparent, #000 32px);
+}
+.tab-scroll[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+.crumbs-seg > .sep {
+  flex: none;
+}
+.crumbs-seg > span:not(.sep) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* CRM-style inline-edit trigger. Read-mode button looks like static
    text until hovered/focused, then reveals a subtle 1px outline + tinted
@@ -1726,11 +1764,17 @@ select:focus-visible {
   font-size: 13px;
   font-weight: 600;
   z-index: 100;
-  transition: transform 0.14s ease-out;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.14s ease-out,
+    opacity 0.14s ease-out;
 }
 .skip-link:focus,
 .skip-link:focus-visible {
   transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
@@ -4142,7 +4186,8 @@ select:focus-visible {
   overflow: hidden;
   color: var(--brand-primary);
 }
-.account-card-tech span {
+.account-card-tech > span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4157,7 +4202,20 @@ select:focus-visible {
 .account-card-tech.is-empty {
   color: var(--fg-tertiary);
 }
-.account-card-tech.is-empty span {
+.account-card-tech > .account-card-tech-item {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 3px;
+}
+.account-card-tech-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-card-tech.is-empty > span {
   border-color: var(--border-subtle);
   background: var(--surface-sunken);
   color: var(--fg-tertiary);

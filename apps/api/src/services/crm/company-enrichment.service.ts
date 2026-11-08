@@ -9,6 +9,8 @@ import { type z } from 'zod';
 
 import {
   CompanyStrategicIntel,
+  openTechStackCategories,
+  parseOpenTechSnapshot,
   type CrmCompany,
   type CrmLogoSource,
   type SourceAttribution,
@@ -225,8 +227,11 @@ function buildProviderTechnicalStack(
 ): CompanyTechnicalStack {
   return dedupeTechnicalStack(
     mergeTechnicalStack(
-      mergeTechnicalStack(parseTechnicalStack(metadata.meetingTechStack), seamlessTechnicalStack(metadata)),
-      techStackMcpTechnicalStack(metadata),
+      mergeTechnicalStack(
+        mergeTechnicalStack(parseTechnicalStack(metadata.meetingTechStack), seamlessTechnicalStack(metadata)),
+        techStackMcpTechnicalStack(metadata),
+      ),
+      openTechStackCategories(parseOpenTechSnapshot(metadata.openTechStack)),
     ),
   );
 }

@@ -27,6 +27,7 @@ import { asProviderStatus, mapDealStage, normalizeName, record } from './dashboa
 import {
   applyOpportunityScope,
   countryVariantsForScope,
+  isApiKeyActor,
   type AccessScope,
 } from '../../lib/access-scope.js';
 import { canReadAccount } from '../../lib/account-access.js';
@@ -281,7 +282,13 @@ export async function resolveCockpitCompany(
           [],
           [company],
         );
-    const resolved = list[0];
+    // buildCompanies always appends a Mantu fallback and sorts by name, so pick by
+    // identity, not position. An enrichment keeps its id unless its display name
+    // matches the Company row, in which case the row's id is stamped on it.
+    const resolved =
+      (byNameEnrichment
+        ? list.find((c) => c.id === byNameEnrichment.id || c.id === company.id)
+        : list.find((c) => normalizeName(c.name) === normalizeName(company.name))) ?? null;
     if (resolved) {
       resolved.id = company.id;
       if (company.domain) resolved.domain = company.domain;
@@ -436,7 +443,7 @@ export async function buildCompanyCockpit(
       // resolved above. Mirrors the shipped pattern in dashboard.service.ts.
       prismaClient.companyFieldOverride.findMany({
         where: { orgId, companyKey: normalizeName(company.name) },
-        select: { fieldKey: true, value: true },
+        select: { fieldKey: true, value: true, currency: true },
         take: 10,
       }),
     ]);
@@ -548,6 +555,12 @@ async function fetchRevenueRows(
             OR t.country_codes && ARRAY[${Prisma.join(variants)}]::text[]
             OR`
         : Prisma.empty;
+    // An API key owns no deals and its userId is not a uuid: scope it by its company allowlist.
+    const ownerOrCompanySql = !isApiKeyActor(scope.userId)
+      ? Prisma.sql`o.owner_id = ${scope.userId}::uuid`
+      : scope.companyIds.length > 0
+        ? Prisma.sql`o.company_id = ANY(ARRAY[${Prisma.join(scope.companyIds)}]::uuid[])`
+        : Prisma.sql`FALSE`;
     return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
       SELECT to_char(date_trunc('month', o.due_date), 'YYYY-MM') AS period,
              SUM(o.value_micros) AS revenue
@@ -560,7 +573,7 @@ async function fetchRevenueRows(
         AND o.due_date IS NOT NULL
         AND (
           ${countryScopeSql}
-          o.owner_id = ${scope.userId}::uuid
+          ${ownerOrCompanySql}
         )
       GROUP BY 1
       ORDER BY 1 DESC

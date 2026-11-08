@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DeliveryModuleNs from './webhook-delivery.js';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnrecoverableError, type Job } from 'bullmq';
 import type pino from 'pino';
 
@@ -24,6 +25,7 @@ vi.mock('@bidstack/db', () => ({
   prisma: {
     webhookSubscription: { findFirst: mocks.subFindFirst, update: mocks.subUpdate },
     webhookDelivery: { create: mocks.deliveryCreate },
+    webhookMessage: { upsert: vi.fn(async () => ({})) },
   },
 }));
 
@@ -42,7 +44,14 @@ vi.mock('../lib/serum-connector-policy.js', () => ({
   serumConnectorDenialMessage: mocks.serumDenial,
 }));
 
-import { processDeliveryJob } from './webhook-delivery.js';
+type DeliveryModule = typeof DeliveryModuleNs;
+// The worker config runs files with isolate: false, so a static import would
+// keep whichever file loaded the module first bound to that file's mocks.
+let processDeliveryJob: DeliveryModule['processDeliveryJob'];
+beforeAll(async () => {
+  vi.resetModules();
+  ({ processDeliveryJob } = await import('./webhook-delivery.js'));
+});
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 

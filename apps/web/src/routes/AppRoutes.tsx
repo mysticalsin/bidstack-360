@@ -21,6 +21,7 @@ import {
   AgreementDetailPage,
   AgreementsPage,
   IntakeReviewPage,
+  WhitespacePage,
   MeetingDetailPage,
   OrgChartPage,
   MeetingFlagsPage,
@@ -188,6 +189,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <AgreementsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/agreements/whitespace"
+            element={
+              <RequireAuth>
+                <WhitespacePage />
               </RequireAuth>
             }
           />

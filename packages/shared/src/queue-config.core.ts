@@ -16,7 +16,8 @@ import type { OrgChartSeedJob } from './schemas/org-chart.js';
  */
 export interface QueueDefaults {
   attempts: number;
-  backoff: { type: 'exponential' | 'fixed'; delay: number };
+  /** `webhook-endpoint` is a custom strategy the delivery worker registers. */
+  backoff: { type: 'exponential' | 'fixed' | 'webhook-endpoint'; delay: number };
   removeOnComplete: { age: number; count?: number };
   removeOnFail: { age: number; count?: number };
 }
@@ -156,6 +157,8 @@ export type AccountEnrichmentJob =
  *   'account-intel.refresh'          refresh chosen sources for one account
  *   'account-intel.sweep'            repeatable, only when ACCOUNT_INTEL_AUTO_REFRESH=true
  *   'account-intel.financials-scan'  repeatable filings scan unless FINANCIALS_SCAN_ENABLED=false
+ *   'account-intel.full-refresh'     every public source plus Apollo organization data for one
+ *                                    company, then its list summary (manual Refresh, imports)
  */
 export const ACCOUNT_INTEL: QueueConfig = {
   name: 'account-intel',
@@ -170,8 +173,30 @@ export const ACCOUNT_INTEL: QueueConfig = {
 /** Jobs on the account-intel queue. */
 export type AccountIntelQueueJob =
   | { kind: 'refresh'; orgId: string; companyId: string; sources: Array<'hiring' | 'posts' | 'financials' | 'registry'>; requestedBy?: string | null }
+  | { kind: 'full-refresh'; orgId: string; companyId: string; batchId: string | null; force: boolean; requestedBy?: string | null }
   | { kind: 'sweep' }
   | { kind: 'financials-scan' };
+
+/**
+ * Open data technology stack (slice 16): DNS, certificate transparency,
+ * homepage, stored job postings and GitHub per account.
+ *   'company-tech-detect.refresh'  one account, on create, import or the sweep
+ *   'company-tech-detect.sweep'    repeatable weekly, batched over every account
+ */
+export const COMPANY_TECH_DETECT: QueueConfig = {
+  name: 'company-tech-detect',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 120_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the company-tech-detect queue. */
+export type CompanyTechDetectQueueJob =
+  | { kind: 'refresh'; orgId: string; companyId: string; reason: 'create' | 'import' | 'sweep' }
+  | { kind: 'sweep' };
 
 /**
  * Consulting partners (slice 15): which consulting firms work with an account.
