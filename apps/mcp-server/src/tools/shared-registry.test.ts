@@ -33,4 +33,11 @@ describe('MCP registry reuses the shared agent tools', () => {
       expect(toolScopes[name]).toBe('read');
     }
   });
+
+  it('serves consulting_partners from the shared registry as a read tool', () => {
+    expect(AGENT_TOOL_NAMES).toContain('consulting_partners');
+    expect(tools.consulting_partners).toBe(agentTools.consulting_partners);
+    expect(toolScopes.consulting_partners).toBe('read');
+    expect(agentTools.consulting_partners.permission).toBe('account-intel:read');
+  });
 });

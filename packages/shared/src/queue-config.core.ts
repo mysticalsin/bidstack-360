@@ -173,6 +173,29 @@ export type AccountIntelQueueJob =
   | { kind: 'sweep' }
   | { kind: 'financials-scan' };
 
+/**
+ * Consulting partners (slice 15): which consulting firms work with an account.
+ *   'consulting-partners.refresh'  manual Refresh on the account page
+ *   'consulting-partners.sweep'    repeatable daily: rescans our own records for
+ *                                  recently changed accounts and prunes old
+ *                                  evidence; public fetches only when
+ *                                  CONSULTING_PARTNERS_AUTO_REFRESH=true
+ */
+export const CONSULTING_PARTNERS: QueueConfig = {
+  name: 'consulting-partners',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 120_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the consulting-partners queue. */
+export type ConsultingPartnersQueueJob =
+  | { kind: 'refresh'; orgId: string; companyId: string; requestedBy?: string | null }
+  | { kind: 'sweep' };
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;
@@ -280,6 +303,37 @@ export const TENANT_EXPORT: QueueConfig = {
  */
 export const AI_AUDIT_RETENTION: QueueConfig = {
   name: 'ai-audit-retention',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 30 },
+    removeOnFail: { age: 86_400 * 30, count: 100 },
+  },
+};
+
+/**
+ * GDPR data subject requests (export / erase, Art. 15, 17, 20). One job per
+ * request row; the runner claims the row, so a redelivery after completion is
+ * a no-op. Erasure is not retried aggressively: a failed run leaves the row
+ * `failed` with the error for an admin to re-file.
+ */
+export const DATA_SUBJECT_REQUEST: QueueConfig = {
+  name: 'data-subject-request',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 1000 },
+  },
+};
+
+/**
+ * Retention sweep per data class (GDPR Art. 5(1)(e)). Daily repeatable cron.
+ * Report-only unless RETENTION_MODE=enforce. Idempotent: it only touches rows
+ * older than a cutoff.
+ */
+export const RETENTION_SWEEP: QueueConfig = {
+  name: 'retention-sweep',
   defaultJobOptions: {
     attempts: 2,
     backoff: { type: 'fixed', delay: 60_000 },

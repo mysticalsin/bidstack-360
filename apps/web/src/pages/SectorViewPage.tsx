@@ -23,6 +23,7 @@ import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
+import { SectorPipelineCard } from './sectorView/SectorPipelineCard';
 import { sourceLabel, titleCase } from './accountsPage/accountUtils';
 import { sectorAccountSignal, sectorCoverageSignal } from './accountsPage/strategicSignals';
 
@@ -68,12 +69,6 @@ export default function SectorViewPage() {
       >
         <div>
           <h1 className="page-title gradient-text">{t('sectorView.title', 'Sector view')}</h1>
-          <div className="page-sub">
-            {t(
-              'sectorView.subtitle',
-              'Industry presence, country depth, and account-level coverage from ABC.',
-            )}
-          </div>
         </div>
         <div className="page-actions">
           <Link to="/accounts" className="btn btn-secondary">
@@ -191,6 +186,8 @@ export default function SectorViewPage() {
               }
             />
           </section>
+
+          <SectorPipelineCard />
 
           <Card className="overflow-hidden p-0">
             <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4">

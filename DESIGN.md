@@ -598,14 +598,16 @@ names or copy into Polo.
 - No em dashes in new copy; no banned AI words (vault `Preferences/dont.md`).
 - **Never cut or reword the pinned consent and safety copy below.** Slice agents must add a test that
   pins these strings (keys in `public/locales/en/*.json` and the inline defaults) before cutting any
-  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept):
+  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept).
+  The three signature lines were realigned to `main` after #304: the page and the PDF say this is an
+  internal approval signature, not a legally binding e-signature.
 
 ```text
 # Signatures (PublicSignPage, signatures.json)
-Your signature is legally binding. This page contains no tracking technologies.
-I agree that this electronic signature is legally binding and represents my intent to sign this document. I have had the opportunity to review its contents.
+This is an internal approval signature, not a legally binding e-signature. This page contains no tracking technologies.
+I understand this is an internal approval signature, not a legally binding e-signature, and that it represents my intent to approve this document. I have had the opportunity to review its contents.
 {{senderName}} has been notified. A copy of the signed document will be sent to your email address.
-I agree that this electronic signature is legally equivalent to my handwritten signature.
+I understand this electronic signature is an internal approval signature, not a legally binding e-signature.
 
 # SMS (SmsComposerModal)
 This number has requested to stop receiving SMS. Sending is blocked (TCPA compliance).
@@ -688,3 +690,54 @@ One section on the account page, after "What to position": where the company is 
 - News and posts: one list, newest first, each item with a kind label (Product, Partnership, Acquisition, Leadership, Results, Layoffs, Expansion) and origin (company or press).
 - Sources strip at the foot of every tab: Job boards, Company posts, Filings, Registries. Each row shows status as text plus icon, last fetched time, the result (new, updated, failed) and a Refresh button (lucide `RefreshCw`) for users with `account-intel:write`. Not configured rows name the env var to set.
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: signals `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers.
+
+### 9.8 Slice 1 as built (2026-11-06)
+
+Appended by factory slice 1. Values only; no existing token changed.
+
+- Surfaces: `--surface-shell` and `--surface-inset` in both theme blocks, bridged as
+  `bg-surface-shell` and `bg-surface-inset`.
+- Status aliases: `--color-positive(-tint)` and `--color-negative(-tint)` in `@theme` point at
+  `--success(-tint)` and `--danger(-tint)`; `warning` already existed. They exist so vendored chart
+  fills keep one meaning across themes. New code still writes `success` and `danger`.
+- Motion: `--ease-ui-out`, `--ease-ui-in-out`, `--ease-drawer` in `@theme` (utilities `ease-ui-out`
+  and so on), mirrored in `apps/web/src/lib/motion-tokens.ts` with `enter` (210ms), `exit` (150ms),
+  `spring`, `instant` and `motionFor(reduced, transition)`. A contract test keeps CSS and TS equal.
+- Components: `components/vendor/tuffui/status-pill.tsx` (`StatusPill` with filled lucide glyphs,
+  `Tag`) and `surface.tsx` (`Shell`, `Panel`, `Inset`, `IconTile`, `ShellHeader`), plus `LICENSE`.
+- Lint ratchet: `no-foreign-token-vocabulary` now also bans bare `text-foreground`, `bg-foreground`,
+  `text-background`, `bg-background`, `fill-foreground`, `stroke-foreground`. The last live
+  leftovers (funnel-chart, sankey-node, chart-stat-flow) now use `fg-*` tokens.
+- Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
+  that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
+
+### 9.9 Slice 2 console shell as built (2026-11-07)
+
+Appended by factory slice 2. Refines the existing shell (AppShell, Sidebar, MobileNav, Topbar); the look
+is unchanged. This supersedes the "56px icon rail" line in 9.4.
+
+- Rail: 232px expanded, 64px collapsed, from `--sidebar-w` on `.app-shell`. The grid track eases
+  200ms with `var(--ease-ui-out)`. It is instant for a keyboard toggle (Enter or Space) and under
+  `prefers-reduced-motion`, via `data-motion="instant"` on `.sidebar`. Collapsed items keep an
+  `aria-label` and a tooltip; section flyouts open on hover and on keyboard focus.
+- Breakpoint: `56rem` (`SHELL_WIDE_QUERY` in `components/layout/shellBreakpoint.ts`). Below it the rail
+  is hidden and the topbar "Open navigation" button opens the nav as an in-place drawer inside the
+  shell (left side, `--ease-drawer`, backdrop button "Close navigation"). The drawer is a
+  `role="dialog"` named "Primary navigation"; focus moves in, Tab is trapped, Escape or a link closes
+  it, and focus returns to the hamburger. Body scroll is locked while it is open.
+- One vertical scroll: the document scrolls; the sidebar keeps only its own safety-net overflow.
+- Pinned by `MobileNav.test.tsx`, `Sidebar.console.test.tsx` and `shell-css.contract.test.ts`.
+
+### 9.10 Consulting partners (slice 15)
+
+One section on the account page and the `/accounts/:id` cockpit, after Account direction: which third-party consulting firms work with the client, and how we stand against each one. Our own group entities stay in the MSA "who works with them" panel; this section is outside firms only.
+
+- Partner strip: one tile per firm, strongest first. Tile: monogram (two letters, brand-tinted inset), firm name, relationship tags (Strategic partner, Implementation, Managed services, Audit, Advisory, Engineering), domain chips (IT, Engineering, Digital, Data, SAP, Cloud, Cyber, HEMA / pharma), a three-step strength meter and the evidence count. Selected tile has the accent ring; arrow keys move along the strip (`role="listbox"`).
+- Selected partner, two columns at 1440 and 1024, one column at 390:
+  - Left: radar (repo `charts/PolarCharts.tsx` `RadarChart`, lazy) with two series, Us (accent) and the partner (muted), on Quality, Price, Speed, Domain depth. Below it a score table, one row per dimension including Relationship: us, partner, evidence count. A dimension without evidence shows "No evidence" in muted text and is left off the radar, never drawn as zero.
+  - Right: record line (wins and losses against the firm, years), then 1 to 3 angles. Each angle cites its evidence; an inferred angle carries the "Inferred" tag.
+- Timeline strip under both columns: one dot per evidence item on a time axis, public dots outlined, internal dots filled; hover or focus shows date, source and title.
+- Evidence list (collapsed by default, "Evidence" toggle): source label, date, excerpt, method, link to the URL or the record; "Load more" pages through the API.
+- Header: section title, last fetched time, and Refresh (lucide `RefreshCw`) for users with `account-intel:write`. Not configured status shows the detail text.
+- Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
+- Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.

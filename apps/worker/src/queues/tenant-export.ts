@@ -24,7 +24,7 @@ import type pino from 'pino';
 
 import { UnrecoverableError, Worker as BullWorker } from 'bullmq';
 import { prisma } from '@bidstack/db';
-import { TENANT_EXPORT, TenantExportJob } from '@bidstack/shared';
+import { DataRegion, TENANT_EXPORT, TenantExportJob } from '@bidstack/shared';
 
 import { deleteExportArchive, uploadExportArchive } from '../lib/tenant-export-storage.js';
 import {
@@ -130,8 +130,7 @@ async function streamEntity(
   const delegate = delegateFor(entity.accessor);
   const select = safeSelectForModel(entity.model);
   // `org` has no orgId column — it IS the tenant; scope it by primary key.
-  const where: Record<string, unknown> =
-    entity.accessor === 'org' ? { id: orgId } : { orgId };
+  const where: Record<string, unknown> = entity.accessor === 'org' ? { id: orgId } : { orgId };
 
   let cursor: string | undefined;
   let total = 0;
@@ -240,11 +239,17 @@ export async function processTenantExportJob(
   const rowLost = new AbortController();
   const stopHeartbeat = startExportHeartbeat({ exportId, orgId }, () => rowLost.abort(), log);
   const storageKey = exportStorageKey(orgId, exportId);
+  let region: DataRegion | null = null;
   try {
+    const settings = await prisma.orgSettings.findFirst({
+      where: { orgId, deletedAt: null },
+      select: { dataRegion: true },
+    });
+    region = DataRegion.safeParse(settings?.dataRegion).data ?? null;
     const { body, done } = buildArchiveStream(orgId, exportId, log, rowLost.signal);
     // Upload consumes the gzip stream; `done` resolves when production finishes.
-    const [{ bytes }, counts] = await Promise.all([
-      uploadExportArchive({ key: storageKey, body }),
+    const [{ bytes, storageRegion }, counts] = await Promise.all([
+      uploadExportArchive({ key: storageKey, body, region }),
       done,
     ]);
 
@@ -258,6 +263,7 @@ export async function processTenantExportJob(
       data: {
         status: 'ready',
         storageKey,
+        storageRegion,
         sizeBytes: BigInt(bytes),
         expiresAt,
         completedAt: new Date(),
@@ -280,8 +286,11 @@ export async function processTenantExportJob(
 
   // Reached only when the row stopped being ours mid-run (swept or deleted):
   // nothing will ever point at the archive, so remove it and stop retrying.
-  await deleteExportArchive(storageKey).catch((err: unknown) =>
-    log.error({ exportId, orgId, storageKey, err }, 'tenant-export: could not delete orphaned archive'),
+  await deleteExportArchive(storageKey, region).catch((err: unknown) =>
+    log.error(
+      { exportId, orgId, storageKey, err },
+      'tenant-export: could not delete orphaned archive',
+    ),
   );
   log.error(
     { exportId, orgId },
@@ -302,7 +311,10 @@ async function failAttempt(
   // Earlier attempts leave the row `running` so the BullMQ retry can re-claim it.
   const finalAttempt = (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
   if (!finalAttempt) {
-    log.warn({ ...ids, attemptsMade: job.attemptsMade, err }, 'tenant-export: attempt failed, will retry');
+    log.warn(
+      { ...ids, attemptsMade: job.attemptsMade, err },
+      'tenant-export: attempt failed, will retry',
+    );
     throw err;
   }
   await prisma.tenantExport.updateMany({
