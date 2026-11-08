@@ -3,6 +3,7 @@
 //
 //   POST /api/v1/ingest/activities              ingest:write (API key or admin)
 //   GET  /api/v1/companies/:id/activity-summary activities:read
+//   GET  /api/v1/companies/:id/conversations    activities:read
 //
 // The handler only authorises and shapes the call; dedupe, mapping, PII and
 // audit live in @bidstack/db ingestActivities, which the MCP write tool also
@@ -11,8 +12,10 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { getCompanyActivitySummary, ingestActivities, prisma } from '@bidstack/db';
+import { getCompanyActivitySummary, ingestActivities, listAccountConversations, prisma } from '@bidstack/db';
 import {
+  ACCOUNT_CONVERSATIONS_PAGE,
+  AccountConversations,
   ACTIVITY_SUMMARY_DEFAULT_WEEKS,
   ACTIVITY_SUMMARY_MAX_WEEKS,
   CompanyActivitySummary,
@@ -20,7 +23,7 @@ import {
   IngestActivitiesResponse,
 } from '@bidstack/shared';
 
-import { applyCompanyScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
+import { applyCompanyScope, applyOpportunityScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
 
 const INGEST_RATE_LIMIT_PER_MINUTE = 60;
 
@@ -115,6 +118,45 @@ export const activityIngestRoutes: FastifyPluginAsyncZod = async (server) => {
         companyId: company.id,
         tz: req.query.tz,
         weeks: req.query.weeks,
+      });
+    },
+  );
+
+  server.get(
+    '/companies/:id/conversations',
+    {
+      config: { permission: 'activities:read' },
+      schema: {
+        tags: ['Activities'],
+        summary: 'Meetings and emails on the account, newest first, with their source',
+        params: z.object({ id: z.string().uuid() }),
+        querystring: z.object({
+          cursor: z.string().max(200).optional(),
+          limit: z.coerce.number().int().min(1).max(100).default(ACCOUNT_CONVERSATIONS_PAGE),
+        }),
+        response: { 200: AccountConversations },
+      },
+    },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      const scope = await getAccessScope(orgId, userId);
+      const company = await prisma.company.findFirst({
+        where: applyCompanyScope({ id: req.params.id, orgId, deletedAt: null }, scope),
+        select: { id: true },
+      });
+      if (!company) throw server.httpErrors.notFound('Company not found');
+      return listAccountConversations({
+        orgId,
+        companyId: company.id,
+        viewerUserId: userId,
+        cursor: req.query.cursor,
+        limit: req.query.limit,
+        // Company visibility is not deal visibility. Hidden opportunities must
+        // not contribute names or their meeting and email subjects.
+        opportunityWhere: applyOpportunityScope(
+          { orgId, companyId: company.id, deletedAt: null },
+          scope,
+        ),
       });
     },
   );

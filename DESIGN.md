@@ -768,6 +768,18 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
 
+### 9.11 Conversations on the account page (slice 20)
+
+Synced Outlook, Teams and Gmail meetings and emails filed to the account, shown under the activity charts on the account page. Read-only: Polo never sends mail or writes calendars.
+
+- Section "Conversations": header with the count shown and the source line "From your connected Outlook and Google calendars and mailboxes". One row per meeting or email, newest first, 25 rows, "Show more" pages by 25.
+- Row: lucide icon (`Video` for Teams, `CalendarDays` for other meetings, `Mail` for email), subject (truncates, full text in `title`), date and time in the browser zone, participant count, direction for email (Received, Sent).
+- Source chip on every row, so each fact names its source: `Outlook`, `Teams`, `Gmail`, `Google Calendar`; rows logged in Polo or pushed by the ingest API show `Logged in Polo` or the ingest source name.
+- Filing hint after the chip: "Filed automatically" (matched by attendee or domain) or "Filed by you". When the account has more than one open opportunity and none was picked, a "Needs opportunity" tag shows instead of a guess.
+- Re-file: meetings you own get a "File to opportunity" select (open opportunities on this account plus "Account only"). It calls the existing `PATCH /calendar/events/:id`; emails have no re-file route yet, so no control.
+- Cancelled meetings stay in the list with a "Cancelled" tag and struck subject.
+- Empty: one line, "No synced meetings or emails yet." Error: one line plus Retry. Loading: skeleton rows.
+- Tokens: `--fg-*`, `--border-subtle`, `--brand-primary`; `Badge` for chips; both themes; nothing overlaps at 1440, 1024 or 390.
 ### 9.11 Company intel on the Companies page (slice 14)
 
 Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.

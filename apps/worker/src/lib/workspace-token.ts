@@ -3,8 +3,8 @@
  * about to expire.
  *
  * - Rotated refresh tokens are stored (Microsoft rotates on every refresh).
- * - Microsoft refreshes ask for the scopes the user actually granted, so a
- *   read-only grant never silently asks for send rights.
+ * - Microsoft refreshes ask for the read scopes the user granted; send and
+ *   write scopes from an older grant are dropped, never requested.
  * - invalid_grant means the user revoked access at the provider: the row is
  *   marked revoked with a reconnect hint and sync stops for it.
  */
@@ -12,7 +12,7 @@ import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
-import { WORKSPACE_READ_SCOPES } from '@bidstack/shared';
+import { microsoftRefreshScopes } from '@bidstack/shared';
 
 const EXPIRY_SKEW_MS = 60_000;
 const REFRESH_TIMEOUT_MS = 15_000;
@@ -51,8 +51,7 @@ function refreshRequest(row: WorkspaceTokenRow, refreshToken: string): { url: st
       }),
     };
   }
-  const granted = row.scope.length > 0 ? row.scope : [...WORKSPACE_READ_SCOPES.microsoft];
-  const scope = granted.includes('offline_access') ? granted : [...granted, 'offline_access'];
+  const scope = microsoftRefreshScopes(row.scope);
   return {
     url: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID ?? 'common'}/oauth2/v2.0/token`,
     body: new URLSearchParams({
