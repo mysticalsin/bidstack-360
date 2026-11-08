@@ -108,6 +108,27 @@ describe('buildIntelSummary: hiring', () => {
     expect(s.openRoles?.value).toBeGreaterThan(0);
   });
 
+  it('does not turn a truncated board into a steady direction', () => {
+    const s = buildIntelSummary(input({
+      postings: [posting(1, 2), posting(2, 3), posting(3, 4)],
+      postingsTruncated: true,
+    }));
+    expect(s.newRoles30d?.value).toBeGreaterThan(0);
+    expect(s.direction).toBeNull();
+  });
+
+  it('keeps a real revenue move when hiring was truncated', () => {
+    const s = buildIntelSummary(input({
+      postingsTruncated: true,
+      postings: [posting(1, 2)],
+      years: [
+        { fiscalYear: 2024, periodEnd: '2024-12-31', currency: 'USD', source: 'sec_edgar', revenue: 4.8e9, headcount: null, fetchedAt: daysAgo(3) },
+        { fiscalYear: 2025, periodEnd: '2025-12-31', currency: 'USD', source: 'sec_edgar', revenue: 5.2e9, headcount: null, fetchedAt: daysAgo(3) },
+      ],
+    }));
+    expect(s.direction?.value).toBe('growing');
+  });
+
   it('counts new postings in the last 30 days as the hiring proxy and never claims hires', () => {
     const postings = [posting(1, 3), posting(2, 10), posting(3, 25, 'security'), posting(4, 40), posting(5, 70)];
     const s = buildIntelSummary(input({ postings }));

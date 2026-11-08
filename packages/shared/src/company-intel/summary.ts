@@ -659,7 +659,8 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       plus.push(`${POST_KIND_LABEL[p.kind]} post: ${p.title}`);
   }
   const score = plus.length - minus.length;
-  const hasInputs = Boolean(headcountGrowth || revenueGrowth || newRoles30d || recent.length);
+  const hiringUsable = Boolean(newRoles30d) && !input.postingsTruncated;
+  const hasInputs = Boolean(headcountGrowth || revenueGrowth || hiringUsable || recent.length);
   const direction: CompanyIntelSummary['direction'] = hasInputs
     ? {
         value: score >= 1 ? 'growing' : score <= -1 ? 'contracting' : 'steady',
