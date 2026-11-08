@@ -11,6 +11,7 @@ import { useContact } from '@/hooks/useContacts';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useTasks } from '@/hooks/useTasks';
 import { useNotes } from '@/hooks/useNotes';
+import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
@@ -260,6 +261,7 @@ export function ContactDetailPage() {
         </Card>
       </div>
 
+      <EmailPanel filter={{ contactId: c.id }} defaultTo={c.email ?? undefined} />
       <CustomFieldValuesSection entityType="contact" entityId={id!} />
 
       {/* Wave 8 — Collaborative scratch-pad: real-time CRDT rich-text. */}

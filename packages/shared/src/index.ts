@@ -8,6 +8,7 @@ export * from './calendar/index.js';
 export * from './rfp-crew.js';
 export * from './competitor-intel/index.js';
 export * from './company-intel/index.js';
+export * from './tech-stack/index.js';
 export * from './bid-classification/index.js';
 export * from './stage-transitions/index.js';
 export * from './document-category.js';
@@ -17,6 +18,7 @@ export * from './workflow-engine.js';
 export * from './llm-catalog/index.js';
 export * from './msa/index.js';
 export * from './list-page.js';
+export * from './comms/index.js';
 // ChileCompra attribution strings only (pure data). Adapters stay behind the
 // server-only '@bidstack/shared/public-sector' subpath.
 export * from './public-sector/attribution.js';

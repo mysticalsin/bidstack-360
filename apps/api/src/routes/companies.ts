@@ -16,6 +16,7 @@ import {
 } from '@bidstack/shared';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
+import { queueCompanyTechDetect } from '../queues/company-tech-detect.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
@@ -253,6 +254,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           targetId: c.id,
         },
       });
+      queueCompanyTechDetect([{ kind: 'refresh', orgId: req.auth.orgId, companyId: c.id, reason: 'create' }]);
       reply.status(201);
       return serializeCompany(c);
     },

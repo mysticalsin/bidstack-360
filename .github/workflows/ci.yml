@@ -131,6 +131,12 @@ jobs:
       - name: Build
         run: pnpm -r build
 
+      - name: Route inventory ratchet (permission + schema)
+        # Boots the API route table without a database and fails on any route
+        # that lacks a permission gate or input schema and is not already in
+        # scripts/route-inventory.baseline.json (shrink-only).
+        run: pnpm routes:inventory --check
+
       - name: Verify PWA manifest exists
         run: |
           test -f apps/web/dist/manifest.json || (echo "::error::manifest.json missing from dist" && exit 1)
