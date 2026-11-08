@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ConnectorsSection } from '@/components/integrations/ConnectorsSection';
 import { DataQualitySection } from '@/components/integrations/DataQualitySection';
 import { ErpConnectorCard } from '@/components/integrations/ErpConnectorCard';
+import { WorkspaceAccountsCard } from '@/components/integrations/WorkspaceAccountsCard';
 import { DataSourceCredentialsCard } from '@/components/settings/DataSourceCredentialsCard';
 import { ProviderHealthSection } from '@/components/integrations/ProviderHealthSection';
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
@@ -12,7 +13,7 @@ import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SyncNowControl } from '@/components/sync/SyncNowControl';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { useConnectorCatalog } from '@/hooks/useCrmIntegrations';
@@ -71,6 +72,12 @@ export function IntegrationsSection() {
     [events.data?.items, setupGuide.data, status.data],
   );
 
+  // Both hero actions land on the developer tab; each scrolls to its own section.
+  function openDeveloperSection(id: 'api-keys' | 'webhooks') {
+    setActiveTab('developer');
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
+  }
+
   return (
     <div className="space-y-5">
       <IntegrationHero
@@ -78,10 +85,9 @@ export function IntegrationsSection() {
         isLoading={setupGuide.isLoading || status.isLoading || events.isLoading}
         summary={summary}
         eventsContinue={eventsContinue}
-        onCreateApiKey={() => setActiveTab('developer')}
-        onAddWebhook={() => setActiveTab('developer')}
+        onCreateApiKey={() => openDeveloperSection('api-keys')}
+        onAddWebhook={() => openDeveloperSection('webhooks')}
       />
-
 
       {isError ? (
         <ErrorState
@@ -171,22 +177,14 @@ export function IntegrationsSection() {
                         : t('integrations.statusUnverified', 'Unverified / not connected')}
                     </Badge>
                   ) : null}
-                  {isAdmin ? (
-                    <LiquidGlassButton
-                      tone="secondary"
-                      size="sm"
-                      onClick={() => {
-                        void api('/api/integrations/dust/resync', { method: 'POST' }).then(() =>
-                          status.refetch(),
-                        );
-                      }}
-                    >
-                      {t('integrations.runSyncNow', 'Run sync now')}
-                    </LiquidGlassButton>
-                  ) : null}
                 </div>
               }
             />
+            {isAdmin ? (
+              <div className="border-b border-[var(--border-subtle)] px-5 py-4">
+                <SyncNowControl source="dust" />
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
               <Stat
                 label={t('integrations.statLastSync', 'Last sync')}
@@ -261,6 +259,7 @@ export function IntegrationsSection() {
         </TabsContent>
 
         <TabsContent value="connectors" className="space-y-6 outline-none">
+          <WorkspaceAccountsCard />
           <ErpConnectorCard />
           <ConnectorsSection />
           <DataQualitySection />
@@ -356,7 +355,10 @@ function ApolloAccountIntelCard({
               ],
               [
                 t('integrations.featureSafetyLabel', 'Safety'),
-                t('integrations.featureSafetyValue', 'Phone numbers and contact leads are not stored'),
+                t(
+                  'integrations.featureSafetyValue',
+                  'Phone numbers and contact leads are not stored',
+                ),
               ],
               [
                 t('integrations.featureFreshnessLabel', 'Freshness'),
@@ -367,9 +369,7 @@ function ApolloAccountIntelCard({
                 key={label}
                 className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2"
               >
-                <div className="text-xs font-medium text-[var(--fg-tertiary)]">
-                  {label}
-                </div>
+                <div className="text-xs font-medium text-[var(--fg-tertiary)]">{label}</div>
                 <div className="mt-1 text-sm font-medium text-[var(--fg-primary)]">{value}</div>
               </div>
             ))}

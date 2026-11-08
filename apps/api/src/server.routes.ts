@@ -70,6 +70,7 @@ import { meetingIntelRoutes } from './routes/meeting-intel.js';
 import { marsRoutes } from './routes/mars.js';
 import { accountEnrichmentRoutes } from './routes/account-enrichment.js';
 import { companyIntelRoutes } from './routes/company-intel.js';
+import { consultingPartnersRoutes } from './routes/consulting-partners.js';
 import orgChartRoutes from './routes/org-chart.js';
 import orgChartFileRoutes from './routes/org-chart-files.js';
 import { accountWatchdogRoutes } from './routes/account-watchdog.js';
@@ -110,6 +111,8 @@ import { proposalRoutes } from './routes/proposals.js';
 import { crewAgentRoutes } from './routes/crew-agents.js';
 import { crewRoutes } from './routes/crews.js';
 import { activityRoutes } from './routes/activities.js';
+import { activityIngestRoutes } from './routes/activity-ingest.js';
+import { syncNowRoutes } from './routes/sync-now.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
 import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
@@ -127,6 +130,7 @@ import { publicSignRoutes } from './routes/public-sign.js';
 import { gmailOAuthRoutes } from './routes/integrations/gmail.js';
 import { microsoftMailOAuthRoutes } from './routes/integrations/microsoft-mail.js';
 import { emailRoutes } from './routes/integrations/email.js';
+import { workspaceRoutes } from './routes/integrations/workspace.js';
 import { microsoftWebhookRoutes } from './routes/integrations/microsoft-webhook.js';
 import { slackOAuthRoutes } from './routes/integrations/slack.js';
 import { slackCommandsPlugin } from './routes/integrations/slack-commands.js';
@@ -167,6 +171,10 @@ import { demoRoutes } from './routes/demo.js';
 import { tenantExportRoutes } from './routes/tenant-export.js';
 // GDPR Art. 17 — per-data-subject erasure (anonymization)
 import { erasureRoutes } from './routes/erasure.js';
+// GDPR data subject export / erase requests (worker-run, dry run by default)
+import { dataSubjectRequestRoutes } from './routes/data-subject-requests.js';
+// Retention report per data class (dry run)
+import { complianceRetentionRoutes } from './routes/compliance-retention.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -201,6 +209,7 @@ await server.register(msaWhitespaceRoutes, { prefix: '/api/v1' });
   await server.register(accountWatchdogRoutes, { prefix: '/api/v1' });
   await server.register(accountFinancialsRoutes, { prefix: '/api/v1' });
   await server.register(companyIntelRoutes, { prefix: '/api/v1' });
+await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
   await server.register(accountSignalsRoutes, { prefix: '/api/v1' });
   await server.register(winLossRoutes, { prefix: '/api/v1' });
   await server.register(governanceRoutes, { prefix: '/api/v1' });
@@ -246,6 +255,14 @@ await server.register(msaWhitespaceRoutes, { prefix: '/api/v1' });
       const target = req.url.replace('/odoo/', '/erp/');
       return reply.redirect(target, 307);
     });
+  } else {
+    // Only the status probe answers, so the settings card can say "not
+    // configured" instead of logging a 404 for every visitor.
+    server.get(
+      '/api/v1/integrations/erp/status',
+      { preHandler: server.requirePermission('integrations:read') },
+      async () => ({ configured: false, url: null, database: null, reachable: false, toolCount: null, lastError: null }),
+    );
   }
 
   await server.register(webhooksRoutes, { prefix: '/webhooks' });
@@ -284,6 +301,10 @@ await server.register(msaWhitespaceRoutes, { prefix: '/api/v1' });
   await server.register(crewAgentRoutes, { prefix: '/api/v1' });
   await server.register(crewRoutes, { prefix: '/api/v1' });
   await server.register(activityRoutes, { prefix: '/api/v1' });
+  // Inbound activity API (Dust, external CRMs) + account activity summary
+  await server.register(activityIngestRoutes, { prefix: '/api/v1' });
+  // Sync now (Dust poll, HubSpot import): start, poll, last synced
+  await server.register(syncNowRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRequirementRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRfpRoutes, { prefix: '/api/v1' });
@@ -309,6 +330,7 @@ await server.register(msaWhitespaceRoutes, { prefix: '/api/v1' });
   // OAuth redirect_uri and the web client pointing at 404s.)
   await server.register(gmailOAuthRoutes, { prefix: '/api/v1' });
   await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1' });
+  await server.register(workspaceRoutes, { prefix: '/api/v1' });
   await server.register(slackOAuthRoutes, { prefix: '/api/v1' });
   await server.register(slackCommandsPlugin, { prefix: '/api/v1' });
   await server.register(emailRoutes, { prefix: '/api/v1' });
@@ -373,6 +395,8 @@ await server.register(msaWhitespaceRoutes, { prefix: '/api/v1' });
 
   // GDPR Art. 17 — per-data-subject erasure / anonymization (admin-gated, org-scoped)
   await server.register(erasureRoutes, { prefix: '/api/v1' });
+  await server.register(dataSubjectRequestRoutes, { prefix: '/api/v1' });
+  await server.register(complianceRetentionRoutes, { prefix: '/api/v1' });
 
   // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
   // Self-gates on DEMO_MODE; registering it unconditionally is safe.

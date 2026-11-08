@@ -1,3 +1,4 @@
+export * from './query-boolean.js';
 export * from './opportunity.js';
 export * from './contact.js';
 export * from './crm.js';
@@ -57,6 +58,7 @@ export * from './account-positioning.js';
 export * from './win-loss.js';
 export * from './tenant-export.js';
 export * from './erasure.js';
+export * from './compliance.js';
 export * from './kam-initiative.js';
 export * from './kam-task.js';
 export * from './kam-session.js';
@@ -71,3 +73,4 @@ export * from './people-map.js';
 export * from './enrichment-watchdog.js';
 export * from './org-chart.js';
 export * from './mars.js';
+export * from './activity-ingest.js';

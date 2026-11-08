@@ -97,6 +97,8 @@ beforeAll(async () => {
   orgB = await createIsolatedOrg('agreement-conn-b');
   userA = (await prisma.user.findFirstOrThrow({ where: { orgId: orgA.orgId }, orderBy: { createdAt: 'asc' } })).id;
   userB = (await prisma.user.findFirstOrThrow({ where: { orgId: orgB.orgId }, orderBy: { createdAt: 'asc' } })).id;
+  await prisma.org.update({ where: { id: orgA.orgId }, data: { microsoftTenantId: TENANT_A } });
+  await prisma.org.update({ where: { id: orgB.orgId }, data: { microsoftTenantId: TENANT_B } });
   restoreAuth = useIsolatedOrgAuth(orgA.clerkOrg);
   __setAgreementIngestEnqueueForTest(async (_job, jobId) => jobId);
   server = await buildServer();
@@ -131,7 +133,7 @@ describe('connecting an org', () => {
     const start = await call('POST', '/msa/connections/sharepoint/start', {});
     expect(start.statusCode, start.body).toBe(200);
     const url = new URL(start.json().url as string);
-    expect(url.pathname).toContain('/adminconsent');
+    expect(url.pathname).toBe(`/${TENANT_A}/v2.0/adminconsent`);
     expect(url.searchParams.get('client_id')).toBe('client-fixture');
     const state = url.searchParams.get('state')!;
 
@@ -155,6 +157,40 @@ describe('connecting an org', () => {
     const list = await call('GET', '/msa/connections');
     expect(list.json()).toMatchObject({ singleTenant: false, items: [{ provider: 'sharepoint', status: 'connected', externalTenantId: TENANT_A }] });
     expect(list.body).not.toMatch(/secret|stateNonce|refresh/i);
+  });
+
+  it('a fresh state cannot bind another already consented tenant', async () => {
+    const { fetch, calls } = graph(TENANT_B);
+    __setAgreementConnectionFetchForTest(fetch);
+    const start = await call('POST', '/msa/connections/sharepoint/start', {});
+    expect(start.statusCode, start.body).toBe(200);
+    const state = new URL(start.json().url as string).searchParams.get('state')!;
+
+    const cb = await server.inject({
+      method: 'GET',
+      url: `/api/v1/integrations/agreements/sharepoint/callback?state=${encodeURIComponent(state)}&tenant=${TENANT_B}&admin_consent=True`,
+    });
+    expect(cb.statusCode, cb.body).toBe(302);
+    expect(cb.headers.location).toBe('https://app.example.test/agreements?connection=sharepoint&result=failed');
+    const conn = await prisma.agreementConnection.findFirstOrThrow({ where: { orgId: orgA.orgId, provider: 'sharepoint' } });
+    expect(conn.status).not.toBe('connected');
+    expect(conn.externalTenantId).toBeNull();
+    expect(calls).toHaveLength(0);
+
+    const res = await call('POST', '/msa/sources', spPayload());
+    expect(res.statusCode, res.body).toBe(409);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('cannot start SharePoint consent without a provisioned tenant', async () => {
+    await prisma.org.update({ where: { id: orgA.orgId }, data: { microsoftTenantId: null } });
+    try {
+      const start = await call('POST', '/msa/connections/sharepoint/start', {});
+      expect(start.statusCode, start.body).toBe(409);
+      expect(start.json().message).toMatch(/No Microsoft tenant is provisioned/);
+    } finally {
+      await prisma.org.update({ where: { id: orgA.orgId }, data: { microsoftTenantId: TENANT_A } });
+    }
   });
 
   it('DocuSign OAuth stores the account and an encrypted refresh token', async () => {
@@ -232,6 +268,18 @@ describe('sources only use their own org connection', () => {
     expect(run.state).toBe('failed');
     expect(run.reasons.join(' ')).toMatch(/different Microsoft tenant/);
     expect(calls.some((c) => c.url.includes('root/delta'))).toBe(false);
+  });
+
+  it('a sync refuses a connection bound to a tenant other than the provisioned one', async () => {
+    const conn = await connect(orgA.orgId, userA, 'sharepoint', { externalTenantId: TENANT_B });
+    const source = await prisma.agreementSource.create({
+      data: { orgId: orgA.orgId, kind: 'sharepoint', name: 'Substituted', config: { siteId: 's', driveId: 'b!d' }, connectionId: conn.id, createdById: userA },
+    });
+    const { fetch, calls } = graph(TENANT_B);
+    const run = await runAgreementSourceSync({ orgId: orgA.orgId, sourceId: source.id, runId: 'tenant-sub-1' }, { fetch, env: process.env });
+    expect(run.state).toBe('failed');
+    expect(run.reasons.join(' ')).toMatch(/not the tenant provisioned/);
+    expect(calls).toHaveLength(0);
   });
 
   it('a DocuSign sync refuses an account the connection user no longer belongs to', async () => {

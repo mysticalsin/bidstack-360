@@ -211,10 +211,7 @@ export function ForecastsPage() {
           {t('forecasts.manualSectionTitle', 'Manual overrides')}
         </h2>
         <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-          {t(
-            'forecasts.manualSectionCaption',
-            'Rep-entered pipeline / best-case / commit / closed figures. These take precedence over the derived baseline for their period.',
-          )}
+          {t('forecasts.manualSectionCaption', 'Rep-entered figures override the projection for their period.')}
         </p>
       </motion.div>
 

@@ -39,6 +39,7 @@ import {
   kamReadProspections,
   kamLogProspection,
 } from './kam-tools.js';
+import { activityTools, activityToolScopes } from './activity-tools.js';
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
   description: string;
@@ -114,6 +115,10 @@ export const tools = {
   relationship_map: agentTools.relationship_map,
   // Agreement pull (slice 13a): stages a document for MSA intake review.
   agreements_ingest: agreementsIngest,
+  // Account activity (Dust, CRMs): additive, defined in activity-tools.ts
+  ...activityTools,
+  // Consulting partners (slice 15): public evidence only for API keys.
+  consulting_partners: agentTools.consulting_partners,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -171,6 +176,8 @@ export const toolScopes = {
   msa_whitespace: 'read',
   relationship_map: 'read',
   agreements_ingest: 'write',
+  ...activityToolScopes,
+  consulting_partners: 'read',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {
