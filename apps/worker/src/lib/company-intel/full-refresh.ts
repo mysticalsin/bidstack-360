@@ -145,9 +145,10 @@ export async function runCompanyFullRefresh(
       } catch (err) {
         if (!(err instanceof EnrichmentRateLimitedError)) throw err;
         apollo = 'rate_limited';
-        // A queued attempt with retries left rethrows after saving the public
-        // data, so the queue fetches Apollo again; the last attempt settles.
-        if (opts.finalAttempt === false) retryLater = err;
+        // Save the public summary, then rethrow. A retry is still queued when
+        // this is not the last attempt. The last attempt is caught below and
+        // recorded as not complete.
+        retryLater = err;
       }
     }
 

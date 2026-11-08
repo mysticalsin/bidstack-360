@@ -101,6 +101,13 @@ describe('buildIntelSummary: revenue', () => {
 });
 
 describe('buildIntelSummary: hiring', () => {
+  it('says a capped posting read is not the full board', () => {
+    const s = buildIntelSummary(input({ postings: [posting(1, 2)], postingsTruncated: true }));
+    expect(s.openRoles?.method).toMatch(/not the full board/);
+    expect(s.newRoles30d?.method).toMatch(/not the full board/);
+    expect(s.openRoles?.value).toBeGreaterThan(0);
+  });
+
   it('counts new postings in the last 30 days as the hiring proxy and never claims hires', () => {
     const postings = [posting(1, 3), posting(2, 10), posting(3, 25, 'security'), posting(4, 40), posting(5, 70)];
     const s = buildIntelSummary(input({ postings }));

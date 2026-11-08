@@ -64,9 +64,12 @@ describe('runCompanyFullRefresh when Apollo rate limits', () => {
     expect(mocks.markBatch).not.toHaveBeenCalled();
   });
 
-  it('settles the company on the last attempt and reports the rate limit', async () => {
-    const res = await runCompanyFullRefresh(JOB, deps, { finalAttempt: true });
-    expect(res.apollo).toBe('rate_limited');
-    expect(mocks.markBatch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ ok: true }));
+  it('records the last rate-limited attempt as not complete', async () => {
+    // WHY: retries are gone. Marking the company ok would say Apollo finished.
+    await expect(runCompanyFullRefresh(JOB, deps, { finalAttempt: true })).rejects.toBeInstanceOf(
+      mocks.EnrichmentRateLimitedError,
+    );
+    expect(mocks.recompute).toHaveBeenCalledOnce();
+    expect(mocks.markBatch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ ok: false }));
   });
 });

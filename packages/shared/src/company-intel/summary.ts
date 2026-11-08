@@ -186,6 +186,8 @@ export interface IntelSummaryInput {
   now: Date;
   years: IntelSummaryYear[];
   postings: IntelSummaryPosting[];
+  /** True when the posting read stopped at the memory ceiling and more rows exist. */
+  postingsTruncated?: boolean;
   posts: IntelSummaryPost[];
   firmographics: IntelSummaryFirmographics | null;
   crm: { employeeCount: number | null; industry: string | null; updatedAt: string | null };
@@ -540,15 +542,18 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       inferred: false,
       sample: allSample,
     };
+    const ceiling = input.postingsTruncated
+      ? ' Stopped at 20000 qualifying postings; this is not the full board.'
+      : '';
     openRoles = {
       ...base,
       value: h.openRoles,
-      method: 'Open postings on public job boards, seen in the last 45 days',
+      method: `Open postings on public job boards, seen in the last 45 days.${ceiling}`,
     };
     newRoles30d = {
       ...base,
       value: h.posted30,
-      method: 'Postings first published in the last 30 days (hiring proxy)',
+      method: `Postings first published in the last 30 days (hiring proxy).${ceiling}`,
       prev30: h.postedPrev30,
       trend30Pct: h.trend30Pct,
       trend90Pct: h.trend90Pct,

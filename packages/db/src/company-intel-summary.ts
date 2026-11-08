@@ -65,8 +65,16 @@ const POSTING_PAGE = 500;
 /** Hard stop so one runaway board cannot exhaust memory; far above any real employer. */
 const POSTING_CEILING = 20_000;
 
-/** Every posting in the reporting window, paged, so hiring totals are never cut at a page size. */
-async function loadQualifyingPostings(db: Db, orgId: string, companyId: string, since: Date) {
+/**
+ * Every posting in the reporting window, paged. The ceiling is a memory stop,
+ * not a claim that the board ended. `truncated` is true when more rows exist.
+ */
+async function loadQualifyingPostings(
+  db: Db,
+  orgId: string,
+  companyId: string,
+  since: Date,
+): Promise<{ rows: Awaited<ReturnType<Db['companyJobPosting']['findMany']>>; truncated: boolean }> {
   const select = {
     id: true,
     source: true,
@@ -81,6 +89,7 @@ async function loadQualifyingPostings(db: Db, orgId: string, companyId: string, 
     sample: true,
   } as const;
   const all = [];
+  let truncated = false;
   for (let cursor: string | undefined; all.length < POSTING_CEILING; ) {
     const page = await db.companyJobPosting.findMany({
       where: {
@@ -93,11 +102,16 @@ async function loadQualifyingPostings(db: Db, orgId: string, companyId: string, 
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select,
     });
-    all.push(...page);
+    const room = POSTING_CEILING - all.length;
+    all.push(...page.slice(0, room));
     if (page.length < POSTING_PAGE) break;
+    if (all.length >= POSTING_CEILING) {
+      truncated = true;
+      break;
+    }
     cursor = page[page.length - 1]!.id;
   }
-  return all;
+  return { rows: all, truncated };
 }
 
 /** Load everything the summary is built from. Null when the company is not in the org. */
@@ -184,7 +198,8 @@ export async function loadIntelSummaryInput(
       headcount: metric(p.metrics, 'headcount'),
       fetchedAt: iso(p.updatedAt),
     })),
-    postings: postings.map((p) => ({ ...p, fetchedAt: iso(p.fetchedAt) })),
+    postings: postings.rows.map((p) => ({ ...p, fetchedAt: iso(p.fetchedAt) })),
+    postingsTruncated: postings.truncated,
     posts: [
       ...posts.map((p) => ({
         kind: kindOf(p.kind, p.title),
