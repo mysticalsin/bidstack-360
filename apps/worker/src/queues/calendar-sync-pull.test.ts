@@ -3,6 +3,28 @@
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const bridgeStore = vi.hoisted(() => {
+  const persisted = { delta: {} as Record<string, unknown> };
+  const tokenUpdate = vi.fn(async (args: { data?: { deltaState?: Record<string, unknown> } }) => {
+    if (args?.data?.deltaState) persisted.delta = args.data.deltaState;
+  });
+  const prismaMock = {
+    calendarEvent: {
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      upsert: vi.fn(async () => ({ id: 'row-1' })),
+      findMany: vi.fn(async () => []),
+    },
+    integrationToken: {
+      update: tokenUpdate,
+      findFirst: vi.fn(async () => ({ deltaState: persisted.delta })),
+    },
+    $queryRaw: vi.fn(async () => [{ delta_state: persisted.delta }]),
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(prismaMock)),
+  };
+  return { persisted, tokenUpdate, prismaMock };
+});
+
 import { ACTIVITY_BRIDGE_RETRY_LIMIT } from '../lib/comms-capture.js';
 import type * as CommsCapture from '../lib/comms-capture.js';
 
@@ -14,16 +36,10 @@ import { pullGoogleIncremental } from './calendar-sync-google.js';
 import { ProviderRateLimitError } from '../lib/provider-http.js';
 
 vi.mock('@bidstack/db', () => ({
-  prisma: {
-    calendarEvent: {
-      update: vi.fn(),
-      updateMany: vi.fn(),
-      upsert: vi.fn(async () => ({ id: 'row-1' })),
-      findMany: vi.fn(async () => []),
-    },
-    integrationToken: { update: vi.fn() },
-  },
+  prisma: bridgeStore.prismaMock,
   syncCalendarEventActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
+  syncEmailMessageActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
+  EmailProvider: { GMAIL: 'GMAIL', OUTLOOK: 'OUTLOOK' },
 }));
 
 vi.mock('@bidstack/db/serum-runtime-policy', () => ({
@@ -80,6 +96,10 @@ function expectFilingPreserved(provider: string, externalId: string): void {
 }
 
 beforeEach(() => {
+  upsert.mockReset();
+  upsert.mockResolvedValue({ id: 'row-1' } as never);
+  vi.mocked(syncCalendarEventActivity).mockReset();
+  vi.mocked(syncCalendarEventActivity).mockResolvedValue({ action: 'created', activityId: 'act-1' });
   vi.mocked(checkSerumConnectorRuntimePolicy).mockResolvedValue({
     configType: 'connectors',
     configKey: 'registry',
@@ -95,6 +115,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  bridgeStore.persisted.delta = {};
   vi.mocked(syncCalendarEventActivity).mockResolvedValue({ action: 'created', activityId: 'act-1' });
 });
 
@@ -290,6 +311,33 @@ describe('Microsoft calendar pull', () => {
     expect(JSON.stringify(last.activityBridgeQuarantine)).not.toContain('Stuck');
   });
 
+  it('holds the page when saving an event throws', async () => {
+    upsert.mockRejectedValueOnce(new Error('write failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'ev-throw',
+              subject: 'Secret subject',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+            },
+          ],
+          '@odata.deltaLink': 'd-next',
+        }),
+      ),
+    );
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log, 'tony@amaris.com');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.calendarDeltaLink).toBeUndefined();
+    expect(saved.data.deltaState.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
+    const pages = saved.data.deltaState.activityBridgeRetryByPage as Record<string, Record<string, number>>;
+    expect(Object.values(pages).some((counts) => counts['ev-throw'] === 1)).toBe(true);
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+
   it('raises a rate limit error with the Retry-After wait on 429', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({}, 429, { 'Retry-After': '9' })));
     const err = await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log).catch((e: unknown) => e);
@@ -364,6 +412,33 @@ describe('Google calendar pull', () => {
     );
     await pullGoogleIncremental('tok-2', orgId, userId, 'at', {}, log, 'tony@amaris.com');
     expectFilingPreserved('google_workspace', 'g-1');
+  });
+
+  it('holds the page when saving an event throws', async () => {
+    upsert.mockRejectedValueOnce(new Error('write failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          items: [
+            {
+              id: 'g-throw',
+              summary: 'Secret subject',
+              start: { dateTime: '2026-11-09T10:00:00Z' },
+              end: { dateTime: '2026-11-09T11:00:00Z' },
+            },
+          ],
+          nextSyncToken: 'sync-next',
+        }),
+      ),
+    );
+    await pullGoogleIncremental('tok-2', orgId, userId, 'at', { watchChannelId: 'ch-1' }, log, 'tony@amaris.com');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
+    expect(saved.data.deltaState.watchChannelId).toBe('ch-1');
+    const pages = saved.data.deltaState.activityBridgeRetryByPage as Record<string, Record<string, number>>;
+    expect(pages['google::']?.['g-throw']).toBe(1);
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
   });
 
   it('drops only the calendar cursor when the sync token expires', async () => {

@@ -10,6 +10,7 @@ import type pino from 'pino';
 
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
+import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
 import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { getWorkspaceAccessToken } from '../lib/workspace-token.js';
@@ -65,9 +66,10 @@ export async function pullDelta(
   }
 
   const accessToken = await getWorkspaceAccessToken(token, log);
-  const deltaState: Record<string, unknown> = { ...((token.deltaState ?? {}) as Record<string, unknown>) };
+  const deltaState: Record<string, unknown> = structuredClone((token.deltaState ?? {}) as Record<string, unknown>);
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
   let persisted = 0;
+  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
 
   for (const f of FOLDERS) {
     let url = (deltaState[f.next] as string | undefined) ?? (deltaState[f.link] as string | undefined) ?? initialUrl(f.folder);
@@ -144,11 +146,13 @@ export async function pullDelta(
           persisted++;
           if (!bridged) failedIds.push(msg.id);
         } catch (err) {
+          failedIds.push(msg.id);
           log.warn({ err, msgId: msg.id }, 'Failed to persist Graph message');
         }
       }
 
       const bridge = noteActivityBridgeFailures(deltaState, url, failedIds);
+      bridgeDeltas.push({ page: url, failedIds });
       if (bridge.quarantined.length > 0) {
         log.warn(
           { tokenId: token.id, folder: f.folder, ids: bridge.quarantined },
@@ -183,10 +187,7 @@ export async function pullDelta(
     }
   }
 
-  await prisma.integrationToken.update({
-    where: { id: token.id },
-    data: { deltaState: deltaState as object, lastSyncedAt: new Date() },
-  });
+  await commitTokenDeltaState(prisma, token.id, deltaState, bridgeDeltas);
 
   return { persisted };
 }
