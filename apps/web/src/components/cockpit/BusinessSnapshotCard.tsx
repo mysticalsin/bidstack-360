@@ -295,17 +295,17 @@ function SourcedSnapshotValue({ companyId, companyName, row, figure }: { company
       <>
         <span className="kv-value" title={text}>{text}</span>
         {n?.provenance ? <SourceChip p={n.provenance} testId={`snapshot-chip-${figure}`} /> : null}
-        <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} />
+        <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} currency={n?.currency} />
       </>
     );
   }
   if (!row.hasValue) {
-    return <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} missing={n?.missing ?? row.source.hint} />;
+    return <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} currency={n?.currency} missing={n?.missing ?? row.source.hint} />;
   }
   return (
     <>
       <SnapshotValue row={row} />
-      <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} />
+      <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} currency={n?.currency} />
     </>
   );
 }

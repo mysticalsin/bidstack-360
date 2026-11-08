@@ -107,6 +107,20 @@ describe('FigureActions', () => {
     expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({ fieldKey: 'annualRevenueMicros', value: 1_200_000, currency: 'CAD' });
   });
 
+  it('defaults the currency to the figure being corrected, and to EUR for an unknown one', async () => {
+    const { unmount } = wrap(<FigureActions companyId={ID} companyName="Acme" fieldKey="annualRevenueMicros" label="Revenue" currency="nok" />);
+    fireEvent.click(screen.getByTestId('sf-edit-annualRevenueMicros'));
+    expect((within(screen.getByTestId('sf-form-annualRevenueMicros')).getByLabelText('Currency') as HTMLSelectElement).value).toBe('NOK');
+    fireEvent.change(within(screen.getByTestId('sf-form-annualRevenueMicros')).getByLabelText('Revenue'), { target: { value: '86100' } });
+    fireEvent.click(within(screen.getByTestId('sf-form-annualRevenueMicros')).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true));
+    expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({ currency: 'NOK' });
+    unmount();
+    wrap(<FigureActions companyId={ID} companyName="Acme" fieldKey="annualRevenueMicros" label="Revenue" currency="XYZ" />);
+    fireEvent.click(screen.getByTestId('sf-edit-annualRevenueMicros'));
+    expect((within(screen.getByTestId('sf-form-annualRevenueMicros')).getByLabelText('Currency') as HTMLSelectElement).value).toBe('EUR');
+  });
+
   it('has no currency select on a headcount form and sends no currency', async () => {
     wrap(<FigureActions companyId={ID} companyName="Acme" fieldKey="employeeCount" label="Employees" />);
     fireEvent.click(screen.getByTestId('sf-edit-employeeCount'));

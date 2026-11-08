@@ -70,11 +70,11 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
       </span>
       {n.editKey ? (
         missing ? (
-          <FigureActions companyId={company.id} companyName={company.name} fieldKey={n.editKey} label={n.label} missing={n.missing ?? `No ${n.label.toLowerCase()} on record`} />
+          <FigureActions companyId={company.id} companyName={company.name} fieldKey={n.editKey} label={n.label} currency={n.currency} missing={n.missing ?? `No ${n.label.toLowerCase()} on record`} />
         ) : (
           <span className="sf-line kn-prov">
             {n.provenance ? <SourceChip p={n.provenance} testId={`kn-chip-${n.id}`} /> : null}
-            <FigureActions companyId={company.id} companyName={company.name} fieldKey={n.editKey} label={n.label} />
+            <FigureActions companyId={company.id} companyName={company.name} fieldKey={n.editKey} label={n.label} currency={n.currency} />
           </span>
         )
       ) : null}

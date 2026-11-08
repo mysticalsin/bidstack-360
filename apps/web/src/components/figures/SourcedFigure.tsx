@@ -47,11 +47,16 @@ function parseValue(fieldKey: CompanyFieldOverrideKey, raw: string): string | nu
   return v;
 }
 
+function defaultCurrency(c: string | null | undefined): ManualRevenueCurrency {
+  const up = (c ?? '').toUpperCase();
+  return (MANUAL_REVENUE_CURRENCIES as readonly string[]).includes(up) ? (up as ManualRevenueCurrency) : 'EUR';
+}
+
 /** Value, source URL and source label. Escape or Cancel closes; Save calls the override API. */
-export function FigureEditForm({ companyKey, fieldKey, label, onClose }: { companyKey: string; fieldKey: CompanyFieldOverrideKey; label: string; onClose: () => void }) {
+export function FigureEditForm({ companyKey, fieldKey, label, currency: initialCurrency, onClose }: { companyKey: string; fieldKey: CompanyFieldOverrideKey; label: string; currency?: string | null; onClose: () => void }) {
   const id = useId();
   const [value, setValue] = useState('');
-  const [currency, setCurrency] = useState<ManualRevenueCurrency>('EUR');
+  const [currency, setCurrency] = useState<ManualRevenueCurrency>(() => defaultCurrency(initialCurrency));
   const [sourceUrl, setSourceUrl] = useState('');
   const [sourceLabel, setSourceLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -127,10 +132,12 @@ interface ActionsProps {
   label: string;
   /** When set, the figure is missing: show why, plus Refresh and Add manually. */
   missing?: string | null;
+  /** Currency of the figure shown, so a correction defaults to it rather than EUR. */
+  currency?: string | null;
 }
 
 /** Edit for a known figure; for a missing one, the reason plus Refresh from public sources and Add manually. */
-export function FigureActions({ companyId, companyName, fieldKey, label, missing }: ActionsProps) {
+export function FigureActions({ companyId, companyName, fieldKey, label, missing, currency }: ActionsProps) {
   const canEdit = useHasPermission('companies:write');
   const canIntel = useHasPermission('account-intel:write');
   const [editing, setEditing] = useState(false);
@@ -148,7 +155,7 @@ export function FigureActions({ companyId, companyName, fieldKey, label, missing
     refocus.current = true;
     setEditing(false);
   };
-  if (editing) return <FigureEditForm companyKey={companyKey} fieldKey={fieldKey} label={label} onClose={close} />;
+  if (editing) return <FigureEditForm companyKey={companyKey} fieldKey={fieldKey} label={label} currency={currency} onClose={close} />;
   if (missing) {
     const canRefresh = isCompanyId(companyId) && (canEdit || canIntel);
     return (
