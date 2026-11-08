@@ -8,6 +8,7 @@ import {
   MentionSummary,
   UserPresence,
   PresenceUpdate,
+  QueryBoolean,
 } from '@bidstack/shared';
 
 import { cacheKey } from '../lib/redis-cache.js';
@@ -306,12 +307,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
     '/mentions',
     {
       schema: {
-        querystring: z.object({
-          unreadOnly: z
-            .enum(['true', 'false'])
-            .transform((v) => v === 'true')
-            .optional(),
-        }),
+        querystring: z.object({ unreadOnly: QueryBoolean.optional() }),
         response: { 200: z.object({ items: z.array(Mention) }) },
       },
     },

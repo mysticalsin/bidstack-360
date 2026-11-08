@@ -21,7 +21,8 @@ out/
 # IDE
 .vscode/
 .idea/
-.cursor/
+.cursor/*
+!.cursor/BUGBOT.md
 *.swp
 *.swo
 
@@ -112,6 +113,7 @@ apps/web/scripts/_i18n_*
 *.mjs
 !scripts/*.mjs
 !apps/polo-preview/**/*.mjs
+!load/*.mjs
 
 # Web app screenshot blobs at the package root (ad-hoc QA dumps)
 apps/web/*.png
@@ -139,3 +141,4 @@ packages/db/prisma/schema.prisma.pulled
 
 # API local storage driver runtime data
 apps/api/.storage/
+load/.deps/
