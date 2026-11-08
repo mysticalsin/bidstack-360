@@ -166,6 +166,10 @@ import { demoRoutes } from './routes/demo.js';
 import { tenantExportRoutes } from './routes/tenant-export.js';
 // GDPR Art. 17 — per-data-subject erasure (anonymization)
 import { erasureRoutes } from './routes/erasure.js';
+// GDPR data subject export / erase requests (worker-run, dry run by default)
+import { dataSubjectRequestRoutes } from './routes/data-subject-requests.js';
+// Retention report per data class (dry run)
+import { complianceRetentionRoutes } from './routes/compliance-retention.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -371,6 +375,8 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
 
   // GDPR Art. 17 — per-data-subject erasure / anonymization (admin-gated, org-scoped)
   await server.register(erasureRoutes, { prefix: '/api/v1' });
+  await server.register(dataSubjectRequestRoutes, { prefix: '/api/v1' });
+  await server.register(complianceRetentionRoutes, { prefix: '/api/v1' });
 
   // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
   // Self-gates on DEMO_MODE; registering it unconditionally is safe.

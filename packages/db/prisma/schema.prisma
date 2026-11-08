@@ -246,6 +246,9 @@ model Org {
   contactFacts        ContactFact[]
   customerCommitments CustomerCommitment[]
 
+  // GDPR data subject requests (export / erase)
+  dataSubjectRequests DataSubjectRequest[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -1076,6 +1079,35 @@ model AuditLog {
   @@map("audit_log")
 }
 
+// ─── GDPR data subject requests ───────────────────────────────────────────
+// One export or erase request for a single person (Art. 15, 17, 20), filed by
+// an org admin and run by the data-subject-request worker. `report` holds
+// counts per store only, never personal values.
+model DataSubjectRequest {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  requestedById String?   @map("requested_by_id") @db.Uuid
+  /// export | erase
+  kind          String    @db.VarChar(16)
+  /// contact | lead | account_person
+  subjectType   String    @map("subject_type") @db.VarChar(32)
+  subjectId     String    @map("subject_id") @db.Uuid
+  dryRun        Boolean   @default(true) @map("dry_run")
+  /// queued | running | done | failed
+  status        String    @default("queued") @db.VarChar(16)
+  report        Json?
+  error         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("data_subject_requests")
+}
+
 // ─── GDPR tenant export ───────────────────────────────────────────────────
 // Tracks a tenant-scoped data-export job (Art. 20 portability). Created by
 // the API when an org-admin hits POST /api/orgs/:id/export; driven through
@@ -1108,6 +1140,8 @@ model TenantExport {
   // Storage key of the zip object — used by the worker to issue fresh
   // download URLs and by the cleanup job to lifecycle the object.
   storageKey    String?            @map("storage_key")
+  // Data region whose bucket holds the archive; null = default bucket.
+  storageRegion String?            @map("storage_region") @db.VarChar(8)
   startedAt     DateTime?          @map("started_at") @db.Timestamptz(6)
   completedAt   DateTime?          @map("completed_at") @db.Timestamptz(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2879,6 +2913,9 @@ model OrgSettings {
   /// Amaris stage-gate enforcement mode for this org: 'off' | 'warn' | 'enforce'.
   /// Null = fall back to the STAGE_GATE_MODE env default. Overrides the env per org.
   stageGateMode          String?   @map("stage_gate_mode")
+  /// Data residency tag: eu | uk | us | ca. Null = not pinned. Selects the
+  /// regional bucket for tenant exports (see docs/compliance/CONTROL-MAP.md).
+  dataRegion             String?   @map("data_region") @db.VarChar(8)
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
 
