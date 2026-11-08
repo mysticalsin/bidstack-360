@@ -114,6 +114,9 @@ const hostOf = (url: string | null | undefined): string | null => {
   }
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const LLM_SYSTEM = [
   'You read one excerpt from our own CRM records about a client account.',
   'List remarks that compare us with a named consulting firm on quality, price, speed or domain depth.',
@@ -142,10 +145,10 @@ export async function llmPartnerRemarks(drafts: PartnerEvidenceDraft[], firms: r
     } catch {
       continue;
     }
-    const list = (parsed as { remarks?: unknown }).remarks;
-    if (!Array.isArray(list)) continue;
+    if (!isRecord(parsed) || !Array.isArray(parsed.remarks)) continue;
     const kept = [];
-    for (const r of list.slice(0, 6) as Array<Record<string, unknown>>) {
+    for (const r of parsed.remarks.slice(0, 6) as unknown[]) {
+      if (!isRecord(r)) continue;
       const phrase = typeof r.quote === 'string' ? r.quote.trim() : '';
       if (phrase.length < 4 || !d.excerpt.includes(phrase)) continue;
       if (typeof r.firm !== 'string' || !firmsIn(r.firm, firms).includes(d.firmKey)) continue;

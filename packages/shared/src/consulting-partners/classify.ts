@@ -143,7 +143,14 @@ function subjectOf(sentence: string, at: number, firmKey: string, mentions: Firm
   if (than >= 0) {
     const after = than + 6;
     const target = mentions.find((m) => m.start >= after && m.start <= after + 5);
-    if (target) return target.firmKey === firmKey ? 'us' : 'other';
+    if (target) {
+      if (target.firmKey !== firmKey) return 'other';
+      // "<subject> is faster than <firm>" is about us only when we are the
+      // subject; "KPMG is faster than Deloitte" says nothing about us.
+      const usBefore = us.filter((u) => u < than).at(-1) ?? -1;
+      const firmBefore = mentions.filter((m) => m.start < than).at(-1)?.start ?? -1;
+      return usBefore > firmBefore ? 'us' : 'other';
+    }
     if (us.some((u) => u >= after && u <= after + 5)) {
       const firmBefore = mentions.filter((m) => m.start < than).at(-1);
       return firmBefore?.firmKey === firmKey ? 'firm' : 'other';
