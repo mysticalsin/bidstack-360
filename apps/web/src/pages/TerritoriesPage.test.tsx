@@ -11,6 +11,7 @@ import {
   useTerritoryAnalytics,
   useTerritorySegments,
 } from '@/hooks/useTerritories';
+import { useCurrencyStore } from '@/stores/currency';
 
 type MapChildrenProps = { children?: ReactNode };
 type GeographiesProps = { children: (args: { geographies: unknown[] }) => ReactNode };
@@ -83,6 +84,7 @@ describe('TerritoriesPage', () => {
     // clearAllMocks() clears call history but not a permanent mockReturnValue,
     // so restate the default explicitly per test for isolation.
     capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    useCurrencyStore.setState({ currency: 'USD' });
   });
 
   afterEach(() => {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useOnboardingStore } from '@/stores/onboarding';
 import { Button } from '@/components/ui/Button';
+import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useSampleDataStatus, useDeleteSampleData } from '@/hooks/useOnboarding';
 
@@ -19,7 +20,14 @@ export function SampleDataBanner() {
   const hasSampleData = (status.data?.hasSampleData ?? false) || storeHas;
   if (hidden || !hasSampleData) return null;
 
-  function removeSampleData() {
+  async function removeSampleData() {
+    const ok = await confirm({
+      title: t('sampleDataBanner.remove', 'Remove sample data'),
+      description: t('sampleData.confirmClear', 'Delete all demonstration data? This action cannot be undone.'),
+      confirmLabel: t('sampleDataBanner.remove', 'Remove sample data'),
+      destructive: true,
+    });
+    if (!ok) return;
     del.mutate(undefined, {
       onSuccess: () => {
         setHasSampleData(false);
@@ -49,7 +57,7 @@ export function SampleDataBanner() {
           <Button variant="ghost" size="sm" onClick={() => setHidden(true)}>
             {t('sampleDataBanner.hide', 'Hide')}
           </Button>
-          <Button variant="secondary" size="sm" onClick={removeSampleData} disabled={del.isPending}>
+          <Button variant="secondary" size="sm" onClick={() => void removeSampleData()} disabled={del.isPending}>
             {del.isPending
               ? t('sampleDataBanner.removing', 'Removing…')
               : t('sampleDataBanner.remove', 'Remove sample data')}

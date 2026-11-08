@@ -52,12 +52,24 @@ export async function seedBidChartDemo(prisma: PrismaClient, orgId: string, seed
       memosPolicies: [],
       notes: DEMO_NOTE,
     };
-    await prisma.bidScore.upsert({
-      where: { id: demoBidScore.id },
-      create: { id: demoBidScore.id, orgId, opportunityId: scoredOppId, scoredBy: seedUserId, version: 1, ...data },
-      update: data,
-    });
-    bidScore = composite.totalScore;
+    const fixture = await prisma.bidScore.findUnique({ where: { id: demoBidScore.id }, select: { id: true } });
+    if (fixture) {
+      await prisma.bidScore.update({ where: { id: demoBidScore.id }, data });
+      bidScore = composite.totalScore;
+    } else {
+      // A score authored through the bid matrix already holds version 1 (unique
+      // per org and opportunity); keep it rather than fail the seed.
+      const authored = await prisma.bidScore.findFirst({
+        where: { orgId, opportunityId: scoredOppId },
+        select: { id: true },
+      });
+      if (!authored) {
+        await prisma.bidScore.create({
+          data: { id: demoBidScore.id, orgId, opportunityId: scoredOppId, scoredBy: seedUserId, version: 1, ...data },
+        });
+        bidScore = composite.totalScore;
+      }
+    }
   }
 
   const today = new Date();

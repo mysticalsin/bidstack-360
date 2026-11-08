@@ -138,7 +138,7 @@ export function Sidebar() {
             <div className="sb-name">
               Polo PreSales
             </div>
-            <div className="sb-tag">Mantu · Bid &amp; presales</div>
+            <div className="sb-tag" title="Mantu · Bid &amp; presales">Mantu · Bid &amp; presales</div>
           </div>
         </div>
 

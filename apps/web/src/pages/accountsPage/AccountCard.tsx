@@ -40,6 +40,7 @@ export const AccountCard = memo(function AccountCard({
   const rankedTech = rankedTechFor(company);
   const topTech = rankedTech.slice(0, 3);
   const imageUrl = displayableLogoUrl(company.imageUrl);
+  const meta = `${titleCase(company.industry ?? t('account.unknownIndustry', 'Unknown industry'))}${company.domain ? ` · ${company.domain}` : ''}`;
   return (
     <motion.div
       layout
@@ -79,10 +80,9 @@ export const AccountCard = memo(function AccountCard({
               size={52}
             />
             <div className="account-card-title">
-              <div className="account-card-name">{company.name}</div>
-              <div className="account-card-meta">
-                {titleCase(company.industry ?? t('account.unknownIndustry', 'Unknown industry'))}
-                {company.domain ? ` · ${company.domain}` : ''}
+              <div className="account-card-name" title={company.name}>{company.name}</div>
+              <div className="account-card-meta" title={meta}>
+                {meta}
               </div>
             </div>
             <Badge tone={healthTone(health)}>{healthLabel(health)}</Badge>

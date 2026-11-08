@@ -19,11 +19,15 @@ export interface PagedResult<T> {
   complete: boolean;
 }
 
-async function fetchAllCursorPages<T>(path: string, signal: AbortSignal): Promise<PagedResult<T>> {
+export async function fetchAllCursorPages<T>(
+  path: string,
+  signal: AbortSignal,
+  filters: Record<string, string> = {},
+): Promise<PagedResult<T>> {
   const items: T[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+    const params = new URLSearchParams({ ...filters, limit: String(PAGE_SIZE) });
     if (cursor) params.set('cursor', cursor);
     const body = await api<CursorPage<T>>(`${path}?${params.toString()}`, { signal });
     items.push(...body.items);

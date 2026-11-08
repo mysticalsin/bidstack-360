@@ -84,6 +84,21 @@ describe('EmailPanel', () => {
     expect(mocks.api).toHaveBeenCalledWith(`/api/email/messages?contactId=${CONTACT}&limit=25`);
   });
 
+  it('loads older pages so threads past the first 25 messages stay reachable', async () => {
+    mocks.api.mockImplementation(async (path: string) => {
+      if (path.endsWith('&page=2')) {
+        return { messages: [message({ id: '33333333-3333-4333-8333-333333333333', threadId: 't2', subject: 'Older bid' })], total: 26, hasMore: false };
+      }
+      return { messages: [message({})], total: 26, hasMore: true };
+    });
+    wrap(<EmailPanel filter={{ contactId: CONTACT }} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Load older email' }));
+    expect(await screen.findByText('Older bid')).toBeTruthy();
+    expect(screen.getByText('RFP questions')).toBeTruthy();
+    expect(mocks.api).toHaveBeenCalledWith(`/api/email/messages?contactId=${CONTACT}&limit=25&page=2`);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Load older email' })).toBeNull());
+  });
+
   it('opens a readable thread with scripts stripped, images blocked and quotes collapsed', async () => {
     wrap(<EmailPanel filter={{ contactId: CONTACT }} />);
     fireEvent.click(await screen.findByText('RFP questions'));
@@ -128,6 +143,9 @@ describe('DraftComposer', () => {
       'mailto:buyer%40client.example?subject=Deadline&body=Friday%20at%20noon.',
     );
     expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy();
+    for (const label of ['To', 'Subject', 'Message']) {
+      expect(screen.getByLabelText(label).hasAttribute('readonly')).toBe(true);
+    }
   });
 
   it('refuses an invalid recipient before saving', () => {

@@ -98,7 +98,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
               <Link to={`/opportunities/${o.id}`} className="proto-row-link">
                 <div className="proto-row-main">
                   <span className="proto-row-code">{o.code}</span>
-                  <span className="proto-row-name">{o.name}</span>
+                  <span className="proto-row-name" title={o.name}>{o.name}</span>
                   {!accountScoped ? <span className="proto-row-meta">{o.customer}</span> : null}
                 </div>
                 <div className="proto-row-right">

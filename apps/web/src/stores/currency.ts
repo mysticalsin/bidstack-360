@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { ORG_LOCALE_DEFAULT } from '@bidstack/shared';
+
 import { buildApiUrl } from '@/lib/api';
 
 const RATES_KEY = 'bidstack:exchange-rates';
@@ -33,12 +35,21 @@ interface ExchangeRates {
 
 interface CurrencyStore {
   currency: CurrencyCode;
+  /** True only after the user picked "Auto" (browser location, then time zone). */
   autoDetect: boolean;
+  /** True until the user picks a currency or "Auto": display follows the workspace currency. */
+  followOrg: boolean;
+  /** Last workspace currency seen from Settings, Currency and locale. */
+  orgCurrency: CurrencyCode | null;
   rates: ExchangeRates | null;
   ratesLoading: boolean;
   ratesError: string | null;
   setCurrency: (c: CurrencyCode) => void;
   enableAutoDetect: () => Promise<void>;
+  /** Record the workspace currency; applied when the display follows it. */
+  applyOrgCurrency: (code: string) => void;
+  /** Go back to following the workspace currency. */
+  followOrgDefault: () => void;
   fetchRates: () => Promise<void>;
   convert: (amount: number, from: string) => number;
 }
@@ -48,6 +59,32 @@ let ratesRetryAt = 0;
 
 function normalizeCurrencyCode(code: string | null | undefined): string {
   return (code ?? '').trim().toUpperCase();
+}
+
+function asSupportedCurrency(code: string | null | undefined): CurrencyCode | null {
+  const c = normalizeCurrencyCode(code);
+  return SUPPORTED_CURRENCIES.some((s) => s.code === c) ? (c as CurrencyCode) : null;
+}
+
+/** Workspace default until the org setting loads; never the browser time zone. */
+const INITIAL_CURRENCY: CurrencyCode = asSupportedCurrency(ORG_LOCALE_DEFAULT.currency) ?? 'EUR';
+
+type PersistedCurrency = Partial<Pick<CurrencyStore, 'currency' | 'autoDetect' | 'followOrg' | 'orgCurrency'>>;
+
+/**
+ * Older builds persisted only { currency, autoDetect } with autoDetect true by
+ * default, so a time-zone guess (R$ for a UTC-3 browser) stuck. Without an
+ * explicit pick, follow the workspace currency instead.
+ */
+export function migratePersistedCurrency(persisted: PersistedCurrency): PersistedCurrency {
+  if (persisted.followOrg !== undefined) return persisted;
+  const picked = persisted.autoDetect === false;
+  return {
+    ...persisted,
+    autoDetect: false,
+    followOrg: !picked,
+    ...(picked ? {} : { currency: persisted.orgCurrency ?? INITIAL_CURRENCY }),
+  };
 }
 
 function isUsableRate(rate: unknown): rate is number {
@@ -276,20 +313,29 @@ function loadCachedRates(): ExchangeRates | null {
 export const useCurrencyStore = create<CurrencyStore>()(
   persist(
     (set, get) => ({
-      currency: detectLocalCurrency(),
-      autoDetect: true,
+      currency: INITIAL_CURRENCY,
+      autoDetect: false,
+      followOrg: true,
+      orgCurrency: null,
       rates: loadCachedRates(),
       ratesLoading: false,
       ratesError: null,
 
-      setCurrency: (currency) => set({ currency, autoDetect: false }),
+      setCurrency: (currency) => set({ currency, autoDetect: false, followOrg: false }),
       enableAutoDetect: async () => {
-        set({ autoDetect: true, currency: detectLocalCurrency() });
+        set({ autoDetect: true, followOrg: false, currency: detectLocalCurrency() });
         const preciseCurrency = await detectCurrencyFromGeolocation();
         if (preciseCurrency && get().autoDetect) {
           set({ currency: preciseCurrency });
         }
       },
+      applyOrgCurrency: (code) => {
+        const orgCurrency = asSupportedCurrency(code);
+        if (!orgCurrency) return;
+        set(get().followOrg ? { orgCurrency, currency: orgCurrency } : { orgCurrency });
+      },
+      followOrgDefault: () =>
+        set({ followOrg: true, autoDetect: false, currency: get().orgCurrency ?? INITIAL_CURRENCY }),
 
       fetchRates: async () => {
         const currentRatesTs = Number(localStorage.getItem(RATES_TS_KEY));
@@ -375,7 +421,16 @@ export const useCurrencyStore = create<CurrencyStore>()(
     }),
     {
       name: 'bidstack:currency-locale',
-      partialize: (state) => ({ currency: state.currency, autoDetect: state.autoDetect }),
+      partialize: (state) => ({
+        currency: state.currency,
+        autoDetect: state.autoDetect,
+        followOrg: state.followOrg,
+        orgCurrency: state.orgCurrency,
+      }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...migratePersistedCurrency((persisted ?? {}) as PersistedCurrency),
+      }),
     },
   ),
 );

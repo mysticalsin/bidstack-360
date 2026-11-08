@@ -2,9 +2,10 @@
 //
 // Copy-cut passes remove taglines and helper text. These strings are legal,
 // consent, privacy, AI-disclosure or destructive-action warnings, so they must
-// survive every cut verbatim. Each one has to exist either as a value in an
-// English locale file (public/locales/en/*.json) or as an inline default in
-// apps/web/src. If a string moves, update the source, not this list; rewording
+// survive every cut verbatim. Each one has to exist either as an inline
+// default in apps/web/src, or as a value in an English locale file
+// (public/locales/en/*.json) whose key is still referenced from apps/web/src,
+// so an orphaned locale value cannot keep a deleted disclosure passing. If a string moves, update the source, not this list; rewording
 // one needs a DESIGN.md change and sign-off first.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -77,11 +78,16 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function collectJsonStrings(value: unknown, out: string[]): void {
-  if (typeof value === 'string') out.push(value);
-  else if (Array.isArray(value)) value.forEach((v) => collectJsonStrings(v, out));
+interface LocaleEntry {
+  key: string;
+  value: string;
+}
+
+function collectJsonStrings(value: unknown, out: LocaleEntry[], key = ''): void {
+  if (typeof value === 'string') out.push({ key, value: value.replace(/\s+/g, ' ') });
+  else if (Array.isArray(value)) value.forEach((v, i) => collectJsonStrings(v, out, `${key}.${i}`));
   else if (value && typeof value === 'object') {
-    Object.values(value).forEach((v) => collectJsonStrings(v, out));
+    for (const [k, v] of Object.entries(value)) collectJsonStrings(v, out, key ? `${key}.${k}` : k);
   }
 }
 
@@ -100,9 +106,9 @@ function normalizeSource(src: string): string {
     .replace(/\s+/g, ' ');
 }
 
-function buildCorpus(): { locale: string[]; source: string } {
+function buildCorpus(): { locale: LocaleEntry[]; source: string } {
   const localeDir = join(WEB_ROOT, 'public/locales/en');
-  const locale: string[] = [];
+  const locale: LocaleEntry[] = [];
   for (const file of readdirSync(localeDir).filter((f) => f.endsWith('.json'))) {
     collectJsonStrings(JSON.parse(readFileSync(join(localeDir, file), 'utf8')), locale);
   }
@@ -120,9 +126,29 @@ function shipsAsWholeCopy(haystack: string, pinned: string): boolean {
   return new RegExp(`(?:^|['"\`>]) ?${escapeRe(pinned)} ?(?=$|['"\`<{])`, 'm').test(haystack);
 }
 
+// A locale key counts as consumed when the source names it as a string
+// literal, with or without its namespace prefix ("crm:publicSign.x").
+function keyIsReferenced(source: string, key: string): boolean {
+  return new RegExp(`['"\`](?:[\\w-]+:)?${escapeRe(key)}['"\`]`).test(source);
+}
+
+/** Locale keys whose value is the pin and that some source file still uses. */
+export function consumedLocaleKeys(locale: readonly LocaleEntry[], source: string, pinned: string): string[] {
+  return locale
+    .filter((e) => shipsAsWholeCopy(`"${e.value}"`, pinned) && keyIsReferenced(source, e.key))
+    .map((e) => e.key);
+}
+
+// Pins whose only copy is a locale value no component renders. Each needs a
+// DESIGN.md decision: render it again, or drop the pin with sign-off. The list
+// must shrink, never grow: a new orphan fails the "still ships" check.
+const KNOWN_UNRENDERED: readonly string[] = [
+  // signatures pad.agreed: PublicSignPage renders the longer consent line instead.
+  'I understand this electronic signature is an internal approval signature, not a legally binding e-signature.',
+];
+
 describe('pinned consent and safety copy (DESIGN.md 9.5)', () => {
   const corpus = buildCorpus();
-  const localeText = corpus.locale.map((s) => `"${s.replace(/\s+/g, ' ')}"`).join('\n');
 
   it('lists every string from the DESIGN.md 9.5 block', () => {
     const design = readFileSync(join(WEB_ROOT, '../../DESIGN.md'), 'utf8');
@@ -136,8 +162,23 @@ describe('pinned consent and safety copy (DESIGN.md 9.5)', () => {
     expect([...PINNED_CONSENT_COPY].sort()).toEqual([...designLines].sort());
   });
 
-  it.each(PINNED_CONSENT_COPY.map((s) => [s]))('still ships: %s', (pinned) => {
-    const found = shipsAsWholeCopy(localeText, pinned) || shipsAsWholeCopy(corpus.source, pinned);
-    expect(found, `pinned copy missing from locales and src: ${pinned}`).toBe(true);
+  it.each(KNOWN_UNRENDERED.map((s) => [s]))('known unrendered pin is still unrendered: %s', (pinned) => {
+    const rendered =
+      shipsAsWholeCopy(corpus.source, pinned) || consumedLocaleKeys(corpus.locale, corpus.source, pinned).length > 0;
+    expect(rendered, `now rendered again, remove it from KNOWN_UNRENDERED: ${pinned}`).toBe(false);
+  });
+
+  it.each(PINNED_CONSENT_COPY.filter((s) => !KNOWN_UNRENDERED.includes(s)).map((s) => [s]))('still ships: %s', (pinned) => {
+    const found =
+      shipsAsWholeCopy(corpus.source, pinned) || consumedLocaleKeys(corpus.locale, corpus.source, pinned).length > 0;
+    expect(found, `pinned copy missing from src, or only left in an unused locale key: ${pinned}`).toBe(true);
+  });
+
+  it('does not accept a locale value whose consuming call was deleted', () => {
+    const pinned = PINNED_CONSENT_COPY[0]!;
+    const locale = [{ key: 'publicSign.footerLegalNote', value: pinned }];
+    expect(consumedLocaleKeys(locale, "t('publicSign.footerLegalNote')", pinned)).toEqual(['publicSign.footerLegalNote']);
+    expect(consumedLocaleKeys(locale, "t('crm:publicSign.footerLegalNote')", pinned)).toHaveLength(1);
+    expect(consumedLocaleKeys(locale, "t('publicSign.title')", pinned)).toEqual([]);
   });
 });
