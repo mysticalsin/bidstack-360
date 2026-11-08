@@ -391,7 +391,7 @@ describe('Microsoft calendar pull', () => {
     // reads that row, not the memory of the process that just exited.
     const findFirst = vi.mocked(prisma.calendarEvent.findFirst);
     findFirst.mockResolvedValue({ id: 'row-old' } as never);
-    const start = { activityBridgePending: [{ id: 'ev-old', attempts: 1 }] };
+    const start = { activityBridgePending: [{ id: 'ev-old', attempts: 1, kind: 'calendar' as const }] };
     bridgeStore.persisted.delta = structuredClone(start);
     vi.stubGlobal(
       'fetch',

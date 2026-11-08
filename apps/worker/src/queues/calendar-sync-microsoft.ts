@@ -186,7 +186,7 @@ export async function pullMicrosoftIncremental(
     if (res.status === 410) {
       log.warn({ tokenId }, 'Graph calendar delta expired (410); resyncing from scratch');
       const { calendarDeltaLink: _d, calendarNextLink: _n, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, baseline, rest, []);
+      await commitTokenDeltaState(prisma, tokenId, baseline, rest, bridgeDeltas);
       return;
     }
     if (!res.ok) throw new Error(`MS Graph delta failed: ${res.status}`);
@@ -199,7 +199,7 @@ export async function pullMicrosoftIncremental(
     const items = body.value ?? [];
     count += items.length;
     const { failed, settled, captureHeld } = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
-    const bridge = noteActivityBridgeFailures(deltaState, url, failed, new Date().toISOString(), settled);
+    const bridge = noteActivityBridgeFailures(deltaState, url, failed, new Date().toISOString(), settled, true, undefined, 'calendar');
     const drained = typeof prisma.calendarEvent?.findFirst === 'function'
       ? await drainPendingActivityBridges(deltaState, async (providerId) => {
       const row = await prisma.calendarEvent.findFirst({
@@ -209,9 +209,9 @@ export async function pullMicrosoftIncremental(
       if (!row) return 'gone';
       const ok = await bridgeActivity(() => syncCalendarEventActivity(orgId, row.id), log, { eventId: providerId });
       return ok;
-    })
+    }, new Date().toISOString(), 'calendar')
       : null;
-    appendBridgeObservations(bridgeDeltas, url, failed, settled, drained);
+    appendBridgeObservations(bridgeDeltas, url, failed, settled, drained, 'calendar');
     if (bridge.quarantined.length > 0) {
       log.warn(
         { tokenId, ids: bridge.quarantined },
@@ -339,8 +339,8 @@ async function upsertMicrosoftEvents(
         update: fields,
         select: { id: true },
       });
-      captured = true;
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'microsoft_graph', externalId: item.id }, filing);
+      captured = true;
       const ok = await bridgeActivity(
         () => syncCalendarEventActivity(orgId, saved.id, { hints }),
         log,

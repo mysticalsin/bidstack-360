@@ -357,7 +357,7 @@ export async function pullGmail(
   }
 
   const pageKey = `gmail:${cursor ?? 'seed'}`;
-  const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds, new Date().toISOString(), settledIds);
+  const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds, new Date().toISOString(), settledIds, true, undefined, 'email');
   const drained = typeof prisma.emailMessage?.findFirst === 'function'
     ? await drainPendingActivityBridges(deltaState, async (providerId) => {
     const row = await prisma.emailMessage.findFirst({
@@ -369,9 +369,9 @@ export async function pullGmail(
     if (!row) return 'gone';
     const ok = await bridgeActivity(() => syncEmailMessageActivity(token.orgId, row.id), log, { msgId: providerId });
     return ok;
-  })
+  }, new Date().toISOString(), 'email')
     : null;
-  appendBridgeObservations(bridgeDeltas, pageKey, failedIds, settledIds, drained);
+  appendBridgeObservations(bridgeDeltas, pageKey, failedIds, settledIds, drained, 'email');
   if (bridge.quarantined.length > 0) {
     log.warn({ tokenId: token.id, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
   }

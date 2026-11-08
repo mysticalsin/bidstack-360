@@ -289,7 +289,11 @@ export type ActivityBridgeDelta = {
    * leave this unset and do park them.
    */
   parkUnseen?: boolean;
+  /** Mail and calendar share a token row. A drain only retries its own kind. */
+  kind?: ActivityBridgeKind;
 };
+
+export type ActivityBridgeKind = 'email' | 'calendar';
 
 /** Record one page observation and, when a drain ran, its outcome as a second delta. */
 export function appendBridgeObservations(
@@ -298,14 +302,16 @@ export function appendBridgeObservations(
   failedIds: readonly string[],
   settledIds: readonly string[],
   drained: { failedIds: readonly string[]; settledIds: readonly string[] } | null,
+  kind?: ActivityBridgeKind,
 ): void {
-  deltas.push({ page, failedIds: [...failedIds], settledIds: [...settledIds] });
+  deltas.push({ page, failedIds: [...failedIds], settledIds: [...settledIds], kind });
   if (!drained) return;
   deltas.push({
     page: `${page}#drain`,
     failedIds: [...drained.failedIds],
     settledIds: [...drained.settledIds],
     parkUnseen: false,
+    kind,
   });
 }
 
@@ -328,19 +334,21 @@ const RETRY_KEYS = [
   'activityBridgeRetryById',
   'activityBridgePending',
   'activityBridgeQuarantine',
+  'activityBridgeStream',
 ] as const;
 
-export type ActivityBridgePending = { id: string; attempts: number };
+export type ActivityBridgePending = { id: string; attempts: number; kind?: ActivityBridgeKind };
 
 function readPending(state: Record<string, unknown>): ActivityBridgePending[] {
   if (!Array.isArray(state.activityBridgePending)) return [];
   const rows: ActivityBridgePending[] = [];
   for (const entry of state.activityBridgePending) {
     if (!entry || typeof entry !== 'object') continue;
-    const row = entry as { id?: unknown; attempts?: unknown };
+    const row = entry as { id?: unknown; attempts?: unknown; kind?: unknown };
     if (typeof row.id !== 'string' || row.id.length === 0) continue;
     if (typeof row.attempts !== 'number' || row.attempts <= 0) continue;
-    rows.push({ id: row.id, attempts: row.attempts });
+    const kind = row.kind === 'email' || row.kind === 'calendar' ? row.kind : undefined;
+    rows.push({ id: row.id, attempts: row.attempts, ...(kind ? { kind } : {}) });
   }
   return rows;
 }
@@ -424,6 +432,7 @@ export function noteActivityBridgeFailures(
   settledIds: readonly string[] = [],
   parkUnseen = true,
   seenIds?: readonly string[],
+  kind?: ActivityBridgeKind,
 ): { hold: boolean; quarantined: string[]; pending: number; backpressure: boolean } {
   void page;
   const failed = [...new Set(failedIds.filter((id) => id.length > 0))];
@@ -435,7 +444,7 @@ export function noteActivityBridgeFailures(
     let backpressure = false;
     if (parkUnseen) {
       for (const [id, attempts] of Object.entries(counts)) {
-        if (!rememberPending(pending, id, attempts)) {
+        if (!rememberPending(pending, id, attempts, stampStream(state, id))) {
           backpressure = true;
           continue;
         }
@@ -458,7 +467,7 @@ export function noteActivityBridgeFailures(
   if (parkUnseen) {
     for (const [id, attempts] of Object.entries(counts)) {
       if (observed.has(id)) continue;
-      if (!rememberPending(pending, id, attempts)) {
+      if (!rememberPending(pending, id, attempts, stampStream(state, id))) {
         backpressure = true;
         continue;
       }
@@ -468,6 +477,7 @@ export function noteActivityBridgeFailures(
   for (const id of settled) {
     delete counts[id];
     removePending(pending, id);
+    forgetStream(state, id);
   }
   backpressure ||= pending.length > ACTIVITY_BRIDGE_PENDING_CAP;
   if (failed.length === 0) {
@@ -496,9 +506,11 @@ export function noteActivityBridgeFailures(
       ? ACTIVITY_BRIDGE_RETRY_LIMIT
       : Math.max(counts[id] ?? 0, pendingAttempt(pending, id));
     const attempts = Math.min(prior + 1, ACTIVITY_BRIDGE_RETRY_LIMIT);
+    const tagged = stampStream(state, id, kind);
     if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) {
       delete counts[id];
       removePending(pending, id);
+      forgetStream(state, id);
       quarantined.push(id);
       continue;
     }
@@ -507,7 +519,7 @@ export function noteActivityBridgeFailures(
       counts[id] = attempts;
       continue;
     }
-    if (rememberPending(pending, id, attempts)) {
+    if (rememberPending(pending, id, attempts, tagged)) {
       delete counts[id];
       continue;
     }
@@ -544,23 +556,64 @@ function removePending(rows: ActivityBridgePending[], id: string): void {
 }
 
 /** @returns false when the id was not stored because the queue is already full. */
-function rememberPending(rows: ActivityBridgePending[], id: string, attempts: number): boolean {
+function rememberPending(
+  rows: ActivityBridgePending[],
+  id: string,
+  attempts: number,
+  kind?: ActivityBridgeKind,
+): boolean {
   const existing = rows.find((row) => row.id === id);
   if (existing) {
     existing.attempts = Math.max(existing.attempts, attempts);
+    if (kind) existing.kind = kind;
     return true;
   }
   if (rows.length >= ACTIVITY_BRIDGE_PENDING_CAP) return false;
-  rows.push({ id, attempts });
+  rows.push({ id, attempts, ...(kind ? { kind } : {}) });
   return true;
+}
+
+function readStream(state: Record<string, unknown>): Record<string, ActivityBridgeKind> {
+  const raw = state.activityBridgeStream;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const next: Record<string, ActivityBridgeKind> = {};
+  for (const [id, kind] of Object.entries(raw as Record<string, unknown>)) {
+    if (kind === 'email' || kind === 'calendar') next[id] = kind;
+  }
+  return next;
+}
+
+function stampStream(state: Record<string, unknown>, id: string, kind?: ActivityBridgeKind): ActivityBridgeKind | undefined {
+  const known = readStream(state)[id] ?? kind;
+  if (!known) return undefined;
+  const next = readStream(state);
+  next[id] = known;
+  state.activityBridgeStream = next;
+  return known;
+}
+
+function forgetStream(state: Record<string, unknown>, id: string): void {
+  const next = readStream(state);
+  if (!(id in next)) return;
+  delete next[id];
+  if (Object.keys(next).length === 0) delete state.activityBridgeStream;
+  else state.activityBridgeStream = next;
 }
 
 /** The next ids a run should retry. They stay in the queue until a later observation settles or counts them. */
 export function claimActivityBridgeDrain(
   state: Record<string, unknown>,
   limit = ACTIVITY_BRIDGE_DRAIN_BATCH,
+  kind?: ActivityBridgeKind,
 ): string[] {
-  return readPending(state).slice(0, limit).map((row) => row.id);
+  return readPending(state)
+    .filter((row) => {
+      if (!kind) return true;
+      // An old entry has no stream. Neither mail nor calendar may settle it.
+      return row.kind === kind;
+    })
+    .slice(0, limit)
+    .map((row) => row.id);
 }
 
 /**
@@ -572,8 +625,9 @@ export async function drainPendingActivityBridges(
   state: Record<string, unknown>,
   run: (providerId: string) => Promise<boolean | 'gone'>,
   now = new Date().toISOString(),
+  kind?: ActivityBridgeKind,
 ): Promise<{ hold: boolean; quarantined: string[]; pending: number; backpressure: boolean; failedIds: string[]; settledIds: string[] } | null> {
-  const ids = claimActivityBridgeDrain(state);
+  const ids = claimActivityBridgeDrain(state, ACTIVITY_BRIDGE_DRAIN_BATCH, kind);
   if (ids.length === 0) return null;
   const failed: string[] = [];
   const settled: string[] = [];
@@ -587,14 +641,17 @@ export async function drainPendingActivityBridges(
       failed.push(id);
     }
   }
-  const noted = noteActivityBridgeFailures(state, 'drain', failed, now, settled, false);
+  const noted = noteActivityBridgeFailures(state, 'drain', failed, now, settled, false, undefined, kind);
   return { ...noted, failedIds: failed, settledIds: settled };
 }
 
-const CALENDAR_CURSOR_KEYS = ['calendarNextLink', 'calendarDeltaLink'] as const;
+const CURSOR_GROUPS = [
+  ['calendarNextLink', 'calendarDeltaLink'],
+  ['calendarSyncToken', 'calendarPageToken'],
+] as const;
 
-function sameCalendarGroup(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
-  return CALENDAR_CURSOR_KEYS.every((key) => samePresence(cursorPresence(left, key), cursorPresence(right, key)));
+function sameCursorGroup(left: Record<string, unknown>, right: Record<string, unknown>, keys: readonly string[]): boolean {
+  return keys.every((key) => samePresence(cursorPresence(left, key), cursorPresence(right, key)));
 }
 
 function sameCursorValue(left: unknown, right: unknown): boolean {
@@ -621,9 +678,9 @@ function samePresence(
  * committed after this run read its snapshot. Retry keys are never taken
  * from either snapshot; `deltas` are applied once onto the stored counts.
  *
- * `calendarNextLink` and `calendarDeltaLink` are one cursor: the next read
- * follows the nextLink first. If this run changes either key, both keys must
- * still match the snapshot, or the locked row must already be the desired
+ * `calendarNextLink`/`calendarDeltaLink` and `calendarSyncToken`/`calendarPageToken`
+ * are each one cursor. If this run changes either key of a pair, both keys
+ * must still match the snapshot, or the locked row must already be the desired
  * pair. A moved sibling key aborts the whole merge. A later key is not
  * written beside a conflicting one.
  * When the locked row already matches this run, the write is idempotent and
@@ -638,26 +695,23 @@ export function mergeBridgeDeltaState(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = structuredClone(stored);
   const retryKeySet = new Set<string>(RETRY_KEYS);
-  const calendarKeySet = new Set<string>(CALENDAR_CURSOR_KEYS);
+  const groupedKeySet = new Set<string>(CURSOR_GROUPS.flat());
   const keys = new Set([...Object.keys(baseline), ...Object.keys(desired)]);
   const conflicts: string[] = [];
   const writes: string[] = [];
-  // calendarNextLink and calendarDeltaLink are one cursor. A write of either
-  // key is refused when the other key has also moved, even if this run did
-  // not intend to change that other key.
-  if (!sameCalendarGroup(baseline, desired)) {
-    if (sameCalendarGroup(result, desired)) {
-      // The locked row already has this run's cursor. Nothing to write.
-    } else if (sameCalendarGroup(result, baseline)) {
-      for (const key of CALENDAR_CURSOR_KEYS) {
+  for (const group of CURSOR_GROUPS) {
+    if (sameCursorGroup(baseline, desired, group)) continue;
+    if (sameCursorGroup(result, desired, group)) continue;
+    if (sameCursorGroup(result, baseline, group)) {
+      for (const key of group) {
         if (!samePresence(cursorPresence(baseline, key), cursorPresence(desired, key))) writes.push(key);
       }
     } else {
-      conflicts.push(...CALENDAR_CURSOR_KEYS);
+      conflicts.push(...group);
     }
   }
   for (const key of keys) {
-    if (retryKeySet.has(key) || calendarKeySet.has(key)) continue;
+    if (retryKeySet.has(key) || groupedKeySet.has(key)) continue;
     const base = cursorPresence(baseline, key);
     const want = cursorPresence(desired, key);
     if (samePresence(base, want)) continue;
@@ -687,6 +741,8 @@ export function mergeBridgeDeltaState(
       now,
       delta.settledIds ?? [],
       delta.parkUnseen !== false,
+      undefined,
+      delta.kind,
     );
   }
   return result;

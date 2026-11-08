@@ -231,7 +231,7 @@ export async function pullGoogleIncremental(
     if (res.status === 410) {
       log.warn({ tokenId }, 'Google sync token expired; clearing for full re-sync');
       const { calendarSyncToken: _s, calendarPageToken: _p, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, baseline, rest, []);
+      await commitTokenDeltaState(prisma, tokenId, baseline, rest, bridgeDeltas);
       return;
     }
     if (!res.ok) throw new Error(`Google events list failed: ${res.status}`);
@@ -241,7 +241,7 @@ export async function pullGoogleIncremental(
     count += items.length;
     const { failed, settled, captureHeld } = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
     const pageKey = `google:${syncToken ?? ''}:${pageToken ?? ''}`;
-    const bridge = noteActivityBridgeFailures(deltaState, pageKey, failed, new Date().toISOString(), settled);
+    const bridge = noteActivityBridgeFailures(deltaState, pageKey, failed, new Date().toISOString(), settled, true, undefined, 'calendar');
     const drained = typeof prisma.calendarEvent?.findFirst === 'function'
       ? await drainPendingActivityBridges(deltaState, async (providerId) => {
       const row = await prisma.calendarEvent.findFirst({
@@ -251,9 +251,9 @@ export async function pullGoogleIncremental(
       if (!row) return 'gone';
       const ok = await bridgeActivity(() => syncCalendarEventActivity(orgId, row.id), log, { eventId: providerId });
       return ok;
-    })
+    }, new Date().toISOString(), 'calendar')
       : null;
-    appendBridgeObservations(bridgeDeltas, pageKey, failed, settled, drained);
+    appendBridgeObservations(bridgeDeltas, pageKey, failed, settled, drained, 'calendar');
     if (bridge.quarantined.length > 0) {
       log.warn({ tokenId, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
     }
@@ -362,8 +362,8 @@ async function upsertGoogleEvents(
         update: fields,
         select: { id: true },
       });
-      captured = true;
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'google_workspace', externalId: item.id }, filing);
+      captured = true;
       const ok = await bridgeActivity(
         () => syncCalendarEventActivity(orgId, saved.id, { hints }),
         log,

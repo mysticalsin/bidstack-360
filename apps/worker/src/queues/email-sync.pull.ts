@@ -165,7 +165,7 @@ export async function pullDelta(
         }
       }
 
-      const bridge = noteActivityBridgeFailures(deltaState, url, failedIds, new Date().toISOString(), settledIds);
+      const bridge = noteActivityBridgeFailures(deltaState, url, failedIds, new Date().toISOString(), settledIds, true, undefined, 'email');
       const drained = typeof prisma.emailMessage?.findFirst === 'function'
         ? await drainPendingActivityBridges(deltaState, async (providerId) => {
         const row = await prisma.emailMessage.findFirst({
@@ -175,9 +175,9 @@ export async function pullDelta(
         if (!row) return 'gone';
         const ok = await bridgeActivity(() => syncEmailMessageActivity(params.orgId, row.id), log, { msgId: providerId });
         return ok;
-      })
+      }, new Date().toISOString(), 'email')
         : null;
-      appendBridgeObservations(bridgeDeltas, url, failedIds, settledIds, drained);
+      appendBridgeObservations(bridgeDeltas, url, failedIds, settledIds, drained, 'email');
       if (bridge.quarantined.length > 0) {
         log.warn(
           { tokenId: token.id, folder: f.folder, ids: bridge.quarantined },

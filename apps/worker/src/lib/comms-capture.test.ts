@@ -281,6 +281,43 @@ describe('activity bridge retry bound', () => {
     expect(stored).toEqual({ calendarNextLink: 'page-1', calendarDeltaLink: 'theirs' });
   });
 
+  it('an email drain does not settle a calendar id or an untyped legacy id', async () => {
+    const state: Record<string, unknown> = {
+      activityBridgePending: [
+        { id: 'same', attempts: 1, kind: 'calendar' },
+        { id: 'mail', attempts: 1, kind: 'email' },
+        { id: 'legacy', attempts: 1 },
+      ],
+    };
+    const seen: string[] = [];
+    await drainPendingActivityBridges(
+      state,
+      async (id) => {
+        seen.push(id);
+        return 'gone';
+      },
+      '2026-11-08T00:00:00.000Z',
+      'email',
+    );
+    expect(seen).toEqual(['mail']);
+    const pending = state.activityBridgePending as Array<{ id: string }>;
+    expect(pending.map((row) => row.id).sort()).toEqual(['legacy', 'same']);
+  });
+
+  it('aborts when a google page token would sit beside another sync token', () => {
+    const stored = { calendarSyncToken: 'theirs', calendarPageToken: 'page-1' };
+    expect(() =>
+      mergeBridgeDeltaState(
+        stored,
+        { calendarSyncToken: 'mine', calendarPageToken: 'page-1' },
+        { calendarSyncToken: 'mine', calendarPageToken: 'page-2' },
+        [],
+        '2026-11-08T03:00:00.000Z',
+      ),
+    ).toThrow(CursorKeyConflictError);
+    expect(stored).toEqual({ calendarSyncToken: 'theirs', calendarPageToken: 'page-1' });
+  });
+
   it('an empty page keeps unexhausted ids and holds the cursor', () => {
     const state: Record<string, unknown> = { activityBridgeRetryById: { poison: 1 } };
     const out = noteActivityBridgeFailures(state, 'empty', [], '2026-11-08T03:00:00.000Z');
