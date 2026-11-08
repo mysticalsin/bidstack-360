@@ -2,6 +2,9 @@
 // PERMISSION_SEEDS list in packages/db/src/seed.ts — keep both in sync.
 
 export const PERMISSION_KEYS = [
+  'access-policies:approve',
+  'access-policies:read',
+  'access-policies:write',
   'account-intel:read',
   'account-intel:write',
   'accounts:read',
@@ -70,6 +73,7 @@ export const PERMISSION_KEYS = [
   'users:read',
   'users:write',
   'webhooks:read',
+  'webhooks:replay',
   'webhooks:write',
   'workflows:read',
   'workflows:write',

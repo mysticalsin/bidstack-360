@@ -16,7 +16,8 @@ import type { OrgChartSeedJob } from './schemas/org-chart.js';
  */
 export interface QueueDefaults {
   attempts: number;
-  backoff: { type: 'exponential' | 'fixed'; delay: number };
+  /** `webhook-endpoint` is a custom strategy the delivery worker registers. */
+  backoff: { type: 'exponential' | 'fixed' | 'webhook-endpoint'; delay: number };
   removeOnComplete: { age: number; count?: number };
   removeOnFail: { age: number; count?: number };
 }

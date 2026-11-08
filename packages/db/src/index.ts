@@ -148,6 +148,7 @@ export type {
   KamSessionDraft,
   KamHandoff,
   KamProspection,
+  AccessPolicyVersion,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -186,6 +187,7 @@ export {
   markWebhookOutboxFailed,
   recordWebhookOutboxEvent,
   webhookOutboxBackoffMs,
+  type WebhookOutboxClaimMode,
   type WebhookOutboxRow,
 } from './webhook-outbox.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';
@@ -195,6 +197,7 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
+export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
@@ -251,6 +254,8 @@ export {
   serializeIngestItem,
   stageAgreementIngest,
 } from './agreements/stage.js';
+export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
+export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
 export type {
   IngestActor as AgreementIngestActor,
   StageAgreementInput,

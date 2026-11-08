@@ -11,6 +11,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { DocumentHits } from '@/components/agreements/DocumentHits';
 import { IntakeDropzone } from '@/components/agreements/IntakeDropzone';
 import { SampleBanner } from '@/components/agreements/SampleBanner';
+import { SourcesPanel } from '@/components/agreements/SourcesPanel';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
 import { Button } from '@/components/ui/Button';
@@ -95,9 +96,12 @@ export default function AgreementsPage() {
               : 'Every MSA, framework, SOW and amendment, with what expires next and when notice is due.'}
           </p>
         </div>
-        <Button variant="primary" onClick={() => setNewOpen(true)} data-testid="agreements-new">
-          <Icon name="plus" size={16} /> New agreement
-        </Button>
+        <div className="agr-actions">
+          <Link className="drill-more agr-head-link" to="/agreements/whitespace" data-testid="agreements-whitespace-link">Whitespace</Link>
+          <Button variant="primary" onClick={() => setNewOpen(true)} data-testid="agreements-new">
+            <Icon name="plus" size={16} /> New agreement
+          </Button>
+        </div>
       </header>
       <IntakeDropzone disabledReason={disabledReason} />
       {sample ? <SampleBanner /> : null}
@@ -194,6 +198,7 @@ export default function AgreementsPage() {
             )}
           </section>
           <DocumentHits q={params.get('q') ?? ''} companyId={params.get('companyId') ?? undefined} enabled={!sample} />
+          <SourcesPanel enabled={!sample} />
         </>
       )}
       <UploadDialog open={newOpen} onOpenChange={setNewOpen} target={{ mode: 'new', companyId: params.get('companyId') ?? undefined }} disabledReason={disabledReason} />

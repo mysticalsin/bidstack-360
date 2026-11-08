@@ -1,4 +1,8 @@
-import { WEBHOOK_EVENT_GROUPS } from '@bidstack/shared';
+import {
+  DEFAULT_WEBHOOK_RETRY_POLICY,
+  WEBHOOK_EVENT_GROUPS,
+  WEBHOOK_RETRY_LIMITS,
+} from '@bidstack/shared';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -24,6 +28,7 @@ const eventSlug = (key: string) => key.replace(/\./g, '_');
 export function CreateWebhookDialog({
   initialUrl = '',
   initialEvents = [],
+  initialTimeoutMs = DEFAULT_WEBHOOK_RETRY_POLICY.timeoutMs,
   mode = 'create',
   onClose,
   onSubmit,
@@ -31,14 +36,21 @@ export function CreateWebhookDialog({
 }: {
   initialUrl?: string;
   initialEvents?: string[];
+  initialTimeoutMs?: number;
   mode?: 'create' | 'edit';
   onClose: () => void;
-  onSubmit: (body: { url: string; events: string[] }) => void;
+  onSubmit: (body: { url: string; events: string[]; timeoutMs: number }) => void;
   isPending: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [url, setUrl] = useState(initialUrl);
   const [selected, setSelected] = useState<string[]>(initialEvents);
+  const [timeoutText, setTimeoutText] = useState(String(initialTimeoutMs));
+  const timeoutMs = Number(timeoutText);
+  const timeoutValid =
+    Number.isInteger(timeoutMs) &&
+    timeoutMs >= WEBHOOK_RETRY_LIMITS.timeoutMs.min &&
+    timeoutMs <= WEBHOOK_RETRY_LIMITS.timeoutMs.max;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const isEditing = mode === 'edit';
 
@@ -53,8 +65,8 @@ export function CreateWebhookDialog({
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!url.trim() || selected.length === 0) return;
-    onSubmit({ url: url.trim(), events: selected });
+    if (!url.trim() || selected.length === 0 || !timeoutValid) return;
+    onSubmit({ url: url.trim(), events: selected, timeoutMs });
   };
 
   return (
@@ -127,6 +139,42 @@ export function CreateWebhookDialog({
             </div>
 
             <div>
+              <label
+                htmlFor="webhook-timeout"
+                className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+              >
+                {t('createWebhook.timeoutLabel', 'Timeout (ms)')}
+              </label>
+              <input
+                id="webhook-timeout"
+                type="number"
+                inputMode="numeric"
+                min={WEBHOOK_RETRY_LIMITS.timeoutMs.min}
+                max={WEBHOOK_RETRY_LIMITS.timeoutMs.max}
+                step={500}
+                value={timeoutText}
+                onChange={(event) => setTimeoutText(event.target.value)}
+                aria-invalid={!timeoutValid}
+                aria-describedby="webhook-timeout-help"
+                className="w-40 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2 text-sm tabular-nums text-[var(--fg-primary)] outline-none transition-colors focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20"
+              />
+              <p
+                id="webhook-timeout-help"
+                className={cn(
+                  'mt-2 text-xs',
+                  timeoutValid ? 'text-[var(--fg-tertiary)]' : 'text-[var(--error-fg)]',
+                )}
+              >
+                {timeoutValid
+                  ? t(
+                      'createWebhook.timeoutHelp',
+                      'How long Polo waits for a response before the attempt counts as failed.',
+                    )
+                  : t('createWebhook.timeoutError', 'Use 1000 to 30000 ms.')}
+              </p>
+            </div>
+
+            <div>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <label className="text-xs font-medium text-[var(--fg-secondary)]">
@@ -186,7 +234,10 @@ export function CreateWebhookDialog({
                             />
                             <span>
                               <span className="block font-medium text-[var(--fg-primary)]">
-                                {t(`createWebhook.event.${eventSlug(event.key)}.label`, event.label)}
+                                {t(
+                                  `createWebhook.event.${eventSlug(event.key)}.label`,
+                                  event.label,
+                                )}
                               </span>
                               <code className="mt-1 block font-mono text-[11px] text-[var(--brand-primary)]">
                                 {event.key}
@@ -215,7 +266,9 @@ export function CreateWebhookDialog({
                 {t('createWebhook.securityContractTitle', 'Security contract')}
               </div>
               <ul className="mt-3 space-y-2 text-xs leading-5 text-[var(--fg-secondary)]">
-                <li>{t('createWebhook.securityReturn2xx', 'Return a 2xx status within 10 seconds.')}</li>
+                <li>
+                  {t('createWebhook.securityReturn2xx', 'Return a 2xx status within 10 seconds.')}
+                </li>
                 <li>
                   {t('createWebhook.securityVerifyHeader', 'Verify the X-Polo-Signature header.')}
                 </li>
@@ -253,7 +306,10 @@ export function CreateWebhookDialog({
             <Button type="button" variant="secondary" onClick={onClose}>
               {t('createWebhook.cancel', 'Cancel')}
             </Button>
-            <Button type="submit" disabled={isPending || !url.trim() || selected.length === 0}>
+            <Button
+              type="submit"
+              disabled={isPending || !url.trim() || selected.length === 0 || !timeoutValid}
+            >
               {isPending
                 ? isEditing
                   ? t('createWebhook.saving', 'Saving...')

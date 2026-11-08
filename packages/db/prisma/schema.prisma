@@ -46,6 +46,8 @@ model Org {
   apiKeys            ApiKey[]
   webhookSubs        WebhookSubscription[]
   webhookOutbox      WebhookOutbox[]
+  webhookMessages    WebhookMessage[]
+  accessPolicies     AccessPolicyVersion[]
   auditLogs          AuditLog[]
   notes              Note[]
   fileAttachments    FileAttachment[]
@@ -986,9 +988,18 @@ model WebhookSubscription {
   lastFailureAt  DateTime? @map("last_failure_at") @db.Timestamptz(6)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Retry policy for this endpoint (defaults match WEBHOOK_DELIVERY).
+  maxAttempts             Int                    @default(5) @map("max_attempts")
+  backoffStrategy         WebhookBackoffStrategy @default(exponential) @map("backoff_strategy")
+  backoffBaseSeconds      Int                    @default(30) @map("backoff_base_seconds")
+  timeoutMs               Int                    @default(10000) @map("timeout_ms")
+  /// Encrypted secret replaced by the last rotation; still signs until it expires.
+  previousSecret          String?                @map("previous_secret")
+  previousSecretExpiresAt DateTime?              @map("previous_secret_expires_at") @db.Timestamptz(6)
 
   org        Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
+  messages   WebhookMessage[]
 
   @@index([orgId])
   // P1 #25: fanOutWebhookEvent queries WHERE orgId=? AND active=true AND deletedAt IS NULL
@@ -1018,12 +1029,111 @@ model WebhookDelivery {
   /// Error message if delivery failed.
   errorMessage   String?  @map("error_message")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Stored message this attempt belongs to (null for test pings and older rows).
+  messageId         String?  @map("message_id") @db.Uuid
+  /// Request headers as sent, with every HMAC masked.
+  requestHeaders    Json?    @map("request_headers")
+  /// Response body, redacted and capped at WEBHOOK_BODY_CAP_BYTES.
+  responseBody      String?  @map("response_body")
+  responseTruncated Boolean  @default(false) @map("response_truncated")
 
   subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  message      WebhookMessage?     @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, createdAt(sort: Desc)])
   @@index([orgId])
+  @@index([orgId, createdAt], map: "webhook_deliveries_org_created_idx")
+  @@index([messageId, attempt], map: "webhook_deliveries_message_attempt_idx")
   @@map("webhook_deliveries")
+}
+
+enum WebhookBackoffStrategy {
+  exponential
+  linear
+  fixed
+
+  @@map("webhook_backoff_strategy")
+}
+
+enum WebhookMessageStatus {
+  pending
+  succeeded
+  failed
+
+  @@map("webhook_message_status")
+}
+
+/// One outbound event for one endpoint. Its id is the event id on the wire;
+/// every attempt is a WebhookDelivery row. A replay is a new message that
+/// points at the original through replayOfId.
+model WebhookMessage {
+  id             String               @id @db.Uuid
+  orgId          String               @map("org_id") @db.Uuid
+  subscriptionId String               @map("subscription_id") @db.Uuid
+  event          String
+  payload        Json
+  eventTimestamp DateTime             @map("event_timestamp") @db.Timestamptz(6)
+  status         WebhookMessageStatus @default(pending)
+  attempts       Int                  @default(0)
+  lastStatusCode Int?                 @map("last_status_code")
+  lastDurationMs Int?                 @map("last_duration_ms")
+  replayOfId     String?              @map("replay_of_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org          Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
+
+  @@index([orgId, createdAt(sort: Desc), id(sort: Desc)], map: "webhook_messages_org_created_idx")
+  @@index([subscriptionId, createdAt(sort: Desc)], map: "webhook_messages_sub_created_idx")
+  @@map("webhook_messages")
+}
+
+enum AccessPolicyStatus {
+  draft
+  pending
+  approved
+  rejected
+  published
+  superseded
+
+  @@map("access_policy_status")
+}
+
+/// One version of an org's access policy (When / Then / Except rules over the
+/// RBAC matrix). draft -> pending -> approved by a second admin -> published
+/// as vN. At most one row per org is published; rollback copies an earlier
+/// version into a new pending row that points back through rollbackOfId.
+/// Raw SQL in 20261107180100_access_policy_versions adds what Prisma cannot
+/// express: the access_policy_versions_no_self_approval CHECK and the
+/// access_policy_versions_one_published_idx partial unique index. An
+/// integration test asserts both exist; keep them out of any drop.
+model AccessPolicyVersion {
+  id            String             @id @default(uuid()) @db.Uuid
+  orgId         String             @map("org_id") @db.Uuid
+  /// Set on publish (max + 1 per org); null until then.
+  version       Int?
+  name          String
+  status        AccessPolicyStatus @default(draft)
+  rules         Json               @default("[]")
+  createdById   String             @map("created_by_id") @db.Uuid
+  submittedById String?            @map("submitted_by_id") @db.Uuid
+  submittedAt   DateTime?          @map("submitted_at") @db.Timestamptz(6)
+  approvedById  String?            @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime?          @map("approved_at") @db.Timestamptz(6)
+  decisionNote  String?            @map("decision_note")
+  publishedById String?            @map("published_by_id") @db.Uuid
+  publishedAt   DateTime?          @map("published_at") @db.Timestamptz(6)
+  rollbackOfId  String?            @map("rollback_of_id") @db.Uuid
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, version], map: "access_policy_versions_org_version_key")
+  @@index([orgId, status, createdAt(sort: Desc)], map: "access_policy_versions_org_status_idx")
+  @@map("access_policy_versions")
 }
 
 enum WebhookOutboxStatus {
@@ -1049,6 +1159,10 @@ model WebhookOutbox {
   lastError      String?             @map("last_error")
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   dispatchedAt   DateTime?           @map("dispatched_at") @db.Timestamptz(6)
+  /// Set for a replay: deliver to this one subscription only.
+  subscriptionId String?             @map("subscription_id") @db.Uuid
+  /// Set for a replay: the message being re-sent.
+  replayOfId     String?             @map("replay_of_id") @db.Uuid
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
 

@@ -229,6 +229,38 @@ describe('technical stack refresh, open data lane', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  skipIfNoDb('never counts sample job postings as detected technology', async () => {
+    const sampleCo = await prisma.company.create({
+      data: { orgId: orgA!.orgId, name: `Sample Jobs ${tag}`, source: 'manual', confidence: 0.7 },
+      select: { id: true },
+    });
+    await prisma.companyJobPosting.create({
+      data: { orgId: orgA!.orgId, companyId: sampleCo.id, source: 'greenhouse', externalId: `${tag}-sample`, title: 'Data Engineer, Snowflake', region: 'emea', function: 'data', seniority: 'mid', skills: ['Snowflake', 'Databricks'], fetchedAt: new Date(), sample: true },
+    });
+    __setOpenTechDetectDepsForTest({ network: false });
+    __setOpenTechApolloEnqueueForTest(async () => null);
+    const res = await refresh(sampleCo.id);
+    expect(res.statusCode).toBe(200);
+    const names = res.json().state.providerStack.flatMap((c: { items: Array<{ name: string }> }) => c.items.map((i) => i.name));
+    expect(names).not.toContain('Snowflake');
+    expect(names).not.toContain('Databricks');
+  });
+
+  skipIfNoDb('resolves a Company by id when its enrichment carries a different display name', async () => {
+    const name = `Acme ${tag}`;
+    const acme = await prisma.company.create({
+      data: { orgId: orgA!.orgId, name, source: 'manual', confidence: 0.7 },
+      select: { id: true },
+    });
+    await prisma.companyEnrichment.create({
+      data: { orgId: orgA!.orgId, normalizedName: normalizeEnrichmentName(name), legalName: `${name} Inc.`, tradeName: `${name} Inc.` },
+    });
+    const cockpit = await server.inject({ method: 'GET', url: `/api/crm/companies/${acme.id}` });
+    expect(cockpit.statusCode).toBe(200);
+    const stack = await server.inject({ method: 'GET', url: `/api/crm/companies/${acme.id}/technical-stack` });
+    expect(stack.statusCode).toBe(200);
+  });
+
   skipIfNoDb('rejects a bad key, a read-only role and another org', async () => {
     __setOpenTechDetectDepsForTest({ network: false });
     // Fastify caps path params before zod runs, so an oversize key is 414, never a 2xx.
