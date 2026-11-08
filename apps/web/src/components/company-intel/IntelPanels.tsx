@@ -1,7 +1,7 @@
 // Slice 12 panels: direction, hiring, financials, news and posts. Every line
 // names its basis and links the evidence it came from.
 import { ArrowDown, ArrowUp, ExternalLink } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   compactAmount,
@@ -167,6 +167,14 @@ function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
   const [all, setAll] = useState(false);
   const b = useMemo(() => hiringBreakdown(h.summary, h.postings, (t) => OFFERING_HOOKS[t]?.label ?? t), [h.summary, h.postings]);
   const filtered = filter ? h.postings.filter((p) => matches(p, filter)) : h.postings;
+  // A refresh of this same company can drop every role the filter named.
+  // Keeping that filter would hide the new list. A filter that still matches stays.
+  useEffect(() => {
+    if (!filter) return;
+    if (h.postings.some((posting) => matches(posting, filter))) return;
+    setFilter(null);
+    setAll(false);
+  }, [filter, h.postings]);
   const shown = all ? filtered : filtered.slice(0, POSTINGS_SHOWN);
   const pick = (f: HiringFilter) => {
     setAll(false);
@@ -267,7 +275,14 @@ function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
         <div className="ci-row">
           <h4 className="ci-k">{filter ? `Roles: ${filter.label}` : 'Recent postings'}</h4>
           {filter ? (
-            <button type="button" className="ci-link" onClick={() => setFilter(null)}>
+            <button
+              type="button"
+              className="ci-link"
+              onClick={() => {
+                setFilter(null);
+                setAll(false);
+              }}
+            >
               Show every role
             </button>
           ) : null}

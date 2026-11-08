@@ -111,4 +111,44 @@ describe('HiringPanel shares and company changes', () => {
     expect(screen.queryByText('Roles: Azure')).toBeNull();
     expect(within(screen.getByTestId('hiring-postings')).getByText('Account executive')).toBeTruthy();
   });
+
+  it('keeps a filter that still matches a refresh of the same company', () => {
+    const { rerender } = render(<HiringPanel h={hiring} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Azure: 12/ }));
+    const refreshed = {
+      ...hiring,
+      postings: [posting('2', 'Azure platform engineer', 'infrastructure', 'Mid', ['Azure'])],
+    };
+    rerender(<HiringPanel h={refreshed} />);
+    expect(screen.getByText('Roles: Azure')).toBeTruthy();
+    expect(within(screen.getByTestId('hiring-postings')).getByText('Azure platform engineer')).toBeTruthy();
+  });
+
+  it('drops a filter that matches nothing in a same-company refresh', () => {
+    const { rerender } = render(<HiringPanel h={hiring} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Azure: 12/ }));
+    const refreshed = {
+      ...hiring,
+      postings: [posting('3', 'Account executive', 'sales', null)],
+    };
+    rerender(<HiringPanel h={refreshed} />);
+    expect(screen.queryByText('Roles: Azure')).toBeNull();
+    expect(within(screen.getByTestId('hiring-postings')).getByText('Account executive')).toBeTruthy();
+  });
+
+  it('collapses the list when the filter is cleared', () => {
+    const many = {
+      ...hiring,
+      postings: Array.from({ length: 10 }, (_, index) =>
+        posting(String(index), `Role ${index}`, 'infrastructure', null, ['Azure']),
+      ),
+    };
+    render(<HiringPanel h={many} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Azure: 12/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Show all 10 roles/ }));
+    expect(within(screen.getByTestId('hiring-postings')).getByText('Role 9')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Show every role' }));
+    expect(within(screen.getByTestId('hiring-postings')).queryByText('Role 9')).toBeNull();
+    expect(within(screen.getByTestId('hiring-postings')).getByText('Role 0')).toBeTruthy();
+  });
 });
