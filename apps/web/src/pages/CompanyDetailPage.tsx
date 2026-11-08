@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
+import { useScrollableTabs } from '@/hooks/useScrollableTabs';
 import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -18,12 +19,12 @@ import { AccountActivityCharts } from '@/components/company/AccountActivityChart
 import { AccountConversations } from '@/components/company/AccountConversations';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
-import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyIntelSummary, useRefreshCompanyIntel } from '@/hooks/useCompanyIntelSummary';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
+import { CompanyPeopleTab } from './companyDetail/CompanyPeopleTab';
 import {
   ContactTab,
   OpportunityTab,
@@ -53,7 +54,16 @@ export function CompanyDetailPage() {
   const hierarchy = useCompanyHierarchy(id);
   const [tab, setTab] = useState<TabKey>('contacts');
   const [intelTab, setIntelTab] = useState<IntelTab>('direction');
-  const tabsRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement | null>(null);
+  const scrollableTabs = useScrollableTabs(tab);
+  // One stable ref feeds both the scroll-into-view target and the fade wiring.
+  const tabStrip = useCallback(
+    (el: HTMLDivElement | null) => {
+      tabsRef.current = el;
+      scrollableTabs(el);
+    },
+    [scrollableTabs],
+  );
   const canReadIntel = useHasPermission('account-intel:read');
   const canRefreshIntel = useHasPermission('account-intel:write');
   const refreshIntel = useRefreshCompanyIntel(id ?? '');
@@ -230,8 +240,8 @@ export function CompanyDetailPage() {
           <ConsultingPartnersSection companyId={c.id} />
 
           <div
-            ref={tabsRef}
-            className="flex gap-2 overflow-x-auto border-b border-[var(--border-subtle)]"
+            ref={tabStrip}
+            className="tab-scroll gap-2 border-b border-[var(--border-subtle)]"
             role="tablist"
             aria-label={t('companyDetail.tabs.label', 'Company sections')}
           >
@@ -313,13 +323,7 @@ export function CompanyDetailPage() {
 
           {tab === 'people' && (
             <div role="tabpanel" id={panelId('people')} aria-labelledby={tabId('people')}>
-              <AccountPeopleSection
-                companyId={c.id}
-                deals={c.opportunities.map((opportunity) => ({
-                  id: opportunity.id,
-                  name: opportunity.name,
-                }))}
-              />
+              <CompanyPeopleTab companyId={c.id} opportunities={c.opportunities} />
             </div>
           )}
           {tab === 'contacts' && (

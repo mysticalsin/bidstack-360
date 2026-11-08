@@ -80,7 +80,10 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
             {leads.data!.items.map((lead) => (
               <li key={lead.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-[var(--fg-primary)]">
+                  <div
+                    className="truncate text-sm font-medium text-[var(--fg-primary)]"
+                    title={[lead.name, lead.title].filter(Boolean).join(', ')}
+                  >
                     {lead.name}
                     {lead.title ? (
                       <span className="ml-1.5 text-xs font-normal text-[var(--fg-tertiary)]">
@@ -88,7 +91,10 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
                       </span>
                     ) : null}
                   </div>
-                  <div className="truncate text-xs text-[var(--fg-tertiary)]">
+                  <div
+                    className="truncate text-xs text-[var(--fg-tertiary)]"
+                    title={[lead.company, lead.listName].filter(Boolean).join(' · ')}
+                  >
                     {[lead.company, lead.listName].filter(Boolean).join(' · ')}
                   </div>
                 </div>

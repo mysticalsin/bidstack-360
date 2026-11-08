@@ -67,7 +67,7 @@ function SignalCard({ s }: { s: Signal }) {
     <li className="fh-card" data-confidence={s.confidence}>
       <button type="button" className="wd-row-btn" aria-expanded={open} aria-controls={`${id}-d`} onClick={() => setOpen((v) => !v)}>
         <span className="wd-row-main">
-          <span className="wd-row-title">{noDash(s.title)}</span>
+          <span className="wd-row-title" title={noDash(s.title)}>{noDash(s.title)}</span>
           <span className="wd-row-meta">
             {CONF[s.confidence]} · period to {periodFmt.format(new Date(`${s.periodEnd}T00:00:00Z`))}
             {s.sample ? <span className="wd-sample-badge">Sample</span> : null}

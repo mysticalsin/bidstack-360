@@ -6,7 +6,7 @@ import { Building2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { cn } from '@/lib/cn';
 
-import { formatDayLabel, formatTime, groupAgenda, isLaneEvent } from './layout';
+import { formatDayLabel, formatTime, groupAgenda } from './layout';
 import { eventFill } from './eventFill';
 import type { CalendarEvent } from './types';
 
@@ -46,7 +46,7 @@ export function AgendaList({ keys, tz, events, todayKey, onSelect }: AgendaListP
             </h2>
             <ul className="divide-y divide-[var(--border-subtle)] overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)]">
               {day.events.map((ev) => {
-                const when = isLaneEvent(ev)
+                const when = ev.isAllDay
                   ? t('calendar.allDay', 'All day')
                   : t('calendar.timeRange', '{{start}} to {{end}}', {
                       start: formatTime(ev.startAt, tz),

@@ -53,8 +53,21 @@ export function compactAmount(n: number): string {
   return String(Math.round(n));
 }
 
+/**
+ * The one compact money format on account pages: code first, then amount
+ * (EUR 29.9bn, CAD 935m, USD 12,400). Key numbers, financials and the
+ * intel panels all go through this so one figure never reads two ways.
+ */
+export function formatCompactMoney(v: number, ccy: string): string {
+  const a = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (a >= 1e9) return `${sign}${ccy} ${(a / 1e9).toFixed(a >= 1e10 ? 1 : 2)}bn`;
+  if (a >= 1e6) return `${sign}${ccy} ${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
+  return `${sign}${ccy} ${Math.round(a).toLocaleString('en-GB')}`;
+}
+
 function money(n: number, currency: string | null): string {
-  return currency ? `${compactAmount(n)} ${currency}` : compactAmount(n);
+  return currency ? formatCompactMoney(n, currency) : compactAmount(n);
 }
 
 function trend(cur: number, prev: number | null): number | null {

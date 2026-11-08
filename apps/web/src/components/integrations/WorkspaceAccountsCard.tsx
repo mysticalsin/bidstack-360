@@ -149,6 +149,16 @@ function AccountRow({ card }: { card: WorkspaceCard }) {
             {card.errorMessage}
           </p>
         ) : null}
+        {connect.isError ? (
+          <p className="text-sm text-[var(--danger)]" role="alert">
+            {t('workspace.connectError', 'Could not start the connection. Try again.')}
+          </p>
+        ) : null}
+        {disconnect.isError ? (
+          <p className="text-sm text-[var(--danger)]" role="alert">
+            {t('workspace.disconnectError', 'Could not disconnect. Access is still active. Try again.')}
+          </p>
+        ) : null}
         {card.scopes.length > 0 ? (
           <ul className="flex flex-wrap gap-1.5" aria-label={t('workspace.scopes', 'Access')}>
             {card.scopes.map((s) => (

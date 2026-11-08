@@ -153,6 +153,7 @@ export const OpportunityFilter = z.object({
   stage: OpportunityStage.optional(),
   owner: z.string().optional(),
   industry: Industry.optional(),
+  companyId: z.string().uuid().optional(),
   search: z.string().max(100).optional(),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),

@@ -84,6 +84,10 @@ export function DraftComposer({ defaultTo, defaultSubject, threadId, link, onClo
     }
   }
 
+  // The API returns the original draft for a reused clientRequestId, so a saved
+  // draft cannot be updated; lock the fields so Copy and the mail app match it.
+  const saved = save.isSuccess;
+
   const error =
     formError ??
     (save.isError ? t('emailDraft.saveError', 'Could not save the draft. Try again.') : null);
@@ -104,7 +108,14 @@ export function DraftComposer({ defaultTo, defaultSubject, threadId, link, onClo
           <label htmlFor="draft-to" className={LABEL}>
             {t('emailDraft.to', 'To')}
           </label>
-          <input id="draft-to" type="text" value={to} onChange={(e) => setTo(e.target.value)} className={FIELD} />
+          <input
+            id="draft-to"
+            type="text"
+            value={to}
+            readOnly={saved}
+            onChange={(e) => setTo(e.target.value)}
+            className={FIELD}
+          />
         </div>
         <div>
           <label htmlFor="draft-subject" className={LABEL}>
@@ -115,6 +126,7 @@ export function DraftComposer({ defaultTo, defaultSubject, threadId, link, onClo
             type="text"
             maxLength={998}
             value={subject}
+            readOnly={saved}
             onChange={(e) => setSubject(e.target.value)}
             className={FIELD}
           />
@@ -127,12 +139,13 @@ export function DraftComposer({ defaultTo, defaultSubject, threadId, link, onClo
             id="draft-text"
             rows={8}
             value={text}
+            readOnly={saved}
             onChange={(e) => setText(e.target.value)}
             className={FIELD}
           />
         </div>
         <div className="flex flex-wrap justify-end gap-2 pt-2">
-          {save.isSuccess ? (
+          {saved ? (
             <>
               <span role="status" className="mr-auto self-center text-sm text-[var(--fg-secondary)]">
                 {t('emailDraft.saved', 'Draft saved')}
