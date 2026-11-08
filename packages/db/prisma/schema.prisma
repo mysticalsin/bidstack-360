@@ -216,6 +216,8 @@ model Org {
   intelSourceRuns               IntelSourceRun[]
   intelSummaries                CompanyIntelSummary[]
   intelImportBatches            IntelImportBatch[]
+  consultingPartnerEvidence     ConsultingPartnerEvidence[]
+  consultingPartnerRuns         ConsultingPartnerRun[]
   enrichmentCreditUsage         EnrichmentCreditUsage[]
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
@@ -451,6 +453,8 @@ model Company {
   intelThemes   InvestmentTheme[]
   intelRuns     IntelSourceRun[]
   intelSummary  CompanyIntelSummary?
+  partnerEvidence ConsultingPartnerEvidence[]
+  partnerRuns     ConsultingPartnerRun[]
   orgChart      OrgChart?
 
   @@index([orgId, domain])
@@ -6738,4 +6742,75 @@ model IntelImportBatch {
   @@unique([orgId, migrationJobId])
   @@index([orgId, createdAt(sort: Desc)])
   @@map("intel_import_batches")
+}
+
+
+/// Slice 15: one consulting firm read out of one public item or one of our
+/// own records for an account. Public rows carry the URL; internal rows carry
+/// record type and id (and the opportunity they hang off) so reads can apply
+/// the caller's access to that record. Retention: replaced on rescan of the
+/// same key; pruned 3 years after fetchedAt.
+model ConsultingPartnerEvidence {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  firmKey       String    @map("firm_key") @db.VarChar(64)
+  firmName      String    @map("firm_name") @db.VarChar(120)
+  /// public | internal
+  origin        String    @db.VarChar(16)
+  /// gdelt | google_news | firm_site | company_newsroom | account_news | meeting | email | activity | note | win_loss | bid_intel | competitor_insight | fixture
+  source        String    @db.VarChar(32)
+  /// keyword_match | record_field | llm_extract | fixture
+  method        String    @db.VarChar(32)
+  inferred      Boolean   @default(false)
+  /// Dedupe key within the firm: "pub:<hash>" or "int:<recordType>:<id>".
+  key           String    @db.VarChar(200)
+  url           String?
+  recordType    String?   @map("record_type") @db.VarChar(32)
+  recordId      String?   @map("record_id") @db.Uuid
+  opportunityId String?   @map("opportunity_id") @db.Uuid
+  title         String?
+  excerpt       String
+  occurredAt    DateTime? @map("occurred_at") @db.Timestamptz(6)
+  fetchedAt     DateTime  @map("fetched_at") @db.Timestamptz(6)
+  relationship  String?   @db.VarChar(32)
+  domains       String[]  @default([])
+  /// incumbent | competing | client_feedback | mention
+  context       String?   @db.VarChar(32)
+  sentiment     String?   @db.VarChar(16)
+  /// [{ dimension, favours, phrase }]
+  remarks       Json      @default("[]")
+  outcome       String?   @db.VarChar(8)
+  sample        Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId, firmKey, key])
+  @@index([orgId, companyId, firmKey, occurredAt(sort: Desc)])
+  @@index([orgId, fetchedAt])
+  @@map("consulting_partner_evidence")
+}
+
+/// Slice 15: last consulting partner scan per account, shown next to Refresh.
+model ConsultingPartnerRun {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  /// ok | partial | failed | not_configured | queued | running
+  status        String
+  lastFetchedAt DateTime? @map("last_fetched_at") @db.Timestamptz(6)
+  /// { new, updated, skipped, failed }
+  result        Json      @default("{}")
+  detail        String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId])
+  @@map("consulting_partner_runs")
 }

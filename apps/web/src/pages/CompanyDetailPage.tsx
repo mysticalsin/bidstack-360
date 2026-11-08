@@ -14,6 +14,7 @@ import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
+import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
 import { useHasPermission } from '@/hooks/useCapabilities';
@@ -218,6 +219,7 @@ export function CompanyDetailPage() {
           )}
 
           <CompanyTechStackSection companyId={c.id} />
+          <ConsultingPartnersSection companyId={c.id} />
 
           <div
             ref={tabsRef}
