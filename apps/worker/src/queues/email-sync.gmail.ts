@@ -10,6 +10,7 @@ import type pino from 'pino';
 
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
+import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
 import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 
@@ -136,7 +137,7 @@ async function historyIds(
 
 /** Pull new Gmail messages for one grant. Returns how many were stored. */
 export async function pullGmail(token: GmailTokenRow, accessToken: string, log: pino.Logger): Promise<number> {
-  const deltaState = (token.deltaState ?? {}) as Record<string, unknown>;
+  const deltaState = structuredClone((token.deltaState ?? {}) as Record<string, unknown>);
   const cursor = deltaState['gmailHistoryId'] as string | undefined;
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
 
@@ -147,7 +148,7 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
     if (res.expired) {
       log.warn({ tokenId: token.id }, 'Gmail history id expired (404); reseeding next tick');
       const { gmailHistoryId: _h, ...rest } = deltaState;
-      await prisma.integrationToken.update({ where: { id: token.id }, data: { deltaState: rest as object } });
+      await commitTokenDeltaState(prisma, token.id, rest, []);
       return 0;
     }
     ids = res.ids;
@@ -160,6 +161,7 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
 
   let persisted = 0;
   const failedIds: string[] = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
   for (const id of ids.slice(0, MAX_MESSAGES_PER_RUN)) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) continue;
@@ -216,30 +218,29 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
       persisted++;
       if (!bridged) failedIds.push(msg.id);
     } catch (err) {
+      failedIds.push(msg.id);
       log.warn({ err, msgId: msg.id }, 'Failed to persist Gmail message');
     }
   }
 
-  const bridge = noteActivityBridgeFailures(deltaState, `gmail:${cursor ?? 'seed'}`, failedIds);
+  const pageKey = `gmail:${cursor ?? 'seed'}`;
+  const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds);
+  bridgeDeltas.push({ page: pageKey, failedIds });
   if (bridge.quarantined.length > 0) {
     log.warn({ tokenId: token.id, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
   }
   if (bridge.hold) {
     log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
-    await prisma.integrationToken.update({
-      where: { id: token.id },
-      data: { deltaState: deltaState as object, lastSyncedAt: new Date() },
-    });
+    await commitTokenDeltaState(prisma, token.id, deltaState, bridgeDeltas);
     return persisted;
   }
 
-  await prisma.integrationToken.update({
-    where: { id: token.id },
-    data: {
-      deltaState: { ...deltaState, ...(nextHistoryId ? { gmailHistoryId: nextHistoryId } : {}) },
-      lastSyncedAt: new Date(),
-    },
-  });
+  await commitTokenDeltaState(
+    prisma,
+    token.id,
+    { ...deltaState, ...(nextHistoryId ? { gmailHistoryId: nextHistoryId } : {}) },
+    bridgeDeltas,
+  );
   log.info({ tokenId: token.id, persisted }, 'Gmail pull complete');
   return persisted;
 }

@@ -174,7 +174,10 @@ export async function refileUnlessManual(
   key: { orgId: string; ownerId: string; provider: 'google_workspace' | 'microsoft_graph'; externalId: string },
   filing: ReturnType<typeof calendarFiling>,
 ): Promise<void> {
-  await prisma.calendarEvent.updateMany({
+  // Resolve at call time. A static import is bound by whichever suite loaded
+  // this module first, and a later test mock would not see the write.
+  const { prisma: db } = await import('@bidstack/db');
+  await db.calendarEvent.updateMany({
     where: { ...key, filedManually: false },
     data: filing,
   });
@@ -245,23 +248,68 @@ export function meetingColumns(hints: MeetingHints, iCalUid: string | null | und
 
 /**
  * How many times one provider item may fail the activity bridge on the same
- * page before it stops pinning that page. The capture row is already saved;
- * the id is kept on `activityBridgeQuarantine` so the miss is visible, and
- * the cursor may then move so later items are not starved.
+ * page before it stops pinning that page. The capture row is already saved.
+ * The id is kept on `activityBridgeQuarantine` (id, attempts, time — no
+ * subject or body). There is no replay worker and no product UI that
+ * re-queues a quarantined id; a later provider change starts a fresh budget
+ * because it is a new page. The list is the audit, capped so the token
+ * cannot grow without bound.
  */
 export const ACTIVITY_BRIDGE_RETRY_LIMIT = 3;
 const BRIDGE_QUARANTINE_CAP = 50;
+const MAX_RETRY_PAGES = 8;
+const MAX_IDS_PER_PAGE = 32;
 
 export type ActivityBridgeQuarantine = { id: string; attempts: number; at: string };
+export type ActivityBridgeDelta = { page: string; failedIds: string[] };
+
+const RETRY_KEYS = ['activityBridgeRetry', 'activityBridgeRetryByPage', 'activityBridgeQuarantine'] as const;
+
+function readRetryPages(state: Record<string, unknown>): Record<string, Record<string, number>> {
+  const pages: Record<string, Record<string, number>> = {};
+  const stored = state.activityBridgeRetryByPage;
+  if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+    for (const [page, counts] of Object.entries(stored as Record<string, unknown>)) {
+      if (!counts || typeof counts !== 'object' || Array.isArray(counts)) continue;
+      const next: Record<string, number> = {};
+      for (const [id, n] of Object.entries(counts as Record<string, unknown>)) {
+        if (typeof n === 'number' && n > 0) next[id] = n;
+      }
+      if (Object.keys(next).length > 0) pages[page] = next;
+    }
+  }
+  const legacy = state.activityBridgeRetry as { page?: string; counts?: Record<string, number> } | undefined;
+  if (legacy?.page && legacy.counts && !pages[legacy.page]) pages[legacy.page] = { ...legacy.counts };
+  return pages;
+}
+
+function writeRetryPages(state: Record<string, unknown>, pages: Record<string, Record<string, number>>): void {
+  delete state.activityBridgeRetry;
+  const keys = Object.keys(pages);
+  if (keys.length === 0) delete state.activityBridgeRetryByPage;
+  else state.activityBridgeRetryByPage = pages;
+}
+
+function quarantineIds(
+  state: Record<string, unknown>,
+  entries: ActivityBridgeQuarantine[],
+): void {
+  if (entries.length === 0) return;
+  const prior = Array.isArray(state.activityBridgeQuarantine)
+    ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
+    : [];
+  const ids = new Set(entries.map((entry) => entry.id));
+  state.activityBridgeQuarantine = [...entries, ...prior.filter((entry) => !ids.has(entry.id))].slice(
+    0,
+    BRIDGE_QUARANTINE_CAP,
+  );
+}
 
 /**
- * Record bridge failures for the page being synced.
- *
- * A failure under the limit holds the cursor so the provider offers the item
- * again. The same id on the same page, once it reaches the limit, is
- * quarantined and no longer holds the cursor. A different page starts a fresh
- * count. An empty failure list clears the hold. The quarantine list is an
- * audit of ids only — never subjects or bodies.
+ * Record bridge failures for one page. Other pages on the same token keep
+ * their own counts, so Inbox and Sent cannot reset each other. Counts saturate
+ * at the limit: a quarantined id does not hold the cursor and does not grow
+ * the map. An empty failure list clears only that page.
  */
 export function noteActivityBridgeFailures(
   state: Record<string, unknown>,
@@ -270,34 +318,74 @@ export function noteActivityBridgeFailures(
   now = new Date().toISOString(),
 ): { hold: boolean; quarantined: string[] } {
   const ids = [...new Set(failedIds.filter((id) => id.length > 0))];
-  const previous = state.activityBridgeRetry as { page?: string; counts?: Record<string, number> } | undefined;
+  const pages = readRetryPages(state);
   if (ids.length === 0) {
-    // A clean page clears only its own hold. Another folder's retry stays.
-    if (previous?.page === page) delete state.activityBridgeRetry;
+    delete pages[page];
+    writeRetryPages(state, pages);
     return { hold: false, quarantined: [] };
   }
-  const counts: Record<string, number> = previous?.page === page ? { ...(previous.counts ?? {}) } : {};
+  const counts = { ...(pages[page] ?? {}) };
   const quarantined: string[] = [];
-  let hold = false;
   for (const id of ids) {
-    const attempts = (counts[id] ?? 0) + 1;
+    const attempts = Math.min((counts[id] ?? 0) + 1, ACTIVITY_BRIDGE_RETRY_LIMIT);
     counts[id] = attempts;
     if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) quarantined.push(id);
-    else hold = true;
   }
-  if (hold) state.activityBridgeRetry = { page, counts };
-  else delete state.activityBridgeRetry;
-  if (quarantined.length > 0) {
-    const prior = Array.isArray(state.activityBridgeQuarantine)
-      ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
-      : [];
-    const fresh = quarantined.map((id) => ({ id, attempts: counts[id] ?? ACTIVITY_BRIDGE_RETRY_LIMIT, at: now }));
-    state.activityBridgeQuarantine = [...fresh, ...prior.filter((entry) => !quarantined.includes(entry.id))].slice(
-      0,
-      BRIDGE_QUARANTINE_CAP,
-    );
+  const overflow = Object.keys(counts).slice(MAX_IDS_PER_PAGE);
+  const overflowEntries: ActivityBridgeQuarantine[] = [];
+  for (const id of overflow) {
+    overflowEntries.push({ id, attempts: counts[id] ?? 1, at: now });
+    delete counts[id];
   }
-  return { hold, quarantined };
+  const hold = Object.values(counts).some((attempts) => attempts < ACTIVITY_BRIDGE_RETRY_LIMIT);
+  delete pages[page];
+  pages[page] = counts;
+  const dropped: ActivityBridgeQuarantine[] = [];
+  while (Object.keys(pages).length > MAX_RETRY_PAGES) {
+    const oldest = Object.keys(pages).find((key) => key !== page);
+    if (!oldest) break;
+    for (const [id, attempts] of Object.entries(pages[oldest] ?? {})) {
+      if (attempts < ACTIVITY_BRIDGE_RETRY_LIMIT) dropped.push({ id, attempts, at: now });
+    }
+    delete pages[oldest];
+  }
+  writeRetryPages(state, pages);
+  const overflowIds = new Set(overflowEntries.map((entry) => entry.id));
+  quarantineIds(state, [
+    ...quarantined
+      .filter((id) => !overflowIds.has(id))
+      .map((id) => ({ id, attempts: counts[id] ?? ACTIVITY_BRIDGE_RETRY_LIMIT, at: now })),
+    ...overflowEntries,
+    ...dropped,
+  ]);
+  return {
+    hold,
+    quarantined: [
+      ...quarantined.filter((id) => !overflowIds.has(id)),
+      ...overflowEntries.map((entry) => entry.id),
+    ],
+  };
+}
+
+/**
+ * Build the token delta to persist. Cursor fields come from this run.
+ * Retry counts and the quarantine list are taken from the stored token and
+ * then each of this run's page deltas is applied once, so a concurrent
+ * writer cannot be overwritten by a stale copy of the map.
+ */
+export function mergeBridgeDeltaState(
+  stored: Record<string, unknown>,
+  desired: Record<string, unknown>,
+  deltas: ActivityBridgeDelta[],
+  now = new Date().toISOString(),
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...desired };
+  for (const key of RETRY_KEYS) delete result[key];
+  for (const key of RETRY_KEYS) {
+    if (key in stored) result[key] = structuredClone(stored[key]);
+  }
+  for (const delta of deltas) noteActivityBridgeFailures(result, delta.page, delta.failedIds, now);
+  return result;
 }
 
 /**

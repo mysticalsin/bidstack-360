@@ -25,6 +25,7 @@ import {
   type GoogleMeetingFields,
 } from '../lib/comms-capture.js';
 import { syncRemovedEvents } from './calendar-sync-microsoft.js';
+import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
@@ -215,6 +216,7 @@ export async function pullGoogleIncremental(
   const syncToken = deltaState['calendarSyncToken'] as string | undefined;
   let pageToken = deltaState['calendarPageToken'] as string | undefined;
   let count = 0;
+  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(
@@ -226,7 +228,7 @@ export async function pullGoogleIncremental(
     if (res.status === 410) {
       log.warn({ tokenId }, 'Google sync token expired; clearing for full re-sync');
       const { calendarSyncToken: _s, calendarPageToken: _p, ...rest } = deltaState;
-      await prisma.integrationToken.update({ where: { id: tokenId }, data: { deltaState: rest as object } });
+      await commitTokenDeltaState(prisma, tokenId, rest, []);
       return;
     }
     if (!res.ok) throw new Error(`Google events list failed: ${res.status}`);
@@ -235,28 +237,26 @@ export async function pullGoogleIncremental(
     const items = body.items ?? [];
     count += items.length;
     const failed = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
-    const bridge = noteActivityBridgeFailures(deltaState, `google:${syncToken ?? ''}:${pageToken ?? ''}`, failed);
+    const pageKey = `google:${syncToken ?? ''}:${pageToken ?? ''}`;
+    const bridge = noteActivityBridgeFailures(deltaState, pageKey, failed);
+    bridgeDeltas.push({ page: pageKey, failedIds: failed });
     if (bridge.quarantined.length > 0) {
       log.warn({ tokenId, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
     }
     if (bridge.hold) {
-      await prisma.integrationToken.update({
-        where: { id: tokenId },
-        data: {
-          deltaState: { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
-          lastSyncedAt: new Date(),
-        },
-      });
+      await commitTokenDeltaState(
+        prisma,
+        tokenId,
+        { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
+        bridgeDeltas,
+      );
       log.warn({ tokenId }, 'Account activity bridge failed; calendar page will be retried before the cursor advances');
       return;
     }
 
     if (body.nextSyncToken) {
       const { calendarPageToken: _p, ...rest } = deltaState;
-      await prisma.integrationToken.update({
-        where: { id: tokenId },
-        data: { deltaState: { ...rest, calendarSyncToken: body.nextSyncToken }, lastSyncedAt: new Date() },
-      });
+      await commitTokenDeltaState(prisma, tokenId, { ...rest, calendarSyncToken: body.nextSyncToken }, bridgeDeltas);
       log.debug({ tokenId, count }, 'Google incremental pull complete');
       return;
     }
@@ -264,10 +264,12 @@ export async function pullGoogleIncremental(
     pageToken = body.nextPageToken;
   }
 
-  await prisma.integrationToken.update({
-    where: { id: tokenId },
-    data: { deltaState: { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) }, lastSyncedAt: new Date() },
-  });
+  await commitTokenDeltaState(
+    prisma,
+    tokenId,
+    { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
+    bridgeDeltas,
+  );
   log.info({ tokenId, count }, 'Google calendar pull paused at page cap; resuming next tick');
 }
 
@@ -347,6 +349,7 @@ async function upsertGoogleEvents(
       );
       if (!ok) failed.push(item.id);
     } catch (err) {
+      failed.push(item.id);
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
     }
   }
