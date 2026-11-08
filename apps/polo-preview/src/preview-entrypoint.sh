@@ -62,9 +62,32 @@ preview_require_local_database() {
 }
 
 # Replace the known preview default before any child starts. The value is not logged.
+# An explicit DATABASE_URL is not rebuilt from a default password.
 preview_prepare_database() {
-  if [[ -z "${POSTGRES_PASSWORD}" || "${POSTGRES_PASSWORD}" == "bidstack" ]]; then
-    POSTGRES_PASSWORD="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+  local default_url="postgres://bidstack:bidstack@127.0.0.1:5432/bidstack"
+  local url_default=0
+  local pass_default=0
+  if [[ "${DATABASE_URL}" == "${default_url}" ]]; then url_default=1; fi
+  if [[ -z "${POSTGRES_PASSWORD}" || "${POSTGRES_PASSWORD}" == "bidstack" ]]; then pass_default=1; fi
+  if [[ "${url_default}" == "1" && "${pass_default}" == "0" ]]; then
+    log "POSTGRES_PASSWORD is set but DATABASE_URL is still the preview default"
+    exit 1
+  fi
+  if [[ "${url_default}" == "0" && "${pass_default}" == "1" ]]; then
+    log "DATABASE_URL is explicit and the preview password is still the default"
+    exit 1
+  fi
+  if [[ "${url_default}" == "1" && "${pass_default}" == "1" ]]; then
+    local generated=""
+    generated="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')" || {
+      log "password generation failed"
+      exit 1
+    }
+    if [[ "${#generated}" -ne 32 || ! "${generated}" =~ ^[0-9a-f]{32}$ ]]; then
+      log "password generation failed"
+      exit 1
+    fi
+    POSTGRES_PASSWORD="${generated}"
     export POSTGRES_PASSWORD
     export POSTGRES_USER="${POSTGRES_USER:-bidstack}"
     export POSTGRES_DB="${POSTGRES_DB:-bidstack}"
@@ -74,9 +97,30 @@ preview_prepare_database() {
 }
 
 preview_child_pids=()
+preview_group_pids=()
 preview_stop_redis=0
 
 preview_track() { preview_child_pids+=("$1"); }
+
+# A leader we started with setsid owns its process group. Cleanup signals that
+# group and no other pid.
+preview_track_leader() {
+  preview_track "$1"
+  preview_group_pids+=("$1")
+}
+
+preview_signal_pid() {
+  local pid="$1"
+  local sig="$2"
+  local leader=""
+  for leader in "${preview_group_pids[@]}"; do
+    if [[ "${leader}" == "${pid}" ]]; then
+      kill "-${sig}" -- "-${pid}" 2>/dev/null || kill "-${sig}" "${pid}" 2>/dev/null || true
+      return
+    fi
+  done
+  kill "-${sig}" "${pid}" 2>/dev/null || true
+}
 
 preview_require_file() {
   local label="$1"
@@ -100,11 +144,12 @@ preview_run_or_die() {
 
 preview_cleanup() {
   local status=$?
+  local why="${1:-exit}"
   trap - EXIT INT TERM
   local pid waits
   for pid in "${preview_child_pids[@]}"; do
     if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-      kill "${pid}" 2>/dev/null || true
+      preview_signal_pid "${pid}" TERM
     fi
   done
   for pid in "${preview_child_pids[@]}"; do
@@ -116,7 +161,7 @@ preview_cleanup() {
       waits=$((waits + 1))
     done
     if kill -0 "${pid}" 2>/dev/null; then
-      kill -9 "${pid}" 2>/dev/null || true
+      preview_signal_pid "${pid}" KILL
       waits=0
       while kill -0 "${pid}" 2>/dev/null && [[ "${waits}" -lt 10 ]]; do
         sleep 0.1
@@ -128,19 +173,22 @@ preview_cleanup() {
       echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
     fi
   done
-  if [[ "${preview_stop_redis}" == "1" ]] && command -v redis-cli >/dev/null 2>&1; then
-    redis-cli -h 127.0.0.1 -p 6379 shutdown nosave >/dev/null 2>&1 || true
-  fi
+  if [[ "${why}" == "INT" ]]; then exit 130; fi
+  if [[ "${why}" == "TERM" ]]; then exit 143; fi
   exit "${status}"
 }
 
-preview_install_trap() { trap preview_cleanup EXIT INT TERM; }
+preview_install_trap() {
+  trap 'preview_cleanup exit' EXIT
+  trap 'preview_cleanup INT' INT
+  trap 'preview_cleanup TERM' TERM
+}
 
 preview_start_redis() {
   log "starting redis"
-  redis-server --daemonize no --bind 127.0.0.1 --protected-mode yes --port 6379 --save "" >>"$LOG" 2>&1 &
+  setsid redis-server --daemonize no --bind 127.0.0.1 --protected-mode yes --port 6379 --save "" >>"$LOG" 2>&1 &
   local redis_pid=$!
-  preview_track "${redis_pid}"
+  preview_track_leader "${redis_pid}"
   sleep 0.1
   if ! kill -0 "${redis_pid}" 2>/dev/null; then
     log "redis failed"
@@ -272,13 +320,13 @@ log "shm $(df -h /dev/shm 2>/dev/null | tail -1)"
 preview_start_redis
 
 log "starting postgres"
-docker-entrypoint.sh postgres \
+setsid docker-entrypoint.sh postgres \
   -c shared_buffers=32MB \
   -c dynamic_shared_memory_type=mmap \
   -c max_connections=40 \
   >>"$LOG" 2>&1 &
 pg_pid=$!
-preview_track "${pg_pid}"
+preview_track_leader "${pg_pid}"
 
 if preview_wait_postgres "${pg_pid}"; then
   log "migrating"
@@ -299,15 +347,15 @@ if preview_wait_postgres "${pg_pid}"; then
   # API up when that binary was not built.
   preview_require_file "queue worker dist" /app/apps/worker/dist/main.js
   log "starting api"
-  (cd /app/apps/api && node dist/main.js) >>"$LOG" 2>&1 &
+  setsid bash -c 'cd /app/apps/api && exec node dist/main.js' >>"$LOG" 2>&1 &
   api_pid=$!
-  preview_track "${api_pid}"
+  preview_track_leader "${api_pid}"
   # Same database, Redis, and upload root as the API. MSA extract and crew
   # runs are queued by the API and consumed only by this process.
   log "starting queue worker"
-  (cd /app/apps/worker && node dist/main.js) >>"$LOG" 2>&1 &
+  setsid bash -c 'cd /app/apps/worker && exec node dist/main.js' >>"$LOG" 2>&1 &
   worker_pid=$!
-  preview_track "${worker_pid}"
+  preview_track_leader "${worker_pid}"
   log "queue worker ${worker_pid}"
 else
   log "postgres did not become ready"

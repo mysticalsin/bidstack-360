@@ -19,7 +19,7 @@ describe('preview queue worker', () => {
     const readyAt = entry.indexOf('if preview_wait_postgres');
     const apiAt = entry.indexOf('starting api');
     const workerAt = entry.indexOf('starting queue worker');
-    const launchAt = entry.indexOf('cd /app/apps/worker && node dist/main.js');
+    const launchAt = entry.indexOf('cd /app/apps/worker && exec node dist/main.js');
     expect(readyAt).toBeGreaterThan(-1);
     expect(apiAt).toBeGreaterThan(readyAt);
     expect(workerAt).toBeGreaterThan(apiAt);
@@ -75,8 +75,8 @@ describe('preview process lifecycle', () => {
     expect(result.log).toContain('a preview process exited (9)');
     expect(Number(a)).toBeGreaterThan(0);
     expect(Number(b)).toBeGreaterThan(0);
-    expect(spawnSync('kill', ['-0', String(a)]).status).not.toBe(0);
-    expect(spawnSync('kill', ['-0', String(b)]).status).not.toBe(0);
+    expect(spawnSync('kill', ['-0', String(a)]).status).toBe(1);
+    expect(spawnSync('kill', ['-0', String(b)]).status).toBe(1);
   });
 
   it('stops after a failed command and does not run the next one', () => {
@@ -87,6 +87,59 @@ describe('preview process lifecycle', () => {
     expect(result.status).toBe(1);
     expect(result.stdout).not.toContain('CONTINUED');
     expect(result.log).toContain('step failed');
+  });
+
+  it('does not replace an explicit database url when the password is still the default', () => {
+    const result = run(`
+      export DATABASE_URL='postgres://bidstack:explicit-secret@127.0.0.1:5432/bidstack'
+      export POSTGRES_PASSWORD=bidstack
+      preview_prepare_database
+      echo CONTINUED
+    `);
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('CONTINUED');
+    expect(result.stdout).not.toContain('explicit-secret');
+    expect(result.log).toContain('DATABASE_URL is explicit');
+    expect(result.log).not.toContain('explicit-secret');
+  });
+
+  it('stops when password generation fails and does not print a value', () => {
+    const result = run(`
+      od() { return 1; }
+      export DATABASE_URL='postgres://bidstack:bidstack@127.0.0.1:5432/bidstack'
+      export POSTGRES_PASSWORD=bidstack
+      preview_prepare_database
+      echo CONTINUED
+    `);
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('CONTINUED');
+    expect(result.log).toContain('password generation failed');
+  });
+
+  it('kills a grandchild of a tracked leader and leaves an unrelated process', () => {
+    const result = run(`
+      preview_install_trap
+      nohup sleep 30 >/dev/null 2>&1 &
+      unrelated=\$!
+      disown || true
+      setsid bash -c 'sleep 30 & echo GRAND:\$!; wait' &
+      child=\$!
+      echo UNRELATED:\$unrelated
+      preview_track_leader "\$child"
+      sleep 0.2
+      echo CHILD:\$child
+      preview_cleanup
+    `);
+    const unrelated = /UNRELATED:(\d+)/.exec(result.stdout)?.[1];
+    const child = /CHILD:(\d+)/.exec(result.stdout)?.[1];
+    const grand = /GRAND:(\d+)/.exec(result.stdout)?.[1];
+    expect(Number(child)).toBeGreaterThan(0);
+    expect(Number(grand)).toBeGreaterThan(0);
+    expect(Number(unrelated)).toBeGreaterThan(0);
+    expect(spawnSync('kill', ['-0', String(child)]).status).toBe(1);
+    expect(spawnSync('kill', ['-0', String(grand)]).status).toBe(1);
+    expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
+    spawnSync('kill', ['-9', String(unrelated)]);
   });
 
   it('rejects a remote host hidden after an at-sign in the path', () => {
@@ -116,7 +169,7 @@ describe('preview process lifecycle', () => {
     const child = /CHILD:(\d+)/.exec(result.stdout)?.[1];
     expect(Number(child)).toBeGreaterThan(0);
     expect(Number(unrelated)).toBeGreaterThan(0);
-    expect(spawnSync('kill', ['-0', String(child)]).status).not.toBe(0);
+    expect(spawnSync('kill', ['-0', String(child)]).status).toBe(1);
     expect(readFileSync(result.reap, 'utf8')).toContain(`reaped ${child}`);
     expect(readFileSync(result.reap, 'utf8')).not.toContain(`reaped ${unrelated}`);
     expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
