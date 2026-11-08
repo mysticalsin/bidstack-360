@@ -50,6 +50,15 @@ export function techStackStale(providerMetadata: unknown, cutoff: Date): boolean
   return new Date(snapshot.checkedAt).getTime() < cutoff.getTime();
 }
 
+/** Sweep order key: real check time in ms, 0 when never checked or only sample data. */
+function techStackCheckedMs(providerMetadata: unknown): number {
+  const metadata = (providerMetadata ?? {}) as Record<string, unknown>;
+  const snapshot = parseOpenTechSnapshot(metadata.openTechStack);
+  if (!snapshot || snapshot.sample) return 0;
+  const ms = new Date(snapshot.checkedAt).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 function normalized(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -57,7 +66,6 @@ function normalized(value: string): string {
 export async function sweepTechStacks(queue: Pick<Queue, 'add'>, env: NodeJS.ProcessEnv, log: pino.Logger, now = new Date()): Promise<{ enqueued: number }> {
   const limit = Number(env.TECH_STACK_SWEEP_LIMIT ?? 500) || 500;
   const cutoff = new Date(now.getTime() - WEEK_MS + DAY_MS / 2);
-  let enqueued = 0;
   const orgs: Array<{ id: string }> = [];
   for (let cursor: string | undefined; ; ) {
     const page = await prisma.org.findMany({ select: { id: true }, orderBy: { id: 'asc' }, take: 500, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
@@ -65,8 +73,11 @@ export async function sweepTechStacks(queue: Pick<Queue, 'add'>, env: NodeJS.Pro
     if (page.length < 500) break;
     cursor = page[page.length - 1]!.id;
   }
+  // The cap applies after ordering by last check, oldest first, so a backlog
+  // larger than the cap rotates through every account across weekly runs.
+  const stale: Array<{ orgId: string; companyId: string; checkedMs: number }> = [];
   for (const org of orgs) {
-    for (let cursor: string | undefined; enqueued < limit; ) {
+    for (let cursor: string | undefined; ; ) {
       const page = await prisma.company.findMany({
         where: { orgId: org.id, deletedAt: null, OR: [{ domain: { not: null } }, { website: { not: null } }] },
         select: { id: true, name: true },
@@ -81,15 +92,19 @@ export async function sweepTechStacks(queue: Pick<Queue, 'add'>, env: NodeJS.Pro
       });
       const metadataByName = new Map(enrichments.map((e) => [e.normalizedName, e.providerMetadata]));
       for (const company of page) {
-        if (enqueued >= limit) break;
-        if (!techStackStale(metadataByName.get(normalized(company.name)), cutoff)) continue;
-        await queue.add('company-tech-detect.refresh', { kind: 'refresh', orgId: org.id, companyId: company.id, reason: 'sweep' }, { jobId: techSweepJobId(org.id, company.id, now) });
-        enqueued++;
+        const metadata = metadataByName.get(normalized(company.name));
+        if (!techStackStale(metadata, cutoff)) continue;
+        stale.push({ orgId: org.id, companyId: company.id, checkedMs: techStackCheckedMs(metadata) });
       }
       if (page.length < SWEEP_PAGE) break;
       cursor = page[page.length - 1]!.id;
     }
-    if (enqueued >= limit) break;
+  }
+  stale.sort((a, b) => a.checkedMs - b.checkedMs);
+  let enqueued = 0;
+  for (const { orgId, companyId } of stale.slice(0, limit)) {
+    await queue.add('company-tech-detect.refresh', { kind: 'refresh', orgId, companyId, reason: 'sweep' }, { jobId: techSweepJobId(orgId, companyId, now) });
+    enqueued++;
   }
   log.info({ enqueued, limit }, 'tech stack sweep queued accounts');
   return { enqueued };
