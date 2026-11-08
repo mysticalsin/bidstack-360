@@ -49,6 +49,7 @@ export * from './contract-agreement.js';
 export * from './msa.js';
 export * from './msa-intake.js';
 export * from './agreement-ingest.js';
+export * from './msa-whitespace.js';
 export * from './meeting-intel.js';
 export * from './account-enrichment.js';
 export * from './account-signals.js';
