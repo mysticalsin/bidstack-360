@@ -65,11 +65,14 @@ function convertedCentSurvives(amount: number): boolean {
   return Math.abs(amount) < 2 ** 42 && Number.isSafeInteger(Math.round(Math.abs(amount) * 100));
 }
 
+/** Explicit numeric conversion. A bare number is neither success nor failure. */
+export type UnitConversionResult = { ok: true; amount: number } | { ok: false };
+
 /** Format stored micros. An unchanged FX result keeps the integer. A count past the safe range is not converted through a JavaScript number. */
 export function formatStoredMicros(
   micros: string | number | bigint,
   sourceCurrency: string | null | undefined,
-  convert: (amount: number, from: string) => number,
+  convert: (amount: number, from: string) => number | UnitConversionResult,
   displayCurrency: string,
   options?: { compact?: boolean },
   convertMicros?: (micros: bigint, from: string) => bigint | null,
@@ -96,14 +99,13 @@ export function formatStoredMicros(
   const exactSource = () => formatSourceOrDisplay(asBigInt, source, false);
   if (!fitsSafeUnitCount(asBigInt)) return exactSource();
   const value = unitsFromMicros(asBigInt);
-  const converted = convert(value, source);
-  if (!Number.isFinite(converted)) return exactSource();
-  const convertedMicros = unitsToMicros(converted);
-  if (convertedMicros == null || !convertedCentSurvives(converted)) return exactSource();
-  // The same integer is not proof of a rate. Equal-rate success is a non-null
-  // convertMicros result. A changed finite amount is the numeric converter's
-  // own result, which existing callers use for a real conversion.
-  if (convertedMicros === asBigInt) return exactSource();
+  const reported = convert(value, source);
+  // Only an explicit result chooses the label. Equality and a changed
+  // amount are not that result. convert() still returns a bare number.
+  if (typeof reported !== 'object' || reported == null || reported.ok !== true) return exactSource();
+  if (!Number.isFinite(reported.amount)) return exactSource();
+  const convertedMicros = unitsToMicros(reported.amount);
+  if (convertedMicros == null || !convertedCentSurvives(reported.amount)) return exactSource();
   return formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
 }
 

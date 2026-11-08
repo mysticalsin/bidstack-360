@@ -19,14 +19,40 @@ describe('failed conversion keeps the source currency', () => {
   });
 
   it('keeps a parity conversion in the display currency', () => {
+    const text = formatStoredMicros(
+      2_500_000n,
+      'EUR',
+      (amount) => ({ ok: true, amount }),
+      'USD',
+    );
+    expect(text).toContain('$');
+    expect(text).toContain('2.50');
+    expect(text).not.toContain('€');
+  });
+
+  it('keeps integer parity in the display currency', () => {
     const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD', undefined, () => 2_500_000n);
     expect(text).toContain('$');
     expect(text).toContain('2.50');
     expect(text).not.toContain('€');
   });
 
+  it('keeps the source label when conversion reports failure', () => {
+    const text = formatStoredMicros(2_500_000n, 'EUR', () => ({ ok: false }), 'USD');
+    expect(text).toContain('€');
+    expect(text).toContain('2.50');
+    expect(text).not.toContain('$');
+  });
+
   it('keeps the source label when a numeric converter echoes the amount', () => {
     const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD');
+    expect(text).toContain('€');
+    expect(text).toContain('2.50');
+    expect(text).not.toContain('$');
+  });
+
+  it('does not treat a changed bare number as a successful conversion', () => {
+    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount * 2, 'USD');
     expect(text).toContain('€');
     expect(text).toContain('2.50');
     expect(text).not.toContain('$');
@@ -40,7 +66,7 @@ describe('failed conversion keeps the source currency', () => {
   });
 
   it('does not throw when the display currency is not a code', () => {
-    const shown = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount * 2, 'NOTREAL');
+    const shown = formatStoredMicros(2_500_000n, 'EUR', (amount) => ({ ok: true, amount: amount * 2 }), 'NOTREAL');
     expect(shown).toContain('5');
     expect(shown).toContain('NOTREAL');
     expect(shown).not.toContain('€');
@@ -58,8 +84,8 @@ describe('failed conversion keeps the source currency', () => {
     expect(text).not.toContain('$');
   });
 
-  it('uses the display currency when the converter changes the amount', () => {
-    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount * 2, 'USD');
+  it('uses the display currency when conversion explicitly changes the amount', () => {
+    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => ({ ok: true, amount: amount * 2 }), 'USD');
     expect(text).toContain('$');
     expect(text).not.toContain('€');
   });

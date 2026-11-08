@@ -492,7 +492,7 @@ describe('useCurrencyStore', () => {
     const formatted = formatStoredMicros(huge, 'EUR', (amount) => amount * 1.1, 'USD');
     expect(formatted).toContain('9,007,199,254,740,993');
     expect(formatted).not.toContain('9,007,199,254,740,992');
-    const safe = formatStoredMicros('100000000', 'EUR', (amount) => amount * 1.1, 'USD', {
+    const safe = formatStoredMicros('100000000', 'EUR', (amount) => ({ ok: true, amount: amount * 1.1 }), 'USD', {
       compact: false,
     });
     expect(safe).toContain('110');
@@ -501,7 +501,7 @@ describe('useCurrencyStore', () => {
     const large = formatStoredMicros(
       '8598204328457184962',
       'USD',
-      (amount) => amount * 1.1,
+      (amount) => ({ ok: true, amount: amount * 1.1 }),
       'EUR',
       { compact: false },
     );
