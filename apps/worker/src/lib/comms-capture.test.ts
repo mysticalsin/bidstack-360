@@ -682,6 +682,45 @@ describe('activity bridge commit lock', () => {
     expect(legacyRows.some((row) => row.attempts === 1)).toBe(false);
   });
 
+  it('does not lower a quarantine-only attempt or borrow the other stream', () => {
+    const state: Record<string, unknown> = {
+      activityBridgeQuarantine: [
+        { id: 'legacy', attempts: 5, at: '2026-11-01T00:00:00.000Z', kind: 'email' },
+        { id: 'legacy', attempts: 9, at: '2026-11-01T00:00:00.000Z', kind: 'calendar' },
+      ],
+    };
+    noteActivityBridgeFailures(state, 'mail', ['legacy'], '2026-11-08T00:00:00.000Z', [], false, undefined, 'email');
+    noteActivityBridgeFailures(state, 'mail', ['legacy'], '2026-11-08T00:00:00.000Z', [], false, undefined, 'email');
+    const quarantine = state.activityBridgeQuarantine as Array<{ id: string; attempts: number; kind?: string }>;
+    expect(quarantine.find((row) => row.id === 'legacy' && row.kind === 'email')?.attempts).toBeGreaterThanOrEqual(5);
+    expect(quarantine.find((row) => row.id === 'legacy' && row.kind === 'calendar')?.attempts).toBe(9);
+  });
+
+  it('keeps the higher quarantine attempt when a legacy row meets a typed one', () => {
+    const higherUntyped: Record<string, unknown> = {
+      activityBridgeQuarantine: [
+        { id: 'legacy', attempts: 5, at: '2026-11-01T00:00:00.000Z' },
+        { id: 'legacy', attempts: 3, at: '2026-11-02T00:00:00.000Z', kind: 'email' },
+        { id: 'legacy', attempts: 2, at: '2026-11-02T00:00:00.000Z', kind: 'calendar' },
+      ],
+    };
+    applyLegacyMigration(higherUntyped, [{ id: 'legacy', result: 'both', attempts: 1 }]);
+    const both = higherUntyped.activityBridgeQuarantine as Array<{ id: string; attempts: number; kind?: string }>;
+    expect(both.find((row) => row.id === 'legacy' && row.kind === undefined)).toBeUndefined();
+    expect(both.find((row) => row.id === 'legacy' && row.kind === 'email')?.attempts).toBe(5);
+    expect(both.find((row) => row.id === 'legacy' && row.kind === 'calendar')?.attempts).toBe(5);
+    const higherTyped: Record<string, unknown> = {
+      activityBridgeQuarantine: [
+        { id: 'legacy', attempts: 3, at: '2026-11-01T00:00:00.000Z' },
+        { id: 'legacy', attempts: 5, at: '2026-11-02T00:00:00.000Z', kind: 'email' },
+      ],
+    };
+    applyLegacyMigration(higherTyped, [{ id: 'legacy', result: 'email', attempts: 1 }]);
+    const email = higherTyped.activityBridgeQuarantine as Array<{ id: string; attempts: number; kind?: string }>;
+    expect(email.find((row) => row.id === 'legacy' && row.kind === 'email')?.attempts).toBe(5);
+    expect(email.some((row) => row.id === 'legacy' && row.kind === undefined)).toBe(false);
+  });
+
   it('does not let one stream hold another that is under its own cap', () => {
     const state: Record<string, unknown> = {
       activityBridgePending: Array.from({ length: 300 }, (_, index) => ({

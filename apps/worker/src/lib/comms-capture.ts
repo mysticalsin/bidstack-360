@@ -517,9 +517,10 @@ export function noteActivityBridgeFailures(
     const slot = activityBridgeSlot(id, kind);
     const untypedFloor = Math.max(counts[id] ?? 0, pendingAttempt(pending, id));
     const typedFloor = Math.max(counts[slot] ?? 0, pendingAttempt(pending, id, kind));
+    const quarantinedFloor = quarantineAttempt(state, id, kind);
     const prior = already.has(id)
-      ? Math.max(ACTIVITY_BRIDGE_RETRY_LIMIT, untypedFloor, typedFloor)
-      : Math.max(typedFloor, untypedFloor);
+      ? Math.max(ACTIVITY_BRIDGE_RETRY_LIMIT, untypedFloor, typedFloor, quarantinedFloor)
+      : Math.max(typedFloor, untypedFloor, quarantinedFloor);
     // A surviving untyped attempt is a floor. Saturating at the limit must not
     // restart that id at 1, and it must not store a lower number than the floor.
     const attempts = Math.max(prior, Math.min(prior + 1, ACTIVITY_BRIDGE_RETRY_LIMIT));
@@ -577,6 +578,23 @@ function sameBridgeIdentity(row: ActivityBridgePending, id: string, kind?: Activ
 
 function pendingAttempt(rows: ActivityBridgePending[], id: string, kind?: ActivityBridgeKind): number {
   return rows.find((row) => sameBridgeIdentity(row, id, kind))?.attempts ?? 0;
+}
+
+/** Same id and same stream, plus an untyped row for that id. Another stream's count is not a floor. */
+function quarantineAttempt(state: Record<string, unknown>, id: string, kind?: ActivityBridgeKind): number {
+  const rows = Array.isArray(state.activityBridgeQuarantine)
+    ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
+    : [];
+  let floor = 0;
+  for (const entry of rows) {
+    if (entry.id !== id || typeof entry.attempts !== 'number') continue;
+    if (kind) {
+      if (entry.kind === kind || !entry.kind) floor = Math.max(floor, entry.attempts);
+    } else if (!entry.kind) {
+      floor = Math.max(floor, entry.attempts);
+    }
+  }
+  return floor;
 }
 
 function removePending(rows: ActivityBridgePending[], id: string, kind?: ActivityBridgeKind): void {
@@ -821,8 +839,16 @@ export function applyLegacyMigration(
         const rest = quarantine.filter((entry) => !(entry.id === plan.id && !entry.kind));
         quarantine.splice(0, quarantine.length, ...rest);
         for (const kind of kinds) {
-          if (quarantine.some((entry) => entry.id === plan.id && entry.kind === kind)) continue;
-          quarantine.unshift({ id: plan.id, attempts: legacyQuarantine.attempts, at: legacyQuarantine.at, kind });
+          const kept = Math.max(
+            legacyQuarantine.attempts,
+            quarantine.find((entry) => entry.id === plan.id && entry.kind === kind)?.attempts ?? 0,
+          );
+          const existing = quarantine.findIndex((entry) => entry.id === plan.id && entry.kind === kind);
+          if (existing >= 0) {
+            quarantine[existing] = { ...quarantine[existing]!, attempts: kept };
+            continue;
+          }
+          quarantine.unshift({ id: plan.id, attempts: kept, at: legacyQuarantine.at, kind });
         }
       }
     }
