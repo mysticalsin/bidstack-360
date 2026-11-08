@@ -35,6 +35,8 @@ let phase = 'booting';
 let detail = '';
 let apiChild = null;
 let apiRestarts = 0;
+let workerChild = null;
+let workerRestarts = 0;
 let selfSeeded = false;
 
 // Container stdout is not reachable from outside, so the last lines are kept
@@ -97,6 +99,11 @@ function apiEnv() {
     PII_FIELD_ENCRYPTION: 'true',
     BIDSTACK_TENANT_SCOPE_GUARD: 'warn',
     PUPPETEER_SKIP_DOWNLOAD: 'true',
+    WORKER_HEALTH_PORT: '4030',
+    ACCOUNT_INTEL_AUTO_REFRESH: 'true',
+    ...(process.env.POLO_INTEL_USER_AGENT
+      ? { ACCOUNT_INTEL_USER_AGENT: process.env.POLO_INTEL_USER_AGENT, SEC_USER_AGENT: process.env.POLO_INTEL_USER_AGENT }
+      : {}),
   };
 }
 
@@ -179,6 +186,23 @@ function startApi() {
   });
 }
 
+// Queued jobs (public registry and filings pulls, imports) run here. A crash
+// never takes the API down; the worker restarts on its own.
+function startWorker() {
+  workerChild = spawn(process.execPath, ['apps/worker/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  workerChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
+  workerChild.stderr.on('data', (chunk) => {
+    process.stderr.write(chunk);
+    remember(chunk);
+  });
+  workerChild.on('exit', (code) => {
+    workerChild = null;
+    const delay = Math.min(60_000, 2_000 * 2 ** Math.min(workerRestarts++, 5));
+    log(`worker exited ${code}; restarting in ${delay}ms`);
+    setTimeout(startWorker, delay);
+  });
+}
+
 async function waitForApi() {
   for (let i = 0; i < 120; i++) {
     const ok = await new Promise((resolve) => {
@@ -211,6 +235,7 @@ async function finishBoot(how) {
     startApi();
     await waitForApi();
     apiRestarts = 0;
+    startWorker();
     setPhase('ready', how);
   } catch (err) {
     setPhase('failed', String(err));
@@ -274,6 +299,7 @@ async function handleInternal(req, res, url) {
       detail,
       bootId: BOOT_ID,
       apiUp: Boolean(apiChild),
+      workerUp: Boolean(workerChild),
       ...(phase === 'failed' ? { recent: recent.slice(-40) } : {}),
     });
   }
@@ -414,5 +440,6 @@ try {
 process.on('SIGTERM', () => {
   log('SIGTERM: stopping');
   apiChild?.kill('SIGTERM');
+  workerChild?.kill('SIGTERM');
   process.exit(0);
 });

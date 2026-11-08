@@ -35,6 +35,8 @@ ACCESS_AUD = "826c47f72e2aa2bb7973d533363fcc2b536137578c33a3f1972afb90584e686c"
 ALLOWED_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com,marc.bisiou@amaris.com,acamaret@amaris.com"
 POLO_ADMIN_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com"
 PUBLIC_ORIGIN = "https://polo-preview.tony-walteur.workers.dev"
+# SEC EDGAR and public registries require a contact User-Agent.
+POLO_INTEL_USER_AGENT = "Polo account intelligence (Amaris Consulting) twalteur@amaris.com"
 
 [[durable_objects.bindings]]
 name = "RELAY"

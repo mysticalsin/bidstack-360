@@ -32,6 +32,13 @@ describe('container env', () => {
     });
   });
 
+  it('passes the public-registry contact User-Agent and optional Companies House key through', () => {
+    expect(containerEnv({ ...SECRETS, ALLOWED_EMAILS: 'a@x.com' })).not.toHaveProperty('POLO_INTEL_USER_AGENT');
+    expect(
+      containerEnv({ ...SECRETS, ALLOWED_EMAILS: 'a@x.com', POLO_INTEL_USER_AGENT: 'Polo ua', COMPANIES_HOUSE_API_KEY: 'ch' }),
+    ).toMatchObject({ POLO_INTEL_USER_AGENT: 'Polo ua', COMPANIES_HOUSE_API_KEY: 'ch' });
+  });
+
   it('refuses to start without the encryption secrets instead of booting with blank keys', () => {
     expect(() => containerEnv({ ALLOWED_EMAILS: 'a@x.com' })).toThrow(/POLO_PII_ENCRYPTION_MASTER_KEY/);
   });

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Polo on Cloudflare Containers: Postgres (pgvector) + Redis + API + the built
+# Polo on Cloudflare Containers: Postgres (pgvector) + Redis + API + worker + the built
 # SPA, all from one `main` checkout. Build context is the repository root.
 # Data is restored from R2 on boot (see container/entrypoint.mjs).
 
@@ -20,7 +20,8 @@ RUN pnpm db:generate \
   && pnpm --filter @bidstack/memos build \
   && pnpm --filter @bidstack/odoo-mcp-client build \
   && pnpm --filter @bidstack/integrations build \
-  && pnpm --filter @bidstack/api build
+  && pnpm --filter @bidstack/api build \
+  && pnpm --filter @bidstack/worker build
 # Same-origin API (empty VITE_API_URL) and Cloudflare Access sign-in.
 RUN VITE_API_URL= VITE_AUTH_MODE=cf-access NODE_ENV=production pnpm --filter @bidstack/web exec vite build
 
