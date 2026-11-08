@@ -148,6 +148,7 @@ export type {
   KamSessionDraft,
   KamHandoff,
   KamProspection,
+  AccessPolicyVersion,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -243,6 +244,17 @@ export type {
 } from './agreements/stage.js';
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';
+export {
+  intelConnections,
+  loadIntelSummaryInput,
+  markImportBatchCompany,
+  openImportBatch,
+  parseIntelSummary,
+  pruneImportBatches,
+  readCompanyIntelSummaries,
+  readImportBatches,
+  recomputeCompanyIntelSummary,
+} from './company-intel-summary.js';
 export {
   countPartnerEngagements,
   isInternalPartnerRow,
