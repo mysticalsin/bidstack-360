@@ -109,7 +109,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                 <span className="oi-count" style={{ background: severityBg(r.severity) }}>
                   {severityLabel[r.severity]}
                 </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="oi-body">
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
                     {r.title}
                   </div>
@@ -134,7 +134,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                 <span className="oi-count" style={{ background: 'var(--tag-amber-bg)' }}>
                   {t('openIssues.kindCompliance', 'Compliance')}
                 </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="oi-body">
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
                     {c.label}
                   </div>

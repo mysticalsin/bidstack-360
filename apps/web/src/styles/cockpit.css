@@ -130,8 +130,9 @@
 }
 .open-issues li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   padding: 10px 4px;
   border-bottom: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -145,6 +146,15 @@
 }
 .open-issues li:last-child {
   border-bottom: 0;
+}
+/* In a narrow column the status badge wraps under the text instead of covering it. */
+.open-issues .oi-body {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.open-issues li > :last-child {
+  flex: none;
 }
 .open-issues .oi-count {
   min-width: 72px;

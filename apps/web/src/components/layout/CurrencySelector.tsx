@@ -143,7 +143,7 @@ export function CurrencySelector() {
           aria-haspopup="listbox"
           aria-expanded={open}
         >
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--surface-card)] text-sm text-[var(--fg-primary)] ring-1 ring-[var(--border-subtle)]">
+          <span className="grid h-6 min-w-6 place-items-center whitespace-nowrap rounded-full px-1 bg-[var(--surface-card)] text-sm text-[var(--fg-primary)] ring-1 ring-[var(--border-subtle)]">
             {selected?.symbol ?? currency}
           </span>
           <span className="tb-currency-code leading-none">
