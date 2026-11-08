@@ -252,6 +252,13 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) notFound(server, 'Fact not found');
+      const subject = await prisma.contact.findFirst({
+        where: { id: existing.contactId, orgId: req.auth.orgId, deletedAt: { not: undefined } },
+        select: { deletedAt: true },
+      });
+      // An erased contact is soft-deleted. Do not return or decide a fact that
+      // still carries their claim.
+      if (!subject || subject.deletedAt) notFound(server, 'Fact not found');
       if (existing.status === 'dismissed') badRequest(server, 'A dismissed fact stays dismissed');
       const next = applyFactDecision(
         {
