@@ -234,6 +234,50 @@ describe('activity bridge retry bound', () => {
     expect(again.mailNextLink).toBe('inbox-page');
   });
 
+  it('does not let a stale snapshot delete a newer calendar page or delta', () => {
+    const now = '2026-11-08T03:00:00.000Z';
+    const stored = { calendarNextLink: 'https://graph/page-2', calendarDeltaLink: 'newer' };
+    const baseline = { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old' };
+    const desired = { calendarDeltaLink: 'stale-done' };
+    const merged = mergeBridgeDeltaState(stored, baseline, desired, [], now);
+    expect(merged.calendarNextLink).toBe('https://graph/page-2');
+    expect(merged.calendarDeltaLink).toBe('newer');
+    const owned = mergeBridgeDeltaState(
+      { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old', mailNextLink: 'keep' },
+      { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old', mailNextLink: 'keep' },
+      { calendarDeltaLink: 'done', mailNextLink: 'keep' },
+      [],
+      now,
+    );
+    expect(owned.calendarNextLink).toBeUndefined();
+    expect(owned.calendarDeltaLink).toBe('done');
+    expect(owned.mailNextLink).toBe('keep');
+  });
+
+  it('forgets only the oldest quarantined id, and that id starts a new budget', () => {
+    const state: Record<string, unknown> = {};
+    const now = '2026-11-08T03:00:00.000Z';
+    for (let i = 0; i < 50; i++) {
+      const id = `id-${i}`;
+      noteActivityBridgeFailures(state, 'p', [id], now);
+      noteActivityBridgeFailures(state, 'p', [id], now);
+      noteActivityBridgeFailures(state, 'p', [id], now);
+    }
+    noteActivityBridgeFailures(state, 'p', ['id-50'], now);
+    noteActivityBridgeFailures(state, 'p', ['id-50'], now);
+    noteActivityBridgeFailures(state, 'p', ['id-50'], now);
+    const listed = state.activityBridgeQuarantine as Array<{ id: string }>;
+    expect(listed).toHaveLength(50);
+    expect(listed.some((entry) => entry.id === 'id-0')).toBe(false);
+    expect(listed.some((entry) => entry.id === 'id-1')).toBe(true);
+    const restarted = noteActivityBridgeFailures(state, 'later', ['id-0'], now);
+    expect(restarted.hold).toBe(true);
+    expect((state.activityBridgeRetryById as Record<string, number>)['id-0']).toBe(1);
+    const remembered = noteActivityBridgeFailures(state, 'later', ['id-1'], now);
+    expect(remembered.hold).toBe(false);
+    expect((state.activityBridgeRetryById as Record<string, number> | undefined)?.['id-1']).toBeUndefined();
+  });
+
   it('keeps counting one poison id when the page url changes', () => {
     const state: Record<string, unknown> = {};
     const now = '2026-11-08T03:00:00.000Z';
@@ -388,9 +432,22 @@ describe('activity bridge commit lock', () => {
       $queryRaw: vi.fn(async () => [{ delta_state: {} }]),
       $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
     };
-    await expect(commitTokenDeltaState(db, 'tok-1', {}, { mailNextLink: 'x' }, [])).rejects.toThrow(/unlocked cursor write/);
+    await expect(commitTokenDeltaState(db, 'tok-1', {}, { mailNextLink: 'x' }, [])).rejects.toThrow(/missing \$queryRaw, \$executeRaw, or a transaction/);
     expect(update).not.toHaveBeenCalled();
     expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('does not let the test adapter skip a lock when any database method exists', async () => {
+    const update = vi.fn();
+    const db = {
+      unlockedCursorTestAdapter: true,
+      integrationToken: { findFirst: vi.fn(), update },
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await expect(commitTokenDeltaState(db, 'tok-1', {}, { mailNextLink: 'x' }, [])).rejects.toThrow(
+      /missing \$queryRaw, \$executeRaw, or a transaction/,
+    );
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('lets an explicit test adapter write without claiming the write was locked', async () => {

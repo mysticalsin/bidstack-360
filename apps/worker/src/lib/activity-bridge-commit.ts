@@ -24,9 +24,10 @@ type TokenTx = {
 const LOCK_TIMEOUT = '2000';
 
 /**
- * Test doubles that cannot offer a row lock set this. Production Prisma has
- * `$transaction`, `$queryRaw`, and `$executeRaw` and must not set it. A
- * client missing either SQL method is refused instead of writing unlocked.
+ * Test doubles with none of `$transaction`, `$queryRaw`, or `$executeRaw`
+ * may set this. If any of those methods exists, the flag is ignored and a
+ * partial client is refused. Production Prisma has all three and must not
+ * set the flag.
  */
 export const UNLOCKED_CURSOR_TEST_ADAPTER = 'unlockedCursorTestAdapter';
 
@@ -54,10 +55,14 @@ export async function commitTokenDeltaState(
   const client = db as TokenTx;
   const write = async (tx: TokenTx) => {
     let stored: Record<string, unknown>;
-    const canLock = typeof tx.$queryRaw === 'function' && typeof tx.$executeRaw === 'function';
-    if (canLock) {
-      if (typeof client.$transaction !== 'function') {
-        throw new Error('Refusing a cursor row lock outside a transaction');
+    const hasQuery = typeof tx.$queryRaw === 'function';
+    const hasExec = typeof tx.$executeRaw === 'function';
+    const hasTx = typeof client.$transaction === 'function';
+    if (hasQuery || hasExec || hasTx) {
+      if (!hasQuery || !hasExec || !hasTx) {
+        throw new Error(
+          'Refusing a cursor write. The client is missing $queryRaw, $executeRaw, or a transaction, so the row lock would not be held.',
+        );
       }
       await tx.$executeRaw`SELECT set_config('lock_timeout', ${LOCK_TIMEOUT}, true)`;
       const rows = await tx.$queryRaw`

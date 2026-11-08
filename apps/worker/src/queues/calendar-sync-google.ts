@@ -387,16 +387,18 @@ export async function renewGoogleWatchChannel(
 
   const json = (await res.json()) as { id: string; expiration: string };
 
-  await prisma.integrationToken.update({
-    where: { id: tokenId },
-    data: {
-      deltaState: {
-        ...deltaState,
-        watchChannelId: json.id,
-        watchChannelExpiry: new Date(Number(json.expiration)).toISOString(),
-      },
+  const baseline = structuredClone(deltaState);
+  await commitTokenDeltaState(
+    prisma,
+    tokenId,
+    baseline,
+    {
+      ...deltaState,
+      watchChannelId: json.id,
+      watchChannelExpiry: new Date(Number(json.expiration)).toISOString(),
     },
-  });
+    [],
+  );
 
   log.info({ tokenId, channelId: json.id }, 'Google watch channel renewed');
 }

@@ -33,7 +33,7 @@ import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { checkSerumConnectorRuntimePolicy } from '@bidstack/db/serum-runtime-policy';
 
 import { pullMicrosoftIncremental } from './calendar-sync-microsoft.js';
-import { pullGoogleIncremental } from './calendar-sync-google.js';
+import { pullGoogleIncremental, renewGoogleWatchChannel } from './calendar-sync-google.js';
 import { ProviderRateLimitError } from '../lib/provider-http.js';
 
 vi.mock('@bidstack/db', () => ({
@@ -452,5 +452,29 @@ describe('Google calendar pull', () => {
     expect(tokenUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '77' } }) }),
     );
+  });
+});
+
+describe('Google watch renewal', () => {
+  it('writes the channel through the locked cursor merge and keeps a newer calendar cursor', async () => {
+    process.env.GOOGLE_CALENDAR_WEBHOOK_URL = 'https://example.test/hook';
+    bridgeStore.persisted.delta = { mailDeltaLink: 'keep-mail', calendarDeltaLink: 'keep-delta' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => json({ id: 'channel-1', expiration: String(Date.now() + 86_400_000) })),
+    );
+    await renewGoogleWatchChannel(
+      orgId,
+      'tok-2',
+      'at',
+      log,
+      { calendarNextLink: 'stale-page', calendarDeltaLink: 'old' },
+    );
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.mailDeltaLink).toBe('keep-mail');
+    expect(saved.data.deltaState.calendarDeltaLink).toBe('keep-delta');
+    expect(saved.data.deltaState.calendarNextLink).toBeUndefined();
+    expect(saved.data.deltaState.watchChannelId).toBe('channel-1');
+    delete process.env.GOOGLE_CALENDAR_WEBHOOK_URL;
   });
 });
