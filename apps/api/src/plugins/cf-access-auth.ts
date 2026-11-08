@@ -175,9 +175,16 @@ export async function verifyCfAccessAuth(req: FastifyRequest): Promise<AuthConte
   if (existing && existing.orgId !== org.id) {
     throw req.server.httpErrors.forbidden('User is already registered in another organization');
   }
+  // Email is unique across orgs: a seeded or imported row with this email must be linked, not duplicated.
+  const sameEmail = existing
+    ? null
+    : await prisma.user.findUnique({ where: { email: allowed.email }, select: { id: true, orgId: true } });
+  if (sameEmail && sameEmail.orgId !== org.id) {
+    throw req.server.httpErrors.forbidden('User is already registered in another organization');
+  }
 
   const user = await prisma.user.upsert({
-    where: { clerkUser },
+    where: sameEmail ? { id: sameEmail.id } : { clerkUser },
     create: {
       orgId: org.id,
       clerkUser,
@@ -185,7 +192,7 @@ export async function verifyCfAccessAuth(req: FastifyRequest): Promise<AuthConte
       name,
       role: allowed.legacyRole,
     },
-    update: { name, role: allowed.legacyRole, email: allowed.email },
+    update: { clerkUser, name, role: allowed.legacyRole, email: allowed.email },
   });
 
   await ensureSystemRoleGrant(user.id, org.id, allowed.role, req);
@@ -197,7 +204,7 @@ export async function verifyCfAccessAuth(req: FastifyRequest): Promise<AuthConte
       actorUserId: user.id,
       targetType: 'user',
       targetId: user.id,
-      diff: { source: 'cf_access', role: allowed.role, newUser: true },
+      diff: { source: 'cf_access', role: allowed.role, newUser: !sameEmail, ...(sameEmail ? { linkedExisting: true } : {}) },
     });
   }
 
