@@ -22,7 +22,10 @@ export default defineConfig({
     // with ERR_IPC_CHANNEL_CLOSED on Windows after all assertions pass.
     pool: 'threads',
     fileParallelism: false,
-    isolate: false,
+    // Each file installs its own SERUM and Prisma mocks. Sharing one module
+    // graph made a later file's gate spy miss the function the handler calls,
+    // so a denial never ran and the assertions looked like the gate was gone.
+    isolate: true,
     env: {
       NODE_ENV: 'test',
     },

@@ -228,6 +228,8 @@ export function deriveAccountPerformance(
 export interface CockpitFieldOverride {
   fieldKey: string;
   value: unknown;
+  /** Currency of a manual revenue value; absent or null reads as EUR. */
+  currency?: string | null;
 }
 
 /** Apply manual overrides on top of the (immutable) enrichment-derived company. */
@@ -248,7 +250,10 @@ export function applyFieldOverrides(
     } else if (
       o.fieldKey === 'annualRevenueMicros' &&
       typeof o.value === 'number' &&
-      o.value > 0
+      o.value > 0 &&
+      // The cockpit holds EUR micros and has no rates server side; a revenue
+      // entered in another currency is shown by the sourced key numbers instead.
+      (o.currency ?? 'EUR') === 'EUR'
     ) {
       next.annualRevenueMicros = o.value;
       overriddenKeys.add('annualRevenueMicros');

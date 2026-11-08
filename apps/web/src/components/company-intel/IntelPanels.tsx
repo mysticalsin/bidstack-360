@@ -24,6 +24,8 @@ import {
   type InvestmentThemeItem,
 } from '@bidstack/shared';
 
+import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
+
 import { fmtDate, safeHref } from './intel-format';
 
 const money = (n: number | null, currency: string | null) => (n === null ? null : currency ? formatCompactMoney(n, currency) : compactAmount(n));
@@ -449,7 +451,9 @@ function NotDisclosed({ source }: { source: string }) {
 }
 
 /** Financials: one row per fiscal year with its source, registry facts and fallback. */
-export function FinancialsPanel({ f }: { f: AccountFinancialsIntel }) {
+/** When `company` is given, registry rows get Edit and an empty registry offers Refresh and Add manually. */
+export function FinancialsPanel({ f, company }: { f: AccountFinancialsIntel; company?: { id: string; name: string } }) {
+  const hasJurisdiction = f.registry.some((r) => r.fieldKey === 'registryJurisdiction' || /jurisdiction/i.test(r.label));
   return (
     <div className="ci-panel">
       {f.years.length ? (
@@ -500,25 +504,28 @@ export function FinancialsPanel({ f }: { f: AccountFinancialsIntel }) {
         </p>
       ) : null}
       {f.registry.length ? (
-        <div className="ci-block">
+        <div className="ci-block" data-testid="intel-registry">
           <h4 className="ci-k">Registry</h4>
           <ul className="ci-list ci-compact">
             {f.registry.map((r) => (
-              <li key={`${r.source}-${r.label}`} className="ci-row">
-                <span>{r.label}</span>
-                <span className="ci-meta">
-                  {r.value},{' '}
-                  {safeHref(r.sourceUrl) ? (
-                    <a href={safeHref(r.sourceUrl)} target="_blank" rel="noopener noreferrer">
-                      {r.source}
-                    </a>
-                  ) : (
-                    r.source
-                  )}
+              <li key={`${r.source}-${r.label}`} className="ci-row ci-registry-row">
+                <span className="ci-registry-label">{r.label}</span>
+                <span className="ci-meta ci-registry-value">
+                  <span className="ci-registry-text" title={r.value}>{r.value}</span>
+                  <SourceChip p={{ origin: r.fieldKey ? 'manual_sourced' : 'provider', label: r.source, year: r.fetchedAt ? r.fetchedAt.slice(0, 4) : null, url: safeHref(r.sourceUrl) ?? null }} />
+                  {company && r.fieldKey ? <FigureActions companyId={company.id} companyName={company.name} fieldKey={r.fieldKey} label={r.label} /> : null}
                 </span>
               </li>
             ))}
           </ul>
+          {company && !hasJurisdiction ? (
+            <FigureActions companyId={company.id} companyName={company.name} fieldKey="registryJurisdiction" label="Jurisdiction" missing="No jurisdiction on record" />
+          ) : null}
+        </div>
+      ) : company ? (
+        <div className="ci-block" data-testid="intel-registry-empty">
+          <h4 className="ci-k">Registry</h4>
+          <FigureActions companyId={company.id} companyName={company.name} fieldKey="registryId" label="Registration number" missing="No registry record found yet. A registration number or LEI lets Polo pull filed figures." />
         </div>
       ) : null}
     </div>

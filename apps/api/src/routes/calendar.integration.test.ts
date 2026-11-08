@@ -136,7 +136,16 @@ describe('PATCH and DELETE /calendar/events/:id', () => {
 
   it('filing an event by hand marks it so the calendar pull keeps that filing', async () => {
     const own = await seedEvent({ start: '2031-03-02T14:00:00Z', end: '2031-03-02T15:00:00Z' });
-    const companyId = randomUUID();
+    const unknown = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/calendar/events/${own.id}`,
+      payload: { companyId: randomUUID() },
+    });
+    expect(unknown.statusCode).toBe(404);
+    const { id: companyId } = await prisma.company.create({
+      data: { orgId, name: `Filing target ${randomUUID().slice(0, 8)}` },
+      select: { id: true },
+    });
     const res = await server.inject({
       method: 'PATCH',
       url: `/api/v1/calendar/events/${own.id}`,

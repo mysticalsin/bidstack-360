@@ -2,9 +2,11 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { beatsProvider, figureText, isCompanyId, useSourcedFigures } from '@/hooks/useSourcedFigures';
 import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
@@ -27,6 +29,9 @@ interface SnapshotRow {
   label: string;
   value: string;
   source: FieldSource;
+  /** Slice 22: revenue and employees also read the sourced key numbers. */
+  figure?: 'revenue' | 'employees';
+  hasValue?: boolean;
 }
 
 // Memoized — see TechStackCard for the rationale (stable cockpit prop;
@@ -112,6 +117,8 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
+      figure: 'revenue',
+      hasValue: Boolean(c.annualRevenueMicros),
       value: c.annualRevenueMicros
         ? formatMoney(c.annualRevenueMicros / 1_000_000, 'EUR')
         : notVerified,
@@ -130,6 +137,8 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.employees', 'Employees'),
+      figure: 'employees',
+      hasValue: Boolean(c.employeeCount),
       value: c.employeeCount ? c.employeeCount.toLocaleString() : notVerified,
       source: cockpitKpiSource(cockpit.kpis, 'employeeCount', Boolean(c.employeeCount), {
         fallbackLabel: t('businessSnapshot.source.externalIntel', 'External'),
@@ -250,15 +259,11 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
             >
               <dt>{row.label}</dt>
               <dd>
-                <span className="kv-value">
-                  <AnimatedMetric value={row.value} />
-                </span>
-                <SourceBadge
-                  label={row.source.label}
-                  state={row.source.state}
-                  hint={row.source.hint}
-                  className="kv-source"
-                />
+                {row.figure && isCompanyId(c.id) ? (
+                  <SourcedSnapshotValue companyId={c.id} companyName={c.name} row={row} figure={row.figure} />
+                ) : (
+                  <SnapshotValue row={row} />
+                )}
               </dd>
             </motion.div>
           ))}
@@ -267,6 +272,43 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     </Card>
   );
 });
+
+function SnapshotValue({ row }: { row: SnapshotRow }) {
+  return (
+    <>
+      <span className="kv-value">
+        <AnimatedMetric value={row.value} />
+      </span>
+      <SourceBadge label={row.source.label} state={row.source.state} hint={row.source.hint} className="kv-source" />
+    </>
+  );
+}
+
+/** The CRM value unless a filed, sourced manual or Wikidata figure beats it; Edit or the empty-state actions after it. */
+function SourcedSnapshotValue({ companyId, companyName, row, figure }: { companyId: string; companyName: string; row: SnapshotRow; figure: 'revenue' | 'employees' }) {
+  const sourced = useSourcedFigures(companyId);
+  const n = sourced[figure];
+  const fieldKey = figure === 'revenue' ? 'annualRevenueMicros' : 'employeeCount';
+  const text = figureText(n);
+  if (text && (!row.hasValue || beatsProvider(n))) {
+    return (
+      <>
+        <span className="kv-value" title={text}>{text}</span>
+        {n?.provenance ? <SourceChip p={n.provenance} testId={`snapshot-chip-${figure}`} /> : null}
+        <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} />
+      </>
+    );
+  }
+  if (!row.hasValue) {
+    return <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} missing={n?.missing ?? row.source.hint} />;
+  }
+  return (
+    <>
+      <SnapshotValue row={row} />
+      <FigureActions companyId={companyId} companyName={companyName} fieldKey={fieldKey} label={row.label} />
+    </>
+  );
+}
 
 function latestAttribution(sources: SourceAttribution[]): SourceAttribution | null {
   let latest: SourceAttribution | null = null;

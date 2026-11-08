@@ -1,6 +1,6 @@
 /**
  * Layout contract for the accounts list, account pages and company pages at
- * 1440, 1024, 768 and 390 wide (DESIGN.md 9.11). For every tab on the page:
+ * 1440, 1024, 768 and 390 wide (DESIGN.md 9.12). For every tab on the page:
  * the tab is clickable (tab strips scroll instead of clipping), no two visible
  * text runs overlap, and any text clipped with an ellipsis or line clamp has a
  * title so the full value is one hover away.

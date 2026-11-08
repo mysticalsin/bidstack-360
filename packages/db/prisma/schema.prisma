@@ -498,8 +498,13 @@ model CompanyFieldOverride {
   // company identity spans enrichment uuids AND opportunity-derived slugs,
   // so the override keys on the normalized name, not a companies-table FK.
   companyKey     String   @map("company_key")
-  fieldKey       String   @map("field_key") // industry | employeeCount | annualRevenueMicros | technicalStack
+  fieldKey       String   @map("field_key") // industry | employeeCount | annualRevenueMicros | registryId | registryJurisdiction | technicalStack
   value          Json
+  /// Provenance for a manual value: where the user read it. http(s) only.
+  sourceUrl      String?  @map("source_url") @db.VarChar(2048)
+  sourceLabel    String?  @map("source_label") @db.VarChar(120)
+  /// ISO 4217 code for a manual annualRevenueMicros value. Null reads as EUR.
+  currency       String?  @map("currency") @db.VarChar(3)
   overriddenById String   @map("overridden_by_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -3698,6 +3703,14 @@ model CalendarEvent {
   opportunityId     String?             @map("opportunity_id") @db.Uuid
   /// A user filed this event by hand; the provider pull never refiles it.
   filedManually     Boolean             @default(false) @map("filed_manually")
+  /// Calendar identity shared by every attendee's copy (Graph `iCalUId`, Google `iCalUID`).
+  iCalUid           String?             @map("ical_uid")
+  /// Provider sensitivity private or confidential, as of the last pull.
+  isPrivate         Boolean             @default(false) @map("is_private")
+  /// "declined" when the owner declined their copy, else null.
+  ownerResponse     String?             @map("owner_response") @db.VarChar(32)
+  /// teams, google_meet or in_person_or_other.
+  meetingChannel    String?             @map("meeting_channel") @db.VarChar(32)
   /// Client-supplied retry key so a repeated create returns the same row.
   clientRequestId   String?             @map("client_request_id") @db.VarChar(64)
   externalUpdatedAt DateTime?           @map("external_updated_at") @db.Timestamptz(6)
@@ -3721,6 +3734,7 @@ model CalendarEvent {
   @@index([orgId, companyId, startAt])
   @@index([orgId, contactId, startAt])
   @@index([orgId, ownerId, startAt])
+  @@index([orgId, iCalUid])
   @@index([orgId, startAt])
   @@index([orgId, syncState])
   @@index([orgId])

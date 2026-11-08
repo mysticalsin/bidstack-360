@@ -6,17 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CommsCapture from '../lib/comms-capture.js';
 import { resolveCaptureTarget } from '../lib/comms-capture.js';
 
-import { prisma } from '@bidstack/db';
+import { prisma, syncEmailMessageActivity } from '@bidstack/db';
 
 import { pullDelta } from './email-sync.pull.js';
-import { pullGmail } from './email-sync.gmail.js';
+import { consumeGmailIdPage, pullGmail } from './email-sync.gmail.js';
 
 vi.mock('@bidstack/db', () => ({
   EmailProvider: { GMAIL: 'GMAIL', OUTLOOK: 'OUTLOOK' },
   prisma: {
+    unlockedCursorTestAdapter: true,
     integrationToken: { findFirst: vi.fn(), update: vi.fn() },
-    emailMessage: { upsert: vi.fn() },
+    emailMessage: { upsert: vi.fn(async () => ({ id: 'row-1' })) },
   },
+  syncEmailMessageActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
+  syncCalendarEventActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
 }));
 
 vi.mock('../lib/workspace-token.js', () => ({
@@ -65,6 +68,9 @@ function tokenRow(provider: 'microsoft_graph' | 'gmail', deltaState: Record<stri
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  upsert.mockReset();
+  upsert.mockResolvedValue({ id: 'row-1' } as never);
+  findToken.mockReset();
 });
 
 describe('Outlook inbox capture', () => {
@@ -133,6 +139,83 @@ describe('Outlook inbox capture', () => {
         }),
       }),
     );
+  });
+
+  it('turns each stored message into an account activity, and a bridge failure keeps the mail', async () => {
+    upsert.mockResolvedValueOnce({ id: 'row-1' } as never).mockResolvedValueOnce({ id: 'row-2' } as never);
+    vi.mocked(syncEmailMessageActivity).mockRejectedValueOnce(new Error('db down'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'm-x',
+              from: { emailAddress: { address: 'buyer@acme.com' } },
+              toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+              subject: 'Hello',
+              receivedDateTime: '2026-11-06T14:00:00Z',
+            },
+          ],
+          '@odata.deltaLink': 'delta',
+        }),
+      ),
+    );
+
+    const result = await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
+
+    expect(result.persisted).toBe(2);
+    expect(syncEmailMessageActivity).toHaveBeenCalledWith(orgId, 'row-1');
+    expect(syncEmailMessageActivity).toHaveBeenCalledWith(orgId, 'row-2');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as {
+      data: { deltaState: Record<string, unknown> };
+    };
+    // Inbox bridge failed, so that folder's delta link stays unset and the
+    // page is kept for another attempt. Sent mail, which bridged, may advance.
+    expect(saved.data.deltaState.calendarDeltaLink).toBe('cal-keep');
+    expect(saved.data.deltaState.mailDeltaLink).toBeUndefined();
+    expect(saved.data.deltaState.mailNextLink).toEqual(expect.stringContaining('mailFolders/inbox'));
+    expect(saved.data.deltaState.mailSentDeltaLink).toBe('delta');
+  });
+
+  it('does not spend the bridge budget when the Outlook row was never written', async () => {
+    const poison = {
+      id: 'm-poison',
+      from: { emailAddress: { address: 'buyer@acme.com' } },
+      toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+      subject: 'Secret subject',
+      receivedDateTime: '2026-11-06T14:00:00Z',
+    };
+    upsert.mockImplementation(async (args: { create?: { externalMessageId?: string } }) => {
+      if (args.create?.externalMessageId === 'm-poison') throw new Error('write failed');
+      return { id: 'row-ok' } as never;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const target = String(url);
+        if (target.includes('sentitems') || target === 'sent-delta') {
+          return json({ value: [], '@odata.deltaLink': 'sent-delta' });
+        }
+        return json({ value: [poison], '@odata.deltaLink': 'inbox-delta' });
+      }),
+    );
+
+    let state: Record<string, unknown> = { calendarDeltaLink: 'cal-keep' };
+    findToken.mockImplementation(async () => tokenRow('microsoft_graph', state));
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
+      state = (tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }).data.deltaState;
+      // The row was never written, so this is not an activity-bridge failure
+      // and the inbox cursor must not move on after a quarantine.
+      expect(state.activityBridgeRetryById).toBeUndefined();
+      expect(state.activityBridgeQuarantine).toBeUndefined();
+      expect(state.mailDeltaLink).toBeUndefined();
+      expect(state.mailNextLink).toEqual(expect.stringContaining('mailFolders/inbox'));
+      expect(state.mailSentDeltaLink).toBe('sent-delta');
+      expect(JSON.stringify(state)).not.toContain('Secret subject');
+    }
   });
 
   it('does not store mail that matches no contact, company or opportunity', async () => {
@@ -281,5 +364,180 @@ describe('Gmail inbox capture', () => {
     expect(tokenUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ deltaState: { calendarSyncToken: 'keep' } }) }),
     );
+  });
+
+  it('holds the history cursor when storing a message throws', async () => {
+    upsert.mockRejectedValueOnce(new Error('write failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.includes('/messages?')) return json({ messages: [{ id: 'g-poison', threadId: 't-1' }] });
+        return json({
+          id: 'g-poison',
+          threadId: 't-1',
+          internalDate: '1793973600000',
+          payload: {
+            mimeType: 'text/plain',
+            headers: [
+              { name: 'From', value: 'Buyer <buyer@acme.com>' },
+              { name: 'To', value: 'tony@amaris.com' },
+              { name: 'Subject', value: 'Secret subject' },
+            ],
+            body: { data: b64('Plain body') },
+          },
+        });
+      }),
+    );
+
+    const persisted = await pullGmail(tokenRow('gmail', { calendarSyncToken: 'keep' }), 'access-token', log);
+    expect(persisted).toBe(0);
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
+    expect(saved.data.deltaState.calendarSyncToken).toBe('keep');
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+
+  it('holds the seed cursor when Gmail returns no message body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.includes('/messages?')) return json({ messages: [{ id: 'g-500', threadId: 't-1' }] });
+        return json({ error: 'unavailable' }, 500);
+      }),
+    );
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await pullGmail(tokenRow('gmail', { calendarSyncToken: 'keep' }), 'access-token', log);
+      const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+      expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
+      expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
+      expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+      expect(upsert).not.toHaveBeenCalled();
+    }
+  });
+
+  it('keeps the list page token when a later page is only partly stored', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.includes('/messages?') && !url.includes('pageToken')) {
+          return json({ messages: [{ id: 'g-1' }], nextPageToken: 'p2' });
+        }
+        if (url.includes('pageToken=p2')) {
+          return json({ messages: [{ id: 'g-2' }, { id: 'g-3' }], nextPageToken: 'p3' });
+        }
+        const id = url.includes('/messages/g-1') ? 'g-1' : 'g-2';
+        return json({
+          id,
+          threadId: 't',
+          internalDate: '1793973600000',
+          payload: {
+            mimeType: 'text/plain',
+            headers: [
+              { name: 'From', value: 'Buyer <buyer@acme.com>' },
+              { name: 'To', value: 'tony@amaris.com' },
+              { name: 'Subject', value: id },
+            ],
+            body: { data: b64('body') },
+          },
+        });
+      }),
+    );
+    await pullGmail(tokenRow('gmail', { calendarSyncToken: 'keep' }), 'access-token', log, 2);
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.gmailListPageToken).toBe('p2');
+    expect(saved.data.deltaState.gmailListResumeCount).toBe(1);
+    expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
+  });
+
+  it('does not advance history past ids the cap has not stored yet', async () => {
+    const page = (ids: string[], next?: string) =>
+      json({
+        history: [{ id: 'h', messagesAdded: ids.map((id) => ({ message: { id } })) }],
+        historyId: '999',
+        ...(next ? { nextPageToken: next } : {}),
+      });
+    const detail = (id: string) =>
+      json({
+        id,
+        threadId: 't',
+        internalDate: '1793973600000',
+        payload: {
+          mimeType: 'text/plain',
+          headers: [
+            { name: 'From', value: 'Buyer <buyer@acme.com>' },
+            { name: 'To', value: 'tony@amaris.com' },
+            { name: 'Subject', value: id },
+          ],
+          body: { data: b64('body') },
+        },
+      });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/history')) return page(['g-a', 'g-b', 'g-c']);
+        if (String(url).includes('/messages/g-a')) return detail('g-a');
+        if (String(url).includes('/messages/g-b')) return detail('g-b');
+        return detail('g-c');
+      }),
+    );
+    const first = await pullGmail(tokenRow('gmail', { gmailHistoryId: '10', calendarSyncToken: 'keep' }), 'at', log, 2);
+    expect(first).toBe(2);
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.gmailHistoryId).toBe('10');
+    expect(saved.data.deltaState.gmailHistoryResumeCount).toBe(2);
+    expect(saved.data.deltaState.calendarSyncToken).toBe('keep');
+    const second = await pullGmail(
+      tokenRow('gmail', saved.data.deltaState),
+      'at',
+      log,
+      2,
+    );
+    expect(second).toBe(1);
+    const done = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(done.data.deltaState.gmailHistoryId).toBe('999');
+    expect(done.data.deltaState.gmailHistoryResumeCount).toBeUndefined();
+    const storedIds = upsert.mock.calls.map((call) => (call[0] as { create: { externalMessageId: string } }).create.externalMessageId);
+    expect(storedIds).toEqual(['g-a', 'g-b', 'g-c']);
+    const firstWrite = upsert.mock.calls[0]?.[0] as {
+      where: { orgId_externalMessageId: { externalMessageId: string } };
+      update: object;
+    };
+    // A failed cursor commit retries the same provider id onto one row.
+    expect(firstWrite.where.orgId_externalMessageId.externalMessageId).toBe('g-a');
+    expect(firstWrite.update).toEqual({});
+  });
+});
+
+describe('Gmail page checkpoint', () => {
+  it('keeps the unread tail of a page and the next page token', () => {
+    const mid = consumeGmailIdPage({
+      messageIds: ['a', 'b', 'c'],
+      nextPageToken: 'page-2',
+      resumeCount: 0,
+      cap: 2,
+    });
+    expect(mid).toEqual({ ids: ['a', 'b'], resumeCount: 2, pageToken: null, finished: false });
+    const rest = consumeGmailIdPage({
+      messageIds: ['a', 'b', 'c'],
+      nextPageToken: 'page-2',
+      resumeCount: mid.resumeCount,
+      cap: 2,
+    });
+    expect(rest.ids).toEqual(['c']);
+    expect(rest.finished).toBe(false);
+    expect(rest.pageToken).toBe('page-2');
+    const done = consumeGmailIdPage({
+      messageIds: ['d'],
+      nextPageToken: null,
+      resumeCount: 0,
+      cap: 2,
+    });
+    expect(done.finished).toBe(true);
+    expect(done.ids).toEqual(['d']);
   });
 });

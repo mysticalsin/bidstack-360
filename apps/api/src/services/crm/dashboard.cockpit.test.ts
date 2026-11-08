@@ -120,6 +120,17 @@ describe('applyFieldOverrides', () => {
     expect(overriddenKeys.has('annualRevenueMicros')).toBe(false);
   });
 
+  it('applies an EUR revenue override and leaves the EUR micros alone for another currency', () => {
+    const eur = applyFieldOverrides(company({}), [{ fieldKey: 'annualRevenueMicros', value: 5_000_000, currency: 'EUR' }]);
+    expect(eur.company.annualRevenueMicros).toBe(5_000_000);
+    const legacy = applyFieldOverrides(company({}), [{ fieldKey: 'annualRevenueMicros', value: 6_000_000 }]);
+    expect(legacy.company.annualRevenueMicros).toBe(6_000_000);
+    // WHY: the cockpit holds EUR micros and has no rates; a USD figure read as EUR would be wrong.
+    const usd = applyFieldOverrides(company({ annualRevenueMicros: 1_000_000 }), [{ fieldKey: 'annualRevenueMicros', value: 5_000_000, currency: 'USD' }]);
+    expect(usd.company.annualRevenueMicros).toBe(1_000_000);
+    expect(usd.overriddenKeys.has('annualRevenueMicros')).toBe(false);
+  });
+
   it('ignores malformed override values instead of corrupting the snapshot', () => {
     const original = company({ industry: 'banking' });
     const { company: next, overriddenKeys } = applyFieldOverrides(original, [

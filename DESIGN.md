@@ -768,6 +768,18 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
 
+### 9.11 Conversations on the account page (slice 20)
+
+Synced Outlook, Teams and Gmail meetings and emails filed to the account, shown under the activity charts on the account page. Read-only: Polo never sends mail or writes calendars.
+
+- Section "Conversations": header with the count shown and the source line "From your connected Outlook and Google calendars and mailboxes". One row per meeting or email, newest first, 25 rows, "Show more" pages by 25.
+- Row: lucide icon (`Video` for Teams, `CalendarDays` for other meetings, `Mail` for email), subject (truncates, full text in `title`), date and time in the browser zone, participant count, direction for email (Received, Sent).
+- Source chip on every row, so each fact names its source: `Outlook`, `Teams`, `Gmail`, `Google Calendar`; rows logged in Polo or pushed by the ingest API show `Logged in Polo` or the ingest source name.
+- Filing hint after the chip: "Filed automatically" (matched by attendee or domain) or "Filed by you". When the account has more than one open opportunity and none was picked, a "Needs opportunity" tag shows instead of a guess.
+- Re-file: meetings you own get a "File to opportunity" select (open opportunities on this account plus "Account only"). It calls the existing `PATCH /calendar/events/:id`; emails have no re-file route yet, so no control.
+- Cancelled meetings stay in the list with a "Cancelled" tag and struck subject.
+- Empty: one line, "No synced meetings or emails yet." Error: one line plus Retry. Loading: skeleton rows.
+- Tokens: `--fg-*`, `--border-subtle`, `--brand-primary`; `Badge` for chips; both themes; nothing overlaps at 1440, 1024 or 390.
 ### 9.11 Company intel on the Companies page (slice 14)
 
 Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.
@@ -808,7 +820,7 @@ Appended by factory slice 5 (Settings > Access policies).
 - Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
 - Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.
 
-### 9.11 Account and company page layout rules (factory 23, 2026-11-08)
+### 9.12 Account and company page layout rules (factory 23, 2026-11-08)
 
 Fix-only rules for the account cockpit (`/accounts/:id`) and company detail (`/companies/:id`). They hold at 1440, 1024, 768 and 390.
 
@@ -824,3 +836,18 @@ Fix-only rules for the account cockpit (`/accounts/:id`) and company detail (`/c
 - Money uses one compact format everywhere on these pages: currency code first, then the amount (`EUR 29.9bn`, `CAD 935m`), from `formatCompactMoney` in `@bidstack/shared`.
 - Display currency defaults to the workspace currency (Settings, Currency and locale). The browser time zone or location is used only when the user picks "Auto"; an explicit pick always wins.
 - Pinned by `e2e/audit/account-company.layout.audit.spec.ts` (overlap per line box, clipped to overflow ancestors, ignoring runs hidden under an opaque positioned layer) and unit tests next to each component.
+
+### 9.11 Sourced company figures (slice 22, 2026-11-08)
+
+Revenue, employees, industry and registry identifiers on the account page show where each number came from, and the user can correct them. Additive only: no existing section is removed or moved.
+
+- Source chip: every revenue, employees and registry value shows a small visible chip under it, `Label · Year` (for example `SEC EDGAR · FY2025`, `Wikidata · 2024`, `Manual · source`). The chip is a link when a source URL exists (new tab, `rel="noopener noreferrer"`), plain text otherwise. 12px, `--fg-tertiary`, underline on hover and focus.
+- Precedence, one rule everywhere: filed statements, then a manual value that carries a source link, then Wikidata (P2123 with its point in time), then a manual value without a source, then the data provider (Apollo or Seamless), then the account's own CRM record. The tile names whichever won.
+- Edit: a quiet `Edit` text button (24 x 24 minimum hit area) next to the chip opens a small inline form: value, source URL (http or https only), source label. Save and Cancel; Escape closes; focus returns to `Edit`. Revenue has a currency select (EUR default; USD, GBP, CAD, CHF, NOK, SEK, DKK, BRL and more) and is stored and shown in that currency. Saved values are audited and show as `Manual`.
+- Empty states say what is missing ("No filed revenue and no public figure found") and offer two actions: `Refresh from public sources` (queues registry and filings refresh plus the Wikidata lookup) and `Add manually` (opens the same form). Never a bare "No data", "Not known" or "Not verified" where an action is possible.
+- Industry never renders as a bare one or two character code: NACE sections, NAICS sectors and SIC divisions map to their names; an unmapped short code shows as "Not known".
+- Registry block (Financials panel): registration number and jurisdiction rows, each with its source chip and Edit; identifiers already matched (LEI, SIREN, Companies House, Brreg, SEC CIK) link to their public register page.
+- Layout: no overlap or spill at 390, 768, 1024 and 1440. Value and chip containers use `min-width: 0`; long values wrap (`overflow-wrap: anywhere`), chips truncate with the full text in `title`; strips and grids collapse to fewer columns. Pinned by `sourced-figures.contract.test.ts`.
+- CRM record: when nothing else has a figure, the number on the account's own record shows with the chip `CRM record · unverified`, so it is visible and honestly labelled. Wikidata headcount gets the same chip as revenue (`Wikidata · Year`, linked to the entity); with no stated year the chip is `Wikidata`.
+- No placeholder text: a tile with nothing to say about its period omits the period line, and a tile with no source and no period shows no hover tip. The words `n/a` and `None` never render.
+- Touch targets: buttons and fields in the technology stack editor are 44px tall; the chip remove control is 44 x 44.

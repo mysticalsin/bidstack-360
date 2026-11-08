@@ -270,6 +270,140 @@ describe('crm companies routes', () => {
     expect(industryAfter?.block).toBe('external');
   });
 
+  skipIfNoDb('field override stores its source link and label, and audits them', async () => {
+    // WHY: the product owner must be able to prove every figure; a manual
+    // revenue without the place it was read from is not provable.
+    const put = await server.inject({
+      method: 'PUT',
+      url: '/api/crm/companies/Mantu/field-overrides',
+      payload: {
+        fieldKey: 'annualRevenueMicros',
+        value: 1_200_000_000_000_000,
+        sourceUrl: 'https://www.mantu.com/annual-report-2025.pdf',
+        sourceLabel: 'Annual report 2025',
+      },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json()).toMatchObject({
+      fieldKey: 'annualRevenueMicros',
+      sourceUrl: 'https://www.mantu.com/annual-report-2025.pdf',
+      sourceLabel: 'Annual report 2025',
+    });
+    const row = await prisma.companyFieldOverride.findFirst({
+      where: { orgId: orgId!, companyKey: 'mantu', fieldKey: 'annualRevenueMicros' },
+    });
+    expect(row?.sourceUrl).toBe('https://www.mantu.com/annual-report-2025.pdf');
+    expect(row?.sourceLabel).toBe('Annual report 2025');
+    const audit = await prisma.auditLog.findFirst({
+      where: { orgId: orgId!, action: 'company.field_override', targetId: 'mantu' },
+      orderBy: { id: 'desc' },
+    });
+    expect(audit?.diff).toMatchObject({ fieldKey: 'annualRevenueMicros', sourceUrl: 'https://www.mantu.com/annual-report-2025.pdf' });
+
+    // Saving again without a source clears the old link: the value changed,
+    // so the old source no longer proves it.
+    await server.inject({
+      method: 'PUT',
+      url: '/api/crm/companies/Mantu/field-overrides',
+      payload: { fieldKey: 'annualRevenueMicros', value: 1_300_000_000_000_000 },
+    });
+    const cleared = await prisma.companyFieldOverride.findFirst({
+      where: { orgId: orgId!, companyKey: 'mantu', fieldKey: 'annualRevenueMicros' },
+    });
+    expect(cleared?.sourceUrl).toBeNull();
+    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/annualRevenueMicros' });
+  });
+
+  skipIfNoDb('field override stores the currency of a manual revenue, EUR when none is given', async () => {
+    const put = (payload: object) => server.inject({ method: 'PUT', url: '/api/crm/companies/Mantu/field-overrides', payload });
+    const row = () => prisma.companyFieldOverride.findFirst({ where: { orgId: orgId!, companyKey: 'mantu', fieldKey: 'annualRevenueMicros' } });
+
+    const usd = await put({ fieldKey: 'annualRevenueMicros', value: 2_000_000_000_000_000, currency: 'USD' });
+    expect(usd.statusCode).toBe(200);
+    expect(usd.json()).toMatchObject({ currency: 'USD' });
+    expect((await row())?.currency).toBe('USD');
+    const audit = await prisma.auditLog.findFirst({ where: { orgId: orgId!, action: 'company.field_override', targetId: 'mantu' }, orderBy: { id: 'desc' } });
+    expect(audit?.diff).toMatchObject({ currency: 'USD' });
+
+    expect((await put({ fieldKey: 'annualRevenueMicros', value: 2_100_000_000_000_000 })).json()).toMatchObject({ currency: 'EUR' });
+    expect((await row())?.currency).toBe('EUR');
+
+    for (const currency of ['XXX', 'usd', 'US']) {
+      expect((await put({ fieldKey: 'annualRevenueMicros', value: 1_000_000, currency })).statusCode).toBe(400);
+    }
+    // Only revenue carries a currency.
+    const emp = await put({ fieldKey: 'employeeCount', value: 500, currency: 'USD' });
+    expect(emp.json()).toMatchObject({ currency: null });
+    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/annualRevenueMicros' });
+    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/employeeCount' });
+  });
+
+  skipIfNoDb('field override refuses a source link that is not http or https', async () => {
+    for (const sourceUrl of ['javascript:alert(1)', 'ftp://files.example.com/a', 'not a url']) {
+      const res = await server.inject({
+        method: 'PUT',
+        url: '/api/crm/companies/Mantu/field-overrides',
+        payload: { fieldKey: 'employeeCount', value: 100, sourceUrl },
+      });
+      expect(res.statusCode).toBe(400);
+    }
+  });
+
+  skipIfNoDb('registry number and jurisdiction can be set with a source and reverted', async () => {
+    const put = await server.inject({
+      method: 'PUT',
+      url: '/api/crm/companies/Mantu/field-overrides',
+      payload: {
+        fieldKey: 'registryId',
+        value: '  B 123 456 789 ',
+        sourceUrl: 'https://annuaire-entreprises.data.gouv.fr/entreprise/123456789',
+        sourceLabel: 'Annuaire des entreprises',
+      },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json().value).toBe('B 123 456 789');
+    const jur = await server.inject({
+      method: 'PUT',
+      url: '/api/crm/companies/Mantu/field-overrides',
+      payload: { fieldKey: 'registryJurisdiction', value: 'fr' },
+    });
+    expect(jur.statusCode).toBe(200);
+    expect(jur.json().value).toBe('FR');
+    const bad = await server.inject({
+      method: 'PUT',
+      url: '/api/crm/companies/Mantu/field-overrides',
+      payload: { fieldKey: 'registryJurisdiction', value: 'France!' },
+    });
+    expect(bad.statusCode).toBe(400);
+    for (const key of ['registryId', 'registryJurisdiction']) {
+      const del = await server.inject({ method: 'DELETE', url: `/api/crm/companies/Mantu/field-overrides/${key}` });
+      expect(del.statusCode).toBe(204);
+    }
+  });
+
+  skipIfNoDb('field override keyed by company id lands on the name key the cockpit reads', async () => {
+    // WHY: the account page knows the company id, the cockpit reads overrides
+    // by normalised name; an id-keyed row would never show up.
+    const company = await prisma.company.create({
+      data: { orgId: orgId!, name: 'Provenance Probe SA' },
+      select: { id: true },
+    });
+    try {
+      const put = await server.inject({
+        method: 'PUT',
+        url: `/api/crm/companies/${company.id}/field-overrides`,
+        payload: { fieldKey: 'employeeCount', value: 4200, sourceUrl: 'https://example.com/facts', sourceLabel: 'Company facts' },
+      });
+      expect(put.statusCode).toBe(200);
+      expect(put.json().companyKey).toBe('provenance-probe-sa');
+      const del = await server.inject({ method: 'DELETE', url: `/api/crm/companies/${company.id}/field-overrides/employeeCount` });
+      expect(del.statusCode).toBe(204);
+      expect(await prisma.companyFieldOverride.count({ where: { orgId: orgId!, companyKey: 'provenance-probe-sa' } })).toBe(0);
+    } finally {
+      await prisma.company.delete({ where: { id: company.id } });
+    }
+  });
+
   skipIfNoDb('manual technical stack persists into the account cockpit', async () => {
     const put = await server.inject({
       method: 'PUT',
