@@ -71,6 +71,35 @@ function parseProjects(v: unknown): PotentialProject[] {
   return out.success ? out.data : [];
 }
 
+// Older seeds and imports stored free-text regions ('emea', 'North America');
+// one off-enum row must not 500 the whole hiring panel.
+const REGION_ALIASES: Record<string, HiringRegion> = {
+  emea: 'EMEA',
+  europe: 'EMEA',
+  amer: 'AMER',
+  americas: 'AMER',
+  'north america': 'AMER',
+  latam: 'LATAM',
+  'latin america': 'LATAM',
+  'south america': 'LATAM',
+  apac: 'APAC',
+  'asia pacific': 'APAC',
+};
+
+export function toHiringRegion(v: string | null): HiringRegion {
+  return REGION_ALIASES[(v ?? '').trim().toLowerCase()] ?? 'unknown';
+}
+
+export function toJobFunction(v: string | null): JobFunction {
+  const out = JobFunction.safeParse((v ?? '').trim().toLowerCase());
+  return out.success ? out.data : 'other';
+}
+
+export function toJobSeniority(v: string | null): JobSeniority {
+  const out = JobSeniority.safeParse((v ?? '').trim().toLowerCase());
+  return out.success ? out.data : 'mid';
+}
+
 function parseHiring(v: unknown): HiringBreakdown {
   const out = HiringBreakdown.safeParse(v);
   return out.success ? out.data : EMPTY_HIRING;
@@ -201,7 +230,7 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
         orgId,
         companyId: company.id,
         ...(req.query.function ? { function: req.query.function } : {}),
-        ...(req.query.region ? { region: req.query.region } : {}),
+        ...(req.query.region ? { region: { equals: req.query.region, mode: 'insensitive' as const } } : {}),
       };
       const [row, rows, total] = await Promise.all([
         prisma.companyFirmographics.findFirst({ where: { orgId, companyId: company.id }, select: { hiring: true, fetchedAt: true } }),
@@ -221,9 +250,9 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
           url: p.url,
           city: p.city,
           country: p.country,
-          region: p.region as HiringRegion,
-          function: p.function as JobFunction,
-          seniority: p.seniority as JobSeniority,
+          region: toHiringRegion(p.region),
+          function: toJobFunction(p.function),
+          seniority: toJobSeniority(p.seniority),
           skills: p.skills,
           postedAt: p.postedAt?.toISOString() ?? null,
         })),

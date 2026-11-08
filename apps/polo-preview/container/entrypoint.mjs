@@ -102,6 +102,8 @@ function apiEnv() {
     PUPPETEER_SKIP_DOWNLOAD: 'true',
     WORKER_HEALTH_PORT: '4030',
     ACCOUNT_INTEL_AUTO_REFRESH: 'true',
+    // An account page fans out to about 30 API calls, so the API's default 120 per user per minute starves widgets after a few accounts.
+    API_RATE_LIMIT_MAX: process.env.API_RATE_LIMIT_MAX || '1200',
     ...(process.env.POLO_INTEL_USER_AGENT
       ? {
           ACCOUNT_INTEL_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
