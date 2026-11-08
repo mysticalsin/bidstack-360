@@ -12,6 +12,7 @@ import type {
   IntelSourceKey,
 } from '@bidstack/shared';
 
+import { toast } from '@/components/ui/Toast';
 import { ApiError, api } from '@/lib/api';
 
 const base = (companyId: string) => `/api/companies/${encodeURIComponent(companyId)}/intel`;
@@ -59,18 +60,29 @@ export function useCompanyNewsIntel(companyId: string | undefined) {
   return useIntel<AccountNewsIntel>('news', companyId);
 }
 
-/** Queue one source; invalidate and poll the intel views for a few minutes. */
+function refreshErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 403) return 'You do not have permission to refresh account intelligence.';
+  if (err instanceof ApiError && err.status === 429) return 'Too many refreshes. Try again in a minute.';
+  if (err instanceof ApiError) return `Refresh failed: ${err.message}`;
+  return err instanceof Error && err.message ? err.message : 'Refresh failed. Check your connection and try again.';
+}
+
+/** Queue one source; invalidate and poll the intel views for a few minutes. Failures raise a toast. */
 export function useRefreshIntelSource(companyId: string) {
   const qc = useQueryClient();
   const [pollUntil, setPollUntil] = useState<number | undefined>(undefined);
   const m = useMutation({
-    mutationFn: (source: IntelSourceKey) =>
-      api<IntelRefreshResponse>(`${base(companyId)}/refresh`, { method: 'POST', body: { source } }),
+    mutationFn: async (source: IntelSourceKey) => {
+      const res = await api<IntelRefreshResponse>(`${base(companyId)}/refresh`, { method: 'POST', body: { source } });
+      if (!res.queued) throw new Error(`${res.status.label} refresh could not be queued. Try again in a minute.`);
+      return res;
+    },
     onSuccess: () => {
       setPollUntil(Date.now() + POLL_FOR_MS);
       setTimeout(() => setPollUntil(undefined), POLL_FOR_MS + POLL_MS);
       void qc.invalidateQueries({ queryKey: ['company-intel', companyId] });
     },
+    onError: (err) => toast.error(refreshErrorMessage(err)),
   });
   return { ...m, pollUntil };
 }

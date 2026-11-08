@@ -12,12 +12,14 @@
 //   - a dry run must change nothing; an admin gate and the tenant guard apply.
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, beforeAll, describe, expect } from 'vitest';
+import { afterAll, beforeAll, describe, expect, vi } from 'vitest';
 
 import {
   eraseDataSubject,
   exportDataSubject,
+  makeTenantScopeGuardMiddleware,
   prisma,
+  PrismaClient,
   resolveDataSubject,
   runDataSubjectRequest,
   scanSubjectResidue,
@@ -368,7 +370,7 @@ describe('data subject requests API', () => {
     });
     const { id } = created.json() as { id: string };
 
-    await runDataSubjectRequest(prisma, id);
+    await runDataSubjectRequest(prisma, id, orgId!);
 
     const status = await server.inject({
       method: 'GET',
@@ -700,5 +702,117 @@ describe('data subject matching is bounded to the subject', () => {
     const subject = await resolveDataSubject(prisma, orgId!, 'contact', c.id);
     expect(subject!.names).toEqual([]);
     expect(subject!.phones).toEqual([]);
+  });
+});
+
+describe('data subject request runner', () => {
+  async function fileRequest(
+    kind: 'export' | 'erase',
+    subjectType: 'contact' | 'account_person',
+    subjectId: string,
+    dryRun = false,
+  ): Promise<string> {
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/v1/orgs/${orgId}/data-subject-requests`,
+      payload: { kind, subjectType, subjectId, dryRun },
+    });
+    expect(res.statusCode).toBe(202);
+    return (res.json() as { id: string }).id;
+  }
+
+  async function seedPortrait(): Promise<{ nodeId: string; key: string }> {
+    const tag = randomUUID().slice(0, 8);
+    const company = await prisma.company.create({ data: { orgId: orgId!, name: `Portrait Co ${tag}` } });
+    const chart = await prisma.orgChart.create({ data: { orgId: orgId!, companyId: company.id } });
+    const key = `${orgId}/orgchart/${tag}/photo.jpg`;
+    const node = await prisma.orgChartNode.create({
+      data: {
+        orgId: orgId!,
+        chartId: chart.id,
+        name: `Paula Portrait ${tag}`,
+        email: `paula.portrait.${tag}@example.com`,
+        photoStorageKey: key,
+      },
+    });
+    return { nodeId: node.id, key };
+  }
+
+  // WHY: production may run with BIDSTACK_TENANT_SCOPE_GUARD=enforce; an
+  // unscoped claim or sidecar read would throw and strand every request.
+  t('export and erasure both complete with the tenant scope guard enforced', async () => {
+    const guarded = new PrismaClient();
+    guarded.$use(makeTenantScopeGuardMiddleware({ mode: 'enforce' }));
+    try {
+      const s = await seedSubject();
+      const exportId = await fileRequest('export', 'contact', s.contactId);
+      expect((await runDataSubjectRequest(guarded, exportId, orgId!)).status).toBe('done');
+      const eraseId = await fileRequest('erase', 'contact', s.contactId, true);
+      expect((await runDataSubjectRequest(guarded, eraseId, orgId!)).status).toBe('done');
+    } finally {
+      await guarded.$disconnect();
+    }
+  });
+
+  // WHY: re-delivery while a run still holds the claim used to complete the job
+  // as skipped; if that run then died the row stayed `running` forever.
+  t('a request another run still holds comes back busy until the claim goes stale', async () => {
+    const s = await seedSubject();
+    const id = await fileRequest('export', 'contact', s.contactId);
+    const startedAt = new Date(Date.now() - 60_000);
+    await prisma.dataSubjectRequest.update({ where: { id }, data: { status: 'running', startedAt } });
+
+    const busy = await runDataSubjectRequest(prisma, id, orgId!);
+    expect(busy.status).toBe('busy');
+    expect(busy.retryAt!.getTime()).toBeGreaterThan(startedAt.getTime() + 15 * 60_000);
+
+    await prisma.dataSubjectRequest.update({
+      where: { id },
+      data: { startedAt: new Date(Date.now() - 16 * 60_000) },
+    });
+    expect((await runDataSubjectRequest(prisma, id, orgId!)).status).toBe('done');
+  });
+
+  // WHY: erasure nulled photoStorageKey but left the uploaded portrait in the
+  // bucket, unreachable and never deleted.
+  t('erasure deletes the uploaded portrait, retrying the delete without erasing twice', async () => {
+    const { nodeId, key } = await seedPortrait();
+    const id = await fileRequest('erase', 'account_person', nodeId);
+
+    const failing = vi.fn(async () => {
+      throw new Error('bucket unavailable');
+    });
+    const first = await runDataSubjectRequest(prisma, id, orgId!, { deleteObjects: failing });
+    expect(first.status).toBe('busy');
+    expect(failing).toHaveBeenCalledWith([key]);
+    // Erased nodes are soft-deleted; `not: undefined` reads past the soft-delete filter.
+    const node = await prisma.orgChartNode.findFirst({
+      where: { id: nodeId, orgId: orgId!, deletedAt: { not: undefined } },
+    });
+    expect(node).not.toBeNull();
+    expect(node?.photoStorageKey).toBeNull();
+    const held = await prisma.dataSubjectRequest.findFirst({ where: { id, orgId: orgId! } });
+    expect(held?.status).toBe('running');
+    expect((held?.report as { pendingStorageKeys?: string[] }).pendingStorageKeys).toEqual([key]);
+
+    await prisma.dataSubjectRequest.update({
+      where: { id },
+      data: { startedAt: new Date(Date.now() - 16 * 60_000) },
+    });
+    const deleted: string[] = [];
+    const second = await runDataSubjectRequest(prisma, id, orgId!, {
+      deleteObjects: async (keys) => {
+        deleted.push(...keys);
+      },
+    });
+    expect(second.status).toBe('done');
+    expect(deleted).toEqual([key]);
+    const done = await prisma.dataSubjectRequest.findFirst({ where: { id, orgId: orgId! } });
+    expect(done?.status).toBe('done');
+    expect(JSON.stringify(done?.report)).not.toContain('pendingStorageKeys');
+    const erasures = await prisma.auditLog.count({
+      where: { orgId: orgId!, action: 'gdpr.erasure', targetId: nodeId },
+    });
+    expect(erasures).toBe(1);
   });
 });

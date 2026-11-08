@@ -54,6 +54,18 @@ function fakeDb(opts: {
   } as unknown as CaptureDb & { calls: Record<string, number> };
 }
 
+describe('externalParticipants on a free mail domain', () => {
+  it('keeps other gmail.com users when the owner is on gmail.com', () => {
+    expect(externalParticipants('owner@gmail.com', ['owner@gmail.com', 'buyer@gmail.com', 'x@acme.com'])).toEqual(['buyer@gmail.com', 'x@acme.com']);
+  });
+
+  it('files mail with a known contact who shares the owner free mail domain', async () => {
+    const db = fakeDb({ contacts: [{ id: 'k1', email: 'buyer@gmail.com', companyId: 'co1' }] });
+    const target = await resolveCaptureTarget({ orgId, ownerEmail: 'owner@gmail.com', participants: ['owner@gmail.com', 'buyer@gmail.com'] }, db);
+    expect(target).toMatchObject({ entityType: 'contact', contactId: 'k1' });
+  });
+});
+
 describe('externalParticipants', () => {
   it('drops the mailbox owner, colleagues on the same domain, blanks and duplicates', () => {
     expect(

@@ -224,6 +224,7 @@ function normalizeRelease(
   prov: ChileProvenance,
   ctx: PsNormalizeContext,
   col: NormalizedCollector,
+  seenAwards: Set<string>,
 ): void {
   const tender = release.tender ?? null;
   const awards = release.awards ?? [];
@@ -340,6 +341,11 @@ function normalizeRelease(
   }
 
   for (const award of awards) {
+    // Releases arrive newest first: the first state seen for an award is its
+    // latest, so an older active copy cannot revive a cancelled award.
+    const awardKey = `${code}:${award.id}`;
+    if (seenAwards.has(awardKey)) continue;
+    seenAwards.add(awardKey);
     if (award.status !== 'active') continue;
     const awardSuppliers = award.suppliers ?? [];
     // One award value shared by several suppliers cannot be split honestly.
@@ -424,7 +430,8 @@ export const ocdsAdapter: PsAdapter<OcdsCursor> = {
     const releases = [...pkg.releases].sort(
       (a, b) => terminal(b) - terminal(a) || (b.date ?? '').localeCompare(a.date ?? ''),
     );
-    for (const release of releases) normalizeRelease(release, prov, ctx, col);
+    const seenAwards = new Set<string>();
+    for (const release of releases) normalizeRelease(release, prov, ctx, col, seenAwards);
     return col.out;
   },
 

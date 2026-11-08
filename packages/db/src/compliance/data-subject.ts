@@ -313,9 +313,12 @@ function subjectIds(s: DataSubject): string[] {
 
 interface Handler {
   linked(db: Db, s: DataSubject): Promise<string[]>;
-  /** Structural erasure of linked rows. Returns rows kept under a legal basis. */
-  erase?(db: Db, s: DataSubject, ids: string[]): Promise<number | void>;
-  rows?(db: Db, ids: string[]): Promise<Array<Record<string, unknown>>>;
+  /**
+   * Structural erasure of linked rows. Returns rows kept under a legal basis.
+   * Stored objects (uploaded files) whose keys it clears go into `storageKeys`.
+   */
+  erase?(db: Db, s: DataSubject, ids: string[], storageKeys: string[]): Promise<number | void>;
+  rows?(db: Db, ids: string[], orgId: string): Promise<Array<Record<string, unknown>>>;
 }
 
 const none = async (): Promise<string[]> => [];
@@ -427,8 +430,12 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
           OR ${uuidIn('OrgChartNode', 'contactId', s.contactIds)}
           OR ${lowerIn('OrgChartNode', 'email', s.emails)}`,
       ),
-    async erase(db, _s, ids) {
+    async erase(db, _s, ids, storageKeys) {
       const m = 'OrgChartNode';
+      const photos = await db.$queryRaw<Array<{ key: string }>>`
+        SELECT ${C(m, 'photoStorageKey')} AS key FROM ${T(m)}
+         WHERE id = ANY(${ids}::uuid[]) AND ${C(m, 'photoStorageKey')} IS NOT NULL`;
+      storageKeys.push(...photos.map((p) => p.key));
       await db.$executeRaw`UPDATE ${T(m)} SET ${C(m, 'name')} = ${TOMBSTONE.name},
           ${C(m, 'title')} = NULL, ${C(m, 'email')} = NULL, ${C(m, 'phone')} = NULL,
           ${C(m, 'linkedinUrl')} = NULL, ${C(m, 'photoUrl')} = NULL, ${C(m, 'photoStorageKey')} = NULL,
@@ -746,10 +753,10 @@ const HANDLERS: Record<SubjectStoreModel, Handler> = {
          WHERE ${C('AuditLog', 'orgId')} = ${s.orgId}::uuid AND ${C('AuditLog', 'targetId')} = ANY(${ids}::text[])`;
       return rows.map((r) => r.id);
     },
-    rows: (db, ids) =>
+    rows: (db, ids, orgId) =>
       inChunks(ids, (chunk) =>
         db.auditLog.findMany({
-          where: { id: { in: chunk.map((id) => BigInt(id)) }, deletedAt: { not: undefined } },
+          where: { id: { in: chunk.map((id) => BigInt(id)) }, orgId, deletedAt: { not: undefined } },
           select: {
             id: true,
             action: true,
@@ -912,8 +919,9 @@ function stripSecrets(row: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row).filter(([k]) => !SECRET_FIELD.test(k)));
 }
 
-async function defaultRows(db: Db, model: string, ids: string[]) {
+async function defaultRows(db: Db, model: string, ids: string[], orgId: string) {
   const where: Record<string, unknown> = { id: { in: ids } };
+  if (hasField(model, 'orgId')) where.orgId = orgId;
   if (hasField(model, 'deletedAt')) where.deletedAt = { not: undefined };
   return inChunks(ids, (chunk) =>
     delegate(db, model).findMany({ where: { ...where, id: { in: chunk } }, take: chunk.length }),
@@ -989,8 +997,8 @@ export async function exportDataSubject(db: Db, s: DataSubject): Promise<DataSub
     const h = HANDLERS[model];
     const rows = linked.length
       ? h.rows
-        ? await h.rows(db, linked)
-        : await defaultRows(db, model, linked)
+        ? await h.rows(db, linked, s.orgId)
+        : await defaultRows(db, model, linked, s.orgId)
       : [];
     stores[model] = [
       ...rows.map(stripSecrets),
@@ -1067,6 +1075,13 @@ async function primaryScrubbedFields(db: Db, s: DataSubject): Promise<string[]> 
   return fields;
 }
 
+/**
+ * The report plus the keys of stored objects (uploaded portraits) whose
+ * database references the erasure cleared. The caller deletes those objects;
+ * the keys are not part of the stored report.
+ */
+export type EraseResult = EraseReport & { storageKeys: string[] };
+
 export interface EraseOptions {
   dryRun: boolean;
   actorUserId?: string | null;
@@ -1082,13 +1097,14 @@ export async function eraseDataSubject(
   db: PrismaClient,
   s: DataSubject,
   opts: EraseOptions,
-): Promise<EraseReport> {
+): Promise<EraseResult> {
   return db.$transaction(
     async (tx) => {
       const scrubbedFields = await primaryScrubbedFields(tx, s);
       const planned = await plan(tx, s);
       const stores: EraseReport['stores'] = {};
       const retained: EraseReport['retained'] = {};
+      const storageKeys: string[] = [];
       let auditRowsPseudonymised = 0;
 
       for (const store of SUBJECT_STORES) {
@@ -1105,7 +1121,7 @@ export async function eraseDataSubject(
         }
         let kept = 0;
         if (!opts.dryRun) {
-          if (linked.length) kept = (await HANDLERS[store.model].erase?.(tx, s, linked)) ?? 0;
+          if (linked.length) kept = (await HANDLERS[store.model].erase?.(tx, s, linked, storageKeys)) ?? 0;
           // A row kept under a legal basis keeps its identifier (that is why it is kept).
           if (!basis) {
             await redactRows(tx, store.model, s, linked, store.fields);
@@ -1153,6 +1169,7 @@ export async function eraseDataSubject(
         stores,
         retained,
         auditRowsPseudonymised,
+        storageKeys,
       };
     },
     { timeout: 120_000, maxWait: 10_000 },

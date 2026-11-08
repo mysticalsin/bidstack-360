@@ -1,10 +1,10 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { fetchBulkUnit, loadLicitacionesCsv, parseErroneousPoList, planBulkMonth } from './cl/bulk.js';
 import { amountMicros, chileDate, redactPersonalRaw } from './cl/common.js';
 import { mercadoPublicoAdapter } from './cl/mercadopublico-api.js';
 import { OCDS_AWARD_SOURCE_KEY, ocdsAdapter } from './cl/ocds-api.js';
-import { iterateCsvRecords, parseCsvText } from './csv.js';
+import { decodeLatin1, iterateCsvRecords, parseCsvText } from './csv.js';
 import { PsSourceError } from './errors.js';
 import { CHILE_TIME_ZONE, InMemoryQuotaStore, createQuotaGuard } from './quota.js';
 import { findPersonalData } from './scrub.js';
@@ -18,7 +18,7 @@ import {
   forbidNetwork,
 } from './test-helpers.test-helpers.js';
 import { zonedDateKey, zonedTimeToUtc } from './time.js';
-import type { PsFetchUnit, PsNormalized } from './types.js';
+import type { FetchLike, PsFetchUnit, PsNormalized } from './types.js';
 
 beforeAll(forbidNetwork);
 
@@ -294,5 +294,57 @@ describe('PR #308 review: OCDS identifiers and numeric amounts', () => {
     expect(amountMicros(1.234)).toBe(1_234_000n);
     expect(amountMicros(1234.5)).toBe(1_234_500_000n);
     expect(amountMicros('1.234')).toBe(1_234_000_000n);
+  });
+});
+
+describe('PR #308 review: bulk downloads, award history and supplier hashes', () => {
+  const quiet = new Date('2026-11-07T03:00:00Z');
+
+  it('keeps the exact bytes of a bulk archive', async () => {
+    const [unit] = planBulkMonth({ year: 2025, month: 7, now: quiet });
+    // ZIP local header followed by bytes that are not valid UTF-8.
+    const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe, 0x80, 0x00, 0xc3]);
+    const fetch = vi.fn<FetchLike>(async () => new Response(zip, { status: 200 }));
+    const raw = await fetchBulkUnit(unit!, { fetch, now: () => quiet });
+    expect(raw.bodyBytes).toEqual(zip);
+    expect(raw.bytes).toBe(zip.byteLength);
+  });
+
+  it('accepts a monthly archive larger than the 32 MiB API page cap', async () => {
+    const [unit] = planBulkMonth({ year: 2025, month: 7, now: quiet });
+    const size = 105 * 1024 * 1024;
+    const fetch = vi.fn<FetchLike>(async () => new Response(new Uint8Array(size), { status: 200, headers: { 'content-length': String(size) } }));
+    const raw = await fetchBulkUnit(unit!, { fetch, now: () => quiet });
+    expect(raw.bytes).toBe(size);
+  });
+
+  it('an older active release cannot restore an award cancelled later', async () => {
+    const pkg = JSON.parse(fixtureText('ocds-award-2741-120-TD25.json')) as { releases: Array<Record<string, unknown> & { date: string; awards: Array<Record<string, unknown>> }> };
+    const active = pkg.releases[0]!;
+    const cancelled = {
+      ...active,
+      id: `${String(active.id)}-cancel`,
+      date: '2025-08-01T12:00:00Z',
+      awards: active.awards.map((a) => ({ ...a, status: 'cancelled' })),
+    };
+    pkg.releases = [active, cancelled];
+    const unit: PsFetchUnit = { sourceKey: 'cl.mp.ocds', kind: 'ocds.award', url: 'https://api.mercadopublico.cl/APISOCDS/OCDS/award/2741-120-TD25' };
+    const raw = await ocdsAdapter.fetch(unit, { fetch: cannedFetch(JSON.stringify(pkg)), now: () => FIXED_NOW });
+    const n = ocdsAdapter.normalize(raw, NORM);
+    expect(n.offers.filter((o) => o.selected)).toEqual([]);
+  });
+
+  it('supplier hashes do not depend on procurement row order', async () => {
+    const bytes = fixtureBytes('lic-da-2025-7.head.csv');
+    const [header, ...rows] = parseCsvText(decodeLatin1(bytes), ';').filter((r) => r.length > 1);
+    const line = (r: string[]) => r.map((f) => `"${f.replace(/"/g, '""')}"`).join(';');
+    const reversed = enc(`${[header!, ...rows.reverse()].map(line).join('\n')}\n`);
+    const ctx = { hashTaxId: TEST_TAX_ID_HASHER, retrievedAt: FIXED_NOW, apiUrl: 'https://transparenciachc.blob.core.windows.net/lic-da/2025-7.zip' };
+    const hashes = async (b: Uint8Array) =>
+      new Map((await loadLicitacionesCsv([b], ctx)).suppliers.map((s) => [s.externalId, s.recordHash]));
+    const forward = await hashes(bytes);
+    const backward = await hashes(reversed);
+    expect(forward.size).toBeGreaterThan(1);
+    expect(backward).toEqual(forward);
   });
 });
