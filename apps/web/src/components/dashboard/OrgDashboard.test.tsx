@@ -40,6 +40,7 @@ vi.mock('@/stores/currency', () => ({
 
 // The getting-started branch is the unit under test; the command-center widgets
 // are not, so stub them to a single sentinel we can assert on/against.
+vi.mock('./ActivityByHourCard', () => ({ ActivityByHourCard: () => <div data-testid="activity-by-hour" /> }));
 vi.mock('./HemaLeverageTile', () => ({
   HemaLeverageTile: () => <div data-testid="hema-leverage-tile" />,
 }));
