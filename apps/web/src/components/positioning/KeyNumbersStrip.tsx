@@ -1,6 +1,8 @@
 // v24 key numbers: the first thing on the account page. Big numbers, small
 // arrows and sparklines, colour only for direction. Every number names its
 // source and period on hover or focus; no data shows the reason, never a guess.
+// Slice 22: company figures also carry a visible source chip and an Edit, and
+// a missing one offers Refresh from public sources and Add manually.
 import './positioning.css';
 
 import { ArrowDown, ArrowRight, ArrowUp } from 'lucide-react';
@@ -8,6 +10,7 @@ import { useId } from 'react';
 
 import type { KeyNumber } from '@bidstack/shared';
 
+import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { useAccountKeyNumbers } from '@/hooks/useAccountPositioning';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 
@@ -25,7 +28,12 @@ function Spark({ series, tone }: { series: number[]; tone: string | null }) {
   );
 }
 
-function Tile({ n, fmtMicros }: { n: KeyNumber; fmtMicros: MicrosFormatter }) {
+interface TileCompany {
+  id: string;
+  name: string;
+}
+
+function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormatter; company: TileCompany }) {
   const tipId = useId();
   const dir = directionOf(n);
   const tone = toneOf(n);
@@ -38,7 +46,9 @@ function Tile({ n, fmtMicros }: { n: KeyNumber; fmtMicros: MicrosFormatter }) {
         {n.label}
         {n.sample ? <span className="sg-sample">Sample</span> : null}
       </span>
-      <span className="kn-value">{formatValue(n, fmtMicros)}</span>
+      <span className="kn-value" title={missing ? undefined : formatValue(n, fmtMicros)}>
+        {missing && n.editKey ? 'Not found yet' : formatValue(n, fmtMicros)}
+      </span>
       <span className="kn-foot">
         {Arrow && delta ? (
           <span className="kn-delta" data-tone={tone}>
@@ -49,7 +59,17 @@ function Tile({ n, fmtMicros }: { n: KeyNumber; fmtMicros: MicrosFormatter }) {
         ) : null}
         <Spark series={n.series} tone={tone} />
       </span>
-      <span className="kn-sub">{missing ? n.missing : n.sub}</span>
+      {n.editKey ? (
+        missing ? (
+          <FigureActions companyId={company.id} companyName={company.name} fieldKey={n.editKey} label={n.label} missing={n.missing ?? `No ${n.label.toLowerCase()} on record`} />
+        ) : (
+          <span className="sf-line kn-prov">
+            {n.provenance ? <SourceChip p={n.provenance} testId={`kn-chip-${n.id}`} /> : null}
+            <FigureActions companyId={company.id} companyName={company.name} fieldKey={n.editKey} label={n.label} />
+          </span>
+        )
+      ) : null}
+      {n.editKey && missing ? null : <span className="kn-sub">{missing ? n.missing : n.sub}</span>}
       <span className="kn-tip" role="tooltip" id={tipId}>
         <b>Source:</b> {n.source}
         <br />
@@ -83,6 +103,7 @@ export function KeyNumbersStrip({ companyId }: { companyId: string }) {
       </section>
     );
   }
+  const tileCompany: TileCompany = { id: q.data.companyId, name: q.data.companyName ?? '' };
   const company = q.data.items.filter((i) => i.group === 'company');
   const health = q.data.items.filter((i) => i.group === 'health');
   return (
@@ -91,13 +112,13 @@ export function KeyNumbersStrip({ companyId }: { companyId: string }) {
       <div className="kn-group">
         <p className="kn-eyebrow">Company</p>
         <ul className="kn-row" data-count={company.length}>
-          {company.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} />)}
+          {company.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} company={tileCompany} />)}
         </ul>
       </div>
       <div className="kn-group">
         <p className="kn-eyebrow">Account health</p>
         <ul className="kn-row" data-count={health.length}>
-          {health.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} />)}
+          {health.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} company={tileCompany} />)}
         </ul>
       </div>
     </section>

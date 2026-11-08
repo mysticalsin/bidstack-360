@@ -3,10 +3,12 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
+import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { beatsProvider, figureText, isCompanyId, useSourcedFigures } from '@/hooks/useSourcedFigures';
 import { springSnap, springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
@@ -155,11 +157,19 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
         </div>
         <div>
           <span>{t('commandCenter.footer.weightedValue.label', 'Weighted account value')}</span>
-          <strong>
-            {cockpit.company.annualRevenueMicros
-              ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
-              : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
-          </strong>
+          {isCompanyId(cockpit.company.id) ? (
+            <SourcedRevenue
+              companyId={cockpit.company.id}
+              companyName={cockpit.company.name}
+              crmValue={cockpit.company.annualRevenueMicros ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR') : null}
+            />
+          ) : (
+            <strong>
+              {cockpit.company.annualRevenueMicros
+                ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
+                : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
+            </strong>
+          )}
         </div>
         <div>
           <span>{t('commandCenter.footer.ownerMap.label', 'Decision owner map')}</span>
@@ -173,6 +183,22 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
     </motion.section>
   );
 });
+
+/** Slice 22: the weighted value names its source, and a missing one offers the refresh and manual entry. */
+function SourcedRevenue({ companyId, companyName, crmValue }: { companyId: string; companyName: string; crmValue: string | null }) {
+  const { revenue } = useSourcedFigures(companyId);
+  const text = figureText(revenue);
+  const shown = text && (!crmValue || beatsProvider(revenue)) ? text : crmValue;
+  if (!shown) {
+    return <FigureActions companyId={companyId} companyName={companyName} fieldKey="annualRevenueMicros" label="Revenue" missing={revenue?.missing ?? 'No revenue on record or in public sources'} />;
+  }
+  return (
+    <>
+      <strong title={shown}>{shown}</strong>
+      {shown === text && revenue?.provenance ? <SourceChip p={revenue.provenance} testId="command-chip-revenue" /> : null}
+    </>
+  );
+}
 
 function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
   const health = cockpit.health.score;

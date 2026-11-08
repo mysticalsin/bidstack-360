@@ -1,6 +1,6 @@
 // Maps the enrichment API (packages/shared account-enrichment, contract in
 // /workspace/fleet/polo-enrichment-api.md) onto the account-page shape.
-import type { Firmographics, HiringBreakdown, PotentialProject as ApiProject } from '@bidstack/shared';
+import { industryLabel, type Firmographics, type HiringBreakdown, type PotentialProject as ApiProject } from '@bidstack/shared';
 
 import type { CompanyEnrichment, CountRow, OpenRole, PotentialProject, Sourced } from './types';
 
@@ -148,7 +148,7 @@ export function fromApi(f: Firmographics, h: ApiHiring | null, pr: ApiProjects |
     firmographics: {
       revenue,
       headcount,
-      industry: f.industry ? src(['industry', 'industries'], f.industry.charAt(0).toUpperCase() + f.industry.slice(1)) : null,
+      industry: industryLabel(f.industry) ? src(['industry', 'industries'], industryLabel(f.industry)!) : null,
       locations: locs.length ? src(['locations'], locs) : null,
     },
     hiring: {

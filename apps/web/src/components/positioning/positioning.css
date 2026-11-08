@@ -40,6 +40,13 @@
 .kn-tip a { color: var(--kn-accent); pointer-events: auto; }
 .kn-tip b { font-weight: 500; color: var(--kn-muted); }
 .kn-tile:hover .kn-tip, .kn-tile:focus-within .kn-tip { opacity: 1; visibility: visible; pointer-events: auto; }
+/* Slice 22: tiles shrink inside the grid, the source chip sits under the value,
+   and the hover tip stays out of the way while the Edit form is open. */
+.kn-row { grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); }
+.kn-tile, .kn-label, .kn-value, .kn-sub, .kn-prov { min-width: 0; }
+.kn-label { overflow-wrap: anywhere; }
+.kn-sub { overflow-wrap: anywhere; }
+.kn-tile:has(.sf-form) .kn-tip, .kn-tile:has(.sf-empty:focus-within) .kn-tip { display: none; }
 
 .wp { margin-bottom: 24px; scroll-margin-top: 80px; }
 .wp-brief { margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: var(--kn-ink); max-width: 88ch; }
