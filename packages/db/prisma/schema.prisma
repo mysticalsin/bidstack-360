@@ -35,6 +35,7 @@ model Org {
   companies          Company[]
   references         Reference[]
   activities         Activity[]
+  externalRecordLinks ExternalRecordLink[]
   opportunities      Opportunity[]
   contacts           Contact[]
   competitorInsights CompetitorInsight[]
@@ -122,6 +123,7 @@ model Org {
   aiPromptTemplates      AiPromptTemplate[]
   // Wave 4 — integration hub (email, slack, zapier)
   emailMessages          EmailMessage[]
+  emailDrafts            EmailDraft[]
   emailTrackingPixels    EmailTrackingPixel[]
   slackChannels          SlackChannel[]
   zapierApps             ZapierApp[]
@@ -248,6 +250,9 @@ model Org {
   contactFacts        ContactFact[]
   customerCommitments CustomerCommitment[]
 
+  // GDPR data subject requests (export / erase)
+  dataSubjectRequests DataSubjectRequest[]
+
   @@index([deletedAt])
   @@map("orgs")
 }
@@ -324,6 +329,7 @@ model User {
   migrationJobs     MigrationJob[]
   // Wave 4 — integration hub
   emailMessages     EmailMessage[]
+  emailDrafts       EmailDraft[]
   // Wave 5 — Slack user mapping (one-to-many; compound @@unique on [orgId,userId])
   slackUserMappings SlackUserMapping[]
   // Wave 7 — Saved Views
@@ -1190,6 +1196,35 @@ model AuditLog {
   @@map("audit_log")
 }
 
+// ─── GDPR data subject requests ───────────────────────────────────────────
+// One export or erase request for a single person (Art. 15, 17, 20), filed by
+// an org admin and run by the data-subject-request worker. `report` holds
+// counts per store only, never personal values.
+model DataSubjectRequest {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  requestedById String?   @map("requested_by_id") @db.Uuid
+  /// export | erase
+  kind          String    @db.VarChar(16)
+  /// contact | lead | account_person
+  subjectType   String    @map("subject_type") @db.VarChar(32)
+  subjectId     String    @map("subject_id") @db.Uuid
+  dryRun        Boolean   @default(true) @map("dry_run")
+  /// queued | running | done | failed
+  status        String    @default("queued") @db.VarChar(16)
+  report        Json?
+  error         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("data_subject_requests")
+}
+
 // ─── GDPR tenant export ───────────────────────────────────────────────────
 // Tracks a tenant-scoped data-export job (Art. 20 portability). Created by
 // the API when an org-admin hits POST /api/orgs/:id/export; driven through
@@ -1222,6 +1257,8 @@ model TenantExport {
   // Storage key of the zip object — used by the worker to issue fresh
   // download URLs and by the cleanup job to lifecycle the object.
   storageKey    String?            @map("storage_key")
+  // Data region whose bucket holds the archive; null = default bucket.
+  storageRegion String?            @map("storage_region") @db.VarChar(8)
   startedAt     DateTime?          @map("started_at") @db.Timestamptz(6)
   completedAt   DateTime?          @map("completed_at") @db.Timestamptz(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2364,6 +2401,28 @@ model Activity {
   @@map("activities")
 }
 
+// Maps an external system's record id (HubSpot account id, Dust entity id, an
+// opportunity tool's deal id) to a Polo company or opportunity, so the inbound
+// activity API can resolve `company: { externalId }` without a domain. Learned
+// on first sight: an ingest item that resolves by id or domain AND carries an
+// externalId writes the link.
+model ExternalRecordLink {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  source     String   @db.VarChar(40)
+  entityType String   @map("entity_type") @db.VarChar(20)
+  externalId String   @map("external_id") @db.VarChar(200)
+  entityId   String   @map("entity_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, entityType, externalId], map: "external_record_links_org_source_type_ext_key")
+  @@index([orgId, entityType, entityId])
+  @@map("external_record_links")
+}
+
 model ActivityAttendee {
   id             String    @id @default(uuid()) @db.Uuid
   orgId          String    @map("org_id") @db.Uuid
@@ -2993,6 +3052,9 @@ model OrgSettings {
   /// Amaris stage-gate enforcement mode for this org: 'off' | 'warn' | 'enforce'.
   /// Null = fall back to the STAGE_GATE_MODE env default. Overrides the env per org.
   stageGateMode          String?   @map("stage_gate_mode")
+  /// Data residency tag: eu | uk | us | ca. Null = not pinned. Selects the
+  /// regional bucket for tenant exports (see docs/compliance/CONTROL-MAP.md).
+  dataRegion             String?   @map("data_region") @db.VarChar(8)
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -3623,6 +3685,14 @@ model CalendarEvent {
   /// CRM linkage — set when the worker maps the event to a known entity.
   relatedEntityType String?             @map("related_entity_type")
   relatedEntityId   String?             @map("related_entity_id") @db.Uuid
+  /// Capture filing by attendee and domain (worker lib/comms-capture.ts).
+  contactId         String?             @map("contact_id") @db.Uuid
+  companyId         String?             @map("company_id") @db.Uuid
+  opportunityId     String?             @map("opportunity_id") @db.Uuid
+  /// A user filed this event by hand; the provider pull never refiles it.
+  filedManually     Boolean             @default(false) @map("filed_manually")
+  /// Client-supplied retry key so a repeated create returns the same row.
+  clientRequestId   String?             @map("client_request_id") @db.VarChar(64)
   externalUpdatedAt DateTime?           @map("external_updated_at") @db.Timestamptz(6)
   lastSyncedAt      DateTime?           @map("last_synced_at") @db.Timestamptz(6)
   /// Provider-side ETag (Google: @odata.etag, Graph: @odata.etag). Used for
@@ -3637,7 +3707,12 @@ model CalendarEvent {
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  @@unique([provider, externalId], map: "calendar_events_provider_external_key")
+  /// Per owner: Google shares one event id across every attendee's calendar,
+  /// so a global (provider, externalId) key let one tenant overwrite another.
+  @@unique([orgId, ownerId, provider, externalId], map: "calendar_events_owner_external_key")
+  @@unique([orgId, ownerId, clientRequestId], map: "calendar_events_client_request_key")
+  @@index([orgId, companyId, startAt])
+  @@index([orgId, contactId, startAt])
   @@index([orgId, ownerId, startAt])
   @@index([orgId, startAt])
   @@index([orgId, syncState])
@@ -3846,6 +3921,10 @@ model EmailMessage {
   /// Polymorphic CRM linkage: "deal" | "contact" | "lead"
   entityType         String?       @map("entity_type") @db.VarChar(32)
   entityId           String?       @map("entity_id") @db.Uuid
+  /// Capture filing by participant and domain (worker lib/comms-capture.ts).
+  contactId          String?       @map("contact_id") @db.Uuid
+  companyId          String?       @map("company_id") @db.Uuid
+  opportunityId      String?       @map("opportunity_id") @db.Uuid
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   /// Soft-delete tombstone. Heavy PII (bodies, recipients) — required so GDPR
@@ -3866,7 +3945,42 @@ model EmailMessage {
   @@index([orgId, entityType, entityId, sentAt(sort: Desc)], map: "email_messages_org_entity_sent_idx")
   @@index([orgId, userId])
   @@index([orgId, deletedAt])
+  @@index([orgId, contactId, receivedAt(sort: Desc)])
+  @@index([orgId, companyId, receivedAt(sort: Desc)])
+  @@index([orgId, opportunityId, receivedAt(sort: Desc)])
   @@map("email_messages")
+}
+
+/// A composed email kept in Polo. Never sent by Polo: the user copies it or
+/// opens it in their own mail app and sends it there.
+model EmailDraft {
+  id              String    @id @default(uuid()) @db.Uuid
+  orgId           String    @map("org_id") @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  /// Array of { email: string; name?: string }
+  toEmails        Json      @default("[]") @map("to_emails")
+  ccEmails        Json      @default("[]") @map("cc_emails")
+  subject         String    @default("")
+  bodyText        String?   @map("body_text")
+  /// Thread this draft replies to (EmailMessage.threadId).
+  threadId        String?   @map("thread_id")
+  contactId       String?   @map("contact_id") @db.Uuid
+  companyId       String?   @map("company_id") @db.Uuid
+  opportunityId   String?   @map("opportunity_id") @db.Uuid
+  /// Client-supplied retry key so a repeated save returns the same draft.
+  clientRequestId String    @map("client_request_id") @db.VarChar(64)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId, clientRequestId], map: "email_drafts_client_request_key")
+  @@index([orgId, userId, updatedAt(sort: Desc)])
+  @@index([orgId, contactId])
+  @@index([orgId, companyId])
+  @@map("email_drafts")
 }
 
 /// One tracking pixel per outbound EmailMessage.

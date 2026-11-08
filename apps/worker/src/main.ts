@@ -63,6 +63,8 @@ import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
 import { startTenantExport } from './queues/tenant-export.js';
 // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
 import { startAiAuditRetention } from './queues/ai-audit-retention.js';
+import { startDataSubjectWorker } from './queues/data-subject.js';
+import { startRetentionSweep } from './queues/retention-sweep.js';
 import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
 import { assertWorkerProductionEnv } from './lib/production-env.js';
 import {
@@ -207,6 +209,8 @@ await Promise.all([
   startTenantExport(connection, log, workers, queues),
   // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
   startAiAuditRetention(connection, log, workers, queues),
+  startDataSubjectWorker(connection, log, workers, queues),
+  startRetentionSweep(connection, log, workers, queues),
 ]);
 
 for (const worker of workers) {
