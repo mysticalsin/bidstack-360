@@ -9,7 +9,7 @@ import { resolveCaptureTarget } from '../lib/comms-capture.js';
 import { prisma, syncEmailMessageActivity } from '@bidstack/db';
 
 import { pullDelta } from './email-sync.pull.js';
-import { pullGmail } from './email-sync.gmail.js';
+import { consumeGmailIdPage, pullGmail } from './email-sync.gmail.js';
 
 vi.mock('@bidstack/db', () => ({
   EmailProvider: { GMAIL: 'GMAIL', OUTLOOK: 'OUTLOOK' },
@@ -407,5 +407,92 @@ describe('Gmail inbox capture', () => {
     const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
     expect(counts['g-poison']).toBe(1);
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+
+  it('does not advance history past ids the cap has not stored yet', async () => {
+    const page = (ids: string[], next?: string) =>
+      json({
+        history: [{ id: 'h', messagesAdded: ids.map((id) => ({ message: { id } })) }],
+        historyId: '999',
+        ...(next ? { nextPageToken: next } : {}),
+      });
+    const detail = (id: string) =>
+      json({
+        id,
+        threadId: 't',
+        internalDate: '1793973600000',
+        payload: {
+          mimeType: 'text/plain',
+          headers: [
+            { name: 'From', value: 'Buyer <buyer@acme.com>' },
+            { name: 'To', value: 'tony@amaris.com' },
+            { name: 'Subject', value: id },
+          ],
+          body: { data: b64('body') },
+        },
+      });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/history')) return page(['g-a', 'g-b', 'g-c']);
+        if (String(url).includes('/messages/g-a')) return detail('g-a');
+        if (String(url).includes('/messages/g-b')) return detail('g-b');
+        return detail('g-c');
+      }),
+    );
+    const first = await pullGmail(tokenRow('gmail', { gmailHistoryId: '10', calendarSyncToken: 'keep' }), 'at', log, 2);
+    expect(first).toBe(2);
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.gmailHistoryId).toBe('10');
+    expect(saved.data.deltaState.gmailHistoryResumeCount).toBe(2);
+    expect(saved.data.deltaState.calendarSyncToken).toBe('keep');
+    const second = await pullGmail(
+      tokenRow('gmail', saved.data.deltaState),
+      'at',
+      log,
+      2,
+    );
+    expect(second).toBe(1);
+    const done = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(done.data.deltaState.gmailHistoryId).toBe('999');
+    expect(done.data.deltaState.gmailHistoryResumeCount).toBeUndefined();
+    const storedIds = upsert.mock.calls.map((call) => (call[0] as { create: { externalMessageId: string } }).create.externalMessageId);
+    expect(storedIds).toEqual(['g-a', 'g-b', 'g-c']);
+    const firstWrite = upsert.mock.calls[0]?.[0] as {
+      where: { orgId_externalMessageId: { externalMessageId: string } };
+      update: object;
+    };
+    // A failed cursor commit retries the same provider id onto one row.
+    expect(firstWrite.where.orgId_externalMessageId.externalMessageId).toBe('g-a');
+    expect(firstWrite.update).toEqual({});
+  });
+});
+
+describe('Gmail page checkpoint', () => {
+  it('keeps the unread tail of a page and the next page token', () => {
+    const mid = consumeGmailIdPage({
+      messageIds: ['a', 'b', 'c'],
+      nextPageToken: 'page-2',
+      resumeCount: 0,
+      cap: 2,
+    });
+    expect(mid).toEqual({ ids: ['a', 'b'], resumeCount: 2, pageToken: null, finished: false });
+    const rest = consumeGmailIdPage({
+      messageIds: ['a', 'b', 'c'],
+      nextPageToken: 'page-2',
+      resumeCount: mid.resumeCount,
+      cap: 2,
+    });
+    expect(rest.ids).toEqual(['c']);
+    expect(rest.finished).toBe(false);
+    expect(rest.pageToken).toBe('page-2');
+    const done = consumeGmailIdPage({
+      messageIds: ['d'],
+      nextPageToken: null,
+      resumeCount: 0,
+      cap: 2,
+    });
+    expect(done.finished).toBe(true);
+    expect(done.ids).toEqual(['d']);
   });
 });

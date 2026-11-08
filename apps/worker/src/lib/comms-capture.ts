@@ -258,6 +258,9 @@ export function meetingColumns(hints: MeetingHints, iCalUid: string | null | und
  */
 export const ACTIVITY_BRIDGE_RETRY_LIMIT = 3;
 const BRIDGE_QUARANTINE_CAP = 50;
+// The list remembers ids that already used their budget. Past 50, the oldest
+// record is dropped and that id can start a new budget. That is the bound,
+// not a silent delete of a message still inside its three attempts.
 const MAX_RETRY_IDS = 32;
 
 export type ActivityBridgeQuarantine = { id: string; attempts: number; at: string };
@@ -406,6 +409,13 @@ export function mergeBridgeDeltaState(
     const inBaseline = Object.prototype.hasOwnProperty.call(baseline, key);
     const inDesired = Object.prototype.hasOwnProperty.call(desired, key);
     if (inBaseline && inDesired && sameCursorValue(baseline[key], desired[key])) continue;
+    // Another pull changed this key after our snapshot. Keep the locked value,
+    // including a deletion. A stale run must not put an old page link back
+    // or remove a newer delta link.
+    const storedHas = Object.prototype.hasOwnProperty.call(result, key);
+    const storedValue = storedHas ? result[key] : undefined;
+    const baselineValue = inBaseline ? baseline[key] : undefined;
+    if (storedHas !== inBaseline || (storedHas && !sameCursorValue(storedValue, baselineValue))) continue;
     if (!inDesired) delete result[key];
     else result[key] = structuredClone(desired[key]);
   }
