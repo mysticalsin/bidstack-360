@@ -130,8 +130,9 @@
 }
 .open-issues li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   padding: 10px 4px;
   border-bottom: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -146,15 +147,26 @@
 .open-issues li:last-child {
   border-bottom: 0;
 }
+/* In a narrow column the status badge wraps under the text instead of covering it. */
+.open-issues .oi-body {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.open-issues li > :last-child {
+  flex: none;
+}
 .open-issues .oi-count {
-  width: 28px;
+  min-width: 72px;
   height: 28px;
+  padding: 0 8px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
   color: var(--fg-primary);
   font-feature-settings: 'tnum';
   flex-shrink: 0;
@@ -3352,6 +3364,7 @@
   background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--tag-jade-fg);
 }
 .acct-pill[data-band='needs_attention'] { background: color-mix(in srgb, var(--warning) 12%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg-primary)); }
+.acct-pill[data-band='unscored'] { background: var(--surface-sunken); color: var(--fg-secondary); }
 .acct-pill[data-band='at_risk'] { background: color-mix(in srgb, var(--danger, #bb5355) 10%, transparent); color: color-mix(in srgb, var(--danger, #bb5355) 80%, var(--fg-primary)); }
 .btn-quiet { background: transparent; color: var(--fg-secondary); border-color: transparent; padding-inline: 10px; }
 .btn-quiet:hover { background: var(--surface-sunken); color: var(--fg-primary); }

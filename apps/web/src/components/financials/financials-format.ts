@@ -1,14 +1,8 @@
-import type { AccountFinancials } from '@bidstack/shared';
+import { formatCompactMoney, type AccountFinancials } from '@bidstack/shared';
 
 export type Period = AccountFinancials['periods'][number];
 
-export function fmtMoney(v: number, ccy: string): string {
-  const a = Math.abs(v);
-  const sign = v < 0 ? '-' : '';
-  if (a >= 1e9) return `${sign}${ccy} ${(a / 1e9).toFixed(a >= 1e10 ? 1 : 2)}bn`;
-  if (a >= 1e6) return `${sign}${ccy} ${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
-  return `${sign}${ccy} ${Math.round(a).toLocaleString('en-GB')}`;
-}
+export const fmtMoney = formatCompactMoney;
 
 export interface Tile {
   key: string;

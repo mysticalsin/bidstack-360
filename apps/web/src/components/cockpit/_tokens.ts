@@ -3,7 +3,7 @@
 // of "what to import" for the consumer; the cockpit barrel re-exports the
 // runtime helpers each card actually needs.
 
-import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
+import type { AccountCockpitSnapshot, CompanyHealth, RiskItem } from '@bidstack/shared';
 
 export type KpiTone = AccountCockpitSnapshot['kpis'][number]['tone'];
 
@@ -50,7 +50,7 @@ export function severityShort(s: RiskItem['severity']): string {
   return s === 'critical' ? 'C' : s === 'high' ? 'H' : s === 'medium' ? 'M' : 'L';
 }
 
-export function labelForBand(b: AccountCockpitSnapshot['health']['band']): string {
+export function labelForBand(b: CompanyHealth['band']): string {
   return b === 'strong'
     ? 'Strong'
     : b === 'good'
