@@ -183,6 +183,12 @@
 .pulse-orb--bold { border-radius: 50%; background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--orb-tint) 16%, transparent) 0 58%, transparent 72%); }
 .dash-hero-pulse { display: grid; justify-items: center; gap: 8px; margin-left: auto; align-self: flex-start; text-align: center; }
 .dash-hero-pulse .viz-meta { max-width: 160px; }
+/* Loading placeholders sized to the final content so data arrival does not shift layout. */
+.dash-hero-pulse-skel { display: block; width: 96px; height: 96px; border-radius: 50%; background: color-mix(in srgb, var(--viz-muted) 8%, transparent); }
+/* DivergingBars with a below series: 28px legend + 12px gap + 229px svg (PAD + UP_H + ZERO_GAP + DOWN_H). */
+.dash-hero-chart-skel { min-height: 269px; border-radius: 12px; background: color-mix(in srgb, var(--viz-muted) 6%, transparent); }
+.dash-needs-skel { display: grid; gap: 12px; padding: 12px 0; }
+.dash-needs-skel span { display: block; height: 44px; border-radius: 8px; background: color-mix(in srgb, var(--viz-muted) 8%, transparent); }
 
 /* ---------- Performance card (kokonutui SmoothTab) ---------- */
 /* Inner views drop their own card chrome: one surface, no card-in-card. */
