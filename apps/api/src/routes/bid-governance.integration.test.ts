@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@bidstack/db';
+import { addBusinessDays } from '@bidstack/shared';
 
 import { buildServer } from '../server.js';
 import {
@@ -364,12 +365,10 @@ describe('Stage 10 — Lessons Learned obligation', () => {
     });
     expect(tasks).toHaveLength(1);
     expect(tasks[0]!.dueDate).not.toBeNull();
-    // 5 business days out is always between 5 and 7 calendar days.
-    const days = Math.round(
-      (tasks[0]!.dueDate!.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
-    );
-    expect(days).toBeGreaterThanOrEqual(5);
-    expect(days).toBeLessThanOrEqual(7);
+    // due_date is a DATE column, so compare calendar days, not elapsed time.
+    const due = tasks[0]!.dueDate!.toISOString().slice(0, 10);
+    const expected = addBusinessDays(new Date(), 5).toISOString().slice(0, 10);
+    expect(due).toBe(expected);
 
     // Reopen and re-close: the obligation is not duplicated.
     await server.inject({
