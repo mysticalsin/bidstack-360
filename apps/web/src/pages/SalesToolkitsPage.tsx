@@ -32,12 +32,6 @@ export default function SalesToolkitsPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">{t('salesToolkits.pageTitle', 'Sales Toolkits')}</h1>
-          <div className="page-sub">
-            {t(
-              'salesToolkits.pageSubtitle',
-              'Stored sales collateral plus live Mantu Academy courses — managed here, readable by the MCP.',
-            )}
-          </div>
         </div>
       </div>
 
@@ -48,9 +42,6 @@ export default function SalesToolkitsPage() {
           <h2 className="page-title" style={{ fontSize: '1.05rem' }}>
             {t('salesToolkits.coursesHeading', 'Mantu Academy courses')}
           </h2>
-          <div className="page-sub">
-            {t('salesToolkits.coursesSub', 'Industry playbooks pulled live from the LMS, filtered by sector.')}
-          </div>
         </div>
       </div>
 
@@ -134,7 +125,7 @@ export default function SalesToolkitsPage() {
                     href={course.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex min-h-[44px] items-center justify-between border-t border-[var(--border)] px-5 text-xs font-medium text-[var(--brand-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
+                    className="flex min-h-[44px] items-center justify-between border-t border-[var(--border)] px-5 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:bg-[var(--surface-sunken)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)]"
                   >
                     {t('salesToolkits.openInAcademy', 'Open in Mantu Academy')}
                     <Icon name="arrow-up-right" size={14} aria-hidden />
@@ -165,7 +156,7 @@ function SectorChip({
       aria-pressed={active}
       className={`min-h-[44px] rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] ${
         active
-          ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+          ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
           : 'border-[var(--border)] text-[var(--fg-secondary)] hover:border-[var(--fg-tertiary)]'
       }`}
     >

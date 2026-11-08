@@ -78,7 +78,7 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
                 <td className="px-4 py-3 align-top">
                   <Link
                     to={`/opportunities/${row.opportunityId}`}
-                    className="font-medium text-[var(--brand-primary)] hover:underline"
+                    className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                   >
                     {row.name}
                   </Link>

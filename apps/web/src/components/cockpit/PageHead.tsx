@@ -18,7 +18,6 @@ import { MetricSpark } from '@/components/viz/lazy-bklit';
 import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
 import CommandButton from '@/components/kokonutui/command-button';
 import { useOpportunities } from '@/hooks/useOpportunities';
-import { formatDate } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
@@ -73,10 +72,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const favorites = useAccountHistory((s) => s.favorites);
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
-  const subtitle = t('pageHead.dashboardSubtitle', 'Today: {{date}} - {{company}} cockpit', {
-    date: formatDate(new Date().toISOString()),
-    company: cockpit.company.name,
-  });
   const { formatMoney } = useFormatMoney();
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
@@ -119,7 +114,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
           <h1 className="page-title">
             {accountView ? cockpit.company.name : t('pageHead.dashboardTitle', 'Dashboard')}
           </h1>
-          {accountView ? null : <div className="page-sub">{subtitle}</div>}
           {accountView ? (
             <p className="acct-health" aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}>
               <PulseOrb tone={toneForBand(cockpit.health.band)} size={48} bold />

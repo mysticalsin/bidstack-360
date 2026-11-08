@@ -13,7 +13,7 @@ import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SyncNowControl } from '@/components/sync/SyncNowControl';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { useConnectorCatalog } from '@/hooks/useCrmIntegrations';
@@ -88,7 +88,6 @@ export function IntegrationsSection() {
         onCreateApiKey={() => openDeveloperSection('api-keys')}
         onAddWebhook={() => openDeveloperSection('webhooks')}
       />
-
 
       {isError ? (
         <ErrorState
@@ -178,22 +177,14 @@ export function IntegrationsSection() {
                         : t('integrations.statusUnverified', 'Unverified / not connected')}
                     </Badge>
                   ) : null}
-                  {isAdmin ? (
-                    <LiquidGlassButton
-                      tone="secondary"
-                      size="sm"
-                      onClick={() => {
-                        void api('/api/integrations/dust/resync', { method: 'POST' }).then(() =>
-                          status.refetch(),
-                        );
-                      }}
-                    >
-                      {t('integrations.runSyncNow', 'Run sync now')}
-                    </LiquidGlassButton>
-                  ) : null}
                 </div>
               }
             />
+            {isAdmin ? (
+              <div className="border-b border-[var(--border-subtle)] px-5 py-4">
+                <SyncNowControl source="dust" />
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
               <Stat
                 label={t('integrations.statLastSync', 'Last sync')}
@@ -364,7 +355,10 @@ function ApolloAccountIntelCard({
               ],
               [
                 t('integrations.featureSafetyLabel', 'Safety'),
-                t('integrations.featureSafetyValue', 'Phone numbers and contact leads are not stored'),
+                t(
+                  'integrations.featureSafetyValue',
+                  'Phone numbers and contact leads are not stored',
+                ),
               ],
               [
                 t('integrations.featureFreshnessLabel', 'Freshness'),
@@ -375,9 +369,7 @@ function ApolloAccountIntelCard({
                 key={label}
                 className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2"
               >
-                <div className="text-xs font-medium text-[var(--fg-tertiary)]">
-                  {label}
-                </div>
+                <div className="text-xs font-medium text-[var(--fg-tertiary)]">{label}</div>
                 <div className="mt-1 text-sm font-medium text-[var(--fg-primary)]">{value}</div>
               </div>
             ))}

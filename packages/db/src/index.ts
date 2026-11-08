@@ -139,6 +139,7 @@ export type {
   ReleaseScore,
   Lead,
   TenantExport,
+  DataSubjectRequest,
   SavedView,
   SavedViewEntity,
   KamConsultant,
@@ -178,6 +179,15 @@ export {
 // Curated multi-tenant demo seeding — shared by the `db:seed:demo` CLI and the
 // runtime demo sign-in door, which populates a fresh per-visitor org on sign-in.
 export { seedOrgData } from './seed-org-data.js';
+export {
+  WEBHOOK_OUTBOX_MAX_ATTEMPTS,
+  claimWebhookOutboxBatch,
+  markWebhookOutboxDispatched,
+  markWebhookOutboxFailed,
+  recordWebhookOutboxEvent,
+  webhookOutboxBackoffMs,
+  type WebhookOutboxRow,
+} from './webhook-outbox.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';
 
 // System RBAC seeding (roles + permission manifest, NO fixture data) — shared
@@ -189,3 +199,34 @@ export { seedSigningEntities } from './seed-signing-entities.js';
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+// Inbound activity API + account activity aggregates. One service behind the
+// REST route (apps/api) and the MCP tools (apps/mcp-server).
+export {
+  ingestActivities,
+  ingestContentHash,
+  ingestDedupeKey,
+  normalizeIngestDomain,
+  type IngestActivitiesInput,
+  type IngestActor,
+} from './services/activity-ingest.js';
+export {
+  bucketActivitySummary,
+  getCompanyActivitySummary,
+  weekStartIn,
+} from './services/account-activity.js';
+
+// GDPR data subject export / erase and retention per data class (compliance pack).
+export * from './compliance/index.js';
+export {
+  countPartnerEngagements,
+  isInternalPartnerRow,
+  loadOrgFirmCatalog,
+  loadPartnerEvidenceRows,
+  loadPartnerRun,
+  ownedPartnerRowIds,
+  prunePartnerEvidence,
+  savePartnerEvidence,
+  scanInternalPartnerEvidence,
+  toPartnerEvidence,
+} from './consulting-partners.js';
+export type { PartnerEvidenceRow, PartnerSaveResult } from './consulting-partners.js';

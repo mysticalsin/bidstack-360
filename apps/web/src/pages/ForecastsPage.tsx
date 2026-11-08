@@ -147,18 +147,12 @@ export function ForecastsPage() {
       {/* ── Header ── */}
       <motion.header
         variants={reducedMotion ? undefined : staggerChild}
-        className="flex flex-wrap items-end justify-between gap-3"
+        className="flex flex-wrap items-center justify-between gap-3"
       >
         <div>
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
             {t('forecasts.title', 'Revenue Forecasts')}
           </h1>
-          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t(
-              'forecasts.subtitle',
-              "Will the bids we're piloting hit the number? Pipeline, best case, commit, and closed by period.",
-            )}
-          </p>
         </div>
         {canWrite && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -217,10 +211,7 @@ export function ForecastsPage() {
           {t('forecasts.manualSectionTitle', 'Manual overrides')}
         </h2>
         <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-          {t(
-            'forecasts.manualSectionCaption',
-            'Rep-entered pipeline / best-case / commit / closed figures. These take precedence over the derived baseline for their period.',
-          )}
+          {t('forecasts.manualSectionCaption', 'Rep-entered figures override the projection for their period.')}
         </p>
       </motion.div>
 
@@ -259,7 +250,7 @@ export function ForecastsPage() {
             key={k.key}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
           >
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
               {k.label}
             </div>
             <div

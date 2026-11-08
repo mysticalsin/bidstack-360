@@ -35,6 +35,7 @@ model Org {
   companies          Company[]
   references         Reference[]
   activities         Activity[]
+  externalRecordLinks ExternalRecordLink[]
   opportunities      Opportunity[]
   contacts           Contact[]
   competitorInsights CompetitorInsight[]
@@ -44,6 +45,7 @@ model Org {
   syncEvents         SyncEvent[]
   apiKeys            ApiKey[]
   webhookSubs        WebhookSubscription[]
+  webhookOutbox      WebhookOutbox[]
   auditLogs          AuditLog[]
   notes              Note[]
   fileAttachments    FileAttachment[]
@@ -214,6 +216,8 @@ model Org {
   intelEvidence                 IntelEvidence[]
   investmentThemes              InvestmentTheme[]
   intelSourceRuns               IntelSourceRun[]
+  consultingPartnerEvidence     ConsultingPartnerEvidence[]
+  consultingPartnerRuns         ConsultingPartnerRun[]
   enrichmentCreditUsage         EnrichmentCreditUsage[]
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
@@ -243,6 +247,9 @@ model Org {
   // promises kept off the internal Task list.
   contactFacts        ContactFact[]
   customerCommitments CustomerCommitment[]
+
+  // GDPR data subject requests (export / erase)
+  dataSubjectRequests DataSubjectRequest[]
 
   @@index([deletedAt])
   @@map("orgs")
@@ -449,6 +456,8 @@ model Company {
   intelEvidence IntelEvidence[]
   intelThemes   InvestmentTheme[]
   intelRuns     IntelSourceRun[]
+  partnerEvidence ConsultingPartnerEvidence[]
+  partnerRuns     ConsultingPartnerRun[]
   orgChart      OrgChart?
 
   @@index([orgId, domain])
@@ -716,6 +725,10 @@ model Contact {
   @@index([orgId, createdAt(sort: Desc)], map: "contacts_org_created_idx")
   @@index([deletedAt])
   @@index([orgId, emailHash], map: "contacts_org_email_hash_idx")
+  // ?search= ILIKE '%term%' over these three columns.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_name_trgm_idx")
+  @@index([customer(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_customer_trgm_idx")
+  @@index([role(ops: raw("gin_trgm_ops"))], type: Gin, map: "contacts_role_trgm_idx")
   @@map("contacts")
 }
 
@@ -1009,6 +1022,37 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
+enum WebhookOutboxStatus {
+  pending
+  dispatched
+  dead
+
+  @@map("webhook_outbox_status")
+}
+
+/// Durable outbox for outbound webhook events. A domain write records the
+/// event here (optionally in the same transaction); the worker relay fans it
+/// out to the webhook.delivery queue. (orgId, idempotencyKey) dedupes retries.
+model WebhookOutbox {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId          String              @map("org_id") @db.Uuid
+  event          String
+  payload        Json
+  idempotencyKey String              @map("idempotency_key") @db.VarChar(255)
+  status         WebhookOutboxStatus @default(pending)
+  attempts       Int                 @default(0)
+  nextAttemptAt  DateTime            @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  lastError      String?             @map("last_error")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  dispatchedAt   DateTime?           @map("dispatched_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, idempotencyKey], map: "webhook_outbox_org_idempotency_key")
+  @@index([status, nextAttemptAt], map: "webhook_outbox_due_idx")
+  @@map("webhook_outbox")
+}
+
 model AuditLog {
   id         BigInt    @id @default(autoincrement())
   orgId      String    @map("org_id") @db.Uuid
@@ -1019,10 +1063,16 @@ model AuditLog {
   diff       Json?
   at         DateTime  @default(now()) @db.Timestamptz(6)
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Hash chain, set by the audit_log_chain trigger on insert (never by the app).
+  /// Rows written before the chain migration stay NULL.
+  chainSeq   BigInt?   @map("chain_seq")
+  prevHash   String?   @map("prev_hash") @db.VarChar(64)
+  rowHash    String?   @map("row_hash") @db.VarChar(64)
 
   org  Org   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [userId], references: [id])
 
+  @@unique([orgId, chainSeq], map: "audit_log_org_chain_seq_key")
   @@index([orgId, at(sort: Desc)])
   @@index([orgId, targetType, targetId, at(sort: Desc)])
   // Scale: backs the id-keyset cursor list (routes/audit-logs.ts) — org +
@@ -1030,6 +1080,35 @@ model AuditLog {
   @@index([orgId, deletedAt, id(sort: Desc)], map: "audit_log_org_deleted_id_idx")
   @@index([deletedAt])
   @@map("audit_log")
+}
+
+// ─── GDPR data subject requests ───────────────────────────────────────────
+// One export or erase request for a single person (Art. 15, 17, 20), filed by
+// an org admin and run by the data-subject-request worker. `report` holds
+// counts per store only, never personal values.
+model DataSubjectRequest {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  requestedById String?   @map("requested_by_id") @db.Uuid
+  /// export | erase
+  kind          String    @db.VarChar(16)
+  /// contact | lead | account_person
+  subjectType   String    @map("subject_type") @db.VarChar(32)
+  subjectId     String    @map("subject_id") @db.Uuid
+  dryRun        Boolean   @default(true) @map("dry_run")
+  /// queued | running | done | failed
+  status        String    @default("queued") @db.VarChar(16)
+  report        Json?
+  error         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt     DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("data_subject_requests")
 }
 
 // ─── GDPR tenant export ───────────────────────────────────────────────────
@@ -1064,6 +1143,8 @@ model TenantExport {
   // Storage key of the zip object — used by the worker to issue fresh
   // download URLs and by the cleanup job to lifecycle the object.
   storageKey    String?            @map("storage_key")
+  // Data region whose bucket holds the archive; null = default bucket.
+  storageRegion String?            @map("storage_region") @db.VarChar(8)
   startedAt     DateTime?          @map("started_at") @db.Timestamptz(6)
   completedAt   DateTime?          @map("completed_at") @db.Timestamptz(6)
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -2206,6 +2287,28 @@ model Activity {
   @@map("activities")
 }
 
+// Maps an external system's record id (HubSpot account id, Dust entity id, an
+// opportunity tool's deal id) to a Polo company or opportunity, so the inbound
+// activity API can resolve `company: { externalId }` without a domain. Learned
+// on first sight: an ingest item that resolves by id or domain AND carries an
+// externalId writes the link.
+model ExternalRecordLink {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @map("org_id") @db.Uuid
+  source     String   @db.VarChar(40)
+  entityType String   @map("entity_type") @db.VarChar(20)
+  externalId String   @map("external_id") @db.VarChar(200)
+  entityId   String   @map("entity_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, source, entityType, externalId], map: "external_record_links_org_source_type_ext_key")
+  @@index([orgId, entityType, entityId])
+  @@map("external_record_links")
+}
+
 model ActivityAttendee {
   id             String    @id @default(uuid()) @db.Uuid
   orgId          String    @map("org_id") @db.Uuid
@@ -2708,6 +2811,8 @@ model Lead {
   @@index([orgId, status, statusChangedAt])
   @@index([deletedAt])
   @@index([orgId, emailHash], map: "leads_org_email_hash_idx")
+  // Backs the GET /leads cursor sort (score DESC, createdAt DESC, id ASC).
+  @@index([orgId, score(sort: Desc), createdAt(sort: Desc), id], map: "leads_org_list_sort_idx")
   @@map("leads")
 }
 
@@ -2833,6 +2938,9 @@ model OrgSettings {
   /// Amaris stage-gate enforcement mode for this org: 'off' | 'warn' | 'enforce'.
   /// Null = fall back to the STAGE_GATE_MODE env default. Overrides the env per org.
   stageGateMode          String?   @map("stage_gate_mode")
+  /// Data residency tag: eu | uk | us | ca. Null = not pinned. Selects the
+  /// regional bucket for tenant exports (see docs/compliance/CONTROL-MAP.md).
+  dataRegion             String?   @map("data_region") @db.VarChar(8)
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
 
@@ -3467,6 +3575,8 @@ model CalendarEvent {
   contactId         String?             @map("contact_id") @db.Uuid
   companyId         String?             @map("company_id") @db.Uuid
   opportunityId     String?             @map("opportunity_id") @db.Uuid
+  /// A user filed this event by hand; the provider pull never refiles it.
+  filedManually     Boolean             @default(false) @map("filed_manually")
   /// Client-supplied retry key so a repeated create returns the same row.
   clientRequestId   String?             @map("client_request_id") @db.VarChar(64)
   externalUpdatedAt DateTime?           @map("external_updated_at") @db.Timestamptz(6)
@@ -5584,6 +5694,8 @@ model WinLossRecord {
 
   @@index([orgId, outcome, reason], map: "win_loss_records_org_outcome_reason_idx")
   @@index([orgId, opportunityId], map: "win_loss_records_org_opp_idx")
+  // GET /win-loss/analysis filters on (orgId, createdAt range) and sorts by createdAt.
+  @@index([orgId, createdAt(sort: Desc)], map: "win_loss_records_org_created_idx")
   @@map("win_loss_records")
 }
 
@@ -6674,4 +6786,74 @@ model IntelSourceRun {
 
   @@unique([orgId, companyId, source])
   @@map("intel_source_runs")
+}
+
+/// Slice 15: one consulting firm read out of one public item or one of our
+/// own records for an account. Public rows carry the URL; internal rows carry
+/// record type and id (and the opportunity they hang off) so reads can apply
+/// the caller's access to that record. Retention: replaced on rescan of the
+/// same key; pruned 3 years after fetchedAt.
+model ConsultingPartnerEvidence {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  firmKey       String    @map("firm_key") @db.VarChar(64)
+  firmName      String    @map("firm_name") @db.VarChar(120)
+  /// public | internal
+  origin        String    @db.VarChar(16)
+  /// gdelt | google_news | firm_site | company_newsroom | account_news | meeting | email | activity | note | win_loss | bid_intel | competitor_insight | fixture
+  source        String    @db.VarChar(32)
+  /// keyword_match | record_field | llm_extract | fixture
+  method        String    @db.VarChar(32)
+  inferred      Boolean   @default(false)
+  /// Dedupe key within the firm: "pub:<hash>" or "int:<recordType>:<id>".
+  key           String    @db.VarChar(200)
+  url           String?
+  recordType    String?   @map("record_type") @db.VarChar(32)
+  recordId      String?   @map("record_id") @db.Uuid
+  opportunityId String?   @map("opportunity_id") @db.Uuid
+  title         String?
+  excerpt       String
+  occurredAt    DateTime? @map("occurred_at") @db.Timestamptz(6)
+  fetchedAt     DateTime  @map("fetched_at") @db.Timestamptz(6)
+  relationship  String?   @db.VarChar(32)
+  domains       String[]  @default([])
+  /// incumbent | competing | client_feedback | mention
+  context       String?   @db.VarChar(32)
+  sentiment     String?   @db.VarChar(16)
+  /// [{ dimension, favours, phrase }]
+  remarks       Json      @default("[]")
+  outcome       String?   @db.VarChar(8)
+  sample        Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId, firmKey, key])
+  @@index([orgId, companyId, firmKey, occurredAt(sort: Desc)])
+  @@index([orgId, fetchedAt])
+  @@map("consulting_partner_evidence")
+}
+
+/// Slice 15: last consulting partner scan per account, shown next to Refresh.
+model ConsultingPartnerRun {
+  id            String    @id @default(uuid()) @db.Uuid
+  orgId         String    @map("org_id") @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  /// ok | partial | failed | not_configured | queued | running
+  status        String
+  lastFetchedAt DateTime? @map("last_fetched_at") @db.Timestamptz(6)
+  /// { new, updated, skipped, failed }
+  result        Json      @default("{}")
+  detail        String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, companyId])
+  @@map("consulting_partner_runs")
 }

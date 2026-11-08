@@ -14,7 +14,7 @@ import {
 } from './calendar-sync-claim.js';
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
-import { captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { calendarFiling, refileUnlessManual, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
@@ -275,14 +275,12 @@ async function upsertGoogleEvents(
         isCancelled: false,
         attendees,
         organizerEmail,
-        relatedEntityType: target?.entityType ?? null,
-        relatedEntityId: target?.entityId ?? null,
-        ...captureColumns(target),
         externalUpdatedAt: item.updated ? new Date(item.updated) : null,
         etag: item.etag ?? null,
         syncState: 'SYNCED' as const,
         lastSyncedAt: new Date(),
       };
+      const filing = calendarFiling(target);
       await prisma.calendarEvent.upsert({
         where: {
           orgId_ownerId_provider_externalId: {
@@ -292,9 +290,10 @@ async function upsertGoogleEvents(
             externalId: item.id,
           },
         },
-        create: { orgId, ownerId: userId, externalId: item.id, provider: 'google_workspace', ...fields },
+        create: { orgId, ownerId: userId, externalId: item.id, provider: 'google_workspace', ...fields, ...filing },
         update: fields,
       });
+      await refileUnlessManual({ orgId, ownerId: userId, provider: 'google_workspace', externalId: item.id }, filing);
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
     }

@@ -164,3 +164,27 @@ export function captureColumns(target: CaptureTarget | null) {
     opportunityId: target?.opportunityId ?? null,
   };
 }
+
+/** Every column a calendar pull files an event with. */
+export function calendarFiling(target: CaptureTarget | null) {
+  return {
+    relatedEntityType: target?.entityType ?? null,
+    relatedEntityId: target?.entityId ?? null,
+    ...captureColumns(target),
+  };
+}
+
+/**
+ * Refile an existing calendar event from its participants, unless a user
+ * filed it by hand (calendar PATCH/POST). The guard is in the same statement
+ * so a concurrent manual filing is never overwritten.
+ */
+export async function refileUnlessManual(
+  key: { orgId: string; ownerId: string; provider: 'google_workspace' | 'microsoft_graph'; externalId: string },
+  filing: ReturnType<typeof calendarFiling>,
+): Promise<void> {
+  await prisma.calendarEvent.updateMany({
+    where: { ...key, filedManually: false },
+    data: filing,
+  });
+}

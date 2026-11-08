@@ -13,11 +13,14 @@ import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
 import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
+import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
 import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
+import { relatedCount } from './companyDetail/relatedCount';
 
 type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
 type View = 'overview' | 'details';
@@ -156,7 +159,7 @@ export function CompanyDetailPage() {
                 ) : (
                   <Link
                     to={`/companies/${c.parent.id}`}
-                    className="font-medium text-[var(--brand-primary)] hover:underline"
+                    className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                   >
                     {c.parent.name}
                   </Link>
@@ -165,7 +168,10 @@ export function CompanyDetailPage() {
             )}
           </div>
 
-          <CompanyTechStackSection companyName={c.name} />
+          <AccountActivityCharts companyId={c.id} />
+
+          <CompanyTechStackSection companyId={c.id} />
+          <ConsultingPartnersSection companyId={c.id} />
 
           <div
             className="flex gap-2 border-b border-[var(--border-subtle)]"
@@ -176,7 +182,7 @@ export function CompanyDetailPage() {
               [
                 {
                   key: 'contacts',
-                  label: t('companyDetail.tab.contacts', 'Contacts ({{count}})', { count: c.contacts.length }),
+                  label: t('companyDetail.tab.contacts', 'Contacts ({{shown}})', { shown: relatedCount(c.contacts.length) }),
                 },
                 {
                   key: 'people',
@@ -184,13 +190,13 @@ export function CompanyDetailPage() {
                 },
                 {
                   key: 'opportunities',
-                  label: t('companyDetail.tab.opportunities', 'Opportunities ({{count}})', {
-                    count: c.opportunities.length,
+                  label: t('companyDetail.tab.opportunities', 'Opportunities ({{shown}})', {
+                    shown: relatedCount(c.opportunities.length),
                   }),
                 },
                 {
                   key: 'cases',
-                  label: t('companyDetail.tab.cases', 'Cases ({{count}})', { count: c.openCases.length }),
+                  label: t('companyDetail.tab.cases', 'Cases ({{shown}})', { shown: relatedCount(c.openCases.length) }),
                 },
                 {
                   key: 'notes',
@@ -224,7 +230,7 @@ export function CompanyDetailPage() {
                 }}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] rounded-t-md ${
                   tab === tabItem.key
-                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                     : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
                 }`}
               >

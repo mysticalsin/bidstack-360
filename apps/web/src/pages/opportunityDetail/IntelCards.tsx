@@ -3,6 +3,8 @@
 import { useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
+import { winFactorRows } from '@/components/charts/bid-chart-data';
+import { DivergingRows } from '@/components/charts/tuffui/diverging-rows';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { formatDate, formatMoney } from '@/lib/format';
@@ -126,19 +128,11 @@ export function WinPredictionCard({ intel }: { intel: IntelPayload }) {
             {t('intelCards.winPrediction.probability', 'probability')}
           </div>
         </div>
-        <ul className="space-y-1.5">
-          {wp.drivers.map((d) => (
-            <li key={d.label} className="flex items-center justify-between text-xs">
-              <span className="text-[var(--fg-secondary)]">{d.label}</span>
-              <span
-                className={`tabular-nums font-medium ${d.contribution >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}
-              >
-                {d.contribution > 0 ? '+' : ''}
-                {d.contribution}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <DivergingRows
+          title={t('intelCards.winPrediction.driversLabel', 'Win drivers')}
+          rows={winFactorRows(wp.drivers)}
+          empty={t('intelCards.winPrediction.noDrivers', 'No drivers recorded.')}
+        />
       </div>
     </Card>
   );
@@ -163,7 +157,7 @@ export function TriggersCard({ intel }: { intel: IntelPayload }) {
               </div>
             </div>
             <div
-              className="rounded-md bg-[var(--brand-primary-tint)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] tabular-nums"
+              className="rounded-md bg-[var(--brand-primary-tint)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] dark:text-[var(--brand-deep)] tabular-nums"
               aria-label={t('intelCards.triggers.weightAria', 'Weight {{weight}}/10', { weight: trigger.weight })}
             >
               {trigger.weight}/10

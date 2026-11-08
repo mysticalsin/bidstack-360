@@ -58,6 +58,29 @@ afterAll(async () => {
 
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
+describe('contacts search indexes', () => {
+  // ?search= ORs ILIKE '%term%' over name, customer and role; without a
+  // trigram index each one scans every contact in the org.
+  skipIfNoDb('name, customer and role carry GIN trigram indexes', async () => {
+    const rows = await prisma.$queryRaw<Array<{ indexdef: string }>>`
+      SELECT indexdef FROM pg_indexes WHERE tablename = 'contacts' AND indexdef ILIKE '%gin_trgm_ops%'`;
+    for (const column of ['name', 'customer', 'role']) {
+      expect(
+        rows.some((r) => new RegExp(`gin \\(${column} gin_trgm_ops\\)`).test(r.indexdef)),
+        `trigram index on contacts.${column}`,
+      ).toBe(true);
+    }
+  });
+
+  // schema.prisma declared contacts_org_created_idx but no migration built it;
+  // the list orders by createdAt DESC within the org.
+  skipIfNoDb('the list sort index exists', async () => {
+    const rows = await prisma.$queryRaw<Array<{ indexname: string }>>`
+      SELECT indexname FROM pg_indexes WHERE tablename = 'contacts' AND indexname = 'contacts_org_created_idx'`;
+    expect(rows).toHaveLength(1);
+  });
+});
+
 describe('contacts routes', () => {
   skipIfNoDb('GET /api/contacts returns seeded contacts', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/contacts?limit=20' });

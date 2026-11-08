@@ -5,6 +5,10 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { prisma } from '@bidstack/db';
 import {
+  DataRegion,
+  OrgDataResidency,
+  OrgDataResidencyView,
+  resolveRegionalBucket,
   AppModules,
   AppModulesUpdate,
   APP_MODULES_DEFAULT,
@@ -266,4 +270,64 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
       return { mode: req.body.mode };
     },
   );
+
+  // Data residency tag. Stored per org; tenant exports resolve their bucket
+  // from it (resolveRegionalBucket). What it does not cover yet is listed in
+  // docs/compliance/CONTROL-MAP.md.
+  server.get(
+    '/org-settings/data-residency',
+    {
+      preHandler: [server.requirePermission('settings:read')],
+      schema: { response: { 200: OrgDataResidencyView } },
+    },
+    async (req) => {
+      const row = await prisma.orgSettings.findFirst({
+        where: { orgId: req.auth.orgId, deletedAt: null },
+        select: { dataRegion: true },
+      });
+      return residencyView(row?.dataRegion ?? null);
+    },
+  );
+
+  server.put(
+    '/org-settings/data-residency',
+    {
+      preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
+      schema: { body: OrgDataResidency, response: { 200: OrgDataResidencyView } },
+    },
+    async (req) => {
+      await prisma.orgSettings.updateMany({
+        where: { orgId: req.auth.orgId, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      await prisma.orgSettings.upsert({
+        where: { orgId: req.auth.orgId },
+        create: { orgId: req.auth.orgId, dataRegion: req.body.region },
+        update: { dataRegion: req.body.region, deletedAt: null },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'org_settings.data_residency.update',
+          targetType: 'org_settings',
+          targetId: req.auth.orgId,
+          diff: { region: req.body.region },
+        },
+      });
+      return residencyView(req.body.region);
+    },
+  );
 };
+
+function residencyView(raw: string | null): OrgDataResidencyView {
+  const parsed = DataRegion.safeParse(raw);
+  const region = parsed.success ? parsed.data : null;
+  let regionalStorage: boolean;
+  try {
+    regionalStorage = resolveRegionalBucket(region, process.env).regional;
+  } catch {
+    regionalStorage = false;
+  }
+  return { region, enforced: process.env.DATA_RESIDENCY_ENFORCE === 'true', regionalStorage };
+}

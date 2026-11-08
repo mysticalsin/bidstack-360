@@ -68,6 +68,7 @@ import { meetingIntelRoutes } from './routes/meeting-intel.js';
 import { marsRoutes } from './routes/mars.js';
 import { accountEnrichmentRoutes } from './routes/account-enrichment.js';
 import { companyIntelRoutes } from './routes/company-intel.js';
+import { consultingPartnersRoutes } from './routes/consulting-partners.js';
 import orgChartRoutes from './routes/org-chart.js';
 import orgChartFileRoutes from './routes/org-chart-files.js';
 import { accountWatchdogRoutes } from './routes/account-watchdog.js';
@@ -108,6 +109,8 @@ import { proposalRoutes } from './routes/proposals.js';
 import { crewAgentRoutes } from './routes/crew-agents.js';
 import { crewRoutes } from './routes/crews.js';
 import { activityRoutes } from './routes/activities.js';
+import { activityIngestRoutes } from './routes/activity-ingest.js';
+import { syncNowRoutes } from './routes/sync-now.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
 import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
@@ -166,6 +169,10 @@ import { demoRoutes } from './routes/demo.js';
 import { tenantExportRoutes } from './routes/tenant-export.js';
 // GDPR Art. 17 — per-data-subject erasure (anonymization)
 import { erasureRoutes } from './routes/erasure.js';
+// GDPR data subject export / erase requests (worker-run, dry run by default)
+import { dataSubjectRequestRoutes } from './routes/data-subject-requests.js';
+// Retention report per data class (dry run)
+import { complianceRetentionRoutes } from './routes/compliance-retention.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -198,6 +205,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(accountWatchdogRoutes, { prefix: '/api/v1' });
   await server.register(accountFinancialsRoutes, { prefix: '/api/v1' });
   await server.register(companyIntelRoutes, { prefix: '/api/v1' });
+await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
   await server.register(accountSignalsRoutes, { prefix: '/api/v1' });
   await server.register(winLossRoutes, { prefix: '/api/v1' });
   await server.register(governanceRoutes, { prefix: '/api/v1' });
@@ -289,6 +297,10 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(crewAgentRoutes, { prefix: '/api/v1' });
   await server.register(crewRoutes, { prefix: '/api/v1' });
   await server.register(activityRoutes, { prefix: '/api/v1' });
+  // Inbound activity API (Dust, external CRMs) + account activity summary
+  await server.register(activityIngestRoutes, { prefix: '/api/v1' });
+  // Sync now (Dust poll, HubSpot import): start, poll, last synced
+  await server.register(syncNowRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRequirementRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRfpRoutes, { prefix: '/api/v1' });
@@ -379,6 +391,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // GDPR Art. 17 — per-data-subject erasure / anonymization (admin-gated, org-scoped)
   await server.register(erasureRoutes, { prefix: '/api/v1' });
+  await server.register(dataSubjectRequestRoutes, { prefix: '/api/v1' });
+  await server.register(complianceRetentionRoutes, { prefix: '/api/v1' });
 
   // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
   // Self-gates on DEMO_MODE; registering it unconditionally is safe.

@@ -16,12 +16,27 @@ import {
   type ContactLinkState,
 } from '@bidstack/shared';
 
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 
 function linkStateFor(companyId: string | null): ContactLinkState {
   // Reads do not invent a link. A historical row with a null companyId stays
   // needs_review even if a unique company name would match today.
   return companyId ? 'linked' : 'needs_review';
+}
+
+async function resolveCompanyIdByName(
+  tx: Prisma.TransactionClient,
+  orgId: string,
+  customer: string,
+): Promise<string | null> {
+  const matches = await tx.company.findMany({
+    where: { orgId, deletedAt: null, name: { equals: customer, mode: 'insensitive' } },
+    select: { id: true },
+    take: 2,
+  });
+  // One exact name is safe to link. Zero or many stay needs_review.
+  return matches.length === 1 ? matches[0]!.id : null;
 }
 
 function serializeContact(c: {
@@ -147,17 +162,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
           if (!company) throw server.httpErrors.notFound('Company not found');
           companyId = company.id;
         } else {
-          const matches = await tx.company.findMany({
-            where: {
-              orgId: req.auth.orgId,
-              deletedAt: null,
-              name: { equals: req.body.customer, mode: 'insensitive' },
-            },
-            select: { id: true },
-            take: 2,
-          });
-          // One exact name is safe to link. Zero or many stay needs_review.
-          companyId = matches.length === 1 ? matches[0]!.id : null;
+          companyId = await resolveCompanyIdByName(tx, req.auth.orgId, req.body.customer);
         }
         const contact = await tx.contact.create({
           data: {
@@ -179,7 +184,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'contact.create',
             targetType: 'contact',
             targetId: contact.id,
-            diff: { customer: contact.customer, name: contact.name },
+            diff: { customer: contact.customer },
           },
         });
         return contact;
@@ -210,14 +215,29 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       // could PATCH any contact by guessing its UUID.
       const existing = await prisma.contact.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true },
+        select: { id: true, customer: true },
       });
       if (!existing) throw server.httpErrors.notFound('Contact not found');
+      if (req.body.customFieldValues?.length) {
+        const foreign = await foreignCustomFieldDefinitions(
+          req.auth.orgId,
+          'contact',
+          req.body.customFieldValues.map((v) => v.definitionId),
+        );
+        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
+      }
 
       const updated = await prisma.$transaction(async (tx) => {
+        // Moving a contact to another customer drops the old company link and
+        // re-resolves it the same way create does.
+        const relink =
+          req.body.customer !== undefined && req.body.customer !== existing.customer
+            ? { companyId: await resolveCompanyIdByName(tx, req.auth.orgId, req.body.customer) }
+            : {};
         const contact = await tx.contact.update({
           where: { id: existing.id },
           data: {
+            ...relink,
             ...(req.body.customer !== undefined ? { customer: req.body.customer } : {}),
             ...(req.body.name !== undefined ? { name: req.body.name } : {}),
             ...(req.body.role !== undefined ? { role: req.body.role } : {}),
@@ -300,7 +320,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'contact.delete',
             targetType: 'contact',
             targetId: existing.id,
-            diff: { customer: existing.customer, name: existing.name },
+            diff: { customer: existing.customer },
           },
         }),
       ]);

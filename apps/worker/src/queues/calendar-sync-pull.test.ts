@@ -49,6 +49,29 @@ function json(body: unknown, status = 200, headers: Record<string, string> = {})
   });
 }
 
+// The update branch of the upsert must leave filing alone; auto filing of an
+// existing row only lands where nobody filed it by hand.
+function expectFilingPreserved(provider: string, externalId: string): void {
+  const call = upsert.mock.calls[0]?.[0] as unknown as {
+    create: Record<string, unknown>;
+    update: Record<string, unknown>;
+  };
+  expect(call.create).toMatchObject({ contactId: 'contact-1', companyId: 'company-1', opportunityId: 'opp-1' });
+  for (const key of ['contactId', 'companyId', 'opportunityId', 'relatedEntityType', 'relatedEntityId']) {
+    expect(call.update).not.toHaveProperty(key);
+  }
+  expect(updateMany).toHaveBeenCalledWith({
+    where: { orgId, ownerId: userId, provider, externalId, filedManually: false },
+    data: {
+      relatedEntityType: 'contact',
+      relatedEntityId: 'contact-1',
+      contactId: 'contact-1',
+      companyId: 'company-1',
+      opportunityId: 'opp-1',
+    },
+  });
+}
+
 beforeEach(() => {
   vi.mocked(checkSerumConnectorRuntimePolicy).mockResolvedValue({
     configType: 'connectors',
@@ -153,6 +176,28 @@ describe('Microsoft calendar pull', () => {
     );
   });
 
+  it('never overwrites filing a user set by hand on an existing event', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        json({
+          value: [
+            {
+              id: 'ev-1',
+              subject: 'Steering committee',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+              attendees: [{ emailAddress: { address: 'buyer@acme.com' } }],
+            },
+          ],
+          '@odata.deltaLink': 'd',
+        }),
+      ),
+    );
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log, 'tony@amaris.com');
+    expectFilingPreserved('microsoft_graph', 'ev-1');
+  });
+
   it('raises a rate limit error with the Retry-After wait on 429', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({}, 429, { 'Retry-After': '9' })));
     const err = await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log).catch((e: unknown) => e);
@@ -205,6 +250,28 @@ describe('Google calendar pull', () => {
         data: expect.objectContaining({ deltaState: { watchChannelId: 'ch-1', calendarSyncToken: 'sync-1' } }),
       }),
     );
+  });
+
+  it('never overwrites filing a user set by hand on an existing event', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        json({
+          items: [
+            {
+              id: 'g-1',
+              summary: 'Client workshop',
+              start: { dateTime: '2026-11-09T10:00:00-05:00' },
+              end: { dateTime: '2026-11-09T11:30:00-05:00' },
+              attendees: [{ email: 'buyer@acme.com' }],
+            },
+          ],
+          nextSyncToken: 'sync-1',
+        }),
+      ),
+    );
+    await pullGoogleIncremental('tok-2', orgId, userId, 'at', {}, log, 'tony@amaris.com');
+    expectFilingPreserved('google_workspace', 'g-1');
   });
 
   it('drops only the calendar cursor when the sync token expires', async () => {

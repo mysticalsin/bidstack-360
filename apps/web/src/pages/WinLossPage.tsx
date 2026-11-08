@@ -9,7 +9,10 @@ import { useTranslation } from 'react-i18next';
 
 import { ChartContainer } from '@/components/charts/ChartContainer';
 import { KpiCard } from '@/components/charts/KpiCard';
-import { BarChart, FunnelChart } from '@/components/charts/charts';
+import { FunnelChart } from '@/components/charts/charts';
+import { SALES_CYCLE_OVERDUE_DAYS, winLossQuarterBars } from '@/components/charts/bid-chart-data';
+import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
+import { DotHistogram } from '@/components/charts/tuffui/dot-histogram';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, type SelectOption } from '@/components/ui/Select';
@@ -27,6 +30,7 @@ import {
 // from replaying on every parent re-render (e.g. while typing a filter date).
 const formatOneDecimal = (n: number) => n.toFixed(1);
 const formatWhole = (n: number) => Math.round(n).toLocaleString();
+const formatDays = (n: number) => `${+n.toFixed(1)} days`;
 
 function quarterWinRates(data: WinLossAnalysis | undefined): number[] {
   return (data?.quarters ?? []).map((q) => {
@@ -58,6 +62,8 @@ export default function WinLossPage() {
   // Trend vs the previous quarter — only meaningful with two buckets.
   const winRateDelta =
     rates.length >= 2 ? rates[rates.length - 1]! - rates[rates.length - 2]! : undefined;
+
+  const quarterBars = useMemo(() => winLossQuarterBars(data?.quarters ?? []), [data?.quarters]);
 
   const lossReasons = useMemo(
     () =>
@@ -101,12 +107,6 @@ export default function WinLossPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">{t('winLoss.title', 'Win/Loss review')}</h1>
-          <div className="page-sub">
-            {t(
-              'winLoss.subtitle',
-              'Quarterly retrospective on closed bids — where we win, why we lose, and which deals to debrief.',
-            )}
-          </div>
         </div>
       </div>
 
@@ -205,25 +205,40 @@ export default function WinLossPage() {
             />
           </div>
 
-          <ChartContainer
-            title={t('winLoss.quarterChartTitle', 'Wins vs losses by quarter')}
-            subtitle={t('winLoss.quarterChartSubtitle', 'Bucketed by when the outcome was recorded')}
-            empty={data.quarters.length === 0}
-          >
-            <div data-testid="win-loss-quarter-chart">
-              <BarChart
-                data={data.quarters}
-                xKey="quarter"
-                yKey={['won', 'lost']}
-                aria-label={t('winLoss.quarterChartAria', 'Wins and losses per quarter')}
-              />
-            </div>
-          </ChartContainer>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <ChartContainer
+              title={t('winLoss.quarterChartTitle', 'Wins vs losses by quarter')}
+              empty={data.quarters.length === 0}
+            >
+              <div data-testid="win-loss-quarter-chart">
+                <DivergingBars
+                  title={t('winLoss.quarterChartAria', 'Won vs lost by quarter')}
+                  labels={quarterBars.labels}
+                  series={[{ id: 'won', label: t('winLoss.won', 'Won'), values: quarterBars.won, color: 'var(--success)' }]}
+                  below={{ id: 'lost', label: t('winLoss.lost', 'Lost'), values: quarterBars.lost }}
+                  format={formatWhole}
+                />
+              </div>
+            </ChartContainer>
+            <ChartContainer title={t('winLoss.cycleChartTitle', 'Sales cycle')}>
+              <div data-testid="win-loss-cycle-chart">
+                <DotHistogram
+                  title={t('winLoss.cycleChartTitle', 'Sales cycle')}
+                  values={data.cycleDays ?? []}
+                  threshold={SALES_CYCLE_OVERDUE_DAYS}
+                  thresholdLabel={t('winLoss.cycleOverdue', '{{days}}+ days', { days: SALES_CYCLE_OVERDUE_DAYS })}
+                  unit={t('winLoss.cycleUnit', 'bids')}
+                  bins={24}
+                  format={formatDays}
+                  empty={t('winLoss.noCycles', 'No sales cycles recorded yet.')}
+                />
+              </div>
+            </ChartContainer>
+          </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
             <ChartContainer
               title={t('winLoss.reasonChartTitle', 'Loss reasons')}
-              subtitle={t('winLoss.reasonChartSubtitle', 'Pareto of recorded lost bids')}
               empty={lossReasons.length === 0}
               emptyMessage={t('winLoss.noLosses', 'No recorded losses in this range.')}
             >
@@ -236,7 +251,6 @@ export default function WinLossPage() {
             </ChartContainer>
             <ChartContainer
               title={t('winLoss.competitorChartTitle', 'Losses by competitor')}
-              subtitle={t('winLoss.competitorChartSubtitle', 'Who is taking the deals we lose')}
               empty={competitorLosses.length === 0}
               emptyMessage={t(
                 'winLoss.noCompetitors',
