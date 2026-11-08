@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
 import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
-import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { getWorkspaceAccessToken } from '../lib/workspace-token.js';
 
@@ -162,6 +162,17 @@ export async function pullDelta(
       }
 
       const bridge = noteActivityBridgeFailures(deltaState, url, failedIds, new Date().toISOString(), settledIds);
+      const drained = typeof prisma.emailMessage?.findFirst === 'function'
+        ? await drainPendingActivityBridges(deltaState, async (providerId) => {
+        const row = await prisma.emailMessage.findFirst({
+          where: { orgId: params.orgId, userId: params.userId, externalMessageId: providerId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!row) return 'gone';
+        const ok = await bridgeActivity(() => syncEmailMessageActivity(params.orgId, row.id), log, { msgId: providerId });
+        return ok;
+      })
+        : null;
       bridgeDeltas.push({ page: url, failedIds, settledIds });
       if (bridge.quarantined.length > 0) {
         log.warn(
@@ -169,7 +180,7 @@ export async function pullDelta(
           'Account activity bridge quarantined after repeated failures',
         );
       }
-      holdCursor = bridge.hold;
+      holdCursor = bridge.backpressure || (drained?.hold ?? bridge.hold);
       if (holdCursor) break;
 
       if (data['@odata.deltaLink']) {

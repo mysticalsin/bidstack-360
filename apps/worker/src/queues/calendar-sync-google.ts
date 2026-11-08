@@ -19,6 +19,7 @@ import {
   calendarFiling,
   googleMeetingHints,
   meetingColumns,
+  drainPendingActivityBridges,
   noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
@@ -240,11 +241,22 @@ export async function pullGoogleIncremental(
     const { failed, settled } = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
     const pageKey = `google:${syncToken ?? ''}:${pageToken ?? ''}`;
     const bridge = noteActivityBridgeFailures(deltaState, pageKey, failed, new Date().toISOString(), settled);
+    const drained = typeof prisma.calendarEvent?.findFirst === 'function'
+      ? await drainPendingActivityBridges(deltaState, async (providerId) => {
+      const row = await prisma.calendarEvent.findFirst({
+        where: { orgId, ownerId: userId, provider: 'google_workspace', externalId: providerId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!row) return 'gone';
+      const ok = await bridgeActivity(() => syncCalendarEventActivity(orgId, row.id), log, { eventId: providerId });
+      return ok;
+    })
+      : null;
     bridgeDeltas.push({ page: pageKey, failedIds: failed, settledIds: settled });
     if (bridge.quarantined.length > 0) {
       log.warn({ tokenId, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
     }
-    if (bridge.hold) {
+    if (bridge.backpressure || (drained?.hold ?? bridge.hold)) {
       await commitTokenDeltaState(
         prisma,
         tokenId,

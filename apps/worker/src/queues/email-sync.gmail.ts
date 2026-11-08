@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
 import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
-import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -342,11 +342,22 @@ export async function pullGmail(
 
   const pageKey = `gmail:${cursor ?? 'seed'}`;
   const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds, new Date().toISOString(), settledIds);
+  const drained = typeof prisma.emailMessage?.findFirst === 'function'
+    ? await drainPendingActivityBridges(deltaState, async (providerId) => {
+    const row = await prisma.emailMessage.findFirst({
+      where: { orgId: token.orgId, userId: token.userId, externalMessageId: providerId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!row) return 'gone';
+    const ok = await bridgeActivity(() => syncEmailMessageActivity(token.orgId, row.id), log, { msgId: providerId });
+    return ok;
+  })
+    : null;
   bridgeDeltas.push({ page: pageKey, failedIds, settledIds });
   if (bridge.quarantined.length > 0) {
     log.warn({ tokenId: token.id, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
   }
-  if (bridge.hold) {
+  if (bridge.backpressure || (drained?.hold ?? bridge.hold)) {
     log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
     await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas);
     return persisted;

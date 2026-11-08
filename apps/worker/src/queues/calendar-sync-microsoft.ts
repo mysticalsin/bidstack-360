@@ -18,6 +18,7 @@ import {
   calendarFiling,
   graphMeetingHints,
   meetingColumns,
+  drainPendingActivityBridges,
   noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
@@ -198,6 +199,17 @@ export async function pullMicrosoftIncremental(
     count += items.length;
     const { failed, settled } = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
     const bridge = noteActivityBridgeFailures(deltaState, url, failed, new Date().toISOString(), settled);
+    const drained = typeof prisma.calendarEvent?.findFirst === 'function'
+      ? await drainPendingActivityBridges(deltaState, async (providerId) => {
+      const row = await prisma.calendarEvent.findFirst({
+        where: { orgId, ownerId: userId, provider: 'microsoft_graph', externalId: providerId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!row) return 'gone';
+      const ok = await bridgeActivity(() => syncCalendarEventActivity(orgId, row.id), log, { eventId: providerId });
+      return ok;
+    })
+      : null;
     bridgeDeltas.push({ page: url, failedIds: failed, settledIds: settled });
     if (bridge.quarantined.length > 0) {
       log.warn(
@@ -205,7 +217,7 @@ export async function pullMicrosoftIncremental(
         'Account activity bridge quarantined after repeated failures',
       );
     }
-    if (bridge.hold) {
+    if (bridge.backpressure || (drained?.hold ?? bridge.hold)) {
       // The calendar row is already saved. Holding this page lets the next
       // tick retry the activity write before Graph moves past the item.
       await commitTokenDeltaState(prisma, tokenId, baseline, { ...deltaState, calendarNextLink: url }, bridgeDeltas);

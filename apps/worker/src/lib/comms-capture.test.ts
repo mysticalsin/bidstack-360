@@ -4,8 +4,12 @@ import { CALENDAR_PULL_INCREMENTAL, OUTLOOK_PULL_HISTORICAL, OUTLOOK_PULL_INCREM
 
 import { commitTokenDeltaState } from './activity-bridge-commit.js';
 import {
+  ACTIVITY_BRIDGE_ACTIVE_CAP,
+  ACTIVITY_BRIDGE_DRAIN_BATCH,
+  ACTIVITY_BRIDGE_PENDING_CAP,
   ACTIVITY_BRIDGE_QUARANTINE_CAP,
   ACTIVITY_BRIDGE_RETRY_LIMIT,
+  claimActivityBridgeDrain,
   CursorKeyConflictError,
   externalParticipants,
   googleMeetingHints,
@@ -199,13 +203,15 @@ describe('activity bridge retry bound', () => {
     expect(noteActivityBridgeFailures(state, 'sent', ['other']).hold).toBe(true);
     expect(noteActivityBridgeFailures(state, 'inbox', ['poison']).hold).toBe(true);
     const third = noteActivityBridgeFailures(state, 'inbox', ['poison']);
-    expect(third.hold).toBe(false);
     expect(third.quarantined).toEqual(['poison']);
-    const counts = state.activityBridgeRetryById as Record<string, number>;
-    expect(counts.poison).toBeUndefined();
-    expect(counts.other).toBe(1);
-    expect(noteActivityBridgeFailures(state, 'sent', []).hold).toBe(false);
-    expect((state.activityBridgeRetryById as Record<string, number>).other).toBe(1);
+    const counts = state.activityBridgeRetryById as Record<string, number> | undefined;
+    expect(counts?.poison).toBeUndefined();
+    // Sent's id was not on the inbox page, so it leaves the active cap and
+    // stays in the pending queue. The cursor remains held until that id drains.
+    expect(third.hold).toBe(true);
+    expect(state.activityBridgePending).toEqual([{ id: 'other', attempts: 1 }]);
+    expect(noteActivityBridgeFailures(state, 'sent', []).hold).toBe(true);
+    expect(state.activityBridgePending).toEqual([{ id: 'other', attempts: 1 }]);
     expect(state.activityBridgeQuarantine).toEqual([
       expect.objectContaining({ id: 'poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
     ]);
@@ -224,7 +230,7 @@ describe('activity bridge retry bound', () => {
       { page: 'sent', failedIds: ['other'] },
     ], now);
     const counts = afterSent.activityBridgeRetryById as Record<string, number>;
-    expect(counts.poison).toBe(1);
+    expect(afterSent.activityBridgePending).toEqual([{ id: 'poison', attempts: 1 }]);
     expect(counts.other).toBe(1);
     expect(afterSent.calendarDeltaLink).toBe('cal-keep');
     expect(afterSent.mailNextLink).toBe('inbox-page');
@@ -281,7 +287,8 @@ describe('activity bridge retry bound', () => {
     expect(restarted.hold).toBe(true);
     expect((state.activityBridgeRetryById as Record<string, number>)['id-0']).toBe(1);
     const remembered = noteActivityBridgeFailures(state, 'later', ['id-1'], now);
-    expect(remembered.hold).toBe(false);
+    expect(remembered.hold).toBe(true);
+    expect(state.activityBridgePending).toEqual([{ id: 'id-0', attempts: 1 }]);
     expect((state.activityBridgeRetryById as Record<string, number> | undefined)?.['id-1']).toBeUndefined();
   });
 
@@ -324,17 +331,64 @@ describe('activity bridge retry bound', () => {
     const kept = noteActivityBridgeFailures(state, 'page-2', ['id-0', 'id-new'], now);
     const afterKept = state.activityBridgeRetryById as Record<string, number>;
     expect(afterKept['id-0']).toBe(2);
-    expect(afterKept['id-new']).toBeUndefined();
+    expect(afterKept['id-new']).toBe(1);
     expect(kept.hold).toBe(true);
     expect(kept.quarantined).toEqual([]);
     const third = noteActivityBridgeFailures(state, 'page-1', ids, now);
     expect(third.quarantined).toEqual(['id-0']);
     expect(third.hold).toBe(true);
-    expect((state.activityBridgeRetryById as Record<string, number>)['id-32']).toBe(1);
+    expect((state.activityBridgeRetryById as Record<string, number>)['id-32']).toBe(2);
     expect((state.activityBridgeRetryById as Record<string, number>)['id-0']).toBeUndefined();
     const listed = state.activityBridgeQuarantine as Array<{ id: string; attempts: number }>;
     expect(listed).toEqual([expect.objectContaining({ id: 'id-0', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT })]);
     expect(JSON.stringify(listed)).not.toContain('subject');
+  });
+
+  it('keeps ids the current page did not see, and still records the new id', () => {
+    // WHY: a full active map of ids from another page used to defer every new
+    // id forever. Those ids stay in the pending queue with their attempts.
+    // They are not deleted to free a slot, and a full pending queue refuses
+    // the newcomer instead of evicting them.
+    const state: Record<string, unknown> = {};
+    const now = '2026-11-08T03:00:00.000Z';
+    const prior = Array.from({ length: ACTIVITY_BRIDGE_ACTIVE_CAP }, (_, index) => `old-${index}`);
+    noteActivityBridgeFailures(state, 'page-a', prior, now);
+    const next = noteActivityBridgeFailures(state, 'page-b', ['new-1'], now, ['new-seen']);
+    const active = state.activityBridgeRetryById as Record<string, number>;
+    const pending = state.activityBridgePending as Array<{ id: string; attempts: number }>;
+    expect(next.hold).toBe(true);
+    expect(active['new-1']).toBe(1);
+    expect(pending).toHaveLength(ACTIVITY_BRIDGE_ACTIVE_CAP);
+    expect(pending.every((row) => row.attempts === 1)).toBe(true);
+    expect(pending.map((row) => row.id)).toEqual(prior);
+    const drained = claimActivityBridgeDrain(state);
+    expect(drained).toEqual(prior.slice(0, ACTIVITY_BRIDGE_DRAIN_BATCH));
+    expect(pending).toHaveLength(ACTIVITY_BRIDGE_ACTIVE_CAP);
+    const again = noteActivityBridgeFailures(state, 'drain', drained, now, [], false);
+    expect(again.quarantined).toEqual([]);
+    const afterDrain = [
+      ...((state.activityBridgePending as Array<{ id: string; attempts: number }> | undefined) ?? []),
+    ];
+    const activeAfter = (state.activityBridgeRetryById as Record<string, number> | undefined) ?? {};
+    const oldAttempt = afterDrain.find((row) => row.id === 'old-0')?.attempts ?? activeAfter['old-0'];
+    expect(oldAttempt).toBe(2);
+    const stuck: Record<string, unknown> = {
+      activityBridgeRetryById: Object.fromEntries(
+        Array.from({ length: ACTIVITY_BRIDGE_ACTIVE_CAP }, (_, index) => [`live-${index}`, 1]),
+      ),
+      activityBridgePending: Array.from({ length: ACTIVITY_BRIDGE_PENDING_CAP }, (_, index) => ({
+        id: `keep-${index}`,
+        attempts: 1,
+      })),
+    };
+    const seen = [...Object.keys(stuck.activityBridgeRetryById as Record<string, number>), 'extra'];
+    const blocked = noteActivityBridgeFailures(stuck, 'page-c', ['extra'], now, [], true, seen);
+    const kept = stuck.activityBridgePending as Array<{ id: string }>;
+    expect(blocked.backpressure).toBe(true);
+    expect(kept).toHaveLength(ACTIVITY_BRIDGE_PENDING_CAP);
+    expect(kept.some((row) => row.id === 'extra')).toBe(false);
+    expect(kept[0]?.id).toBe('keep-0');
+    expect(kept.at(-1)?.id).toBe(`keep-${ACTIVITY_BRIDGE_PENDING_CAP - 1}`);
   });
 
   it('frees a retry slot when an id later succeeds and leaves the other failures', () => {
@@ -344,8 +398,8 @@ describe('activity bridge retry bound', () => {
     const now = '2026-11-08T03:00:00.000Z';
     const ids = Array.from({ length: 32 }, (_, i) => `id-${i}`);
     noteActivityBridgeFailures(state, 'page-1', ids, now);
-    const settled = noteActivityBridgeFailures(state, 'page-1', [], now, ['id-0']);
-    expect(settled.hold).toBe(false);
+    const settled = noteActivityBridgeFailures(state, 'page-1', [], now, ['id-0'], true, ids);
+    expect(settled.hold).toBe(true);
     const counts = state.activityBridgeRetryById as Record<string, number>;
     expect(counts['id-0']).toBeUndefined();
     expect(counts['id-1']).toBe(1);
@@ -355,8 +409,9 @@ describe('activity bridge retry bound', () => {
     expect(admitted.quarantined).toEqual([]);
     const after = state.activityBridgeRetryById as Record<string, number>;
     expect(after['id-new']).toBe(1);
-    expect(after['id-1']).toBe(1);
-    expect(Object.keys(after)).toHaveLength(32);
+    expect(state.activityBridgePending).toEqual(
+      expect.arrayContaining([{ id: 'id-1', attempts: 1 }]),
+    );
   });
 
   it('does not drop an unexhausted id that this run did not settle', () => {
@@ -367,8 +422,8 @@ describe('activity bridge retry bound', () => {
     ], now);
     const counts = merged.activityBridgeRetryById as Record<string, number>;
     expect(counts.poison).toBeUndefined();
-    expect(counts.other).toBe(1);
     expect(counts.fresh).toBe(1);
+    expect(merged.activityBridgePending).toEqual([{ id: 'other', attempts: 1 }]);
     expect(merged.activityBridgeQuarantine).toBeUndefined();
   });
 });
@@ -403,7 +458,7 @@ describe('activity bridge commit lock', () => {
       [{ page: 'sent', failedIds: ['other'] }],
     );
     const counts = stored.delta.activityBridgeRetryById as Record<string, number>;
-    expect(counts.poison).toBe(1);
+    expect(stored.delta.activityBridgePending).toEqual([{ id: 'poison', attempts: 1 }]);
     expect(counts.other).toBe(1);
     expect(stored.delta.mailNextLink).toBe('inbox-page');
     expect(stored.delta.mailSentNextLink).toBe('sent-page');
@@ -413,8 +468,8 @@ describe('activity bridge commit lock', () => {
     await commitTokenDeltaState(db, 'tok-1', later, later, [{ page: 'inbox-2', failedIds: ['poison'] }]);
     await commitTokenDeltaState(db, 'tok-1', later, later, [{ page: 'inbox-3', failedIds: ['poison'] }]);
     const last = stored.delta;
-    expect((last.activityBridgeRetryById as Record<string, number>).poison).toBeUndefined();
-    expect((last.activityBridgeRetryById as Record<string, number>).other).toBe(1);
+    expect(last.activityBridgeRetryById).toBeUndefined();
+    expect(last.activityBridgePending).toEqual([{ id: 'other', attempts: 1 }]);
     expect(last.mailSentNextLink).toBe('sent-page');
     expect(last.activityBridgeQuarantine).toEqual([
       expect.objectContaining({ id: 'poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
@@ -583,9 +638,8 @@ describe('activity bridge commit lock', () => {
     expect(update).toHaveBeenCalledOnce();
     expect(stored.delta.calendarDeltaLink).toBe('done');
     expect(stored.delta.calendarNextLink).toBeUndefined();
-    const counts = stored.delta.activityBridgeRetryById as Record<string, number>;
-    expect(counts.poison).toBeUndefined();
-    expect(counts.other).toBe(2);
+    expect(stored.delta.activityBridgeRetryById).toBeUndefined();
+    expect(stored.delta.activityBridgePending).toEqual([{ id: 'other', attempts: 2 }]);
   });
 
   it('leaves lock-timeout retries to the pull jobs that already back off', () => {
