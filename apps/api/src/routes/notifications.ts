@@ -3,15 +3,25 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import {
   DEFAULT_NOTIFICATION_PREFS,
   Notification,
+  NotificationChannelPrefs,
+  NotificationChannelSettings,
   NotificationPage,
   NotificationPrefs,
+  TeamsWebhookInput,
+  TeamsWebhookTestResult,
+  absoluteAppUrl,
+  buildTeamsAdaptiveCard,
+  isAllowedTeamsWebhookUrl,
+  postTeamsCard,
+  resolveChannelGroups,
   type NotificationType,
   QueryBoolean,
 } from '@bidstack/shared';
+import { decryptSecret, encryptSecret } from '@bidstack/shared/server-crypto';
 
 interface DbRow {
   id: string;
@@ -145,4 +155,153 @@ export const notificationsRoutes: FastifyPluginAsyncZod = async (server) => {
       };
     },
   );
+
+  // ── Per kind group, per channel delivery + Teams webhook ───────────────────
+  async function channelSettings(userId: string): Promise<z.infer<typeof NotificationChannelSettings>> {
+    const row = await prisma.notificationPref.findUnique({
+      where: { userId },
+      select: { channelPrefs: true, accountDigestDaily: true, teamsWebhookEnc: true, teamsWebhookHost: true },
+    });
+    return {
+      groups: resolveChannelGroups(row?.channelPrefs),
+      dailyDigest: row?.accountDigestDaily ?? false,
+      teamsWebhook: { configured: !!row?.teamsWebhookEnc, host: row?.teamsWebhookHost ?? null },
+    };
+  }
+
+  server.get(
+    '/notifications/channels',
+    { schema: { response: { 200: NotificationChannelSettings } } },
+    async (req) => channelSettings(req.auth.userId),
+  );
+
+  server.put(
+    '/notifications/channels',
+    { schema: { body: NotificationChannelPrefs, response: { 200: NotificationChannelSettings } } },
+    async (req) => {
+      const channelPrefs = { groups: req.body.groups } as unknown as Prisma.InputJsonValue;
+      await prisma.notificationPref.upsert({
+        where: { userId: req.auth.userId },
+        create: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          ...DEFAULT_NOTIFICATION_PREFS,
+          channelPrefs,
+          accountDigestDaily: req.body.dailyDigest,
+        },
+        update: { channelPrefs, accountDigestDaily: req.body.dailyDigest },
+      });
+      return channelSettings(req.auth.userId);
+    },
+  );
+
+  server.put(
+    '/notifications/teams-webhook',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: { body: TeamsWebhookInput, response: { 200: NotificationChannelSettings } },
+    },
+    async (req) => {
+      const url = req.body.url;
+      if (!isAllowedTeamsWebhookUrl(url)) {
+        throw server.httpErrors.badRequest(
+          'Paste the https webhook URL from a Microsoft Teams Workflows flow (logic.azure.com, powerplatform.com or webhook.office.com).',
+        );
+      }
+      let enc: string;
+      try {
+        enc = encryptSecret(url);
+      } catch {
+        throw server.httpErrors.serviceUnavailable('Teams delivery is not configured on this server yet.');
+      }
+      const host = new URL(url).hostname.toLowerCase();
+      await prisma.notificationPref.upsert({
+        where: { userId: req.auth.userId },
+        create: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          ...DEFAULT_NOTIFICATION_PREFS,
+          teamsWebhookEnc: enc,
+          teamsWebhookHost: host,
+        },
+        update: { teamsWebhookEnc: enc, teamsWebhookHost: host },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'notification.teams_webhook.set',
+          targetType: 'user',
+          targetId: req.auth.userId,
+          diff: { host } as Prisma.InputJsonValue,
+        },
+      });
+      return channelSettings(req.auth.userId);
+    },
+  );
+
+  server.delete(
+    '/notifications/teams-webhook',
+    { schema: { response: { 200: NotificationChannelSettings } } },
+    async (req) => {
+      await prisma.notificationPref.updateMany({
+        where: { userId: req.auth.userId, orgId: req.auth.orgId },
+        data: { teamsWebhookEnc: null, teamsWebhookHost: null },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'notification.teams_webhook.clear',
+          targetType: 'user',
+          targetId: req.auth.userId,
+        },
+      });
+      return channelSettings(req.auth.userId);
+    },
+  );
+
+  server.post(
+    '/notifications/teams-webhook/test',
+    {
+      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+      schema: { body: z.object({}).strict().nullish(), response: { 200: TeamsWebhookTestResult } },
+    },
+    async (req) => {
+      const row = await prisma.notificationPref.findUnique({
+        where: { userId: req.auth.userId },
+        select: { teamsWebhookEnc: true },
+      });
+      if (!row?.teamsWebhookEnc) {
+        return { ok: false, status: null, message: 'Add a Teams webhook URL first.' };
+      }
+      let url: string;
+      try {
+        url = decryptSecret(row.teamsWebhookEnc);
+      } catch {
+        return { ok: false, status: null, message: 'The saved webhook could not be read. Paste it again.' };
+      }
+      const card = buildTeamsAdaptiveCard({
+        title: 'Polo test alert',
+        body: 'Account alerts will show up here.',
+        url: absoluteAppUrl(process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173', '/settings'),
+      });
+      const res = await teamsPoster(url, card);
+      if (res.ok) return { ok: true, status: res.status, message: 'Test card sent to Teams.' };
+      req.log.warn({ status: res.status, reason: res.reason }, 'teams webhook test failed');
+      return {
+        ok: false,
+        status: res.status,
+        message: res.status ? `Teams answered ${res.status}. Check the workflow is on.` : 'Teams could not be reached.',
+      };
+    },
+  );
 };
+
+type TeamsPoster = (url: string, card: Record<string, unknown>) => ReturnType<typeof postTeamsCard>;
+let teamsPoster: TeamsPoster = (url, card) => postTeamsCard(url, card);
+
+/** Tests swap the HTTP call for a fake. Pass null to reset. */
+export function __setTeamsPosterForTest(fn: TeamsPoster | null): void {
+  teamsPoster = fn ?? ((url, card) => postTeamsCard(url, card));
+}

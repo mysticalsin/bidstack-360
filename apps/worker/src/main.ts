@@ -41,6 +41,7 @@ import { startAccountEnrichment } from './queues/account-enrichment.js';
 import { startAccountIntel } from './queues/account-intel.js';
 import { startCompanyTechDetect } from './queues/company-tech-detect.js';
 import { startConsultingPartners } from './queues/consulting-partners.js';
+import { startNotificationDelivery } from './queues/notification-delivery.js';
 import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
@@ -190,6 +191,8 @@ await Promise.all([
   startCompanyTechDetect(connection, log, workers, queues),
   // Consulting partners: which consulting firms work with each account, cited
   startConsultingPartners(connection, log, workers, queues),
+  // Account alerts: instant email and Teams copies, daily account digest
+  startNotificationDelivery(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),

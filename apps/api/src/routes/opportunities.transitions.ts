@@ -24,6 +24,7 @@ import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { createNotification } from '../services/notification.service.js';
+import { emitOpportunityAccountEventSafe } from '../services/account-events.service.js';
 import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
 
 /** Task.type marker for the Stage-10 debrief, so it can be found and deduped. */
@@ -412,6 +413,21 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           url: `/opportunities/${updated.id}`,
         }).catch((err: unknown) => {
           req.log.warn({ err, opportunityId: updated.id }, 'stage-change notification failed');
+        });
+      }
+
+      if (stageChanged) {
+        const stageName = toStage?.name ?? nextStage;
+        emitOpportunityAccountEventSafe({
+          orgId: req.auth.orgId,
+          opportunityId: updated.id,
+          kind: 'opportunity_stage_changed',
+          actorUserId: req.auth.userId,
+          entityType: 'opportunity',
+          entityId: updated.id,
+          title: ({ companyName, opportunityName }) => `Stage moved to ${stageName} on ${companyName}: ${opportunityName}`,
+          sourceUrl: `/opportunities/${updated.id}`,
+          excludeUserIds: updated.ownerId && updated.ownerId !== req.auth.userId ? [updated.ownerId] : [],
         });
       }
 

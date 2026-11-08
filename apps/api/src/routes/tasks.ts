@@ -6,6 +6,7 @@ import type { Prisma } from '@bidstack/db';
 import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '@bidstack/shared';
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
 type TaskSummaryCacheEntry = {
@@ -193,6 +194,12 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         status: created.status,
         oppId: created.oppId,
       });
+      emitTaskAccountEventSafe({
+        orgId: req.auth.orgId,
+        taskId: created.id,
+        kind: 'task_created',
+        actorUserId: req.auth.userId,
+      });
       return reply.code(201).send({
         id: created.id,
         oppId: created.oppId,
@@ -220,7 +227,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       // only matches a unique key; we need orgId in the filter too).
       const existing = await prisma.task.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, assigneeId: true },
+        select: { id: true, assigneeId: true, status: true },
       });
       if (!existing) throw server.httpErrors.notFound('Task not found');
 
@@ -280,6 +287,14 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { assignee: true },
       });
       clearTaskSummaryCache(req.auth.orgId);
+      if (existing.status !== 'done' && updated.status === 'done') {
+        emitTaskAccountEventSafe({
+          orgId: req.auth.orgId,
+          taskId: updated.id,
+          kind: 'task_completed',
+          actorUserId: req.auth.userId,
+        });
+      }
       await prisma.auditLog.create({
         data: {
           orgId: req.auth.orgId,

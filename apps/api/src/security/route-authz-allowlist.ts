@@ -18,6 +18,12 @@ export const UNGATED_ALLOWLIST: Record<string, string> = {
   'PUT /api/v1/notifications/prefs': 'Self-scoped (userId).',
   'PATCH /api/v1/notifications/:id/read': 'Self-scoped (orgId + userId).',
   'POST /api/v1/notifications/read-all': 'Self-scoped (orgId + userId).',
+  'GET /api/v1/notifications/channels': 'Self-scoped (userId).',
+  'PUT /api/v1/notifications/channels': 'Self-scoped (userId).',
+  'PUT /api/v1/notifications/teams-webhook': 'Caller’s own Teams webhook (userId); stored encrypted.',
+  'DELETE /api/v1/notifications/teams-webhook': 'Clears the caller’s own Teams webhook (userId).',
+  'POST /api/v1/notifications/teams-webhook/test':
+    'Posts a fixed test card to the caller’s own saved webhook; rate limited.',
   'GET /api/v1/saved-views': 'Own views plus views explicitly shared in the org.',
   'POST /api/v1/saved-views': 'Creates a view owned by the caller.',
   'PATCH /api/v1/saved-views/:id': 'Owner-or-admin check in loadOwnedOrAdmin.',
