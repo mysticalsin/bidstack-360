@@ -56,8 +56,8 @@ describe('sweepTechStacks', () => {
     const add = vi.fn().mockResolvedValue({ id: 'x' });
     const res = await sweepTechStacks({ add } as never, {}, log, NOW);
     expect(res.enqueued).toBe(2);
-    expect(add.mock.calls.map((c) => c[1].companyId)).toEqual(['c-stale', 'c-new']);
-    expect(add.mock.calls[0]![2]).toEqual({ jobId: techSweepJobId('org-1', 'c-stale', NOW) });
+    expect(add.mock.calls.map((c) => c[1].companyId)).toEqual(['c-new', 'c-stale']);
+    expect(add.mock.calls[1]![2]).toEqual({ jobId: techSweepJobId('org-1', 'c-stale', NOW) });
     expect(companyFindMany.mock.calls[0]![0].where.orgId).toBe('org-1');
     expect(enrichmentFindMany.mock.calls[0]![0].where.orgId).toBe('org-1');
   });
@@ -73,6 +73,23 @@ describe('sweepTechStacks', () => {
     const res = await sweepTechStacks({ add } as never, { TECH_STACK_SWEEP_LIMIT: '1' }, log, NOW);
     expect(res.enqueued).toBe(1);
     expect(add).toHaveBeenCalledTimes(1);
+  });
+
+  it('spends a capped sweep on the oldest checks first, so a backlog rotates', async () => {
+    orgFindMany.mockResolvedValue([{ id: 'org-1' }]);
+    companyFindMany.mockResolvedValue([
+      { id: 'a', name: 'A Co' },
+      { id: 'b', name: 'B Co' },
+      { id: 'c', name: 'C Co' },
+    ]);
+    enrichmentFindMany.mockResolvedValue([
+      { normalizedName: 'a-co', providerMetadata: snapshot('2026-10-30T00:00:00.000Z') },
+      { normalizedName: 'b-co', providerMetadata: snapshot('2026-10-01T00:00:00.000Z') },
+    ]);
+    const add = vi.fn().mockResolvedValue({ id: 'x' });
+    const res = await sweepTechStacks({ add } as never, { TECH_STACK_SWEEP_LIMIT: '2' }, log, NOW);
+    expect(res.enqueued).toBe(2);
+    expect(add.mock.calls.map((c) => c[1].companyId)).toEqual(['c', 'b']);
   });
 
   it('gives the same job id within a week, so a restarted sweep never doubles up', () => {

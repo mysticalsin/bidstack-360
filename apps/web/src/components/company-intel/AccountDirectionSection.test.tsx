@@ -91,7 +91,7 @@ describe('AccountDirectionSection', () => {
     render(<AccountDirectionSection companyId="c1" />);
     fireEvent.click(screen.getByRole('tab', { name: 'Hiring' }));
     expect(screen.getByTestId('intel-open-roles').textContent).toContain('3');
-    expect(screen.getByText('Databricks')).toBeTruthy();
+    expect(screen.getAllByText('Databricks').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('tab', { name: 'Financials' }));
     expect(screen.getByTestId('intel-fin-year-2025')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'News and posts' }));

@@ -785,3 +785,8 @@ Where each company is heading, at a glance, on the list and in the account heade
 - Intel tab on the account page mounts the slice 12 section (9.7).
 - Widths: the table scrolls horizontally inside its card; the strip wraps to two rows at 1024 and stacks at 390. No overlapping text at 1440, 1024 and 390.
 - No taglines or helper text. Tokens only, both themes, tabular numbers, sample data tagged.
+### 9.x Hiring detail and source rules (2026-11-07)
+
+- Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
+- Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
+- Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.
