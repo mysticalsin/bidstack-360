@@ -194,6 +194,8 @@ export const IntelRegistryFact = z.object({
   source: z.string(),
   sourceUrl: z.string().nullable(),
   fetchedAt: Iso,
+  /** Set on rows the user can correct (registration number, jurisdiction). */
+  fieldKey: z.enum(['registryId', 'registryJurisdiction']).nullable().optional(),
 });
 /** A registry fact. */
 export type IntelRegistryFact = z.infer<typeof IntelRegistryFact>;

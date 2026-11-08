@@ -8,6 +8,8 @@
  */
 import { z } from 'zod';
 
+import { FigureProvenance } from '../company-figures/index.js';
+
 import { OFFERING_HOOKS, type Initiative, type InitiativeTheme, InitiativeTheme as InitiativeThemeSchema } from './account-signals.js';
 
 const Iso = z.string();
@@ -142,6 +144,10 @@ export const KeyNumber = z.object({
   anchor: z.string().nullable(),
   missing: z.string().nullable(),
   sample: z.boolean(),
+  /** Visible source chip for company figures (revenue, employees). */
+  provenance: FigureProvenance.nullable().optional(),
+  /** Set when the user may correct this figure through a field override. */
+  editKey: z.enum(['annualRevenueMicros', 'employeeCount']).nullable().optional(),
 });
 export type KeyNumber = z.infer<typeof KeyNumber>;
 

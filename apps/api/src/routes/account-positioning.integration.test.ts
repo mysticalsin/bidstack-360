@@ -138,4 +138,61 @@ describe('GET /accounts/:id/key-numbers', () => {
       if (i.value === null) expect(i.missing).toBeTruthy();
     }
   });
+
+  it('shows Wikidata revenue with its chip, then lets a sourced manual value win over it', async () => {
+    // WHY: the product owner wants every figure provable. Wikidata is public
+    // and linkable, so it beats nothing; a manual value with a source link
+    // beats Wikidata; one without a source does not.
+    const name = `${TAG} Wiki`;
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name } })).id;
+    const normalizedName = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    await prisma.companyEnrichment.create({
+      data: {
+        orgId: orgA.orgId,
+        normalizedName,
+        legalName: name,
+        registryIds: {},
+        address: {},
+        formerNames: [],
+        industryCodes: [],
+        status: 'active',
+        confidenceBps: 8000,
+        sourceAttribution: [],
+        providerMetadata: { openCompanyProfile: { revenue: { amount: 7_400_000_000, currency: 'EUR', pointInTime: '2024', year: 2024, sourceUrl: 'https://www.wikidata.org/wiki/Q1#P2123', sourceLabel: 'Wikidata' } } },
+        cacheExpiresAt: new Date(Date.now() + DAY),
+      },
+    });
+    const revenueOf = async () => (await get(`/accounts/${id}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'revenue')!;
+
+    expect(await revenueOf()).toMatchObject({
+      value: 7_400_000_000,
+      currency: 'EUR',
+      unit: 'money',
+      editKey: 'annualRevenueMicros',
+      provenance: { origin: 'wikidata', label: 'Wikidata', year: '2024', url: 'https://www.wikidata.org/wiki/Q1#P2123' },
+    });
+
+    const user = await prisma.user.findFirst({ where: { orgId: orgA.orgId }, select: { id: true } });
+    await prisma.companyFieldOverride.create({
+      data: { orgId: orgA.orgId, companyKey: normalizedName, fieldKey: 'annualRevenueMicros', value: 5_000_000_000_000_000, overriddenById: user!.id },
+    });
+    expect((await revenueOf()).provenance?.origin).toBe('wikidata');
+
+    await prisma.companyFieldOverride.updateMany({
+      where: { orgId: orgA.orgId, companyKey: normalizedName },
+      data: { sourceUrl: 'https://example.com/annual-report.pdf', sourceLabel: 'Annual report' },
+    });
+    expect(await revenueOf()).toMatchObject({
+      value: 5_000_000_000_000_000,
+      unit: 'money_micros',
+      provenance: { origin: 'manual_sourced', label: 'Annual report', url: 'https://example.com/annual-report.pdf' },
+    });
+  });
+
+  it('says what is missing and stays editable when no source has revenue', async () => {
+    const by = Object.fromEntries((await get(`/accounts/${c.empty}/key-numbers`)).json<AccountKeyNumbers>().items.map((i) => [i.id, i]));
+    expect(by.revenue).toMatchObject({ value: null, editKey: 'annualRevenueMicros' });
+    expect(by.revenue!.missing).toContain('No public revenue figure found yet');
+    expect(by.employees).toMatchObject({ value: null, editKey: 'employeeCount' });
+  });
 });

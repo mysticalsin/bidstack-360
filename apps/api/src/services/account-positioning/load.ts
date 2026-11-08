@@ -12,6 +12,8 @@ import {
   stripSamplePrefix,
   themeForText,
   tierLabel,
+  pickFigure,
+  type FigureOrigin,
   type AccountKeyNumbers,
   type AccountPositioning,
   type BriefFacts,
@@ -29,6 +31,7 @@ import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
 import { groupMap, loadMomentumInputs, momentumFor } from '../account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../account-signals/live-signals.js';
+import { loadSourcedExtras, manualOrigin, manualProvenance, providerLabel } from './sourced-figures.js';
 
 const DAY = 86_400_000;
 const OPEN: string[] = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'];
@@ -262,7 +265,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const d90 = new Date(now.getTime() - 90 * DAY);
   const d180 = new Date(now.getTime() - 180 * DAY);
   const [company, firmo, fin, rawPostings, opps, news, momentumIn, { people, lastMeeting }] = await Promise.all([
-    prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { employeeCount: true, updatedAt: true } }),
+    prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
     prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
@@ -283,24 +286,54 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const prev = latest ? periods.find((p) => p.fiscalYear === latest.fiscalYear - 1) : undefined;
   const fy = (p: FinancialPeriod) => `FY${p.fiscalYear} (to ${p.periodEnd})`;
   const finMissing = fin.gate === 'general' ? 'Financials are tracked for Strategic and Top accounts' : fin.statusCopy ?? 'No filed statements yet';
+  const extra = await loadSourcedExtras(orgId, company.name);
+  const providerName = (field: string) => providerLabel((firmo?.provenance as Record<string, { source?: string } | undefined> | null)?.[field]?.source);
+  const fetchedYear = firmo?.fetchedAt ? String(firmo.fetchedAt.getUTCFullYear()) : null;
 
-  // Employees: filings, then enrichment cache, then the account record.
+  // Employees: filings, then a manual value, then enrichment cache, then the account record.
   const hc = latest?.metrics.headcount;
-  if (hc && latest) {
-    items.push(base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: hc.value, delta: pctChange(hc.value, prev?.metrics.headcount?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.headcount?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
-  } else if (firmo?.employeeCount) {
-    items.push(base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: firmo.employeeCount, delta: firmo.headcountGrowth12m != null ? Math.round(firmo.headcountGrowth12m * 1000) / 10 : null, deltaUnit: 'pct', source: 'Enrichment cache', period: `As of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}, change over 12 months`, anchor: 'firmographics' }));
-  } else if (company.employeeCount) {
-    items.push(base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: company.employeeCount, source: 'Account record', period: 'Entered on the account, no trend yet' }));
-  } else items.push(base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', source: 'None', period: 'n/a', missing: 'No headcount on record' }));
+  const empOverride = extra.overrides.employeeCount;
+  const employees = pickFigure<{ origin: FigureOrigin; item: () => KeyNumber }>([
+    hc && latest
+      ? { origin: 'filed', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: hc.value, delta: pctChange(hc.value, prev?.metrics.headcount?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.headcount?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
+      : null,
+    empOverride && typeof empOverride.value === 'number'
+      ? { origin: manualOrigin(empOverride), item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: empOverride.value as number, source: empOverride.sourceLabel ?? 'Manual entry', period: `Entered ${empOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: empOverride.sourceUrl, provenance: manualProvenance(empOverride) }) }
+      : null,
+    firmo?.employeeCount
+      ? { origin: 'provider', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: firmo.employeeCount!, delta: firmo.headcountGrowth12m != null ? Math.round(firmo.headcountGrowth12m * 1000) / 10 : null, deltaUnit: 'pct', source: 'Enrichment cache', period: `As of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}, change over 12 months`, anchor: 'firmographics', provenance: { origin: 'provider', label: providerName('employeeCount'), year: fetchedYear, url: null } }) }
+      : null,
+    company.employeeCount
+      ? { origin: 'record', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: company.employeeCount!, source: 'Account record', period: 'Entered on the account, no trend yet', provenance: { origin: 'record', label: 'Account record', year: null, url: null } }) }
+      : null,
+  ]);
+  items.push({
+    ...(employees?.item() ?? base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', source: 'None', period: 'n/a', missing: 'No headcount on record or in public sources' })),
+    editKey: 'employeeCount',
+  });
 
-  // Revenue, with YoY.
+  // Revenue, with YoY: filings, then a sourced manual value, then Wikidata, then the data provider.
   const rev = latest?.metrics.revenue;
-  if (rev && latest) {
-    items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: latest.source === FINANCIAL_SOURCE_LABEL.fixture }));
-  } else if (firmo?.annualRevenueUsd) {
-    items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: 'USD', value: Number(firmo.annualRevenueUsd), source: 'Enrichment cache', period: `Annual, as of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}`, anchor: 'firmographics' }));
-  } else items.push(base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', source: 'None', period: 'n/a', missing: finMissing }));
+  const revOverride = extra.overrides.annualRevenueMicros;
+  const wiki = extra.wikidataRevenue;
+  const revenue = pickFigure<{ origin: FigureOrigin; item: () => KeyNumber }>([
+    rev && latest
+      ? { origin: 'filed', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: latest.source === FINANCIAL_SOURCE_LABEL.fixture, provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
+      : null,
+    revOverride && typeof revOverride.value === 'number'
+      ? { origin: manualOrigin(revOverride), item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money_micros', value: revOverride.value as number, source: revOverride.sourceLabel ?? 'Manual entry', period: `Annual, entered ${revOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: revOverride.sourceUrl, provenance: manualProvenance(revOverride) }) }
+      : null,
+    wiki
+      ? { origin: 'wikidata', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: wiki.currency, value: wiki.amount, source: 'Wikidata', period: `Total revenue, point in time ${wiki.pointInTime}`, sourceUrl: wiki.sourceUrl, provenance: { origin: 'wikidata', label: 'Wikidata', year: String(wiki.year), url: wiki.sourceUrl } }) }
+      : null,
+    firmo?.annualRevenueUsd
+      ? { origin: 'provider', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: 'USD', value: Number(firmo.annualRevenueUsd), source: 'Enrichment cache', period: `Annual, as of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}`, anchor: 'firmographics', provenance: { origin: 'provider', label: providerName('annualRevenueUsd'), year: fetchedYear, url: null } }) }
+      : null,
+  ]);
+  items.push({
+    ...(revenue?.item() ?? base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', source: 'None', period: 'n/a', missing: `${finMissing}. No public revenue figure found yet` })),
+    editKey: 'annualRevenueMicros',
+  });
 
   // Margin trend.
   const lm = latest ? marginOf(latest) : null;
