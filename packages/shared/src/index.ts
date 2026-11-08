@@ -17,6 +17,7 @@ export * from './workflow-engine.js';
 export * from './llm-catalog/index.js';
 export * from './msa/index.js';
 export * from './list-page.js';
+export * from './comms/index.js';
 // ChileCompra attribution strings only (pure data). Adapters stay behind the
 // server-only '@bidstack/shared/public-sector' subpath.
 export * from './public-sector/attribution.js';
