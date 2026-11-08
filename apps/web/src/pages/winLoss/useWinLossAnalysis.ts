@@ -56,6 +56,8 @@ export interface WinLossAnalysis {
   quarters: WinLossQuarterBucket[];
   reasons: WinLossReasonBucket[];
   competitors: WinLossCompetitorBucket[];
+  /** Days from opening each closed bid to its recorded outcome. */
+  cycleDays: number[];
   recent: WinLossClosedRow[];
 }
 

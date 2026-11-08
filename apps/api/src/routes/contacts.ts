@@ -184,7 +184,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'contact.create',
             targetType: 'contact',
             targetId: contact.id,
-            diff: { customer: contact.customer, name: contact.name },
+            diff: { customer: contact.customer },
           },
         });
         return contact;
@@ -320,7 +320,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'contact.delete',
             targetType: 'contact',
             targetId: existing.id,
-            diff: { customer: existing.customer, name: existing.name },
+            diff: { customer: existing.customer },
           },
         }),
       ]);

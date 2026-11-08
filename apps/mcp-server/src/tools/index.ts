@@ -111,6 +111,8 @@ export const tools = {
   account_news: agentTools.account_news,
   // Agreement pull (slice 13a): stages a document for MSA intake review.
   agreements_ingest: agreementsIngest,
+  // Consulting partners (slice 15): public evidence only for API keys.
+  consulting_partners: agentTools.consulting_partners,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -166,6 +168,7 @@ export const toolScopes = {
   account_financials_summary: 'read',
   account_news: 'read',
   agreements_ingest: 'write',
+  consulting_partners: 'read',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {

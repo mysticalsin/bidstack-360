@@ -139,6 +139,7 @@ export type {
   ReleaseScore,
   Lead,
   TenantExport,
+  DataSubjectRequest,
   SavedView,
   SavedViewEntity,
   KamConsultant,
@@ -207,3 +208,18 @@ export {
   stageAgreementIngest,
 } from './agreements/stage.js';
 export type { IngestActor, StageAgreementInput, StageAgreementResult } from './agreements/stage.js';
+// GDPR data subject export / erase and retention per data class (compliance pack).
+export * from './compliance/index.js';
+export {
+  countPartnerEngagements,
+  isInternalPartnerRow,
+  loadOrgFirmCatalog,
+  loadPartnerEvidenceRows,
+  loadPartnerRun,
+  ownedPartnerRowIds,
+  prunePartnerEvidence,
+  savePartnerEvidence,
+  scanInternalPartnerEvidence,
+  toPartnerEvidence,
+} from './consulting-partners.js';
+export type { PartnerEvidenceRow, PartnerSaveResult } from './consulting-partners.js';
