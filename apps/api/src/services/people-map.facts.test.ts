@@ -1,0 +1,81 @@
+import { describe, expect, it } from 'vitest';
+
+import { PEOPLE_MAP_FACT_TAKE, contactFactListArgs } from './people-map.js';
+
+type Row = {
+  id: string;
+  orgId: string;
+  contactId: string;
+  opportunityId: string | null;
+  companyId: string | null;
+  createdAt: string;
+};
+
+function matches(row: Row, where: ReturnType<typeof contactFactListArgs>['where']): boolean {
+  if (row.orgId !== where.orgId) return false;
+  if (!where.contactId.in.includes(row.contactId)) return false;
+  if (!where.OR) return true;
+  return where.OR.some((branch) => {
+    if ('OR' in branch && branch.OR) {
+      if (row.opportunityId !== null) return false;
+      return branch.OR.some((company) =>
+        'companyId' in company ? row.companyId === company.companyId : row.companyId === null,
+      );
+    }
+    return row.opportunityId === branch.opportunityId;
+  });
+}
+
+describe('contact fact query scope', () => {
+  const orgId = '00000000-0000-4000-8000-0000000000aa';
+  const otherOrg = '00000000-0000-4000-8000-0000000000bb';
+  const contactId = '00000000-0000-4000-8000-0000000000c1';
+  const dealId = '00000000-0000-4000-8000-0000000000d1';
+  const otherDeal = '00000000-0000-4000-8000-0000000000d2';
+  const companyId = '00000000-0000-4000-8000-0000000000e1';
+
+  it('keeps a newer deal fact when more than 1000 older unrelated facts exist', () => {
+    const older = Array.from({ length: PEOPLE_MAP_FACT_TAKE }, (_, index) => ({
+      id: `old-${index}`,
+      orgId,
+      contactId,
+      opportunityId: otherDeal,
+      companyId,
+      createdAt: `2020-01-01T00:00:${String(index % 60).padStart(2, '0')}.000Z`,
+    }));
+    const relevant: Row = {
+      id: 'new-role',
+      orgId,
+      contactId,
+      opportunityId: dealId,
+      companyId,
+      createdAt: '2026-11-08T00:00:00.000Z',
+    };
+    const report: Row = {
+      id: 'report',
+      orgId,
+      contactId,
+      opportunityId: null,
+      companyId: null,
+      createdAt: '2019-01-01T00:00:00.000Z',
+    };
+    const foreign: Row = {
+      id: 'foreign',
+      orgId: otherOrg,
+      contactId,
+      opportunityId: dealId,
+      companyId,
+      createdAt: '2026-11-08T00:00:00.000Z',
+    };
+    const args = contactFactListArgs(orgId, [contactId], dealId, companyId);
+    const eligible = [foreign, ...older, report, relevant].filter((row) => matches(row, args.where));
+    eligible.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const page = eligible.slice(0, args.take);
+    expect(args.orderBy).toEqual({ createdAt: 'desc' });
+    expect(args.take).toBe(PEOPLE_MAP_FACT_TAKE);
+    expect(page.map((row) => row.id)).toContain('new-role');
+    expect(page.map((row) => row.id)).toContain('report');
+    expect(page.some((row) => row.opportunityId === otherDeal)).toBe(false);
+    expect(page.some((row) => row.orgId === otherOrg)).toBe(false);
+  });
+});

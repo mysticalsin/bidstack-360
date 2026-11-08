@@ -11,13 +11,19 @@ export function relationshipFrameStatus(input: {
   companiesError: boolean;
   companyCount: number;
   manualCompany: boolean;
+  /** True only before the follow-up has ever resolved. A refetch is not pending. */
+  startPending: boolean;
+  /** True while a background refetch is in flight. It must not hide a resolved frame. */
   startFetching: boolean;
   startError: boolean;
+  /** The follow-up already has a company id, including during a refetch. */
+  startHasData: boolean;
 }): RelationshipFrameStatus {
   if (input.companiesPending) return 'loading';
   if (input.companiesError) return 'error';
   if (input.companyCount === 0) return 'empty';
-  if (!input.manualCompany && input.startFetching) return 'loading';
-  if (!input.manualCompany && input.startError) return 'error';
+  if (!input.manualCompany && input.startPending && !input.startHasData) return 'loading';
+  if (!input.manualCompany && input.startError && !input.startHasData) return 'error';
+  void input.startFetching;
   return 'ready';
 }

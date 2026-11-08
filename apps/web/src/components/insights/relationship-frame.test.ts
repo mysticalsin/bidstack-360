@@ -29,7 +29,7 @@ describe('relationship frame', () => {
     ).toBe('error');
   });
 
-  it('waits only while the follow-up query is actually fetching', () => {
+  it('loads only before the follow-up has a company, and keeps a resolved frame during refetch', () => {
     const base = {
       companiesPending: false,
       companiesError: false,
@@ -37,7 +37,29 @@ describe('relationship frame', () => {
       manualCompany: false,
       startError: false,
     };
-    expect(relationshipFrameStatus({ ...base, startFetching: true })).toBe('loading');
-    expect(relationshipFrameStatus({ ...base, startFetching: false })).toBe('ready');
+    expect(
+      relationshipFrameStatus({ ...base, startPending: true, startFetching: true, startHasData: false }),
+    ).toBe('loading');
+    expect(
+      relationshipFrameStatus({ ...base, startPending: false, startFetching: true, startHasData: true }),
+    ).toBe('ready');
+    expect(
+      relationshipFrameStatus({
+        ...base,
+        startPending: false,
+        startFetching: false,
+        startError: true,
+        startHasData: true,
+      }),
+    ).toBe('ready');
+    expect(
+      relationshipFrameStatus({
+        ...base,
+        startPending: false,
+        startFetching: false,
+        startError: true,
+        startHasData: false,
+      }),
+    ).toBe('error');
   });
 });

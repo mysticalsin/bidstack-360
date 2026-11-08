@@ -45,8 +45,10 @@ export function RelationshipDiagram() {
     companiesError: companies.isError,
     companyCount: items.length,
     manualCompany: manualId !== null,
+    startPending: start.isPending,
     startFetching: start.isFetching,
     startError: start.isError,
+    startHasData: start.data !== undefined,
   });
 
   return (
@@ -54,7 +56,7 @@ export function RelationshipDiagram() {
       title="Relationships"
       caption="Each band is one contact linked to the company. Width is that link, not revenue."
       status={frameStatus}
-      errorMessage={insightErrorText(companies.error)}
+      errorMessage={insightErrorText(companies.isError ? companies.error : start.error)}
       onRetry={() => {
         void companies.refetch();
         void start.refetch();

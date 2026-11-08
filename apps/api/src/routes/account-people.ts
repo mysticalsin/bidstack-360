@@ -465,13 +465,18 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) notFound(server, 'Commitment not found');
-      let opportunityId = req.body.opportunityId;
-      if (existing.status === 'needs_review' && opportunityId && req.body.status === undefined) {
-        opportunityId = undefined;
+      const nextStatus = req.body.status ?? existing.status;
+      const nextOpportunityId =
+        req.body.opportunityId !== undefined ? req.body.opportunityId : existing.opportunityId;
+      if (nextStatus === 'needs_review' && nextOpportunityId) {
+        badRequest(
+          server,
+          'A needs_review commitment cannot be linked to a deal. Set a status or clear the deal.',
+        );
       }
-      if (opportunityId) {
+      if (nextOpportunityId) {
         const deal = await prisma.opportunity.findFirst({
-          where: { id: opportunityId, orgId: req.auth.orgId, deletedAt: null },
+          where: { id: nextOpportunityId, orgId: req.auth.orgId, deletedAt: null },
           select: { id: true, companyId: true },
         });
         if (!deal || !commitmentDealMatchesCompany(existing.companyId, deal.companyId)) {
@@ -492,7 +497,7 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(req.body.ownerContactId !== undefined ? { ownerContactId: req.body.ownerContactId } : {}),
           ...(req.body.status !== undefined ? { status: req.body.status } : {}),
           ...(req.body.sourceNote !== undefined ? { sourceNote: req.body.sourceNote } : {}),
-          ...(opportunityId !== undefined ? { opportunityId } : {}),
+          ...(req.body.opportunityId !== undefined ? { opportunityId: nextOpportunityId } : {}),
         },
       });
       const row = await serializeCommitment(req.auth.orgId, existing.id);

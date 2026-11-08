@@ -15,6 +15,38 @@ import {
   type PersonFactView,
 } from '@bidstack/shared';
 
+export const PEOPLE_MAP_FACT_TAKE = 1000;
+
+/**
+ * Scope before the take. A deal map keeps that deal's facts and the
+ * account's non-deal evidence (a reporting line or company link with no
+ * opportunity). Other deals' facts are not eligible, so a thousand older
+ * unrelated rows cannot push a newer relevant fact past the limit. An
+ * account map has no opportunity id and still reads the contact's facts.
+ * Newest first, so a full in-scope set keeps the latest row.
+ */
+export function contactFactListArgs(
+  orgId: string,
+  contactIds: string[],
+  opportunityId: string | null,
+  companyId: string | null,
+) {
+  const accountEvidence = companyId
+    ? { opportunityId: null, OR: [{ companyId: null }, { companyId }] }
+    : { opportunityId: null };
+  return {
+    where: {
+      orgId,
+      contactId: { in: contactIds },
+      deletedAt: null,
+      ...(opportunityId ? { OR: [{ opportunityId }, accountEvidence] } : {}),
+    },
+    select: FACT_SELECT,
+    orderBy: { createdAt: 'desc' as const },
+    take: PEOPLE_MAP_FACT_TAKE,
+  };
+}
+
 const FACT_SELECT = {
   id: true,
   contactId: true,
@@ -202,12 +234,7 @@ async function finishMap(
   const [facts, deals] = await Promise.all([
     ids.length === 0
       ? Promise.resolve([] as FactRow[])
-      : prisma.contactFact.findMany({
-          where: { orgId, contactId: { in: ids }, deletedAt: null },
-          select: FACT_SELECT,
-          orderBy: { createdAt: 'asc' },
-          take: 1000,
-        }),
+      : prisma.contactFact.findMany(contactFactListArgs(orgId, ids, opportunityId, companyId)),
     ids.length === 0
       ? Promise.resolve([] as DealRow[])
       : prisma.opportunityContact.findMany({
