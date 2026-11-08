@@ -19,6 +19,7 @@ import { leadsConvert } from './leads-convert.js';
 import { notesList } from './notes-list.js';
 import { notesCreate } from './notes-create.js';
 import { salesToolkitsList } from './sales-toolkits-list.js';
+import { agreementsIngest } from './agreements-ingest.js';
 import {
   crmSearchCompanies,
   crmCreateDeal,
@@ -109,6 +110,8 @@ export const tools = {
   account_hiring: agentTools.account_hiring,
   account_financials_summary: agentTools.account_financials_summary,
   account_news: agentTools.account_news,
+  // Agreement pull (slice 13a): stages a document for MSA intake review.
+  agreements_ingest: agreementsIngest,
   // Account activity (Dust, CRMs): additive, defined in activity-tools.ts
   ...activityTools,
   // Consulting partners (slice 15): public evidence only for API keys.
@@ -167,6 +170,7 @@ export const toolScopes = {
   account_hiring: 'read',
   account_financials_summary: 'read',
   account_news: 'read',
+  agreements_ingest: 'write',
   ...activityToolScopes,
   consulting_partners: 'read',
 } satisfies Record<ToolName, ToolScope>;

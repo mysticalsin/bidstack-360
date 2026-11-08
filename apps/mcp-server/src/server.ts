@@ -19,6 +19,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { mcpAuth, type McpAuthCtx } from './auth.js';
+import { boundedProbe, probeTimeoutMs } from './lib/bounded-probe.js';
 import { runToolCall, type ToolAuditEntry } from './lib/tool-call.js';
 import { hourlyRateLimitPlugin, mcpRateLimitFailsClosed } from './plugins/hourly-rate-limit.js';
 import { pingRedis, redis } from './redis.js';
@@ -162,13 +163,11 @@ export async function buildMcpServer(): Promise<FastifyInstance> {
   // fail-closed mode a dead Redis means every /mcp call 503s — health must not
   // stay green while the service is effectively down.
   server.get('/health', async (_req, reply) => {
-    let dbOk = true;
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-    } catch {
-      dbOk = false;
-    }
-    const redisOk = await pingRedis();
+    const timeoutMs = probeTimeoutMs();
+    const [dbOk, redisOk] = await Promise.all([
+      boundedProbe(() => prisma.$queryRaw`SELECT 1`, timeoutMs),
+      boundedProbe(pingRedis, timeoutMs),
+    ]);
     const ok = dbOk && (redisOk || !mcpRateLimitFailsClosed());
     const body = {
       ok,

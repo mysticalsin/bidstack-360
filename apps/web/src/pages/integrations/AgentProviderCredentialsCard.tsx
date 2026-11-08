@@ -748,7 +748,7 @@ function Field({
         className="mt-1 h-10 w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-sm text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)]"
         {...rest}
       />
-      {hint ? <span className="mt-1 block text-[11px] text-[var(--fg-tertiary)]">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-xs text-[var(--fg-tertiary)]">{hint}</span> : null}
     </label>
   );
 }

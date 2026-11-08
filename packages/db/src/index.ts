@@ -234,6 +234,18 @@ export {
   type AccountActivityListener,
 } from './services/account-activity-events.js';
 
+// Agreement ingest staging (slice 13a), shared by the REST route and MCP.
+export {
+  AgreementStageError,
+  INGEST_ITEM_SELECT,
+  serializeIngestItem,
+  stageAgreementIngest,
+} from './agreements/stage.js';
+export type {
+  IngestActor as AgreementIngestActor,
+  StageAgreementInput,
+  StageAgreementResult,
+} from './agreements/stage.js';
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';
 export {
