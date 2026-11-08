@@ -67,7 +67,7 @@ export function formatStoredMicros(
   convert: (amount: number, from: string) => number,
   displayCurrency: string,
   options?: { compact?: boolean },
-  convertMicros?: (micros: bigint, from: string) => bigint,
+  convertMicros?: (micros: bigint, from: string) => bigint | null,
 ): string {
   const asBigInt = microsBigInt(micros);
   if (asBigInt == null) return formatUnspecifiedCompact(0);
@@ -79,10 +79,12 @@ export function formatStoredMicros(
   }
   if (convertMicros) {
     const converted = convertMicros(asBigInt, source);
+    const amount = converted ?? asBigInt;
+    const code = converted == null ? source : displayCurrency;
     if (options?.compact === false) {
-      return formatSourceOrDisplay(converted, displayCurrency, false);
+      return formatSourceOrDisplay(amount, code, false);
     }
-    return formatSourceOrDisplay(converted, displayCurrency, options?.compact !== false);
+    return formatSourceOrDisplay(amount, code, options?.compact !== false);
   }
   // No integer converter. A unit count past the safe range has already lost digits
   // inside a JavaScript number, so print the stored integer in its own currency.

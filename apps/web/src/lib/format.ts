@@ -47,18 +47,24 @@ function detectCurrency(): string {
 export function formatMoney(value: number, currency?: string, locale?: string): string {
   const resolvedCurrency = currency ?? detectCurrency();
   const resolvedLocale = locale ?? detectLocale();
-  if (value >= 1_000_000)
+  const label = resolvedCurrency.trim() || 'unspecified';
+  try {
+    if (!/^[A-Za-z]{3}$/.test(resolvedCurrency)) throw new Error('invalid currency');
+    if (value >= 1_000_000)
+      return new Intl.NumberFormat(resolvedLocale, {
+        style: 'currency',
+        currency: resolvedCurrency,
+        maximumFractionDigits: 2,
+        notation: 'compact',
+      }).format(value);
     return new Intl.NumberFormat(resolvedLocale, {
       style: 'currency',
       currency: resolvedCurrency,
-      maximumFractionDigits: 2,
-      notation: 'compact',
+      maximumFractionDigits: 0,
     }).format(value);
-  return new Intl.NumberFormat(resolvedLocale, {
-    style: 'currency',
-    currency: resolvedCurrency,
-    maximumFractionDigits: 0,
-  }).format(value);
+  } catch {
+    return `${value} ${label}`;
+  }
 }
 
 /** Full integer when compact rounding or a zero-decimal format would move the cent. */
@@ -147,19 +153,25 @@ export function formatMoneyMicros(
         ? BigInt(Math.trunc(micros))
         : BigInt(micros);
   const abs = asBigInt < 0n ? -asBigInt : asBigInt;
+  const plain = formatMicrosAmount(asBigInt);
+  const label = resolvedCurrency.trim() || 'unspecified';
   const compact = options.compact ?? abs >= 1_000n * 1_000_000n;
-  if (!compact) {
-    const text = formatMicrosAmount(asBigInt);
-    const { symbol, symbolFirst } = currencyAffix(resolvedCurrency, resolvedLocale);
-    return symbolFirst ? `${symbol}${text}` : `${text} ${symbol}`;
+  try {
+    if (!/^[A-Za-z]{3}$/.test(resolvedCurrency)) throw new Error('invalid currency');
+    if (!compact) {
+      const { symbol, symbolFirst } = currencyAffix(resolvedCurrency, resolvedLocale);
+      return symbolFirst ? `${symbol}${plain}` : `${plain} ${symbol}`;
+    }
+    const value = compactValue(asBigInt);
+    return new Intl.NumberFormat(resolvedLocale, {
+      style: 'currency',
+      currency: resolvedCurrency,
+      notation: 'compact',
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${plain} ${label}`;
   }
-  const value = compactValue(asBigInt);
-  return new Intl.NumberFormat(resolvedLocale, {
-    style: 'currency',
-    currency: resolvedCurrency,
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 /** USD from integer micros, including sub-cent digits. A 4-decimal float prints a small cost as zero. */

@@ -44,8 +44,8 @@ interface CurrencyStore {
   convert: (amount: number, from: string) => number;
   /** Converted unit amount in integer micros. Null when the amount is not finite. */
   convertAmountMicros: (amount: number, from: string) => bigint | null;
-  /** FX in integer micros. An identity rate returns the stored integer. */
-  convertMicros: (micros: bigint, from: string) => bigint;
+  /** FX in integer micros. Null when the rate is unavailable. An identity rate returns the stored integer. */
+  convertMicros: (micros: bigint, from: string) => bigint | null;
 }
 
 let inflightRatesRequest: Promise<void> | null = null;
@@ -450,11 +450,12 @@ export const useCurrencyStore = create<CurrencyStore>()(
         if (micros == null) return null;
         const signed = negative ? -micros : micros;
         const { currency: to, rates } = get();
-        if (!rates?.rates || source === to) return signed;
+        if (source === to) return signed;
+        if (!rates?.rates) return null;
         const base = normalizeCurrencyCode(rates.base);
         const fromRate = source === base ? 1 : rates.rates[source];
         const toRate = to === base ? 1 : rates.rates[to];
-        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return signed;
+        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return null;
         return convertMicrosByRates(signed, fromRate, toRate);
       },
 
@@ -476,13 +477,14 @@ export const useCurrencyStore = create<CurrencyStore>()(
       convertMicros: (micros, from) => {
         const { currency: to, rates } = get();
         const source = normalizeCurrencyCode(from);
-        if (!rates || !rates.rates || !source) return micros;
+        if (!source) return null;
         if (source === to) return micros;
+        if (!rates || !rates.rates) return null;
         const base = normalizeCurrencyCode(rates.base);
         const fromRate = source === base ? 1 : rates.rates[source];
         const toRate = to === base ? 1 : rates.rates[to];
-        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return micros;
-        return convertMicrosByRates(micros, fromRate, toRate) ?? micros;
+        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return null;
+        return convertMicrosByRates(micros, fromRate, toRate);
       },
     }),
     {

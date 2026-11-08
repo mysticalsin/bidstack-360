@@ -4,6 +4,8 @@ import { formatMicrosAmount } from '@bidstack/shared';
 
 import { fmtMoney } from '@/components/financials/financials-format';
 
+import { formatConvertedMicros, formatMoney, formatMoneyMicros } from '@/lib/format';
+
 import { formatStoredMicros } from './useFormatMoney';
 
 describe('failed conversion keeps the source currency', () => {
@@ -19,6 +21,25 @@ describe('failed conversion keeps the source currency', () => {
     expect(text).toContain('$');
     expect(text).toContain('2.50');
     expect(text).not.toContain('€');
+  });
+
+  it('keeps the source label when integer conversion is unavailable', () => {
+    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD', undefined, () => null);
+    expect(text).toContain('€');
+    expect(text).toContain('2.50');
+    expect(text).not.toContain('$');
+  });
+
+  it('does not throw when the display currency is not a code', () => {
+    const shown = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount * 2, 'NOTREAL');
+    expect(shown).toContain('5');
+    expect(shown).toContain('NOTREAL');
+    expect(shown).not.toContain('€');
+    expect(formatMoneyMicros(2_500_000n, 'NOTREAL', { compact: false })).toBe('2.50 NOTREAL');
+    expect(formatMoney(2.5, 'NOTREAL')).toContain('2.5');
+    expect(formatMoney(2.5, 'NOTREAL')).toContain('NOTREAL');
+    expect(formatConvertedMicros(2_500_000n, 'NOTREAL')).toContain('2.50');
+    expect(formatConvertedMicros(2_500_000n, 'NOTREAL')).toContain('NOTREAL');
   });
 
   it('renders an invalid source currency as plain text', () => {
