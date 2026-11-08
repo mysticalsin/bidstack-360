@@ -19,6 +19,8 @@ import type { Prisma } from '../../generated/client/index.js';
 
 import { prisma } from '../index.js';
 
+import { onAccountActivityCreated, runAccountActivityBatch } from './account-activity-events.js';
+
 export type IngestActor = { kind: 'api_key'; keyId: string } | { kind: 'user'; userId: string };
 
 export interface IngestActivitiesInput {
@@ -172,10 +174,14 @@ function updatableData(data: ReturnType<typeof activityData>) {
   return rest;
 }
 
-export async function ingestActivities(
-  input: IngestActivitiesInput,
-): Promise<IngestActivitiesResponse> {
+/** One batch is one run: followers get one alert per account, not one per row. */
+export function ingestActivities(input: IngestActivitiesInput): Promise<IngestActivitiesResponse> {
+  return runAccountActivityBatch(() => ingestBatch(input));
+}
+
+async function ingestBatch(input: IngestActivitiesInput): Promise<IngestActivitiesResponse> {
   const { orgId } = input;
+  const actorUserId = input.actor.kind === 'user' ? input.actor.userId : null;
   const out: IngestActivitiesResponse = {
     counts: { accepted: 0, updated: 0, skipped: 0 },
     accepted: [],
@@ -413,6 +419,7 @@ export async function ingestActivities(
         select: { id: true },
       });
       out.accepted.push({ ...ref, activityId: created.id });
+      if (companyId) await onAccountActivityCreated(orgId, companyId, created.id, actorUserId);
     } catch (err) {
       // A concurrent request (or a soft-deleted row) already holds the key.
       if ((err as { code?: string }).code === 'P2002') {

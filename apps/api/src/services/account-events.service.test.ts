@@ -15,11 +15,16 @@ const m = vi.hoisted(() => ({
   notifUpdateMany: vi.fn(),
   publish: vi.fn(),
   enqueue: vi.fn(),
+  activityFindMany: vi.fn(),
+  contactFindMany: vi.fn(),
+  digestListeners: new Set<(d: unknown) => void>(),
 }));
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
     company: { findFirst: m.companyFindFirst, count: m.companyCount },
+    activity: { findMany: m.activityFindMany },
+    contact: { findMany: m.contactFindMany },
     accountTeamMember: { findMany: m.teamFindMany },
     opportunity: { findMany: m.oppFindMany },
     accountFollow: { findMany: m.followFindMany },
@@ -32,6 +37,10 @@ vi.mock('@bidstack/db', () => ({
       updateMany: m.notifUpdateMany,
     },
   },
+  subscribeAccountActivityDigest: (fn: (d: unknown) => void) => {
+    m.digestListeners.add(fn);
+    return () => m.digestListeners.delete(fn);
+  },
 }));
 vi.mock('../lib/access-scope.js', () => ({
   getAccessScope: vi.fn(async () => ({ unrestricted: true })),
@@ -40,7 +49,12 @@ vi.mock('../lib/access-scope.js', () => ({
 vi.mock('./realtime.service.js', () => ({ publish: m.publish }));
 vi.mock('../queues/notification-delivery.js', () => ({ enqueueNotificationDelivery: m.enqueue }));
 
-import { emitAccountEvent } from './account-events.service.js';
+import {
+  emitAccountEvent,
+  emitActivitiesAccountEvents,
+  installAccountActivityAlerts,
+  uninstallAccountActivityAlerts,
+} from './account-events.service.js';
 
 const NOW = new Date('2026-11-07T12:00:00Z');
 const base = {
@@ -222,5 +236,72 @@ describe('emitAccountEvent', () => {
       expect(take).toBeGreaterThan(0);
       expect(take).toBeLessThanOrEqual(1000);
     }
+  });
+});
+
+describe('emitActivitiesAccountEvents (synced and ingested activity)', () => {
+  function activities(rows: Array<{ id: string; type: string }>) {
+    m.activityFindMany.mockResolvedValue(
+      rows.map((r) => ({ ...r, entityType: 'company', entityId: 'c1' })),
+    );
+    m.contactFindMany.mockResolvedValue([]);
+  }
+
+  it('one import run on one account is one counted alert, never to the owner or colleagues on it', async () => {
+    setup();
+    activities([
+      { id: 'a1', type: 'meeting' },
+      { id: 'a2', type: 'email' },
+      { id: 'a3', type: 'email' },
+    ]);
+    await emitActivitiesAccountEvents({
+      orgId: 'org',
+      activityIds: ['a1', 'a2', 'a3'],
+      actorUserId: 'owner1',
+      excludeUserIds: ['owner1', 'team1', 'actor'],
+    });
+    const rows = m.notifCreate.mock.calls.map((c) => c[0].data);
+    expect(rows.map((r) => r.userId).sort()).toEqual(['kam']);
+    expect(rows[0]).toMatchObject({ title: '3 new activities on Pfizer', eventCount: 3 });
+  });
+
+  it('a single synced meeting reads as a new meeting', async () => {
+    setup();
+    activities([{ id: 'a1', type: 'meeting' }]);
+    await emitActivitiesAccountEvents({ orgId: 'org', activityIds: ['a1'], actorUserId: null });
+    expect(m.notifCreate.mock.calls[0]![0].data.title).toBe('New meeting on Pfizer');
+  });
+
+  it('system rows (stage changes logged by sync) raise nothing', async () => {
+    setup();
+    activities([{ id: 'a1', type: 'stage_change' }]);
+    await emitActivitiesAccountEvents({ orgId: 'org', activityIds: ['a1'], actorUserId: null });
+    expect(m.companyFindFirst).not.toHaveBeenCalled();
+    expect(m.notifCreate).not.toHaveBeenCalled();
+  });
+
+  it('the in-process digest subscriber is installed once and forwards exclusions', async () => {
+    setup();
+    activities([{ id: 'a1', type: 'email' }]);
+    installAccountActivityAlerts();
+    installAccountActivityAlerts();
+    try {
+      expect(m.digestListeners.size).toBe(1);
+      for (const fn of m.digestListeners) {
+        fn({
+          orgId: 'org',
+          companyId: 'c1',
+          activityIds: ['a1'],
+          actorUserId: 'actor',
+          excludeUserIds: ['actor', 'kam'],
+        });
+      }
+      await vi.waitFor(() => expect(m.notifCreate).toHaveBeenCalled());
+      const recipients = m.notifCreate.mock.calls.map((c) => c[0].data.userId).sort();
+      expect(recipients).toEqual(['owner1', 'team1']);
+    } finally {
+      uninstallAccountActivityAlerts();
+    }
+    expect(m.digestListeners.size).toBe(0);
   });
 });

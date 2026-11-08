@@ -330,4 +330,28 @@ describe('POST /api/v1/ingest/activities', () => {
       await prisma.activity.count({ where: { orgId, entityType: 'company', entityId: fresh.id } }),
     ).toBe(2);
   });
+
+  it('a batch on a followed account raises one counted alert for the follower', async () => {
+    const watched = await prisma.company.create({
+      data: { orgId, name: `Watched Co ${run}`, domain: `watched-${run}.example.com` },
+    });
+    const follower = await prisma.user.findFirst({ where: { orgId }, orderBy: { createdAt: 'asc' } });
+    expect(follower).toBeTruthy();
+    await prisma.accountFollow.create({ data: { orgId, companyId: watched.id, userId: follower!.id } });
+    const res = await post(rawKey, [
+      call('w-1', { company: { id: watched.id } }),
+      call('w-2', { company: { id: watched.id }, type: 'email' }),
+      call('w-3', { company: { id: watched.id }, type: 'meeting' }),
+    ]);
+    expect(res.json().counts.accepted).toBe(3);
+    let alerts: Array<{ title: string; eventCount: number }> = [];
+    for (let i = 0; i < 40 && alerts.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      alerts = await prisma.notification.findMany({
+        where: { orgId, userId: follower!.id, type: 'account_activity', entityType: 'activity' },
+        select: { title: true, eventCount: true },
+      });
+    }
+    expect(alerts).toEqual([{ title: `3 new activities on Watched Co ${run}`, eventCount: 3 }]);
+  });
 });

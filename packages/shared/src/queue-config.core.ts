@@ -252,6 +252,31 @@ export type NotificationDeliveryJob =
     }
   | { kind: 'digest' };
 
+/**
+ * Account activity alerts raised outside apps/api (worker mail and calendar
+ * sync, MCP ingest). apps/api consumes them and fans out through the account
+ * events service, so recipients, prefs and coalescing have one owner.
+ *   'account-activity-alerts.digest'  one account, one import run
+ */
+export const ACCOUNT_ACTIVITY_ALERTS: QueueConfig = {
+  name: 'account-activity-alerts',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 1000 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** One account, one import run. Ids only: titles are built from the rows at send time. */
+export interface AccountActivityAlertJob {
+  orgId: string;
+  companyId: string;
+  activityIds: string[];
+  actorUserId: string | null;
+  excludeUserIds: string[];
+}
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;
