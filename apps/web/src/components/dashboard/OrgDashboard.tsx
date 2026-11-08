@@ -253,8 +253,15 @@ export const OrgDashboard = memo(function OrgDashboard() {
             openCount={s?.openOpportunities ?? 0}
             feed={feed.data}
             onDrill={setDrill}
+            rowsPending={opps.isLoading}
+            feedPending={feed.isLoading}
           />
-          <NeedsYou rows={oppRows} overdueTasks={s?.overdueTasks ?? 0} feed={feed.data} />
+          <NeedsYou
+            rows={oppRows}
+            overdueTasks={s?.overdueTasks ?? 0}
+            feed={feed.data}
+            pending={opps.isLoading || feed.isLoading}
+          />
         </div>
         <Suspense
           fallback={

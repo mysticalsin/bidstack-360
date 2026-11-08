@@ -28,8 +28,12 @@ import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill }: {
+export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false }: {
   rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
+  /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
+  rowsPending?: boolean;
+  /** Watchdog feed still loading: hold the pulse slot so the figures row does not grow. */
+  feedPending?: boolean;
 }) {
   const fresh = feed?.newAlertCount ?? 0;
   const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
@@ -68,9 +72,16 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
             <PulseOrb tone={pulse} size={96} bold />
             <span className="viz-meta">{pulseText}</span>
           </div>
+        ) : feedPending ? (
+          <div className="dash-hero-pulse" aria-hidden="true" data-testid="dashboard-pulse-placeholder">
+            <span className="dash-hero-pulse-skel" />
+            <span className="viz-meta">{'\u00a0'}</span>
+          </div>
         ) : null}
       </div>
-      {months.keys.length ? (
+      {rowsPending && !months.keys.length ? (
+        <div className="dash-hero-chart-skel" aria-hidden="true" data-testid="dashboard-hero-chart-placeholder" />
+      ) : months.keys.length ? (
         <DivergingBars
           title="Bids by close month"
           labels={months.labels}
@@ -100,7 +111,11 @@ function HeroFig({ onClick, label, children }: { onClick?: () => void; label: st
   );
 }
 
-export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdueTasks: number; feed?: WatchdogFeed }) {
+export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
+  rows: OppRow[]; overdueTasks: number; feed?: WatchdogFeed;
+  /** Opportunities or feed still loading: late items would insert above earlier ones and push them down. */
+  pending?: boolean;
+}) {
   const [now] = useState(() => Date.now());
   const pastDue = pastDueOpen(rows, now);
   const soon = (feed?.earnings ?? []).filter((e) => new Date(e.expectedAt).getTime() - now < 14 * 86_400_000);
@@ -112,8 +127,12 @@ export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdue
   ].filter(Boolean) as Array<{ key: string; to: string; title: string; meta: string; kind: string }>;
   return (
     <section className="viz dash-needs" aria-labelledby="dash-needs-t" data-testid="needs-you">
-      <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{items.length}</span></header>
-      {items.length === 0 ? <p className="viz-empty">Nothing waiting. Nice.</p> : (
+      <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{pending ? '\u00a0' : items.length}</span></header>
+      {pending ? (
+        <div className="dash-needs-skel" aria-busy="true" data-testid="needs-you-placeholder">
+          <span /><span /><span />
+        </div>
+      ) : items.length === 0 ? <p className="viz-empty">Nothing waiting. Nice.</p> : (
         <ul className="dash-needs-list">
           {items.map((it, i) => (
             <li key={it.key} style={{ '--i': i } as React.CSSProperties}>
