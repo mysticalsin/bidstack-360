@@ -153,6 +153,16 @@ if [[ "${ready}" == "1" ]]; then
   log "starting api"
   (cd /app/apps/api && node dist/main.js) >>"$LOG" 2>&1 &
   api_pid=$!
+  # Same database, Redis, and upload root as the API. MSA extract and crew
+  # runs are queued by the API and consumed only by this process.
+  log "starting queue worker"
+  if [[ -f /app/apps/worker/dist/main.js ]]; then
+    (cd /app/apps/worker && node dist/main.js) >>"$LOG" 2>&1 &
+    worker_pid=$!
+    log "queue worker ${worker_pid}"
+  else
+    log "queue worker dist missing; uploaded contracts and crew runs will stay queued"
+  fi
 else
   log "postgres did not become ready"
 fi

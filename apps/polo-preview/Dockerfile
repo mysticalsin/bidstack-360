@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Always-on Polo preview: Postgres (pgvector) + Redis + API + the built SPA.
+# Always-on Polo preview: Postgres (pgvector) + Redis + API + queue worker + the built SPA.
 # The Worker proxies port 8080. Build context is the repository root.
 
 FROM node:24-bookworm-slim AS build
@@ -21,7 +21,8 @@ RUN pnpm db:generate \
   && pnpm --filter @bidstack/dust-client build \
   && pnpm --filter @bidstack/memos build \
   && pnpm --filter @bidstack/odoo-mcp-client build \
-  && (pnpm --filter @bidstack/api build || test -f apps/api/dist/main.js)
+  && (pnpm --filter @bidstack/api build || test -f apps/api/dist/main.js) \
+  && (pnpm --filter @bidstack/worker build || test -f apps/worker/dist/main.js)
 # The web `build` script typechecks first. `tsc -b` is red on main
 # (missing names in a few pages). Vite still produces the SPA the preview serves.
 ENV VITE_API_URL=
