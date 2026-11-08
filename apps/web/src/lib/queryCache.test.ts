@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -133,6 +133,36 @@ describe('queryCache', () => {
     expect(queryClient.getQueryData(['accounts'])).toBeUndefined();
     expect(localStorage.getItem(CACHE_KEY)).toBeNull();
     unsubscribe();
+  });
+
+  it('refetches a query that was in flight when the first sign-in writes the session marker', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const unsubscribe = watchAuthForCacheClear(queryClient);
+    let calls = 0;
+    const observer = new QueryObserver(queryClient, {
+      queryKey: ['crm-dashboard', 'acct-1'],
+      queryFn: ({ signal }) =>
+        new Promise<string>((resolve, reject) => {
+          calls += 1;
+          const n = calls;
+          const timer = setTimeout(() => resolve(`snapshot-${n}`), 5);
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        }),
+    });
+    const stopObserving = observer.subscribe(() => {});
+    try {
+      localStorage.setItem('bidstack:session', 'cf-access:user-a');
+      window.dispatchEvent(new Event(AUTH_FINGERPRINT_EVENT));
+
+      await vi.waitFor(() => expect(observer.getCurrentResult().data).toBe('snapshot-2'));
+      expect(observer.getCurrentResult().isLoading).toBe(false);
+    } finally {
+      stopObserving();
+      unsubscribe();
+    }
   });
 
   it('clears user-scoped cache when demo identity changes without a new session marker', () => {

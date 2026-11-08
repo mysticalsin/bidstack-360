@@ -331,6 +331,10 @@ describe('crm companies routes', () => {
     for (const currency of ['XXX', 'usd', 'US']) {
       expect((await put({ fieldKey: 'annualRevenueMicros', value: 1_000_000, currency })).statusCode).toBe(400);
     }
+    // Large-company revenue (NOK 86.1bn) is above 2^53 micros and must still save.
+    const big = await put({ fieldKey: 'annualRevenueMicros', value: 86_100_000_000 * 1_000_000, currency: 'NOK' });
+    expect(big.statusCode, big.body).toBe(200);
+    expect(Number((await row())?.value)).toBe(86_100_000_000 * 1_000_000);
     // Only revenue carries a currency.
     const emp = await put({ fieldKey: 'employeeCount', value: 500, currency: 'USD' });
     expect(emp.json()).toMatchObject({ currency: null });

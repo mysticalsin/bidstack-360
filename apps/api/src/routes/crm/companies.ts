@@ -582,9 +582,10 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     z.object({ fieldKey: z.literal('employeeCount'), value: z.number().int().positive().max(10_000_000), ...Provenance }),
     z.object({
       fieldKey: z.literal('annualRevenueMicros'),
-      // Micros (int × 1e6); bounded to the same €9e15 float8-exact ceiling
-      // the analytics engine documents.
-      value: z.number().int().positive().max(9e15),
+      // Micros (int × 1e6), stored as JSON. Above 2^53 a double drifts by at
+      // most a few micros, which a revenue figure can absorb; 1e21 still fits
+      // JPY revenue in the tens of trillions.
+      value: z.number().int().positive().max(1e21),
       // Currency the figure was read in; omitted means EUR, as before.
       currency: z.enum(MANUAL_REVENUE_CURRENCIES).nullish(),
       ...Provenance,
