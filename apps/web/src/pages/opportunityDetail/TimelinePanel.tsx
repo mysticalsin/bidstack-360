@@ -29,6 +29,7 @@ const KIND_ICON: Record<string, IconName> = {
   cadence_started: 'zap',
   cadence_completed: 'checkCircle',
   custom: 'sparkle',
+  teams_message: 'messageCircle',
 };
 
 function iconFor(kind: string): IconName {

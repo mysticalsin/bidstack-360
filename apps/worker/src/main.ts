@@ -18,6 +18,7 @@ import { startDocumentExtract } from './queues/document-extract.js';
 import { startMsaTextExtract } from './queues/msa-text-extract.js';
 import { startCalendarSync } from './queues/calendar-sync.js';
 import { startEmailSync } from './queues/email-sync.js';
+import { startTeamsChatSync } from './queues/teams-chat-sync.js';
 import { startSmsWorker } from './queues/sms.js';
 import { startWebhookDeliveryWorker } from './queues/webhook-delivery.js';
 // Wave 8 — Y.js CRDT compaction
@@ -166,6 +167,7 @@ await Promise.all([
   startMsaTextExtract(connection, log, workers, queues),
   startCalendarSync(connection, log, workers, queues),
   startEmailSync(connection, log, workers, queues),
+  startTeamsChatSync(connection, log, workers, queues),
   startSmsWorker(connection, log, workers as never, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),

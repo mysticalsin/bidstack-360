@@ -18,14 +18,36 @@ export const WORKSPACE_READ_SCOPES: Record<WorkspaceProvider, readonly string[]>
   microsoft: ['openid', 'email', 'offline_access', `${GRAPH}User.Read`, `${GRAPH}Mail.Read`, `${GRAPH}Calendars.Read`],
 };
 
+/**
+ * Teams chat import (slice 26), requested only when the person asks for it.
+ * Chat.Read is user-consentable in most tenants.
+ */
+export const TEAMS_CHAT_SCOPES: readonly string[] = [`${GRAPH}Chat.Read`];
+
+/**
+ * Channel threads. ChannelMessage.Read.All needs an admin to approve it, so it
+ * is requested only when the server says the tenant has (see
+ * MICROSOFT_TEAMS_CHANNELS_ADMIN_CONSENTED); asking without approval blocks
+ * the whole consent for a non-admin.
+ */
+export const TEAMS_CHANNEL_SCOPES: readonly string[] = [
+  `${GRAPH}Team.ReadBasic.All`,
+  `${GRAPH}Channel.ReadBasic.All`,
+  `${GRAPH}ChannelMessage.Read.All`,
+];
+
 export type ScopeKey =
   | 'identity'
   | 'offline'
   | 'mail_read'
   | 'calendar_read'
+  | 'teams_chat_read'
+  | 'teams_directory_read'
+  | 'teams_channel_read'
   | 'mail_send'
   | 'mail_write'
-  | 'calendar_write';
+  | 'calendar_write'
+  | 'teams_write';
 
 /** One granted permission, phrased for the person who granted it. */
 export interface ScopeGrant {
@@ -39,9 +61,13 @@ const SCOPE_ORDER: ScopeKey[] = [
   'offline',
   'mail_read',
   'calendar_read',
+  'teams_chat_read',
+  'teams_directory_read',
+  'teams_channel_read',
   'mail_send',
   'mail_write',
   'calendar_write',
+  'teams_write',
 ];
 
 const SCOPE_LABEL: Record<ScopeKey, { label: string; access: 'read' | 'write' }> = {
@@ -49,9 +75,13 @@ const SCOPE_LABEL: Record<ScopeKey, { label: string; access: 'read' | 'write' }>
   offline: { label: 'Stay connected between sign-ins', access: 'read' },
   mail_read: { label: 'Read your email', access: 'read' },
   calendar_read: { label: 'Read your calendar', access: 'read' },
+  teams_chat_read: { label: 'Read your Teams chats', access: 'read' },
+  teams_directory_read: { label: 'See your teams and channel names', access: 'read' },
+  teams_channel_read: { label: 'Read Teams channel messages', access: 'read' },
   mail_send: { label: 'Send email as you', access: 'write' },
   mail_write: { label: 'Change or delete your email', access: 'write' },
   calendar_write: { label: 'Change your calendar', access: 'write' },
+  teams_write: { label: 'Send or change Teams messages', access: 'write' },
 };
 
 function bare(scope: string): string {
@@ -79,6 +109,19 @@ function classify(scope: string): ScopeKey[] {
     case 'calendar.events.readonly':
     case 'Calendars.Read':
       return ['calendar_read'];
+    case 'Chat.Read':
+      return ['teams_chat_read'];
+    case 'Team.ReadBasic.All':
+    case 'Channel.ReadBasic.All':
+      return ['teams_directory_read'];
+    case 'ChannelMessage.Read.All':
+      return ['teams_channel_read'];
+    case 'Chat.ReadWrite':
+      return ['teams_chat_read', 'teams_write'];
+    case 'ChatMessage.Send':
+    case 'ChannelMessage.Send':
+    case 'Chat.Create':
+      return ['teams_write'];
     case 'gmail.send':
     case 'Mail.Send':
       return ['mail_send'];
@@ -117,6 +160,17 @@ export function grantsCalendarRead(scopes: readonly string[]): boolean {
   return keysOf(scopes).has('calendar_read');
 }
 
+/** True when the grant can read the user's Teams chats (Chat.Read). */
+export function grantsTeamsChatRead(scopes: readonly string[]): boolean {
+  return keysOf(scopes).has('teams_chat_read');
+}
+
+/** True when the grant can list teams and channels and read channel threads. */
+export function grantsTeamsChannelRead(scopes: readonly string[]): boolean {
+  const keys = keysOf(scopes);
+  return keys.has('teams_channel_read') && keys.has('teams_directory_read');
+}
+
 /** True when the grant can send mail. Read-only connects never can. */
 export function grantsMailSend(scopes: readonly string[]): boolean {
   return keysOf(scopes).has('mail_send');
@@ -153,6 +207,7 @@ export function microsoftRefreshScopes(granted: readonly string[]): string[] {
     const s = bare(scope);
     if (s === 'Calendars.ReadWrite') add(`${GRAPH}Calendars.Read`);
     else if (s === 'Mail.ReadWrite') add(`${GRAPH}Mail.Read`);
+    else if (s === 'Chat.ReadWrite') add(`${GRAPH}Chat.Read`);
     else if (readOnlyScopes([scope]).length === 1) add(scope);
   }
   const base = out.some((s) => grantsMailRead([s]) || grantsCalendarRead([s]))

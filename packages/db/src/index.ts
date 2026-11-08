@@ -254,6 +254,36 @@ export {
   type AccountActivityDigestListener,
   type AccountActivityListener,
 } from './services/account-activity-events.js';
+// Teams chat import (slice 26): read-only Graph client and filing to accounts.
+export {
+  createTeamsGraphClient,
+  teamsPlainText,
+  TeamsConsentError,
+  TeamsGraphError,
+  TeamsNotFoundError,
+  TeamsThrottledError,
+  type TeamsChannel,
+  type TeamsChat,
+  type TeamsGraphClient,
+  type TeamsMember,
+  type TeamsMessage,
+  type TeamsTeam,
+} from './services/teams-graph.js';
+export {
+  createTeamsActivityService,
+  fileTeamsMessages,
+  filedTeamsMessageIds,
+  loadTeamsThread,
+  suggestTeamsAccounts,
+  teamsActivityKey,
+  teamsThreadKey,
+  teamsThreadTitle,
+  type FileTeamsMessagesInput,
+  type FileTeamsMessagesResult,
+  type LoadedTeamsThread,
+  type TeamsActivityDb,
+  type TeamsCaptureMeta,
+} from './services/teams-activity.js';
 
 // Agreement ingest staging (slice 13a), shared by the REST route and MCP.
 export {

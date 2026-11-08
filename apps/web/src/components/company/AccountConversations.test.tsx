@@ -146,6 +146,42 @@ describe('AccountConversations', () => {
     expect(screen.getByText('No synced meetings or emails yet.')).toBeTruthy();
   });
 
+  it('shows a filed Teams message with its author and a link back to Teams', () => {
+    withItems([
+      item({
+        type: 'teams_message',
+        subject: 'Chat with Jane Doe',
+        channel: null,
+        filing: 'manual',
+        needsOpportunity: false,
+        sourceRecord: null,
+        canRefile: false,
+        author: 'Jane Doe',
+        webUrl: 'https://teams.microsoft.com/l/message/19%3Aacme/m2',
+      }),
+    ]);
+    render(<AccountConversations companyId={COMPANY} companyName="Acme" />);
+    expect(screen.getByTestId('conversation-source').textContent).toBe('Teams');
+    expect(screen.getByText(/Jane Doe · 3 people/)).toBeTruthy();
+    const link = screen.getByRole('link', { name: 'Open in Teams' });
+    expect(link.getAttribute('href')).toBe('https://teams.microsoft.com/l/message/19%3Aacme/m2');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(screen.queryByLabelText('File to opportunity')).toBeNull();
+  });
+
+  it('offers Import from Teams only to people who can write activities', () => {
+    withItems([]);
+    render(<AccountConversations companyId={COMPANY} />);
+    expect(screen.getByRole('button', { name: 'Import from Teams' })).toBeTruthy();
+    cleanup();
+
+    vi.mocked(useHasPermission).mockImplementation((p: string) => p === 'activities:read');
+    withItems([]);
+    render(<AccountConversations companyId={COMPANY} />);
+    expect(screen.queryByRole('button', { name: 'Import from Teams' })).toBeNull();
+  });
+
   it('stays out of the page without activities:read', () => {
     vi.mocked(useHasPermission).mockReturnValue(false);
     withItems([item({})]);

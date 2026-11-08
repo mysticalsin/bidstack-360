@@ -54,7 +54,7 @@ const Iso = z.string().datetime();
 export const AccountConversation = z.object({
   /** Activity id. */
   id: z.string().uuid(),
-  type: z.enum(['meeting', 'email']),
+  type: z.enum(['meeting', 'email', 'teams_message']),
   subject: z.string(),
   occurredAt: Iso,
   endAt: Iso.nullable(),
@@ -77,6 +77,10 @@ export const AccountConversation = z.object({
     .nullable(),
   /** The caller owns the meeting and the calendar re-file route accepts it. */
   canRefile: z.boolean(),
+  /** Deep link back to the source (Teams message webUrl). */
+  webUrl: z.string().url().nullable().optional(),
+  /** Display name of who wrote it (Teams messages). */
+  author: z.string().nullable().optional(),
 });
 export type AccountConversation = z.infer<typeof AccountConversation>;
 

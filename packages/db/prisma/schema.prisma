@@ -232,6 +232,7 @@ model Org {
   notificationPrefs             NotificationPref[]
   accountTeamMembers            AccountTeamMember[]
   accountFollows                AccountFollow[]
+  teamsChatLinks                TeamsChatLink[]
   serumConfigVersions           SerumConfigVersion[]
   serumConnectorConnectionTests SerumConnectorConnectionTest[]
 
@@ -2351,6 +2352,8 @@ enum ActivityType {
   cadence_started
   cadence_completed
   custom
+  // Slice 26 — a Teams chat or channel message a person filed to an account
+  teams_message
 
   @@map("activity_type")
 }
@@ -6441,6 +6444,44 @@ model AccountFollow {
   @@unique([companyId, userId], map: "account_follows_company_user_key")
   @@index([orgId, userId], map: "account_follows_org_user_idx")
   @@map("account_follows")
+}
+
+/// Slice 26: a Teams chat or channel thread a person filed to an account.
+/// With keepSyncing the worker files new messages (read-only Graph pulls,
+/// watermark on lastModifiedDateTime). One row per person per thread.
+model TeamsChatLink {
+  id                 String    @id @default(uuid()) @db.Uuid
+  orgId              String    @map("org_id") @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  integrationTokenId String    @map("integration_token_id") @db.Uuid
+  /// chat | channel_thread
+  kind               String    @db.VarChar(20)
+  /// chat:<chatId> or channel:<teamId>:<channelId>:<messageId>
+  threadKey          String    @map("thread_key") @db.VarChar(1000)
+  chatId             String?   @map("chat_id") @db.VarChar(300)
+  teamId             String?   @map("team_id") @db.VarChar(300)
+  channelId          String?   @map("channel_id") @db.VarChar(300)
+  rootMessageId      String?   @map("root_message_id") @db.VarChar(300)
+  title              String    @default("") @db.VarChar(300)
+  webUrl             String?   @map("web_url") @db.VarChar(2000)
+  companyId          String    @map("company_id") @db.Uuid
+  opportunityId      String?   @map("opportunity_id") @db.Uuid
+  keepSyncing        Boolean   @default(false) @map("keep_syncing")
+  /// Highest Graph lastModifiedDateTime filed so far.
+  watermark          DateTime? @db.Timestamptz(6)
+  lastSyncedAt       DateTime? @map("last_synced_at") @db.Timestamptz(6)
+  /// consent_required | not_found | null
+  lastError          String?   @map("last_error") @db.VarChar(64)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId, threadKey], map: "teams_chat_links_org_user_thread_key")
+  @@index([orgId, companyId], map: "teams_chat_links_org_company_idx")
+  @@index([integrationTokenId, keepSyncing], map: "teams_chat_links_token_sync_idx")
+  @@map("teams_chat_links")
 }
 
 // ── Financial Watchdog (public financial events per customer account) ──
