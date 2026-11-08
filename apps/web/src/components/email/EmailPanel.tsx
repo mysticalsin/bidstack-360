@@ -2,7 +2,7 @@
 // Opening a row shows the thread; "New draft" composes a Polo-only draft.
 
 import type { EmailListResponse, EmailMessageDto } from '@bidstack/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { ArrowDownLeft, ArrowUpRight, PenLine } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,12 +45,18 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
   qs.set('limit', String(LIMIT));
   const path = `/api/email/messages?${qs.toString()}`;
 
-  const list = useQuery<EmailListResponse>({
+  const list = useInfiniteQuery({
     queryKey: ['email-messages', path],
-    queryFn: () => api(path),
+    queryFn: ({ pageParam }) =>
+      api<EmailListResponse>(pageParam > 1 ? `${path}&page=${pageParam}` : path),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (last.hasMore ? pages.length + 1 : undefined),
     staleTime: 60_000,
   });
-  const threads = useMemo(() => latestPerThread(list.data?.messages ?? []), [list.data]);
+  const threads = useMemo(
+    () => latestPerThread(list.data?.pages.flatMap((p) => p.messages) ?? []),
+    [list.data],
+  );
 
   return (
     <Card data-testid="email-panel">
@@ -106,6 +112,25 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
               </li>
             );
           })}
+          {list.hasNextPage ? (
+            <li className="flex flex-col items-center gap-2 px-5 py-3">
+              {list.isFetchNextPageError ? (
+                <p role="alert" className="text-sm text-[var(--danger)]">
+                  {t('emailPanel.loadMoreError', 'Could not load older email. Try again.')}
+                </p>
+              ) : null}
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={list.isFetchingNextPage}
+                onClick={() => void list.fetchNextPage()}
+              >
+                {list.isFetchingNextPage
+                  ? t('emailPanel.loadingMore', 'Loading…')
+                  : t('emailPanel.loadMore', 'Load older email')}
+              </Button>
+            </li>
+          ) : null}
         </ul>
       )}
 

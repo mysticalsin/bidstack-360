@@ -195,6 +195,8 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
 // The visitor is always an org admin in their demo workspace.
 export const DEMO_TOKEN_KEY = 'bidstack:demo-token';
 export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
+/** Set by an explicit sign-out so /login does not re-enter from the edge identity. */
+export const DEMO_SIGNED_OUT_KEY = 'bidstack:demo-signed-out';
 
 function DemoAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
@@ -251,8 +253,17 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback((cb?: () => void) => {
     localStorage.removeItem(DEMO_TOKEN_KEY);
     localStorage.removeItem(DEMO_EMAIL_KEY);
+    localStorage.setItem(DEMO_SIGNED_OUT_KEY, '1');
     setSignedIn(false);
     writeSessionMarker(null);
+    // Behind the polo-preview Worker this clears the Polo session cookie. An
+    // Access session outlives it, which is what DEMO_SIGNED_OUT_KEY covers.
+    void fetch('/__auth/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: '{}',
+    }).catch(() => undefined);
     cb?.();
   }, []);
 

@@ -16,9 +16,9 @@ import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
-import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
+import { CompanyPeopleTab } from './companyDetail/CompanyPeopleTab';
 import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
 import { relatedCount } from './companyDetail/relatedCount';
 
@@ -241,13 +241,7 @@ export function CompanyDetailPage() {
 
           {tab === 'people' && (
             <div role="tabpanel" id={panelId('people')} aria-labelledby={tabId('people')}>
-              <AccountPeopleSection
-                companyId={c.id}
-                deals={c.opportunities.map((opportunity) => ({
-                  id: opportunity.id,
-                  name: opportunity.name,
-                }))}
-              />
+              <CompanyPeopleTab companyId={c.id} opportunities={c.opportunities} />
             </div>
           )}
           {tab === 'contacts' && (

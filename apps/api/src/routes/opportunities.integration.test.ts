@@ -119,6 +119,26 @@ describe('opportunities routes', () => {
     expect(body.items.some((o) => o.id === searchable!.id)).toBe(true);
   });
 
+  skipIfNoDb('GET /api/opportunities filters by companyId', async () => {
+    const linked = await prisma.opportunity.findFirst({
+      where: { orgId: orgId!, deletedAt: null, companyId: { not: null } },
+      select: { companyId: true },
+    });
+    expect(linked).not.toBeNull();
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/opportunities?companyId=${linked!.companyId}&limit=200`,
+    });
+    expect(res.statusCode).toBe(200);
+    const ids = res.json<{ items: Array<{ id: string }> }>().items.map((o) => o.id);
+    const expected = await prisma.opportunity.findMany({
+      where: { orgId: orgId!, deletedAt: null, companyId: linked!.companyId },
+      select: { id: true },
+    });
+    expect(ids.sort()).toEqual(expected.map((o) => o.id).sort());
+  });
+
   skipIfNoDb('mintNextCode sorts OP suffixes numerically beyond four digits', async () => {
     const org = await prisma.org.create({
       data: {

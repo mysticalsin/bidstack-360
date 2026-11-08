@@ -675,7 +675,7 @@ Delete all demonstration data? This action cannot be undone.
 - Keyboard: all controls reachable in order; Escape closes drawers and popovers; focus returns to the
   trigger; visible focus ring from `--border-focus`. MatchField rule rows are reorderable by keyboard.
 - Live regions: delivery replay and policy publish results announce via `aria-live="polite"`.
-- Reduced motion honoured everywhere (9.2). Hit targets at least 24 x 24 px.
+- Reduced motion honoured everywhere (9.2). Touch targets at least 44 x 44 px, even when the visible control is smaller.
 - Lighthouse a11y stays at 100 on `/login` and `/dashboard` (baseline in `docs/factory/RECON.md`).
 
 ### 9.7 Account direction (slice 12)

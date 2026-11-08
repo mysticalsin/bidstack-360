@@ -10,7 +10,7 @@ import { MeetingPrepCard } from '@/components/ai/MeetingPrepCard';
 import { Badge } from '@/components/ui/Badge';
 import { Sheet, SheetContent } from '@/components/ui/Sheet';
 
-import { eventDaySpan, formatDayLabel, formatTime, isLaneEvent, timeZoneLabel } from './layout';
+import { eventDaySpan, formatDayLabel, formatTime, timeZoneLabel } from './layout';
 import type { CalendarEvent } from './types';
 
 interface EventPanelProps {
@@ -35,7 +35,7 @@ export function EventPanel({ event, tz, onClose }: EventPanelProps) {
           start: formatDayLabel(first, dayOpts),
           end: formatDayLabel(last, dayOpts),
         });
-  const time = isLaneEvent(event)
+  const time = event.isAllDay
     ? t('calendar.allDay', 'All day')
     : t('calendar.timeRange', '{{start}} to {{end}}', {
         start: formatTime(event.startAt, tz),
@@ -55,7 +55,7 @@ export function EventPanel({ event, tz, onClose }: EventPanelProps) {
                 <span className="block">{days}</span>
                 <span className="block text-[var(--fg-secondary)]">
                   {time}
-                  {isLaneEvent(event) ? '' : `, ${timeZoneLabel(tz)}`}
+                  {event.isAllDay ? '' : `, ${timeZoneLabel(tz)}`}
                 </span>
               </dd>
             </div>
