@@ -221,6 +221,37 @@ export type ConsultingPartnersQueueJob =
   | { kind: 'refresh'; orgId: string; companyId: string; requestedBy?: string | null }
   | { kind: 'sweep' };
 
+/**
+ * Notification delivery (slice 21): instant email and Teams posts for alerts
+ * the user opted into, plus the daily account digest.
+ *   'notification-delivery.deliver'  one alert, one channel, one user
+ *   'notification-delivery.digest'   repeatable daily account digest
+ */
+export const NOTIFICATION_DELIVERY: QueueConfig = {
+  name: 'notification-delivery',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { age: 86_400, count: 1000 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the notification-delivery queue. Content is Polo data for Polo users only. */
+export type NotificationDeliveryJob =
+  | {
+      kind: 'deliver';
+      channel: 'email' | 'teams';
+      orgId: string;
+      userId: string;
+      notificationId: string | null;
+      companyId: string | null;
+      title: string;
+      body: string | null;
+      url: string | null;
+    }
+  | { kind: 'digest' };
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;

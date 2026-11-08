@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma, type Prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
 import { createNotification } from '../services/notification.service.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 import {
   Opportunity,
   OpportunityFilter,
@@ -531,6 +532,36 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         }).catch((err: unknown) => {
           req.log.warn({ err, opportunityId: updated.id }, 'stage-change notification failed');
         });
+      }
+
+      if (updated.companyId) {
+        const stageName = updated.pipelineStage?.name ?? updated.stage;
+        const ownerNotified = updated.ownerId && updated.ownerId !== req.auth.userId ? [updated.ownerId] : [];
+        if (stageChanged) {
+          emitAccountEventSafe({
+            orgId: req.auth.orgId,
+            companyId: updated.companyId,
+            kind: 'opportunity_stage_changed',
+            actorUserId: req.auth.userId,
+            entityType: 'opportunity',
+            entityId: updated.id,
+            title: (company) => `Stage moved to ${stageName} on ${company}: ${updated.name}`,
+            sourceUrl: `/opportunities/${updated.id}`,
+            excludeUserIds: ownerNotified,
+          });
+        } else if (updated.ownerId !== before.ownerId) {
+          const ownerName = updated.owner?.name ?? updated.owner?.email ?? 'nobody';
+          emitAccountEventSafe({
+            orgId: req.auth.orgId,
+            companyId: updated.companyId,
+            kind: 'opportunity_owner_changed',
+            actorUserId: req.auth.userId,
+            entityType: 'opportunity',
+            entityId: updated.id,
+            title: (company) => `New owner on ${company}: ${updated.name} is now with ${ownerName}`,
+            sourceUrl: `/opportunities/${updated.id}`,
+          });
+        }
       }
 
       return serializeOpportunity(updated);

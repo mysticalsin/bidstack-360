@@ -97,6 +97,7 @@ import { webhookMessagesRoutes } from './routes/webhook-messages.js';
 import { accessPoliciesRoutes } from './routes/access-policies.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
+import { accountTeamRoutes } from './routes/account-team.js';
 import { accountPeopleRoutes } from './routes/account-people.js';
 import { duplicatesRoutes } from './routes/duplicates.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
@@ -290,6 +291,7 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
   await server.register(webhookMessagesRoutes, { prefix: '/api/v1' });
   await server.register(accessPoliciesRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
+  await server.register(accountTeamRoutes, { prefix: '/api/v1' });
   await server.register(accountPeopleRoutes, { prefix: '/api/v1' });
   await server.register(duplicatesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
@@ -358,7 +360,7 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
 
   // Wave 7 — Real-time collaboration REST endpoints (lock + presence snapshot)
   // WHY /api/v1: consistent with other authenticated endpoints.
-  // The WebSocket endpoint /api/realtime is registered by the realtimePlugin above.
+  // The WebSocket endpoint /api/v1/realtime is registered by the realtimePlugin above.
   await server.register(realtimeRoutes, { prefix: '/api/v1' });
 
   // Wave 8 — Voice + Video calls
