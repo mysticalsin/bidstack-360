@@ -71,7 +71,7 @@ describe('ImpactPreview', () => {
 
   it('offers the daily chart as a table', () => {
     render(<ImpactPreview result={RESULT} onRun={vi.fn()} running={false} />);
-    expect(screen.getByRole('img', { name: /Daily access changes/ })).toBeTruthy();
+    expect(screen.getByRole('group', { name: /Daily access changes/ })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'View as table' }));
     const table = screen.getByRole('table', { name: 'Daily access changes' });
     expect(within(table).getAllByRole('row')).toHaveLength(8);

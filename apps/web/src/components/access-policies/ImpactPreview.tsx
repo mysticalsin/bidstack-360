@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
-import { DivergingBars } from '@/components/vendor/tuffui/diverging-bars';
+import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import { Inset } from '@/components/vendor/tuffui/surface';
 import type { AccessPolicySimulation, AccessPolicySimulationSide } from '@/hooks/useAccessPolicies';
 
@@ -57,6 +57,9 @@ export function ImpactPreview({ result, onRun, running, disabled }: ImpactPrevie
   const { t } = useTranslation('settings');
   const [asTable, setAsTable] = useState(false);
   const changed = result ? result.gained.count + result.lost.count > 0 : false;
+  const dailyTitle = t('accessPolicies.daily', 'Daily access changes');
+  const gainsLabel = t('accessPolicies.gains', 'Gains access');
+  const losesLabel = t('accessPolicies.loses', 'Loses access');
 
   return (
     <div className="space-y-3">
@@ -112,37 +115,52 @@ export function ImpactPreview({ result, onRun, running, disabled }: ImpactPrevie
             )}
           </Inset>
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-medium text-fg-primary">{dailyTitle}</h4>
             <Button variant="ghost" size="sm" aria-pressed={asTable} onClick={() => setAsTable((v) => !v)}>
               {asTable ? t('accessPolicies.viewChart', 'View as chart') : t('accessPolicies.viewTable', 'View as table')}
             </Button>
           </div>
-          <DivergingBars
-            title={t('accessPolicies.daily', 'Daily access changes')}
-            labels={result.byDay.map((d) => d.day.slice(5))}
-            series={[
-              {
-                id: 'gained',
-                label: t('accessPolicies.gains', 'Gains access'),
-                values: result.byDay.map((d) => d.gained),
-                color: 'var(--success)',
-              },
-            ]}
-            below={{
-              id: 'lost',
-              label: t('accessPolicies.loses', 'Loses access'),
-              values: result.byDay.map((d) => d.lost),
-              color: 'var(--danger)',
-            }}
-            showTable={asTable}
-            className="max-w-none"
-          />
+          {asTable ? (
+            <table className="w-full text-left text-sm tabular-nums text-fg-primary">
+              <caption className="sr-only">{dailyTitle}</caption>
+              <thead className="text-xs text-fg-secondary">
+                <tr>
+                  <th scope="col" className="py-1 font-medium">
+                    {t('accessPolicies.day', 'Day')}
+                  </th>
+                  <th scope="col" className="py-1 font-medium">
+                    {gainsLabel}
+                  </th>
+                  <th scope="col" className="py-1 font-medium">
+                    {losesLabel}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.byDay.map((d) => (
+                  <tr key={d.day}>
+                    <th scope="row" className="py-1 font-normal">
+                      {d.day.slice(5)}
+                    </th>
+                    <td className="py-1">{d.gained}</td>
+                    <td className="py-1">{d.lost}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <DivergingBars
+              title={dailyTitle}
+              labels={result.byDay.map((d) => d.day.slice(5))}
+              series={[{ id: 'gained', label: gainsLabel, values: result.byDay.map((d) => d.gained), color: 'var(--success)' }]}
+              below={{ id: 'lost', label: losesLabel, values: result.byDay.map((d) => d.lost), color: 'var(--danger)' }}
+            />
+          )}
 
           <div className="grid gap-4 @3xl:grid-cols-2">
-            {result.lost.count > 0 && <Side title={t('accessPolicies.loses', 'Loses access')} side={result.lost} />}
-            {result.gained.count > 0 && (
-              <Side title={t('accessPolicies.gains', 'Gains access')} side={result.gained} />
-            )}
+            {result.lost.count > 0 && <Side title={losesLabel} side={result.lost} />}
+            {result.gained.count > 0 && <Side title={gainsLabel} side={result.gained} />}
           </div>
         </>
       )}

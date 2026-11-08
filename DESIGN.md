@@ -749,7 +749,7 @@ Appended by factory slice 5 (Settings > Access policies).
 - Builder: one card per rule with When, Then, Conditions and Except fieldsets, a plain sentence that
   reads the rule back, and Move up / Move down / Remove buttons (keyboard reorder). MatchField was not
   vendored: upstream it is a fit chart, not a form, so the rule rows use native checkboxes and inputs.
-- Impact preview: vendored `DivergingBars` (gains above the line in `--success`, losses below in
+- Impact preview: the shared `DivergingBars` from `components/charts/tuffui` (gains above the line in `--success`, losses below in
   `--danger`) with a "View as table" toggle; people and example events per side, one sentence when
   nothing changes.
 - Approvals and versions: `StatusPill` for Pending, Approved and Live; the author sees a sentence
