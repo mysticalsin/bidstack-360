@@ -34,6 +34,7 @@ import { useHasPermission } from '@/hooks/useCapabilities';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatStage } from '@/lib/format';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
+import { StatusPill } from '@/components/vendor/tuffui/status-pill';
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
 
 import {
@@ -464,15 +465,18 @@ export function OpportunityDetailPage() {
                       )}
                       min={0}
                       step={1000}
-                      display={(v) =>
-                        `${formatUnspecifiedAmount(v)} (currency not recorded; not a euro forecast)`
-                      }
+                      display={(v) => formatUnspecifiedAmount(v)}
                     />
                   ) : (
                     <span title={readOnlyHint}>
-                      {`${formatUnspecifiedAmount(data.value)} (currency not recorded; not a euro forecast)`}
+                      {formatUnspecifiedAmount(data.value)}
                     </span>
                   )}
+                </div>
+                <div className="mt-1 flex justify-end">
+                  <StatusPill size="sm" title={t('opportunityDetail.currencyNotSetHint', 'Opportunities do not record a currency yet.')}>
+                    {t('opportunityDetail.currencyNotSet', 'Currency not set')}
+                  </StatusPill>
                 </div>
                 <div className="flex items-center justify-end gap-2 text-xs text-[var(--fg-tertiary)] mt-1">
                   <span className="flex items-center gap-1">

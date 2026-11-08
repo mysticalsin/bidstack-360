@@ -8,6 +8,11 @@ export interface CalendarEvent {
   syncState: string;
   provider: string;
   createdAt: string;
+  contactId: string | null;
+  companyId: string | null;
+  opportunityId: string | null;
+  /** Created in Polo and not pushed to the provider calendar (read-only grant). */
+  localOnly: boolean;
 }
 
 export interface CreateEventBody {
@@ -17,4 +22,7 @@ export interface CreateEventBody {
   location?: string;
   bodyPreview?: string;
   provider?: 'google_workspace' | 'microsoft_graph';
+  isAllDay?: boolean;
+  /** Retry key so a double submit creates one event. */
+  clientRequestId?: string;
 }

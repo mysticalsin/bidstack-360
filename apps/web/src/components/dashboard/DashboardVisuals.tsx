@@ -12,7 +12,9 @@ import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
 import SmoothTab from '@/components/kokonutui/smooth-tab';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { PulseOrb } from '@/components/viz/PulseOrb';
-import { HeroArea, QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
+import { QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
+import { closeMonthLabel, pipelineByCloseMonth } from '@/components/charts/bid-chart-data';
+import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import {
   accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
@@ -35,17 +37,22 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
   const pulseText = !feed ? '' : fresh > 0
     ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
     : 'Watchdog: all quiet';
-  const trend = cumulativeWon(rows);
-  const wonTotal = trend.at(-1)?.y ?? 0;
+  const [now] = useState(() => Date.now());
+  const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
+  const months = pipelineByCloseMonth(rows, now);
+  const fullLabels = months.keys.map(closeMonthLabel);
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
       summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
-      table={{ columns: ['Month', 'Won to date'], rows: trend.map((p) => [p.x, fmtCompact(p.y)]) }}
+      table={{
+        columns: ['Month', 'Won', 'Lost', 'Open', 'Overdue'],
+        rows: fullLabels.map((m, i) => [m, fmtCompact(months.won[i]!), fmtCompact(months.lost[i]!), fmtCompact(months.open[i]!), fmtCompact(months.overdue[i]!)]),
+      }}
       className="dash-hero"
-      interactive={Boolean(onDrill)}
+      interactive
     >
       <div className="dash-hero-figs">
         <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
@@ -63,8 +70,23 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
           </div>
         ) : null}
       </div>
-      <HeroArea data={trend} format={fmtCompact} />
-      <div className="viz-caption">Won value to date, by close month. Select a number to see the bids behind it.</div>
+      {months.keys.length ? (
+        <DivergingBars
+          title="Bids by close month"
+          labels={months.labels}
+          series={[
+            { id: 'won', label: 'Won', values: months.won, color: 'var(--success)' },
+            { id: 'lost', label: 'Lost', values: months.lost, color: 'var(--fg-tertiary)' },
+            { id: 'open', label: 'Open', values: months.open, color: 'var(--brand-deep)' },
+          ]}
+          below={{ id: 'overdue', label: 'Overdue', values: months.overdue }}
+          format={fmtCompact}
+          onActivate={onDrill ? (i) => onDrill({ status: 'all', closeMonth: months.keys[i] }) : undefined}
+        />
+      ) : (
+        <p className="viz-empty">No dated bids yet.</p>
+      )}
+      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
     </ChartCard>
   );
 }

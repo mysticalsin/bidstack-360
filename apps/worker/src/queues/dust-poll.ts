@@ -104,6 +104,23 @@ export function resetDustCircuitBreakerForTest(): void {
   lastBreakerSweepAt = 0;
 }
 
+/** Returned as the BullMQ job result so "Sync now" can show the counts. */
+export interface DustPollResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  reason?: 'not_configured' | 'org_missing' | 'circuit_open';
+}
+
+const emptyResult = (reason?: DustPollResult['reason']): DustPollResult => ({
+  created: 0,
+  updated: 0,
+  skipped: 0,
+  errors: 0,
+  ...(reason ? { reason } : {}),
+});
+
 /**
  * Poll one org's OWN Dust workspace and ingest its documents into that org.
  *
@@ -114,7 +131,7 @@ export function resetDustCircuitBreakerForTest(): void {
  * metadata only routes a doc to the right entity type. Writes a stub sync_event
  * when the org has no Dust configured, so the integration UI still has feedback.
  */
-export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void> {
+export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<DustPollResult> {
   // A job can outlive its tenant: the org may be deleted between enqueue and
   // processing (offboarding, or a dropped test tenant). Writing the stub
   // sync_event below then violates sync_events_org_id_fkey and throws, so
@@ -123,7 +140,7 @@ export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void
   const org = await prisma.org.findUnique({ where: { id: orgId }, select: { id: true } });
   if (!org) {
     log.info({ orgId }, 'dust.poll: org no longer exists — dropping job');
-    return;
+    return emptyResult('org_missing');
   }
 
   const { client: dust, creds } = await getOrgDust(orgId, log.child({ orgId, kind: 'dust' }));
@@ -141,12 +158,18 @@ export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void
         processedAt: new Date(),
       },
     });
-    return;
+    return emptyResult('not_configured');
   }
 
   const docs = await dust.listDocuments(dataSourceId);
   log.info({ orgId, count: docs.length }, 'pulled from dust');
   const results = { opportunity: 0, company: 0, note: 0, lead: 0, skipped: 0, errors: 0 };
+  const counts = emptyResult();
+  const tally = (res: { created: boolean; skipped?: boolean } | null) => {
+    if (!res || res.skipped) counts.skipped++;
+    else if (res.created) counts.created++;
+    else counts.updated++;
+  };
 
   for (const doc of docs) {
     try {
@@ -154,21 +177,25 @@ export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void
       const meta = (detail.metadata ?? {}) as Record<string, unknown>;
       if (typeof meta.opportunity_code === 'string') {
         const res = await upsertOpportunityFromDust(orgId, detail);
+        tally(res);
         if (res.skipped) results.skipped++;
         else results.opportunity++;
       } else if (typeof meta.lead_email === 'string') {
         const res = await upsertLeadFromDust(orgId, detail);
+        tally(res);
         if (res.skipped) results.skipped++;
         else results.lead++;
       } else if (typeof meta.company_name === 'string') {
-        await upsertCompanyFromDust(orgId, detail);
+        tally(await upsertCompanyFromDust(orgId, detail));
         results.company++;
       } else {
         const note = await upsertNoteFromDust(orgId, detail);
+        tally(note);
         if (note) results.note++;
       }
     } catch (docErr) {
       results.errors++;
+      counts.errors++;
       log.warn({ docId: doc.document_id, err: docErr }, 'failed to process dust document');
     }
   }
@@ -183,6 +210,7 @@ export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void
       processedAt: new Date(),
     },
   });
+  return counts;
 }
 
 /**
@@ -190,15 +218,19 @@ export async function pollOrgDust(orgId: string, log: pino.Logger): Promise<void
  * Worker closure (and exported, like pollOrgDust) so tests can prove one
  * tenant's open circuit never gates another tenant's poll.
  */
-export async function pollOrgDustWithBreaker(orgId: string, log: pino.Logger): Promise<void> {
+export async function pollOrgDustWithBreaker(
+  orgId: string,
+  log: pino.Logger,
+): Promise<DustPollResult> {
   if (isDustCircuitOpen(orgId)) {
     log.warn({ orgId }, 'circuit open, skipping dust poll');
-    return;
+    return emptyResult('circuit_open');
   }
 
   try {
-    await pollOrgDust(orgId, log);
+    const result = await pollOrgDust(orgId, log);
     recordDustPollSuccess(orgId);
+    return result;
   } catch (err) {
     const { consecutiveFailures, opened } = recordDustPollFailure(orgId);
     if (opened) {
@@ -297,7 +329,7 @@ export async function startDustPoller(
         return;
       }
 
-      await pollOrgDustWithBreaker(data.orgId, log);
+      return pollOrgDustWithBreaker(data.orgId, log);
     },
     { connection, concurrency: 5, limiter: { max: 10, duration: 1_000 } },
   );

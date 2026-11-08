@@ -139,6 +139,7 @@ export type {
   ReleaseScore,
   Lead,
   TenantExport,
+  DataSubjectRequest,
   SavedView,
   SavedViewEntity,
   KamConsultant,
@@ -199,6 +200,21 @@ export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+// Inbound activity API + account activity aggregates. One service behind the
+// REST route (apps/api) and the MCP tools (apps/mcp-server).
+export {
+  ingestActivities,
+  ingestContentHash,
+  ingestDedupeKey,
+  normalizeIngestDomain,
+  type IngestActivitiesInput,
+  type IngestActor,
+} from './services/activity-ingest.js';
+export {
+  bucketActivitySummary,
+  getCompanyActivitySummary,
+  weekStartIn,
+} from './services/account-activity.js';
 
 // Agreement ingest staging (slice 13a), shared by the REST route and MCP.
 export {
@@ -207,6 +223,25 @@ export {
   serializeIngestItem,
   stageAgreementIngest,
 } from './agreements/stage.js';
-export type { IngestActor, StageAgreementInput, StageAgreementResult } from './agreements/stage.js';
 export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
 export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
+export type {
+  IngestActor as AgreementIngestActor,
+  StageAgreementInput,
+  StageAgreementResult,
+} from './agreements/stage.js';
+// GDPR data subject export / erase and retention per data class (compliance pack).
+export * from './compliance/index.js';
+export {
+  countPartnerEngagements,
+  isInternalPartnerRow,
+  loadOrgFirmCatalog,
+  loadPartnerEvidenceRows,
+  loadPartnerRun,
+  ownedPartnerRowIds,
+  prunePartnerEvidence,
+  savePartnerEvidence,
+  scanInternalPartnerEvidence,
+  toPartnerEvidence,
+} from './consulting-partners.js';
+export type { PartnerEvidenceRow, PartnerSaveResult } from './consulting-partners.js';

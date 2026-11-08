@@ -1,9 +1,10 @@
-// Mobile navigation drawer — full-screen overlay that replaces the sidebar
-// on viewports below the md breakpoint. Opens via hamburger in the topbar
-// and closes on link selection, backdrop tap, or Escape.
+// Navigation drawer for viewports below 56rem, where the sidebar rail is
+// hidden. Opens from the topbar hamburger as an in-place drawer inside the
+// app shell (no body portal) and closes on link selection, backdrop tap, or
+// Escape. Focus moves in on open, Tab is trapped, and focus returns to the
+// element that opened it.
 
-import * as RadixDialog from '@radix-ui/react-dialog';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +13,7 @@ import { useUiStore } from '@/stores/ui';
 import { useAccountHistory } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useTaskSummary } from '@/hooks/useTasks';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
@@ -19,39 +21,137 @@ import { prefetchRoute } from '@/lib/prefetch';
 
 import { useAppModules } from '@/hooks/useAppModules';
 import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
+import { useIsWideShell } from './shellBreakpoint';
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function MobileNav() {
+  const wide = useIsWideShell();
   const open = useUiStore((s) => s.mobileNavOpen);
   const setOpen = useUiStore((s) => s.setMobileNavOpen);
 
-  // Lock body scroll while open.
+  // The drawer only exists below 56rem; widening the window past it closes
+  // a drawer left open so it cannot reappear when the window narrows again.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-      document.body.style.pointerEvents = 'auto';
+    if (!wide || !open) return;
+    setOpen(false);
+    // The drawer just unmounted with focus inside it; hand focus to the rail.
+    if (document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('.sb-toggle')?.focus();
     }
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.pointerEvents = 'auto';
-    };
+  }, [wide, open, setOpen]);
+
+  const close = useCallback(() => setOpen(false), [setOpen]);
+
+  if (wide) return null;
+  return <NavDrawer open={open} onClose={close} />;
+}
+
+function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const reduced = useReducedMotion();
+  const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
+  // Mount the nav on first open, then keep it so the slide-out has content.
+  const [mounted, setMounted] = useState(open);
+  if (open && !mounted) setMounted(true);
+
+  useEffect(() => {
+    const el = panel.current;
+    if (!el) return undefined;
+    if (open) {
+      wasOpen.current = true;
+      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      el.removeAttribute('inert');
+      el.focus();
+      document.body.style.overflow = 'hidden';
+      // aria-modal alone does not stop touch screen readers swiping into the
+      // page behind, so the drawer's shell siblings go inert while it is open.
+      const behind = Array.from(root.current?.parentElement?.children ?? []).filter(
+        (node): node is HTMLElement =>
+          node instanceof HTMLElement && node !== root.current && !node.hasAttribute('inert'),
+      );
+      for (const node of behind) node.setAttribute('inert', '');
+      return () => {
+        for (const node of behind) node.removeAttribute('inert');
+        document.body.style.overflow = '';
+      };
+    }
+    // Read focus before `inert` lands: inert blurs whatever it contains.
+    const focusWasInside = el.contains(document.activeElement) || document.activeElement === document.body;
+    el.setAttribute('inert', '');
+    if (wasOpen.current && focusWasInside) {
+      const target =
+        returnFocus.current?.isConnected === true
+          ? returnFocus.current
+          : document.querySelector<HTMLElement>('[aria-controls="mobile-nav-drawer"]');
+      target?.focus();
+    }
+    wasOpen.current = false;
+    returnFocus.current = null;
+    return undefined;
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  const trapTab = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    const root = panel.current;
+    if (event.key !== 'Tab' || !root) return;
+    const items = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE));
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!first || !last) {
+      event.preventDefault();
+      return;
+    }
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === root)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }, []);
+
   return (
-    <RadixDialog.Root open={open} onOpenChange={setOpen}>
-      <RadixDialog.Portal>
-        <RadixDialog.Overlay className="mobile-nav-backdrop" />
-        <RadixDialog.Content
-          aria-describedby={undefined}
-          id="mobile-nav-drawer"
-          className="mobile-nav-drawer"
-        >
-          <RadixDialog.Title className="sr-only">Primary navigation</RadixDialog.Title>
-          <MobileNavContent onClose={() => setOpen(false)} />
-        </RadixDialog.Content>
-      </RadixDialog.Portal>
-    </RadixDialog.Root>
+    <div
+      ref={root}
+      className="mobile-nav-root"
+      data-state={open ? 'open' : 'closed'}
+      data-motion={reduced ? 'instant' : 'animate'}
+    >
+      <button
+        type="button"
+        className="mobile-nav-backdrop"
+        aria-label="Close navigation"
+        tabIndex={-1}
+        onClick={onClose}
+      />
+      <div
+        ref={panel}
+        id="mobile-nav-drawer"
+        // Closed, it stays mounted for the slide-out; no dialog role then, so
+        // `[role="dialog"]` checks elsewhere never see a phantom open dialog.
+        role={open ? 'dialog' : undefined}
+        aria-modal={open ? true : undefined}
+        aria-label="Primary navigation"
+        tabIndex={-1}
+        data-state={open ? 'open' : 'closed'}
+        className="mobile-nav-drawer"
+        onKeyDown={trapTab}
+      >
+        {mounted ? <MobileNavContent onClose={onClose} /> : null}
+      </div>
+    </div>
   );
 }
 
@@ -90,7 +190,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
             </span>
           </div>
         </div>
-        <button type="button" onClick={onClose} className="iconbtn" aria-label="Close navigation">
+        <button type="button" onClick={onClose} className="iconbtn" aria-label={t('actions.close', 'Close')}>
           <Icon name="close" size={18} ariaHidden />
         </button>
       </div>
