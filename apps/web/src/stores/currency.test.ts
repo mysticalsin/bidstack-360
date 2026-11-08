@@ -658,6 +658,22 @@ describe('micros precision before formatting', () => {
     expect(cross.formatMoneyMicros(-100_000_000n, 'EUR', full)).toBe('-$110.00');
   });
 
+  it('does not print exact digits for an unsafe Number micros input through either hook', () => {
+    useCurrencyStore.setState({ currency: 'EUR', rates: null });
+    const format = renderHook(() => useFormatMoney()).result.current;
+    expect(format.formatMoneyMicros(-9223372036854775000, 'EUR', { compact: false })).toBe('—');
+    expect(format.formatMoneyMicros('-9223372036854775000', 'EUR', { compact: false })).toBe(
+      '-€9,223,372,036,854.78',
+    );
+    expect(format.formatMoneyMicros(-9007199254740991, 'EUR', { compact: false })).toBe(
+      '-€9,007,199,254.74',
+    );
+    const display = renderHook(() =>
+      useDisplayMoneyMicros(-9223372036854775000, 'EUR', { compact: false }),
+    );
+    expect(display.result.current).toBe('—');
+  });
+
   it('keeps the formatter exact when called directly past Number.MAX_SAFE_INTEGER units', () => {
     expect(
       formatMoneyMicros(HUGE_MICROS.toString(), 'EUR', { compact: false, locale: 'en-US' }),

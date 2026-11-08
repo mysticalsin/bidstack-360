@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   formatStage,
@@ -84,6 +84,110 @@ describe('formatMoneyMicros exact digits', () => {
     expect(formatMoneyMicrosFull(9007199254740993000000n, 'EUR', 'en-US')).toBe(
       '€9,007,199,254,740,993.00',
     );
+  });
+
+  it('renders the int8 minimum and its neighbours from exact input', () => {
+    expect(full(-9223372036854775808n, 'EUR')).toBe('-€9,223,372,036,854.78');
+    expect(full('-9223372036854775000', 'EUR')).toBe('-€9,223,372,036,854.78');
+    expect(full('-9223372036854774999', 'EUR')).toBe('-€9,223,372,036,854.77');
+  });
+
+  it('keeps the minus sign on tiny negatives that round to zero cents', () => {
+    expect(full(-1n, 'EUR')).toBe('-€0.00');
+    expect(full(-4999n, 'EUR')).toBe('-€0.00');
+    expect(full(-5000n, 'EUR')).toBe('-€0.01');
+  });
+});
+
+describe('formatMoneyMicros Number input', () => {
+  const full = (micros: number, currency = 'EUR') =>
+    formatMoneyMicros(micros, currency, { compact: false, locale: 'en-US' });
+
+  it('formats safe integer Numbers exactly', () => {
+    expect(full(9007199254740991)).toBe('€9,007,199,254.74');
+    expect(full(-9007199254740991)).toBe('-€9,007,199,254.74');
+    expect(full(1_005_000)).toBe('€1.01');
+    expect(full(-5000)).toBe('-€0.01');
+  });
+
+  it('refuses exact digits for a Number that is no longer the intended integer', () => {
+    // -9223372036854775000 as a Number is -9223372036854774784, which would
+    // print .77 instead of the intended .78.
+    expect(full(-9223372036854775000)).toBe('—');
+    expect(full(9007199254740992)).toBe('—');
+    expect(full(Number.NaN)).toBe('—');
+    expect(full(Number.POSITIVE_INFINITY)).toBe('—');
+  });
+
+  it('still shows compact figures for large Numbers, where rounding is the display contract', () => {
+    expect(formatMoneyMicros(-9223372036854775000, 'EUR', { locale: 'en-US' })).toBe('-€9.2T');
+  });
+});
+
+// Engines before Intl.NumberFormat v3 coerce a string to Number without
+// throwing. This simulates that coercion in Node; it is not an old browser.
+describe('formatMoneyMicros on an Intl that coerces decimal strings', () => {
+  const RealNumberFormat = Intl.NumberFormat;
+  class CoercingNumberFormat {
+    private readonly inner: Intl.NumberFormat;
+    constructor(locale?: string | string[], options?: Intl.NumberFormatOptions) {
+      this.inner = new RealNumberFormat(locale, options);
+    }
+    format(value: number | bigint | string): string {
+      return this.inner.format(typeof value === 'string' ? Number(value) : value);
+    }
+    resolvedOptions() {
+      return this.inner.resolvedOptions();
+    }
+  }
+
+  async function legacyFormat() {
+    vi.resetModules();
+    vi.stubGlobal('Intl', Object.create(Intl, { NumberFormat: { value: CoercingNumberFormat } }));
+    return import('./format.js');
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('is a lossy simulation (negative control for the capability check)', async () => {
+    await legacyFormat();
+    const nf = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 2,
+    });
+    expect(nf.format('9007199254740993.000000')).toBe('€9,007,199,254,740,992.00');
+    expect(nf.format('9223372036854.774999')).toBe('€9,223,372,036,854.78');
+  });
+
+  it('keeps exact cents inside the int8 range', async () => {
+    const legacy = await legacyFormat();
+    const full = (m: bigint | string) =>
+      legacy.formatMoneyMicros(m, 'EUR', { compact: false, locale: 'en-US' });
+    expect(full(9223372036854774999n)).toBe('€9,223,372,036,854.77');
+    expect(full(-9223372036854774999n)).toBe('-€9,223,372,036,854.77');
+    expect(full(-9223372036854775808n)).toBe('-€9,223,372,036,854.78');
+    expect(full(1099511627776005000n)).toBe('€1,099,511,627,776.01');
+    expect(full('1005000')).toBe('€1.01');
+    expect(full(0n)).toBe('€0.00');
+  });
+
+  it('shows an em dash rather than digits it cannot render exactly', async () => {
+    const legacy = await legacyFormat();
+    expect(
+      legacy.formatMoneyMicros(9007199254740993000000n, 'EUR', { compact: false, locale: 'en-US' }),
+    ).toBe('—');
+    expect(legacy.formatMoneyMicros(9007199254740993000000n, 'EUR', { locale: 'en-US' })).toBe('—');
+    expect(legacy.formatMoneyMicros(-9223372036854775000, 'EUR', { locale: 'en-US' })).toBe('—');
+  });
+
+  it('renders compact amounts as exact full amounts instead of rounding a Number', async () => {
+    const legacy = await legacyFormat();
+    expect(legacy.formatMoneyMicros(1_234_000_000n, 'USD', { locale: 'en-US' })).toBe('$1,234.00');
+    expect(legacy.formatMoneyMicros(999_990_000n, 'USD', { locale: 'en-US' })).toBe('$999.99');
   });
 });
 

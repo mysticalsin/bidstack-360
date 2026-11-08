@@ -80,16 +80,67 @@ export function formatStage(stage: string): string {
     .join(' ');
 }
 
+const MAX_SAFE_MICROS = BigInt(Number.MAX_SAFE_INTEGER);
+// A decimal with at most 15 significant digits survives a Number round trip.
+const NUMBER_EXACT_DIGITS = 15;
+let decimalStringsExact: boolean | undefined;
+
+// Engines before Intl.NumberFormat v3 coerce a string argument to Number
+// without throwing, so exactness is probed instead of caught.
+function intlFormatsDecimalStringsExactly(): boolean {
+  if (decimalStringsExact === undefined) {
+    try {
+      const probe = new Intl.NumberFormat('en-US', {
+        useGrouping: false,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      decimalStringsExact =
+        probe.format('9007199254740993' as `${number}`) === '9007199254740993.00' &&
+        probe.format('1.004999999999999999' as `${number}`) === '1.00';
+    } catch {
+      decimalStringsExact = false;
+    }
+  }
+  return decimalStringsExact;
+}
+
+// Rounds half away from zero with BigInt, then hands Intl a Number that
+// already has its final digits. Returns null when that Number could not
+// hold them.
+function formatPreRounded(
+  negative: boolean,
+  magnitude: bigint,
+  format: Intl.NumberFormat,
+): string | null {
+  const fractionDigits = Math.min(format.resolvedOptions().maximumFractionDigits ?? 2, 6);
+  const step = BigInt(10) ** BigInt(6 - fractionDigits);
+  let scaled = magnitude / step;
+  if ((magnitude % step) * BigInt(2) >= step) scaled += BigInt(1);
+  if (scaled.toString().length > NUMBER_EXACT_DIGITS) return null;
+  const unit = BigInt(10) ** BigInt(fractionDigits);
+  const fraction = (scaled % unit).toString().padStart(fractionDigits, '0');
+  const text = `${negative ? '-' : ''}${scaled / unit}${fractionDigits ? `.${fraction}` : ''}`;
+  return format.format(Number(text));
+}
+
 /**
  * Format a money amount carried on the wire as integer micros (string).
  * Compacts ≥ 1M as `$1.2M`, ≥ 1k as `$12k`, otherwise full currency.
  * The string-encoded micros preserve BigInt precision over JSON.
+ *
+ * Exact digits need string or bigint micros. A Number past
+ * Number.MAX_SAFE_INTEGER has already lost digits, so it only renders in
+ * compact notation. Without Intl decimal-string support, compact requests
+ * render the exact full amount. Anything that cannot be shown exactly
+ * returns an em dash.
  */
 export function formatMoneyMicros(
   micros: string | number | bigint,
   currency?: string,
   options: { compact?: boolean; locale?: string } = {},
 ): string {
+  if (typeof micros === 'number' && !Number.isFinite(micros)) return '—';
   const resolvedCurrency = currency ?? detectCurrency();
   const resolvedLocale = options.locale ?? detectLocale();
   const asBigInt =
@@ -101,17 +152,26 @@ export function formatMoneyMicros(
   const million = BigInt(1_000_000);
   const negative = asBigInt < BigInt(0);
   const magnitude = negative ? -asBigInt : asBigInt;
-  // Intl rounds a decimal string exactly; a Number cannot hold 6 fraction
-  // digits past ~1e9 units, so cents and whole units would drift.
+  const compact = options.compact ?? magnitude >= BigInt(1000) * million;
+  const roundedNumber = typeof micros === 'number' && magnitude > MAX_SAFE_MICROS;
+  const exactIntl = intlFormatsDecimalStringsExactly();
+  if (roundedNumber && !(compact && exactIntl)) return '—';
+  const standard = (): Intl.NumberFormat =>
+    new Intl.NumberFormat(resolvedLocale, {
+      style: 'currency',
+      currency: resolvedCurrency,
+      maximumFractionDigits: 2,
+    });
+  if (!exactIntl) return formatPreRounded(negative, magnitude, standard()) ?? '—';
   const exact = `${negative ? '-' : ''}${magnitude / million}.${(magnitude % million)
     .toString()
     .padStart(6, '0')}` as `${number}`;
-  const compact = options.compact ?? magnitude >= BigInt(1000) * million;
+  if (!compact) return standard().format(exact);
   return new Intl.NumberFormat(resolvedLocale, {
     style: 'currency',
     currency: resolvedCurrency,
-    notation: compact ? 'compact' : 'standard',
-    maximumFractionDigits: compact ? 1 : 2,
+    notation: 'compact',
+    maximumFractionDigits: 1,
   }).format(exact);
 }
 

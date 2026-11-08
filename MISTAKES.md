@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-08 BUG: exact money display assumed Intl decimal strings and safe Number input
+
+- **What went wrong:** The exact-digit fix passed a decimal string to Intl and documented that older engines give "the old output". They coerce the string to a Number without throwing, and the output can differ from the parent. Integer Numbers past `Number.MAX_SAFE_INTEGER` were also accepted as if exact: `-9223372036854775000` printed `.77` instead of `.78`.
+- **Root cause:** A capability was treated as guaranteed because the local Node had it, and input provenance was not checked.
+- **Prevention rule:** Probe an Intl capability whose absence is silent; never rely on catch. Render exact digits only from string or bigint micros, or a safe integer Number.
+- **Files affected:** `apps/web/src/lib/format.ts`, `apps/web/src/hooks/useFormatMoney.ts`, `apps/web/src/lib/format.test.ts`, `apps/web/src/stores/currency.test.ts`, `docs/solutions/display-micros-safe-integer.md`.
+
+---
+
 ### 2026-11-08 BUG: `formatMoneyMicros` rendered a Number, not the stored micros
 
 - **What went wrong:** The hook fix passed exact micros to `formatMoneyMicros`, which then computed `Number(whole) + Number(remainder) / 1e6` before Intl. `9007199254740993000000n` rendered `€9,007,199,254,740,992.00`, and inside the int8 column range `9223372036854774999n` rendered `.78` instead of `.77`.

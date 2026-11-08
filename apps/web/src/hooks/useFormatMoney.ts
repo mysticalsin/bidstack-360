@@ -84,8 +84,8 @@ function crossRateMicros(
  * Show micros in the display currency only when that label is honest.
  * Same currency and an exact 1:1 rate quote pass the stored integer through.
  * The parent hook always rebuilt micros with `amount * 1e6`, which changes
- * integers Number cannot store. formatMoneyMicros may still round what it
- * renders; the string it receives is the contract this function keeps.
+ * integers Number cannot store. Number input is passed on as a Number so
+ * formatMoneyMicros can refuse exact digits for an unsafe integer.
  */
 export function formatConvertedMicros(
   micros: string | number | bigint,
@@ -97,9 +97,10 @@ export function formatConvertedMicros(
   return contained(() => {
     const stored = parseMicros(micros);
     if (stored == null) return '—';
+    const unchanged = typeof micros === 'number' ? micros : stored.toString();
     const relation = rateRelation(sourceCurrency, displayCurrency, rates);
     if (relation === 'same' || relation === 'parity') {
-      return formatMoneyMicros(stored.toString(), displayCurrency, options);
+      return formatMoneyMicros(unchanged, displayCurrency, options);
     }
     if (relation === 'cross') {
       const converted = crossRateMicros(stored, sourceCurrency, displayCurrency, rates);
@@ -107,7 +108,7 @@ export function formatConvertedMicros(
         return formatMoneyMicros(converted.toString(), displayCurrency, options);
       }
     }
-    return formatMoneyMicros(stored.toString(), sourceCurrency, options);
+    return formatMoneyMicros(unchanged, sourceCurrency, options);
   });
 }
 
