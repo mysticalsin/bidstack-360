@@ -154,3 +154,20 @@ describe('bucketActivitySummary', () => {
     expect(summary.overdue.oldestDueAt).toBe('2026-06-01T09:00:00.000Z');
   });
 });
+
+describe('bucketActivitySummary task deadlines', () => {
+  // Task.dueDate is a Postgres date read back as midnight UTC. Converting it to
+  // Toronto time moved a Monday deadline into the previous week.
+  it('keeps a date-only deadline on its calendar week in a negative-offset zone', () => {
+    const out = bucketActivitySummary({
+      now: new Date('2026-11-12T15:00:00Z'),
+      tz: 'America/Toronto',
+      weeks: 4,
+      activities: [],
+      overdue: [{ dueAt: new Date('2026-11-02T00:00:00Z'), dateOnly: true }],
+    });
+    const byWeek = Object.fromEntries(out.weekly.map((w) => [w.weekStart, w.overdue]));
+    expect(byWeek['2026-11-02']).toBe(1);
+    expect(byWeek['2026-10-26']).toBe(0);
+  });
+});

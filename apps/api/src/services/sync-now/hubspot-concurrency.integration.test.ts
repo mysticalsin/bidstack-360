@@ -9,7 +9,7 @@ import { createIsolatedOrg, dropIsolatedOrg } from '../../test-support/isolated-
 import { startHubspotSync } from './hubspot.js';
 import { SyncUnavailableError } from './errors.js';
 
-const importCalls = vi.hoisted(() => ({ count: 0 }));
+const importCalls = vi.hoisted(() => ({ count: 0, entities: [] as string[] }));
 
 // The real import awaits the HubSpot connection and the connector policy
 // before it writes its first MigrationJob; the delay reproduces that window.
@@ -18,8 +18,14 @@ vi.mock('../hubspot-import.js', async (importOriginal) => {
   const { prisma: db } = await import('@bidstack/db');
   return {
     ...actual,
-    startHubspotImport: async (input: { orgId: string; userId: string; syncRunId?: string }) => {
+    startHubspotImport: async (input: {
+      orgId: string;
+      userId: string;
+      entities: readonly string[];
+      syncRunId?: string;
+    }) => {
       importCalls.count += 1;
+      importCalls.entities = [...input.entities];
       await new Promise((resolve) => setTimeout(resolve, 300));
       return [
         await db.migrationJob.create({
@@ -61,6 +67,9 @@ describe('HubSpot sync now start guard', () => {
     ]);
 
     expect(importCalls.count).toBe(1);
+    // The migration worker cannot import HubSpot tasks and fails that job,
+    // which would fail the whole run.
+    expect(importCalls.entities).toEqual(['companies', 'contacts', 'deals']);
     const jobs = await prisma.migrationJob.count({
       where: { orgId, source: 'HUBSPOT_OAUTH', status: 'RUNNING' },
     });

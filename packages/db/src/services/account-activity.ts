@@ -92,8 +92,9 @@ export interface BucketInput {
   tz: string;
   weeks: number;
   activities: SummaryActivity[];
-  /** Follow-ups already known to be overdue (due before `now`). */
-  overdue: Array<{ dueAt: Date }>;
+  /** Follow-ups already known to be overdue (due before `now`). `dateOnly`
+   *  marks a calendar date (Task.dueDate, midnight UTC), not an instant. */
+  overdue: Array<{ dueAt: Date; dateOnly?: boolean }>;
 }
 
 export function bucketActivitySummary(
@@ -124,7 +125,7 @@ export function bucketActivitySummary(
 
   let oldest: Date | null = null;
   for (const o of input.overdue) {
-    const week = weekly.get(weekStartIn(o.dueAt, tz));
+    const week = weekly.get(weekStartIn(o.dueAt, o.dateOnly ? 'UTC' : tz));
     if (week) week.overdue += 1;
     if (!oldest || o.dueAt < oldest) oldest = o.dueAt;
   }
@@ -226,7 +227,7 @@ export async function getCompanyActivitySummary(input: {
 
   const overdue = [
     ...plannedOverdue.flatMap((a) => (a.startTime ? [{ dueAt: a.startTime }] : [])),
-    ...tasksOverdue.flatMap((t) => (t.dueDate ? [{ dueAt: t.dueDate }] : [])),
+    ...tasksOverdue.flatMap((t) => (t.dueDate ? [{ dueAt: t.dueDate, dateOnly: true }] : [])),
   ];
 
   return {

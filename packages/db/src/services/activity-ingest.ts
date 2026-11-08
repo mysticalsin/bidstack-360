@@ -71,7 +71,7 @@ type OpportunityHit = { id: string; companyId: string | null } | null;
 /** Per-batch lookup cache so 500 rows on one account cost one query. */
 function memo<T>() {
   const map = new Map<string, Promise<T>>();
-  return (key: string, load: () => Promise<T>): Promise<T> => {
+  const get = (key: string, load: () => Promise<T>): Promise<T> => {
     let hit = map.get(key);
     if (!hit) {
       hit = load();
@@ -79,6 +79,7 @@ function memo<T>() {
     }
     return hit;
   };
+  return Object.assign(get, { forget: (key: string) => map.delete(key) });
 }
 
 async function learnLink(
@@ -321,6 +322,13 @@ export async function ingestActivities(
       skip(index, item, 'company_mismatch');
       continue;
     }
+    // The row lands on the opportunity, so a scoped key needs the opportunity's
+    // own account in its allowlist; an allowed company ref cannot vouch for an
+    // opportunity with no account.
+    if (scope && opportunity && (!opportunity.companyId || !scope.includes(opportunity.companyId))) {
+      skip(index, item, 'out_of_scope');
+      continue;
+    }
     if (!company && opportunity?.companyId) company = { id: opportunity.companyId };
     if (!company && !opportunity) {
       skip(index, item, notFound('company_not_found'));
@@ -367,6 +375,8 @@ export async function ingestActivities(
     const ref = { index, externalSource: item.externalSource, externalId: item.externalId };
     for (const link of pendingLinks) {
       await learnLink(orgId, source, link.entityType, link.externalId, link.entityId);
+      // A miss cached earlier in this batch would hide the link just learned.
+      linked.forget(`${link.entityType}\u0000${source}\u0000${link.externalId}`);
     }
 
     const existing = await prisma.activity.findFirst({

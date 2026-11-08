@@ -42,17 +42,22 @@ export function useSyncNow(source: SyncSource, pollMs = DEFAULT_POLL_MS) {
     },
   });
 
+  // After a reload only the overview knows about a run still in flight; poll
+  // it too, or the control stays on "Syncing" after the backend finishes.
+  const lastRun = overview.data?.lastRun ?? undefined;
+  const pollId = runId ?? (lastRun && !finished(lastRun) ? lastRun.runId : null);
+
   const run = useQuery<SyncRun>({
-    queryKey: ['sync-now', source, 'run', runId],
-    queryFn: () => api(`/api/sync-now/${source}/runs/${runId}`),
-    enabled: runId !== null,
+    queryKey: ['sync-now', source, 'run', pollId],
+    queryFn: () => api(`/api/sync-now/${source}/runs/${pollId}`),
+    enabled: pollId !== null,
     refetchInterval: (query) => (finished(query.state.data) ? false : pollMs),
   });
 
-  const current = run.data ?? overview.data?.lastRun ?? undefined;
-  const busy = start.isPending || (runId !== null && !finished(run.data));
+  const current = run.data ?? lastRun;
+  const busy = start.isPending || (pollId !== null && !finished(run.data));
 
-  const done = runId !== null && finished(run.data);
+  const done = pollId !== null && finished(run.data);
   useEffect(() => {
     if (done) void qc.invalidateQueries({ queryKey: ['sync-now', source, 'overview'] });
   }, [done, qc, source]);

@@ -6,7 +6,7 @@ import { prisma } from '@bidstack/db';
 import { MIGRATION, type SyncOverview, type SyncRun } from '@bidstack/shared';
 
 import {
-  HUBSPOT_IMPORT_ENTITIES,
+  HUBSPOT_SYNC_ENTITIES,
   HubspotNotConnectedError,
   startHubspotImport,
 } from '../hubspot-import.js';
@@ -98,7 +98,7 @@ export async function startHubspotSync(input: StartSyncInput): Promise<SyncRun> 
         await startHubspotImport({
           orgId: input.orgId,
           userId: input.userId,
-          entities: HUBSPOT_IMPORT_ENTITIES,
+          entities: HUBSPOT_SYNC_ENTITIES,
           dedupStrategy: 'update',
           queue: migrationQueue(),
           syncRunId: runId,
