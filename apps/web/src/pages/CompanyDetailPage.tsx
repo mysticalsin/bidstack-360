@@ -240,7 +240,7 @@ export function CompanyDetailPage() {
           )}
           <AccountActivityCharts companyId={c.id} />
           <AccountTeamCard companyId={c.id} />
-          <AccountConversations companyId={c.id} />
+          <AccountConversations companyId={c.id} companyName={c.name} />
 
           <CompanyTechStackSection companyId={c.id} />
           <ConsultingPartnersSection companyId={c.id} />

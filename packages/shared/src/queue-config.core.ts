@@ -277,6 +277,26 @@ export interface AccountActivityAlertJob {
   excludeUserIds: string[];
 }
 
+/**
+ * Teams chat sync (slice 26): a 10-minute fanout plus one job per Microsoft
+ * grant that has chats linked with "keep syncing". Read-only Graph pulls.
+ */
+export const TEAMS_CHAT_SYNC: QueueConfig = {
+  name: 'teams-chat-sync',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { age: 86_400, count: 1000 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+export interface TeamsChatSyncJob {
+  orgId: string;
+  userId: string;
+  integrationTokenId: string;
+}
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;

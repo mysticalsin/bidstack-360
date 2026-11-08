@@ -15,6 +15,7 @@ export const ActivityType = z.enum([
   'cadence_started',
   'cadence_completed',
   'custom',
+  'teams_message',
 ]);
 export const ActivityStatus = z.enum(['planned', 'completed', 'cancelled']);
 export const ActivityActorType = z.enum(['user', 'system', 'agent']);

@@ -1,5 +1,5 @@
-import { CalendarDays, Mail, MessagesSquare, Video } from 'lucide-react';
-import { useId } from 'react';
+import { CalendarDays, Mail, MessageSquare, MessagesSquare, Video } from 'lucide-react';
+import { useId, useState } from 'react';
 
 import type { AccountConversation } from '@bidstack/shared';
 
@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useAccountConversations, useRefileMeeting } from '@/hooks/useAccountConversations';
 import { useHasPermission } from '@/hooks/useCapabilities';
+
+import { OpenInTeamsLink, TeamsImportSheet } from './TeamsImportSheet';
 
 const COMPANY_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACCOUNT_ONLY = '';
@@ -30,7 +32,14 @@ const when = (iso: string) =>
   });
 
 function RowIcon({ item }: { item: AccountConversation }) {
-  const Glyph = item.type === 'email' ? Mail : item.channel === 'teams' ? Video : CalendarDays;
+  const Glyph =
+    item.type === 'teams_message'
+      ? MessageSquare
+      : item.type === 'email'
+        ? Mail
+        : item.channel === 'teams'
+          ? Video
+          : CalendarDays;
   return (
     <span aria-hidden="true" className="mt-0.5 shrink-0 text-[var(--fg-tertiary)]">
       <Glyph size={16} />
@@ -96,6 +105,7 @@ function Row({
   const cancelled = item.status === 'cancelled';
   const facts = [
     when(item.occurredAt),
+    ...(item.author ? [item.author] : []),
     `${item.participantCount} ${item.participantCount === 1 ? 'person' : 'people'}`,
     ...(item.direction ? [item.direction === 'inbound' ? 'Received' : 'Sent'] : []),
   ];
@@ -127,6 +137,7 @@ function Row({
             </span>
           )}
           <RefileSelect item={item} companyId={companyId} options={options} />
+          {item.type === 'teams_message' && item.webUrl && <OpenInTeamsLink href={item.webUrl} />}
         </div>
       </div>
     </li>
@@ -138,8 +149,10 @@ function Row({
  * connected Outlook and Google calendars and mailboxes; the chip on each row
  * names the source.
  */
-export function AccountConversations({ companyId }: { companyId: string }) {
+export function AccountConversations({ companyId, companyName }: { companyId: string; companyName?: string }) {
   const canRead = useHasPermission('activities:read');
+  const canWrite = useHasPermission('activities:write');
+  const [teamsOpen, setTeamsOpen] = useState(false);
   const eligible = canRead && COMPANY_ID_RE.test(companyId);
   const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAccountConversations(eligible ? companyId : undefined);
@@ -155,13 +168,26 @@ export function AccountConversations({ companyId }: { companyId: string }) {
         <span aria-hidden="true" className="text-[var(--fg-tertiary)]">
           <MessagesSquare size={16} />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-[var(--fg-primary)]">Conversations</h2>
           <p className="truncate text-xs text-[var(--fg-tertiary)]">
             From your connected Outlook and Google calendars and mailboxes
           </p>
         </div>
+        {canWrite && (
+          <Button variant="secondary" size="sm" className="shrink-0" onClick={() => setTeamsOpen(true)}>
+            Import from Teams
+          </Button>
+        )}
       </div>
+      {canWrite && teamsOpen && (
+        <TeamsImportSheet
+          companyId={companyId}
+          companyName={companyName ?? 'this account'}
+          open={teamsOpen}
+          onOpenChange={setTeamsOpen}
+        />
+      )}
       <div className="px-4">
         {isLoading ? (
           <div className="py-4">

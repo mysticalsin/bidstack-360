@@ -53,6 +53,26 @@ function captureOf(metadata: unknown): CommsCaptureMeta | null {
   return CommsSource.safeParse((meta as { source?: unknown }).source).success ? (meta as CommsCaptureMeta) : null;
 }
 
+/** Teams fields on a filed Teams message; the link must be an https Teams URL. */
+function teamsOf(capture: CommsCaptureMeta | null): { webUrl: string | null; authorName: string | null } | null {
+  const teams = (capture as { teams?: { webUrl?: unknown; authorName?: unknown } } | null)?.teams;
+  if (!teams || typeof teams !== 'object') return null;
+  const url = typeof teams.webUrl === 'string' ? teams.webUrl : null;
+  let webUrl: string | null = null;
+  if (url) {
+    try {
+      const host = new URL(url).hostname;
+      const teamsHost = ['teams.microsoft.com', 'teams.cloud.microsoft'].some((h) => host === h || host.endsWith(`.${h}`));
+      if (url.startsWith('https://') && teamsHost) {
+        webUrl = url;
+      }
+    } catch {
+      webUrl = null;
+    }
+  }
+  return { webUrl, authorName: typeof teams.authorName === 'string' ? teams.authorName : null };
+}
+
 function ingestSourceOf(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== 'object') return null;
   const source = (metadata as { externalSource?: unknown }).externalSource;
@@ -102,7 +122,7 @@ export function buildConversationIdQuery(input: {
     FROM activities
     WHERE org_id = ${input.orgId}::uuid
       AND deleted_at IS NULL
-      AND type::text IN ('meeting', 'email')
+      AND type::text IN ('meeting', 'email', 'teams_message')
       AND (${Prisma.join(entities, ' OR ')})
       ${cursorSql}
     ORDER BY ${orderInstant()} DESC, id DESC
@@ -194,10 +214,13 @@ export async function listAccountConversations(input: {
             : 'completed';
     const bodyDirection = (row.body as { direction?: unknown } | null)?.direction;
     const opportunityId = row.entityType === 'opportunity' ? row.entityId : null;
+    const teams = teamsOf(capture);
     return {
       id: row.id,
-      type: row.type as 'meeting' | 'email',
-      subject: row.subject?.trim() || (row.type === 'meeting' ? '(No title)' : '(No subject)'),
+      type: row.type as 'meeting' | 'email' | 'teams_message',
+      subject:
+        row.subject?.trim() ||
+        (row.type === 'meeting' ? '(No title)' : row.type === 'teams_message' ? 'Teams chat' : '(No subject)'),
       occurredAt: occurredAt.toISOString(),
       endAt: row.endTime?.toISOString() ?? null,
       status,
@@ -211,8 +234,13 @@ export async function listAccountConversations(input: {
       filing: capture ? (capture.filedManually ? 'manual' : 'automatic') : null,
       needsOpportunity: Boolean(capture?.needsOpportunity) && !opportunityId,
       opportunity: opportunityId ? { id: opportunityId, name: oppName.get(opportunityId) ?? 'Opportunity' } : null,
-      sourceRecord: capture ? { kind: capture.sourceType, id: capture.sourceId } : null,
+      sourceRecord:
+        capture && (capture.sourceType === 'calendar_event' || capture.sourceType === 'email_message')
+          ? { kind: capture.sourceType, id: capture.sourceId }
+          : null,
       canRefile: capture?.sourceType === 'calendar_event' && capture.ownerUserId === input.viewerUserId,
+      webUrl: teams?.webUrl ?? null,
+      author: teams?.authorName ?? null,
     };
   });
 

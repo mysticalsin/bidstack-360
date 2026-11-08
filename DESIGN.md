@@ -790,6 +790,22 @@ Synced Outlook, Teams and Gmail meetings and emails filed to the account, shown 
 - Cancelled meetings stay in the list with a "Cancelled" tag and struck subject.
 - Empty: one line, "No synced meetings or emails yet." Error: one line plus Retry. Loading: skeleton rows.
 - Tokens: `--fg-*`, `--border-subtle`, `--brand-primary`; `Badge` for chips; both themes; nothing overlaps at 1440, 1024 or 390.
+### 9.12 Teams chats on the account page (slice 26)
+
+A person files Teams messages they choose onto an account. Read-only: Polo reads the chats the signed-in user is in through Microsoft Graph and never posts to Teams.
+
+- Entry: a secondary "Import from Teams" button in the Conversations card header (needs `activities:write`). It opens a right-hand `Sheet` (size `lg`, full width below `sm`) titled "Import from Teams", description "Pick messages to file to {account}. Polo only reads your chats.".
+- Consent first. The sheet asks the API for Teams access before listing anything:
+  - Not connected to Microsoft 365: one line "Connect Microsoft 365 to import Teams chats." plus a primary "Connect Microsoft 365" button.
+  - Connected without `Chat.Read`: an amber notice "Polo needs permission to read your Teams chats. Reconnect Microsoft 365 and accept the Teams permission." plus a primary "Reconnect with Teams access" button. Same notice when a Graph call returns 403 later, so a missing permission never fails silently.
+  - Channel threads need `ChannelMessage.Read.All`, which an admin grants. When the server is not set up for it, the Channels tab shows "Channel threads need an admin to approve Teams channel access." and no list.
+- Step 1, pick a conversation: `Tabs` "Chats" and "Channels". Chats: recent chats, newest activity first, each row shows the chat name (topic, else member names), member count and last activity time. Channels: team name, then channel name, then recent threads (first line of the root message). Search box filters the loaded list by name. Loading: skeleton rows. Empty: "No recent chats." Error: one line plus Retry.
+- Step 2, pick messages: a "Back" link, the chat name, and messages oldest to newest with a checkbox each (author, time, a two-line plain-text preview, attachment names as small chips with a `Paperclip` icon, never their content). "Select all" toggles every loaded message. System messages (member added, call ended) are not listed. Messages already filed show a "Filed" tag and stay unchecked.
+- Account: a select labelled "File to", defaulting to the account the sheet was opened from. Under it, a suggestion line when the participants match another account: "Participants match {name} ({reason})" with a "Use {name}" text button. Reasons: "contact jane@acme.com" or "domain acme.com". When the current account is the match, the line reads "Participants match this account".
+- Keep syncing: a switch "Keep filing new messages from this chat to {account}". When on, the worker files new messages every 10 minutes. Linked chats show in a "Synced chats" list at the top of step 1 with the account name and a "Stop syncing" button.
+- Footer: secondary "Cancel", primary "File {n} messages" (disabled at 0). On success a toast "Filed {n} messages to {account}" and the Conversations list refreshes. Partial results name what was skipped ("2 already filed").
+- Conversations list: Teams messages render with the `MessageSquare` icon and the `Teams` chip, subject is the chat name, the facts line adds author. Each Teams row has an "Open in Teams" link (`ExternalLink` icon, opens the Graph `webUrl` in a new tab, `rel="noopener noreferrer"`).
+- Tokens: `--fg-*`, `--border-subtle`, `--surface-sunken` for message rows, `--brand-primary` focus ring; `Badge` for chips; 44px coarse-pointer targets for checkboxes and buttons; both themes; nothing overlaps at 1440, 1024 or 390.
 ### 9.11 Company intel on the Companies page (slice 14)
 
 Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.

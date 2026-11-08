@@ -88,7 +88,12 @@ export function microsoftTenant(): string {
  * without touching an active grant: a cancelled reconnect leaves the
  * existing connection working.
  */
-export async function buildConnectUrl(provider: WorkspaceProvider, orgId: string, userId: string): Promise<string> {
+export async function buildConnectUrl(
+  provider: WorkspaceProvider,
+  orgId: string,
+  userId: string,
+  opts: { extraScopes?: readonly string[] } = {},
+): Promise<string> {
   if (!isWorkspaceConfigured(provider)) {
     throw new WorkspaceNotConfiguredError(
       provider === 'google' ? 'Google Workspace is not configured on this server.' : 'Microsoft 365 is not configured on this server.',
@@ -126,7 +131,7 @@ export async function buildConnectUrl(provider: WorkspaceProvider, orgId: string
     });
   }
 
-  const scope = WORKSPACE_READ_SCOPES[provider].join(' ');
+  const scope = [...new Set([...WORKSPACE_READ_SCOPES[provider], ...(opts.extraScopes ?? [])])].join(' ');
   if (provider === 'google') {
     const params = new URLSearchParams({
       client_id: googleClientId() ?? '',
