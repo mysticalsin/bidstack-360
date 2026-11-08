@@ -151,7 +151,7 @@ export const KeyNumber = z.object({
 });
 export type KeyNumber = z.infer<typeof KeyNumber>;
 
-export const AccountKeyNumbers = z.object({ companyId: z.string(), items: z.array(KeyNumber), computedAt: Iso });
+export const AccountKeyNumbers = z.object({ companyId: z.string(), companyName: z.string().optional(), items: z.array(KeyNumber), computedAt: Iso });
 export type AccountKeyNumbers = z.infer<typeof AccountKeyNumbers>;
 
 // ── people ──────────────────────────────────────────────────────────────────

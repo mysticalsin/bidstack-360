@@ -398,6 +398,6 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
       ? base({ id: 'sentiment', group: 'health', label: 'News sentiment', unit: 'sentiment', value: Math.round(sNow * 100) / 100, delta: sPrev != null ? Math.round((sNow - sPrev) * 100) / 100 : null, deltaUnit: 'abs', sub: `${recent.length} scored item${recent.length === 1 ? '' : 's'}`, source: [...new Set(news.map((n) => sourceLabel(n.source)))].slice(0, 3).join(', '), period: 'Last 90 days vs the 90 before, scale -1 to +1', anchor: 'watchdog', sample: news.filter((n) => n.occurredAt >= d90).every((n) => n.sample) })
       : base({ id: 'sentiment', group: 'health', label: 'News sentiment', unit: 'sentiment', source: 'News watchdog', period: 'Last 90 days', missing: 'No scored news in 90 days', anchor: 'watchdog' }),
   );
-  return { companyId, items, computedAt: now.toISOString() };
+  return { companyId, companyName: company.name, items, computedAt: now.toISOString() };
 }
 
