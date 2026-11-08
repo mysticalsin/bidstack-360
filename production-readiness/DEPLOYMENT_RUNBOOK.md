@@ -190,6 +190,8 @@ Never run plain `pnpm db:seed` against production (fixture workspace).
 
 Boot order is enforced by `depends_on`: postgres + redis healthy -> migrate completed -> api -> (web waits on api healthy). Worker and mcp-server also wait on migrate.
 
+**Webhook rollout order (rolling deploys): worker before api.** The api enqueues deliveries with the `webhook-endpoint` backoff type and writes targeted replay rows to the outbox. An older worker has neither the custom backoff strategy (BullMQ fails the job with "Unknown backoff strategy") nor the `subscription_id` filter on the relay (a replay would fan out to every matching endpoint in the org). Roll the worker out fully, then the api.
+
 Build a single service image (Azure/registry path), e.g.:
 
 ```bash
