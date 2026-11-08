@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { unitsToMicros } from '@bidstack/shared';
+import { formatMicrosAmount, unitsToMicros } from '@bidstack/shared';
 
 import {
   formatExactUnspecified,
@@ -13,6 +13,26 @@ import { useCurrencyStore } from '@/stores/currency';
 import { formatConvertedMicros, formatMoney, formatMoneyMicros } from '@/lib/format';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
+
+function formatPlainMoney(value: number, currency: string): string {
+  try {
+    return formatMoney(value, currency);
+  } catch {
+    const label = currency.trim() || 'unspecified';
+    return `${value} ${label}`;
+  }
+}
+
+function formatSourceOrDisplay(micros: bigint, currency: string, compact: boolean): string {
+  try {
+    return compact
+      ? formatConvertedMicros(micros, currency)
+      : formatMoneyMicros(micros.toString(), currency, { compact: false });
+  } catch {
+    const label = currency.trim() || 'unspecified';
+    return `${formatMicrosAmount(micros)} ${label}`;
+  }
+}
 
 function microsBigInt(micros: string | number | bigint): bigint | null {
   try {
@@ -59,23 +79,18 @@ export function formatStoredMicros(
   }
   if (convertMicros) {
     const converted = convertMicros(asBigInt, source);
-    const unchanged = converted === asBigInt && source !== displayCurrency;
-    const amount = unchanged ? asBigInt : converted;
-    const code = unchanged ? source : displayCurrency;
     if (options?.compact === false) {
-      return formatMoneyMicros(amount.toString(), code, { compact: false });
+      return formatSourceOrDisplay(converted, displayCurrency, false);
     }
-    return formatConvertedMicros(amount, code);
+    return formatSourceOrDisplay(converted, displayCurrency, options?.compact !== false);
   }
   // No integer converter. A unit count past the safe range has already lost digits
   // inside a JavaScript number, so print the stored integer in its own currency.
-  const exactSource = () => formatMoneyMicros(asBigInt.toString(), source, { compact: false });
+  const exactSource = () => formatSourceOrDisplay(asBigInt, source, false);
   if (!fitsSafeUnitCount(asBigInt)) return exactSource();
   const value = unitsFromMicros(asBigInt);
   const converted = convert(value, source);
-  if (!Number.isFinite(converted) || (converted === value && source !== displayCurrency)) {
-    return exactSource();
-  }
+  if (!Number.isFinite(converted)) return exactSource();
   const convertedMicros = unitsToMicros(converted);
   if (convertedMicros == null || !convertedCentSurvives(converted)) return exactSource();
   return formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
@@ -100,7 +115,7 @@ export function useFormatMoney() {
       const source = sourceCurrency?.trim();
       if (!source) return formatUnspecifiedAmount(value);
       const converted = convertAmountMicros(value, source);
-      if (converted == null) return formatMoney(value, source);
+      if (converted == null) return formatPlainMoney(value, source);
       return formatConvertedMicros(converted, currency);
     },
     formatMoneyMicros: (

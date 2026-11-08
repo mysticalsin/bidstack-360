@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { formatMicrosAmount } from '@bidstack/shared';
 
+import { fmtMoney } from '@/components/financials/financials-format';
+
 import { formatStoredMicros } from './useFormatMoney';
 
 describe('failed conversion keeps the source currency', () => {
@@ -12,9 +14,17 @@ describe('failed conversion keeps the source currency', () => {
     expect(text).toContain('2.50');
   });
 
-  it('keeps the source code when a different display currency comes back unchanged', () => {
+  it('keeps a parity conversion in the display currency', () => {
     const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD');
-    expect(text).toContain('€');
+    expect(text).toContain('$');
+    expect(text).toContain('2.50');
+    expect(text).not.toContain('€');
+  });
+
+  it('renders an invalid source currency as plain text', () => {
+    const text = formatStoredMicros(2_500_000n, 'NOTREAL', () => Number.NaN, 'USD');
+    expect(text).toContain('2.50');
+    expect(text).toContain('NOTREAL');
     expect(text).not.toContain('$');
   });
 
@@ -22,6 +32,11 @@ describe('failed conversion keeps the source currency', () => {
     const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount * 2, 'USD');
     expect(text).toContain('$');
     expect(text).not.toContain('€');
+  });
+
+  it('labels a blank financial currency as unspecified', () => {
+    expect(fmtMoney(1200, ' ')).toContain('unspecified');
+    expect(fmtMoney(1200, ' ')).not.toMatch(/^\s/);
   });
 
   it('scales the stored micros before labelling them', () => {
