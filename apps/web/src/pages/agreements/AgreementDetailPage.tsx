@@ -12,6 +12,7 @@ import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
 import { ValuePanel } from '@/components/agreements/ValuePanel';
+import { WhoWorksWithThem } from '@/components/agreements/WhoWorksWithThem';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -237,6 +238,7 @@ export default function AgreementDetailPage() {
           <ValuePanel msaId={a.id} />
         </section>
       ) : null}
+      {!sample ? <WhoWorksWithThem companyId={a.companyId} /> : null}
 
       <section className="agr-section" aria-labelledby="agr-timeline">
         <h2 id="agr-timeline">Timeline and audit</h2>

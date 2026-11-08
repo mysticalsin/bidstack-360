@@ -35,6 +35,11 @@ export interface FirmographicFields {
   locations?: EnrichmentLocation[];
   techStack?: string[];
   departmentHeadcount?: Record<string, number>;
+  totalFundingUsd?: number;
+  latestFundingStage?: string;
+  /** ISO timestamp. */
+  latestFundingAt?: string;
+  foundedYear?: number;
 }
 
 export const FIRMOGRAPHIC_FIELDS = [
@@ -50,6 +55,10 @@ export const FIRMOGRAPHIC_FIELDS = [
   'locations',
   'techStack',
   'departmentHeadcount',
+  'totalFundingUsd',
+  'latestFundingStage',
+  'latestFundingAt',
+  'foundedYear',
 ] as const satisfies readonly (keyof FirmographicFields)[];
 
 export interface ProviderJobPosting {
@@ -151,7 +160,7 @@ export interface PeopleSearchResult {
 export const PEOPLE_SEARCH_SENIORITIES = ['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director'] as const;
 export const PEOPLE_PER_PAGE = 100;
 
-type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
 export interface ProviderOptions {
   env?: NodeJS.ProcessEnv;
@@ -308,6 +317,15 @@ export function mapApolloOrganization(org: Record<string, unknown>): Firmographi
     Object.entries(dept).filter((e): e is [string, number] => typeof e[1] === 'number' && e[1] > 0),
   );
   if (Object.keys(depts).length) f.departmentHeadcount = depts;
+  const funding = parseAmount(org.total_funding);
+  if (funding !== null && funding > 0) f.totalFundingUsd = funding;
+  const stage = str(org.latest_funding_stage);
+  if (stage) f.latestFundingStage = stage;
+  const roundAt = str(org.latest_funding_round_date);
+  const roundTime = roundAt ? Date.parse(roundAt) : Number.NaN;
+  if (Number.isFinite(roundTime)) f.latestFundingAt = new Date(roundTime).toISOString();
+  const founded = typeof org.founded_year === 'number' ? org.founded_year : Number(str(org.founded_year));
+  if (Number.isInteger(founded) && founded >= 1600 && founded <= new Date().getUTCFullYear()) f.foundedYear = founded;
   return f;
 }
 

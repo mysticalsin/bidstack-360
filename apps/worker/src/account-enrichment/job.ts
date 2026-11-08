@@ -166,6 +166,10 @@ function storedValues(row: Record<string, unknown> | null): FirmographicFields {
     locations: row.locations,
     techStack: row.techStack,
     departmentHeadcount: row.departmentHeadcount,
+    totalFundingUsd: row.totalFundingUsd === null || row.totalFundingUsd === undefined ? undefined : Number(row.totalFundingUsd),
+    latestFundingStage: row.latestFundingStage,
+    latestFundingAt: row.latestFundingAt instanceof Date ? row.latestFundingAt.toISOString() : row.latestFundingAt,
+    foundedYear: row.foundedYear,
   };
   for (const [k, val] of Object.entries(map)) if (hasValue(val)) v[k] = val;
   return v as FirmographicFields;
@@ -351,6 +355,10 @@ export async function runAccountEnrichment(
     locations: (v.locations ?? []) as unknown as Prisma.InputJsonValue,
     techStack: v.techStack ?? [],
     departmentHeadcount: (v.departmentHeadcount ?? undefined) as Prisma.InputJsonValue | undefined,
+    totalFundingUsd: v.totalFundingUsd === undefined ? null : BigInt(Math.round(v.totalFundingUsd)),
+    latestFundingStage: v.latestFundingStage ?? null,
+    latestFundingAt: v.latestFundingAt ? new Date(v.latestFundingAt) : null,
+    foundedYear: v.foundedYear ?? null,
     providerIds: providerIds as Prisma.InputJsonValue,
     provenance: merged.provenance as unknown as Prisma.InputJsonValue,
     providerStatus: providerStatus as unknown as Prisma.InputJsonValue,

@@ -36,8 +36,10 @@ import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
 import { startAccountWatchdog } from './queues/account-watchdog.js';
 import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
 import { startMsaReminders } from './queues/msa-reminders.js';
+import { startMsaWhitespaceDigest } from './queues/msa-whitespace-digest.js';
 import { startAccountEnrichment } from './queues/account-enrichment.js';
 import { startAccountIntel } from './queues/account-intel.js';
+import { startCompanyTechDetect } from './queues/company-tech-detect.js';
 import { startConsultingPartners } from './queues/consulting-partners.js';
 import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
@@ -176,12 +178,16 @@ await Promise.all([
   startAccountWatchdog(connection, log, workers, queues),
   // MSA renewal / expiry reminders (90/60/30 days + notice deadline)
   startMsaReminders(connection, log, workers, queues),
+  // Weekly whitespace digest: top 3 new flags per owner (in-app only)
+  startMsaWhitespaceDigest(connection, log, workers, queues),
   // Strategic account meeting intel: source sync, match/dedupe pipeline, cross-region flags
   startMeetingIntel(connection, log, workers, queues),
   // Account enrichment: Apollo + Seamless firmographics, open jobs, potential projects
   startAccountEnrichment(connection, log, workers, queues),
   // Account intelligence: job boards, company posts, registries, scheduled filings scan
   startAccountIntel(connection, log, workers, queues),
+  // Open data technology stack: on create and import, plus a weekly batched sweep
+  startCompanyTechDetect(connection, log, workers, queues),
   // Consulting partners: which consulting firms work with each account, cited
   startConsultingPartners(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),

@@ -10,6 +10,8 @@ export interface WebhookSub {
   lastDeliveryAt: string | null;
   lastFailureAt: string | null;
   createdAt: string;
+  /** Per-endpoint delivery timeout. Older API builds omit it. */
+  timeoutMs?: number;
 }
 
 export interface WebhookCreatedSub extends WebhookSub {
@@ -57,7 +59,7 @@ export function useWebhookDeliveries(subscriptionId: string) {
 export function useCreateWebhookSubscription() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { url: string; events: string[]; active?: boolean }) =>
+    mutationFn: (body: { url: string; events: string[]; active?: boolean; timeoutMs?: number }) =>
       api<WebhookCreatedSub>('/api/v1/webhook-subscriptions', {
         method: 'POST',
         body,
@@ -69,7 +71,7 @@ export function useCreateWebhookSubscription() {
 export function useUpdateWebhookSubscription(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<WebhookSub, 'url' | 'events' | 'active'>>) =>
+    mutationFn: (body: Partial<Pick<WebhookSub, 'url' | 'events' | 'active' | 'timeoutMs'>>) =>
       api<WebhookSub>(`/api/v1/webhook-subscriptions/${id}`, {
         method: 'PATCH',
         body,

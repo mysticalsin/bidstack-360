@@ -46,6 +46,8 @@ model Org {
   apiKeys            ApiKey[]
   webhookSubs        WebhookSubscription[]
   webhookOutbox      WebhookOutbox[]
+  webhookMessages    WebhookMessage[]
+  accessPolicies     AccessPolicyVersion[]
   auditLogs          AuditLog[]
   notes              Note[]
   fileAttachments    FileAttachment[]
@@ -205,6 +207,10 @@ model Org {
   contractFileVersions          ContractFileVersion[]
   signingEntities               SigningEntity[]
   msaIntakeDrafts               MsaIntakeDraft[]
+  agreementSources              AgreementSource[]
+  agreementIngestItems          AgreementIngestItem[]
+  agreementConnections          AgreementConnection[]
+  msaWhitespaceDecisions        MsaWhitespaceDecision[]
   meetingSourceConnections      MeetingSourceConnection[]
   meetingIngestItems            MeetingIngestItem[]
   meetingIntel                  MeetingIntel[]
@@ -216,6 +222,8 @@ model Org {
   intelEvidence                 IntelEvidence[]
   investmentThemes              InvestmentTheme[]
   intelSourceRuns               IntelSourceRun[]
+  intelSummaries                CompanyIntelSummary[]
+  intelImportBatches            IntelImportBatch[]
   consultingPartnerEvidence     ConsultingPartnerEvidence[]
   consultingPartnerRuns         ConsultingPartnerRun[]
   enrichmentCreditUsage         EnrichmentCreditUsage[]
@@ -407,14 +415,14 @@ model Company {
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  org           Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  parent        Company?         @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children      Company[]        @relation("CompanyHierarchy")
-  contacts      Contact[]
-  opportunities Opportunity[]
-  projectReferences  ProjectReference[]
-  notes         Note[]
-  files         FileAttachment[]
+  org               Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent            Company?           @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Company[]          @relation("CompanyHierarchy")
+  contacts          Contact[]
+  opportunities     Opportunity[]
+  projectReferences ProjectReference[]
+  notes             Note[]
+  files             FileAttachment[]
 
   serviceCases           ServiceCase[]
   accountSolutions       AccountSolution[]
@@ -456,6 +464,7 @@ model Company {
   intelEvidence IntelEvidence[]
   intelThemes   InvestmentTheme[]
   intelRuns     IntelSourceRun[]
+  intelSummary  CompanyIntelSummary?
   partnerEvidence ConsultingPartnerEvidence[]
   partnerRuns     ConsultingPartnerRun[]
   orgChart      OrgChart?
@@ -939,26 +948,26 @@ model SyncEvent {
 }
 
 model ApiKey {
-  id         String    @id @default(uuid()) @db.Uuid
-  orgId      String    @map("org_id") @db.Uuid
-  name       String
+  id                String    @id @default(uuid()) @db.Uuid
+  orgId             String    @map("org_id") @db.Uuid
+  name              String
   // SHA-256 hex digest of the raw key. Globally unique by construction, so
   // @unique both prevents hash collisions AND backs the verifyApiKey hot path
   // (findFirst on hashedKey ran a full table scan without an index — P0 #?).
-  hashedKey  String    @unique @map("hashed_key")
-  prefix     String // first 8 chars, displayed
-  scopes     String[]  @default(["read"])
+  hashedKey         String    @unique @map("hashed_key")
+  prefix            String // first 8 chars, displayed
+  scopes            String[]  @default(["read"])
   // Existing keys are backfilled unrestricted + writable. New keys default
   // to deny (empty company/MSA lists) and read-only unless the creator
   // opts in. See docs/enterprise-readiness.md B2.
-  unrestrictedScope Boolean  @default(false) @map("unrestricted_scope")
-  readOnly          Boolean  @default(true) @map("read_only")
-  companyIds        String[] @default([]) @map("company_ids") @db.Uuid
-  msaIds            String[] @default([]) @map("msa_ids") @db.Uuid
-  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
-  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  unrestrictedScope Boolean   @default(false) @map("unrestricted_scope")
+  readOnly          Boolean   @default(true) @map("read_only")
+  companyIds        String[]  @default([]) @map("company_ids") @db.Uuid
+  msaIds            String[]  @default([]) @map("msa_ids") @db.Uuid
+  lastUsedAt        DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -982,9 +991,18 @@ model WebhookSubscription {
   lastFailureAt  DateTime? @map("last_failure_at") @db.Timestamptz(6)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Retry policy for this endpoint (defaults match WEBHOOK_DELIVERY).
+  maxAttempts             Int                    @default(5) @map("max_attempts")
+  backoffStrategy         WebhookBackoffStrategy @default(exponential) @map("backoff_strategy")
+  backoffBaseSeconds      Int                    @default(30) @map("backoff_base_seconds")
+  timeoutMs               Int                    @default(10000) @map("timeout_ms")
+  /// Encrypted secret replaced by the last rotation; still signs until it expires.
+  previousSecret          String?                @map("previous_secret")
+  previousSecretExpiresAt DateTime?              @map("previous_secret_expires_at") @db.Timestamptz(6)
 
   org        Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
+  messages   WebhookMessage[]
 
   @@index([orgId])
   // P1 #25: fanOutWebhookEvent queries WHERE orgId=? AND active=true AND deletedAt IS NULL
@@ -1014,12 +1032,111 @@ model WebhookDelivery {
   /// Error message if delivery failed.
   errorMessage   String?  @map("error_message")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Stored message this attempt belongs to (null for test pings and older rows).
+  messageId         String?  @map("message_id") @db.Uuid
+  /// Request headers as sent, with every HMAC masked.
+  requestHeaders    Json?    @map("request_headers")
+  /// Response body, redacted and capped at WEBHOOK_BODY_CAP_BYTES.
+  responseBody      String?  @map("response_body")
+  responseTruncated Boolean  @default(false) @map("response_truncated")
 
   subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  message      WebhookMessage?     @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, createdAt(sort: Desc)])
   @@index([orgId])
+  @@index([orgId, createdAt], map: "webhook_deliveries_org_created_idx")
+  @@index([messageId, attempt], map: "webhook_deliveries_message_attempt_idx")
   @@map("webhook_deliveries")
+}
+
+enum WebhookBackoffStrategy {
+  exponential
+  linear
+  fixed
+
+  @@map("webhook_backoff_strategy")
+}
+
+enum WebhookMessageStatus {
+  pending
+  succeeded
+  failed
+
+  @@map("webhook_message_status")
+}
+
+/// One outbound event for one endpoint. Its id is the event id on the wire;
+/// every attempt is a WebhookDelivery row. A replay is a new message that
+/// points at the original through replayOfId.
+model WebhookMessage {
+  id             String               @id @db.Uuid
+  orgId          String               @map("org_id") @db.Uuid
+  subscriptionId String               @map("subscription_id") @db.Uuid
+  event          String
+  payload        Json
+  eventTimestamp DateTime             @map("event_timestamp") @db.Timestamptz(6)
+  status         WebhookMessageStatus @default(pending)
+  attempts       Int                  @default(0)
+  lastStatusCode Int?                 @map("last_status_code")
+  lastDurationMs Int?                 @map("last_duration_ms")
+  replayOfId     String?              @map("replay_of_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org          Org                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  deliveries   WebhookDelivery[]
+
+  @@index([orgId, createdAt(sort: Desc), id(sort: Desc)], map: "webhook_messages_org_created_idx")
+  @@index([subscriptionId, createdAt(sort: Desc)], map: "webhook_messages_sub_created_idx")
+  @@map("webhook_messages")
+}
+
+enum AccessPolicyStatus {
+  draft
+  pending
+  approved
+  rejected
+  published
+  superseded
+
+  @@map("access_policy_status")
+}
+
+/// One version of an org's access policy (When / Then / Except rules over the
+/// RBAC matrix). draft -> pending -> approved by a second admin -> published
+/// as vN. At most one row per org is published; rollback copies an earlier
+/// version into a new pending row that points back through rollbackOfId.
+/// Raw SQL in 20261107180100_access_policy_versions adds what Prisma cannot
+/// express: the access_policy_versions_no_self_approval CHECK and the
+/// access_policy_versions_one_published_idx partial unique index. An
+/// integration test asserts both exist; keep them out of any drop.
+model AccessPolicyVersion {
+  id            String             @id @default(uuid()) @db.Uuid
+  orgId         String             @map("org_id") @db.Uuid
+  /// Set on publish (max + 1 per org); null until then.
+  version       Int?
+  name          String
+  status        AccessPolicyStatus @default(draft)
+  rules         Json               @default("[]")
+  createdById   String             @map("created_by_id") @db.Uuid
+  submittedById String?            @map("submitted_by_id") @db.Uuid
+  submittedAt   DateTime?          @map("submitted_at") @db.Timestamptz(6)
+  approvedById  String?            @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime?          @map("approved_at") @db.Timestamptz(6)
+  decisionNote  String?            @map("decision_note")
+  publishedById String?            @map("published_by_id") @db.Uuid
+  publishedAt   DateTime?          @map("published_at") @db.Timestamptz(6)
+  rollbackOfId  String?            @map("rollback_of_id") @db.Uuid
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, version], map: "access_policy_versions_org_version_key")
+  @@index([orgId, status, createdAt(sort: Desc)], map: "access_policy_versions_org_status_idx")
+  @@map("access_policy_versions")
 }
 
 enum WebhookOutboxStatus {
@@ -1045,6 +1162,10 @@ model WebhookOutbox {
   lastError      String?             @map("last_error")
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   dispatchedAt   DateTime?           @map("dispatched_at") @db.Timestamptz(6)
+  /// Set for a replay: deliver to this one subscription only.
+  subscriptionId String?             @map("subscription_id") @db.Uuid
+  /// Set for a replay: the message being re-sent.
+  replayOfId     String?             @map("replay_of_id") @db.Uuid
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -5507,19 +5628,19 @@ model ContractAgreement {
   // Intake + leverage (2026-11). signingEntityId is OUR brand/branch that
   // signed; commercial clause fields stay blank when the document does not
   // contain them. parties/fieldCitations are provenance, never invented.
-  signingEntityId    String?  @map("signing_entity_id") @db.Uuid
-  termMonths         Int?     @map("term_months")
-  renewalTerms       String?  @map("renewal_terms") @db.VarChar(500)
-  ipClause           String?  @map("ip_clause")
-  confidentiality    String?
-  nonSolicit         String?  @map("non_solicit")
-  exclusivity        String?
-  insurance          String?
-  indexation         String?  @db.VarChar(500)
-  scopeOfServices    String?  @map("scope_of_services")
-  affiliatesClause   String?  @map("affiliates_clause")
-  parties            Json     @default("[]")
-  fieldCitations     Json     @default("{}") @map("field_citations")
+  signingEntityId  String? @map("signing_entity_id") @db.Uuid
+  termMonths       Int?    @map("term_months")
+  renewalTerms     String? @map("renewal_terms") @db.VarChar(500)
+  ipClause         String? @map("ip_clause")
+  confidentiality  String?
+  nonSolicit       String? @map("non_solicit")
+  exclusivity      String?
+  insurance        String?
+  indexation       String? @db.VarChar(500)
+  scopeOfServices  String? @map("scope_of_services")
+  affiliatesClause String? @map("affiliates_clause")
+  parties          Json    @default("[]")
+  fieldCitations   Json    @default("{}") @map("field_citations")
 
   org            Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   sourceFile     FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
@@ -5528,6 +5649,7 @@ model ContractAgreement {
   children       ContractAgreement[]   @relation("ContractHierarchy")
   owner          User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   signingEntity  SigningEntity?        @relation(fields: [signingEntityId], references: [id], onDelete: SetNull)
+  whitespaceDecisions MsaWhitespaceDecision[]
   fileVersions   ContractFileVersion[]
   intakeDrafts   MsaIntakeDraft[]
 
@@ -5571,28 +5693,28 @@ model SigningEntity {
 // One-drop intake draft. The uploaded file is stored, fields are extracted,
 // and nothing becomes a ContractAgreement until the user confirms.
 model MsaIntakeDraft {
-  id                    String    @id @default(uuid()) @db.Uuid
-  orgId                 String    @map("org_id") @db.Uuid
-  status                String    @default("pending_review") @db.VarChar(24)
-  fileName              String    @map("file_name") @db.VarChar(255)
-  contentType           String    @map("content_type") @db.VarChar(100)
-  bytes                 Int
-  sha256                String    @db.VarChar(64)
-  storageKey            String    @map("storage_key") @db.VarChar(500)
-  fileAttachmentId      String?   @map("file_attachment_id") @db.Uuid
-  extractedText         String?   @map("extracted_text")
-  pageCount             Int?      @map("page_count")
-  needsOcr              Boolean   @default(false) @map("needs_ocr")
-  usedLlm               Boolean   @default(false) @map("used_llm")
-  extractedFields       Json      @default("{}") @map("extracted_fields")
-  accountMatches        Json      @default("[]") @map("account_matches")
-  signingEntityMatches  Json      @default("[]") @map("signing_entity_matches")
-  warnings              Json      @default("[]")
-  confirmedContractId   String?   @map("confirmed_contract_id") @db.Uuid
-  createdById           String    @map("created_by_id") @db.Uuid
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  orgId                String    @map("org_id") @db.Uuid
+  status               String    @default("pending_review") @db.VarChar(24)
+  fileName             String    @map("file_name") @db.VarChar(255)
+  contentType          String    @map("content_type") @db.VarChar(100)
+  bytes                Int
+  sha256               String    @db.VarChar(64)
+  storageKey           String    @map("storage_key") @db.VarChar(500)
+  fileAttachmentId     String?   @map("file_attachment_id") @db.Uuid
+  extractedText        String?   @map("extracted_text")
+  pageCount            Int?      @map("page_count")
+  needsOcr             Boolean   @default(false) @map("needs_ocr")
+  usedLlm              Boolean   @default(false) @map("used_llm")
+  extractedFields      Json      @default("{}") @map("extracted_fields")
+  accountMatches       Json      @default("[]") @map("account_matches")
+  signingEntityMatches Json      @default("[]") @map("signing_entity_matches")
+  warnings             Json      @default("[]")
+  confirmedContractId  String?   @map("confirmed_contract_id") @db.Uuid
+  createdById          String    @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   org            Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
   fileAttachment FileAttachment?    @relation("MsaIntakeDraftFile", fields: [fileAttachmentId], references: [id], onDelete: SetNull)
@@ -5603,6 +5725,146 @@ model MsaIntakeDraft {
   @@index([orgId, createdById], map: "msa_intake_drafts_org_creator_idx")
   @@index([deletedAt])
   @@map("msa_intake_drafts")
+}
+
+// A configured pull source for agreements (slice 13): a SharePoint/OneDrive
+// folder read through Microsoft Graph, or DocuSign completed envelopes. Config
+// holds ids and filters only; credentials stay in env (MICROSOFT_GRAPH_*,
+// DOCUSIGN_*). cursor is the Graph delta link or the last envelope date.
+model AgreementSource {
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  kind        String    @db.VarChar(20)
+  name        String    @db.VarChar(200)
+  enabled     Boolean   @default(true)
+  config      Json      @default("{}")
+  cursor      String?
+  lastSyncAt  DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  lastRunId   String?   @map("last_run_id") @db.VarChar(80)
+  lastResult  Json?     @map("last_result")
+  createdById String    @map("created_by_id") @db.Uuid
+  /// Org-scoped provider connection the pull uses. Null only in single-tenant mode.
+  connectionId String?  @map("connection_id") @db.Uuid
+  /// Resumable position inside an unfinished pull: { next?: page url, delta?: final link not yet committed }.
+  progress    Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  org        Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection AgreementConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  items      AgreementIngestItem[]
+
+  @@index([orgId, kind], map: "agreement_sources_org_kind_idx")
+  @@index([deletedAt])
+  @@map("agreement_sources")
+}
+
+// One org's own grant to a provider for the agreement pull (slice 13a). The
+// deployment env holds only the OAuth app identity; data access always goes
+// through the tenant (Graph admin consent) or account (DocuSign) recorded
+// here, so one org can never read another org's library.
+model AgreementConnection {
+  id               String    @id @default(uuid()) @db.Uuid
+  orgId            String    @map("org_id") @db.Uuid
+  provider         String    @db.VarChar(20)
+  /// pending | connected | revoked
+  status           String    @default("pending") @db.VarChar(20)
+  /// Graph: the Entra tenant id that granted admin consent.
+  externalTenantId String?   @map("external_tenant_id") @db.VarChar(100)
+  /// DocuSign: the account id the consenting user belongs to.
+  accountId        String?   @map("account_id") @db.VarChar(100)
+  accountName      String?   @map("account_name") @db.VarChar(200)
+  baseUri          String?   @map("base_uri") @db.VarChar(300)
+  /// DocuSign refresh token, encrypted with INTEGRATION_TOKEN_KEY.
+  secretEncrypted  String?   @map("secret_encrypted")
+  stateNonce       String?   @map("state_nonce") @db.VarChar(64)
+  createdById      String    @map("created_by_id") @db.Uuid
+  connectedById    String?   @map("connected_by_id") @db.Uuid
+  connectedAt      DateTime? @map("connected_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sources AgreementSource[]
+
+  @@unique([orgId, provider], map: "agreement_connections_org_provider_uq")
+  @@map("agreement_connections")
+}
+
+// One inbound agreement document from any channel (SharePoint, DocuSign, REST,
+// MCP). The row is the durable queue: status moves queued -> processing ->
+// drafted | versioned | duplicate | rejected | failed. A drafted item waits
+// for human review on its MsaIntakeDraft; nothing creates an agreement here.
+// pendingContent holds inline bytes until processing and is then cleared.
+model AgreementIngestItem {
+  id                    String    @id @default(uuid()) @db.Uuid
+  orgId                 String    @map("org_id") @db.Uuid
+  sourceId              String?   @map("source_id") @db.Uuid
+  channel               String    @db.VarChar(20)
+  externalSource        String    @map("external_source") @db.VarChar(120)
+  externalId            String    @map("external_id") @db.VarChar(300)
+  externalVersion       String?   @map("external_version") @db.VarChar(200)
+  idempotencyKey        String?   @map("idempotency_key") @db.VarChar(128)
+  fileName              String    @map("file_name") @db.VarChar(255)
+  contentType           String?   @map("content_type") @db.VarChar(100)
+  bytes                 Int?
+  sha256                String?   @db.VarChar(64)
+  fileUrl               String?   @map("file_url") @db.VarChar(2000)
+  pendingContent        Bytes?    @map("pending_content")
+  metadata              Json      @default("{}")
+  status                String    @default("queued") @db.VarChar(20)
+  error                 String?   @db.VarChar(500)
+  attempts              Int       @default(0)
+  /// Source items: when a retryable failure may be tried again.
+  nextAttemptAt         DateTime? @map("next_attempt_at") @db.Timestamptz(6)
+  /// Set when retries stop; the item stays failed for a person to look at.
+  deadLetteredAt        DateTime? @map("dead_lettered_at") @db.Timestamptz(6)
+  intakeDraftId         String?   @map("intake_draft_id") @db.Uuid
+  contractId            String?   @map("contract_id") @db.Uuid
+  contractFileVersionId String?   @map("contract_file_version_id") @db.Uuid
+  actorType             String    @map("actor_type") @db.VarChar(20)
+  actorId               String?   @map("actor_id") @db.VarChar(80)
+  processedAt           DateTime? @map("processed_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org    Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  source AgreementSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, actorType, actorId, idempotencyKey], map: "agreement_ingest_items_org_idem_uq")
+  @@index([orgId, externalSource, externalId], map: "agreement_ingest_items_org_ext_idx")
+  @@index([orgId, sha256], map: "agreement_ingest_items_org_sha_idx")
+  @@index([status, createdAt], map: "agreement_ingest_items_status_idx")
+  @@index([sourceId, status], map: "agreement_ingest_items_source_status_idx")
+  @@map("agreement_ingest_items")
+}
+
+// Accept / dismiss decisions on ranked MSA whitespace flags (slice 13b), one
+// row per decision on one business line of one MSA. A dismissal hides that
+// line for 90 days unless evidenceHash changes. Accepting links the
+// CrossSellAction or draft Opportunity the click created.
+model MsaWhitespaceDecision {
+  id                String   @id @default(uuid()) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  contractId        String   @map("contract_id") @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  line              String   @db.VarChar(40)
+  state             String   @db.VarChar(20)
+  reason            String?  @db.VarChar(500)
+  evidenceHash      String   @map("evidence_hash") @db.VarChar(16)
+  score             Int
+  decidedById       String   @map("decided_by_id") @db.Uuid
+  decidedAt         DateTime @default(now()) @map("decided_at") @db.Timestamptz(6)
+  crossSellActionId String?  @map("cross_sell_action_id") @db.Uuid
+  opportunityId     String?  @map("opportunity_id") @db.Uuid
+
+  org      Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contract ContractAgreement @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, contractId, line, decidedAt], map: "msa_whitespace_decisions_org_msa_line_idx")
+  @@map("msa_whitespace_decisions")
 }
 
 // One uploaded file version of a contract (MSA, SOW, amendment, addendum).
@@ -6454,6 +6716,11 @@ model CompanyFirmographics {
   locations           Json      @default("[]")
   techStack           String[]  @default([]) @map("tech_stack")
   departmentHeadcount Json?     @map("department_headcount")
+  /// Organization funding as the provider reports it (Apollo total_funding, USD).
+  totalFundingUsd     BigInt?   @map("total_funding_usd")
+  latestFundingStage  String?   @map("latest_funding_stage")
+  latestFundingAt     DateTime? @map("latest_funding_at") @db.Timestamptz(6)
+  foundedYear         Int?      @map("founded_year")
   providerIds         Json      @default("{}") @map("provider_ids")
   provenance          Json      @default("{}")
   providerStatus      Json      @default("{}") @map("provider_status")
@@ -6787,6 +7054,69 @@ model IntelSourceRun {
   @@unique([orgId, companyId, source])
   @@map("intel_source_runs")
 }
+
+/// Slice 14: list-level intel summary per company (revenue, headcount growth,
+/// open and new roles, funding, signal, direction). Derived from stored facts
+/// by the worker after each intel or enrichment run; `payload` is the full
+/// CompanyIntelSummary with source, as-of date and method per number. The
+/// scalar columns exist only to filter and sort the Companies list.
+model CompanyIntelSummary {
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  companyId          String   @unique @map("company_id") @db.Uuid
+  /// Approximate USD (static FX table) for filtering and sorting only.
+  revenueUsdApprox   Float?   @map("revenue_usd_approx")
+  revenueGrowthPct   Float?   @map("revenue_growth_pct")
+  headcount          Int?
+  headcountGrowthPct Float?   @map("headcount_growth_pct")
+  openRoles          Int?     @map("open_roles")
+  newRoles30d        Int?     @map("new_roles_30d")
+  fundingUsd         Float?   @map("funding_usd")
+  /// growing | steady | contracting, inferred
+  direction          String?
+  payload            Json
+  sample             Boolean  @default(false)
+  computedAt         DateTime @map("computed_at") @db.Timestamptz(6)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, direction])
+  @@index([orgId, revenueUsdApprox])
+  @@index([orgId, newRoles30d])
+  @@map("company_intel_summaries")
+}
+
+/// Slice 14: one enrichment run over the companies an import created (CSV or
+/// HubSpot). Progress for the Companies page row; one batch per migration job.
+/// Retention: rows older than 90 days are pruned by the account-intel sweep.
+model IntelImportBatch {
+  id             String    @id @default(uuid()) @db.Uuid
+  orgId          String    @map("org_id") @db.Uuid
+  migrationJobId String?   @map("migration_job_id") @db.Uuid
+  /// csv | hubspot
+  origin         String
+  companyIds     String[]  @default([]) @map("company_ids")
+  doneIds        String[]  @default([]) @map("done_ids")
+  failedIds      String[]  @default([]) @map("failed_ids")
+  /// running | complete
+  status         String    @default("running")
+  /// { withRevenue, withHeadcountGrowth, withNewRoles30d, apollo }
+  summary        Json      @default("{}")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, migrationJobId])
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("intel_import_batches")
+}
+
 
 /// Slice 15: one consulting firm read out of one public item or one of our
 /// own records for an account. Public rows carry the URL; internal rows carry

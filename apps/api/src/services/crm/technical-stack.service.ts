@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   TechnicalStackCategory,
   type TechnicalStackCategory as TechnicalStackCategoryType,
+  type TechnicalStackCoverage,
   type TechnicalStackItemType,
   type TechnicalStackState,
 } from '@bidstack/shared';
@@ -22,13 +23,15 @@ interface BuildTechnicalStackStateInput {
   overrideValue?: unknown;
   overrideUpdatedAt?: Date | string | null;
   providerUpdatedAt?: Date | string | null;
+  coverage?: TechnicalStackCoverage | null;
 }
 
 function slug(value: string): string {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '');
 }
 
@@ -46,6 +49,8 @@ function normalizeStackItem(item: TechnicalStackItemType): TechnicalStackItemTyp
     name,
     source: item.source.trim() || 'manual',
     confidence: Math.min(1, Math.max(0, item.confidence)),
+    ...(item.evidence ? { evidence: item.evidence } : {}),
+    ...(item.sample ? { sample: true } : {}),
   };
 }
 
@@ -53,12 +58,13 @@ export function normalizeTechnicalStack(
   stack: TechnicalStackCategoryType[],
 ): TechnicalStackCategoryType[] {
   const byLabel = new Map<string, Map<string, TechnicalStackItemType>>();
-  const labels = new Map<string, string>();
+  const labels = new Map<string, { stack: string; label: string }>();
 
   for (const category of stack) {
     const label = category.label.trim() || 'Other';
-    const labelKey = slug(label) || 'other';
-    labels.set(labelKey, labels.get(labelKey) ?? label);
+    const stackName = category.stack?.trim() ?? '';
+    const labelKey = `${slug(stackName)}|${slug(label) || 'other'}`;
+    labels.set(labelKey, labels.get(labelKey) ?? { stack: stackName, label });
     const items = byLabel.get(labelKey) ?? new Map<string, TechnicalStackItemType>();
 
     for (const rawItem of category.items) {
@@ -73,10 +79,14 @@ export function normalizeTechnicalStack(
   }
 
   return [...byLabel.entries()]
-    .map(([labelKey, items]) => ({
-      label: labels.get(labelKey) ?? 'Other',
-      items: [...items.values()],
-    }))
+    .map(([labelKey, items]) => {
+      const named = labels.get(labelKey);
+      return {
+        ...(named?.stack ? { stack: named.stack } : {}),
+        label: named?.label ?? 'Other',
+        items: [...items.values()],
+      };
+    })
     .filter((category) => category.items.length > 0);
 }
 
@@ -117,6 +127,7 @@ export function buildTechnicalStackState({
   overrideValue,
   overrideUpdatedAt,
   providerUpdatedAt,
+  coverage = null,
 }: BuildTechnicalStackStateInput): TechnicalStackState {
   const provider = normalizeTechnicalStack(providerStack);
   const override = parseTechnicalStackOverride(overrideValue);
@@ -146,6 +157,7 @@ export function buildTechnicalStackState({
     effectiveStack: override ? manual : provider,
     suggestions,
     updatedAt: toIso(overrideUpdatedAt),
+    coverage,
   };
 }
 
@@ -157,11 +169,14 @@ export function acceptTechnicalStackSuggestion(
   if (!suggestion) return null;
   const next = normalizeTechnicalStack(state.manualStack);
   const labelKey = slug(suggestion.label);
-  const existing = next.find((category) => slug(category.label) === labelKey);
+  const existing = next.find(
+    (category) => !category.stack && slug(category.label) === labelKey,
+  );
   const acceptedItem: TechnicalStackItemType = {
     name: suggestion.item.name,
     source: `manual:accepted:${suggestion.item.source}`,
     confidence: 1,
+    ...(suggestion.item.evidence ? { evidence: suggestion.item.evidence } : {}),
   };
 
   if (existing) {

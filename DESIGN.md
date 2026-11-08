@@ -711,6 +711,32 @@ Appended by factory slice 1. Values only; no existing token changed.
 - Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
   that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
 
+### 9.16 Technology stack from open data (slice 16)
+
+One technology stack per account, on `/accounts/:accountId` (Technical Stack card) and on
+`/companies/:id` (Technology stack section). Same data, same wall.
+
+- Wall: grouped by category (Cloud, Collaboration, Email security, Identity, CRM and marketing,
+  ITSM, Data and analytics, ERP, Web platform, DevOps, Languages, Other). Category label in
+  uppercase `--fg-tertiary` 12px; items as pills with `TechLogo` (20px), name, a source chip and
+  the confidence as a whole percent in tabular numbers.
+- Source chips, plain words only: DNS, Cert, Website, Jobs, GitHub, Apollo, Manual, Meeting notes,
+  Seamless, Tech intel. Chip uses `--surface-sunken` with `--fg-secondary`; Manual uses
+  `--brand-primary` text. No colour-only meaning: the word is always there.
+- Evidence: each pill is a button that opens a popover (Radix HoverCard on hover, click toggles a
+  pinned popover; Escape closes and focus returns to the pill). Content: source, the record or URL
+  observed (URLs are links, `rel="noreferrer"`), observed date, confidence.
+- Coverage line under the wall: `Coverage: DNS 6, Cert 2, Website 4, Jobs 3. Nothing found in
+  GitHub.` Lanes that failed say `Cert unavailable`. Last checked date on the right, `Checked 7 Nov`.
+  Sample data carries the `Sample` tag next to the coverage line.
+- Empty: `No technology found yet` plus the coverage line when lanes ran. Loading: skeleton rows.
+  Error: `Could not load technology stack` with Retry.
+- Accounts list card: up to three `TechLogo` (16px) with names, in the existing `account-card-tech`
+  row; it truncates with an ellipsis and carries a `title` with the full list. No new row.
+- Layout: no overlap at 1440, 1024 and 390, light and dark; pills wrap; popover stays inside the
+  viewport (collision padding 8px). Hit targets 24 x 24 minimum. Copy: no em dashes, no taglines.
+- Build note: the empty state keeps the existing copy `No technology detected yet` so current tests
+  and screenshots stay valid. Chip and Sample text use 12px (`text-xs`), the audit floor.
 ### 9.9 Slice 2 console shell as built (2026-11-07)
 
 Appended by factory slice 2. Refines the existing shell (AppShell, Sidebar, MobileNav, Topbar); the look
@@ -741,3 +767,43 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Header: section title, last fetched time, and Refresh (lucide `RefreshCw`) for users with `account-intel:write`. Not configured status shows the detail text.
 - Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
+
+### 9.11 Company intel on the Companies page (slice 14)
+
+Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.
+
+- List columns, after Company and Domain: Revenue, Revenue growth, Headcount, Headcount growth (6m), Open roles, New roles (30d), Hiring trend, Funding, Signal, Direction. All sortable on the loaded page; filters run on the server.
+- Saved views as a segmented row above the table: Hiring fast (5 or more new postings in 30 days), Revenue over 1B (USD equivalent), Contracting. `aria-pressed` on the active one; one click again clears it. A Direction select sits beside them.
+- Columns button (lucide `Columns3`) opens a checkbox menu; hidden columns persist per browser in `localStorage` key `polo.companies.columns.v1`.
+- Every number names its source, year or as-of date and method in its hover title and accessible label. Derived numbers (revenue growth, filed headcount growth, direction) say "inferred"; growth values render italic when inferred.
+- Empty values render an en dash with the reason on hover: Not connected, Private company, No public data, plus one line of detail.
+- New roles (30d) is the hiring proxy: postings first published in the last 30 days, with the delta against the prior 30 days. It is never called hires.
+- Hiring trend: vendored TUFFUI sparkline (72 x 28), six monthly points, last point dotted; success tone when the 30 day trend is up, danger when down, tertiary when flat.
+- Direction: `StatusPill` sm with lucide `TrendingUp`, `Minus` or `TrendingDown` and the word Growing, Steady or Contracting; reasons in a tooltip ending with "Inferred". Signal: `StatusPill` with the post kind.
+- Import progress: one row above the table while an import's companies are enriched: origin, done of total, then the result counts when complete (with revenue, headcount growth, new roles 30d).
+- Account header: a compact strip under the name with five buttons: Revenue (with FY), Headcount (with 6m growth), Open roles (with 30 day delta), Funding, Direction. Each opens the matching Intel tab (financials, hiring, hiring, financials, direction). A Refresh button (lucide `RefreshCw`) for `account-intel:write` queues every source.
+- Intel tab on the account page mounts the slice 12 section (9.7).
+- Widths: the table scrolls horizontally inside its card; the strip wraps to two rows at 1024 and stacks at 390. No overlapping text at 1440, 1024 and 390.
+- No taglines or helper text. Tokens only, both themes, tabular numbers, sample data tagged.
+### 9.11 Slice 5 as built (2026-11-07)
+
+Appended by factory slice 5 (Settings > Access policies).
+
+- Builder: one card per rule with When, Then, Conditions and Except fieldsets, a plain sentence that
+  reads the rule back, and Move up / Move down / Remove buttons (keyboard reorder). MatchField was not
+  vendored: upstream it is a fit chart, not a form, so the rule rows use native checkboxes and inputs.
+- Impact preview: the shared `DivergingBars` from `components/charts/tuffui` (gains above the line in `--success`, losses below in
+  `--danger`) with a "View as table" toggle; people and example events per side, one sentence when
+  nothing changes.
+- Approvals and versions: `StatusPill` for Pending, Approved and Live; the author sees a sentence
+  instead of Approve; "Publish vN" and "Roll back to vN" announce through `aria-live="polite"`.
+- Review fixes: the author or submitter sees Withdraw instead of Approve; checkbox groups are named
+  groups; hour inputs say UTC. "Roll back to vN" files a pending request that a second admin approves
+  before it can be published. The preview headline counts people, the sub-line counts actions, and
+  two sentences say what it cannot show: changes that depend on the record country (not enforced at
+  route level yet) and reads (not in the audit log). The tab and its API are Admin only.
+### 9.x Hiring detail and source rules (2026-11-07)
+
+- Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
+- Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
+- Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.
