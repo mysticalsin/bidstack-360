@@ -162,7 +162,7 @@ export function WhatToPosition({ companyId }: { companyId: string }) {
   const q = useAccountPositioning(companyId);
   const leverage = useMsaLeverage(companyId);
   const money = useFormatMoney();
-  // Pipeline micros are EUR at rest; show them in the user's display currency.
+  // Deal-range labels use the page money helper. That is not a currency stored on Opportunity.
   const micros = (m: string) => money.formatMoneyMicros(m, 'EUR', { compact: true });
   if (q.isLoading) return <div className="sg wp" aria-busy="true"><div className="sg-skel" style={{ minHeight: 320 }} /></div>;
   if (q.isError || !q.data) {
