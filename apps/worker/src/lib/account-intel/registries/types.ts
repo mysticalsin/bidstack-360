@@ -17,6 +17,7 @@ export function normaliseLegalName(name: string): string {
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b([a-z])\.(?=[a-z]\b\.?)/g, '$1')
     .replace(/[.,'’&()-]/g, ' ')
     .replace(/\b(asa|as|ab|abp|oyj|oy|sa|sas|sasu|sarl|se|ag|gmbh|kgaa|kg|co|nv|bv|spa|srl|plc|ltd|limited|llc|inc|incorporated|corp|corporation|group|holding|holdings|the)\b/g, ' ')
     .replace(/\s+/g, ' ')

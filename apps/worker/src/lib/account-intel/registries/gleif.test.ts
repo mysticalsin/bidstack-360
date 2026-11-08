@@ -49,6 +49,13 @@ describe('GLEIF matching', () => {
     expect(found.matches.map((m) => m.lei)).toEqual(['G', 'S']);
   });
 
+  it('finds a parent listed under its registered name variants (MAPFRE S.A.)', async () => {
+    const c = client({
+      [gleifSearchUrl('MAPFRE', null, 'entity.names')]: [rec('M', 'MAPFRE S.A.', 'ES'), rec('C', 'CLUB MAPFRE S.A.', 'ES')],
+    });
+    expect((await matchLei(c, 'MAPFRE', null)).record?.lei).toBe('M');
+  });
+
   it('lets the account country settle an ambiguous name', async () => {
     const c = client({
       [gleifSearchUrl('MAHLE', 'DE')]: [],

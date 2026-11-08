@@ -20,7 +20,7 @@ export interface LeiRecord {
 }
 
 /** Fuzzy legal-name search, filtered by country when known. */
-export function gleifSearchUrl(name: string, country: string | null, field: 'fulltext' | 'entity.legalName' = 'fulltext'): string {
+export function gleifSearchUrl(name: string, country: string | null, field: 'fulltext' | 'entity.legalName' | 'entity.names' = 'fulltext'): string {
   // Full-text ranking buries the parent entity under subsidiaries, so read a wide page.
   const p = new URLSearchParams({ [`filter[${field}]`]: name, 'page[size]': '50' });
   if (country) p.set('filter[entity.legalAddress.country]', country.toUpperCase());
@@ -85,9 +85,10 @@ export async function matchLei(
   const url = gleifSearchUrl(name, country);
   const records = parseGleifRecords(await client.get(url, { accept: 'application/vnd.api+json' }));
   let matches = leiNameMatches(records, name, country);
-  if (matches.length !== 1) {
-    const byName = parseGleifRecords(await client.get(gleifSearchUrl(name, country, 'entity.legalName'), { accept: 'application/vnd.api+json' }));
-    matches = leiNameMatches([...matches, ...byName], name, country);
+  for (const field of ['entity.legalName', 'entity.names'] as const) {
+    if (matches.length === 1) break;
+    const more = parseGleifRecords(await client.get(gleifSearchUrl(name, country, field), { accept: 'application/vnd.api+json' }));
+    matches = leiNameMatches([...matches, ...more], name, country);
   }
   return { record: matches.length === 1 ? matches[0]! : null, url, candidates: records.length, matches };
 }

@@ -14,6 +14,7 @@ import { resolveOrgLlm } from '../org-llm.js';
 import { runFinancialsScan } from '../financials/scan.js';
 import { derived } from '../financials/xbrl.js';
 import { edgarAnnualReportSection, esefSections, statementsFromSections, type FilingSection, type StatementLlm } from './filing-text.js';
+import { inferCountry } from './country.js';
 import { createIntelClient, defaultIntelFetch, intelUserAgent } from './http.js';
 import type { EvidenceRow, IntelIdentifiers, IntelStore, IntelSubject, PostingRow, SourceRunResult } from './run.js';
 
@@ -56,11 +57,11 @@ async function saveEvidenceRows(s: IntelSubject, rows: EvidenceRow[]): Promise<s
 export function prismaIntelStore(): IntelStore {
   return {
     async loadSubject(orgId, companyId) {
-      const c = await prisma.company.findFirst({ where: { id: companyId, orgId, deletedAt: null }, select: { id: true, orgId: true, name: true, legalName: true, domain: true, countryCode: true } });
+      const c = await prisma.company.findFirst({ where: { id: companyId, orgId, deletedAt: null }, select: { id: true, orgId: true, name: true, legalName: true, domain: true, countryCode: true, address: true } });
       if (!c) return null;
       const w = await prisma.accountWatchSubject.findFirst({ where: { orgId, companyId } });
       const identifiers = Object.fromEntries(IDENTIFIER_FIELDS.map((k) => [k, (w?.[k] as string | null | undefined) ?? null])) as unknown as IntelIdentifiers;
-      return { orgId, companyId, companyName: c.legalName || c.name, domain: c.domain?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') || null, countryCode: c.countryCode, identifiers };
+      return { orgId, companyId, companyName: c.legalName || c.name, domain: c.domain?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') || null, countryCode: inferCountry(c), identifiers };
     },
 
     async saveIdentifiers(s, patch, evidence) {
