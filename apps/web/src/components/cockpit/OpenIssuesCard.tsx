@@ -10,7 +10,7 @@ import { springSoft } from '@/lib/motion';
 
 import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
 
-import { severityBg, severityShort, severityTone } from './_tokens';
+import { severityBg, severityTone } from './_tokens';
 
 interface Props {
   risks: RiskItem[];
@@ -55,6 +55,12 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
       tone: 'gray',
     },
   ] as const;
+  const severityLabel: Record<RiskItem['severity'], string> = {
+    critical: buckets[0].labelText,
+    high: buckets[1].labelText,
+    medium: buckets[2].labelText,
+    low: buckets[3].labelText,
+  };
 
   return (
     <Card role="region" aria-label={t('openIssues.regionLabel', 'Open issues by severity')}>
@@ -101,7 +107,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                 transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
               >
                 <span className="oi-count" style={{ background: severityBg(r.severity) }}>
-                  {severityShort(r.severity)}
+                  {severityLabel[r.severity]}
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
@@ -112,7 +118,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                     {r.dueDate ? t('openIssues.dueSuffix', ' - due {{dueDate}}', { dueDate: r.dueDate }) : ''}
                   </div>
                 </div>
-                <Badge tone={severityTone(r.severity)}>{r.severity}</Badge>
+                <Badge tone={severityTone(r.severity)}>{r.status.replace('_', ' ')}</Badge>
               </motion.li>
             ))}
             {openCompliance.slice(0, 2).map((c, index) => (
@@ -126,7 +132,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                 }}
               >
                 <span className="oi-count" style={{ background: 'var(--tag-amber-bg)' }}>
-                  C
+                  {t('openIssues.kindCompliance', 'Compliance')}
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>

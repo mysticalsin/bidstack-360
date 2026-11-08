@@ -147,14 +147,16 @@
   border-bottom: 0;
 }
 .open-issues .oi-count {
-  width: 28px;
+  min-width: 72px;
   height: 28px;
+  padding: 0 8px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
   color: var(--fg-primary);
   font-feature-settings: 'tnum';
   flex-shrink: 0;

@@ -123,6 +123,7 @@ export function Topbar() {
             <span
               className={c.here ? 'here' : undefined}
               aria-current={c.here ? 'page' : undefined}
+              title={c.label}
             >
               {c.label}
             </span>

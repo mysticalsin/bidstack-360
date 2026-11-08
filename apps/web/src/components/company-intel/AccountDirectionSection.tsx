@@ -16,6 +16,7 @@ import {
   useCompanyNewsIntel,
   useRefreshIntelSource,
 } from '@/hooks/useCompanyIntel';
+import { useScrollableTabs } from '@/hooks/useScrollableTabs';
 
 import { fmtDate } from './intel-format';
 import { DirectionPanel, FinancialsPanel, HiringPanel, NewsPanel } from './IntelPanels';
@@ -85,6 +86,7 @@ function SourcesStrip({ sources, canRefresh, onRefresh, pending }: {
 export function AccountDirectionSection({ companyId }: { companyId: string }) {
   const [tab, setTab] = useState<TabKey>('direction');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabStrip = useScrollableTabs(tab);
   const canRefresh = useHasPermission('account-intel:write');
   const refresh = useRefreshIntelSource(companyId);
   const direction = useCompanyDirection(companyId, refresh.pollUntil);
@@ -111,7 +113,7 @@ export function AccountDirectionSection({ companyId }: { companyId: string }) {
           Where they&apos;re heading {sample ? <span className="sg-sample">Sample</span> : null}
         </h2>
       </header>
-      <div role="tablist" aria-label="Account intelligence" className="ci-tabs">
+      <div ref={tabStrip} role="tablist" aria-label="Account intelligence" className="ci-tabs tab-scroll">
         {TABS.map((t, i) => (
           <button
             key={t.key}

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
+import { useScrollableTabs } from '@/hooks/useScrollableTabs';
 import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -40,6 +41,7 @@ export function CompanyDetailPage() {
   const company = useCompany(id);
   const hierarchy = useCompanyHierarchy(id);
   const [tab, setTab] = useState<TabKey>('contacts');
+  const tabStrip = useScrollableTabs(tab);
   const tabId = (key: TabKey) => `company-tab-${key}`;
   const panelId = (key: TabKey) => `company-panel-${key}`;
   const [view, setViewState] = useState<View>(initialView);
@@ -174,7 +176,8 @@ export function CompanyDetailPage() {
           <ConsultingPartnersSection companyId={c.id} />
 
           <div
-            className="flex gap-2 border-b border-[var(--border-subtle)]"
+            ref={tabStrip}
+            className="tab-scroll gap-2 border-b border-[var(--border-subtle)]"
             role="tablist"
             aria-label={t('companyDetail.tabs.label', 'Company sections')}
           >
