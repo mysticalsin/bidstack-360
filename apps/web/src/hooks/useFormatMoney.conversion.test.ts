@@ -1,12 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import * as money from '@bidstack/shared';
 import { formatMicrosAmount } from '@bidstack/shared';
 
 import { fmtMoney } from '@/components/financials/financials-format';
 
+import * as format from '@/lib/format';
 import { formatConvertedMicros, formatMoney, formatMoneyMicros } from '@/lib/format';
 
-import { formatStoredMicros } from './useFormatMoney';
+import { formatPlainMoney, formatStoredMicros } from './useFormatMoney';
 
 describe('failed conversion keeps the source currency', () => {
   it('does not label a non-finite conversion with the display currency', () => {
@@ -17,10 +19,17 @@ describe('failed conversion keeps the source currency', () => {
   });
 
   it('keeps a parity conversion in the display currency', () => {
-    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD');
+    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD', undefined, () => 2_500_000n);
     expect(text).toContain('$');
     expect(text).toContain('2.50');
     expect(text).not.toContain('€');
+  });
+
+  it('keeps the source label when a numeric converter echoes the amount', () => {
+    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD');
+    expect(text).toContain('€');
+    expect(text).toContain('2.50');
+    expect(text).not.toContain('$');
   });
 
   it('keeps the source label when integer conversion is unavailable', () => {
@@ -62,5 +71,24 @@ describe('failed conversion keeps the source currency', () => {
 
   it('scales the stored micros before labelling them', () => {
     expect(formatMicrosAmount(100_000_000_000n)).toBe('100,000');
+  });
+
+  it('contains a throwing unit or formatter and still names the source', () => {
+    const units = vi.spyOn(money, 'unitsToMicros').mockImplementation(() => {
+      throw new Error('units');
+    });
+    expect(formatPlainMoney(2.5, 'EUR')).toContain('2.5');
+    expect(formatPlainMoney(2.5, 'EUR')).toContain('EUR');
+    expect(formatPlainMoney(-2.5, 'EUR')).toContain('EUR');
+    units.mockRestore();
+    const rendered = vi.spyOn(format, 'formatMoneyMicros').mockImplementation(() => {
+      throw new Error('format');
+    });
+    expect(formatPlainMoney(2.5, 'EUR')).toBe('2.5 EUR');
+    expect(formatPlainMoney(0, 'EUR')).toBe('0 EUR');
+    expect(formatPlainMoney(Number.NaN, 'EUR')).toContain('EUR');
+    rendered.mockRestore();
+    expect(formatPlainMoney(2.5, 'EUR')).toContain('2.50');
+    expect(formatPlainMoney(-2.5, 'EUR')).toContain('2.50');
   });
 });

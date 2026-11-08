@@ -18,10 +18,14 @@ const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 export function formatPlainMoney(value: number, currency: string): string {
   const label = currency.trim() || 'unspecified';
   if (!Number.isFinite(value)) return `${value} ${label}`;
-  const negative = value < 0;
-  const micros = unitsToMicros(negative ? -value : value);
-  if (micros == null) return `${value} ${label}`;
-  return formatMoneyMicros(negative ? -micros : micros, currency, { compact: false });
+  try {
+    const negative = value < 0;
+    const micros = unitsToMicros(negative ? -value : value);
+    if (micros == null) return `${value} ${label}`;
+    return formatMoneyMicros(negative ? -micros : micros, currency, { compact: false });
+  } catch {
+    return `${value} ${label}`;
+  }
 }
 
 function formatSourceOrDisplay(micros: bigint, currency: string, compact: boolean): string {
@@ -96,6 +100,10 @@ export function formatStoredMicros(
   if (!Number.isFinite(converted)) return exactSource();
   const convertedMicros = unitsToMicros(converted);
   if (convertedMicros == null || !convertedCentSurvives(converted)) return exactSource();
+  // The same integer is not proof of a rate. Equal-rate success is a non-null
+  // convertMicros result. A changed finite amount is the numeric converter's
+  // own result, which existing callers use for a real conversion.
+  if (convertedMicros === asBigInt) return exactSource();
   return formatMoneyMicros(convertedMicros.toString(), displayCurrency, options);
 }
 
