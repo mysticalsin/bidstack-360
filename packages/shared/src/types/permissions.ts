@@ -27,6 +27,7 @@ export const PERMISSION_KEYS = [
   'documents:write',
   'files:read',
   'files:write',
+  'ingest:write',
   'integrations:read',
   'integrations:write',
   'invoices:read',

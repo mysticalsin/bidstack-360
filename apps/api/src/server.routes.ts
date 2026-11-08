@@ -110,6 +110,8 @@ import { proposalRoutes } from './routes/proposals.js';
 import { crewAgentRoutes } from './routes/crew-agents.js';
 import { crewRoutes } from './routes/crews.js';
 import { activityRoutes } from './routes/activities.js';
+import { activityIngestRoutes } from './routes/activity-ingest.js';
+import { syncNowRoutes } from './routes/sync-now.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
 import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
@@ -288,6 +290,10 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
   await server.register(crewAgentRoutes, { prefix: '/api/v1' });
   await server.register(crewRoutes, { prefix: '/api/v1' });
   await server.register(activityRoutes, { prefix: '/api/v1' });
+  // Inbound activity API (Dust, external CRMs) + account activity summary
+  await server.register(activityIngestRoutes, { prefix: '/api/v1' });
+  // Sync now (Dust poll, HubSpot import): start, poll, last synced
+  await server.register(syncNowRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRequirementRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRfpRoutes, { prefix: '/api/v1' });

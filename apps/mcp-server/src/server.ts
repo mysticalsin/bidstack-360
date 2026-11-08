@@ -2,7 +2,8 @@
 // the Model Context Protocol spec. Legacy HTTP+SSE stays available during migration.
 //
 // Auth: Authorization: Bearer <bidstack API key with `mcp` + read/write scopes>
-// Rate-limited: 60/min and 600/hour per key.
+// Rate-limited: 60/min and 600/hour per key. Every tool call goes through
+// runToolCall: read-only grant, Serum policy, audit row, output cap.
 
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
@@ -17,7 +18,8 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
-import { mcpAuth, requireMcpScope, type McpAuthCtx } from './auth.js';
+import { mcpAuth, type McpAuthCtx } from './auth.js';
+import { runToolCall, type ToolAuditEntry } from './lib/tool-call.js';
 import { hourlyRateLimitPlugin, mcpRateLimitFailsClosed } from './plugins/hourly-rate-limit.js';
 import { pingRedis, redis } from './redis.js';
 import { assertSerumAllowsMcpToolCall } from './serum-policy.js';
@@ -57,16 +59,27 @@ function releaseMetadata(env: NodeJS.ProcessEnv = process.env): {
 } {
   return {
     commit:
-      env.BIDSTACK_RELEASE_COMMIT?.trim() ||
-      env.GIT_COMMIT?.trim() ||
-      env.GIT_SHA?.trim() ||
-      null,
+      env.BIDSTACK_RELEASE_COMMIT?.trim() || env.GIT_COMMIT?.trim() || env.GIT_SHA?.trim() || null,
     branch:
       env.BIDSTACK_RELEASE_BRANCH?.trim() ||
       env.GIT_BRANCH?.trim() ||
       env.VERCEL_GIT_COMMIT_REF?.trim() ||
       null,
   };
+}
+
+/** One audit row per tool call: who (key), what (tool + scope), outcome, size. */
+async function auditToolCall(entry: ToolAuditEntry): Promise<void> {
+  await prisma.auditLog.create({
+    data: {
+      orgId: entry.orgId,
+      userId: null,
+      action: entry.action,
+      targetType: 'api_key',
+      targetId: entry.keyId,
+      diff: entry.diff,
+    },
+  });
 }
 
 function createAuthenticatedMcp(ctx: McpAuthCtx): McpServer {
@@ -80,17 +93,16 @@ function createAuthenticatedMcp(ctx: McpAuthCtx): McpServer {
       name,
       tool.description,
       (tool.input as z.ZodObject<z.ZodRawShape>).shape,
-      async (args: unknown) => {
-        try {
-          requireMcpScope(ctx, requiredScope);
-          await assertSerumAllowsMcpToolCall(ctx, name);
-          const out = await (tool as LooseTool).handler(args, ctx);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
-        } catch (err) {
-          const message = err instanceof Error ? err.message : 'Internal error';
-          return { content: [{ type: 'text' as const, text: message }], isError: true };
-        }
-      },
+      async (args: unknown) =>
+        runToolCall({
+          name,
+          tool: tool as LooseTool,
+          scope: requiredScope,
+          args,
+          ctx,
+          audit: auditToolCall,
+          serum: (c, n) => assertSerumAllowsMcpToolCall(c, n as ToolName),
+        }),
     );
   }
 

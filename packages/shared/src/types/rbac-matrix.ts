@@ -109,9 +109,10 @@ function write(...res: string[]): PermissionKey[] {
  * Each entry lists the permissions granted to that role.
  */
 export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> = {
-  // msa:admin (archive MSAs and file versions, edit any MSA) and
-  // webhooks:replay (re-send a stored payload to an endpoint) are Admin-only.
-  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin', 'webhooks:replay'],
+  // msa:admin (archive MSAs and file versions, edit any MSA),
+  // webhooks:replay (re-send a stored payload to an endpoint) and
+  // ingest:write (bulk activity import by API key) are Admin-only.
+  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin', 'webhooks:replay', 'ingest:write'],
 
   'Sales Manager': [
     ...ALL_READ,
@@ -238,6 +239,8 @@ export const MATRIX_RESOURCES = [
   'contacts',
   'documents',
   'files',
+  // Inbound activity API (ingest:write, slice 9).
+  'ingest',
   'integrations',
   'invoices',
   'kam',

@@ -200,6 +200,21 @@ export { seedSigningEntities } from './seed-signing-entities.js';
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+// Inbound activity API + account activity aggregates. One service behind the
+// REST route (apps/api) and the MCP tools (apps/mcp-server).
+export {
+  ingestActivities,
+  ingestContentHash,
+  ingestDedupeKey,
+  normalizeIngestDomain,
+  type IngestActivitiesInput,
+  type IngestActor,
+} from './services/activity-ingest.js';
+export {
+  bucketActivitySummary,
+  getCompanyActivitySummary,
+  weekStartIn,
+} from './services/account-activity.js';
 
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';
