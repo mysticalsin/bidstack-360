@@ -234,9 +234,67 @@ export function googleMeetingHints(item: GoogleMeetingFields): MeetingHints {
 }
 
 /**
+ * How many times one provider item may fail the activity bridge on the same
+ * page before it stops pinning that page. The capture row is already saved;
+ * the id is kept on `activityBridgeQuarantine` so the miss is visible, and
+ * the cursor may then move so later items are not starved.
+ */
+export const ACTIVITY_BRIDGE_RETRY_LIMIT = 3;
+const BRIDGE_QUARANTINE_CAP = 50;
+
+export type ActivityBridgeQuarantine = { id: string; attempts: number; at: string };
+
+/**
+ * Record bridge failures for the page being synced.
+ *
+ * A failure under the limit holds the cursor so the provider offers the item
+ * again. The same id on the same page, once it reaches the limit, is
+ * quarantined and no longer holds the cursor. A different page starts a fresh
+ * count. An empty failure list clears the hold. The quarantine list is an
+ * audit of ids only — never subjects or bodies.
+ */
+export function noteActivityBridgeFailures(
+  state: Record<string, unknown>,
+  page: string,
+  failedIds: string[],
+  now = new Date().toISOString(),
+): { hold: boolean; quarantined: string[] } {
+  const ids = [...new Set(failedIds.filter((id) => id.length > 0))];
+  const previous = state.activityBridgeRetry as { page?: string; counts?: Record<string, number> } | undefined;
+  if (ids.length === 0) {
+    // A clean page clears only its own hold. Another folder's retry stays.
+    if (previous?.page === page) delete state.activityBridgeRetry;
+    return { hold: false, quarantined: [] };
+  }
+  const counts: Record<string, number> = previous?.page === page ? { ...(previous.counts ?? {}) } : {};
+  const quarantined: string[] = [];
+  let hold = false;
+  for (const id of ids) {
+    const attempts = (counts[id] ?? 0) + 1;
+    counts[id] = attempts;
+    if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) quarantined.push(id);
+    else hold = true;
+  }
+  if (hold) state.activityBridgeRetry = { page, counts };
+  else delete state.activityBridgeRetry;
+  if (quarantined.length > 0) {
+    const prior = Array.isArray(state.activityBridgeQuarantine)
+      ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
+      : [];
+    const fresh = quarantined.map((id) => ({ id, attempts: counts[id] ?? ACTIVITY_BRIDGE_RETRY_LIMIT, at: now }));
+    state.activityBridgeQuarantine = [...fresh, ...prior.filter((entry) => !quarantined.includes(entry.id))].slice(
+      0,
+      BRIDGE_QUARANTINE_CAP,
+    );
+  }
+  return { hold, quarantined };
+}
+
+/**
  * Run the activity bridge for a synced item. A failure never undoes the
  * capture. Callers that advance an incremental cursor must keep the current
- * page when this returns false, or the provider will not offer the item again.
+ * page when this returns false, until {@link noteActivityBridgeFailures}
+ * quarantines a repeated failure.
  */
 export async function bridgeActivity(
   run: () => Promise<unknown>,

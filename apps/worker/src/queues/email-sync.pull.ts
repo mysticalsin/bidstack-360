@@ -10,7 +10,7 @@ import type pino from 'pino';
 
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
-import { bridgeActivity, captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { getWorkspaceAccessToken } from '../lib/workspace-token.js';
 
@@ -75,6 +75,7 @@ export async function pullDelta(
     let holdCursor = false;
 
     for (let page = 0; page < MAX_PAGES_PER_FOLDER; page++) {
+      const failedIds: string[] = [];
       const res = await providerFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } }, { provider: 'Microsoft Graph' });
 
       if (res.status === 410) {
@@ -141,12 +142,20 @@ export async function pullDelta(
             { msgId: msg.id },
           );
           persisted++;
-          if (!bridged) holdCursor = true;
+          if (!bridged) failedIds.push(msg.id);
         } catch (err) {
           log.warn({ err, msgId: msg.id }, 'Failed to persist Graph message');
         }
       }
 
+      const bridge = noteActivityBridgeFailures(deltaState, url, failedIds);
+      if (bridge.quarantined.length > 0) {
+        log.warn(
+          { tokenId: token.id, folder: f.folder, ids: bridge.quarantined },
+          'Account activity bridge quarantined after repeated failures',
+        );
+      }
+      holdCursor = bridge.hold;
       if (holdCursor) break;
 
       if (data['@odata.deltaLink']) {

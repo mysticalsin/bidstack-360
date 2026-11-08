@@ -3,6 +3,7 @@
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ACTIVITY_BRIDGE_RETRY_LIMIT } from '../lib/comms-capture.js';
 import type * as CommsCapture from '../lib/comms-capture.js';
 
 import { prisma, syncCalendarEventActivity } from '@bidstack/db';
@@ -94,6 +95,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  vi.mocked(syncCalendarEventActivity).mockResolvedValue({ action: 'created', activityId: 'act-1' });
 });
 
 describe('Microsoft calendar pull', () => {
@@ -250,6 +252,42 @@ describe('Microsoft calendar pull', () => {
     };
     expect(saved.data.deltaState.calendarDeltaLink).toBeUndefined();
     expect(saved.data.deltaState.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
+  });
+
+  it('quarantines a poison event after the retry bound so the cursor can move', async () => {
+    upsert.mockResolvedValue({ id: 'row-1' } as never);
+    vi.mocked(syncCalendarEventActivity).mockRejectedValue(new Error('db down'));
+    const poison = {
+      value: [
+        {
+          id: 'ev-poison',
+          subject: 'Stuck',
+          start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+          end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+        },
+      ],
+      '@odata.deltaLink': 'd-next',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => json(poison)));
+    let state: Record<string, unknown> = {};
+    for (let attempt = 0; attempt < ACTIVITY_BRIDGE_RETRY_LIMIT - 1; attempt++) {
+      await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', state, log, 'tony@amaris.com');
+      state = (
+        tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }
+      ).data.deltaState;
+      expect(state.calendarDeltaLink).toBeUndefined();
+      expect(state.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
+    }
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', state, log, 'tony@amaris.com');
+    const last = (
+      tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }
+    ).data.deltaState;
+    expect(last.calendarDeltaLink).toBe('d-next');
+    expect(last.calendarNextLink).toBeUndefined();
+    expect(last.activityBridgeQuarantine).toEqual([
+      expect.objectContaining({ id: 'ev-poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
+    ]);
+    expect(JSON.stringify(last.activityBridgeQuarantine)).not.toContain('Stuck');
   });
 
   it('raises a rate limit error with the Retry-After wait on 429', async () => {

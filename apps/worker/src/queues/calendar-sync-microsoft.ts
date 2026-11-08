@@ -17,6 +17,7 @@ import {
   bridgeActivity,
   calendarFiling,
   graphMeetingHints,
+  noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
   type GraphMeetingFields,
@@ -188,8 +189,15 @@ export async function pullMicrosoftIncremental(
     };
     const items = body.value ?? [];
     count += items.length;
-    const bridged = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
-    if (!bridged) {
+    const failed = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
+    const bridge = noteActivityBridgeFailures(deltaState, url, failed);
+    if (bridge.quarantined.length > 0) {
+      log.warn(
+        { tokenId, ids: bridge.quarantined },
+        'Account activity bridge quarantined after repeated failures',
+      );
+    }
+    if (bridge.hold) {
       // The calendar row is already saved. Holding this page lets the next
       // tick retry the activity write before Graph moves past the item.
       await prisma.integrationToken.update({
@@ -248,8 +256,8 @@ async function upsertMicrosoftEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<boolean> {
-  let bridged = true;
+): Promise<string[]> {
+  const failed: string[] = [];
   for (const item of items) {
     if (!item.id) continue;
 
@@ -259,7 +267,7 @@ async function upsertMicrosoftEvents(
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
       const removed = await syncRemovedEvents(orgId, userId, 'microsoft_graph', item.id, log);
-      if (!removed) bridged = false;
+      if (!removed) failed.push(item.id);
       continue;
     }
 
@@ -320,12 +328,12 @@ async function upsertMicrosoftEvents(
         log,
         { eventId: item.id },
       );
-      if (!ok) bridged = false;
+      if (!ok) failed.push(item.id);
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert MS event; skipping');
     }
   }
-  return bridged;
+  return failed;
 }
 
 /** Cancel the activity of an event the provider removed. */

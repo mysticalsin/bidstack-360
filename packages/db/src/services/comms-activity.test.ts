@@ -310,6 +310,24 @@ describe('comms activity bridge: meetings', () => {
     expect(db.activity.rows[0]!.deletedAt).toBeInstanceOf(Date);
   });
 
+  it('does not revive a legacy tomb that a private pull cannot recognise as its own', async () => {
+    const db = fakeDb({ events: [event()] });
+    const bridge = bridgeFor(db);
+    await bridge.syncCalendarEvent(ORG, EVENT);
+    const row = db.activity.rows[0]!;
+    row.deletedAt = new Date();
+    row.metadata = { note: 'legacy' };
+    const priv = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: true } });
+    expect(priv).toMatchObject({ action: 'skipped', reason: 'deleted_by_user' });
+    expect(row.metadata).toEqual({ note: 'legacy' });
+    expect(row.deletedAt).toBeInstanceOf(Date);
+    const back = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { isPrivate: false } });
+    expect(back).toMatchObject({ action: 'skipped', reason: 'deleted_by_user' });
+    expect(db.activity.rows).toHaveLength(1);
+    expect(row.deletedAt).toBeInstanceOf(Date);
+    expect(JSON.stringify(row.metadata)).not.toContain('removedBy');
+  });
+
   it('announces new account activity once, with no actor for automatic filing', async () => {
     const seen: unknown[] = [];
     const off = subscribeAccountActivityCreated((e) => {

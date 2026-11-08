@@ -18,6 +18,7 @@ import {
   bridgeActivity,
   calendarFiling,
   googleMeetingHints,
+  noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
   type GoogleMeetingFields,
@@ -217,8 +218,12 @@ export async function pullGoogleIncremental(
     const body = (await res.json()) as { items?: GoogleEventItem[]; nextSyncToken?: string; nextPageToken?: string };
     const items = body.items ?? [];
     count += items.length;
-    const bridged = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
-    if (!bridged) {
+    const failed = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
+    const bridge = noteActivityBridgeFailures(deltaState, `google:${syncToken ?? ''}:${pageToken ?? ''}`, failed);
+    if (bridge.quarantined.length > 0) {
+      log.warn({ tokenId, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
+    }
+    if (bridge.hold) {
       await prisma.integrationToken.update({
         where: { id: tokenId },
         data: {
@@ -256,8 +261,8 @@ async function upsertGoogleEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<boolean> {
-  let bridged = true;
+): Promise<string[]> {
+  const failed: string[] = [];
   for (const item of items) {
     if (!item.id) continue;
 
@@ -267,7 +272,7 @@ async function upsertGoogleEvents(
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
       const removed = await syncRemovedEvents(orgId, userId, 'google_workspace', item.id, log);
-      if (!removed) bridged = false;
+      if (!removed) failed.push(item.id);
       continue;
     }
 
@@ -322,12 +327,12 @@ async function upsertGoogleEvents(
         log,
         { eventId: item.id },
       );
-      if (!ok) bridged = false;
+      if (!ok) failed.push(item.id);
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
     }
   }
-  return bridged;
+  return failed;
 }
 
 // ─── Google watch channel renewal ─────────────────────────────────────────

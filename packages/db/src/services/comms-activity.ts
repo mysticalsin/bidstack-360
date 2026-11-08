@@ -263,9 +263,13 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
     // Privacy is decided before cancellation. A cancelled private meeting would
     // otherwise stay on the account page, because cancelled rows are listed.
     if (hints.isPrivate) {
-      // A person already deleted this row. Remember privacy, but do not stamp
-      // removedBy "sync" or the next public pull would bring their deletion back.
-      const userDeleted = Boolean(tomb && prior && prior.removedBy !== 'sync');
+      // Only a tomb this sync wrote (removedBy "sync") may be updated or
+      // restored. A legacy row, a person delete, or metadata we cannot read
+      // stays deleted and is never stamped as a sync tomb.
+      const syncOwnedTomb = Boolean(tomb && prior?.removedBy === 'sync');
+      if (tomb && !syncOwnedTomb) {
+        return { action: 'skipped', reason: 'deleted_by_user', activityId: tomb.id };
+      }
       const hidden: CommsCaptureMeta = {
         version: 1,
         kind: n.kind,
@@ -284,7 +288,7 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
         participantCount: 0,
         isPrivate: true,
         ownerDeclined: hints.ownerDeclined,
-        ...(userDeleted ? {} : { removedBy: 'sync' as const }),
+        removedBy: 'sync',
       };
       const hiddenData = {
         subject: null,
@@ -306,11 +310,7 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
           where: { id: tomb.id, orgId, deletedAt: { not: null } },
           data: hiddenData,
         });
-        return {
-          action: 'skipped',
-          reason: userDeleted ? 'deleted_by_user' : 'private',
-          activityId: tomb.id,
-        };
+        return { action: 'skipped', reason: 'private', activityId: tomb.id };
       }
       try {
         const created = await db.activity.create({

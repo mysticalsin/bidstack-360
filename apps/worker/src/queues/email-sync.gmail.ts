@@ -10,7 +10,7 @@ import type pino from 'pino';
 
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
-import { bridgeActivity, captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -159,7 +159,7 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
   }
 
   let persisted = 0;
-  let holdHistory = false;
+  const failedIds: string[] = [];
   for (const id of ids.slice(0, MAX_MESSAGES_PER_RUN)) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) continue;
@@ -214,17 +214,21 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
         { msgId: msg.id },
       );
       persisted++;
-      if (!bridged) holdHistory = true;
+      if (!bridged) failedIds.push(msg.id);
     } catch (err) {
       log.warn({ err, msgId: msg.id }, 'Failed to persist Gmail message');
     }
   }
 
-  if (holdHistory) {
+  const bridge = noteActivityBridgeFailures(deltaState, `gmail:${cursor ?? 'seed'}`, failedIds);
+  if (bridge.quarantined.length > 0) {
+    log.warn({ tokenId: token.id, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
+  }
+  if (bridge.hold) {
     log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
     await prisma.integrationToken.update({
       where: { id: token.id },
-      data: { lastSyncedAt: new Date() },
+      data: { deltaState: deltaState as object, lastSyncedAt: new Date() },
     });
     return persisted;
   }
