@@ -1,3 +1,4 @@
+export * from './query-boolean.js';
 export * from './opportunity.js';
 export * from './contact.js';
 export * from './crm.js';
