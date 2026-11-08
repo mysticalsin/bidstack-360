@@ -21,7 +21,8 @@ out/
 # IDE
 .vscode/
 .idea/
-.cursor/
+.cursor/*
+!.cursor/BUGBOT.md
 *.swp
 *.swo
 
