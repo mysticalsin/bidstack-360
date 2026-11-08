@@ -39,8 +39,10 @@ export async function verifyAuditChain(orgId: string): Promise<AuditChainReport>
     WITH chain AS (
       SELECT a.id,
              a.chain_seq,
-             a.row_hash = audit_log_row_digest(a.prev_hash, a) AS hash_ok,
-             (lag(a.row_hash) OVER w IS NULL OR a.prev_hash = lag(a.row_hash) OVER w) AS link_ok,
+             -- NULL-safe: a cleared digest must read as a break, not as unknown.
+             coalesce(a.row_hash = audit_log_row_digest(a.prev_hash, a), false) AS hash_ok,
+             (lag(a.chain_seq) OVER w IS NULL
+                OR a.prev_hash IS NOT DISTINCT FROM lag(a.row_hash) OVER w) AS link_ok,
              (lag(a.chain_seq) OVER w IS NULL OR a.chain_seq = lag(a.chain_seq) OVER w + 1) AS seq_ok
         FROM audit_log a
        WHERE a.org_id = ${orgId}::uuid AND a.chain_seq IS NOT NULL
@@ -48,7 +50,7 @@ export async function verifyAuditChain(orgId: string): Promise<AuditChainReport>
     )
     SELECT id, chain_seq, hash_ok, link_ok, seq_ok
       FROM chain
-     WHERE NOT (hash_ok AND link_ok AND seq_ok)
+     WHERE (hash_ok AND link_ok AND seq_ok) IS NOT TRUE
      ORDER BY chain_seq
      LIMIT ${MAX_BREAKS}`;
 

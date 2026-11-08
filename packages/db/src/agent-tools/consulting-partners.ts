@@ -24,9 +24,10 @@ import {
 } from '../consulting-partners.js';
 import { prisma } from '../index.js';
 
-import type { AgentCitation, AgentTool } from './types.js';
+import { companyScopeWhere, type AgentCitation, type AgentTool } from './types.js';
 
 const MAX_PARTNERS = 12;
+const EVIDENCE_CAP = 50;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NOTE = 'Scores and angles cite evidence ids listed under evidence. A dimension with no evidence shows no_evidence, not a guess. Lines marked inferred are derived by rules.';
 
@@ -38,6 +39,27 @@ const Input = z
     limit: z.number().int().min(1).max(MAX_PARTNERS).default(6),
   })
   .refine((v) => Boolean(v.companyId || v.companyName), { message: 'companyId or companyName is required' });
+
+/**
+ * Bound the evidence returned while keeping every citation resolvable: take
+ * ids breadth first across the angle and score card lists, so each list keeps
+ * at least its first citation, then the caller drops ids that were not picked.
+ */
+function pickCitedEvidence(lists: string[][]): Set<string> {
+  const cap = Math.max(EVIDENCE_CAP, lists.length);
+  const picked = new Set<string>();
+  for (let depth = 0; picked.size < cap; depth += 1) {
+    let more = false;
+    for (const ids of lists) {
+      const id = ids[depth];
+      if (id === undefined) continue;
+      more = true;
+      if (picked.size < cap) picked.add(id);
+    }
+    if (!more) break;
+  }
+  return picked;
+}
 
 function stripMarkup(value: string): string {
   return value
@@ -77,11 +99,13 @@ export const consultingPartners = {
   kind: 'read',
   permission: 'account-intel:read',
   async handler(args, ctx) {
+    const scope = companyScopeWhere(ctx);
     const company = await prisma.company.findFirst({
       where: {
         orgId: ctx.orgId,
         deletedAt: null,
         ...(args.companyId ? { id: args.companyId } : { name: { equals: args.companyName ?? '', mode: 'insensitive' as const } }),
+        ...(scope ? { AND: [scope] } : {}),
       },
       select: { id: true, name: true },
     });
@@ -97,15 +121,20 @@ export const consultingPartners = {
     ]);
     const evidence = visible.map(toPartnerEvidence);
     const summary = composeConsultingPartners({ companyId: company.id, clientName: company.name, firms, evidence, engagements, run, now: new Date() });
-    const partners = summary.partners.slice(0, Math.max(1, Math.min(MAX_PARTNERS, Number(args.limit ?? 6))));
-    const cited = new Set(partners.flatMap((p) => [...p.angles.flatMap((a) => a.evidenceIds), ...p.scorecard.flatMap((d) => d.evidenceIds)]));
+    const top = summary.partners.slice(0, Math.max(1, Math.min(MAX_PARTNERS, Number(args.limit ?? 6))));
+    const cited = pickCitedEvidence(top.flatMap((p) => [...p.angles.map((a) => a.evidenceIds), ...p.scorecard.map((d) => d.evidenceIds)]));
+    const keep = (ids: string[]) => ids.filter((id) => cited.has(id));
+    const partners = top.map(({ timeline: _timeline, ...p }) => ({
+      ...p,
+      scorecard: p.scorecard.map((d) => ({ ...d, evidenceIds: keep(d.evidenceIds) })),
+      angles: p.angles.map((a) => ({ ...a, evidenceIds: keep(a.evidenceIds) })),
+    }));
     const citations: AgentCitation[] = [{ kind: 'account', label: company.name, href: `/accounts/${company.id}` }];
     return clean({
       account: company.name,
-      partners: partners.map(({ timeline: _timeline, ...p }) => p),
+      partners,
       evidence: evidence
         .filter((e) => cited.has(e.id))
-        .slice(0, 50)
         .map((e) => ({ id: e.id, firm: e.firmName, origin: e.origin, source: e.sourceLabel, url: e.url, recordHref: e.recordHref, date: e.date, excerpt: e.excerpt, method: e.method, inferred: e.inferred })),
       lastFetchedAt: run.lastFetchedAt,
       sample: summary.sample,

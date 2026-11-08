@@ -135,4 +135,13 @@ describe('llmPartnerRemarks', () => {
     expect(await llmPartnerRemarks([d], firms, async () => 'not json')).toBe(0);
     expect(d.remarks).toEqual([]);
   });
+
+  // Valid JSON of the wrong shape must not abort the refresh and lose the
+  // evidence already collected.
+  it('skips null answers and null remarks instead of throwing', async () => {
+    const d = internalDraft('The client told us KPMG took four months to staff the team.');
+    await expect(llmPartnerRemarks([d], firms, async () => 'null')).resolves.toBe(0);
+    await expect(llmPartnerRemarks([d], firms, async () => '{"remarks":[null, 3]}')).resolves.toBe(0);
+    expect(d.remarks).toEqual([]);
+  });
 });

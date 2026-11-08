@@ -35,7 +35,7 @@ import {
 } from '@bidstack/shared';
 
 import { visiblePartnerRows } from '../consulting-partners/visibility.js';
-import { applyCompanyScope, applyOpportunityScope, getAccessScope, type AccessScope } from '../lib/access-scope.js';
+import { applyCompanyScope, applyOpportunityScope, getAccessScope, isApiKeyActor, type AccessScope } from '../lib/access-scope.js';
 import { enqueueConsultingPartners } from '../queues/consulting-partners.js';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -53,8 +53,17 @@ function shouldAuditRead(key: string, now = Date.now()): boolean {
 }
 
 async function audit(req: FastifyRequest, action: string, targetId: string, diff: Record<string, unknown> = {}): Promise<void> {
+  // AuditLog.userId is a User uuid; an API key keeps its identity in the diff.
+  const apiKey = isApiKeyActor(req.auth.userId);
   await prisma.auditLog.create({
-    data: { orgId: req.auth.orgId, userId: req.auth.userId, action, targetType: 'company', targetId, diff: diff as Prisma.InputJsonValue },
+    data: {
+      orgId: req.auth.orgId,
+      userId: apiKey ? null : req.auth.userId,
+      action,
+      targetType: 'company',
+      targetId,
+      diff: (apiKey ? { ...diff, actor: req.auth.userId } : diff) as Prisma.InputJsonValue,
+    },
   });
 }
 

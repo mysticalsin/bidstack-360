@@ -15,6 +15,7 @@ import { afterAll, afterEach, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
+import { invalidateAccessScope } from '../lib/access-scope.js';
 import { redis } from '../redis.js';
 import { buildServer } from '../server.js';
 import { __setJarvisLlmForTest, JARVIS_MAX_STEPS } from '../services/jarvis/jarvis.loop.js';
@@ -337,6 +338,126 @@ describe('Jarvis with an LLM planner', () => {
     expect(view.status).toBe('done');
     expect(view.steps).toHaveLength(JARVIS_MAX_STEPS);
     expect(view.answer?.text).toMatch(/step limit/i);
+  });
+});
+
+// The shared tools must keep the REST boundaries: proposals need
+// proposals:read and the owner-or-admin rule, approved proposals stay
+// immutable, and access groups hide accounts.
+describe('Jarvis tools keep the REST access boundaries', () => {
+  async function callTool(tool: string, args: Record<string, unknown>, headers: Record<string, string> = {}) {
+    const prompts: string[] = [];
+    __setJarvisLlmForTest(async ({ user }) => {
+      prompts.push(user);
+      return prompts.length === 1
+        ? JSON.stringify({ type: 'tool', tool, args })
+        : JSON.stringify({ type: 'answer', text: 'Checked.' });
+    });
+    const view = await runToEnd('Check this record', {}, headers);
+    return { step: view.steps[0]!, output: prompts[1] ?? '' };
+  }
+
+  const stubUser = (email: string) =>
+    prisma.user.findFirstOrThrow({ where: { orgId, email }, select: { id: true } });
+
+  const adminId = async () =>
+    (await prisma.user.findFirstOrThrow({ where: { orgId }, orderBy: { createdAt: 'asc' } })).id;
+
+  async function proposalFor(ownerId: string, status: 'draft' | 'review' | 'approved', name: string) {
+    const opp = await prisma.opportunity.findFirstOrThrow({ where: { orgId, code: 'OP-0002' } });
+    return prisma.proposal.create({
+      data: { orgId, opportunityId: opp.id, name, status, ownerId, dueDate: new Date('2026-01-10') },
+    });
+  }
+
+  t('overdue bids leave out proposals for a role without proposals:read', async () => {
+    const name = `Overdue proposal ${randomUUID().slice(0, 6)}`;
+    await proposalFor(await adminId(), 'review', name);
+    const admin = await callTool('bids.overdue', {});
+    expect(admin.output).toContain(name);
+    const cs = await callTool('bids.overdue', {}, { 'x-bidstack-e2e-role': 'customer-success' });
+    expect(cs.step.status).toBe('done');
+    expect(cs.output).toContain('OP-0004');
+    expect(cs.output).not.toContain(name);
+  });
+
+  t('records.resolve and rfp.summary leave out proposals for a role without proposals:read', async () => {
+    const name = `Resolver proposal ${randomUUID().slice(0, 6)}`;
+    await proposalFor(await adminId(), 'draft', name);
+    const cs = { 'x-bidstack-e2e-role': 'customer-success' };
+    expect((await callTool('records.resolve', { text: `Where is ${name}?` })).output).toContain(name);
+    expect((await callTool('records.resolve', { text: `Where is ${name}?` }, cs)).output).not.toContain(name);
+    const opp = await prisma.opportunity.findFirstOrThrow({ where: { orgId, code: 'OP-0002' } });
+    expect((await callTool('rfp.summary', { opportunityId: opp.id }, cs)).output).not.toContain(name);
+  });
+
+  t('a non-admin cannot read or draft into a proposal another user owns', async () => {
+    const ae = { 'x-bidstack-e2e-role': 'account-executive' };
+    const name = `Owned proposal ${randomUUID().slice(0, 6)}`;
+    const proposal = await proposalFor(await adminId(), 'draft', name);
+    const draft = { proposalId: proposal.id, key: 'executive_summary', content: 'Overwritten by Jarvis.' };
+
+    const blocked = await callTool('proposal.section_draft', draft, ae);
+    expect(blocked.step.status).toBe('error');
+    expect(blocked.step.summary).toBe('Proposal not found');
+    expect((await callTool('proposal.status', { proposalId: proposal.id }, ae)).output).not.toContain(name);
+
+    const aeId = (await stubUser('e2e-account-executive@bidstack.local')).id;
+    await prisma.proposal.update({ where: { id: proposal.id }, data: { ownerId: aeId } });
+    const own = await callTool('proposal.section_draft', draft, ae);
+    expect(own.step.status).toBe('pending');
+  });
+
+  t('an approved proposal is locked for Jarvis drafts, even for an admin', async () => {
+    const proposal = await proposalFor(await adminId(), 'approved', `Approved ${randomUUID().slice(0, 6)}`);
+    const res = await callTool('proposal.section_draft', {
+      proposalId: proposal.id,
+      key: 'executive_summary',
+      content: 'Silent rewrite.',
+    });
+    expect(res.step.status).toBe('error');
+    expect(res.step.summary).toMatch(/approved; sections are locked/);
+  });
+
+  t('consulting_partners hides an account outside the user access groups', async () => {
+    const manager = { 'x-bidstack-e2e-role': 'sales-manager' };
+    await runToEnd('Which bids are overdue?', {}, manager);
+    const managerId = (await stubUser('e2e-manager@bidstack.local')).id;
+    const company = await prisma.company.create({
+      data: { orgId, name: `Out of scope Co ${randomUUID().slice(0, 6)}`, countryCode: 'FR' },
+    });
+    const group = await prisma.userGroup.create({
+      data: { orgId, name: `Jarvis ZZ only ${randomUUID().slice(0, 6)}`, scopeCountries: ['ZZ'] },
+    });
+    await prisma.userGroupMember.create({ data: { orgId, groupId: group.id, userId: managerId } });
+    invalidateAccessScope(orgId, managerId);
+    try {
+      const hidden = await callTool('consulting_partners', { companyId: company.id }, manager);
+      expect(hidden.step.status).toBe('error');
+      expect(hidden.step.summary).toBe('Account not found');
+      expect((await callTool('consulting_partners', { companyId: company.id })).step.status).toBe('done');
+    } finally {
+      await prisma.userGroup.delete({ where: { id: group.id } });
+      invalidateAccessScope(orgId, managerId);
+    }
+  });
+
+  t('records.resolve finds an exact OP code outside the most recent 500 deals', async () => {
+    const old = new Date('2020-01-01T00:00:00Z');
+    await prisma.opportunity.create({
+      data: {
+        orgId, code: 'OP-7001', customer: 'Legacy Co', name: 'Legacy deal', stage: 's1_ongoing',
+        valueMicros: 1_000_000, probability: 10, intel: {}, updatedAt: old,
+      },
+    });
+    await prisma.opportunity.createMany({
+      data: Array.from({ length: 501 }, (_, i) => ({
+        orgId, code: `OP-${8000 + i}`, customer: 'Bulk Co', name: `Bulk deal ${i}`, stage: 's1_ongoing' as const,
+        valueMicros: 1_000_000, probability: 10, intel: {},
+      })),
+    });
+    const res = await callTool('records.resolve', { text: 'What happened on OP-7001?' });
+    expect(res.output).toContain('Legacy deal');
   });
 });
 

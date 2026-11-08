@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 
 import { prisma, savePartnerEvidence, scanInternalPartnerEvidence } from '@bidstack/db';
@@ -151,5 +153,35 @@ describe('consulting partners routes', () => {
     expect((await get(`/api/v1/companies/${foreign.id}/consulting-partners/ey/evidence`)).statusCode).toBe(404);
     expect((await server.inject({ method: 'POST', url: `/api/v1/companies/${foreign.id}/consulting-partners/refresh` })).statusCode).toBe(404);
     await prisma.org.delete({ where: { id: other.id } }).catch(() => undefined);
+  });
+  // AuditLog.userId is a User uuid; an API key actor ("apikey:<id>") made the
+  // audit insert fail, so the summary 500ed and the refresh 500ed after queueing.
+  skipIfNoDb('an API key reads the summary and queues a refresh; the audit keeps the key in the diff', async () => {
+    const { c } = await seeded();
+    const raw = `bs_partners_${randomUUID()}`;
+    const key = await prisma.apiKey.create({
+      data: {
+        orgId: orgId!,
+        name: 'partners key',
+        prefix: raw.slice(0, 8),
+        hashedKey: createHash('sha256').update(raw).digest('hex'),
+        scopes: ['account-intel:read', 'account-intel:write'],
+        unrestrictedScope: true,
+        readOnly: false,
+      },
+    });
+    const headers = { 'x-api-key': raw };
+    expect((await get(`/api/v1/companies/${c.id}/consulting-partners`, headers)).statusCode).toBe(200);
+    const refresh = await server.inject({ method: 'POST', url: `/api/v1/companies/${c.id}/consulting-partners/refresh`, headers });
+    expect(refresh.statusCode).toBe(202);
+    const rows = await prisma.auditLog.findMany({
+      where: { orgId: orgId!, targetId: c.id, action: { startsWith: 'partners.' } },
+      select: { userId: true, diff: true },
+    });
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    for (const row of rows) {
+      expect(row.userId).toBeNull();
+      expect((row.diff as { actor?: string }).actor).toBe(`apikey:${key.id}`);
+    }
   });
 });

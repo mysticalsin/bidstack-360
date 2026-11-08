@@ -18,6 +18,9 @@ import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 export const HUBSPOT_IMPORT_ENTITIES = ['companies', 'contacts', 'deals', 'tasks'] as const;
 export type HubspotImportEntity = (typeof HUBSPOT_IMPORT_ENTITIES)[number];
+/** What Sync now imports: the migration worker has no task mapping and fails a
+ *  tasks job, which would mark the whole run failed. */
+export const HUBSPOT_SYNC_ENTITIES = ['companies', 'contacts', 'deals'] as const satisfies readonly HubspotImportEntity[];
 
 const HUBSPOT_INTEGRATION_TYPE = 'hubspot';
 const HUBSPOT_MIGRATION_CONFIG_NAME = 'hubspot-migration';

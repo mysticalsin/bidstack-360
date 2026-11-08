@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
@@ -150,7 +150,25 @@ export interface JarvisDecisionInput {
 
 export interface JarvisDecisionResult {
   ok: boolean;
+  tool?: string;
+  result?: { id?: string; proposalId?: string } | null;
   citation?: JarvisCitation | null;
+}
+
+/** Queries a confirmed Jarvis write made stale, matching the normal edit hooks. */
+export function jarvisWriteQueryKeys(data: JarvisDecisionResult): QueryKey[] {
+  switch (data.tool) {
+    case 'opportunity.update':
+      return [
+        ...(data.result?.id ? [['opportunity', data.result.id]] : []),
+        ['opportunities'],
+        ['report:pipeline'],
+      ];
+    case 'proposal.section_draft':
+      return [...(data.result?.proposalId ? [['proposal', data.result.proposalId]] : []), ['proposals']];
+    default:
+      return [['tasks']];
+  }
 }
 
 export function useStartJarvisRun() {
@@ -179,8 +197,11 @@ export function useJarvisActionDecision() {
       api<JarvisDecisionResult>(`/api/ai-assistant/jarvis/actions/${actionId}/${decision}`, {
         method: 'POST',
       }),
-    onSuccess: (_data, vars) => {
-      if (vars.decision === 'confirm') void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    onSuccess: (data, vars) => {
+      if (vars.decision !== 'confirm') return;
+      for (const queryKey of jarvisWriteQueryKeys(data)) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
     },
   });
 }
