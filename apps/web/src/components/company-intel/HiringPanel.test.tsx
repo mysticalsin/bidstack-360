@@ -136,6 +136,28 @@ describe('HiringPanel shares and company changes', () => {
     expect(within(screen.getByTestId('hiring-postings')).getByText('Account executive')).toBeTruthy();
   });
 
+  it('collapses an expanded list when the same company is refreshed', () => {
+    const many = {
+      ...hiring,
+      postings: Array.from({ length: 10 }, (_, index) =>
+        posting(String(index), `Role ${index}`, 'infrastructure', null, ['Azure']),
+      ),
+    };
+    const { rerender } = render(<HiringPanel h={many} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Azure: 12/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Show all 10 roles/ }));
+    expect(within(screen.getByTestId('hiring-postings')).getByText('Role 9')).toBeTruthy();
+    rerender(<HiringPanel h={{
+      ...many,
+      postings: Array.from({ length: 10 }, (_, index) =>
+        posting(`b${index}`, `Next ${index}`, 'infrastructure', null, ['Azure']),
+      ),
+    }} />);
+    expect(screen.getByText('Roles: Azure')).toBeTruthy();
+    expect(within(screen.getByTestId('hiring-postings')).queryByText('Next 9')).toBeNull();
+    expect(within(screen.getByTestId('hiring-postings')).getByText('Next 0')).toBeTruthy();
+  });
+
   it('collapses the list when the filter is cleared', () => {
     const many = {
       ...hiring,

@@ -170,10 +170,10 @@ function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
   // A refresh of this same company can drop every role the filter named.
   // Keeping that filter would hide the new list. A filter that still matches stays.
   useEffect(() => {
+    setAll(false);
     if (!filter) return;
     if (h.postings.some((posting) => matches(posting, filter))) return;
     setFilter(null);
-    setAll(false);
   }, [filter, h.postings]);
   const shown = all ? filtered : filtered.slice(0, POSTINGS_SHOWN);
   const pick = (f: HiringFilter) => {
