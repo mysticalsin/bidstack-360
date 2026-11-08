@@ -100,6 +100,18 @@ describe('integrations:write parity with contacts:write', () => {
     expect(presales).not.toContain('proposals:approve');
   });
 
+  it('webhook replay is an Admin-only grant, separate from webhooks:write', () => {
+    // WHY: a replay re-sends stored CRM payloads to an external system. Only
+    // the tenant administrator may do that; holding webhooks:write (or every
+    // read key) is not enough.
+    expect(PERMISSION_KEYS as readonly string[]).toContain('webhooks:replay');
+    expect(ALL_PERMISSION_KEYS).toContain('webhooks:replay');
+    const holders = ROLE_SEEDS.filter((r) => r.permissionKeys.includes('webhooks:replay')).map(
+      (r) => r.name,
+    );
+    expect(holders).toEqual(['Admin']);
+  });
+
   it('Presales (a write role without contacts:write) is not granted integrations:write', () => {
     // Guards against over-granting: Presales writes bid-scores/documents/proposals
     // etc but never contacts, so it must not pick up integrations:write either.

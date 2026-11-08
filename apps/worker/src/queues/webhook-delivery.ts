@@ -13,14 +13,17 @@
  *   The legacy X-BidStack-Signature header carries the same value during the
  *   rebrand deprecation window so existing receivers keep verifying.
  *
- * Retry schedule (configured in queue-config.ts WEBHOOK_DELIVERY):
- *   attempt 1: immediate
- *   attempt 2: +30 s
- *   attempt 3: +2 min
- *   attempt 4: +15 min (accumulated from exponential)
- *   attempt 5: +1 h
- * Dead-letter after 5 failures. Increments failureCount on the subscription.
- * Subscriptions with failureCount >= 10 are auto-disabled.
+ * Retry schedule: per endpoint (WebhookSubscription maxAttempts, backoffStrategy,
+ * backoffBaseSeconds, timeoutMs). The default is 5 attempts, exponential from
+ * 30 s: +30 s, +1 min, +2 min, +4 min between tries. The queue allows up to
+ * WEBHOOK_MAX_ATTEMPTS_CEILING tries and the job stops itself at the endpoint
+ * limit. A non-retryable 4xx (410 Gone, 404, ...) fails at once; a 429 or 503
+ * Retry-After header sets the next delay. Increments failureCount on the
+ * subscription; subscriptions with failureCount >= 10 are auto-disabled.
+ *
+ * Every attempt upserts one WebhookMessage (keyed by the stable event id) and
+ * records a WebhookDelivery row with masked request headers and a redacted,
+ * size-capped response body for the message log.
  */
 
 import { createHash, createHmac, randomUUID } from 'node:crypto';
@@ -30,7 +33,20 @@ import type pino from 'pino';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { WEBHOOK_DELIVERY, assertSafeWebhookUrl } from '@bidstack/shared';
+import {
+  DEFAULT_WEBHOOK_RETRY_POLICY,
+  WEBHOOK_BODY_CAP_BYTES,
+  WEBHOOK_DELIVERY,
+  WEBHOOK_MAX_ATTEMPTS_CEILING,
+  assertSafeWebhookUrl,
+  capWebhookText,
+  isRetryableWebhookStatus,
+  maskWebhookSignature,
+  parseRetryAfterMs,
+  redactWebhookText,
+  webhookRetryDelayMs,
+  type WebhookRetryPolicy,
+} from '@bidstack/shared';
 import {
   decryptWebhookSigningSecret,
   isLegacyWebhookSigningSecret,
@@ -47,9 +63,6 @@ const QUEUE_NAME = WEBHOOK_DELIVERY.name;
  * check (`assertSafeWebhookUrl`) cannot catch on its own.
  */
 const safeFetch = createResearchFetch();
-
-/** Maximum time we wait for the partner endpoint to respond. */
-const DELIVERY_TIMEOUT_MS = 10_000;
 
 /** Auto-disable a subscription after this many consecutive failures. */
 const AUTO_DISABLE_AFTER = 10;
@@ -72,6 +85,8 @@ const DeliveryJobSchema = z.object({
   eventId: z.string().uuid().optional(),
   /** ISO-8601 timestamp of the originating event, stamped once at enqueue. */
   eventTimestamp: z.string().datetime().optional(),
+  /** Set on a replay: the WebhookMessage this delivery re-sends. */
+  replayOfId: z.string().uuid().optional(),
 });
 
 type DeliveryJob = z.infer<typeof DeliveryJobSchema>;
@@ -88,9 +103,64 @@ export type WebhookDeliveryQueue = Queue<DeliveryJob>;
  * so all retries of a job sign with the SAME timestamp — partner-side replay /
  * dedup windows key on `t`, so a per-attempt `t` would defeat them.
  */
-function buildSignatureHeader(secret: string, body: string, tSeconds: number): string {
-  const sig = createHmac('sha256', secret).update(`${tSeconds}.${body}`).digest('hex');
-  return `t=${tSeconds},v1=${sig}`;
+function buildSignatureHeader(secrets: string[], body: string, tSeconds: number): string {
+  const sigs = secrets.map(
+    (secret) => `v1=${createHmac('sha256', secret).update(`${tSeconds}.${body}`).digest('hex')}`,
+  );
+  return [`t=${tSeconds}`, ...sigs].join(',');
+}
+
+/** An Error that tells {@link webhookBackoffStrategy} how long to wait. */
+class WebhookRetryError extends Error {
+  constructor(
+    message: string,
+    readonly retryDelayMs: number,
+  ) {
+    super(message);
+    this.name = 'WebhookRetryError';
+  }
+}
+
+/** BullMQ backoff type registered on the delivery worker. */
+export const WEBHOOK_BACKOFF_TYPE = 'webhook-endpoint';
+
+/**
+ * Custom BullMQ backoff: the delay the failed attempt computed from its
+ * endpoint policy (or Retry-After), else the default curve.
+ */
+export function webhookBackoffStrategy(attemptsMade: number, _type?: string, err?: Error): number {
+  const fromAttempt = (err as { retryDelayMs?: unknown } | undefined)?.retryDelayMs;
+  if (typeof fromAttempt === 'number' && Number.isFinite(fromAttempt) && fromAttempt >= 0) {
+    return fromAttempt;
+  }
+  return webhookRetryDelayMs(DEFAULT_WEBHOOK_RETRY_POLICY, attemptsMade);
+}
+
+/** Reads at most `capBytes` of a response body without buffering the rest. */
+async function readCappedBody(res: Response): Promise<{ text: string; truncated: boolean } | null> {
+  const stream = (res as Partial<Response>).body;
+  if (!stream || typeof stream.getReader !== 'function') return null;
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  let truncated = false;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      size += value.byteLength;
+      if (size > WEBHOOK_BODY_CAP_BYTES) {
+        truncated = true;
+        break;
+      }
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  const joined = Buffer.concat(chunks).toString('utf8');
+  const capped = capWebhookText(redactWebhookText(joined));
+  return { text: capped.text, truncated: truncated || capped.truncated };
 }
 
 /**
@@ -115,12 +185,34 @@ function deriveStableEventId(job: Job<DeliveryJob>): string {
 
 // ── Delivery ──────────────────────────────────────────────────────────────────
 
+type DeliveryResult = {
+  statusCode: number | null;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+  requestHeaders?: Record<string, string>;
+  responseBody?: string | null;
+  responseTruncated?: boolean;
+  retryAfterMs?: number | null;
+  /** The URL failed the safety check, so no retry can succeed. */
+  unsafeUrl?: boolean;
+};
+
+function maskedHeaders(headers: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) {
+    out[k] = /signature/i.test(k) ? maskWebhookSignature(v) : v;
+  }
+  return out;
+}
+
 async function deliver(
   url: string,
-  secret: string,
+  secrets: string[],
   body: string,
   tSeconds: number,
-): Promise<{ statusCode: number | null; durationMs: number; success: boolean; error?: string }> {
+  timeoutMs: number,
+): Promise<DeliveryResult> {
   try {
     assertSafeWebhookUrl(url);
   } catch (err) {
@@ -129,42 +221,71 @@ async function deliver(
       durationMs: 0,
       success: false,
       error: err instanceof Error ? `Unsafe webhook URL: ${err.message}` : 'Unsafe webhook URL',
+      unsafeUrl: true,
     };
   }
 
-  const signature = buildSignatureHeader(secret, body, tSeconds);
+  const signature = buildSignatureHeader(secrets, body, tSeconds);
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Polo-Signature': signature,
+    // Legacy header kept during the rebrand deprecation window.
+    'X-BidStack-Signature': signature,
+    'User-Agent': 'PoloPreSales-Webhooks/1.0',
+  };
+  const requestHeaders = maskedHeaders(headers);
   const start = Date.now();
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
+    // The timeout covers the body read too: an endpoint that sends headers and
+    // then stalls the body must not hold a worker slot past timeoutMs.
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     let res: Response;
+    let read: Awaited<ReturnType<typeof readCappedBody>>;
+    let durationMs: number;
     try {
       res = await safeFetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Polo-Signature': signature,
-          // Legacy header kept during the rebrand deprecation window.
-          'X-BidStack-Signature': signature,
-          'User-Agent': 'PoloPreSales-Webhooks/1.0',
-        },
+        headers,
         body,
         signal: controller.signal,
       });
+      durationMs = Date.now() - start;
+      read = await readCappedBody(res).catch(() => null);
     } finally {
       clearTimeout(timeoutId);
     }
 
-    const durationMs = Date.now() - start;
     const success = res.status >= 200 && res.status < 300;
-    return { statusCode: res.status, durationMs, success };
+    const retryAfter =
+      res.status === 429 || res.status === 503
+        ? parseRetryAfterMs((res as Partial<Response>).headers?.get?.('retry-after'))
+        : null;
+    return {
+      statusCode: res.status,
+      durationMs,
+      success,
+      requestHeaders,
+      responseBody: read?.text ?? null,
+      responseTruncated: read?.truncated ?? false,
+      retryAfterMs: retryAfter,
+    };
   } catch (err) {
     const durationMs = Date.now() - start;
     const error = err instanceof Error ? err.message : String(err);
-    return { statusCode: null, durationMs, success: false, error };
+    return { statusCode: null, durationMs, success: false, error, requestHeaders };
   }
+}
+
+function policyOf(sub: Partial<WebhookRetryPolicy>): WebhookRetryPolicy {
+  return {
+    maxAttempts: sub.maxAttempts ?? DEFAULT_WEBHOOK_RETRY_POLICY.maxAttempts,
+    backoffStrategy: sub.backoffStrategy ?? DEFAULT_WEBHOOK_RETRY_POLICY.backoffStrategy,
+    backoffBaseSeconds: sub.backoffBaseSeconds ?? DEFAULT_WEBHOOK_RETRY_POLICY.backoffBaseSeconds,
+    timeoutMs: sub.timeoutMs ?? DEFAULT_WEBHOOK_RETRY_POLICY.timeoutMs,
+  };
 }
 
 // ── Worker ────────────────────────────────────────────────────────────────────
@@ -179,7 +300,7 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     return; // don't retry malformed jobs
   }
 
-  const { subscriptionId, event, payload, eventId, eventTimestamp } = parsed.data;
+  const { subscriptionId, event, payload, eventId, eventTimestamp, replayOfId } = parsed.data;
 
   // Stable event identity — computed ONCE per job, reused across all 5 retries so
   // partner-side dedup works. Prefer the values stamped at enqueue; fall back to
@@ -198,11 +319,23 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
       url: true,
       secret: true,
       failureCount: true,
+      maxAttempts: true,
+      backoffStrategy: true,
+      backoffBaseSeconds: true,
+      timeoutMs: true,
+      previousSecret: true,
+      previousSecretExpiresAt: true,
     },
   });
 
   if (!sub) {
-    // Subscription was deleted or disabled between enqueue and processing — skip silently.
+    // A retry can arrive after the endpoint was paused, deleted, or auto-disabled.
+    // The previous attempt left the message pending; leave it failed so the log
+    // does not show "Retrying" after no retry remains.
+    await prisma.webhookMessage.updateMany({
+      where: { id: stableEventId, status: 'pending' },
+      data: { status: 'failed' },
+    });
     log.debug({ subscriptionId }, 'webhook subscription not found or inactive — skipping delivery');
     return;
   }
@@ -216,6 +349,47 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
   });
 
   const attempt = (job.attemptsMade ?? 0) + 1;
+  const policy = policyOf(sub);
+  // A policy edit applies to the next attempt. Do not send when this try is
+  // already past the budget the endpoint has now.
+  const attemptLimit = Math.min(policy.maxAttempts, job.opts?.attempts ?? WEBHOOK_MAX_ATTEMPTS_CEILING);
+
+  /** One message per stable event id; every attempt refreshes its status. */
+  const recordMessage = async (status: 'pending' | 'succeeded' | 'failed', r: DeliveryResult) => {
+    await prisma.webhookMessage.upsert({
+      where: { id: stableEventId },
+      create: {
+        id: stableEventId,
+        orgId: sub.orgId,
+        subscriptionId,
+        event,
+        payload: payload as object,
+        eventTimestamp: new Date(stableTimestamp),
+        status,
+        attempts: attempt,
+        lastStatusCode: r.statusCode,
+        lastDurationMs: r.durationMs,
+        replayOfId: replayOfId ?? null,
+      },
+      update: {
+        status,
+        attempts: attempt,
+        lastStatusCode: r.statusCode,
+        lastDurationMs: r.durationMs,
+      },
+    });
+  };
+
+  if (attempt > attemptLimit) {
+    await recordMessage('failed', {
+      statusCode: null,
+      durationMs: 0,
+      success: false,
+      error: 'Attempt budget exhausted',
+    });
+    throw new UnrecoverableError('webhook attempt budget exhausted');
+  }
+
   const denial = await serumConnectorDenialMessage({
     orgId: sub.orgId,
     connectorId: 'webhook_delivery',
@@ -224,6 +398,7 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
   });
   if (denial) {
     log.warn({ subscriptionId, event, attempt }, denial);
+    await recordMessage('failed', { statusCode: null, durationMs: 0, success: false, error: denial });
     await prisma.webhookDelivery.create({
       data: {
         subscriptionId,
@@ -232,6 +407,7 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
         statusCode: null,
         success: false,
         durationMs: 0,
+        messageId: stableEventId,
         attempt,
         errorMessage: denial,
       },
@@ -239,14 +415,33 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     return;
   }
 
-  let result: Awaited<ReturnType<typeof deliver>>;
+  // The previous secret also signs until its overlap window closes, so a
+  // receiver mid-rotation verifies with either.
+  const secretsFor = (current: string): string[] => {
+    const keep =
+      sub.previousSecret && sub.previousSecretExpiresAt && sub.previousSecretExpiresAt.getTime() > Date.now();
+    if (!keep) return [current];
+    try {
+      return [current, decryptWebhookSigningSecret(sub.previousSecret!)];
+    } catch {
+      return [current];
+    }
+  };
+
+  let result: DeliveryResult;
   // Set only when decryptWebhookSigningSecret throws. Both of its failure causes
   // (legacy plaintext disabled in prod, or a wrong INTEGRATION_TOKEN_KEY /
   // corrupted blob) are deterministic and can never succeed on retry, so BullMQ
   // must not burn the full 5-attempt/~1.5h retry schedule on them.
   let unrecoverableDecryptError: string | null = null;
   try {
-    result = await deliver(sub.url, decryptWebhookSigningSecret(sub.secret), body, stableTSeconds);
+    result = await deliver(
+      sub.url,
+      secretsFor(decryptWebhookSigningSecret(sub.secret)),
+      body,
+      stableTSeconds,
+      policy.timeoutMs,
+    );
   } catch (err) {
     unrecoverableDecryptError = isLegacyWebhookSigningSecret(sub.secret)
       ? 'Stored webhook signing secret is legacy plaintext and the fallback is disabled; run the webhook secret encryption backfill (scripts/encrypt-webhook-secrets.ts).'
@@ -273,17 +468,28 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     result.success ? 'webhook delivery succeeded' : 'webhook delivery failed',
   );
 
+  const retryable =
+    !unrecoverableDecryptError &&
+    !result.unsafeUrl &&
+    attempt < attemptLimit &&
+    isRetryableWebhookStatus(result.statusCode);
+  await recordMessage(result.success ? 'succeeded' : retryable ? 'pending' : 'failed', result);
+
   // Record the delivery attempt.
   await prisma.webhookDelivery.create({
     data: {
       subscriptionId,
       orgId: sub.orgId,
+      messageId: stableEventId,
       event,
       statusCode: result.statusCode,
       success: result.success,
       durationMs: result.durationMs,
       attempt,
       errorMessage: result.error ?? null,
+      ...(result.requestHeaders ? { requestHeaders: result.requestHeaders } : {}),
+      responseBody: result.responseBody ?? null,
+      responseTruncated: result.responseTruncated ?? false,
     },
   });
 
@@ -295,7 +501,9 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     });
   } else {
     const newFailureCount = sub.failureCount + 1;
-    const shouldDisable = newFailureCount >= AUTO_DISABLE_AFTER && attempt >= 5;
+    // A final failure (last attempt or a status no retry can fix) counts
+    // towards auto-disable, so a 410 Gone endpoint is disabled too.
+    const shouldDisable = newFailureCount >= AUTO_DISABLE_AFTER && !retryable;
 
     await prisma.webhookSubscription.update({
       where: { id: subscriptionId },
@@ -319,9 +527,12 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
       throw new UnrecoverableError(unrecoverableDecryptError);
     }
 
-    // Throw so BullMQ schedules a retry (up to WEBHOOK_DELIVERY.defaultJobOptions.attempts).
-    const err = new Error(result.error ?? `HTTP ${result.statusCode} from ${sub.url}`);
-    throw err;
+    const message = result.error ?? `HTTP ${result.statusCode} from ${sub.url}`;
+    // A 4xx a retry cannot fix, or the endpoint's last allowed attempt.
+    if (!retryable) throw new UnrecoverableError(message);
+
+    // Throw so BullMQ schedules a retry after the endpoint's own delay.
+    throw new WebhookRetryError(message, result.retryAfterMs ?? webhookRetryDelayMs(policy, attempt));
   }
 }
 
@@ -406,6 +617,7 @@ export async function startWebhookDeliveryWorker(
     {
       connection,
       concurrency: 20, // 20 concurrent HTTP deliveries
+      settings: { backoffStrategy: webhookBackoffStrategy },
     },
   );
 

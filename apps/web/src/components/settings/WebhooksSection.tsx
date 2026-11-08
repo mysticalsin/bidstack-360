@@ -7,10 +7,15 @@ import { Card } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { confirm } from '@/components/ui/ConfirmDialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { toast } from '@/components/ui/Toast';
 import { CreateWebhookDialog } from '@/components/webhooks/CreateWebhookDialog';
+import { DeliveriesPanel, WebhookFilterBar } from '@/components/webhooks/DeliveriesPanel';
 import { DeliveryHistoryPanel } from '@/components/webhooks/DeliveryHistoryPanel';
+import { MessageLog } from '@/components/webhooks/MessageLog';
+import { RetryScheduleEditor } from '@/components/webhooks/RetryScheduleEditor';
 import { SignatureGuide } from '@/components/webhooks/SignatureGuide';
+import { useRotateWebhookSecret, type WebhookDeliveryFilters } from '@/hooks/useWebhookDeliveries';
 import {
   useWebhookSubscriptions,
   useCreateWebhookSubscription,
@@ -38,6 +43,14 @@ export function WebhooksSection() {
   const [showCreate, setShowCreate] = useState(false);
   const [createdSecret, setCreatedSecret] = useState<CreatedSecret | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [tab, setTab] = useState('endpoints');
+  const [filters, setFilters] = useState<WebhookDeliveryFilters>({ window: '24h' });
+  const patchFilters = (patch: Partial<WebhookDeliveryFilters>) =>
+    setFilters((f) => ({ ...f, ...patch }));
+  const endpoints = useMemo(
+    () => (subs.data?.items ?? []).map((s) => ({ id: s.id, url: s.url })),
+    [subs.data],
+  );
 
   const metrics = useMemo(() => buildWebhookMetrics(subs.data?.items ?? []), [subs.data]);
   const drawnCaption =
@@ -155,80 +168,117 @@ export function WebhooksSection() {
         <SigningSecretCard secret={createdSecret.secret} url={createdSecret.url} />
       ) : null}
 
-      <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
-              {t('webhooks.subscriptionsTitle', 'Webhook subscriptions')}
-            </h2>
-            {drawnCaption ? (
-              <p className="mt-1 text-xs text-[var(--fg-tertiary)]">{drawnCaption}</p>
-            ) : null}
-            <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-              {metrics.lastActivity
-                ? t('webhooks.lastActivity', 'Last activity {{time}}', {
-                    time: relativeTime(metrics.lastActivity),
-                  })
-                : t('webhooks.noActivity', 'No delivery activity recorded yet.')}
-            </p>
-          </div>
-          <Badge tone={metrics.failing > 0 ? 'tomato' : 'jade'}>
-            {metrics.failing > 0
-              ? t('webhooks.needAttention', '{{count}} need attention', { count: metrics.failing })
-              : t('webhooks.allClear', 'All clear')}
-          </Badge>
-        </div>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList aria-label={t('webhooks.tabsLabel', 'Webhook views')} className="overflow-x-auto">
+          <TabsTrigger value="endpoints">{t('webhooks.tab.endpoints', 'Endpoints')}</TabsTrigger>
+          <TabsTrigger value="deliveries">{t('webhooks.tab.deliveries', 'Deliveries')}</TabsTrigger>
+          <TabsTrigger value="log">{t('webhooks.tab.log', 'Message log')}</TabsTrigger>
+          <TabsTrigger value="retry">{t('webhooks.tab.retry', 'Retry schedule')}</TabsTrigger>
+        </TabsList>
 
-        {subs.isLoading ? (
-          <div className="p-5">
-            <LoadingSkeleton rows={4} />
-          </div>
-        ) : subs.isError ? (
-          <div className="p-5">
-            <ErrorState
-              title={t('webhooks.errorTitle', 'Failed to load webhooks')}
-              message={t(
-                'webhooks.errorMessage',
-                'Could not load webhook subscriptions. Check your admin permissions or refresh.',
-              )}
-              action={
-                <Button variant="secondary" size="sm" onClick={() => void subs.refetch()}>
-                  {t('webhooks.retry', 'Retry')}
-                </Button>
-              }
-            />
-          </div>
-        ) : !subs.data || subs.data.items.length === 0 ? (
-          <div className="p-5">
-            <EmptyState
-              title={t('webhooks.emptyTitle', 'No subscriptions yet')}
-              message={t(
-                'webhooks.emptyMessage',
-                'Create a subscription to start sending signed platform events to your systems.',
-              )}
-              action={
-                <Button size="sm" onClick={() => setShowCreate(true)}>
-                  <Icon name="plus" size={14} className="mr-1.5" />
-                  {t('webhooks.addSubscription', 'Add subscription')}
-                </Button>
-              }
-            />
-          </div>
-        ) : (
-          <ul className="divide-y divide-[var(--border-subtle)]">
-            {subs.data.items.map((sub) => (
-              <SubscriptionRow
-                key={sub.id}
-                subscription={sub}
-                expanded={expandedId === sub.id}
-                onToggleExpand={() => setExpandedId((prev) => (prev === sub.id ? null : sub.id))}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+        <TabsContent value="deliveries">
+          <DeliveriesPanel
+            subscriptions={endpoints}
+            filters={filters}
+            onFiltersChange={patchFilters}
+          />
+        </TabsContent>
 
-      <SignatureGuide />
+        <TabsContent value="log" className="space-y-4">
+          <WebhookFilterBar
+            subscriptions={endpoints}
+            filters={filters}
+            onFiltersChange={patchFilters}
+          />
+          <MessageLog key={JSON.stringify(filters)} filters={filters} />
+        </TabsContent>
+
+        <TabsContent value="retry">
+          <RetryScheduleEditor subscriptions={endpoints} />
+        </TabsContent>
+
+        <TabsContent value="endpoints" className="space-y-6">
+          <Card className="overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+                  {t('webhooks.subscriptionsTitle', 'Webhook subscriptions')}
+                </h2>
+                {drawnCaption ? (
+                  <p className="mt-1 text-xs text-[var(--fg-tertiary)]">{drawnCaption}</p>
+                ) : null}
+                <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+                  {metrics.lastActivity
+                    ? t('webhooks.lastActivity', 'Last activity {{time}}', {
+                        time: relativeTime(metrics.lastActivity),
+                      })
+                    : t('webhooks.noActivity', 'No delivery activity recorded yet.')}
+                </p>
+              </div>
+              <Badge tone={metrics.failing > 0 ? 'tomato' : 'jade'}>
+                {metrics.failing > 0
+                  ? t('webhooks.needAttention', '{{count}} need attention', {
+                      count: metrics.failing,
+                    })
+                  : t('webhooks.allClear', 'All clear')}
+              </Badge>
+            </div>
+
+            {subs.isLoading ? (
+              <div className="p-5">
+                <LoadingSkeleton rows={4} />
+              </div>
+            ) : subs.isError ? (
+              <div className="p-5">
+                <ErrorState
+                  title={t('webhooks.errorTitle', 'Failed to load webhooks')}
+                  message={t(
+                    'webhooks.errorMessage',
+                    'Could not load webhook subscriptions. Check your admin permissions or refresh.',
+                  )}
+                  action={
+                    <Button variant="secondary" size="sm" onClick={() => void subs.refetch()}>
+                      {t('webhooks.retry', 'Retry')}
+                    </Button>
+                  }
+                />
+              </div>
+            ) : !subs.data || subs.data.items.length === 0 ? (
+              <div className="p-5">
+                <EmptyState
+                  title={t('webhooks.emptyTitle', 'No subscriptions yet')}
+                  message={t(
+                    'webhooks.emptyMessage',
+                    'Create a subscription to start sending signed platform events to your systems.',
+                  )}
+                  action={
+                    <Button size="sm" onClick={() => setShowCreate(true)}>
+                      <Icon name="plus" size={14} className="mr-1.5" />
+                      {t('webhooks.addSubscription', 'Add subscription')}
+                    </Button>
+                  }
+                />
+              </div>
+            ) : (
+              <ul className="divide-y divide-[var(--border-subtle)]">
+                {subs.data.items.map((sub) => (
+                  <SubscriptionRow
+                    key={sub.id}
+                    subscription={sub}
+                    expanded={expandedId === sub.id}
+                    onToggleExpand={() =>
+                      setExpandedId((prev) => (prev === sub.id ? null : sub.id))
+                    }
+                    onSecretRotated={(secret) => setCreatedSecret({ url: sub.url, secret })}
+                  />
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <SignatureGuide />
+        </TabsContent>
+      </Tabs>
 
       {showCreate ? (
         <CreateWebhookDialog
@@ -349,7 +399,11 @@ function SigningSecretCard({ secret, url }: { secret: string; url: string }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Icon name="shield" size={16} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
+            <Icon
+              name="shield"
+              size={16}
+              className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]"
+            />
             <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
               {t('webhooks.signingSecretTitle', 'Copy the signing secret now')}
             </h3>
@@ -393,14 +447,17 @@ function SubscriptionRow({
   subscription,
   expanded,
   onToggleExpand,
+  onSecretRotated,
 }: {
   subscription: WebhookSub;
   expanded: boolean;
   onToggleExpand: () => void;
+  onSecretRotated: (secret: string) => void;
 }) {
   const { t } = useTranslation('settings');
   const update = useUpdateWebhookSubscription(subscription.id);
   const del = useDeleteWebhookSubscription();
+  const rotate = useRotateWebhookSecret();
   const ping = useTestWebhookPing();
   const [pingResult, setPingResult] = useState<TestPingResult | null>(null);
   const [editing, setEditing] = useState(false);
@@ -434,6 +491,25 @@ function SubscriptionRow({
       toast.success(t('webhooks.toastDeleted', 'Webhook subscription deleted'));
     } catch {
       toast.error(t('webhooks.toastDeleteFailed', 'Failed to delete subscription'));
+    }
+  };
+
+  const handleRotate = async () => {
+    const ok = await confirm({
+      title: t('webhooks.rotateConfirmTitle', 'Rotate the signing secret?'),
+      description: t(
+        'webhooks.rotateConfirmDescription',
+        'Deliveries are signed with both the old and the new secret for 24 hours, then with the new one only. The new secret is shown once.',
+      ),
+      confirmLabel: t('webhooks.rotateConfirmLabel', 'Rotate secret'),
+    });
+    if (!ok) return;
+    try {
+      const result = await rotate.mutateAsync({ id: subscription.id, overlapHours: 24 });
+      onSecretRotated(result.signingSecret);
+      toast.success(t('webhooks.toastRotated', 'Signing secret rotated'));
+    } catch {
+      toast.error(t('webhooks.toastRotateFailed', 'Failed to rotate the signing secret'));
     }
   };
 
@@ -585,6 +661,16 @@ function SubscriptionRow({
             />
           </Button>
 
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void handleRotate()}
+            disabled={rotate.isPending}
+          >
+            <Icon name="refresh" size={14} />
+            <span className="ml-1.5">{t('webhooks.rotateSecret', 'Rotate secret')}</span>
+          </Button>
+
           <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
             <Icon name="pencil" size={14} />
             <span className="ml-1.5">{t('webhooks.edit', 'Edit')}</span>
@@ -628,6 +714,7 @@ function SubscriptionRow({
           mode="edit"
           initialUrl={subscription.url}
           initialEvents={subscription.events}
+          initialTimeoutMs={subscription.timeoutMs}
           onClose={() => setEditing(false)}
           onSubmit={async (body) => {
             try {
