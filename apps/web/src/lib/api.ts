@@ -5,6 +5,8 @@ interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
+  /** Extra request headers, e.g. Idempotency-Key. Auth headers always win. */
+  headers?: Record<string, string>;
 }
 
 interface ApiTokenOptions {
@@ -82,7 +84,10 @@ function getE2eRoleHeader(): Record<string, string> {
   return role ? { 'x-bidstack-e2e-role': role } : {};
 }
 
-function buildHeaders(token: string | null, hasJsonBody: boolean): Record<string, string> | undefined {
+function buildHeaders(
+  token: string | null,
+  hasJsonBody: boolean,
+): Record<string, string> | undefined {
   const headers: Record<string, string> = {
     ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -195,7 +200,9 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     const token = await getApiToken(forceRefresh ? { forceRefresh: true } : undefined);
     return fetch(buildApiUrl(resolvedPath), {
       method: opts.method ?? 'GET',
-      headers: buildHeaders(token, Boolean(body)),
+      headers: opts.headers
+        ? { ...opts.headers, ...buildHeaders(token, Boolean(body)) }
+        : buildHeaders(token, Boolean(body)),
       body,
       signal: opts.signal,
       credentials: 'include',
