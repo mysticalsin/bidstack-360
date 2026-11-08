@@ -11,7 +11,6 @@ import { composeBrief, type AccountGap, type EvidenceChip, type PositioningPlay 
 import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { fmtMoney } from '@/components/financials/financials-format';
 import { useAccountPositioning } from '@/hooks/useAccountPositioning';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 
 const CONF_LABEL: Record<PositioningPlay['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
@@ -161,9 +160,9 @@ function Gap({ g }: { g: AccountGap }) {
 export function WhatToPosition({ companyId }: { companyId: string }) {
   const q = useAccountPositioning(companyId);
   const leverage = useMsaLeverage(companyId);
-  const money = useFormatMoney();
-  // Deal-range labels use the page money helper. That is not a currency stored on Opportunity.
-  const micros = (m: string) => money.formatMoneyMicros(m, 'EUR', { compact: true });
+  // Open pipeline micros have no currency. composeBrief does not send them
+  // through a currency formatter.
+  const micros = (m: string) => `${m} unspecified`;
   if (q.isLoading) return <div className="sg wp" aria-busy="true"><div className="sg-skel" style={{ minHeight: 320 }} /></div>;
   if (q.isError || !q.data) {
     return (

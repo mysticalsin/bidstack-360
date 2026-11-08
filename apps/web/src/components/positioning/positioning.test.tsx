@@ -48,11 +48,17 @@ describe('positioning-format', () => {
     expect(formatValue(kn({ value: 1.7e9, unit: 'money', currency: 'EUR' }))).toBe('EUR 1.70bn');
     expect(formatValue(kn({ value: 1.7e9, unit: 'money' }))).toBe('1.70bn unspecified');
     expect(formatValue(kn({ value: 1.7e9, unit: 'money' }))).not.toContain('USD');
-    const convert = (m: number) => `shown:${m}`;
-    expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros', currency: 'EUR' }), convert)).toBe('shown:2500000');
+    const calls: Array<{ micros: number; currency: string }> = [];
+    const convert = (m: number, currency: string) => {
+      calls.push({ micros: m, currency });
+      return `shown:${currency}:${m}`;
+    };
+    expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros', currency: 'EUR' }), convert)).toBe('shown:EUR:2500000');
+    expect(calls).toEqual([{ micros: 2_500_000, currency: 'EUR' }]);
     // A missing currency must not be sent through FX. Opportunity.valueMicros has no currency column.
     expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros', currency: null }), convert)).toBe('2.50 unspecified');
     expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros' }), convert)).toBe('2.50 unspecified');
+    expect(calls).toEqual([{ micros: 2_500_000, currency: 'EUR' }]);
     expect(formatValue(kn({ value: 18.34, unit: 'pct' }))).toBe('18.3%');
     expect(formatValue(kn({ value: -0.4, unit: 'sentiment' }))).toBe('Negative');
     expect(formatValue(kn({ value: 12, unit: 'days' }))).toBe('12d ago');

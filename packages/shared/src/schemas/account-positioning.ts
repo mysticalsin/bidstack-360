@@ -8,6 +8,7 @@
  */
 import { z } from 'zod';
 
+import { formatMicrosAmount } from '../utils/money.js';
 import { OFFERING_HOOKS, type Initiative, type InitiativeTheme, InitiativeTheme as InitiativeThemeSchema } from './account-signals.js';
 
 const Iso = z.string();
@@ -458,7 +459,11 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
   }
   const p = f.pipeline;
   const hist = p.won24m || p.lost24m ? `; ${p.won24m} won and ${p.lost24m} lost in the last 24 months` : '';
-  s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${fmtMicros(p.openMicros)}${hist}.` : `We have no open deals${hist}.`);
+  // Opportunity stores micros and no currency. fmtMicros is not used here:
+  // passing a display currency would invent one.
+  void fmtMicros;
+  const openAmount = `${formatMicrosAmount(BigInt(p.openMicros))} unspecified`;
+  s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${openAmount}${hist}.` : `We have no open deals${hist}.`);
   const pe = f.people;
   if (pe.known) {
     const last = pe.lastMeeting ? `, last meeting on ${pe.lastMeeting.at.slice(0, 10)} (${pe.lastMeeting.title})` : ', no meeting logged';

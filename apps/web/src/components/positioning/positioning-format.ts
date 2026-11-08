@@ -32,7 +32,7 @@ export function sentimentWord(v: number): string {
   return 'Neutral';
 }
 
-export type MicrosFormatter = (micros: string | number) => string;
+export type MicrosFormatter = (micros: string | number, currency: string) => string;
 
 export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
   if (n.value === null) return 'No data';
@@ -49,7 +49,7 @@ export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
       const micros = BigInt(Math.round(n.value));
       const code = recordedCurrency(n.currency);
       if (!code) return `${formatMicrosAmount(micros)} unspecified`;
-      return fmtMicros ? fmtMicros(Number(micros)) : formatMoneyMicros(micros, code, { compact: true });
+      return fmtMicros ? fmtMicros(Number(micros), code) : formatMoneyMicros(micros, code, { compact: true });
     }
     case 'pct':
       return `${n.value.toFixed(1)}%`;
