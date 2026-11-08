@@ -2063,6 +2063,8 @@
     "dashboardSubtitle": "Today: {{date}} - {{company}} cockpit",
     "dashboardTitle": "Dashboard",
     "accountStatusSummaryLabel": "Account status summary",
+    "notScored": "Not scored yet",
+    "notScoredTitle": "Signal coverage needs this account's own contacts, deals and tasks",
     "attributionConfidence": "{{percent}}% attribution confidence",
     "refreshed": "Refreshed {{time}}",
     "externalFreshness": "External {{freshness}} - {{time}}",
@@ -3095,6 +3097,8 @@
     "toastExtractionFailed": "Extraction failed"
   },
   "healthScore": {
+    "notScored": "Not scored yet",
+    "notScoredBody": "Signal coverage is scored from this account's own contacts, deals and tasks. None are loaded here yet.",
     "regionLabel": "Account signal coverage",
     "title": "Signal coverage",
     "signalsScored": "{{count}} account signals scored",

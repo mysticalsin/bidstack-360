@@ -8,17 +8,49 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { springSoft } from '@/lib/motion';
 
-import type { AccountCockpitSnapshot } from '@bidstack/shared';
+import type { AccountCockpitMaybeScored, CompanyHealth } from '@bidstack/shared';
 
 const ORDER = ['strong', 'good', 'needs_attention', 'critical'] as const;
 
 interface Props {
-  cockpit: AccountCockpitSnapshot;
+  cockpit: AccountCockpitMaybeScored;
 }
 
 export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props) {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
+  if (!cockpit.health) {
+    return (
+      <Card
+        role="region"
+        aria-label={t('healthScore.regionLabel', 'Account signal coverage')}
+        className="health-score-card"
+      >
+        <SectionHeader
+          title={t('healthScore.title', 'Signal coverage')}
+          caption={t('healthScore.notScored', 'Not scored yet')}
+        />
+        <p className="px-5 pb-4 text-sm text-[var(--fg-secondary)]" data-testid="health-not-scored">
+          {t(
+            'healthScore.notScoredBody',
+            "Signal coverage is scored from this account's own contacts, deals and tasks. None are loaded here yet.",
+          )}
+        </p>
+      </Card>
+    );
+  }
+  return <ScoredHealthCard health={cockpit.health} reducedMotion={Boolean(reducedMotion)} />;
+});
+
+const ScoredHealthCard = memo(function ScoredHealthCard({
+  health,
+  reducedMotion,
+}: {
+  health: CompanyHealth;
+  reducedMotion: boolean;
+}) {
+  const { t } = useTranslation('crm');
+  const cockpit = { health };
   const total = ORDER.reduce((acc, key) => acc + (cockpit.health.counts[key] ?? 0), 0) || 1;
   const scorePct = Math.max(0, Math.min(100, cockpit.health.score)) / 100;
   const segments = ORDER.map((key) => ({
@@ -130,7 +162,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
 function SignalFactorPanel({
   factors,
 }: {
-  factors: NonNullable<AccountCockpitSnapshot['health']['factors']>;
+  factors: NonNullable<CompanyHealth['factors']>;
 }) {
   const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);

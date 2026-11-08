@@ -3364,6 +3364,7 @@
   background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--tag-jade-fg);
 }
 .acct-pill[data-band='needs_attention'] { background: color-mix(in srgb, var(--warning) 12%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg-primary)); }
+.acct-pill[data-band='unscored'] { background: var(--surface-sunken); color: var(--fg-secondary); }
 .acct-pill[data-band='at_risk'] { background: color-mix(in srgb, var(--danger, #bb5355) 10%, transparent); color: color-mix(in srgb, var(--danger, #bb5355) 80%, var(--fg-primary)); }
 .btn-quiet { background: transparent; color: var(--fg-secondary); border-color: transparent; padding-inline: 10px; }
 .btn-quiet:hover { background: var(--surface-sunken); color: var(--fg-primary); }
