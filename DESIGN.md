@@ -773,3 +773,20 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
 - Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
 - Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.
+
+### 9.11 Account and company page layout rules (factory 23, 2026-11-08)
+
+Fix-only rules for the account cockpit (`/accounts/:id`) and company detail (`/companies/:id`). They hold at 1440, 1024, 768 and 390.
+
+- Grid tracks never size to content: use `minmax(0, 1fr)`, never bare `1fr` or `auto 1fr`, for any track that holds text. Cards and every grid or flex child that holds text get `min-width: 0`.
+- Chips wrap. A chip label may wrap onto a second line; a single long word breaks (`overflow-wrap: anywhere`). If a chip must stay on one line it truncates with an ellipsis and carries the full text in `title`.
+- Clipped text always has a way back: any `text-overflow: ellipsis` or line clamp ships with a `title` (or the same text in an `aria-label`) on the clipped element or its row.
+- Tab strips scroll sideways, they never clip: `overflow-x: auto`, `scroll-snap-type: x proximity`, tabs do not shrink (`flex: none`, `white-space: nowrap`), a fade on the trailing edge while more tabs are hidden, and the selected tab scrolls into view. Every tab stays reachable and clickable at 390.
+- Topbar at 390: breadcrumb segments truncate with an ellipsis and a `title`; they never paint over each other. "Skip to content" is invisible and takes no space until it has keyboard focus.
+- Severity reads as a word (High, Medium, Critical, Low), never a single letter. Compliance rows say "Compliance".
+- One logo per header. A decorative status graphic never sits next to the company logo where it reads as a second, empty logo.
+- Empty data shows a sentence, not empty chrome: a chart with no data shows a zero baseline and "No postings in the last 6 months"; empty lists show one muted line and, when the user can act, the action ("Refresh from job boards").
+- A figure the source did not report shows muted "Not disclosed" with a `title` naming the source checked, never a bare "-".
+- Money uses one compact format everywhere on these pages: currency code first, then the amount (`EUR 29.9bn`, `CAD 935m`), from `formatCompactMoney` in `@bidstack/shared`.
+- Display currency defaults to the workspace currency (Settings, Currency and locale). The browser time zone or location is used only when the user picks "Auto"; an explicit pick always wins.
+- Pinned by `e2e/audit/account-company.layout.audit.spec.ts` (overlap per line box, clipped to overflow ancestors, ignoring runs hidden under an opaque positioned layer) and unit tests next to each component.
