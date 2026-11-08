@@ -39,6 +39,7 @@ import { startMsaReminders } from './queues/msa-reminders.js';
 import { startAccountEnrichment } from './queues/account-enrichment.js';
 import { startAccountIntel } from './queues/account-intel.js';
 import { startCompanyTechDetect } from './queues/company-tech-detect.js';
+import { startConsultingPartners } from './queues/consulting-partners.js';
 import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
@@ -63,6 +64,8 @@ import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
 import { startTenantExport } from './queues/tenant-export.js';
 // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
 import { startAiAuditRetention } from './queues/ai-audit-retention.js';
+import { startDataSubjectWorker } from './queues/data-subject.js';
+import { startRetentionSweep } from './queues/retention-sweep.js';
 import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
 import { assertWorkerProductionEnv } from './lib/production-env.js';
 import {
@@ -179,6 +182,8 @@ await Promise.all([
   startAccountIntel(connection, log, workers, queues),
   // Open data technology stack: on create and import, plus a weekly batched sweep
   startCompanyTechDetect(connection, log, workers, queues),
+  // Consulting partners: which consulting firms work with each account, cited
+  startConsultingPartners(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),
@@ -207,6 +212,8 @@ await Promise.all([
   startTenantExport(connection, log, workers, queues),
   // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
   startAiAuditRetention(connection, log, workers, queues),
+  startDataSubjectWorker(connection, log, workers, queues),
+  startRetentionSweep(connection, log, workers, queues),
 ]);
 
 for (const worker of workers) {

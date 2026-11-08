@@ -15,6 +15,8 @@ import {
 
 import { visibleOpportunityRelation, visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 
+import { salesCycleDays } from './win-loss.helpers.js';
+
 interface DbRow {
   id: string;
   opportunityId: string;
@@ -75,6 +77,8 @@ const WinLossAnalysis = z.object({
   quarters: z.array(OutcomeCounts.extend({ quarter: z.string() })),
   reasons: z.array(OutcomeCounts.extend({ reason: WinLossReasonCode })),
   competitors: z.array(OutcomeCounts.extend({ competitor: z.string() })),
+  /** Days from opening each scanned bid to its recorded outcome (sales cycle). */
+  cycleDays: z.array(z.number().int().nonnegative()),
   recent: z.array(
     z.object({
       opportunityId: z.string().uuid(),
@@ -104,6 +108,7 @@ interface AnalysisScanRow {
     customer: string;
     valueMicros: bigint;
     ownerId: string | null;
+    createdAt: Date;
     owner: { name: string | null; email: string } | null;
   };
 }
@@ -138,9 +143,12 @@ function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLoss
   const quarters = new Map<string, { won: number; lost: number }>();
   const reasons = new Map<string, { won: number; lost: number }>();
   const competitors = new Map<string, { won: number; lost: number }>();
+  const cycleDays: number[] = [];
   let totalWon = 0;
   let totalLost = 0;
   for (const r of rows) {
+    const cycle = salesCycleDays(r.opportunity.createdAt, r.createdAt);
+    if (cycle !== null) cycleDays.push(cycle);
     const won = r.outcome === 'won';
     if (won) totalWon += 1;
     else totalLost += 1;
@@ -167,6 +175,7 @@ function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLoss
       .map(([competitor, counts]) => ({ competitor, ...counts }))
       .sort(byLostDesc)
       .slice(0, 10),
+    cycleDays,
     recent: rows.slice(0, ANALYSIS_RECENT_LIMIT).map(serializeRecent),
   };
 }
@@ -255,6 +264,7 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
               customer: true,
               valueMicros: true,
               ownerId: true,
+              createdAt: true,
               owner: { select: { name: true, email: true } },
             },
           },

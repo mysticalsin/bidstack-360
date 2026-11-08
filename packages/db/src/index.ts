@@ -139,6 +139,7 @@ export type {
   ReleaseScore,
   Lead,
   TenantExport,
+  DataSubjectRequest,
   SavedView,
   SavedViewEntity,
   KamConsultant,
@@ -208,3 +209,34 @@ export {
   refreshCompanyOpenTechStack,
 } from './open-tech-refresh.js';
 export type { ApolloFallbackDecision, OpenTechApolloJob, OpenTechRefreshResult } from './open-tech-refresh.js';
+// Inbound activity API + account activity aggregates. One service behind the
+// REST route (apps/api) and the MCP tools (apps/mcp-server).
+export {
+  ingestActivities,
+  ingestContentHash,
+  ingestDedupeKey,
+  normalizeIngestDomain,
+  type IngestActivitiesInput,
+  type IngestActor,
+} from './services/activity-ingest.js';
+export {
+  bucketActivitySummary,
+  getCompanyActivitySummary,
+  weekStartIn,
+} from './services/account-activity.js';
+
+// GDPR data subject export / erase and retention per data class (compliance pack).
+export * from './compliance/index.js';
+export {
+  countPartnerEngagements,
+  isInternalPartnerRow,
+  loadOrgFirmCatalog,
+  loadPartnerEvidenceRows,
+  loadPartnerRun,
+  ownedPartnerRowIds,
+  prunePartnerEvidence,
+  savePartnerEvidence,
+  scanInternalPartnerEvidence,
+  toPartnerEvidence,
+} from './consulting-partners.js';
+export type { PartnerEvidenceRow, PartnerSaveResult } from './consulting-partners.js';

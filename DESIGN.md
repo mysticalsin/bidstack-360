@@ -737,3 +737,33 @@ One technology stack per account, on `/accounts/:accountId` (Technical Stack car
   viewport (collision padding 8px). Hit targets 24 x 24 minimum. Copy: no em dashes, no taglines.
 - Build note: the empty state keeps the existing copy `No technology detected yet` so current tests
   and screenshots stay valid. Chip and Sample text use 12px (`text-xs`), the audit floor.
+### 9.9 Slice 2 console shell as built (2026-11-07)
+
+Appended by factory slice 2. Refines the existing shell (AppShell, Sidebar, MobileNav, Topbar); the look
+is unchanged. This supersedes the "56px icon rail" line in 9.4.
+
+- Rail: 232px expanded, 64px collapsed, from `--sidebar-w` on `.app-shell`. The grid track eases
+  200ms with `var(--ease-ui-out)`. It is instant for a keyboard toggle (Enter or Space) and under
+  `prefers-reduced-motion`, via `data-motion="instant"` on `.sidebar`. Collapsed items keep an
+  `aria-label` and a tooltip; section flyouts open on hover and on keyboard focus.
+- Breakpoint: `56rem` (`SHELL_WIDE_QUERY` in `components/layout/shellBreakpoint.ts`). Below it the rail
+  is hidden and the topbar "Open navigation" button opens the nav as an in-place drawer inside the
+  shell (left side, `--ease-drawer`, backdrop button "Close navigation"). The drawer is a
+  `role="dialog"` named "Primary navigation"; focus moves in, Tab is trapped, Escape or a link closes
+  it, and focus returns to the hamburger. Body scroll is locked while it is open.
+- One vertical scroll: the document scrolls; the sidebar keeps only its own safety-net overflow.
+- Pinned by `MobileNav.test.tsx`, `Sidebar.console.test.tsx` and `shell-css.contract.test.ts`.
+
+### 9.10 Consulting partners (slice 15)
+
+One section on the account page and the `/accounts/:id` cockpit, after Account direction: which third-party consulting firms work with the client, and how we stand against each one. Our own group entities stay in the MSA "who works with them" panel; this section is outside firms only.
+
+- Partner strip: one tile per firm, strongest first. Tile: monogram (two letters, brand-tinted inset), firm name, relationship tags (Strategic partner, Implementation, Managed services, Audit, Advisory, Engineering), domain chips (IT, Engineering, Digital, Data, SAP, Cloud, Cyber, HEMA / pharma), a three-step strength meter and the evidence count. Selected tile has the accent ring; arrow keys move along the strip (`role="listbox"`).
+- Selected partner, two columns at 1440 and 1024, one column at 390:
+  - Left: radar (repo `charts/PolarCharts.tsx` `RadarChart`, lazy) with two series, Us (accent) and the partner (muted), on Quality, Price, Speed, Domain depth. Below it a score table, one row per dimension including Relationship: us, partner, evidence count. A dimension without evidence shows "No evidence" in muted text and is left off the radar, never drawn as zero.
+  - Right: record line (wins and losses against the firm, years), then 1 to 3 angles. Each angle cites its evidence; an inferred angle carries the "Inferred" tag.
+- Timeline strip under both columns: one dot per evidence item on a time axis, public dots outlined, internal dots filled; hover or focus shows date, source and title.
+- Evidence list (collapsed by default, "Evidence" toggle): source label, date, excerpt, method, link to the URL or the record; "Load more" pages through the API.
+- Header: section title, last fetched time, and Refresh (lucide `RefreshCw`) for users with `account-intel:write`. Not configured status shows the detail text.
+- Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
+- Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
