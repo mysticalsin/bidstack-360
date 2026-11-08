@@ -264,17 +264,22 @@ export async function pullGmail(
 
   let persisted = 0;
   const failedIds: string[] = [];
-  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
+  const settledIds: string[] = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
   for (const id of ids) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) {
       // A missing body is not a reason to move the cursor past this id.
       // 404 means Gmail already dropped it; anything else is retried.
       if (detail.status !== 404) failedIds.push(id);
+      else settledIds.push(id);
       continue;
     }
     const msg = detail.body;
-    if ((msg.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) continue;
+    if ((msg.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) {
+      settledIds.push(msg.id);
+      continue;
+    }
 
     try {
       const headers = msg.payload?.headers ?? [];
@@ -291,7 +296,10 @@ export async function pullGmail(
         participants: [fromEmail, ...toEmails.map((a) => a.email), ...ccEmails.map((a) => a.email)],
       });
       // Mail that matches no CRM record stays out of Polo (pay slips, HR, personal mail).
-      if (!target) continue;
+      if (!target) {
+        settledIds.push(msg.id);
+        continue;
+      }
 
       const saved = await prisma.emailMessage.upsert({
         where: { orgId_externalMessageId: { orgId: token.orgId, externalMessageId: msg.id } },
@@ -325,6 +333,7 @@ export async function pullGmail(
       );
       persisted++;
       if (!bridged) failedIds.push(msg.id);
+      else settledIds.push(msg.id);
     } catch (err) {
       failedIds.push(msg.id);
       log.warn({ err, msgId: msg.id }, 'Failed to persist Gmail message');
@@ -332,8 +341,8 @@ export async function pullGmail(
   }
 
   const pageKey = `gmail:${cursor ?? 'seed'}`;
-  const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds);
-  bridgeDeltas.push({ page: pageKey, failedIds });
+  const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds, new Date().toISOString(), settledIds);
+  bridgeDeltas.push({ page: pageKey, failedIds, settledIds });
   if (bridge.quarantined.length > 0) {
     log.warn({ tokenId: token.id, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
   }

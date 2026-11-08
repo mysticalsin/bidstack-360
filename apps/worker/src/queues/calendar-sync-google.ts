@@ -217,7 +217,7 @@ export async function pullGoogleIncremental(
   const syncToken = deltaState['calendarSyncToken'] as string | undefined;
   let pageToken = deltaState['calendarPageToken'] as string | undefined;
   let count = 0;
-  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(
@@ -237,10 +237,10 @@ export async function pullGoogleIncremental(
     const body = (await res.json()) as { items?: GoogleEventItem[]; nextSyncToken?: string; nextPageToken?: string };
     const items = body.items ?? [];
     count += items.length;
-    const failed = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
+    const { failed, settled } = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
     const pageKey = `google:${syncToken ?? ''}:${pageToken ?? ''}`;
-    const bridge = noteActivityBridgeFailures(deltaState, pageKey, failed);
-    bridgeDeltas.push({ page: pageKey, failedIds: failed });
+    const bridge = noteActivityBridgeFailures(deltaState, pageKey, failed, new Date().toISOString(), settled);
+    bridgeDeltas.push({ page: pageKey, failedIds: failed, settledIds: settled });
     if (bridge.quarantined.length > 0) {
       log.warn({ tokenId, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
     }
@@ -282,8 +282,9 @@ async function upsertGoogleEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<string[]> {
+): Promise<{ failed: string[]; settled: string[] }> {
   const failed: string[] = [];
+  const settled: string[] = [];
   for (const item of items) {
     if (!item.id) continue;
 
@@ -294,6 +295,7 @@ async function upsertGoogleEvents(
       });
       const removed = await syncRemovedEvents(orgId, userId, 'google_workspace', item.id, log);
       if (!removed) failed.push(item.id);
+      else settled.push(item.id);
       continue;
     }
 
@@ -301,6 +303,7 @@ async function upsertGoogleEvents(
     const endAt = googleEventTime(item.end);
     if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
       log.warn({ eventId: item.id }, 'Google event without a readable start/end; skipping');
+      settled.push(item.id);
       continue;
     }
     const isAllDay = Boolean(item.start?.date && !item.start?.dateTime);
@@ -351,12 +354,13 @@ async function upsertGoogleEvents(
         { eventId: item.id },
       );
       if (!ok) failed.push(item.id);
+      else settled.push(item.id);
     } catch (err) {
       failed.push(item.id);
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
     }
   }
-  return failed;
+  return { failed, settled };
 }
 
 // ─── Google watch channel renewal ─────────────────────────────────────────

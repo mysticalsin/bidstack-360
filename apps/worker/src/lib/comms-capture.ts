@@ -252,19 +252,43 @@ export function meetingColumns(hints: MeetingHints, iCalUid: string | null | und
  * a new nextLink or sync token must not restart the budget and pin forever.
  * The capture row is already saved. The id is kept on
  * `activityBridgeQuarantine` (id, attempts, time — no subject or body).
- * There is no replay worker and no product UI. After the cursor moves, a
- * quarantined id is not fetched again. The list is the audit, capped so the
- * token cannot grow without bound.
+ * There is no replay worker and no product UI.
+ *
+ * The quarantine list is a bounded audit, not a permanent exclusion. It keeps
+ * at most {@link ACTIVITY_BRIDGE_QUARANTINE_CAP} ids. Past that, the oldest
+ * record is dropped and that id can start a new budget of
+ * {@link ACTIVITY_BRIDGE_RETRY_LIMIT}. Ids still inside that budget stay in
+ * the retry map and are not dropped to make room, and they are not removed
+ * by age. A later success removes an id from the retry map only.
  */
 export const ACTIVITY_BRIDGE_RETRY_LIMIT = 3;
-const BRIDGE_QUARANTINE_CAP = 50;
-// The list remembers ids that already used their budget. Past 50, the oldest
-// record is dropped and that id can start a new budget. That is the bound,
-// not a silent delete of a message still inside its three attempts.
+export const ACTIVITY_BRIDGE_QUARANTINE_CAP = 50;
 const MAX_RETRY_IDS = 32;
 
 export type ActivityBridgeQuarantine = { id: string; attempts: number; at: string };
-export type ActivityBridgeDelta = { page: string; failedIds: string[] };
+export type ActivityBridgeDelta = {
+  page: string;
+  failedIds: string[];
+  /**
+   * Ids this run actually visited that are not outstanding failures: the
+   * bridge succeeded, or the provider item is gone or deliberately not retried.
+   * Ids this run did not see stay in the map.
+   */
+  settledIds?: string[];
+};
+
+/** The locked cursor changed a key this run needed to write. The job retries the whole pull. */
+export class CursorKeyConflictError extends Error {
+  readonly keys: string[];
+
+  constructor(keys: string[]) {
+    super(
+      `Cursor key conflict on ${keys.join(', ')}. The locked row no longer matches this run, so nothing was written.`,
+    );
+    this.name = 'CursorKeyConflictError';
+    this.keys = keys;
+  }
+}
 
 const RETRY_KEYS = [
   'activityBridgeRetry',
@@ -317,7 +341,7 @@ function quarantineIds(
   const ids = new Set(entries.map((entry) => entry.id));
   state.activityBridgeQuarantine = [...entries, ...prior.filter((entry) => !ids.has(entry.id))].slice(
     0,
-    BRIDGE_QUARANTINE_CAP,
+    ACTIVITY_BRIDGE_QUARANTINE_CAP,
   );
 }
 
@@ -327,8 +351,10 @@ function quarantineIds(
  * restart a poison id at 1. Counts saturate at the limit. An id at the limit
  * leaves the active map and does not hold the cursor. The map stays at or
  * under the cap. A new id that does not fit is not quarantined early; the
- * page is held until a finished id frees a slot. An empty failure list does
- * not clear other ids.
+ * page is held until a settled or finished id frees a slot. An empty failure
+ * list does not clear other ids. `settledIds` removes only those ids from the
+ * active map, including when this page had no new failure. Quarantine records
+ * and ids this run did not settle stay. Unexhausted ids are not dropped by age.
  * `page` is the caller's cursor key and is not part of the count.
  */
 export function noteActivityBridgeFailures(
@@ -336,11 +362,19 @@ export function noteActivityBridgeFailures(
   page: string,
   failedIds: string[],
   now = new Date().toISOString(),
+  settledIds: readonly string[] = [],
 ): { hold: boolean; quarantined: string[] } {
   void page;
   const failed = [...new Set(failedIds.filter((id) => id.length > 0))];
+  const failedSet = new Set(failed);
+  const settled = [...new Set(settledIds.filter((id) => id.length > 0 && !failedSet.has(id)))];
+  if (failed.length === 0 && settled.length === 0) return { hold: false, quarantined: [] };
   const counts = readRetryIds(state);
-  if (failed.length === 0) return { hold: false, quarantined: [] };
+  for (const id of settled) delete counts[id];
+  if (failed.length === 0) {
+    writeRetryIds(state, counts);
+    return { hold: false, quarantined: [] };
+  }
   const already = new Set(
     (Array.isArray(state.activityBridgeQuarantine) ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[]) : [])
       .map((entry) => entry.id),
@@ -388,11 +422,30 @@ function sameCursorValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function cursorPresence(record: Record<string, unknown>, key: string): { present: boolean; value: unknown } {
+  const present = Object.prototype.hasOwnProperty.call(record, key);
+  return { present, value: present ? record[key] : undefined };
+}
+
+function samePresence(
+  left: { present: boolean; value: unknown },
+  right: { present: boolean; value: unknown },
+): boolean {
+  return left.present === right.present && (!left.present || sameCursorValue(left.value, right.value));
+}
+
 /**
  * Cursor fields this run actually changed are copied onto the locked row.
  * Fields it did not change stay as stored, including a value another pull
  * committed after this run read its snapshot. Retry keys are never taken
  * from either snapshot; `deltas` are applied once onto the stored counts.
+ *
+ * `calendarNextLink` and `calendarDeltaLink` are one cursor: the next read
+ * follows the nextLink first. If any key this run needs to change no longer
+ * matches the snapshot, and the locked row is not already the desired value,
+ * the whole merge aborts. A later key is not written beside a conflicting one.
+ * When the locked row already matches this run, the write is idempotent and
+ * the retry deltas still apply.
  */
 export function mergeBridgeDeltaState(
   stored: Record<string, unknown>,
@@ -404,26 +457,34 @@ export function mergeBridgeDeltaState(
   const result: Record<string, unknown> = structuredClone(stored);
   const retryKeySet = new Set<string>(RETRY_KEYS);
   const keys = new Set([...Object.keys(baseline), ...Object.keys(desired)]);
+  const conflicts: string[] = [];
+  const writes: string[] = [];
   for (const key of keys) {
     if (retryKeySet.has(key)) continue;
-    const inBaseline = Object.prototype.hasOwnProperty.call(baseline, key);
-    const inDesired = Object.prototype.hasOwnProperty.call(desired, key);
-    if (inBaseline && inDesired && sameCursorValue(baseline[key], desired[key])) continue;
-    // Another pull changed this key after our snapshot. Keep the locked value,
-    // including a deletion. A stale run must not put an old page link back
-    // or remove a newer delta link.
-    const storedHas = Object.prototype.hasOwnProperty.call(result, key);
-    const storedValue = storedHas ? result[key] : undefined;
-    const baselineValue = inBaseline ? baseline[key] : undefined;
-    if (storedHas !== inBaseline || (storedHas && !sameCursorValue(storedValue, baselineValue))) continue;
-    if (!inDesired) delete result[key];
-    else result[key] = structuredClone(desired[key]);
+    const base = cursorPresence(baseline, key);
+    const want = cursorPresence(desired, key);
+    if (samePresence(base, want)) continue;
+    const locked = cursorPresence(result, key);
+    if (samePresence(locked, want)) continue;
+    if (!samePresence(locked, base)) {
+      conflicts.push(key);
+      continue;
+    }
+    writes.push(key);
+  }
+  if (conflicts.length > 0) throw new CursorKeyConflictError([...conflicts].sort());
+  for (const key of writes) {
+    const want = cursorPresence(desired, key);
+    if (!want.present) delete result[key];
+    else result[key] = structuredClone(want.value);
   }
   for (const key of RETRY_KEYS) {
     if (key in stored) result[key] = structuredClone(stored[key]);
     else delete result[key];
   }
-  for (const delta of deltas) noteActivityBridgeFailures(result, delta.page, delta.failedIds, now);
+  for (const delta of deltas) {
+    noteActivityBridgeFailures(result, delta.page, delta.failedIds, now, delta.settledIds ?? []);
+  }
   return result;
 }
 

@@ -4,7 +4,9 @@ import { CALENDAR_PULL_INCREMENTAL, OUTLOOK_PULL_HISTORICAL, OUTLOOK_PULL_INCREM
 
 import { commitTokenDeltaState } from './activity-bridge-commit.js';
 import {
+  ACTIVITY_BRIDGE_QUARANTINE_CAP,
   ACTIVITY_BRIDGE_RETRY_LIMIT,
+  CursorKeyConflictError,
   externalParticipants,
   googleMeetingHints,
   graphMeetingHints,
@@ -239,9 +241,11 @@ describe('activity bridge retry bound', () => {
     const stored = { calendarNextLink: 'https://graph/page-2', calendarDeltaLink: 'newer' };
     const baseline = { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old' };
     const desired = { calendarDeltaLink: 'stale-done' };
-    const merged = mergeBridgeDeltaState(stored, baseline, desired, [], now);
-    expect(merged.calendarNextLink).toBe('https://graph/page-2');
-    expect(merged.calendarDeltaLink).toBe('newer');
+    // Both keys moved. Returning the locked row would still be a write of a
+    // mixed cursor, so the merge aborts and the caller does not persist.
+    expect(() => mergeBridgeDeltaState(stored, baseline, desired, [], now)).toThrow(CursorKeyConflictError);
+    expect(stored.calendarNextLink).toBe('https://graph/page-2');
+    expect(stored.calendarDeltaLink).toBe('newer');
     const owned = mergeBridgeDeltaState(
       { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old', mailNextLink: 'keep' },
       { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old', mailNextLink: 'keep' },
@@ -255,9 +259,12 @@ describe('activity bridge retry bound', () => {
   });
 
   it('forgets only the oldest quarantined id, and that id starts a new budget', () => {
+    // The cap is a bound, not a permanent budget. The forgotten id can be
+    // counted again. An id still inside the list does not get a new budget.
     const state: Record<string, unknown> = {};
     const now = '2026-11-08T03:00:00.000Z';
-    for (let i = 0; i < 50; i++) {
+    expect(ACTIVITY_BRIDGE_QUARANTINE_CAP).toBe(50);
+    for (let i = 0; i < ACTIVITY_BRIDGE_QUARANTINE_CAP; i++) {
       const id = `id-${i}`;
       noteActivityBridgeFailures(state, 'p', [id], now);
       noteActivityBridgeFailures(state, 'p', [id], now);
@@ -328,6 +335,41 @@ describe('activity bridge retry bound', () => {
     const listed = state.activityBridgeQuarantine as Array<{ id: string; attempts: number }>;
     expect(listed).toEqual([expect.objectContaining({ id: 'id-0', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT })]);
     expect(JSON.stringify(listed)).not.toContain('subject');
+  });
+
+  it('frees a retry slot when an id later succeeds and leaves the other failures', () => {
+    // WHY: 32 ids that already succeeded used to sit in the map forever, so a
+    // new failure could not be counted and the page stayed held.
+    const state: Record<string, unknown> = {};
+    const now = '2026-11-08T03:00:00.000Z';
+    const ids = Array.from({ length: 32 }, (_, i) => `id-${i}`);
+    noteActivityBridgeFailures(state, 'page-1', ids, now);
+    const settled = noteActivityBridgeFailures(state, 'page-1', [], now, ['id-0']);
+    expect(settled.hold).toBe(false);
+    const counts = state.activityBridgeRetryById as Record<string, number>;
+    expect(counts['id-0']).toBeUndefined();
+    expect(counts['id-1']).toBe(1);
+    expect(Object.keys(counts)).toHaveLength(31);
+    const admitted = noteActivityBridgeFailures(state, 'page-1', ['id-new'], now);
+    expect(admitted.hold).toBe(true);
+    expect(admitted.quarantined).toEqual([]);
+    const after = state.activityBridgeRetryById as Record<string, number>;
+    expect(after['id-new']).toBe(1);
+    expect(after['id-1']).toBe(1);
+    expect(Object.keys(after)).toHaveLength(32);
+  });
+
+  it('does not drop an unexhausted id that this run did not settle', () => {
+    const state: Record<string, unknown> = { activityBridgeRetryById: { poison: 2, other: 1 } };
+    const now = '2026-11-08T03:00:00.000Z';
+    const merged = mergeBridgeDeltaState(state, state, state, [
+      { page: 'inbox', failedIds: ['fresh'], settledIds: ['poison'] },
+    ], now);
+    const counts = merged.activityBridgeRetryById as Record<string, number>;
+    expect(counts.poison).toBeUndefined();
+    expect(counts.other).toBe(1);
+    expect(counts.fresh).toBe(1);
+    expect(merged.activityBridgeQuarantine).toBeUndefined();
   });
 });
 
@@ -462,6 +504,88 @@ describe('activity bridge commit lock', () => {
     await commitTokenDeltaState(db, 'tok-1', { calendarDeltaLink: 'cal-keep' }, { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox' }, []);
     expect(update).toHaveBeenCalledOnce();
     expect(db.integrationToken.findFirst).toHaveBeenCalled();
+  });
+
+  it('aborts a mixed nextLink and delta instead of keeping the stale page', async () => {
+    // WHY: the next read prefers calendarNextLink. Writing a new delta while
+    // leaving a conflicting nextLink would resume on the stale page.
+    const stored = {
+      delta: { calendarNextLink: 'https://graph/page-2', calendarDeltaLink: 'old' } as Record<string, unknown>,
+    };
+    const update = vi.fn(async (args: { data: { deltaState: Record<string, unknown> } }) => {
+      stored.delta = args.data.deltaState;
+    });
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ delta_state: stored.delta }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await expect(
+      commitTokenDeltaState(
+        db,
+        'tok-1',
+        { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old' },
+        { calendarDeltaLink: 'done' },
+        [],
+      ),
+    ).rejects.toThrow(CursorKeyConflictError);
+    expect(update).not.toHaveBeenCalled();
+    expect(stored.delta.calendarNextLink).toBe('https://graph/page-2');
+    expect(stored.delta.calendarDeltaLink).toBe('old');
+  });
+
+  it('does not write when a stale snapshot would replace a deleted nextLink', async () => {
+    const stored = { delta: { calendarDeltaLink: 'newer' } as Record<string, unknown> };
+    const update = vi.fn();
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ delta_state: stored.delta }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await expect(
+      commitTokenDeltaState(
+        db,
+        'tok-1',
+        { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old' },
+        { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'stale-done' },
+        [{ page: 'https://graph/page-1', failedIds: ['poison'] }],
+      ),
+    ).rejects.toThrow(/Cursor key conflict/);
+    expect(update).not.toHaveBeenCalled();
+    expect(stored.delta).toEqual({ calendarDeltaLink: 'newer' });
+  });
+
+  it('persists when the locked cursor already matches and still applies a success', async () => {
+    const stored = {
+      delta: {
+        calendarDeltaLink: 'done',
+        activityBridgeRetryById: { poison: 1, other: 2 },
+      } as Record<string, unknown>,
+    };
+    const update = vi.fn(async (args: { data: { deltaState: Record<string, unknown> } }) => {
+      stored.delta = args.data.deltaState;
+    });
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ delta_state: stored.delta }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await commitTokenDeltaState(
+      db,
+      'tok-1',
+      { calendarNextLink: 'https://graph/page-1', calendarDeltaLink: 'old' },
+      { calendarDeltaLink: 'done' },
+      [{ page: 'https://graph/page-2', failedIds: [], settledIds: ['poison'] }],
+    );
+    expect(update).toHaveBeenCalledOnce();
+    expect(stored.delta.calendarDeltaLink).toBe('done');
+    expect(stored.delta.calendarNextLink).toBeUndefined();
+    const counts = stored.delta.activityBridgeRetryById as Record<string, number>;
+    expect(counts.poison).toBeUndefined();
+    expect(counts.other).toBe(2);
   });
 
   it('leaves lock-timeout retries to the pull jobs that already back off', () => {

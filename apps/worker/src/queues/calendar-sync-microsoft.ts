@@ -168,12 +168,15 @@ export async function pullMicrosoftIncremental(
   });
 
   const baseline = structuredClone(deltaState);
+  // nextLink wins over deltaLink. Those two keys are one cursor, so a commit
+  // that kept a stale nextLink and wrote a new delta would resume on the
+  // stale page. A conflict on either key aborts the whole save.
   let url =
     (deltaState['calendarNextLink'] as string | undefined) ??
     (deltaState['calendarDeltaLink'] as string | undefined) ??
     initialDeltaUrl();
   let count = 0;
-  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(url, { headers: GRAPH_READ_HEADERS(accessToken) }, { provider: 'Microsoft Graph' });
@@ -193,9 +196,9 @@ export async function pullMicrosoftIncremental(
     };
     const items = body.value ?? [];
     count += items.length;
-    const failed = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
-    const bridge = noteActivityBridgeFailures(deltaState, url, failed);
-    bridgeDeltas.push({ page: url, failedIds: failed });
+    const { failed, settled } = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
+    const bridge = noteActivityBridgeFailures(deltaState, url, failed, new Date().toISOString(), settled);
+    bridgeDeltas.push({ page: url, failedIds: failed, settledIds: settled });
     if (bridge.quarantined.length > 0) {
       log.warn(
         { tokenId, ids: bridge.quarantined },
@@ -250,8 +253,9 @@ async function upsertMicrosoftEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<string[]> {
+): Promise<{ failed: string[]; settled: string[] }> {
   const failed: string[] = [];
+  const settled: string[] = [];
   for (const item of items) {
     if (!item.id) continue;
 
@@ -262,6 +266,7 @@ async function upsertMicrosoftEvents(
       });
       const removed = await syncRemovedEvents(orgId, userId, 'microsoft_graph', item.id, log);
       if (!removed) failed.push(item.id);
+      else settled.push(item.id);
       continue;
     }
 
@@ -270,6 +275,7 @@ async function upsertMicrosoftEvents(
     const endAt = graphEventTime(item.end, isAllDay);
     if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
       log.warn({ eventId: item.id }, 'MS event without a readable start/end; skipping');
+      settled.push(item.id);
       continue;
     }
 
@@ -325,12 +331,13 @@ async function upsertMicrosoftEvents(
         { eventId: item.id },
       );
       if (!ok) failed.push(item.id);
+      else settled.push(item.id);
     } catch (err) {
       failed.push(item.id);
       log.warn({ err, eventId: item.id }, 'Failed to upsert MS event; skipping');
     }
   }
-  return failed;
+  return { failed, settled };
 }
 
 /** Cancel the activity of an event the provider removed. */

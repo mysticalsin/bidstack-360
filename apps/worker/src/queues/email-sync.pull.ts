@@ -70,7 +70,7 @@ export async function pullDelta(
   const baseline = structuredClone(deltaState);
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
   let persisted = 0;
-  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
 
   for (const f of FOLDERS) {
     let url = (deltaState[f.next] as string | undefined) ?? (deltaState[f.link] as string | undefined) ?? initialUrl(f.folder);
@@ -79,6 +79,7 @@ export async function pullDelta(
 
     for (let page = 0; page < MAX_PAGES_PER_FOLDER; page++) {
       const failedIds: string[] = [];
+      const settledIds: string[] = [];
       const res = await providerFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } }, { provider: 'Microsoft Graph' });
 
       if (res.status === 410) {
@@ -100,7 +101,11 @@ export async function pullDelta(
       };
 
       for (const msg of data.value ?? []) {
-        if (msg.isDraft || msg['@removed'] || !msg.id) continue;
+        if (!msg.id) continue;
+        if (msg.isDraft || msg['@removed']) {
+          settledIds.push(msg.id);
+          continue;
+        }
         try {
           const fromEmail = (msg.from?.emailAddress?.address ?? '').toLowerCase();
           const toEmails = recipients(msg.toRecipients);
@@ -111,7 +116,10 @@ export async function pullDelta(
             participants: [fromEmail, ...toEmails.map((r) => r.email), ...ccEmails.map((r) => r.email)],
           });
           // Mail that matches no CRM record stays out of Polo (pay slips, HR, personal mail).
-          if (!target) continue;
+          if (!target) {
+            settledIds.push(msg.id);
+            continue;
+          }
           const html = msg.body?.contentType?.toLowerCase() === 'html';
 
           const saved = await prisma.emailMessage.upsert({
@@ -146,14 +154,15 @@ export async function pullDelta(
           );
           persisted++;
           if (!bridged) failedIds.push(msg.id);
+          else settledIds.push(msg.id);
         } catch (err) {
           failedIds.push(msg.id);
           log.warn({ err, msgId: msg.id }, 'Failed to persist Graph message');
         }
       }
 
-      const bridge = noteActivityBridgeFailures(deltaState, url, failedIds);
-      bridgeDeltas.push({ page: url, failedIds });
+      const bridge = noteActivityBridgeFailures(deltaState, url, failedIds, new Date().toISOString(), settledIds);
+      bridgeDeltas.push({ page: url, failedIds, settledIds });
       if (bridge.quarantined.length > 0) {
         log.warn(
           { tokenId: token.id, folder: f.folder, ids: bridge.quarantined },
