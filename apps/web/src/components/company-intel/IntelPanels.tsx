@@ -156,6 +156,11 @@ export function DirectionPanel({ d }: { d: AccountDirection }) {
 
 /** Hiring: open roles, trend, monthly strip, function mix, skills, postings. */
 export function HiringPanel({ h }: { h: AccountHiringIntel }) {
+  // Keyed so a role filter picked on one account never carries to the next.
+  return <HiringPanelBody key={h.companyId} h={h} />;
+}
+
+function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
   const s = h.summary;
   const max = Math.max(1, ...s.monthly);
   const [filter, setFilter] = useState<HiringFilter | null>(null);
@@ -363,32 +368,37 @@ function ShareList({
   unit: string;
 }) {
   return (
-    <ul className="ci-list ci-compact">
-      {rows.map((r) => {
-        const active = filter?.kind === kind && filter.key === r.key;
-        return (
-          <li key={r.key} className="ci-share">
-            <div className="ci-row">
-              <button
-                type="button"
-                className="ci-share-label"
-                aria-pressed={active}
-                aria-label={`${r.label}: ${r.count}, ${r.pct}% ${unit}. Show these roles`}
-                onClick={() => onFilter({ kind, key: r.key, label: r.label })}
-              >
-                {r.label}
-              </button>
-              <span className="ci-num">
-                {r.count} <span className="ci-meta">· {r.pct}%</span>
+    <>
+      <p className="ci-meta" data-testid={`share-unit-${kind}`}>
+        Percent {unit}
+      </p>
+      <ul className="ci-list ci-compact">
+        {rows.map((r) => {
+          const active = filter?.kind === kind && filter.key === r.key;
+          return (
+            <li key={r.key} className="ci-share">
+              <div className="ci-row">
+                <button
+                  type="button"
+                  className="ci-share-label"
+                  aria-pressed={active}
+                  aria-label={`${r.label}: ${r.count}, ${r.pct}% ${unit}. Show these roles`}
+                  onClick={() => onFilter({ kind, key: r.key, label: r.label })}
+                >
+                  {r.label}
+                </button>
+                <span className="ci-num">
+                  {r.count} <span className="ci-meta">· {r.pct}%</span>
+                </span>
+              </div>
+              <span className="ci-share-track" aria-hidden>
+                <span className="ci-share-fill" style={{ width: `${Math.min(100, r.pct)}%` }} />
               </span>
-            </div>
-            <span className="ci-share-track" aria-hidden>
-              <span className="ci-share-fill" style={{ width: `${Math.min(100, r.pct)}%` }} />
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 

@@ -90,3 +90,25 @@ describe('HiringPanel detail', () => {
     expect(within(screen.getByTestId('hiring-postings')).getByText('Account executive')).toBeTruthy();
   });
 });
+
+describe('HiringPanel shares and company changes', () => {
+  afterEach(cleanup);
+
+  it('shows the base of every share next to it', () => {
+    render(<HiringPanel h={hiring} />);
+    expect(screen.getByTestId('share-unit-function').textContent).toBe('Percent of open roles');
+    expect(screen.getByTestId('share-unit-theme').textContent).toBe('Percent of 3 postings');
+    expect(screen.getByTestId('share-unit-seniority').textContent).toBe('Percent of 3 postings');
+  });
+
+  it('clears the role filter when the panel moves to another company', () => {
+    const { rerender } = render(<HiringPanel h={hiring} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Azure: 12/ }));
+    expect(screen.getByText('Roles: Azure')).toBeTruthy();
+
+    rerender(<HiringPanel h={{ ...hiring, companyId: 'c2' }} />);
+
+    expect(screen.queryByText('Roles: Azure')).toBeNull();
+    expect(within(screen.getByTestId('hiring-postings')).getByText('Account executive')).toBeTruthy();
+  });
+});
