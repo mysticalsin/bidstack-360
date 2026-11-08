@@ -231,7 +231,7 @@ function TechStackEditor({
                     type="button"
                     onClick={() => update(index, { items: cat.items.filter((it) => it.name !== item.name) })}
                     aria-label={`Remove ${item.name}`}
-                    className="min-h-6 rounded px-1 text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]"
                   >
                     ×
                   </button>
@@ -319,9 +319,9 @@ function cleanDraft(draft: TechnicalStackCategory[]): TechnicalStackCategory[] {
 }
 
 const SECONDARY_BTN =
-  'inline-flex min-h-9 items-center rounded-lg border border-[var(--border-default)] px-3 text-sm font-semibold text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]';
+  'inline-flex min-h-11 items-center rounded-lg border border-[var(--border-default)] px-3 text-sm font-semibold text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]';
 const INPUT =
-  'min-h-9 rounded-lg border border-[var(--border-default)] bg-[var(--surface-raised)] px-2.5 text-sm text-[var(--fg-primary)]';
+  'min-h-11 rounded-lg border border-[var(--border-default)] bg-[var(--surface-raised)] px-2.5 text-sm text-[var(--fg-primary)]';
 
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-');

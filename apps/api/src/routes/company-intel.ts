@@ -35,6 +35,7 @@ import {
 
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { enqueueAccountIntel, enqueueCompanyFullRefresh } from '../queues/account-intel.js';
+import { registryRows } from '../services/account-positioning/sourced-figures.js';
 
 const idParam = z.object({ id: z.string().uuid() });
 /** One read audit per user, account and view in this window; refresh polling would otherwise write one per poll. */
@@ -71,11 +72,11 @@ async function audit(
   });
 }
 
-async function loadCompany(req: FastifyRequest, id: string): Promise<{ id: string } | null> {
+async function loadCompany(req: FastifyRequest, id: string): Promise<{ id: string; name: string } | null> {
   const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
   return prisma.company.findFirst({
     where: applyCompanyScope({ id, orgId: req.auth.orgId, deletedAt: null }, scope),
-    select: { id: true },
+    select: { id: true, name: true },
   });
 }
 
@@ -91,31 +92,34 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     if (!snapshot) throw server.httpErrors.notFound('Company not found');
     if (shouldAuditRead(`${req.auth.orgId}:${req.auth.userId}:${company.id}:${view}`))
       await audit(req, `intel.${view}.view`, company.id);
-    return composeAccountIntel(snapshot);
+    return { company, intel: composeAccountIntel(snapshot) };
   }
 
   server.get(
     '/companies/:id/intel/direction',
     { config: READ, schema: { params: idParam, response: { 200: AccountDirection } } },
-    async (req) => (await composed(req, req.params.id, 'direction')).direction,
+    async (req) => (await composed(req, req.params.id, 'direction')).intel.direction,
   );
 
   server.get(
     '/companies/:id/intel/hiring',
     { config: READ, schema: { params: idParam, response: { 200: AccountHiringIntel } } },
-    async (req) => (await composed(req, req.params.id, 'hiring')).hiring,
+    async (req) => (await composed(req, req.params.id, 'hiring')).intel.hiring,
   );
 
   server.get(
     '/companies/:id/intel/financials',
     { config: READ, schema: { params: idParam, response: { 200: AccountFinancialsIntel } } },
-    async (req) => (await composed(req, req.params.id, 'financials')).financials,
+    async (req) => {
+      const { company, intel } = await composed(req, req.params.id, 'financials');
+      return { ...intel.financials, registry: await registryRows(req.auth.orgId, company.id, company.name, intel.financials.registry) };
+    },
   );
 
   server.get(
     '/companies/:id/intel/news',
     { config: READ, schema: { params: idParam, response: { 200: AccountNewsIntel } } },
-    async (req) => (await composed(req, req.params.id, 'news')).news,
+    async (req) => (await composed(req, req.params.id, 'news')).intel.news,
   );
 
   server.post(

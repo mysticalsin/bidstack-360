@@ -100,3 +100,9 @@ a.ci-line-label:hover, .ci-line-label a:hover, .ci-table a:hover, .ci-meta a:hov
   .ci-refresh [data-spin='true'] { animation: none; }
   .ci-tab { transition: none; }
 }
+
+/* Slice 22: registry rows keep the label and value apart and wrap long identifiers instead of overlapping. */
+.ci-registry-row { min-width: 0; }
+.ci-registry-label { min-width: 0; overflow-wrap: anywhere; }
+.ci-registry-value { display: inline-flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 2px 8px; min-width: 0; max-width: 100%; }
+.ci-registry-text { min-width: 0; overflow-wrap: anywhere; color: var(--sg-ink); }
