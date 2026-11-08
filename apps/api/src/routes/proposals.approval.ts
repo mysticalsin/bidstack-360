@@ -14,6 +14,7 @@ import { Proposal, ProposalApprove, ProposalDraftRequest, ProposalSubmitResult }
 
 import { canViewAllRfps } from '../lib/rfp-visibility.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { rfpLinkedApprovalBlock } from './proposal-rfp-gate.js';
 import { serializeProposal } from './proposals.helpers.js';
 
 export const IMMUTABLE_PROPOSAL_STATUSES = ['approved', 'submitted', 'won', 'lost'] as const;
@@ -56,6 +57,13 @@ export const proposalApprovalRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const updated = await prisma.$transaction(async (tx) => {
+        const orchestration = await tx.rfpOrchestration.findFirst({
+          where: { proposalId: row.id, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        const rfpBlock = rfpLinkedApprovalBlock(orchestration?.id);
+        if (rfpBlock) throw server.httpErrors.conflict(rfpBlock);
+
         const changed = await tx.proposal.updateMany({
           where: {
             id: row.id,
