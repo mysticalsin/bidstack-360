@@ -33,6 +33,10 @@ COPY --from=build /usr/local/bin/node /usr/local/bin/node
 COPY --from=build /app /app
 ENV PATH=/usr/lib/postgresql/16/bin:/usr/local/bin:$PATH \
     PUPPETEER_SKIP_DOWNLOAD=true
+RUN mkdir -p /data && chown postgres:postgres /data
 WORKDIR /app
+USER postgres
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:8080/').then((r) => process.exit(r.status < 500 || r.status === 503 ? 0 : 1), () => process.exit(1))"]
 ENTRYPOINT ["node", "/app/apps/polo-preview/container/entrypoint.mjs"]

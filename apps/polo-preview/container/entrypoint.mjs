@@ -51,7 +51,7 @@ function remember(text) {
 function log(message) {
   const line = `[polo-container] ${new Date().toISOString()} ${message}`;
   remember(line);
-  console.log(line);
+  process.stdout.write(`${line}\n`);
 }
 
 function setPhase(next, why = '') {
@@ -111,21 +111,21 @@ function startDatabase() {
     const ip = Object.values(networkInterfaces())
       .flat()
       .find((a) => a && a.family === 'IPv4' && !a.internal)?.address;
-    if (!ip) throw new Error(`cannot write /etc/hosts (${err.message}) and no private IPv4 for Redis`);
+    if (!ip) throw new Error(`cannot write /etc/hosts (${err.message}) and no private IPv4 for Redis`, { cause: err });
     redisHost = ip;
     bind.push(ip);
     log(`/etc/hosts is read-only; Redis on ${ip}`);
   }
-  const { uid, gid } = pgUid();
+  const asRoot = process.getuid?.() === 0;
+  const ids = asRoot ? pgUid() : {};
   mkdirSync(PGDATA, { recursive: true });
   mkdirSync(STORAGE, { recursive: true });
-  runSync('chown', ['-R', 'postgres:postgres', PGDATA]);
+  if (asRoot) runSync('chown', ['-R', 'postgres:postgres', PGDATA]);
   if (!existsSync(join(PGDATA, 'PG_VERSION'))) {
-    runSync('initdb', ['-D', PGDATA, '-U', PG_USER, '--auth=trust', '-E', 'UTF8'], { uid, gid });
+    runSync('initdb', ['-D', PGDATA, '-U', PG_USER, '--auth=trust', '-E', 'UTF8'], ids);
   }
   const pg = spawn('postgres', ['-D', PGDATA, '-h', '127.0.0.1', '-k', '/tmp', '-c', 'shared_buffers=256MB'], {
-    uid,
-    gid,
+    ...ids,
     stdio: 'inherit',
   });
   pg.on('exit', (code) => {
@@ -339,7 +339,7 @@ const TYPES = {
 function serveStatic(req, res, pathname) {
   const safe = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
   let file = join(WEB_ROOT, safe);
-  let isFile = false;
+  let isFile;
   try {
     isFile = file.startsWith(WEB_ROOT) && statSync(file).isFile();
   } catch {

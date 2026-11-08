@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, type ReactNode } from 'react';
 
-import { AuthProvider, DEMO_TOKEN_KEY, useAuth, useSignOut, useUser } from './auth';
+import { AuthProvider, DEMO_TOKEN_KEY, isTransientMeFailure, useAuth, useSignOut, useUser } from './auth';
 import { api } from './api';
 
 // Mocked Clerk SDK. The real one would attempt to fetch session JWKs and
@@ -375,5 +375,41 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
     });
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
     expect(screen.getByTestId('email').textContent).not.toBe('jane@mantu.com');
+  });
+
+  it('retries /me while the box is waking up instead of showing the sign-in screen', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'cf-access');
+    let meCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes('/api/v1/me')) {
+        meCalls += 1;
+        if (meCalls === 1) return jsonResponse({ message: 'Service Unavailable' }, 503);
+        return jsonResponse({ id: 'user-ada', email: 'ada@mantu.com', name: 'Ada Lovelace', role: 'admin' });
+      }
+      return jsonResponse({ ok: true });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('email').textContent).toBe('ada@mantu.com');
+      },
+      { timeout: 4000 },
+    );
+    expect(meCalls).toBe(2);
+  });
+
+  it('does not retry a 403 from the allowlist', () => {
+    expect(isTransientMeFailure(403)).toBe(false);
+    expect(isTransientMeFailure(401)).toBe(false);
+    expect(isTransientMeFailure(503)).toBe(true);
+    expect(isTransientMeFailure(null)).toBe(true);
   });
 });
