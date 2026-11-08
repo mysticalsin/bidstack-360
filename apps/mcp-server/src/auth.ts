@@ -1,6 +1,6 @@
 // Per-key authentication for MCP tool calls.
 // Resolves Bearer token -> ApiKey row -> AuthCtx { orgId, scopes, keyId }.
-// Updates lastUsedAt on every call, and emits a 1%-sampled
+// Updates lastUsedAt at most once a minute per key, and emits a 1%-sampled
 // `apikey.used` audit-log row so breach back-tracing has a trail without
 // dwarfing user audit traffic.
 
@@ -22,6 +22,9 @@ import type { Prisma, PrismaClient } from '@bidstack/db';
  */
 export const APIKEY_USED_SAMPLE_RATE = 0.01;
 
+/** lastUsedAt is shown to admins at minute resolution; finer writes are waste. */
+export const LAST_USED_RESOLUTION_MS = 60_000;
+
 /** Test seam: when set, replaces the random sampling decision so tests can
  *  force inclusion (true) or exclusion (false). Production callers must
  *  leave this null. */
@@ -42,6 +45,11 @@ export interface McpAuthCtx {
   orgId: string;
   keyId: string;
   scopes: string[];
+  /** Connection grant: a read-only key may call read tools only. Always set by mcpAuth. */
+  readOnly?: boolean;
+  /** false = the key is limited to `companyIds` (same allowlist as REST). */
+  unrestrictedScope?: boolean;
+  companyIds?: string[];
 }
 
 // `kam` is the dedicated KAM staging scope — distinct from `write` so a KAM
@@ -94,10 +102,18 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
     throw req.server.httpErrors.forbidden('API key lacks `mcp` scope');
   }
 
-  // Fire-and-forget update of lastUsedAt
-  prisma.apiKey
-    .update({ where: { id: key.id }, data: { lastUsedAt: new Date() } })
-    .catch((err) => req.log.warn({ err, keyId: key.id }, 'apiKey lastUsedAt write failed'));
+  // Fire-and-forget, at most once per LAST_USED_RESOLUTION_MS per key. The
+  // conditional WHERE keeps concurrent calls from all writing the same row.
+  const now = new Date();
+  const fresh = new Date(now.getTime() - LAST_USED_RESOLUTION_MS);
+  if (!key.lastUsedAt || key.lastUsedAt < fresh) {
+    prisma.apiKey
+      .updateMany({
+        where: { id: key.id, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: fresh } }] },
+        data: { lastUsedAt: now },
+      })
+      .catch((err) => req.log.warn({ err, keyId: key.id }, 'apiKey lastUsedAt write failed'));
+  }
 
   // Sampled audit-log entry — see APIKEY_USED_SAMPLE_RATE comment for why
   // this isn't 100%. Await it for deterministic audit semantics, but swallow
@@ -119,5 +135,12 @@ export async function mcpAuth(req: FastifyRequest, prisma: PrismaClient): Promis
       });
   }
 
-  return { orgId: key.orgId, keyId: key.id, scopes: key.scopes };
+  return {
+    orgId: key.orgId,
+    keyId: key.id,
+    scopes: key.scopes,
+    readOnly: key.readOnly,
+    unrestrictedScope: key.unrestrictedScope,
+    companyIds: key.companyIds,
+  };
 }

@@ -268,3 +268,27 @@ describe('OpportunityDetailPage load states', () => {
     expect(refetch).toHaveBeenCalled();
   });
 });
+
+describe('OpportunityDetailPage deal value', () => {
+  beforeEach(() => {
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: OPPORTUNITY,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it.each([true, false])('shows the amount as the headline with a Currency not set tag (write=%s)', (canWrite) => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(canWrite);
+    renderPage();
+    expect(screen.getByText('500,000')).toBeTruthy();
+    expect(screen.getByText('Currency not set')).toBeTruthy();
+    expect(screen.queryByText(/not a euro forecast/)).toBeNull();
+  });
+});
