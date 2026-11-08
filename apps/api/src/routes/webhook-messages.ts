@@ -123,6 +123,7 @@ export const webhookMessagesRoutes: FastifyPluginAsyncZod = async (server) => {
       const found = ordered.length
         ? await prisma.webhookMessage.findMany({
             where: { orgId: req.auth.orgId, id: { in: ordered.map((row) => row.id) } },
+            take: ordered.length,
             include: { subscription: { select: { url: true } } },
           })
         : [];
