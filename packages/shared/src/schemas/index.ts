@@ -1,4 +1,3 @@
-export * from './query-boolean.js';
 export * from './opportunity.js';
 export * from './contact.js';
 export * from './crm.js';
@@ -48,7 +47,6 @@ export * from './rbac.js';
 export * from './contract-agreement.js';
 export * from './msa.js';
 export * from './msa-intake.js';
-export * from './agreement-ingest.js';
 export * from './meeting-intel.js';
 export * from './account-enrichment.js';
 export * from './account-signals.js';

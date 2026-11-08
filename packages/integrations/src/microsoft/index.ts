@@ -170,6 +170,35 @@ export class MicrosoftPlugin implements IntegrationPlugin {
           return res.json();
         },
       },
+      {
+        name: 'microsoft_send_email',
+        description: 'Send an email via Microsoft 365.',
+        parameters: {
+          to: { type: 'string', description: 'Recipient email', required: true },
+          subject: { type: 'string', description: 'Email subject', required: true },
+          body: { type: 'string', description: 'Email body (HTML)', required: true },
+        },
+        execute: async (args, context) => {
+          const accessToken = context.config.credentials?.accessToken as string | undefined;
+          if (!accessToken) throw new Error('Microsoft not connected');
+          const res = await fetchWithTimeout('https://graph.microsoft.com/v1.0/me/sendMail', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: {
+                subject: args.subject,
+                body: { contentType: 'HTML', content: args.body },
+                toRecipients: [{ emailAddress: { address: args.to } }],
+              },
+            }),
+          });
+          if (!res.ok) throw new Error(`Microsoft send failed: ${res.status}`);
+          return { sent: true };
+        },
+      },
     ];
   }
 }

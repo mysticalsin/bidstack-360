@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
 import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
-import { bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { getWorkspaceAccessToken } from '../lib/workspace-token.js';
 
@@ -70,7 +70,7 @@ export async function pullDelta(
   const baseline = structuredClone(deltaState);
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
   let persisted = 0;
-  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
 
   for (const f of FOLDERS) {
     let url = (deltaState[f.next] as string | undefined) ?? (deltaState[f.link] as string | undefined) ?? initialUrl(f.folder);
@@ -79,7 +79,6 @@ export async function pullDelta(
 
     for (let page = 0; page < MAX_PAGES_PER_FOLDER; page++) {
       const failedIds: string[] = [];
-      const settledIds: string[] = [];
       const res = await providerFetch(url, { headers: { Authorization: `Bearer ${accessToken}` } }, { provider: 'Microsoft Graph' });
 
       if (res.status === 410) {
@@ -101,11 +100,7 @@ export async function pullDelta(
       };
 
       for (const msg of data.value ?? []) {
-        if (!msg.id) continue;
-        if (msg.isDraft || msg['@removed']) {
-          settledIds.push(msg.id);
-          continue;
-        }
+        if (msg.isDraft || msg['@removed'] || !msg.id) continue;
         try {
           const fromEmail = (msg.from?.emailAddress?.address ?? '').toLowerCase();
           const toEmails = recipients(msg.toRecipients);
@@ -116,10 +111,7 @@ export async function pullDelta(
             participants: [fromEmail, ...toEmails.map((r) => r.email), ...ccEmails.map((r) => r.email)],
           });
           // Mail that matches no CRM record stays out of Polo (pay slips, HR, personal mail).
-          if (!target) {
-            settledIds.push(msg.id);
-            continue;
-          }
+          if (!target) continue;
           const html = msg.body?.contentType?.toLowerCase() === 'html';
 
           const saved = await prisma.emailMessage.upsert({
@@ -154,33 +146,21 @@ export async function pullDelta(
           );
           persisted++;
           if (!bridged) failedIds.push(msg.id);
-          else settledIds.push(msg.id);
         } catch (err) {
           failedIds.push(msg.id);
           log.warn({ err, msgId: msg.id }, 'Failed to persist Graph message');
         }
       }
 
-      const bridge = noteActivityBridgeFailures(deltaState, url, failedIds, new Date().toISOString(), settledIds);
-      const drained = typeof prisma.emailMessage?.findFirst === 'function'
-        ? await drainPendingActivityBridges(deltaState, async (providerId) => {
-        const row = await prisma.emailMessage.findFirst({
-          where: { orgId: params.orgId, userId: params.userId, externalMessageId: providerId, deletedAt: null },
-          select: { id: true },
-        });
-        if (!row) return 'gone';
-        const ok = await bridgeActivity(() => syncEmailMessageActivity(params.orgId, row.id), log, { msgId: providerId });
-        return ok;
-      })
-        : null;
-      bridgeDeltas.push({ page: url, failedIds, settledIds });
+      const bridge = noteActivityBridgeFailures(deltaState, url, failedIds);
+      bridgeDeltas.push({ page: url, failedIds });
       if (bridge.quarantined.length > 0) {
         log.warn(
           { tokenId: token.id, folder: f.folder, ids: bridge.quarantined },
           'Account activity bridge quarantined after repeated failures',
         );
       }
-      holdCursor = bridge.backpressure || (drained?.hold ?? bridge.hold);
+      holdCursor = bridge.hold;
       if (holdCursor) break;
 
       if (data['@odata.deltaLink']) {

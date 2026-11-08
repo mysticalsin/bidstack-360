@@ -2,13 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   accessScopeFromApiKey,
-  accountOpportunityScopePredicate,
   applyCompanyScope,
+  accountOpportunityScopePredicate,
   applyMsaResourceScope,
   applyOpportunityScope,
   companyScopePredicate,
 } from './access-scope.js';
-import { visibleMeetingWhere } from '../meeting-intel/access.js';
 
 const KEY = 'apikey:11111111-1111-4111-8111-111111111111';
 const COMPANY_A = '22222222-2222-4222-8222-222222222222';
@@ -56,32 +55,6 @@ describe('API key resource scope (B2)', () => {
         { OR: [{ id: { in: [MSA_A] } }, { companyId: { in: [COMPANY_A] } }] },
       ],
     });
-  });
-
-  // A restricted key's userId is "apikey:<id>", not a uuid. Putting it in an
-  // ownerId clause made Prisma throw, so every opportunity read by a scoped
-  // key answered 500.
-  it('scopes opportunities by the company allowlist, never by an apikey ownerId', () => {
-    const scoped = accessScopeFromApiKey(KEY, { unrestrictedScope: false, companyIds: [COMPANY_A], msaIds: [] });
-    expect(applyOpportunityScope({ orgId: 'org-1' }, scoped)).toEqual({
-      AND: [{ orgId: 'org-1' }, { companyId: { in: [COMPANY_A] } }],
-    });
-    expect(accountOpportunityScopePredicate(scoped)).toEqual({ companyId: { in: [COMPANY_A] } });
-
-    const denied = accessScopeFromApiKey(KEY, { unrestrictedScope: false, companyIds: [], msaIds: [] });
-    expect(JSON.stringify(applyOpportunityScope({ orgId: 'org-1' }, denied))).not.toContain('apikey:');
-    expect(applyOpportunityScope({ orgId: 'org-1' }, denied)).toEqual({
-      AND: [{ orgId: 'org-1' }, { companyId: { in: [] } }],
-    });
-  });
-
-  it('meeting visibility for a key never compares an apikey id to a uuid column', () => {
-    for (const unrestrictedScope of [true, false]) {
-      const scope = accessScopeFromApiKey(KEY, { unrestrictedScope, companyIds: [COMPANY_A], msaIds: [] });
-      const where = visibleMeetingWhere('org-1', scope);
-      expect(JSON.stringify(where)).not.toContain('apikey:');
-      expect(where).toMatchObject({ orgId: 'org-1', visibility: 'org' });
-    }
   });
 });
 

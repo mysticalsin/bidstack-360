@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { ApiError, api } from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface ErpStatus {
   configured: boolean;
@@ -69,18 +69,12 @@ export function ErpConnectorCard() {
   const status = useQuery({
     queryKey: ['erp:status'],
     queryFn: ({ signal }) => api<ErpStatus>('/api/integrations/erp/status', { signal }),
-    retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
   });
-  // The ERP routes exist only when the deployment opts in (ERP_ENABLED).
-  const disabled = status.error instanceof ApiError && status.error.status === 404;
-  const configured = status.data?.configured === true;
   const kit = useQuery({
     queryKey: ['erp:presales-kit'],
     queryFn: ({ signal }) => api<ErpPresalesKit>('/api/integrations/erp/presales-kit', { signal }),
-    enabled: configured,
   });
   const autocomplete = useQuery({
-    enabled: configured,
     queryKey: ['erp:company-autocomplete', query],
     queryFn: ({ signal }) => {
       const params = new URLSearchParams({ q: query, limit: '5' });
@@ -109,8 +103,6 @@ export function ErpConnectorCard() {
         : status.data.reachable
           ? t('erpConnector.status.live', 'live')
           : t('erpConnector.status.unreachable', 'unreachable');
-
-  if (disabled) return null;
 
   return (
     <Card>
@@ -243,7 +235,7 @@ export function ErpConnectorCard() {
                     <p className="mt-1 line-clamp-2 text-xs text-[var(--fg-secondary)]">
                       {module.value}
                     </p>
-                    <div className="mt-2 truncate font-mono text-xs text-[var(--fg-tertiary)]">
+                    <div className="mt-2 truncate font-mono text-[10px] text-[var(--fg-tertiary)]">
                       {module.erpModels.join(' / ')}
                     </div>
                   </div>
@@ -327,7 +319,7 @@ export function ErpConnectorCard() {
                       {item.matchKeys.map((key) => (
                         <span
                           key={key}
-                          className="rounded bg-[var(--surface-card)] px-1.5 py-0.5 text-xs font-semibold uppercase text-[var(--fg-tertiary)]"
+                          className="rounded bg-[var(--surface-card)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--fg-tertiary)]"
                         >
                           {key}
                         </span>
@@ -365,7 +357,7 @@ export function ErpConnectorCard() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
         {label}
       </div>
       <div className="mt-1 truncate text-sm font-semibold tabular-nums text-[var(--fg-primary)]">

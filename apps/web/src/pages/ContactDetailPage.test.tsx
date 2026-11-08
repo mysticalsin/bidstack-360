@@ -38,8 +38,6 @@ vi.mock('@/hooks/useOpportunities', () => ({
 vi.mock('@/hooks/useTasks', () => ({ useTasks: vi.fn(() => ({ data: { items: [] } })) }));
 vi.mock('@/hooks/useNotes', () => ({ useNotes: vi.fn(() => ({ data: { items: [] } })) }));
 vi.mock('@/components/CustomFieldValuesSection', () => ({ CustomFieldValuesSection: () => null }));
-vi.mock('@/components/email/EmailPanel', () => ({ EmailPanel: () => null }));
-vi.mock('@/components/email/EmailPanel', () => ({ EmailPanel: () => null }));
 vi.mock('@/components/editor/CollaborativeNotesSection', () => ({
   CollaborativeNotesSection: () => null,
 }));

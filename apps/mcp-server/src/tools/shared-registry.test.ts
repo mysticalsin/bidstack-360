@@ -27,7 +27,6 @@ describe('MCP registry reuses the shared agent tools', () => {
       'account_hiring',
       'account_financials_summary',
       'account_news',
-      'company_tech_stack',
     ] as const) {
       expect(AGENT_TOOL_NAMES).toContain(name);
       expect(tools[name]).toBe(agentTools[name]);

@@ -73,18 +73,7 @@ function providerUrls(domain: string): string[] {
   return urls;
 }
 
-type FetchResult =
-  | { kind: 'image'; buf: Buffer; contentType: string }
-  | { kind: 'miss' }
-  | { kind: 'unavailable' };
-
-/**
- * First provider image wins. `miss` means every provider answered and none had
- * an image; `unavailable` means at least one timed out, failed or answered 429
- * or 5xx, so the miss may be transient and must not be negative-cached.
- */
-async function fetchFirstImage(urls: string[]): Promise<FetchResult> {
-  let transient = false;
+async function fetchFirstImage(urls: string[]): Promise<{ buf: Buffer; contentType: string } | null> {
   for (const url of urls) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
@@ -93,17 +82,15 @@ async function fetchFirstImage(urls: string[]): Promise<FetchResult> {
       const ct = res.headers.get('content-type') ?? '';
       if (res.ok && ct.startsWith('image/')) {
         const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.byteLength >= MIN_IMAGE_BYTES) return { kind: 'image', buf, contentType: ct };
-      } else if (res.status === 429 || res.status >= 500) {
-        transient = true;
+        if (buf.byteLength >= MIN_IMAGE_BYTES) return { buf, contentType: ct };
       }
     } catch {
-      transient = true;
+      /* try next provider */
     } finally {
       clearTimeout(timer);
     }
   }
-  return transient ? { kind: 'unavailable' } : { kind: 'miss' };
+  return null;
 }
 
 export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -164,11 +151,7 @@ export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
         return cached ? serve(cached) : reply.code(404).send();
       }
       const fetched = await fetchFirstImage(urls);
-      if (fetched.kind === 'unavailable') return reply.code(404).send();
-      const hit: Hit =
-        fetched.kind === 'image'
-          ? { buf: fetched.buf, contentType: fetched.contentType, ts: Date.now() }
-          : null;
+      const hit: Hit = fetched ? { ...fetched, ts: Date.now() } : null;
       cacheSet(cacheKey, hit);
       return hit ? serve(hit) : reply.code(404).send();
     },

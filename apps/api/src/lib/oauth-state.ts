@@ -26,7 +26,7 @@ import { decryptSecret, encryptSecret } from '@bidstack/shared/server-crypto';
 export const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const PURPOSE = 'polo.oauth-state.v1';
 
-export type OAuthStateProvider = 'gmail' | 'microsoft_mail' | 'slack' | 'agreement_sharepoint' | 'agreement_docusign';
+export type OAuthStateProvider = 'gmail' | 'microsoft_mail' | 'slack';
 
 export type OAuthStateFailure = 'invalid' | 'expired' | 'replayed';
 

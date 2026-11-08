@@ -24,11 +24,10 @@ type TokenTx = {
 const LOCK_TIMEOUT = '2000';
 
 /**
- * Config guard for a fake client that has none of `$transaction`,
- * `$queryRaw`, or `$executeRaw`. It is not a claim that a production process
- * is unable to set a flag. If any of those methods exists, the flag is
- * ignored and the write is refused. Production Prisma has all three, so the
- * flag does not unlock a real client.
+ * Test doubles with none of `$transaction`, `$queryRaw`, or `$executeRaw`
+ * may set this. If any of those methods exists, the flag is ignored and a
+ * partial client is refused. Production Prisma has all three and must not
+ * set the flag.
  */
 export const UNLOCKED_CURSOR_TEST_ADAPTER = 'unlockedCursorTestAdapter';
 
@@ -40,14 +39,11 @@ export const UNLOCKED_CURSOR_TEST_ADAPTER = 'unlockedCursorTestAdapter';
  * did not change.
  *
  * A lock or read error aborts the write. There is no unlocked fallback on a
- * real client. `lock_timeout` is always set before `FOR UPDATE`. A conflicting
- * cursor key aborts before the update, so a nextLink and a delta link from
- * the same provider are not mixed. If the locked row already matches this
- * run, the update still runs and is idempotent. This function does not retry:
- * calendar incremental jobs already use 3 attempts with exponential backoff
- * from 5s, and Outlook incremental jobs use 5 attempts with exponential
- * backoff from 10s. The thrown error is what those jobs retry. Postgres drops
- * the row lock when the transaction ends.
+ * real client. `lock_timeout` is always set before `FOR UPDATE`. This
+ * function does not retry: calendar incremental jobs already use 3 attempts
+ * with exponential backoff from 5s, and Outlook incremental jobs use 5
+ * attempts with exponential backoff from 10s. The thrown error is what those
+ * jobs retry. Postgres drops the row lock when the transaction ends.
  */
 export async function commitTokenDeltaState(
   db: unknown,
@@ -63,7 +59,7 @@ export async function commitTokenDeltaState(
     const hasExec = typeof tx.$executeRaw === 'function';
     const hasTx = typeof client.$transaction === 'function';
     if (hasQuery || hasExec || hasTx) {
-      if (!tx.$queryRaw || !tx.$executeRaw || !hasTx) {
+      if (!hasQuery || !hasExec || !hasTx) {
         throw new Error(
           'Refusing a cursor write. The client is missing $queryRaw, $executeRaw, or a transaction, so the row lock would not be held.',
         );

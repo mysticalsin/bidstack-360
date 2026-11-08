@@ -49,8 +49,6 @@ export const ApolloEnrichJobData = z.object({
   companyName: z.string().min(1),
   domain: z.string().min(1).optional(),
   signature: z.string().min(1).optional(),
-  // Open data fallback jobs (slice 16): organization fields only, people and executive search stay off.
-  orgOnly: z.boolean().optional(),
 });
 
 export type ApolloEnrichJobData = z.infer<typeof ApolloEnrichJobData>;
@@ -407,14 +405,6 @@ function normalizeDomain(domain: string | null): string | null {
 
 // Mirrors the normalization in apps/api/src/routes/crm.ts so the upsert
 // targets the same row whether the API or the worker writes it.
-/** Other providers' keys (open data stack, Seamless, GitHub org) survive an Apollo refresh. */
-const APOLLO_OWNED_METADATA_KEYS = new Set(['apollo', 'apolloOrganization', 'mappedIndustry', 'meetingTechStack']);
-
-export function preservedProviderMetadata(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([key]) => !APOLLO_OWNED_METADATA_KEYS.has(key)));
-}
-
 export function normalizeName(value: string): string {
   return value
     .trim()
@@ -1299,7 +1289,7 @@ export async function startCompanyEnrichApollo(
           ...(data.domain ? { domain: data.domain } : {}),
           timeoutMs: Number(process.env.APOLLO_MCP_TIMEOUT_MS ?? APOLLO_TIMEOUT_MS),
           includeCreditTools: process.env.APOLLO_MCP_ENABLE_CREDIT_TOOLS === 'true',
-          includeExecutiveSearch: !data.orgOnly && process.env.APOLLO_MCP_ENABLE_EXECUTIVE_SEARCH === 'true',
+          includeExecutiveSearch: process.env.APOLLO_MCP_ENABLE_EXECUTIVE_SEARCH === 'true',
           tools: {
             searchCompanies: process.env.APOLLO_MCP_SEARCH_COMPANIES_TOOL ?? 'search_companies',
             getCompany: process.env.APOLLO_MCP_GET_COMPANY_TOOL ?? 'get_company',
@@ -1339,7 +1329,7 @@ export async function startCompanyEnrichApollo(
         });
         syncMode = 'apollo_api_organization_enrich';
         creditPolicy = 'uses_credits';
-        if (!data.orgOnly && process.env.APOLLO_API_ENABLE_PEOPLE_SEARCH === 'true') {
+        if (process.env.APOLLO_API_ENABLE_PEOPLE_SEARCH === 'true') {
           try {
             const peopleSearch = await callApolloPeopleSearch({
               apiKey: transport.apiKey,
@@ -1418,11 +1408,6 @@ export async function startCompanyEnrichApollo(
         rawNewsCrossCheck: sanitizeApolloPayload(rawNewsCrossCheck),
       };
 
-      const existing = await prisma.companyEnrichment.findUnique({
-        where: { orgId_normalizedName: { orgId: data.orgId, normalizedName } },
-        select: { providerMetadata: true },
-      });
-      const keptMetadata = preservedProviderMetadata(existing?.providerMetadata);
       const enrichment = await prisma.companyEnrichment.upsert({
         where: { orgId_normalizedName: { orgId: data.orgId, normalizedName } },
         create: {
@@ -1467,7 +1452,6 @@ export async function startCompanyEnrichApollo(
           confidenceBps: APOLLO_CONFIDENCE_BPS,
           sourceAttribution: sourceAttribution as Prisma.InputJsonValue,
           providerMetadata: {
-            ...keptMetadata,
             apollo: apolloMetadata,
             apolloOrganization: sanitizeApolloPayload(organization),
             mappedIndustry: mapped.industry,

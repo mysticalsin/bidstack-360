@@ -166,30 +166,6 @@ export function techStackPillsFor(company: CrmCompany): string[] {
   return items.slice(0, 3);
 }
 
-/** Every technology once, most confident first; the card shows the first three. */
-export function rankedTechFor(company: CrmCompany): Array<{ name: string; category: string }> {
-  const best = new Map<string, { name: string; category: string; confidence: number; order: number }>();
-  let order = 0;
-  for (const category of company.technicalStack ?? []) {
-    for (const item of category.items) {
-      const key = item.name.trim().toLowerCase();
-      if (!key) continue;
-      const prev = best.get(key);
-      if (!prev || item.confidence > prev.confidence) {
-        best.set(key, { name: item.name, category: category.label, confidence: item.confidence, order: prev?.order ?? order });
-      }
-      order++;
-    }
-  }
-  return [...best.values()]
-    .sort((a, b) => b.confidence - a.confidence || a.order - b.order)
-    .map(({ name, category }) => ({ name, category }));
-}
-
-export function topTechFor(company: CrmCompany, max = 3): Array<{ name: string; category: string }> {
-  return rankedTechFor(company).slice(0, max);
-}
-
 export function sourceLabel(source: string): string {
   const normalized = source.toLowerCase();
   if (normalized.includes('external_erp')) return 'ERP';

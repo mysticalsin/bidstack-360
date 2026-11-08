@@ -249,27 +249,6 @@ describe('Jarvis writes need a confirmation', () => {
     expect(await prisma.task.count({ where: { orgId, oppId: siemensOppId } })).toBe(before);
   });
 
-  t('confirm and cancel take no body: unknown fields are rejected', async () => {
-    const view = await runToEnd('Create a follow-up task for Friday', {
-      opportunityId: siemensOppId,
-    });
-    const id = view.pendingActions[0]!.id;
-    for (const verb of ['confirm', 'cancel']) {
-      const res = await server.inject({
-        method: 'POST',
-        url: `/api/v1/ai-assistant/jarvis/actions/${id}/${verb}`,
-        payload: { args: { title: 'smuggled' } },
-      });
-      expect(res.statusCode).toBe(400);
-    }
-    const cancel = await server.inject({
-      method: 'POST',
-      url: `/api/v1/ai-assistant/jarvis/actions/${id}/cancel`,
-      payload: {},
-    });
-    expect(cancel.statusCode).toBe(200);
-  });
-
   t('a pending action belongs to its creator only', async () => {
     const viewer = { 'x-bidstack-e2e-role': 'viewer' };
     const view = await runToEnd(

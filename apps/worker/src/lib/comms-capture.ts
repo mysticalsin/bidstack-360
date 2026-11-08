@@ -236,96 +236,32 @@ export function googleMeetingHints(item: GoogleMeetingFields): MeetingHints {
   };
 }
 
-/** CalendarEvent columns the activity bridge reads across every attendee's copy. */
-export function meetingColumns(hints: MeetingHints, iCalUid: string | null | undefined) {
-  return {
-    iCalUid: iCalUid?.trim() || null,
-    isPrivate: hints.isPrivate ?? false,
-    ownerResponse: hints.ownerDeclined ? 'declined' : null,
-    meetingChannel: hints.channel ?? null,
-  };
-}
-
 /**
  * How many times one provider item may fail the activity bridge before it
  * stops pinning the cursor. The count is per provider id, not per page URL:
  * a new nextLink or sync token must not restart the budget and pin forever.
  * The capture row is already saved. The id is kept on
  * `activityBridgeQuarantine` (id, attempts, time — no subject or body).
- * There is no replay worker and no product UI.
- *
- * The quarantine list is a bounded audit, not a permanent exclusion. It keeps
- * at most {@link ACTIVITY_BRIDGE_QUARANTINE_CAP} ids. Past that, the oldest
- * record is dropped and that id can start a new budget of
- * {@link ACTIVITY_BRIDGE_RETRY_LIMIT}. Ids still inside that budget stay in
- * the retry map and are not dropped to make room, and they are not removed
- * by age. A later success removes an id from the retry map only.
+ * There is no replay worker and no product UI. After the cursor moves, a
+ * quarantined id is not fetched again. The list is the audit, capped so the
+ * token cannot grow without bound.
  */
 export const ACTIVITY_BRIDGE_RETRY_LIMIT = 3;
-export const ACTIVITY_BRIDGE_QUARANTINE_CAP = 50;
-/** Ids being counted for the page in hand. This is not the whole backlog. */
-export const ACTIVITY_BRIDGE_ACTIVE_CAP = 32;
-/**
- * Unexhausted ids that were not on the page just read. They stay here with
- * their attempt counts. The cap is backpressure: a new id is refused, not
- * swapped in, and the cursor is held. Nothing is dropped by age.
- */
-export const ACTIVITY_BRIDGE_PENDING_CAP = 256;
-/** How many preserved ids one run retries before the cursor may move. */
-export const ACTIVITY_BRIDGE_DRAIN_BATCH = 8;
+const BRIDGE_QUARANTINE_CAP = 50;
+// The list remembers ids that already used their budget. Past 50, the oldest
+// record is dropped and that id can start a new budget. That is the bound,
+// not a silent delete of a message still inside its three attempts.
+const MAX_RETRY_IDS = 32;
 
 export type ActivityBridgeQuarantine = { id: string; attempts: number; at: string };
-export type ActivityBridgeDelta = {
-  page: string;
-  failedIds: string[];
-  /**
-   * Ids this run actually visited that are not outstanding failures: the
-   * bridge succeeded, or the provider item is gone or deliberately not retried.
-   * Ids this run did not see stay in the map.
-   */
-  settledIds?: string[];
-};
-
-/** The locked cursor changed a key this run needed to write. The job retries the whole pull. */
-export class CursorKeyConflictError extends Error {
-  readonly keys: string[];
-
-  constructor(keys: string[]) {
-    super(
-      `Cursor key conflict on ${keys.join(', ')}. The locked row no longer matches this run, so nothing was written.`,
-    );
-    this.name = 'CursorKeyConflictError';
-    this.keys = keys;
-  }
-}
+export type ActivityBridgeDelta = { page: string; failedIds: string[] };
 
 const RETRY_KEYS = [
   'activityBridgeRetry',
   'activityBridgeRetryByPage',
   'activityBridgeRetryById',
-  'activityBridgePending',
   'activityBridgeQuarantine',
 ] as const;
-
-export type ActivityBridgePending = { id: string; attempts: number };
-
-function readPending(state: Record<string, unknown>): ActivityBridgePending[] {
-  if (!Array.isArray(state.activityBridgePending)) return [];
-  const rows: ActivityBridgePending[] = [];
-  for (const entry of state.activityBridgePending) {
-    if (!entry || typeof entry !== 'object') continue;
-    const row = entry as { id?: unknown; attempts?: unknown };
-    if (typeof row.id !== 'string' || row.id.length === 0) continue;
-    if (typeof row.attempts !== 'number' || row.attempts <= 0) continue;
-    rows.push({ id: row.id, attempts: row.attempts });
-  }
-  return rows;
-}
-
-function writePending(state: Record<string, unknown>, rows: ActivityBridgePending[]): void {
-  if (rows.length === 0) delete state.activityBridgePending;
-  else state.activityBridgePending = rows;
-}
 
 function readCountMap(value: unknown): Record<string, number> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -371,7 +307,7 @@ function quarantineIds(
   const ids = new Set(entries.map((entry) => entry.id));
   state.activityBridgeQuarantine = [...entries, ...prior.filter((entry) => !ids.has(entry.id))].slice(
     0,
-    ACTIVITY_BRIDGE_QUARANTINE_CAP,
+    BRIDGE_QUARANTINE_CAP,
   );
 }
 
@@ -380,164 +316,60 @@ function quarantineIds(
  * URLs, so Inbox and Sent cannot reset each other and a new page URL cannot
  * restart a poison id at 1. Counts saturate at the limit. An id at the limit
  * leaves the active map and does not hold the cursor. The map stays at or
- * under the active cap. Ids this page did not see move to
- * `activityBridgePending` with their attempt counts. That queue is bounded.
- * At the cap a new id is not admitted and is not swapped for an older one;
- * the cursor stays. An empty observation does not clear other ids. Success
- * removes only the ids in `settledIds`. Unexhausted ids are not dropped by age.
+ * under the cap. A new id that does not fit is not quarantined early; the
+ * page is held until a finished id frees a slot. An empty failure list does
+ * not clear other ids.
  * `page` is the caller's cursor key and is not part of the count.
- * `parkUnseen` is false for a drain pass, which retries specific ids and must
- * not treat the rest of the backlog as absent.
  */
 export function noteActivityBridgeFailures(
   state: Record<string, unknown>,
   page: string,
   failedIds: string[],
   now = new Date().toISOString(),
-  settledIds: readonly string[] = [],
-  parkUnseen = true,
-  seenIds?: readonly string[],
-): { hold: boolean; quarantined: string[]; pending: number; backpressure: boolean } {
+): { hold: boolean; quarantined: string[] } {
   void page;
   const failed = [...new Set(failedIds.filter((id) => id.length > 0))];
-  const failedSet = new Set(failed);
-  const settled = [...new Set(settledIds.filter((id) => id.length > 0 && !failedSet.has(id)))];
-  if (failed.length === 0 && settled.length === 0) {
-    const pending = readPending(state);
-    return { hold: pending.length > 0, quarantined: [], pending: pending.length, backpressure: false };
-  }
   const counts = readRetryIds(state);
-  const pending = readPending(state);
-  const observed = new Set<string>([...(seenIds ?? []), ...failed, ...settled]);
-  if (parkUnseen) {
-    for (const [id, attempts] of Object.entries(counts)) {
-      if (observed.has(id)) continue;
-      if (!rememberPending(pending, id, attempts)) {
-        backpressure = true;
-        continue;
-      }
-      delete counts[id];
-    }
-  }
-  for (const id of settled) {
-    delete counts[id];
-    removePending(pending, id);
-  }
-  let backpressure = pending.length > ACTIVITY_BRIDGE_PENDING_CAP;
-  if (failed.length === 0) {
-    writeRetryIds(state, counts);
-    writePending(state, pending);
-    return {
-      hold: backpressure || pending.length > 0 || underLimit(counts),
-      quarantined: [],
-      pending: pending.length,
-      backpressure,
-    };
-  }
+  if (failed.length === 0) return { hold: false, quarantined: [] };
   const already = new Set(
     (Array.isArray(state.activityBridgeQuarantine) ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[]) : [])
       .map((entry) => entry.id),
   );
   const quarantined: string[] = [];
-  let refused = false;
-  const known = new Set<string>([...Object.keys(counts), ...pending.map((row) => row.id)]);
+  const deferred: string[] = [];
   const ordered = [
-    ...failed.filter((id) => already.has(id) || known.has(id)),
-    ...failed.filter((id) => !already.has(id) && !known.has(id)),
+    ...failed.filter((id) => already.has(id) || counts[id] !== undefined),
+    ...failed.filter((id) => !already.has(id) && counts[id] === undefined),
   ];
   for (const id of ordered) {
-    const prior = already.has(id)
-      ? ACTIVITY_BRIDGE_RETRY_LIMIT
-      : Math.max(counts[id] ?? 0, pendingAttempt(pending, id));
+    const prior = already.has(id) ? ACTIVITY_BRIDGE_RETRY_LIMIT : (counts[id] ?? 0);
     const attempts = Math.min(prior + 1, ACTIVITY_BRIDGE_RETRY_LIMIT);
     if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) {
-      delete counts[id];
-      removePending(pending, id);
+      // Finished ids leave the active map so the cap is only unresolved work.
       quarantined.push(id);
-      continue;
-    }
-    if (Object.keys(counts).length < ACTIVITY_BRIDGE_ACTIVE_CAP || counts[id] !== undefined) {
-      removePending(pending, id);
-      counts[id] = attempts;
-      continue;
-    }
-    if (rememberPending(pending, id, attempts)) {
       delete counts[id];
       continue;
     }
-    // Both bounds are full. Keep the id on the active map so this observation
-    // is not discarded, and hold the cursor. Do not evict someone else.
-    refused = true;
+    if (counts[id] === undefined && Object.keys(counts).length >= MAX_RETRY_IDS) {
+      // No room. Hold the page and try this id next time. Do not quarantine it early.
+      deferred.push(id);
+      continue;
+    }
+    delete counts[id];
     counts[id] = attempts;
   }
-  backpressure = backpressure || refused;
   writeRetryIds(state, counts);
-  writePending(state, pending);
   quarantineIds(
     state,
     quarantined.map((id) => ({ id, attempts: ACTIVITY_BRIDGE_RETRY_LIMIT, at: now })),
   );
-  return {
-    hold: backpressure || refused || pending.length > 0 || underLimit(counts),
-    quarantined,
-    pending: Math.min(pending.length, ACTIVITY_BRIDGE_PENDING_CAP),
-    backpressure,
-  };
-}
-
-function underLimit(counts: Record<string, number>): boolean {
-  return Object.values(counts).some((attempts) => attempts < ACTIVITY_BRIDGE_RETRY_LIMIT);
-}
-
-function pendingAttempt(rows: ActivityBridgePending[], id: string): number {
-  return rows.find((row) => row.id === id)?.attempts ?? 0;
-}
-
-function removePending(rows: ActivityBridgePending[], id: string): void {
-  const index = rows.findIndex((row) => row.id === id);
-  if (index >= 0) rows.splice(index, 1);
-}
-
-/** @returns false when the id was not stored because the queue is already full. */
-function rememberPending(rows: ActivityBridgePending[], id: string, attempts: number): boolean {
-  const existing = rows.find((row) => row.id === id);
-  if (existing) {
-    existing.attempts = Math.max(existing.attempts, attempts);
-    return true;
-  }
-  if (rows.length >= ACTIVITY_BRIDGE_PENDING_CAP) return false;
-  rows.push({ id, attempts });
-  return true;
-}
-
-/** The next ids a run should retry. They stay in the queue until a later observation settles or counts them. */
-export function claimActivityBridgeDrain(
-  state: Record<string, unknown>,
-  limit = ACTIVITY_BRIDGE_DRAIN_BATCH,
-): string[] {
-  return readPending(state).slice(0, limit).map((row) => row.id);
-}
-
-/**
- * Retry a bounded batch of preserved ids. `gone` means the saved capture row
- * is no longer there, so the bridge cannot run; that id is settled. A failure
- * counts one attempt. This pass does not park the active page's other ids.
- */
-export async function drainPendingActivityBridges(
-  state: Record<string, unknown>,
-  run: (providerId: string) => Promise<boolean | 'gone'>,
-  now = new Date().toISOString(),
-): Promise<{ hold: boolean; quarantined: string[]; pending: number; backpressure: boolean } | null> {
-  const ids = claimActivityBridgeDrain(state);
-  if (ids.length === 0) return null;
-  const failed: string[] = [];
-  const settled: string[] = [];
-  for (const id of ids) {
-    const result = await run(id);
-    if (result === true || result === 'gone') settled.push(id);
-    else failed.push(id);
-  }
-  return noteActivityBridgeFailures(state, 'drain', failed, now, settled, false);
+  const hold =
+    deferred.length > 0 ||
+    failed.some((id) => {
+      const attempts = counts[id];
+      return typeof attempts === 'number' && attempts < ACTIVITY_BRIDGE_RETRY_LIMIT;
+    });
+  return { hold, quarantined };
 }
 
 function sameCursorValue(left: unknown, right: unknown): boolean {
@@ -546,30 +378,11 @@ function sameCursorValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function cursorPresence(record: Record<string, unknown>, key: string): { present: boolean; value: unknown } {
-  const present = Object.prototype.hasOwnProperty.call(record, key);
-  return { present, value: present ? record[key] : undefined };
-}
-
-function samePresence(
-  left: { present: boolean; value: unknown },
-  right: { present: boolean; value: unknown },
-): boolean {
-  return left.present === right.present && (!left.present || sameCursorValue(left.value, right.value));
-}
-
 /**
  * Cursor fields this run actually changed are copied onto the locked row.
  * Fields it did not change stay as stored, including a value another pull
  * committed after this run read its snapshot. Retry keys are never taken
  * from either snapshot; `deltas` are applied once onto the stored counts.
- *
- * `calendarNextLink` and `calendarDeltaLink` are one cursor: the next read
- * follows the nextLink first. If any key this run needs to change no longer
- * matches the snapshot, and the locked row is not already the desired value,
- * the whole merge aborts. A later key is not written beside a conflicting one.
- * When the locked row already matches this run, the write is idempotent and
- * the retry deltas still apply.
  */
 export function mergeBridgeDeltaState(
   stored: Record<string, unknown>,
@@ -581,34 +394,26 @@ export function mergeBridgeDeltaState(
   const result: Record<string, unknown> = structuredClone(stored);
   const retryKeySet = new Set<string>(RETRY_KEYS);
   const keys = new Set([...Object.keys(baseline), ...Object.keys(desired)]);
-  const conflicts: string[] = [];
-  const writes: string[] = [];
   for (const key of keys) {
     if (retryKeySet.has(key)) continue;
-    const base = cursorPresence(baseline, key);
-    const want = cursorPresence(desired, key);
-    if (samePresence(base, want)) continue;
-    const locked = cursorPresence(result, key);
-    if (samePresence(locked, want)) continue;
-    if (!samePresence(locked, base)) {
-      conflicts.push(key);
-      continue;
-    }
-    writes.push(key);
-  }
-  if (conflicts.length > 0) throw new CursorKeyConflictError([...conflicts].sort());
-  for (const key of writes) {
-    const want = cursorPresence(desired, key);
-    if (!want.present) delete result[key];
-    else result[key] = structuredClone(want.value);
+    const inBaseline = Object.prototype.hasOwnProperty.call(baseline, key);
+    const inDesired = Object.prototype.hasOwnProperty.call(desired, key);
+    if (inBaseline && inDesired && sameCursorValue(baseline[key], desired[key])) continue;
+    // Another pull changed this key after our snapshot. Keep the locked value,
+    // including a deletion. A stale run must not put an old page link back
+    // or remove a newer delta link.
+    const storedHas = Object.prototype.hasOwnProperty.call(result, key);
+    const storedValue = storedHas ? result[key] : undefined;
+    const baselineValue = inBaseline ? baseline[key] : undefined;
+    if (storedHas !== inBaseline || (storedHas && !sameCursorValue(storedValue, baselineValue))) continue;
+    if (!inDesired) delete result[key];
+    else result[key] = structuredClone(desired[key]);
   }
   for (const key of RETRY_KEYS) {
     if (key in stored) result[key] = structuredClone(stored[key]);
     else delete result[key];
   }
-  for (const delta of deltas) {
-    noteActivityBridgeFailures(result, delta.page, delta.failedIds, now, delta.settledIds ?? []);
-  }
+  for (const delta of deltas) noteActivityBridgeFailures(result, delta.page, delta.failedIds, now);
   return result;
 }
 

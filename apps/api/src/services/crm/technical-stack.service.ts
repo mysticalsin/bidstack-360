@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   TechnicalStackCategory,
   type TechnicalStackCategory as TechnicalStackCategoryType,
-  type TechnicalStackCoverage,
   type TechnicalStackItemType,
   type TechnicalStackState,
 } from '@bidstack/shared';
@@ -23,7 +22,6 @@ interface BuildTechnicalStackStateInput {
   overrideValue?: unknown;
   overrideUpdatedAt?: Date | string | null;
   providerUpdatedAt?: Date | string | null;
-  coverage?: TechnicalStackCoverage | null;
 }
 
 function slug(value: string): string {
@@ -48,8 +46,6 @@ function normalizeStackItem(item: TechnicalStackItemType): TechnicalStackItemTyp
     name,
     source: item.source.trim() || 'manual',
     confidence: Math.min(1, Math.max(0, item.confidence)),
-    ...(item.evidence ? { evidence: item.evidence } : {}),
-    ...(item.sample ? { sample: true } : {}),
   };
 }
 
@@ -121,7 +117,6 @@ export function buildTechnicalStackState({
   overrideValue,
   overrideUpdatedAt,
   providerUpdatedAt,
-  coverage = null,
 }: BuildTechnicalStackStateInput): TechnicalStackState {
   const provider = normalizeTechnicalStack(providerStack);
   const override = parseTechnicalStackOverride(overrideValue);
@@ -151,7 +146,6 @@ export function buildTechnicalStackState({
     effectiveStack: override ? manual : provider,
     suggestions,
     updatedAt: toIso(overrideUpdatedAt),
-    coverage,
   };
 }
 
@@ -168,7 +162,6 @@ export function acceptTechnicalStackSuggestion(
     name: suggestion.item.name,
     source: `manual:accepted:${suggestion.item.source}`,
     confidence: 1,
-    ...(suggestion.item.evidence ? { evidence: suggestion.item.evidence } : {}),
   };
 
   if (existing) {

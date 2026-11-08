@@ -17,8 +17,6 @@ import {
   bridgeActivity,
   calendarFiling,
   graphMeetingHints,
-  meetingColumns,
-  drainPendingActivityBridges,
   noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
@@ -169,15 +167,12 @@ export async function pullMicrosoftIncremental(
   });
 
   const baseline = structuredClone(deltaState);
-  // nextLink wins over deltaLink. Those two keys are one cursor, so a commit
-  // that kept a stale nextLink and wrote a new delta would resume on the
-  // stale page. A conflict on either key aborts the whole save.
   let url =
     (deltaState['calendarNextLink'] as string | undefined) ??
     (deltaState['calendarDeltaLink'] as string | undefined) ??
     initialDeltaUrl();
   let count = 0;
-  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(url, { headers: GRAPH_READ_HEADERS(accessToken) }, { provider: 'Microsoft Graph' });
@@ -197,27 +192,16 @@ export async function pullMicrosoftIncremental(
     };
     const items = body.value ?? [];
     count += items.length;
-    const { failed, settled } = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
-    const bridge = noteActivityBridgeFailures(deltaState, url, failed, new Date().toISOString(), settled);
-    const drained = typeof prisma.calendarEvent?.findFirst === 'function'
-      ? await drainPendingActivityBridges(deltaState, async (providerId) => {
-      const row = await prisma.calendarEvent.findFirst({
-        where: { orgId, ownerId: userId, provider: 'microsoft_graph', externalId: providerId, deletedAt: null },
-        select: { id: true },
-      });
-      if (!row) return 'gone';
-      const ok = await bridgeActivity(() => syncCalendarEventActivity(orgId, row.id), log, { eventId: providerId });
-      return ok;
-    })
-      : null;
-    bridgeDeltas.push({ page: url, failedIds: failed, settledIds: settled });
+    const failed = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
+    const bridge = noteActivityBridgeFailures(deltaState, url, failed);
+    bridgeDeltas.push({ page: url, failedIds: failed });
     if (bridge.quarantined.length > 0) {
       log.warn(
         { tokenId, ids: bridge.quarantined },
         'Account activity bridge quarantined after repeated failures',
       );
     }
-    if (bridge.backpressure || (drained?.hold ?? bridge.hold)) {
+    if (bridge.hold) {
       // The calendar row is already saved. Holding this page lets the next
       // tick retry the activity write before Graph moves past the item.
       await commitTokenDeltaState(prisma, tokenId, baseline, { ...deltaState, calendarNextLink: url }, bridgeDeltas);
@@ -241,7 +225,6 @@ export async function pullMicrosoftIncremental(
 
 interface MsGraphEventItem extends GraphMeetingFields {
   id: string;
-  iCalUId?: string;
   subject?: string;
   bodyPreview?: string;
   start?: { dateTime: string; timeZone: string };
@@ -265,9 +248,8 @@ async function upsertMicrosoftEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<{ failed: string[]; settled: string[] }> {
+): Promise<string[]> {
   const failed: string[] = [];
-  const settled: string[] = [];
   for (const item of items) {
     if (!item.id) continue;
 
@@ -278,7 +260,6 @@ async function upsertMicrosoftEvents(
       });
       const removed = await syncRemovedEvents(orgId, userId, 'microsoft_graph', item.id, log);
       if (!removed) failed.push(item.id);
-      else settled.push(item.id);
       continue;
     }
 
@@ -287,7 +268,6 @@ async function upsertMicrosoftEvents(
     const endAt = graphEventTime(item.end, isAllDay);
     if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
       log.warn({ eventId: item.id }, 'MS event without a readable start/end; skipping');
-      settled.push(item.id);
       continue;
     }
 
@@ -298,7 +278,6 @@ async function upsertMicrosoftEvents(
         responseStatus: a.status?.response,
       }));
       const organizerEmail = item.organizer?.emailAddress?.address ?? null;
-      const hints = graphMeetingHints(item);
       const target = await resolveCaptureTarget({
         orgId,
         ownerEmail,
@@ -319,7 +298,6 @@ async function upsertMicrosoftEvents(
         etag: item['@odata.etag'] ?? null,
         syncState: 'SYNCED' as const,
         lastSyncedAt: new Date(),
-        ...meetingColumns(hints, item.iCalUId),
       };
       const filing = calendarFiling(target);
 
@@ -338,18 +316,17 @@ async function upsertMicrosoftEvents(
       });
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'microsoft_graph', externalId: item.id }, filing);
       const ok = await bridgeActivity(
-        () => syncCalendarEventActivity(orgId, saved.id, { hints }),
+        () => syncCalendarEventActivity(orgId, saved.id, { hints: graphMeetingHints(item) }),
         log,
         { eventId: item.id },
       );
       if (!ok) failed.push(item.id);
-      else settled.push(item.id);
     } catch (err) {
       failed.push(item.id);
       log.warn({ err, eventId: item.id }, 'Failed to upsert MS event; skipping');
     }
   }
-  return { failed, settled };
+  return failed;
 }
 
 /** Cancel the activity of an event the provider removed. */

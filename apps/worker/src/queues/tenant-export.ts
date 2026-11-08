@@ -22,11 +22,11 @@ import type { Queue, Worker, Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { UnrecoverableError, Worker as BullWorker } from 'bullmq';
+import { Worker as BullWorker } from 'bullmq';
 import { prisma } from '@bidstack/db';
 import { DataRegion, TENANT_EXPORT, TenantExportJob } from '@bidstack/shared';
 
-import { deleteExportArchive, uploadExportArchive } from '../lib/tenant-export-storage.js';
+import { uploadExportArchive } from '../lib/tenant-export-storage.js';
 import {
   TENANT_EXPORT_ENTITIES,
   safeSelectForModel,
@@ -39,40 +39,6 @@ const QUEUE_NAME = TENANT_EXPORT.name;
 const PAGE_SIZE = 500;
 /** Signed download URL + storage object lifetime. */
 const EXPIRY_HOURS = 24;
-/** A running export refreshes its row this often; the sweeper reads it as liveness. */
-export const HEARTBEAT_EVERY_MS = 60_000;
-
-// ─── Heartbeat ───────────────────────────────────────────────────────────────
-
-/**
- * Keep the claimed row's updatedAt fresh while this job works on it. When the
- * refresh matches no row (the sweeper failed it, or it was deleted), call
- * onLost once so the job stops instead of finishing work nobody will read.
- * Returns a stop function.
- */
-export function startExportHeartbeat(
-  ids: { exportId: string; orgId: string },
-  onLost: () => void,
-  log: pino.Logger,
-): () => void {
-  let lost = false;
-  const timer = setInterval(() => {
-    void prisma.tenantExport
-      .updateMany({
-        where: { id: ids.exportId, orgId: ids.orgId, status: 'running', deletedAt: null },
-        data: { updatedAt: new Date() },
-      })
-      .then((res) => {
-        if (res.count === 0 && !lost) {
-          lost = true;
-          onLost();
-        }
-      })
-      .catch((err: unknown) => log.warn({ ...ids, err }, 'tenant-export: heartbeat failed'));
-  }, HEARTBEAT_EVERY_MS);
-  timer.unref();
-  return () => clearInterval(timer);
-}
 
 // ─── Prisma delegate access ──────────────────────────────────────────────────
 
@@ -125,18 +91,17 @@ async function streamEntity(
   entity: TenantExportEntity,
   sink: PassThrough,
   log: pino.Logger,
-  signal: AbortSignal,
 ): Promise<number> {
   const delegate = delegateFor(entity.accessor);
   const select = safeSelectForModel(entity.model);
   // `org` has no orgId column — it IS the tenant; scope it by primary key.
-  const where: Record<string, unknown> = entity.accessor === 'org' ? { id: orgId } : { orgId };
+  const where: Record<string, unknown> =
+    entity.accessor === 'org' ? { id: orgId } : { orgId };
 
   let cursor: string | undefined;
   let total = 0;
 
   for (;;) {
-    signal.throwIfAborted();
     const page = await delegate.findMany({
       where,
       select,
@@ -171,7 +136,6 @@ function buildArchiveStream(
   orgId: string,
   exportId: string,
   log: pino.Logger,
-  signal: AbortSignal,
 ): { body: Readable; done: Promise<Record<string, number>> } {
   const ndjson = new PassThrough();
   const gzip = createGzip();
@@ -193,7 +157,7 @@ function buildArchiveStream(
         }),
       );
       for (const entity of TENANT_EXPORT_ENTITIES) {
-        counts[entity.name] = await streamEntity(orgId, entity, ndjson, log, signal);
+        counts[entity.name] = await streamEntity(orgId, entity, ndjson, log);
       }
       ndjson.end();
     } catch (err) {
@@ -213,7 +177,7 @@ function buildArchiveStream(
  * claims the row, and a redelivery after completion is a no-op.
  */
 export async function processTenantExportJob(
-  job: Pick<Job<unknown>, 'data'> & { attemptsMade?: number; opts?: { attempts?: number } },
+  job: Pick<Job<unknown>, 'data'>,
   log: pino.Logger,
 ): Promise<void> {
   const parsed = TenantExportJob.safeParse(job.data);
@@ -234,19 +198,14 @@ export async function processTenantExportJob(
     return;
   }
 
-  // The sweeper may fail this row while the job is still running (stale
-  // heartbeat after a long stall); from then on the row is not ours.
-  const rowLost = new AbortController();
-  const stopHeartbeat = startExportHeartbeat({ exportId, orgId }, () => rowLost.abort(), log);
-  const storageKey = exportStorageKey(orgId, exportId);
-  let region: DataRegion | null = null;
   try {
     const settings = await prisma.orgSettings.findFirst({
       where: { orgId, deletedAt: null },
       select: { dataRegion: true },
     });
-    region = DataRegion.safeParse(settings?.dataRegion).data ?? null;
-    const { body, done } = buildArchiveStream(orgId, exportId, log, rowLost.signal);
+    const region = DataRegion.safeParse(settings?.dataRegion).data ?? null;
+    const { body, done } = buildArchiveStream(orgId, exportId, log);
+    const storageKey = exportStorageKey(orgId, exportId);
     // Upload consumes the gzip stream; `done` resolves when production finishes.
     const [{ bytes, storageRegion }, counts] = await Promise.all([
       uploadExportArchive({ key: storageKey, body, region }),
@@ -258,7 +217,7 @@ export async function processTenantExportJob(
     // handed out; downloadUrl stays null in the row.
     const expiresAt = new Date(Date.now() + EXPIRY_HOURS * 3_600_000);
 
-    const finished = await prisma.tenantExport.updateMany({
+    await prisma.tenantExport.updateMany({
       where: { id: exportId, orgId, status: 'running' },
       data: {
         status: 'ready',
@@ -270,58 +229,18 @@ export async function processTenantExportJob(
         error: null,
       },
     });
-    if (finished.count === 1) {
-      log.info(
-        { exportId, orgId, bytes, entities: Object.keys(counts).length },
-        'tenant-export: ready',
-      );
-      return;
-    }
-    rowLost.abort();
-  } catch (err) {
-    if (!rowLost.signal.aborted) await failAttempt(job, { exportId, orgId }, err, log);
-  } finally {
-    stopHeartbeat();
-  }
-
-  // Reached only when the row stopped being ours mid-run (swept or deleted):
-  // nothing will ever point at the archive, so remove it and stop retrying.
-  await deleteExportArchive(storageKey, region).catch((err: unknown) =>
-    log.error(
-      { exportId, orgId, storageKey, err },
-      'tenant-export: could not delete orphaned archive',
-    ),
-  );
-  log.error(
-    { exportId, orgId },
-    'tenant-export: row is no longer running (swept or deleted); archive discarded, job failed',
-  );
-  throw new UnrecoverableError('tenant-export: row is no longer running; archive discarded');
-}
-
-/** Rethrow a failed attempt; only the final attempt marks the row failed. */
-async function failAttempt(
-  job: { attemptsMade?: number; opts?: { attempts?: number } },
-  ids: { exportId: string; orgId: string },
-  err: unknown,
-  log: pino.Logger,
-): Promise<never> {
-  const message = err instanceof Error ? err.message : 'tenant export failed';
-  // attemptsMade counts finished attempts, so this one is number attemptsMade + 1.
-  // Earlier attempts leave the row `running` so the BullMQ retry can re-claim it.
-  const finalAttempt = (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
-  if (!finalAttempt) {
-    log.warn(
-      { ...ids, attemptsMade: job.attemptsMade, err },
-      'tenant-export: attempt failed, will retry',
+    log.info(
+      { exportId, orgId, bytes, entities: Object.keys(counts).length },
+      'tenant-export: ready',
     );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'tenant export failed';
+    await prisma.tenantExport.updateMany({
+      where: { id: exportId, orgId, status: 'running' },
+      data: { status: 'failed', error: message.slice(0, 2000), completedAt: new Date() },
+    });
     throw err;
   }
-  await prisma.tenantExport.updateMany({
-    where: { id: ids.exportId, orgId: ids.orgId, status: 'running' },
-    data: { status: 'failed', error: message.slice(0, 2000), completedAt: new Date() },
-  });
-  throw err;
 }
 
 /** Org-namespaced, export-scoped storage key. Mirrors the storage adapter's

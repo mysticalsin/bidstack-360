@@ -633,8 +633,6 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   return auth;
 }
 
-export const API_KEY_LAST_USED_RESOLUTION_MS = 60_000;
-
 async function verifyApiKey(req: FastifyRequest): Promise<AuthContext | null> {
   const apiKeyHeader = req.headers['x-api-key'];
   if (!apiKeyHeader || typeof apiKeyHeader !== 'string') return null;
@@ -656,20 +654,15 @@ async function verifyApiKey(req: FastifyRequest): Promise<AuthContext | null> {
     return null;
   }
 
-  // Fire-and-forget, at most once a minute per key: a busy integration key
-  // otherwise turns every read into a write on one hot row.
-  const now = new Date();
-  const fresh = new Date(now.getTime() - API_KEY_LAST_USED_RESOLUTION_MS);
-  if (!apiKey.lastUsedAt || apiKey.lastUsedAt < fresh) {
-    void prisma.apiKey
-      .updateMany({
-        where: { id: apiKey.id, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: fresh } }] },
-        data: { lastUsedAt: now },
-      })
-      .catch(() => {
-        /* silently ignore */
-      });
-  }
+  // Update lastUsedAt fire-and-forget
+  void prisma.apiKey
+    .update({
+      where: { id: apiKey.id },
+      data: { lastUsedAt: new Date() },
+    })
+    .catch(() => {
+      /* silently ignore */
+    });
 
   return {
     orgId: apiKey.orgId,

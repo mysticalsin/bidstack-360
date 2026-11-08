@@ -4142,8 +4142,7 @@ select:focus-visible {
   overflow: hidden;
   color: var(--brand-primary);
 }
-.account-card-tech > span {
-  min-width: 0;
+.account-card-tech span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4158,20 +4157,7 @@ select:focus-visible {
 .account-card-tech.is-empty {
   color: var(--fg-tertiary);
 }
-.account-card-tech > .account-card-tech-item {
-  display: inline-flex;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 8px 2px 3px;
-}
-.account-card-tech-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.account-card-tech.is-empty > span {
+.account-card-tech.is-empty span {
   border-color: var(--border-subtle);
   background: var(--surface-sunken);
   color: var(--fg-tertiary);

@@ -239,7 +239,6 @@ describe('Microsoft calendar pull', () => {
           value: [
             {
               id: 'ev-teams',
-              iCalUId: '040000008200E00074C5B7101A82E008',
               subject: 'Weekly sync',
               start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
               end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
@@ -269,15 +268,6 @@ describe('Microsoft calendar pull', () => {
     expect(syncCalendarEventActivity).toHaveBeenNthCalledWith(2, orgId, 'row-1', {
       hints: { channel: 'in_person_or_other', isPrivate: true, ownerDeclined: true },
     });
-    // Stored so a colleague's copy of the same meeting merges into one activity.
-    const [teams, priv] = upsert.mock.calls.map((c) => (c[0] as unknown as { update: Record<string, unknown> }).update);
-    expect(teams).toMatchObject({
-      iCalUid: '040000008200E00074C5B7101A82E008',
-      isPrivate: false,
-      ownerResponse: null,
-      meetingChannel: 'teams',
-    });
-    expect(priv).toMatchObject({ iCalUid: null, isPrivate: true, ownerResponse: 'declined' });
     // The first bridge failed. The saved events stay, but the delta link must
     // not advance or Graph will never offer those unchanged items again.
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as {
@@ -425,41 +415,6 @@ describe('Google calendar pull', () => {
     );
     await pullGoogleIncremental('tok-2', orgId, userId, 'at', {}, log, 'tony@amaris.com');
     expectFilingPreserved('google_workspace', 'g-1');
-  });
-
-  it('stores a calendar identity per instance of a recurring meeting', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        json({
-          items: [
-            {
-              id: 'g-1',
-              iCalUID: 'weekly@google.com',
-              recurringEventId: 'g-series',
-              originalStartTime: { dateTime: '2026-11-09T10:00:00-05:00' },
-              summary: 'Weekly client sync',
-              start: { dateTime: '2026-11-09T11:00:00-05:00' },
-              end: { dateTime: '2026-11-09T12:00:00-05:00' },
-              attendees: [{ email: 'buyer@acme.com' }],
-            },
-            {
-              id: 'g-2',
-              iCalUID: 'once@google.com',
-              summary: 'Kickoff',
-              start: { dateTime: '2026-11-10T10:00:00-05:00' },
-              end: { dateTime: '2026-11-10T11:00:00-05:00' },
-              attendees: [{ email: 'buyer@acme.com' }],
-            },
-          ],
-          nextSyncToken: 'sync-1',
-        }),
-      ),
-    );
-    await pullGoogleIncremental('tok-2', orgId, userId, 'at', {}, log, 'tony@amaris.com');
-    const ids = upsert.mock.calls.map((c) => (c[0] as unknown as { update: { iCalUid: unknown } }).update.iCalUid);
-    // Moving one instance keeps its original slot, so every attendee's copy still matches.
-    expect(ids).toEqual(['weekly@google.com#2026-11-09T15:00:00.000Z', 'once@google.com']);
   });
 
   it('holds the page when saving an event throws', async () => {

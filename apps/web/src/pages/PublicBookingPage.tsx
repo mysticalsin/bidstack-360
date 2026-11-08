@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-import { buildApiUrl } from '@/lib/api';
 import { cn } from '@/lib/cn';
 
 interface AvailabilityResponse {
@@ -53,7 +52,7 @@ export function PublicBookingPage() {
       setSelectedSlot(null);
       try {
         const params = new URLSearchParams({ date, tz: timezone });
-        const res = await fetch(buildApiUrl(`/api/v1/booking-pages/${encodeURIComponent(slug)}/availability?${params}`), {
+        const res = await fetch(`/api/v1/booking-pages/${slug}/availability?${params}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -87,7 +86,7 @@ export function PublicBookingPage() {
     if (!selectedSlot) return;
     setSubmitError(null);
     try {
-      const res = await fetch(buildApiUrl(`/api/v1/booking-pages/${encodeURIComponent(slug)}/bookings`), {
+      const res = await fetch(`/api/v1/booking-pages/${slug}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -171,7 +170,6 @@ export function PublicBookingPage() {
                     key={day}
                     type="button"
                     onClick={() => setDate(day)}
-                    aria-pressed={date === day}
                     className={cn(
                       'min-h-[44px] rounded-lg border px-3 py-2 text-left text-sm transition-colors',
                       date === day

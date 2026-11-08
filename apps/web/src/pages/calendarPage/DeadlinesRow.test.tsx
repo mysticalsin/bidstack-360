@@ -159,7 +159,7 @@ describe('DeadlinesRow', () => {
     renderRow();
 
     expect(
-      await screen.findByText('No deadlines'),
+      await screen.findByText('No bid or proposal deadlines this week.'),
     ).toBeTruthy();
   });
 });

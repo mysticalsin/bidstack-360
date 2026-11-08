@@ -13,7 +13,6 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { TechCoverageLine, TechEvidenceChip } from '@/components/company/TechEvidence';
 import { TechLogo } from '@/components/company/TechLogo';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -29,13 +28,12 @@ import {
 } from '@/hooks/useCompanyTechnicalStack';
 import { springSnap } from '@/lib/motion';
 
-import {
-  techSourceLabel,
-  type AccountCockpitSnapshot,
-  type TechnicalStackCategory,
-  type TechnicalStackItemType,
-  type TechnicalStackRefreshProvider,
-  type TechnicalStackSuggestion,
+import type {
+  AccountCockpitSnapshot,
+  TechnicalStackCategory,
+  TechnicalStackItemType,
+  TechnicalStackRefreshProvider,
+  TechnicalStackSuggestion,
 } from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
@@ -279,7 +277,6 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
       />
       <div className="tech-stack-body">
         <TechStackSourceRail sources={sourceSummary} />
-        {!isEditing ? <TechCoverageLine coverage={technicalStack.data?.coverage} /> : null}
         {isEditing ? (
           <TechStackEditor
             draft={draft}
@@ -659,16 +656,12 @@ function ReadOnlyStackCategory({
           >
             <TechLogo name={item.name} size={14} />
             <span className="tech-pill-name">{item.name}</span>
-            {item.evidence ? (
-              <TechEvidenceChip item={item} />
-            ) : (
-              <SourceBadge
-                label={sourceLabelForTechItem(item)}
-                state={sourceStateForTechItem(item)}
-                hint={`${item.name} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
-                className="tech-pill-source"
-              />
-            )}
+            <SourceBadge
+              label={sourceLabelForTechItem(item)}
+              state={sourceStateForTechItem(item)}
+              hint={`${item.name} source: ${item.source}. Confidence ${Math.round(item.confidence * 100)}%.`}
+              className="tech-pill-source"
+            />
           </motion.span>
         ))}
       </div>
@@ -3242,15 +3235,13 @@ function providerSourceRailItem({
           : 'Queued API'
         : provider.status === 'synced'
           ? 'Synced'
-          : provider.status === 'skipped'
-            ? 'Not needed'
-            : provider.status === 'disabled'
-              ? 'Disabled'
-              : provider.message.toLowerCase().includes('no technology')
-                ? 'No signal'
-                : 'Review',
+          : provider.status === 'disabled'
+            ? 'Disabled'
+            : provider.message.toLowerCase().includes('no technology')
+              ? 'No signal'
+              : 'Review',
     tone:
-      provider.status === 'synced' || provider.status === 'queued' || provider.status === 'skipped'
+      provider.status === 'synced' || provider.status === 'queued'
         ? 'ready'
         : provider.status === 'disabled'
           ? 'waiting'
@@ -3275,7 +3266,6 @@ function providerStatusText(provider: TechStackProviderRow): string {
     if (provider.transport === 'api') return 'Synced via API';
     return 'Synced';
   }
-  if (provider.status === 'skipped') return 'not needed';
   if (provider.status === 'disabled') return 'not configured';
   if (provider.message.toLowerCase().includes('no technology')) return 'no technology signals';
   return 'review provider';
@@ -3298,7 +3288,6 @@ function providerNextActionText(
   if (reviewCount > 0) return `Review ${reviewCount}`;
   if (provider.status === 'queued') return 'Polling';
   if (provider.status === 'synced') return 'No new deltas';
-  if (provider.status === 'skipped') return 'Open data enough';
   if (provider.status === 'disabled') return 'Connect';
   return 'Check setup';
 }
@@ -3306,7 +3295,7 @@ function providerNextActionText(
 function providerTone(
   providerStatus: TechnicalStackRefreshProvider['status'],
 ): SourceRailItem['tone'] {
-  if (providerStatus === 'synced' || providerStatus === 'queued' || providerStatus === 'skipped') return 'ready';
+  if (providerStatus === 'synced' || providerStatus === 'queued') return 'ready';
   if (providerStatus === 'unavailable') return 'attention';
   return 'waiting';
 }
@@ -3324,7 +3313,6 @@ function sourceLabelForTechItem(item: TechnicalStackItemType): string {
   if (source.includes('apollo')) return 'Apollo';
   if (source.includes('seamless')) return 'Seamless';
   if (source.includes('tech_stack_mcp')) return techIntelSourceLabelForSource(source);
-  if (/^open_data:(dns|ct|web|jobs|github)\b/.test(source)) return techSourceLabel(source);
   if (isOpenDataProviderSource(source)) return 'Open data';
   if (source.includes('meeting')) return 'Meeting';
   if (source.includes('om')) return 'OM';

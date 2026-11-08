@@ -62,7 +62,6 @@ import { crossSellRoutes } from './routes/cross-sell.js';
 import { contractAgreementRoutes } from './routes/contract-agreements.js';
 import { msaRoutes } from './routes/msa.js';
 import { msaIntakeRoutes } from './routes/msa-intake.js';
-import { agreementIngestRoutes } from './routes/agreement-ingest.js';
 import { msaLeverageRoutes } from './routes/msa-leverage.js';
 import { signingEntityRoutes } from './routes/signing-entities.js';
 import { meetingIntelRoutes } from './routes/meeting-intel.js';
@@ -195,7 +194,6 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(crossSellRoutes, { prefix: '/api/v1' });
   await server.register(contractAgreementRoutes, { prefix: '/api/v1' });
   await server.register(msaIntakeRoutes, { prefix: '/api/v1' });
-await server.register(agreementIngestRoutes, { prefix: '/api/v1' });
   await server.register(msaLeverageRoutes, { prefix: '/api/v1' });
   await server.register(signingEntityRoutes, { prefix: '/api/v1' });
   await server.register(msaRoutes, { prefix: '/api/v1' });

@@ -100,10 +100,13 @@ describe('ConnectorsSection — Slack disconnect RBAC gate', () => {
     expect(disconnectButton.hasAttribute('disabled')).toBe(false);
   });
 
-  it('leaves Gmail to the workspace accounts card instead of a second catalog row', () => {
+  it('never gates Gmail disconnect — it only ever touches the caller\'s own mailbox', () => {
+    hookMocks.canWriteIntegrations = false;
     renderSection();
 
-    expect(screen.queryByTestId('integration-card-gmail')).toBeNull();
-    expect(screen.getByTestId('integration-card-slack')).toBeTruthy();
+    const gmailRow = screen.getByTestId('integration-card-gmail');
+    const disconnectButton = within(gmailRow).getByRole('button', { name: /disconnect/i });
+
+    expect(disconnectButton.hasAttribute('disabled')).toBe(false);
   });
 });

@@ -174,27 +174,6 @@ export type AccountIntelQueueJob =
   | { kind: 'financials-scan' };
 
 /**
- * Open data technology stack (slice 16): DNS, certificate transparency,
- * homepage, stored job postings and GitHub per account.
- *   'company-tech-detect.refresh'  one account, on create, import or the sweep
- *   'company-tech-detect.sweep'    repeatable weekly, batched over every account
- */
-export const COMPANY_TECH_DETECT: QueueConfig = {
-  name: 'company-tech-detect',
-  defaultJobOptions: {
-    attempts: 2,
-    backoff: { type: 'exponential', delay: 120_000 },
-    removeOnComplete: { age: 86_400, count: 500 },
-    removeOnFail: { age: 604_800, count: 2000 },
-  },
-};
-
-/** Jobs on the company-tech-detect queue. */
-export type CompanyTechDetectQueueJob =
-  | { kind: 'refresh'; orgId: string; companyId: string; reason: 'create' | 'import' | 'sweep' }
-  | { kind: 'sweep' };
-
-/**
  * Consulting partners (slice 15): which consulting firms work with an account.
  *   'consulting-partners.refresh'  manual Refresh on the account page
  *   'consulting-partners.sweep'    repeatable daily: rescans our own records for

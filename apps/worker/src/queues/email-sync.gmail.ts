@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
 import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
-import { bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -264,22 +264,17 @@ export async function pullGmail(
 
   let persisted = 0;
   const failedIds: string[] = [];
-  const settledIds: string[] = [];
-  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
+  const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
   for (const id of ids) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) {
       // A missing body is not a reason to move the cursor past this id.
       // 404 means Gmail already dropped it; anything else is retried.
       if (detail.status !== 404) failedIds.push(id);
-      else settledIds.push(id);
       continue;
     }
     const msg = detail.body;
-    if ((msg.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) {
-      settledIds.push(msg.id);
-      continue;
-    }
+    if ((msg.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) continue;
 
     try {
       const headers = msg.payload?.headers ?? [];
@@ -296,10 +291,7 @@ export async function pullGmail(
         participants: [fromEmail, ...toEmails.map((a) => a.email), ...ccEmails.map((a) => a.email)],
       });
       // Mail that matches no CRM record stays out of Polo (pay slips, HR, personal mail).
-      if (!target) {
-        settledIds.push(msg.id);
-        continue;
-      }
+      if (!target) continue;
 
       const saved = await prisma.emailMessage.upsert({
         where: { orgId_externalMessageId: { orgId: token.orgId, externalMessageId: msg.id } },
@@ -333,7 +325,6 @@ export async function pullGmail(
       );
       persisted++;
       if (!bridged) failedIds.push(msg.id);
-      else settledIds.push(msg.id);
     } catch (err) {
       failedIds.push(msg.id);
       log.warn({ err, msgId: msg.id }, 'Failed to persist Gmail message');
@@ -341,23 +332,12 @@ export async function pullGmail(
   }
 
   const pageKey = `gmail:${cursor ?? 'seed'}`;
-  const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds, new Date().toISOString(), settledIds);
-  const drained = typeof prisma.emailMessage?.findFirst === 'function'
-    ? await drainPendingActivityBridges(deltaState, async (providerId) => {
-    const row = await prisma.emailMessage.findFirst({
-      where: { orgId: token.orgId, userId: token.userId, externalMessageId: providerId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!row) return 'gone';
-    const ok = await bridgeActivity(() => syncEmailMessageActivity(token.orgId, row.id), log, { msgId: providerId });
-    return ok;
-  })
-    : null;
-  bridgeDeltas.push({ page: pageKey, failedIds, settledIds });
+  const bridge = noteActivityBridgeFailures(deltaState, pageKey, failedIds);
+  bridgeDeltas.push({ page: pageKey, failedIds });
   if (bridge.quarantined.length > 0) {
     log.warn({ tokenId: token.id, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
   }
-  if (bridge.backpressure || (drained?.hold ?? bridge.hold)) {
+  if (bridge.hold) {
     log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
     await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas);
     return persisted;

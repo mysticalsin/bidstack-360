@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { ConnectorsSection } from '@/components/integrations/ConnectorsSection';
 import { DataQualitySection } from '@/components/integrations/DataQualitySection';
 import { ErpConnectorCard } from '@/components/integrations/ErpConnectorCard';
-import { WorkspaceAccountsCard } from '@/components/integrations/WorkspaceAccountsCard';
 import { DataSourceCredentialsCard } from '@/components/settings/DataSourceCredentialsCard';
 import { ProviderHealthSection } from '@/components/integrations/ProviderHealthSection';
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
@@ -72,12 +71,6 @@ export function IntegrationsSection() {
     [events.data?.items, setupGuide.data, status.data],
   );
 
-  // Both hero actions land on the developer tab; each scrolls to its own section.
-  function openDeveloperSection(id: 'api-keys' | 'webhooks') {
-    setActiveTab('developer');
-    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
-  }
-
   return (
     <div className="space-y-5">
       <IntegrationHero
@@ -85,8 +78,8 @@ export function IntegrationsSection() {
         isLoading={setupGuide.isLoading || status.isLoading || events.isLoading}
         summary={summary}
         eventsContinue={eventsContinue}
-        onCreateApiKey={() => openDeveloperSection('api-keys')}
-        onAddWebhook={() => openDeveloperSection('webhooks')}
+        onCreateApiKey={() => setActiveTab('developer')}
+        onAddWebhook={() => setActiveTab('developer')}
       />
 
       {isError ? (
@@ -259,7 +252,6 @@ export function IntegrationsSection() {
         </TabsContent>
 
         <TabsContent value="connectors" className="space-y-6 outline-none">
-          <WorkspaceAccountsCard />
           <ErpConnectorCard />
           <ConnectorsSection />
           <DataQualitySection />

@@ -1,94 +1,86 @@
-// Self-contained "create calendar event" modal: owns its own form state.
-import { zonedWallTimeToUtc } from '@bidstack/shared';
+// Self-contained "create calendar event" modal — owns its own form state.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Modal } from '@/components/ui/Modal';
-import { dayKey, timeZoneLabel, userTimeZone } from './layout';
 import type { CreateEventBody } from './types';
 
 interface CreateEventModalProps {
-  /** Day the user picked (YYYY-MM-DD in timeZone). Defaults to today. */
-  initialDayKey?: string;
-  /** Hour the user picked, 0 to 23. */
-  initialHour?: number;
-  /** Time zone the wall times are entered in. Defaults to the browser's. */
-  timeZone?: string;
+  initialDate?: Date;
   onClose: () => void;
   onSave: (body: CreateEventBody) => void;
   loading: boolean;
   error?: string | null;
 }
 
-const FIELD =
-  'w-full rounded-lg border border-(--border-default) bg-(--surface-page) px-3 py-2 text-sm text-(--fg-primary) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--border-focus)';
-const LABEL = 'block text-sm font-medium text-(--fg-secondary) mb-1';
-
-function hhmm(minutes: number): string {
-  const m = Math.min(Math.max(minutes, 0), 23 * 60 + 59);
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+// Convert a local date ("YYYY-MM-DD") + time ("HH:MM") into an offset-correct
+// ISO instant. `new Date(y, mo, d, h, m)` interprets the parts as LOCAL time, so
+// toISOString() yields the right UTC instant for the user's chosen wall-clock —
+// matching how the week grid buckets events back into local hour rows. A literal
+// "Z" suffix instead mislabels local wall-clock as UTC, dropping events into the
+// wrong hour/day for any non-UTC offset.
+function localWallClockToIso(date: string, time: string): string {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  const hour = Number(time.slice(0, 2));
+  const minute = Number(time.slice(3, 5));
+  return new Date(year, month - 1, day, hour, minute, 0, 0).toISOString();
 }
 
 export function CreateEventModal({
-  initialDayKey,
-  initialHour,
-  timeZone,
+  initialDate,
   onClose,
   onSave,
   loading,
   error,
 }: CreateEventModalProps) {
   const { t } = useTranslation('crm');
-  const tz = timeZone ?? userTimeZone();
-  const startHour = initialHour ?? 9;
+  // WHY: derive baseDateStr inline — avoids importing toIso from the parent module
+  const baseDateStr = (initialDate ?? new Date()).toISOString().slice(0, 10);
   const [subject, setSubject] = useState('');
-  const [date, setDate] = useState(() => initialDayKey ?? dayKey(new Date(), tz));
-  const [startTime, setStartTime] = useState(hhmm(startHour * 60));
-  const [endTime, setEndTime] = useState(hhmm(startHour * 60 + 30));
+  const [date, setDate] = useState(baseDateStr);
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('09:30');
   const [location, setLocation] = useState('');
   const [provider, setProvider] = useState<'google_workspace' | 'microsoft_graph'>(
     'google_workspace',
   );
-  const [formError, setFormError] = useState<string | null>(null);
-  // One key per dialog, so a double submit or a network retry creates one event.
-  const [clientRequestId] = useState(() => crypto.randomUUID());
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (endTime <= startTime) {
-      setFormError(t('createEvent.endBeforeStart', 'End time must be after the start time.'));
-      return;
-    }
-    setFormError(null);
     onSave({
       subject,
-      startAt: zonedWallTimeToUtc(`${date}T${startTime}:00`, tz).toISOString(),
-      endAt: zonedWallTimeToUtc(`${date}T${endTime}:00`, tz).toISOString(),
+      // Local wall-clock → instant: the week grid buckets by local hour via
+      // `new Date(startAt).getHours()`, so emit an offset-correct ISO (not a "Z"
+      // string that mislabels local time as UTC) to keep rows consistent.
+      startAt: localWallClockToIso(date, startTime),
+      endAt: localWallClockToIso(date, endTime),
       location: location || undefined,
       provider,
-      clientRequestId,
     });
   }
 
-  const shownError = formError ?? error ?? null;
-
   return (
     <Modal open onClose={onClose} title={t('createEvent.modalLabel', 'Create calendar event')}>
-      <div className="bg-(--surface-card) rounded-2xl p-6 shadow-xl w-full max-w-md mx-4 focus:outline-none">
-        <h2 className="text-lg font-semibold mb-4 text-(--fg-primary)">
+      <div className="bg-(--color-surface) rounded-2xl p-6 shadow-xl w-full max-w-md mx-4 focus:outline-none">
+        <h2 className="text-lg font-semibold mb-4 text-(--color-text-primary)">
           {t('createEvent.heading', 'New event')}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {shownError ? (
+          {error ? (
             <p
               role="alert"
-              className="rounded-lg border border-(--danger) px-3 py-2 text-sm text-(--danger)"
+              className="rounded-lg border border-(--color-danger) bg-(--color-danger)/10 px-3 py-2 text-sm text-(--color-danger)"
             >
-              {shownError}
+              {error}
             </p>
           ) : null}
           <div>
-            <label htmlFor="evt-subject" className={LABEL}>
+            <label
+              htmlFor="evt-subject"
+              className="block text-sm font-medium text-(--color-text-secondary) mb-1"
+            >
               {t('createEvent.titleLabel', 'Title')}
             </label>
             <input
@@ -97,7 +89,7 @@ export function CreateEventModal({
               required
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className={FIELD}
+              className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
               placeholder={t('createEvent.titlePlaceholder', 'Event title')}
               autoFocus
             />
@@ -105,7 +97,10 @@ export function CreateEventModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="evt-date" className={LABEL}>
+              <label
+                htmlFor="evt-date"
+                className="block text-sm font-medium text-(--color-text-secondary) mb-1"
+              >
                 {t('createEvent.dateLabel', 'Date')}
               </label>
               <input
@@ -114,18 +109,21 @@ export function CreateEventModal({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className={FIELD}
+                className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
               />
             </div>
             <div>
-              <label htmlFor="evt-provider" className={LABEL}>
+              <label
+                htmlFor="evt-provider"
+                className="block text-sm font-medium text-(--color-text-secondary) mb-1"
+              >
                 {t('createEvent.calendarLabel', 'Calendar')}
               </label>
               <select
                 id="evt-provider"
                 value={provider}
                 onChange={(e) => setProvider(e.target.value as typeof provider)}
-                className={FIELD}
+                className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
               >
                 <option value="google_workspace">{t('createEvent.providerGoogle', 'Google')}</option>
                 <option value="microsoft_graph">
@@ -137,7 +135,10 @@ export function CreateEventModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="evt-start" className={LABEL}>
+              <label
+                htmlFor="evt-start"
+                className="block text-sm font-medium text-(--color-text-secondary) mb-1"
+              >
                 {t('createEvent.startLabel', 'Start')}
               </label>
               <input
@@ -146,11 +147,14 @@ export function CreateEventModal({
                 required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className={FIELD}
+                className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
               />
             </div>
             <div>
-              <label htmlFor="evt-end" className={LABEL}>
+              <label
+                htmlFor="evt-end"
+                className="block text-sm font-medium text-(--color-text-secondary) mb-1"
+              >
                 {t('createEvent.endLabel', 'End')}
               </label>
               <input
@@ -159,14 +163,16 @@ export function CreateEventModal({
                 required
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className={FIELD}
+                className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
               />
             </div>
           </div>
-          <p className="text-xs text-(--fg-tertiary)">{timeZoneLabel(tz)}</p>
 
           <div>
-            <label htmlFor="evt-location" className={LABEL}>
+            <label
+              htmlFor="evt-location"
+              className="block text-sm font-medium text-(--color-text-secondary) mb-1"
+            >
               {t('createEvent.locationLabel', 'Location (optional)')}
             </label>
             <input
@@ -174,8 +180,8 @@ export function CreateEventModal({
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className={FIELD}
-              placeholder={t('createEvent.locationPlaceholder', 'Room, video link, address')}
+              className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
+              placeholder={t('createEvent.locationPlaceholder', 'Room, Zoom link, address…')}
             />
           </div>
 
@@ -183,14 +189,14 @@ export function CreateEventModal({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-11 px-4 py-2 rounded-lg text-sm font-medium text-(--fg-secondary) hover:bg-(--surface-hover) focus:outline-none focus-visible:ring-2 focus-visible:ring-(--border-focus)"
+              className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium text-(--color-text-secondary) hover:bg-(--color-surface-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent)"
             >
               {t('createEvent.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="min-h-11 px-4 py-2 rounded-lg text-sm font-medium bg-(--brand-primary) text-(--fg-on-brand) hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--border-focus) focus-visible:ring-offset-2 disabled:opacity-50"
+              className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium bg-(--color-accent) text-white hover:bg-(--color-accent-hover) focus:outline-none focus:ring-2 focus:ring-(--color-accent) focus:ring-offset-2 disabled:opacity-50"
             >
               {loading
                 ? t('createEvent.saving', 'Saving…')
