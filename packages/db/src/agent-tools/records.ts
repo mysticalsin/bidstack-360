@@ -3,13 +3,22 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 
 import { activityText, auditText } from './timeline-text.js';
-import { isoDate, oppCitation, type AgentCitation, type AgentTool } from './types.js';
+import {
+  callerCan,
+  companyScopeWhere,
+  isoDate,
+  oppCitation,
+  proposalOwnerWhere,
+  type AgentCitation,
+  type AgentTool,
+} from './types.js';
 
 const MIN_NAME_LENGTH = 3;
+// Candidate rows per record type before scope filters and the final cut.
+const CANDIDATES = 50;
 
-function mentions(haystack: string, name: string | null | undefined): boolean {
-  if (!name || name.trim().length < MIN_NAME_LENGTH) return false;
-  return haystack.includes(name.trim().toLowerCase());
+interface IdRow {
+  id: string;
 }
 
 function byLongestName<T>(name: (row: T) => string) {
@@ -33,43 +42,78 @@ export const recordsResolve: AgentTool<typeof ResolveInput> = {
   handler: async (args, ctx) => {
     const text = args.text.toLowerCase();
     const codes = [...args.text.matchAll(/\bOP-\d{4}\b/gi)].map((m) => m[0].toUpperCase());
-
-    const [companies, opps, proposals] = await Promise.all([
-      prisma.company.findMany({
-        where: { orgId: ctx.orgId },
-        select: { id: true, name: true },
-        orderBy: { updatedAt: 'desc' },
-        take: 500,
-      }),
-      prisma.opportunity.findMany({
-        where: { orgId: ctx.orgId, deletedAt: null },
-        select: { id: true, code: true, name: true, customer: true, companyId: true, dueDate: true },
-        orderBy: { updatedAt: 'desc' },
-        take: 500,
-      }),
-      prisma.proposal.findMany({
-        where: { orgId: ctx.orgId, deletedAt: null },
-        select: { id: true, name: true, dueDate: true },
-        orderBy: { updatedAt: 'desc' },
-        take: 300,
-      }),
+    const [showOpps, showProposals] = await Promise.all([
+      callerCan(ctx, 'opportunities:read'),
+      callerCan(ctx, 'proposals:read'),
     ]);
+    const companyScope = companyScopeWhere(ctx);
 
-    const accounts = companies
-      .filter((c) => mentions(text, c.name))
-      .sort(byLongestName((c) => c.name))
-      .slice(0, 3);
-    const accountIds = new Set(accounts.map((a) => a.id));
-    const matchedOpps = opps
-      .filter(
-        (o) =>
-          codes.includes(o.code) ||
-          mentions(text, o.customer) ||
-          mentions(text, o.name) ||
-          (o.companyId !== null && accountIds.has(o.companyId)),
-      )
-      .slice(0, 5);
-    const matchedProposals = proposals.filter((p) => mentions(text, p.name)).slice(0, 3);
+    // Names and codes are matched in SQL so an older record the user named is
+    // found, not just the most recently updated ones.
+    const companyHits = await prisma.$queryRaw<IdRow[]>`
+      SELECT id FROM companies
+      WHERE org_id = ${ctx.orgId}::uuid AND deleted_at IS NULL
+        AND length(btrim(name)) >= ${MIN_NAME_LENGTH}
+        AND strpos(${text}, lower(btrim(name))) > 0
+      ORDER BY length(name) DESC, updated_at DESC
+      LIMIT ${CANDIDATES}`;
+    const companies = await prisma.company.findMany({
+      where: {
+        orgId: ctx.orgId,
+        id: { in: companyHits.map((r) => r.id) },
+        ...(companyScope ? { AND: [companyScope] } : {}),
+      },
+      select: { id: true, name: true },
+    });
+    const accounts = companies.sort(byLongestName((c) => c.name)).slice(0, 3);
+    const accountIds = accounts.map((a) => a.id);
+
+    const [oppHits, proposalHits] = await Promise.all([
+      showOpps
+        ? prisma.$queryRaw<IdRow[]>`
+            SELECT id FROM opportunities
+            WHERE org_id = ${ctx.orgId}::uuid AND deleted_at IS NULL AND (
+              upper(code) = ANY(${codes}::text[])
+              OR company_id = ANY(${accountIds}::uuid[])
+              OR (length(btrim(customer)) >= ${MIN_NAME_LENGTH} AND strpos(${text}, lower(btrim(customer))) > 0)
+              OR (length(btrim(name)) >= ${MIN_NAME_LENGTH} AND strpos(${text}, lower(btrim(name))) > 0)
+            )
+            ORDER BY updated_at DESC
+            LIMIT ${CANDIDATES}`
+        : Promise.resolve([]),
+      showProposals
+        ? prisma.$queryRaw<IdRow[]>`
+            SELECT id FROM proposals
+            WHERE org_id = ${ctx.orgId}::uuid AND deleted_at IS NULL
+              AND length(btrim(name)) >= ${MIN_NAME_LENGTH}
+              AND strpos(${text}, lower(btrim(name))) > 0
+            ORDER BY updated_at DESC
+            LIMIT ${CANDIDATES}`
+        : Promise.resolve([]),
+    ]);
+    const [matchedOpps, matchedProposals] = await Promise.all([
+      oppHits.length === 0
+        ? Promise.resolve([])
+        : prisma.opportunity.findMany({
+            where: { orgId: ctx.orgId, deletedAt: null, id: { in: oppHits.map((r) => r.id) } },
+            select: { id: true, code: true, name: true, customer: true, companyId: true, dueDate: true },
+            orderBy: { updatedAt: 'desc' },
+            take: 5,
+          }),
+      proposalHits.length === 0
+        ? Promise.resolve([])
+        : prisma.proposal.findMany({
+            where: {
+              orgId: ctx.orgId,
+              deletedAt: null,
+              id: { in: proposalHits.map((r) => r.id) },
+              ...proposalOwnerWhere(ctx),
+            },
+            select: { id: true, name: true, dueDate: true },
+            orderBy: { updatedAt: 'desc' },
+            take: 3,
+          }),
+    ]);
 
     const citations: AgentCitation[] = [
       ...accounts.map((a) => ({ kind: 'account' as const, label: a.name, href: `/accounts/${a.id}` })),

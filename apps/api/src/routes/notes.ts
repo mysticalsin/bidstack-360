@@ -30,6 +30,7 @@ import {
   persistTasks,
   asJsonObject,
 } from '../services/crm/notes.service.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 
 // WHY: only email is needed for the wire shape; fetching the whole User row
 // would include clerkId, settings, and other fields irrelevant to note display.
@@ -152,6 +153,17 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         include: { author: { select: { email: true } } },
       });
+      if (created.companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId: created.companyId,
+          kind: 'note_added',
+          actorUserId: req.auth.userId,
+          entityType: 'note',
+          entityId: created.id,
+          title: (company) => `New note on ${company}`,
+        });
+      }
       return reply.code(201).send(serializeNote(created));
     },
   );
@@ -266,6 +278,18 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
 
         return { note, created };
       });
+
+      if (persisted.note.companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId: persisted.note.companyId,
+          kind: 'note_added',
+          actorUserId: req.auth.userId,
+          entityType: 'note',
+          entityId: persisted.note.id,
+          title: (company) => `New meeting notes on ${company}`,
+        });
+      }
 
       return reply.code(201).send({
         note: serializeNote(persisted.note),

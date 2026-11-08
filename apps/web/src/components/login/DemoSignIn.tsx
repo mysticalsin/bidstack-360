@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { api, ApiError } from '@/lib/api';
-import { DEMO_TOKEN_KEY, DEMO_EMAIL_KEY, useSignInAction } from '@/lib/auth';
+import { DEMO_TOKEN_KEY, DEMO_EMAIL_KEY, DEMO_SIGNED_OUT_KEY, useSignInAction } from '@/lib/auth';
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 
 /**
@@ -28,8 +28,12 @@ const VIDEO_URL =
 const LINKEDIN_URL = 'https://www.linkedin.com/in/tonywalteur/';
 
 // The polo-preview Worker answers /__auth/*. Anywhere else (plain Vercel, local
-// preview) the SPA fallback returns HTML, so only a JSON answer counts.
-type Gate = { kind: 'signed-in'; email: string } | { kind: 'otp' } | { kind: 'none' };
+// preview) the SPA fallback returns HTML, so only a JSON answer counts. A
+// request that fails or times out is 'unknown', not 'none': on an OTP Worker
+// the ungated flow would be rejected.
+type Gate = { kind: 'signed-in'; email: string } | { kind: 'otp' } | { kind: 'none' } | { kind: 'unknown' };
+
+const GATE_TIMEOUT_MS = 2500;
 
 async function readGate(signal: AbortSignal): Promise<Gate> {
   try {
@@ -42,10 +46,20 @@ async function readGate(signal: AbortSignal): Promise<Gate> {
     const body = (await res.json()) as { email?: unknown; otp?: unknown };
     if (res.ok && typeof body.email === 'string' && body.email) return { kind: 'signed-in', email: body.email };
     if (res.status === 401 && body.otp === true) return { kind: 'otp' };
+    return { kind: 'none' };
   } catch {
-    /* offline, aborted or not behind the Worker */
+    return { kind: 'unknown' };
   }
-  return { kind: 'none' };
+}
+
+async function discoverGate(): Promise<Gate> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), GATE_TIMEOUT_MS);
+  try {
+    return await readGate(ctrl.signal);
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 async function postAuth(path: string, body: Record<string, string>) {
@@ -69,6 +83,7 @@ export function DemoSignIn() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [otp, setOtp] = useState(false);
+  const [gateUnknown, setGateUnknown] = useState(false);
   const [step, setStep] = useState<Step>('checking');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +100,7 @@ export function DemoSignIn() {
         localStorage.setItem(DEMO_TOKEN_KEY, res.token);
         localStorage.setItem(DEMO_EMAIL_KEY, res.email);
         localStorage.setItem('bidstack:session', 'demo');
+        localStorage.removeItem(DEMO_SIGNED_OUT_KEY);
         signIn(() => navigate('/dashboard', { replace: true }));
       } catch (err) {
         setError(
@@ -107,30 +123,41 @@ export function DemoSignIn() {
     enterRef.current = enter;
   }, [enter]);
 
-  // Already verified by Cloudflare (Access session or a Polo code): no second sign-in.
-  useEffect(() => {
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), 2500);
-    void readGate(ctrl.signal).then((gate) => {
-      window.clearTimeout(timer);
-      if (ctrl.signal.aborted && gate.kind === 'none') {
+  // Already verified by Cloudflare (Access session or a Polo code): no second
+  // sign-in, unless the visitor just signed out on purpose.
+  const applyGate = useCallback((gate: Gate) => {
+    if (gate.kind === 'signed-in') {
+      setEmail(gate.email);
+      setGateUnknown(false);
+      setOtp(false);
+      if (localStorage.getItem(DEMO_SIGNED_OUT_KEY)) {
         setStep('email');
         return;
       }
-      if (gate.kind === 'signed-in') {
-        setEmail(gate.email);
-        setStep('entering');
-        void enterRef.current(gate.email);
-        return;
-      }
-      setOtp(gate.kind === 'otp');
-      setStep('email');
+      setStep('entering');
+      void enterRef.current(gate.email);
+      return;
+    }
+    setGateUnknown(gate.kind === 'unknown');
+    setOtp(gate.kind === 'otp');
+    setStep('email');
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    void discoverGate().then((gate) => {
+      if (live) applyGate(gate);
     });
     return () => {
-      window.clearTimeout(timer);
-      ctrl.abort();
+      live = false;
     };
-  }, []);
+  }, [applyGate]);
+
+  function retryGate() {
+    setError(null);
+    setStep('checking');
+    void discoverGate().then(applyGate);
+  }
 
   async function requestCode() {
     const res = await postAuth('/__auth/code', { email: email.trim() });
@@ -163,7 +190,21 @@ export function DemoSignIn() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (loading || email.trim().length === 0) return;
-    if (!otp) {
+    let useOtp = otp;
+    if (gateUnknown) {
+      setError(null);
+      setLoading(true);
+      const gate = await discoverGate();
+      setLoading(false);
+      if (gate.kind === 'unknown') {
+        setError(t('demoSignIn.error.gate', 'Could not check sign-in. Check your connection and try again.'));
+        return;
+      }
+      setGateUnknown(false);
+      useOtp = gate.kind === 'otp';
+      setOtp(useOtp);
+    }
+    if (!useOtp) {
       await enter(email.trim());
       return;
     }
@@ -361,6 +402,17 @@ export function DemoSignIn() {
               <p id="demo-error" role="alert" className="mt-3 text-sm font-medium text-red-600">
                 {error}
               </p>
+            ) : gateUnknown && step === 'email' ? (
+              <div role="status" className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm text-slate-700">
+                <span>{t('demoSignIn.gateUnknown', 'Could not check sign-in.')}</span>
+                <button
+                  type="button"
+                  onClick={retryGate}
+                  className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-slate-800 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/50"
+                >
+                  {t('demoSignIn.retryGate', 'Retry')}
+                </button>
+              </div>
             ) : null}
 
             <motion.p

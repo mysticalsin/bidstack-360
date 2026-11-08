@@ -7,7 +7,7 @@
 // to danger, onSelect fires on click and Enter only, named prisms, empty state.
 
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
 import { EASE_OUT, enter, exit, instant } from '@/lib/motion-tokens';
@@ -68,13 +68,15 @@ const compact = (n: number) =>
       : `${+n.toFixed(1)}`;
 
 function useWidth() {
-  const ref = useRef<HTMLDivElement>(null);
+  // Callback ref: the chart can mount on its empty state and gain data later,
+  // so measurement attaches whenever the element appears.
+  const [el, ref] = useState<HTMLDivElement | null>(null);
   // null until measured: the chart draws once at its real width, so entrance
   // animations don't tween from a guessed size.
   const [width, setWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- first layout measurement of the attached element.
     setWidth(el.getBoundingClientRect().width || null);
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(([entry]) => {
@@ -82,7 +84,7 @@ function useWidth() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [el]);
   return [ref, width ?? 560, width !== null] as const;
 }
 

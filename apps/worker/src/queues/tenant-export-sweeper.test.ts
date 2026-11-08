@@ -19,6 +19,10 @@ interface Row {
 const store = vi.hoisted(() => ({ rows: [] as Row[] }));
 
 function matches(row: Row, where: Record<string, unknown>): boolean {
+  if (Array.isArray(where.OR)) {
+    return (where.OR as Record<string, unknown>[]).some((w) => matches(row, w));
+  }
+  if (where.orgId && row.orgId !== where.orgId) return false;
   if (where.status && row.status !== where.status) return false;
   if ('deletedAt' in where && row.deletedAt !== where.deletedAt) return false;
   for (const key of ['createdAt', 'startedAt', 'updatedAt'] as const) {
@@ -28,20 +32,35 @@ function matches(row: Row, where: Record<string, unknown>): boolean {
   return true;
 }
 
+// Same rule as BIDSTACK_TENANT_SCOPE_GUARD=enforce: a TenantExport query
+// without orgId in its where is rejected.
+function enforceTenantScope(where: Record<string, unknown>): void {
+  if (!where.orgId) throw new Error('[tenant-scope-guard] TenantExport must include orgId in where');
+}
+
 vi.mock('@bidstack/db', () => ({
   prisma: {
+    org: {
+      findMany: vi.fn(async ({ where }: { where: { tenantExports: { some: Record<string, unknown> } } }) =>
+        [...new Set(store.rows.filter((r) => matches(r, where.tenantExports.some)).map((r) => r.orgId))]
+          .sort()
+          .map((id) => ({ id })),
+      ),
+    },
     tenantExport: {
       updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
+        enforceTenantScope(where);
         const hit = store.rows.filter((r) => matches(r, where));
         for (const r of hit) Object.assign(r, data);
         return { count: hit.length };
       }),
-      findMany: vi.fn(async ({ where, take }: { where: Record<string, unknown>; take: number }) =>
-        store.rows
+      findMany: vi.fn(async ({ where, take }: { where: Record<string, unknown>; take: number }) => {
+        enforceTenantScope(where);
+        return store.rows
           .filter((r) => matches(r, where))
           .slice(0, take)
-          .map((r) => ({ id: r.id, orgId: r.orgId })),
-      ),
+          .map((r) => ({ id: r.id, orgId: r.orgId }));
+      }),
     },
   },
 }));
@@ -114,6 +133,20 @@ describe('sweepTenantExports', () => {
     expect(enqueue).not.toHaveBeenCalled();
     expect(result).toEqual({ requeued: 0, failed: 0 });
     expect(store.rows[0]?.status).toBe('ready');
+  });
+
+  it('recovers stuck exports in every org with org-scoped queries (tenant guard enforce)', async () => {
+    const other = row('b-pending', 'pending', PENDING_GRACE_MS * 2);
+    other.orgId = 'org-2';
+    const otherDead = row('b-dead', 'running', RUNNING_STALE_MS * 2, RUNNING_STALE_MS * 2);
+    otherDead.orgId = 'org-2';
+    store.rows = [row('a-pending', 'pending', PENDING_GRACE_MS * 2), other, otherDead];
+    const enqueue = vi.fn(async () => true);
+    const result = await sweepTenantExports(enqueue, log, now);
+    expect(result).toEqual({ requeued: 2, failed: 1 });
+    expect(enqueue).toHaveBeenCalledWith({ exportId: 'a-pending', orgId: 'org-1' });
+    expect(enqueue).toHaveBeenCalledWith({ exportId: 'b-pending', orgId: 'org-2' });
+    expect(store.rows.find((r) => r.id === 'b-dead')?.status).toBe('failed');
   });
 
   it('keeps sweeping when one re-enqueue fails (Redis still flaky)', async () => {

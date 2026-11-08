@@ -44,7 +44,11 @@ function fakePrisma(lastUsedAt: Date | null) {
     },
     auditLog: { create: vi.fn(async () => ({})) },
   };
-  return { prisma: prisma as unknown as Parameters<typeof mcpAuth>[1], writes: () => update.mock.calls.length + updateMany.mock.calls.length };
+  return {
+    prisma: prisma as unknown as Parameters<typeof mcpAuth>[1],
+    writes: () => update.mock.calls.length + updateMany.mock.calls.length,
+    updateMany,
+  };
 }
 
 describe('mcpAuth lastUsedAt', () => {
@@ -64,6 +68,16 @@ describe('mcpAuth lastUsedAt', () => {
     const never = fakePrisma(null);
     await mcpAuth(request(), never.prisma);
     expect(never.writes()).toBe(1);
+    __setApikeyUsedSampleForTest(null);
+  });
+
+  // BIDSTACK_TENANT_SCOPE_GUARD=enforce rejects updateMany without orgId.
+  it('scopes the write to the key org', async () => {
+    __setApikeyUsedSampleForTest(false);
+    const { prisma, updateMany } = fakePrisma(null);
+    await mcpAuth(request(), prisma);
+    const [args] = updateMany.mock.calls[0] as unknown as [{ where: Record<string, unknown> }];
+    expect(args.where).toMatchObject({ id: 'key-1', orgId: 'org-1' });
     __setApikeyUsedSampleForTest(null);
   });
 });

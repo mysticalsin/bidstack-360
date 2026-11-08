@@ -23,8 +23,15 @@ export const CHILE_SOURCE_HOSTS: readonly string[] = [
 /** Query parameters that carry credentials and must never be stored or logged. */
 const SECRET_PARAMS = ['ticket', 'token', 'apikey', 'api_key', 'key', 'access_token'];
 
-/** Default response cap (32 MiB). Bulk archives are streamed by the worker instead. */
+/** Default response cap (32 MiB) for API pages. */
 export const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Cap for one monthly ChileCompra bulk archive (512 MiB). The July 2025
+ * purchase order ZIP is 105 MB (docs/factory/PUBLIC-SECTOR-INTEL.md 1.1.C);
+ * this leaves room for busier months while still bounding memory.
+ */
+export const BULK_MAX_RESPONSE_BYTES = 512 * 1024 * 1024;
 
 /** Replace credential query values with `REDACTED`. Safe on any input. */
 export function redactUrl(rawUrl: string): string {

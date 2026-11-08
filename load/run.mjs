@@ -82,7 +82,7 @@ function percentile(sorted, p) {
   return Math.round(sorted[Math.max(0, i)]);
 }
 
-function summarize(name, { result, statusCounts, latencies }) {
+function summarize(name, { result, statusCounts, latencies }, appErrors = 0) {
   const sorted = Float64Array.from(latencies).sort();
   const total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
   const sum = (pred) =>
@@ -92,7 +92,8 @@ function summarize(name, { result, statusCounts, latencies }) {
   const s5xx = sum((c) => c >= 500);
   const s429 = sum((c) => c === 429);
   const s4xx = sum((c) => c >= 400 && c < 500 && c !== 429);
-  const failures = s5xx + s4xx + result.errors + result.timeouts;
+  // HTTP 200 responses whose body reports a failed call (MCP tool errors).
+  const failures = s5xx + s4xx + appErrors + result.errors + result.timeouts;
   const attempts = total + result.errors + result.timeouts;
   return {
     scenario: name,
@@ -105,6 +106,7 @@ function summarize(name, { result, statusCounts, latencies }) {
     s5xx,
     s429,
     s4xx,
+    appErrors,
     socketErrors: result.errors,
     timeouts: result.timeouts,
     errorRate: attempts ? Number(((failures / attempts) * 100).toFixed(2)) : 0,
@@ -115,14 +117,14 @@ function summarize(name, { result, statusCounts, latencies }) {
 function toMarkdown(rows, meta) {
   const head =
     `Connections ${meta.connections}, ${meta.duration} s per scenario, ${meta.startedAt}\n\n` +
-    '| Scenario | Requests | Req/s | p50 ms | p95 ms | p99 ms | 5xx | 429 | other 4xx | socket err | timeouts | error rate % |\n' +
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n';
+    '| Scenario | Requests | Req/s | p50 ms | p95 ms | p99 ms | 5xx | 429 | other 4xx | app errors | socket err | timeouts | error rate % |\n' +
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n';
   return (
     head +
     rows
       .map(
         (r) =>
-          `| ${r.scenario} | ${r.requests} | ${r.rps} | ${r.p50} | ${r.p95} | ${r.p99} | ${r.s5xx} | ${r.s429} | ${r.s4xx} | ${r.socketErrors} | ${r.timeouts} | ${r.errorRate} |`,
+          `| ${r.scenario} | ${r.requests} | ${r.rps} | ${r.p50} | ${r.p95} | ${r.p99} | ${r.s5xx} | ${r.s429} | ${r.s4xx} | ${r.appErrors} | ${r.socketErrors} | ${r.timeouts} | ${r.errorRate} |`,
       )
       .join('\n') +
     '\n'
@@ -148,7 +150,11 @@ async function main() {
       continue;
     }
     console.log(`run ${scenario.name} (${connections} connections, ${duration} s)`);
-    const row = summarize(scenario.name, await runOne(autocannon, scenario, { connections, duration }));
+    const row = summarize(
+      scenario.name,
+      await runOne(autocannon, scenario, { connections, duration }),
+      scenario.appErrors?.count ?? 0,
+    );
     console.log(JSON.stringify(row));
     rows.push(row);
   }

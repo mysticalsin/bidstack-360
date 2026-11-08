@@ -139,4 +139,28 @@ describe('audit log hash chain', () => {
     ]);
     expect((await verifyAuditChain(orgId)).ok).toBe(true);
   });
+
+  // A NULL digest made the integrity predicate NULL, so the row dropped out of
+  // the break list and the next row's NULL lag(row_hash) passed the link check.
+  it('detects a row whose digest was cleared', async () => {
+    const nullOrg = (
+      await prisma.org.create({ data: { clerkOrg: `org_chain_null_${randomUUID()}`, name: 'Chain Null Org' } })
+    ).id;
+    try {
+      const rows = await write(nullOrg, 3, 'cleared');
+      await prisma.$transaction([
+        prisma.$executeRawUnsafe('ALTER TABLE audit_log DISABLE TRIGGER audit_log_append_only'),
+        prisma.$executeRaw`UPDATE audit_log SET row_hash = NULL WHERE id = ${rows[1]!.id}`,
+        prisma.$executeRawUnsafe('ALTER TABLE audit_log ENABLE TRIGGER audit_log_append_only'),
+      ]);
+      const report = await verifyAuditChain(nullOrg);
+      expect(report.ok).toBe(false);
+      expect(report.breaks).toEqual([
+        { id: rows[1]!.id.toString(), chainSeq: rows[1]!.chainSeq!.toString(), reason: 'hash_mismatch' },
+        { id: rows[2]!.id.toString(), chainSeq: rows[2]!.chainSeq!.toString(), reason: 'link_mismatch' },
+      ]);
+    } finally {
+      await prisma.org.deleteMany({ where: { id: nullOrg } });
+    }
+  });
 });

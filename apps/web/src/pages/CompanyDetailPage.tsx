@@ -16,15 +16,17 @@ import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
+import { AccountTeamCard } from '@/components/company/AccountTeamCard';
+import { FollowAccountButton } from '@/components/company/FollowAccountButton';
 import { AccountConversations } from '@/components/company/AccountConversations';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
-import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyIntelSummary, useRefreshCompanyIntel } from '@/hooks/useCompanyIntelSummary';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
+import { CompanyPeopleTab } from './companyDetail/CompanyPeopleTab';
 import {
   ContactTab,
   OpportunityTab,
@@ -134,31 +136,34 @@ export function CompanyDetailPage() {
             )}
           </div>
         </div>
-        <div
-          role="radiogroup"
-          aria-label={t('companyDetail.viewToggle.label', 'Account view')}
-          className="inline-flex shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-0.5"
-        >
-          {(
-            [
-              ['overview', t('companyDetail.viewToggle.overview', 'Overview'), 'eye'],
-              ['details', t('companyDetail.viewToggle.details', 'Edit details'), 'pencil'],
-            ] as const
-          ).map(([v, label, icon]) => (
-            <button
-              key={v}
-              role="radio"
-              aria-checked={view === v}
-              onClick={() => setView(v)}
-              className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
-                view === v
-                  ? 'bg-[var(--brand-primary)] text-white'
-                  : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
-              }`}
-            >
-              <Icon name={icon} size={14} ariaHidden /> {label}
-            </button>
-          ))}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <FollowAccountButton companyId={c.id} />
+          <div
+            role="radiogroup"
+            aria-label={t('companyDetail.viewToggle.label', 'Account view')}
+            className="inline-flex shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-0.5"
+          >
+            {(
+              [
+                ['overview', t('companyDetail.viewToggle.overview', 'Overview'), 'eye'],
+                ['details', t('companyDetail.viewToggle.details', 'Edit details'), 'pencil'],
+              ] as const
+            ).map(([v, label, icon]) => (
+              <button
+                key={v}
+                role="radio"
+                aria-checked={view === v}
+                onClick={() => setView(v)}
+                className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
+                  view === v
+                    ? 'bg-[var(--brand-primary)] text-white'
+                    : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
+                }`}
+              >
+                <Icon name={icon} size={14} ariaHidden /> {label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -234,6 +239,7 @@ export function CompanyDetailPage() {
             </div>
           )}
           <AccountActivityCharts companyId={c.id} />
+          <AccountTeamCard companyId={c.id} />
           <AccountConversations companyId={c.id} />
 
           <CompanyTechStackSection companyId={c.id} />
@@ -323,13 +329,7 @@ export function CompanyDetailPage() {
 
           {tab === 'people' && (
             <div role="tabpanel" id={panelId('people')} aria-labelledby={tabId('people')}>
-              <AccountPeopleSection
-                companyId={c.id}
-                deals={c.opportunities.map((opportunity) => ({
-                  id: opportunity.id,
-                  name: opportunity.name,
-                }))}
-              />
+              <CompanyPeopleTab companyId={c.id} opportunities={c.opportunities} />
             </div>
           )}
           {tab === 'contacts' && (

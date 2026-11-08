@@ -208,7 +208,7 @@ export async function writeEvidence(args) {
   mkdirSync(outDir, { recursive: true });
   const generatedAt = new Date().toISOString();
   const config = collectConfig(root);
-  const tests = args.runTests && !args.check ? runTests(root, controls) : null;
+  const tests = args.runTests && !args.check ? (args.runTestsImpl ?? runTests)(root, controls) : null;
   const counts = args.withDb && !args.check ? await collectCounts(root) : null;
 
   const seen = new Set();
@@ -217,6 +217,10 @@ export async function writeEvidence(args) {
     const checks = checkControl(root, c, ctx);
     if (seen.has(c.id)) checks.push({ name: 'id is unique', ok: false });
     seen.add(c.id);
+    // A requested test run that failed or never ran must fail the control.
+    for (const t of (c.tests ?? []).filter((x) => tests?.[x])) {
+      checks.push({ name: `test passed: ${t}`, ok: tests[t].status === 'passed' });
+    }
     const evidence = {
       control: c.id,
       framework: c.framework,
@@ -328,6 +332,17 @@ async function selftest() {
     assert.deepEqual(Object.keys(good.config), ['RETENTION_MODE']);
     assert.equal(typeof good.config.RETENTION_MODE.set, 'boolean');
     assert.ok(existsSync(path.join(root, 'ev/index.json')));
+
+    const runTestsImpl = () => ({ 'src/a.test.ts': { status: 'not-run' } });
+    const notRun = await writeEvidence({ root, out: 'ev-tests', runTests: true, runTestsImpl });
+    assert.ok(notRun.failed.includes('GOOD-1'));
+    const passing = await writeEvidence({
+      root,
+      out: 'ev-tests-ok',
+      runTests: true,
+      runTestsImpl: () => ({ 'src/a.test.ts': { status: 'passed', passed: 1, total: 1 } }),
+    });
+    assert.ok(!passing.failed.includes('GOOD-1'));
     console.log('write-compliance-evidence selftest passed');
   } finally {
     rmSync(root, { recursive: true, force: true });

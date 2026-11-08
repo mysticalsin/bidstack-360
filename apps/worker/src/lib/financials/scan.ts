@@ -66,6 +66,7 @@ export interface FinancialsScanSummary {
     /** Narrative text of the latest report and where it lives (ESEF), for stated priorities. */
     textBlocks?: Array<{ concept: string; text: string }>;
     textUrl?: string | null;
+    /** Set only when this run matched the EDGAR filer name for the CIK on file. */
     secCik?: string | null;
     lastError?: string | null;
   }>;
@@ -114,7 +115,7 @@ export async function runFinancialsScan(deps: FinancialsScanDeps = {}): Promise<
   const env = deps.env ?? process.env;
   const now = deps.now ?? new Date();
   const fetchImpl = deps.fetchImpl ?? (fetch as unknown as FinFetch);
-  const ua = env.SEC_USER_AGENT?.trim() || env.FINANCIALS_USER_AGENT?.trim() || '';
+  const ua = env.SEC_USER_AGENT?.trim() || env.FINANCIALS_USER_AGENT?.trim() || env.ACCOUNT_INTEL_USER_AGENT?.trim() || '';
   const max = Math.max(1, Number(env.FINANCIALS_MAX_ACCOUNTS ?? 20) || 20);
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const secPace = pacer(150, sleep); // under the SEC 10 req/s cap
@@ -146,7 +147,7 @@ export async function runFinancialsScan(deps: FinancialsScanDeps = {}): Promise<
     const tries: Array<() => Promise<PulledEntity>> = [];
     if (subject?.lei) tries.push(() => pullEsef(subject.lei!, { fetchImpl, userAgent: ua || 'PoloFinancials/1.0', pace: xbrlPace }));
     if (subject?.secCik) tries.push(() => pullEdgar(subject.secCik!, { fetchImpl, userAgent: ua, pace: secPace }));
-    const row: FinancialsScanSummary['pulled'][number] = { companyId: d.companyId, name: d.company.name, status: 'no_identifier', source: null, periods: 0, signals: 0, secCik: subject?.secCik ?? null };
+    const row: FinancialsScanSummary['pulled'][number] = { companyId: d.companyId, name: d.company.name, status: 'no_identifier', source: null, periods: 0, signals: 0, secCik: null };
     if (!tries.length) {
       await db.accountFinancialProfile.update({ where: { companyId: d.companyId }, data: { status: 'no_identifier', lastPulledAt: now, nextPullAt: new Date(now.getTime() + RECHECK_DAYS * DAY), lastError: null } });
       summary.pulled.push(row);
@@ -165,6 +166,7 @@ export async function runFinancialsScan(deps: FinancialsScanDeps = {}): Promise<
           used = e;
           continue;
         }
+        if (e.source === 'sec_edgar') row.secCik = subject!.secCik;
         const ps = buildPeriods(e.facts, { quarters: e.quarters });
         if (!ps.length) {
           used ??= e;

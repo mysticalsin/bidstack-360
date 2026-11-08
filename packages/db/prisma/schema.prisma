@@ -31,38 +31,38 @@ model Org {
   microsoftTenantId  String? @map("microsoft_tenant_id")
   microsoftSsoMethod String  @default("oauth") @map("microsoft_sso_method") // oauth | saml
 
-  users              User[]
-  companies          Company[]
-  references         Reference[]
-  activities         Activity[]
+  users               User[]
+  companies           Company[]
+  references          Reference[]
+  activities          Activity[]
   externalRecordLinks ExternalRecordLink[]
-  opportunities      Opportunity[]
-  contacts           Contact[]
-  competitorInsights CompetitorInsight[]
-  competitorProfiles CompetitorProfile[]
-  tasks              Task[]
-  documents          Document[]
-  syncEvents         SyncEvent[]
-  apiKeys            ApiKey[]
-  webhookSubs        WebhookSubscription[]
-  webhookOutbox      WebhookOutbox[]
-  webhookMessages    WebhookMessage[]
-  accessPolicies     AccessPolicyVersion[]
-  auditLogs          AuditLog[]
-  notes              Note[]
-  fileAttachments    FileAttachment[]
-  companyEnrichments CompanyEnrichment[]
-  aiInsights         AiInsight[]
-  dustRuns           DustRun[]
-  dashboardWidgets   DashboardWidget[]
-  bidOpportunities   BidOpportunity[]
-  riskRegisterItems  RiskRegisterItem[]
-  complianceChecks   ComplianceCheck[]
-  proposals          Proposal[]
-  proposalSections   ProposalSection[]
-  providerHealth     ProviderHealth[]
-  queueHealth        QueueHealth[]
-  releaseScores      ReleaseScore[]
+  opportunities       Opportunity[]
+  contacts            Contact[]
+  competitorInsights  CompetitorInsight[]
+  competitorProfiles  CompetitorProfile[]
+  tasks               Task[]
+  documents           Document[]
+  syncEvents          SyncEvent[]
+  apiKeys             ApiKey[]
+  webhookSubs         WebhookSubscription[]
+  webhookOutbox       WebhookOutbox[]
+  webhookMessages     WebhookMessage[]
+  accessPolicies      AccessPolicyVersion[]
+  auditLogs           AuditLog[]
+  notes               Note[]
+  fileAttachments     FileAttachment[]
+  companyEnrichments  CompanyEnrichment[]
+  aiInsights          AiInsight[]
+  dustRuns            DustRun[]
+  dashboardWidgets    DashboardWidget[]
+  bidOpportunities    BidOpportunity[]
+  riskRegisterItems   RiskRegisterItem[]
+  complianceChecks    ComplianceCheck[]
+  proposals           Proposal[]
+  proposalSections    ProposalSection[]
+  providerHealth      ProviderHealth[]
+  queueHealth         QueueHealth[]
+  releaseScores       ReleaseScore[]
 
   accountSolutions     AccountSolution[]
   accountProducts      AccountProduct[]
@@ -230,6 +230,8 @@ model Org {
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
   notificationPrefs             NotificationPref[]
+  accountTeamMembers            AccountTeamMember[]
+  accountFollows                AccountFollow[]
   serumConfigVersions           SerumConfigVersion[]
   serumConnectorConnectionTests SerumConnectorConnectionTest[]
 
@@ -366,6 +368,8 @@ model User {
   msaIntakeDrafts          MsaIntakeDraft[]          @relation("MsaIntakeDraftCreatedBy")
   meetingSourceConnections MeetingSourceConnection[]
   orgChartNodesOwned       OrgChartNode[]            @relation("OrgChartNodeOwner")
+  accountTeamMemberships   AccountTeamMember[]       @relation("AccountTeamMemberUser")
+  accountFollows           AccountFollow[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -456,18 +460,20 @@ model Company {
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  contracts     ContractAgreement[]   @relation("CompanyContracts")
-  meetingIntel  MeetingIntel[]
-  firmographics CompanyFirmographics?
-  jobPostings   CompanyJobPosting[]
-  intelPosts    CompanyPost[]
-  intelEvidence IntelEvidence[]
-  intelThemes   InvestmentTheme[]
-  intelRuns     IntelSourceRun[]
-  intelSummary  CompanyIntelSummary?
+  contracts       ContractAgreement[]         @relation("CompanyContracts")
+  meetingIntel    MeetingIntel[]
+  firmographics   CompanyFirmographics?
+  jobPostings     CompanyJobPosting[]
+  intelPosts      CompanyPost[]
+  intelEvidence   IntelEvidence[]
+  intelThemes     InvestmentTheme[]
+  intelRuns       IntelSourceRun[]
+  intelSummary    CompanyIntelSummary?
   partnerEvidence ConsultingPartnerEvidence[]
   partnerRuns     ConsultingPartnerRun[]
-  orgChart      OrgChart?
+  orgChart        OrgChart?
+  teamMembers     AccountTeamMember[]
+  follows         AccountFollow[]
 
   @@index([orgId, domain])
   @@index([orgId])
@@ -984,18 +990,18 @@ model ApiKey {
 }
 
 model WebhookSubscription {
-  id             String    @id @default(uuid()) @db.Uuid
-  orgId          String    @map("org_id") @db.Uuid
-  url            String
-  secret         String
-  secretHash     String?   @map("secret_hash") @db.VarChar(64)
-  events         String[]
-  active         Boolean   @default(true)
-  failureCount   Int       @default(0) @map("failure_count")
-  lastDeliveryAt DateTime? @map("last_delivery_at") @db.Timestamptz(6)
-  lastFailureAt  DateTime? @map("last_failure_at") @db.Timestamptz(6)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id                      String                 @id @default(uuid()) @db.Uuid
+  orgId                   String                 @map("org_id") @db.Uuid
+  url                     String
+  secret                  String
+  secretHash              String?                @map("secret_hash") @db.VarChar(64)
+  events                  String[]
+  active                  Boolean                @default(true)
+  failureCount            Int                    @default(0) @map("failure_count")
+  lastDeliveryAt          DateTime?              @map("last_delivery_at") @db.Timestamptz(6)
+  lastFailureAt           DateTime?              @map("last_failure_at") @db.Timestamptz(6)
+  createdAt               DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt               DateTime?              @map("deleted_at") @db.Timestamptz(6)
   /// Retry policy for this endpoint (defaults match WEBHOOK_DELIVERY).
   maxAttempts             Int                    @default(5) @map("max_attempts")
   backoffStrategy         WebhookBackoffStrategy @default(exponential) @map("backoff_strategy")
@@ -1021,22 +1027,22 @@ model WebhookSubscription {
 /// Delivery attempt record for an outbound webhook.
 /// Created per delivery attempt so partners can debug failures.
 model WebhookDelivery {
-  id             String   @id @default(uuid()) @db.Uuid
-  subscriptionId String   @map("subscription_id") @db.Uuid
-  orgId          String   @map("org_id") @db.Uuid
+  id                String   @id @default(uuid()) @db.Uuid
+  subscriptionId    String   @map("subscription_id") @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
   /// The event type that triggered this delivery (e.g. "lead.created").
-  event          String
+  event             String
   /// HTTP status code returned by the partner endpoint (null = timeout/network error).
-  statusCode     Int?     @map("status_code")
+  statusCode        Int?     @map("status_code")
   /// Whether the delivery was acknowledged (2xx response within 10 s).
-  success        Boolean
+  success           Boolean
   /// Round-trip duration in milliseconds.
-  durationMs     Int?     @map("duration_ms")
+  durationMs        Int?     @map("duration_ms")
   /// Attempt number (1–5).
-  attempt        Int      @default(1)
+  attempt           Int      @default(1)
   /// Error message if delivery failed.
-  errorMessage   String?  @map("error_message")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  errorMessage      String?  @map("error_message")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   /// Stored message this attempt belongs to (null for test pings and older rows).
   messageId         String?  @map("message_id") @db.Uuid
   /// Request headers as sent, with every HMAC masked.
@@ -5656,16 +5662,16 @@ model ContractAgreement {
   parties          Json    @default("[]")
   fieldCitations   Json    @default("{}") @map("field_citations")
 
-  org            Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sourceFile     FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
-  company        Company?              @relation("CompanyContracts", fields: [companyId], references: [id], onDelete: SetNull)
-  parent         ContractAgreement?    @relation("ContractHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children       ContractAgreement[]   @relation("ContractHierarchy")
-  owner          User?                 @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  signingEntity  SigningEntity?        @relation(fields: [signingEntityId], references: [id], onDelete: SetNull)
+  org                 Org                     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceFile          FileAttachment?         @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  company             Company?                @relation("CompanyContracts", fields: [companyId], references: [id], onDelete: SetNull)
+  parent              ContractAgreement?      @relation("ContractHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children            ContractAgreement[]     @relation("ContractHierarchy")
+  owner               User?                   @relation("ContractOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  signingEntity       SigningEntity?          @relation(fields: [signingEntityId], references: [id], onDelete: SetNull)
   whitespaceDecisions MsaWhitespaceDecision[]
-  fileVersions   ContractFileVersion[]
-  intakeDrafts   MsaIntakeDraft[]
+  fileVersions        ContractFileVersion[]
+  intakeDrafts        MsaIntakeDraft[]
 
   @@index([orgId, accountKey], map: "contract_agreements_org_account_idx")
   @@index([orgId, companyId], map: "contract_agreements_org_company_idx")
@@ -5746,27 +5752,27 @@ model MsaIntakeDraft {
 // holds ids and filters only; credentials stay in env (MICROSOFT_GRAPH_*,
 // DOCUSIGN_*). cursor is the Graph delta link or the last envelope date.
 model AgreementSource {
-  id          String    @id @default(uuid()) @db.Uuid
-  orgId       String    @map("org_id") @db.Uuid
-  kind        String    @db.VarChar(20)
-  name        String    @db.VarChar(200)
-  enabled     Boolean   @default(true)
-  config      Json      @default("{}")
-  cursor      String?
-  lastSyncAt  DateTime? @map("last_sync_at") @db.Timestamptz(6)
-  lastRunId   String?   @map("last_run_id") @db.VarChar(80)
-  lastResult  Json?     @map("last_result")
-  createdById String    @map("created_by_id") @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
+  orgId        String    @map("org_id") @db.Uuid
+  kind         String    @db.VarChar(20)
+  name         String    @db.VarChar(200)
+  enabled      Boolean   @default(true)
+  config       Json      @default("{}")
+  cursor       String?
+  lastSyncAt   DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  lastRunId    String?   @map("last_run_id") @db.VarChar(80)
+  lastResult   Json?     @map("last_result")
+  createdById  String    @map("created_by_id") @db.Uuid
   /// Org-scoped provider connection the pull uses. Null only in single-tenant mode.
-  connectionId String?  @map("connection_id") @db.Uuid
+  connectionId String?   @map("connection_id") @db.Uuid
   /// Resumable position inside an unfinished pull: { next?: page url, delta?: final link not yet committed }.
-  progress    Json?
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  progress     Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  org        Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  connection AgreementConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  org        Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection AgreementConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   items      AgreementIngestItem[]
 
   @@index([orgId, kind], map: "agreement_sources_org_kind_idx")
@@ -6323,22 +6329,31 @@ model KamProspection {
 // @mentions, assignments, and director escalations. readAt drives the unread
 // badge; entityType/entityId/url deep-link to the source.
 model Notification {
-  id         String    @id @default(uuid()) @db.Uuid
-  orgId      String    @map("org_id") @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  type       String // mention | assignment | bid_override | stage_change | system
-  title      String
-  body       String?
-  entityType String?   @map("entity_type")
-  entityId   String?   @map("entity_id")
-  url        String?
-  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  type        String // mention | assignment | bid_override | stage_change | system
+  title       String
+  body        String?
+  entityType  String?   @map("entity_type")
+  entityId    String?   @map("entity_id")
+  url         String?
+  readAt      DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Account alerts: repeats on the same account within the coalescing window
+  // update one row (eventCount, lastEventAt) instead of stacking new rows.
+  groupKey    String?   @map("group_key")
+  eventCount  Int       @default(1) @map("event_count")
+  lastEventAt DateTime? @map("last_event_at") @db.Timestamptz(6)
+  actorUserId String?   @map("actor_user_id") @db.Uuid
+  emailSentAt DateTime? @map("email_sent_at") @db.Timestamptz(6)
+  teamsSentAt DateTime? @map("teams_sent_at") @db.Timestamptz(6)
 
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([orgId, userId, readAt, createdAt(sort: Desc)], map: "notifications_org_user_read_created_idx")
+  @@index([userId, groupKey, lastEventAt(sort: Desc)], map: "notifications_user_group_last_idx")
   @@map("notifications")
 }
 
@@ -6347,20 +6362,85 @@ model Notification {
 // createNotification; taskDueSoon + emailDigest persist for features that emit
 // them. Replaces the old localStorage-only toggles so prefs follow the user.
 model NotificationPref {
-  id              String   @id @default(uuid()) @db.Uuid
-  orgId           String   @map("org_id") @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  emailDigest     Boolean  @default(true) @map("email_digest")
-  mentionPush     Boolean  @default(true) @map("mention_push")
-  taskDueSoon     Boolean  @default(true) @map("task_due_soon")
-  dealStageChange Boolean  @default(false) @map("deal_stage_change")
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  emailDigest        Boolean  @default(true) @map("email_digest")
+  mentionPush        Boolean  @default(true) @map("mention_push")
+  taskDueSoon        Boolean  @default(true) @map("task_due_soon")
+  dealStageChange    Boolean  @default(false) @map("deal_stage_change")
+  // Per kind group (account_activity, deals, tasks, mentions) and channel
+  // (in_app, email, teams). Shape and defaults live in @bidstack/shared
+  // resolveChannelPrefs; an empty object means all defaults.
+  channelPrefs       Json     @default("{}") @map("channel_prefs")
+  accountDigestDaily Boolean  @default(false) @map("account_digest_daily")
+  // Microsoft Teams Workflows webhook, encrypted with INTEGRATION_TOKEN_KEY.
+  teamsWebhookEnc    String?  @map("teams_webhook_enc")
+  teamsWebhookHost   String?  @map("teams_webhook_host")
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([orgId])
   @@map("notification_prefs")
+}
+
+// ─── Account team and follow (slice 21) ──────────────────────────────────────
+// Internal staffing on an account (who from our side works it, and how much).
+// Company.keyAccountOwnerId stays the account lead of record; these rows add the
+// rest of the team. Members, the key account owner and opp owners follow the
+// account automatically; AccountFollow rows add explicit followers or mute.
+
+enum AccountTeamRole {
+  account_lead
+  delivery_lead
+  pre_sales
+  bid_manager
+  executive_sponsor
+  other
+
+  @@map("account_team_role")
+}
+
+model AccountTeamMember {
+  id            String          @id @default(uuid()) @db.Uuid
+  orgId         String          @map("org_id") @db.Uuid
+  companyId     String          @map("company_id") @db.Uuid
+  userId        String          @map("user_id") @db.Uuid
+  role          AccountTeamRole @default(other)
+  allocationPct Int?            @map("allocation_pct")
+  startDate     DateTime?       @map("start_date") @db.Date
+  endDate       DateTime?       @map("end_date") @db.Date
+  createdById   String?         @map("created_by_id") @db.Uuid
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation("AccountTeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId], map: "account_team_members_company_user_key")
+  @@index([orgId, userId], map: "account_team_members_org_user_idx")
+  @@map("account_team_members")
+}
+
+model AccountFollow {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  muted     Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId], map: "account_follows_company_user_key")
+  @@index([orgId, userId], map: "account_follows_org_user_idx")
+  @@map("account_follows")
 }
 
 // ── Financial Watchdog (public financial events per customer account) ──
@@ -7022,22 +7102,25 @@ model IntelEvidence {
 /// each refresh. Each row cites evidence ids; next12 rows are always
 /// basis=inferred. Derived data, safe to drop and rebuild.
 model InvestmentTheme {
-  id          String   @id @default(uuid()) @db.Uuid
-  orgId       String   @map("org_id") @db.Uuid
-  companyId   String   @map("company_id") @db.Uuid
+  id           String   @id @default(uuid()) @db.Uuid
+  orgId        String   @map("org_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
   /// investing | cutting | next12
-  direction   String
-  area        String
-  theme       String?
-  label       String
-  amount      Float?
-  currency    String?
-  trendPct    Float?   @map("trend_pct")
+  direction    String
+  area         String
+  theme        String?
+  label        String
+  /// Monetary lines only, in micros of `currency`.
+  amountMicros BigInt?  @map("amount_micros")
+  /// Headcount lines only.
+  headcount    Int?
+  currency     String?
+  trendPct     Float?   @map("trend_pct")
   /// observed | stated | inferred
-  basis       String
-  summary     String
-  evidenceIds String[] @default([]) @map("evidence_ids")
-  computedAt  DateTime @map("computed_at") @db.Timestamptz(6)
+  basis        String
+  summary      String
+  evidenceIds  String[] @default([]) @map("evidence_ids")
+  computedAt   DateTime @map("computed_at") @db.Timestamptz(6)
 
   org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -7130,7 +7213,6 @@ model IntelImportBatch {
   @@index([orgId, createdAt(sort: Desc)])
   @@map("intel_import_batches")
 }
-
 
 /// Slice 15: one consulting firm read out of one public item or one of our
 /// own records for an account. Public rows carry the URL; internal rows carry

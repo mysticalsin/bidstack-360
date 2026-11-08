@@ -80,6 +80,31 @@ function yearFromPeriod(p: { id: string; source: string; fiscalYear: number; per
   };
 }
 
+const POSTING_PAGE = 1000;
+
+/**
+ * Every posting in the window: the hiring summary counts open roles and 30/90
+ * day trends over all of them, so a row cap here would skew the aggregates.
+ * Callers cap the detail list. Read in pages to stay under the query guard.
+ */
+async function loadPostings(db: Db, orgId: string, companyId: string, since: Date) {
+  const select = { id: true, source: true, title: true, url: true, city: true, country: true, function: true, seniority: true, skills: true, department: true, postedAt: true, lastSeenAt: true, fetchedAt: true, sample: true } as const;
+  const out = [];
+  for (let cursor: string | undefined; ; ) {
+    const page = await db.companyJobPosting.findMany({
+      where: { orgId, companyId, OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }] },
+      orderBy: { id: 'asc' },
+      take: POSTING_PAGE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select,
+    });
+    out.push(...page);
+    if (page.length < POSTING_PAGE) break;
+    cursor = page[page.length - 1]!.id;
+  }
+  return out.sort((a, b) => (b.postedAt?.getTime() ?? -Infinity) - (a.postedAt?.getTime() ?? -Infinity));
+}
+
 /** Load everything stored about one account. Null when the account is not in the org. */
 export async function loadCompanyIntel(db: Db, orgId: string, companyId: string, now: Date = new Date()): Promise<CompanyIntelSnapshot | null> {
   const company = await db.company.findFirst({ where: { id: companyId, orgId, deletedAt: null }, select: { id: true, name: true } });
@@ -89,12 +114,7 @@ export async function loadCompanyIntel(db: Db, orgId: string, companyId: string,
 
   const [periods, postings, posts, events, ledger, runs, firmo] = await Promise.all([
     db.accountFinancialPeriod.findMany({ where: { orgId, companyId, periodType: 'FY' }, orderBy: { periodEnd: 'desc' }, take: 40, select: { id: true, source: true, fiscalYear: true, periodEnd: true, currency: true, sourceUrl: true, metrics: true, updatedAt: true } }),
-    db.companyJobPosting.findMany({
-      where: { orgId, companyId, OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }] },
-      orderBy: { postedAt: 'desc' },
-      take: 500,
-      select: { id: true, source: true, title: true, url: true, city: true, country: true, function: true, seniority: true, skills: true, department: true, postedAt: true, lastSeenAt: true, fetchedAt: true, sample: true },
-    }),
+    loadPostings(db, orgId, companyId, since),
     db.companyPost.findMany({ where: { orgId, companyId }, orderBy: { publishedAt: 'desc' }, take: 60, select: { id: true, source: true, url: true, title: true, excerpt: true, kind: true, publishedAt: true, fetchedAt: true, sample: true } }),
     db.accountWatchEvent.findMany({ where: { orgId, companyId, occurredAt: { gte: newsSince }, source: { notIn: NEWS_EXCLUDED } }, orderBy: { occurredAt: 'desc' }, take: 40, select: { id: true, source: true, title: true, sourceUrl: true, summary: true, occurredAt: true, detectedAt: true } }),
     db.intelEvidence.findMany({ where: { orgId, companyId, kind: { in: ['registry', 'statement'] } }, orderBy: { fetchedAt: 'desc' }, take: 200 }),

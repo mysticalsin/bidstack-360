@@ -117,6 +117,8 @@ const READ_LIKE_MUTATIONS: Record<string, string> = {
   'DELETE /api/v1/meeting-intel/sources/metis':
     'Revokes the caller’s own meeting-source consent (userId = caller).',
   'POST /api/v1/mentions/:id/read': 'Marks the caller’s own mention read.',
+  'PUT /api/v1/companies/:id/follow':
+    'Follows or mutes an account the caller can read; writes only the caller’s own follow row.',
   'POST /api/v1/presence': 'Ephemeral presence heartbeat; no record data.',
   'POST /api/v1/email-templates/render': 'Renders a template preview; read only.',
   'POST /api/v1/email-templates/:id/track-use': 'Usage counter on send; no content change.',

@@ -7,7 +7,7 @@
 // onSelect fires on click and Enter only, named axis hit areas, empty state.
 
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
 import { EASE_OUT, enter, exit } from '@/lib/motion-tokens';
@@ -55,13 +55,15 @@ const WRAP = 84;
 const monoW = (s: string) => s.length * 7.3;
 
 function useWidth() {
-  const ref = useRef<HTMLDivElement>(null);
+  // Callback ref: the chart can mount on its empty state and gain data later,
+  // so measurement attaches whenever the element appears.
+  const [el, ref] = useState<HTMLDivElement | null>(null);
   // null until measured: the chart draws once at its real width, so entrance
   // animations don't tween from a guessed size.
   const [width, setWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- first layout measurement of the attached element.
     setWidth(el.getBoundingClientRect().width || null);
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(([entry]) => {
@@ -69,7 +71,7 @@ function useWidth() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [el]);
   return [ref, width ?? 400, width !== null] as const;
 }
 
@@ -90,10 +92,12 @@ export function RadarChart({
 }: RadarChartProps) {
   const reduce = useReducedMotion();
   const [ref, width, measured] = useWidth();
-  const [active, setActive] = useState<number | null>(null);
+  const [selected, setActive] = useState<number | null>(null);
   const [fromKeyboard, setFromKeyboard] = useState(false);
 
   const n = axes.length;
+  // A refresh can drop axes while one is active; an index past the end has no angle.
+  const active = selected !== null && selected < n ? selected : null;
   if (!n) {
     return <p className={cn('py-6 text-center text-sm text-fg-secondary', className)}>{empty ?? 'Nothing scored yet.'}</p>;
   }

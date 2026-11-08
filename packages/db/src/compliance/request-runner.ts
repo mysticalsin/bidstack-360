@@ -2,6 +2,15 @@
  * Runs one DataSubjectRequest row: claims it, resolves the subject, exports or
  * erases, and stores a counts-only report. Called by the data-subject-request
  * worker; integration tests call it directly.
+ *
+ * Every query carries the request's orgId, so the runner works with
+ * BIDSTACK_TENANT_SCOPE_GUARD=enforce.
+ *
+ * An erasure that unlinks stored objects (uploaded portraits) records their
+ * keys on the row as `pendingStorageKeys` before deleting them, and the row
+ * only becomes `done` once they are gone. If a delete fails, the row stays
+ * `running` and the outcome is `busy`: the worker retries after the claim goes
+ * stale, and that run only retries the deletes.
  */
 import type { Prisma, PrismaClient } from '../../generated/client/index.js';
 
@@ -10,16 +19,25 @@ import {
   exportDataSubject,
   resolveDataSubject,
   scanSubjectResidue,
+  type DataSubject,
   type DataSubjectType,
 } from './data-subject.js';
 
 export interface DataSubjectRequestOutcome {
   id: string;
-  status: 'done' | 'failed' | 'skipped';
+  /** `busy`: another run holds the claim, or stored objects still need deleting. Retry at `retryAt`. */
+  status: 'done' | 'failed' | 'skipped' | 'busy';
   kind: string;
   dryRun: boolean;
+  /** For `busy`: when the claim goes stale and the request can be run again. */
+  retryAt?: Date;
   /** Failure detail for the caller's log. Not stored on the row: it can echo values. */
   errorDetail?: string;
+}
+
+export interface RunDataSubjectRequestOptions {
+  /** Delete stored objects by key. A missing object is not an error; throw on any other failure. */
+  deleteObjects?: (keys: string[]) => Promise<void>;
 }
 
 /** A `running` row older than this is treated as abandoned and may be claimed again. */
@@ -32,13 +50,21 @@ function publicError(err: unknown): string {
   return typeof code === 'string' ? `Request failed (${code})` : 'Request failed';
 }
 
+function pendingStorageKeys(report: unknown): string[] | null {
+  const keys = (report as { pendingStorageKeys?: unknown } | null)?.pendingStorageKeys;
+  return Array.isArray(keys) ? keys.filter((k): k is string => typeof k === 'string') : null;
+}
+
 export async function runDataSubjectRequest(
   db: PrismaClient,
   requestId: string,
+  orgId: string,
+  opts: RunDataSubjectRequestOptions = {},
 ): Promise<DataSubjectRequestOutcome> {
   const claimed = await db.dataSubjectRequest.updateMany({
     where: {
       id: requestId,
+      orgId,
       OR: [
         { status: 'queued' },
         { status: 'running', startedAt: { lt: new Date(Date.now() - STALE_RUNNING_MS) } },
@@ -46,10 +72,56 @@ export async function runDataSubjectRequest(
     },
     data: { status: 'running', startedAt: new Date() },
   });
-  const row = await db.dataSubjectRequest.findUnique({ where: { id: requestId } });
+  const row = await db.dataSubjectRequest.findFirst({ where: { id: requestId, orgId } });
   if (!row) throw new Error(`data-subject-request ${requestId} not found`);
-  if (claimed.count === 0)
-    return { id: row.id, status: 'skipped', kind: row.kind, dryRun: row.dryRun };
+  const outcome = { id: row.id, kind: row.kind, dryRun: row.dryRun };
+  const retryAt = () => new Date((row.startedAt?.getTime() ?? Date.now()) + STALE_RUNNING_MS + 1_000);
+  if (claimed.count === 0) {
+    // A recent run still holds the claim; acknowledging the job here would
+    // strand the row if that run died.
+    if (row.status === 'running') return { ...outcome, status: 'busy', retryAt: retryAt() };
+    return { ...outcome, status: 'skipped' };
+  }
+
+  /** Delete stored objects, then mark the erasure done. `busy` when a delete failed. */
+  const completeErase = async (
+    base: Prisma.InputJsonObject,
+    keys: string[],
+    subject: DataSubject | null,
+  ): Promise<DataSubjectRequestOutcome> => {
+    if (keys.length) {
+      try {
+        if (!opts.deleteObjects) throw new Error('no object store configured');
+        await opts.deleteObjects(keys);
+      } catch (err) {
+        return {
+          ...outcome,
+          status: 'busy',
+          retryAt: retryAt(),
+          errorDetail: `stored object delete failed: ${err instanceof Error ? err.message.slice(0, 200) : 'unknown'}`,
+        };
+      }
+    }
+    // The erasure has committed: record it as done before the residue scan,
+    // so a scan failure can never make a completed erasure look failed.
+    await db.dataSubjectRequest.update({
+      where: { id: row.id },
+      data: { status: 'done', report: base, error: null, completedAt: new Date() },
+    });
+    if (!row.dryRun && subject) {
+      let extra: Prisma.InputJsonObject;
+      try {
+        extra = { residue: (await scanSubjectResidue(db, subject)) as unknown as Prisma.InputJsonArray };
+      } catch (err) {
+        extra = { residueError: publicError(err) };
+      }
+      await db.dataSubjectRequest.update({
+        where: { id: row.id },
+        data: { report: { ...base, ...extra } },
+      });
+    }
+    return { ...outcome, status: 'done' };
+  };
 
   try {
     const subject = await resolveDataSubject(
@@ -58,34 +130,29 @@ export async function runDataSubjectRequest(
       row.subjectType as DataSubjectType,
       row.subjectId,
     );
+
+    const pending = row.kind === 'erase' ? pendingStorageKeys(row.report) : null;
+    if (pending) {
+      // An earlier run committed the erasure; only its object deletes are left.
+      const { pendingStorageKeys: _keys, ...base } = row.report as Prisma.JsonObject;
+      return await completeErase(base as Prisma.InputJsonObject, pending, subject);
+    }
     if (!subject) throw new Error('Subject not found');
 
     if (row.kind === 'erase') {
-      const erased = await eraseDataSubject(db, subject, {
+      const { storageKeys, ...erased } = await eraseDataSubject(db, subject, {
         dryRun: row.dryRun,
         actorUserId: row.requestedById,
         requestId: row.id,
       });
-      // The erasure has committed: record it as done before the residue scan,
-      // so a scan failure can never make a completed erasure look failed.
       const base = erased as unknown as Prisma.InputJsonObject;
-      await db.dataSubjectRequest.update({
-        where: { id: row.id },
-        data: { status: 'done', report: base, error: null, completedAt: new Date() },
-      });
-      if (!row.dryRun) {
-        let extra: Prisma.InputJsonObject;
-        try {
-          extra = { residue: (await scanSubjectResidue(db, subject)) as unknown as Prisma.InputJsonArray };
-        } catch (err) {
-          extra = { residueError: publicError(err) };
-        }
+      if (storageKeys.length) {
         await db.dataSubjectRequest.update({
           where: { id: row.id },
-          data: { report: { ...base, ...extra } },
+          data: { report: { ...base, pendingStorageKeys: storageKeys } },
         });
       }
-      return { id: row.id, status: 'done', kind: row.kind, dryRun: row.dryRun };
+      return await completeErase(base, storageKeys, subject);
     }
 
     const bundle = await exportDataSubject(db, subject);
@@ -119,17 +186,15 @@ export async function runDataSubjectRequest(
       where: { id: row.id },
       data: { status: 'done', report, error: null, completedAt: new Date() },
     });
-    return { id: row.id, status: 'done', kind: row.kind, dryRun: row.dryRun };
+    return { ...outcome, status: 'done' };
   } catch (err) {
     await db.dataSubjectRequest.update({
       where: { id: row.id },
       data: { status: 'failed', error: publicError(err), completedAt: new Date() },
     });
     return {
-      id: row.id,
+      ...outcome,
       status: 'failed',
-      kind: row.kind,
-      dryRun: row.dryRun,
       errorDetail: err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500),
     };
   }

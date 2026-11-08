@@ -139,6 +139,14 @@ describe('remarks', () => {
     expect(extractRemarks('Accenture presented their pricing.', 'accenture', firms)).toEqual([]);
     expect(extractRemarks('KPMG was faster than Deloitte.', 'kpmg', firms)).toEqual([]);
   });
+
+  // A comparison between two other firms is no evidence about us.
+  it('does not credit us when another firm is the subject of the comparison', () => {
+    expect(extractRemarks('KPMG is faster than Deloitte.', 'deloitte', firms)).toEqual([]);
+    expect(extractRemarks('Our team is faster than Deloitte.', 'deloitte', firms)).toEqual([
+      expect.objectContaining({ dimension: 'speed', favours: 'us' }),
+    ]);
+  });
 });
 
 describe('evidence drafts', () => {

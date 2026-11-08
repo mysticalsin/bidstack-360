@@ -2,7 +2,8 @@
  * Capture filing: decide which contact, account and opportunity an email or
  * meeting belongs to, from its participants.
  *
- * 1. Drop the mailbox owner and colleagues on the owner's domain.
+ * 1. Drop the mailbox owner and colleagues on the owner's domain (unless that
+ *    domain is a free mail provider).
  * 2. A participant that is a known contact wins; its account comes with it.
  * 3. Otherwise the first participant domain that matches an account's
  *    domain (free mail domains never match).
@@ -74,7 +75,8 @@ export function externalParticipants(ownerEmail: string | null, participants: re
   for (const raw of participants) {
     const email = raw.trim().toLowerCase();
     if (!EMAIL.test(email) || email === owner) continue;
-    if (ownerDomain && domainOf(email) === ownerDomain) continue;
+    // Sharing gmail.com with the owner does not make someone a colleague.
+    if (ownerDomain && !FREE_MAIL.has(ownerDomain) && domainOf(email) === ownerDomain) continue;
     if (!out.includes(email)) out.push(email);
     if (out.length >= MAX_PARTICIPANTS) break;
   }

@@ -24,6 +24,8 @@ type Recipients = EmailMessageDto['toEmails'];
 type EmailMessage = NonNullable<Awaited<ReturnType<typeof prisma.emailMessage.findFirst>>>;
 type EmailDraft = NonNullable<Awaited<ReturnType<typeof prisma.emailDraft.findFirst>>>;
 
+const THREAD_CAP = 200;
+
 function messageTime(m: EmailMessage): number {
   return (m.receivedAt ?? m.sentAt ?? m.createdAt).getTime();
 }
@@ -174,13 +176,17 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
     },
     handler: async (req, reply) => {
       const { orgId, userId } = req.auth;
-      const messages = await prisma.emailMessage.findMany({
-        where: { orgId, threadId: req.params.threadId, deletedAt: null, ...visibleTo(userId) },
-        orderBy: [{ receivedAt: 'asc' }, { sentAt: 'asc' }, { createdAt: 'asc' }],
-        take: 200,
-      });
-      if (messages.length === 0) throw server.httpErrors.notFound('Thread not found');
-      const sorted = [...messages].sort((x, y) => messageTime(x) - messageTime(y));
+      // A message's time is receivedAt, else sentAt, else createdAt. Prisma
+      // cannot order by that coalesce, so take the oldest 200 of each group
+      // and cap after merging.
+      const where = { orgId, threadId: req.params.threadId, deletedAt: null, ...visibleTo(userId) };
+      const groups = await Promise.all([
+        prisma.emailMessage.findMany({ where: { ...where, receivedAt: { not: null } }, orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }], take: THREAD_CAP }),
+        prisma.emailMessage.findMany({ where: { ...where, receivedAt: null, sentAt: { not: null } }, orderBy: [{ sentAt: 'asc' }, { id: 'asc' }], take: THREAD_CAP }),
+        prisma.emailMessage.findMany({ where: { ...where, receivedAt: null, sentAt: null }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: THREAD_CAP }),
+      ]);
+      const sorted = groups.flat().sort((x, y) => messageTime(x) - messageTime(y)).slice(0, THREAD_CAP);
+      if (sorted.length === 0) throw server.httpErrors.notFound('Thread not found');
       return reply.send({
         threadId: req.params.threadId,
         subject: sorted[0]?.subject ?? '',

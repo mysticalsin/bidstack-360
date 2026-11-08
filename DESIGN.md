@@ -675,7 +675,7 @@ Delete all demonstration data? This action cannot be undone.
 - Keyboard: all controls reachable in order; Escape closes drawers and popovers; focus returns to the
   trigger; visible focus ring from `--border-focus`. MatchField rule rows are reorderable by keyboard.
 - Live regions: delivery replay and policy publish results announce via `aria-live="polite"`.
-- Reduced motion honoured everywhere (9.2). Hit targets at least 24 x 24 px.
+- Reduced motion honoured everywhere (9.2). Touch targets at least 44 x 44 px, even when the visible control is smaller.
 - Lighthouse a11y stays at 100 on `/login` and `/dashboard` (baseline in `docs/factory/RECON.md`).
 
 ### 9.7 Account direction (slice 12)
@@ -768,6 +768,16 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
 
+### 9.11 Account team, follow and alerts (slice 21)
+
+Internal staffing on an account plus alerts when someone else acts on it. Recipients are Polo users only; nothing here messages customers.
+
+- Account team card, on the company page after the activity charts. Header: "Account team" and, for `companies:write`, an "Add member" button (lucide `UserPlus`). The key account owner shows first as "Account lead" with the "Owner of record" tag and no edit controls (edited on the account record, not here). One row per member: avatar initials, name, role label, allocation as a number plus a 64px bar (`--brand-primary` fill, `--surface-sunken` track; red `--danger` fill when the person's total across accounts is over 100%), and dates ("from Nov 1, 2026", "until ..."). Row actions (Edit, Remove, lucide `Pencil` and `Trash2`, 36px hit area) only for `companies:write`. Empty: one line, "No one on the team yet".
+- Add or edit dialog (existing `Dialog`): person (select of workspace users, add only), role, allocation % (0 to 100), start and end dates. Under allocation, the person's total across accounts with this change applied; over 100% shows a warning line ("Ana would be at 120% across accounts") in `--warning`. Over 100% warns, never blocks. End before start blocks with an inline error.
+- Follow button in the company header, before the view toggle. States: "Follow" (lucide `Bell`), "Following" (lucide `BellRing`, accent), "Muted" (lucide `BellOff`). Automatic followers (team, owner, opp owner) see "Following" with a menu offering "Mute"; a muted user sees "Unmute"; an explicit follower sees "Unfollow" and "Mute". `aria-pressed` reflects following; the reason ("You are on the team") is in the button `title`.
+- Toast for a new alert: the existing `Toast` stack, tone info, title from the alert, description is actor and item, one "Open" action that navigates in-app. Motion follows the toast system, which already respects `prefers-reduced-motion`. A coalesced alert refreshes the same toast instead of stacking.
+- Settings, Notifications: below the existing toggles, a "Delivery" grid. Rows: Account activity, Deals, Tasks, Mentions. Columns: In-app, Email, Teams (checkboxes with visible labels for screen readers). A "Daily digest email" toggle under the grid. Teams block: webhook URL field (password-style, never echoed back; shows the saved host), Save, Send test, Remove. Copy explains to paste the URL from a Teams Workflows "post to a chat or channel when a webhook request is received" flow.
+- Tokens: `.sg` variables, both themes, 12px card radius, tabular numbers for percentages, lucide icons only. Nothing overlaps at 1440, 1024 or 390.
 ### 9.11 Conversations on the account page (slice 20)
 
 Synced Outlook, Teams and Gmail meetings and emails filed to the account, shown under the activity charts on the account page. Read-only: Polo never sends mail or writes calendars.

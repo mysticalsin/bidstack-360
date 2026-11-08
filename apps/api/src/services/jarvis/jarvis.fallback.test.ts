@@ -99,10 +99,19 @@ describe('nextFallbackTurn', () => {
   });
 
   it('turns a task ask on an opportunity into a tasks.create call for next Friday', () => {
+    const message = 'Create a follow-up task for Friday';
+    const first = nextFallbackTurn({ message, context: { opportunityId: OPP }, results: [], now: NOW });
+    expect(first).toEqual({ type: 'tool', tool: 'records.resolve', args: { text: message } });
     const turn = nextFallbackTurn({
-      message: 'Create a follow-up task for Friday',
+      message,
       context: { opportunityId: OPP },
-      results: [],
+      results: [
+        {
+          tool: 'records.resolve',
+          ok: true,
+          output: { accounts: [], opportunities: [], proposals: [] },
+        },
+      ],
       now: NOW,
     });
     expect(turn).toMatchObject({
@@ -111,6 +120,33 @@ describe('nextFallbackTurn', () => {
       args: { oppId: OPP, dueDate: '2026-11-13' },
     });
     if (turn.type === 'tool') expect(String(turn.args.title)).toMatch(/follow-up/i);
+  });
+
+  it('attaches a task to the opportunity the message names, not the one on screen', () => {
+    const named = '33333333-3333-4333-8333-333333333333';
+    const turn = nextFallbackTurn({
+      message: 'Create a task for OP-2222 to send the deck',
+      context: { opportunityId: OPP },
+      results: [
+        {
+          tool: 'records.resolve',
+          ok: true,
+          output: { accounts: [], opportunities: [{ id: named }], proposals: [] },
+        },
+      ],
+      now: NOW,
+    });
+    expect(turn).toMatchObject({ type: 'tool', tool: 'tasks.create', args: { oppId: named } });
+  });
+
+  it('uses the opportunity on screen for "this opportunity" without resolving', () => {
+    const turn = nextFallbackTurn({
+      message: 'Add a task on this opportunity for tomorrow',
+      context: { opportunityId: OPP },
+      results: [],
+      now: NOW,
+    });
+    expect(turn).toMatchObject({ type: 'tool', tool: 'tasks.create', args: { oppId: OPP } });
   });
 
   it('says what is missing when a task ask has no opportunity to attach to', () => {

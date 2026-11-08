@@ -177,7 +177,10 @@ export interface PsRawPage {
   /** Lowercase hex SHA-256 of the exact body bytes (spec 3.4). */
   rawPayloadHash: string;
   bytes: number;
+  /** UTF-8 text of the body. Empty for binary units, which carry `bodyBytes`. */
   body: string;
+  /** Exact body bytes, set for binary units (bulk ZIP archives). */
+  bodyBytes?: Uint8Array;
 }
 
 /** Options every normalizer needs. */

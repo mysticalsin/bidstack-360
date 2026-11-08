@@ -663,7 +663,7 @@ async function verifyApiKey(req: FastifyRequest): Promise<AuthContext | null> {
   if (!apiKey.lastUsedAt || apiKey.lastUsedAt < fresh) {
     void prisma.apiKey
       .updateMany({
-        where: { id: apiKey.id, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: fresh } }] },
+        where: { id: apiKey.id, orgId: apiKey.orgId, OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: fresh } }] },
         data: { lastUsedAt: now },
       })
       .catch(() => {

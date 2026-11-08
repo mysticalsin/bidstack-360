@@ -28,6 +28,25 @@ export function intelJobId(orgId: string, companyId: string, at: Date = new Date
   return `${orgId}--intel--${companyId}--${Math.floor(at.getTime() / 60_000)}`;
 }
 
+/** The daily filings scan runs when a contact User-Agent is set, unless FINANCIALS_SCAN_ENABLED=false. */
+export function financialsScanEnabled(env: Record<string, string | undefined>): boolean {
+  return env.FINANCIALS_SCAN_ENABLED !== 'false' && intelUserAgent(env) !== null;
+}
+
+/**
+ * Match the Redis-backed repeatable job to the flag: a schedule registered by
+ * an earlier start survives restarts, so turning the scan off must remove it.
+ */
+export async function syncFinancialsScanSchedule(queue: Pick<Queue, 'add' | 'getRepeatableJobs' | 'removeRepeatableByKey'>, enabled: boolean): Promise<void> {
+  if (enabled) {
+    await queue.add('account-intel.financials-scan', { kind: 'financials-scan' }, { repeat: { every: DAY_MS }, jobId: 'account-intel-financials-scan' });
+    return;
+  }
+  for (const r of await queue.getRepeatableJobs()) {
+    if (r.name === 'account-intel.financials-scan') await queue.removeRepeatableByKey(r.key);
+  }
+}
+
 async function sweep(queue: Queue, env: NodeJS.ProcessEnv, log: pino.Logger): Promise<{ enqueued: number }> {
   const limit = env.ACCOUNT_INTEL_AUTO_REFRESH === 'true' ? Number(env.ACCOUNT_INTEL_SWEEP_LIMIT ?? 25) || 25 : 0;
   const now = new Date();
@@ -73,6 +92,10 @@ export async function startAccountIntel(connection: IORedis, log: pino.Logger, w
       const data = job.data;
       if (data.kind === 'sweep') return sweep(queue, env, log);
       if (data.kind === 'financials-scan') {
+        if (!financialsScanEnabled(env)) {
+          log.info({ jobId: job.id }, 'scheduled financials scan skipped: disabled');
+          return { due: 0, pulled: 0, skipped: 'disabled' };
+        }
         const s = await runFinancialsScan({ env, log });
         log.info({ jobId: job.id, scheduled: s.scheduled, paused: s.paused, due: s.due, pulled: s.pulled.length }, 'scheduled financials scan finished');
         return { due: s.due, pulled: s.pulled.length };
@@ -106,9 +129,7 @@ export async function startAccountIntel(connection: IORedis, log: pino.Logger, w
   workers.push(worker);
 
   await queue.add('account-intel.sweep', { kind: 'sweep' }, { repeat: { every: DAY_MS }, jobId: 'account-intel-sweep' });
-  const financialsScan = env.FINANCIALS_SCAN_ENABLED !== 'false' && intelUserAgent(env) !== null;
-  if (financialsScan) {
-    await queue.add('account-intel.financials-scan', { kind: 'financials-scan' }, { repeat: { every: DAY_MS }, jobId: 'account-intel-financials-scan' });
-  }
+  const financialsScan = financialsScanEnabled(env);
+  await syncFinancialsScanSchedule(queue, financialsScan);
   log.info({ queue: ACCOUNT_INTEL.name, autoRefresh: env.ACCOUNT_INTEL_AUTO_REFRESH === 'true', financialsScan }, 'account intel worker started');
 }

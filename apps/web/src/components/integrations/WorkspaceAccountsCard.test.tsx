@@ -128,6 +128,32 @@ describe('WorkspaceAccountsCard', () => {
     expect(within(card).getByText('Access was revoked. Reconnect to resume sync.')).toBeTruthy();
   });
 
+  it('surfaces a failed disconnect instead of silently re-enabling the button', async () => {
+    mocks.api.mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (path === '/api/integrations/workspace') return { providers: [connectedGoogle, unconfiguredMicrosoft] };
+      if (init?.method === 'DELETE') throw new Error('boom');
+      return null;
+    });
+    renderCard();
+    const card = await screen.findByTestId('integration-card-gmail');
+    fireEvent.click(within(card).getByRole('button', { name: /disconnect/i }));
+    expect((await within(card).findByRole('alert')).textContent).toBe(
+      'Could not disconnect. Access is still active. Try again.',
+    );
+  });
+
+  it('surfaces a failed reconnect', async () => {
+    mocks.api.mockImplementation(async (path: string) => {
+      if (path === '/api/integrations/workspace') return { providers: [connectedGoogle, unconfiguredMicrosoft] };
+      throw new Error('boom');
+    });
+    renderCard();
+    const card = await screen.findByTestId('integration-card-gmail');
+    fireEvent.click(within(card).getByRole('button', { name: /reconnect/i }));
+    expect((await within(card).findByRole('alert')).textContent).toBe('Could not start the connection. Try again.');
+    expect(mocks.assign).not.toHaveBeenCalled();
+  });
+
   it('shows a retry when the status cannot load', async () => {
     mocks.api.mockRejectedValue(new Error('boom'));
     renderCard();

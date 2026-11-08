@@ -37,6 +37,7 @@ import {
 import { handleMicrosoftPush, pullMicrosoftIncremental } from './calendar-sync-microsoft.js';
 import { pullGmail } from './email-sync.gmail.js';
 import { ProviderRateLimitError } from '../lib/provider-http.js';
+import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
 import { GrantRevokedError, getWorkspaceAccessToken } from '../lib/workspace-token.js';
 
 /** Token rows that can carry a calendar grant. Google grants live on the gmail row. */
@@ -439,7 +440,7 @@ export async function sweepStrandedPushes(queue: Queue, log: pino.Logger): Promi
  * One tick for one grant: calendar when the grant can read it, and for Google
  * grants the Gmail inbox too (Outlook mail has its own delta queue).
  */
-async function runIncrementalPull(
+export async function runIncrementalPull(
   tokenId: string,
   orgId: string,
   userId: string,
@@ -453,7 +454,15 @@ async function runIncrementalPull(
 
   const isGoogle = token.provider === 'google_workspace' || token.provider === 'gmail';
   const wantsCalendar = grantsCalendarRead(token.scope);
-  const wantsGmail = isGoogle && grantsMailRead(token.scope);
+  let wantsGmail = isGoogle && grantsMailRead(token.scope);
+  if (wantsGmail) {
+    // Same SERUM gate as the API mail pull, checked before any token refresh.
+    const denial = await serumConnectorDenialMessage({ orgId, connectorId: 'gmail', operation: 'email.pull', writeRequested: false });
+    if (denial) {
+      log.warn({ tokenId, denial }, 'Gmail capture skipped by connector policy');
+      wantsGmail = false;
+    }
+  }
   if (!wantsCalendar && !wantsGmail) return;
 
   const accessToken = await getWorkspaceAccessToken(token, log);
