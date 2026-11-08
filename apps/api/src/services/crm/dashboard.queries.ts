@@ -443,7 +443,7 @@ export async function buildCompanyCockpit(
       // resolved above. Mirrors the shipped pattern in dashboard.service.ts.
       prismaClient.companyFieldOverride.findMany({
         where: { orgId, companyKey: normalizeName(company.name) },
-        select: { fieldKey: true, value: true },
+        select: { fieldKey: true, value: true, currency: true },
         take: 10,
       }),
     ]);

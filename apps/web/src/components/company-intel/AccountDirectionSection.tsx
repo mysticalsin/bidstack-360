@@ -16,6 +16,7 @@ import {
   useCompanyNewsIntel,
   useRefreshIntelSource,
 } from '@/hooks/useCompanyIntel';
+import { useSourcedFigures } from '@/hooks/useSourcedFigures';
 
 import { fmtDate } from './intel-format';
 import { DirectionPanel, FinancialsPanel, HiringPanel, NewsPanel } from './IntelPanels';
@@ -91,6 +92,7 @@ export function AccountDirectionSection({ companyId, initialTab = 'direction' }:
   const hiring = useCompanyHiringIntel(companyId);
   const financials = useCompanyFinancialsIntel(companyId);
   const news = useCompanyNewsIntel(companyId);
+  const sourced = useSourcedFigures(companyId);
 
   const onKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
@@ -142,7 +144,7 @@ export function AccountDirectionSection({ companyId, initialTab = 'direction' }:
         ) : tab === 'hiring' && hiring.data ? (
           <HiringPanel h={hiring.data} />
         ) : tab === 'financials' && financials.data ? (
-          <FinancialsPanel f={financials.data} />
+          <FinancialsPanel f={financials.data} company={sourced.companyName ? { id: companyId, name: sourced.companyName } : undefined} />
         ) : tab === 'news' && news.data ? (
           <NewsPanel n={news.data} />
         ) : null}

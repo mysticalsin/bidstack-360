@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import {
   AccountCockpitSnapshot,
+  COMPANY_FIELD_OVERRIDE_KEYS,
+  MANUAL_REVENUE_CURRENCIES,
+  isHttpUrl,
   CompanyAutopopulateResponse,
   CrmCompany,
   TechnicalStackCategory,
@@ -45,6 +48,8 @@ import {
   parseTechnicalStackOverride,
   technicalStackOverrideValue,
 } from '../../services/crm/technical-stack.service.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CompanySearchQuery = z.object({
   q: z.string().trim().optional(),
@@ -561,22 +566,63 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   // Manual correction of an Apollo-sourced cockpit field. The enrichment
   // snapshot is never mutated — the override layers on top and the field moves
   // to the Internal Data block flagged "manually overridden".
+  // Provenance: where the user read the value. Optional so older clients keep
+  // working; a save without a source clears any earlier one.
+  const Provenance = {
+    sourceUrl: z
+      .string()
+      .trim()
+      .max(2048)
+      .refine(isHttpUrl, { message: 'Source URL must be an http or https link' })
+      .nullish(),
+    sourceLabel: z.string().trim().min(1).max(120).nullish(),
+  };
   const FieldOverrideBody = z.discriminatedUnion('fieldKey', [
-    z.object({ fieldKey: z.literal('industry'), value: z.string().trim().min(1).max(120) }),
-    z.object({ fieldKey: z.literal('employeeCount'), value: z.number().int().positive().max(10_000_000) }),
+    z.object({ fieldKey: z.literal('industry'), value: z.string().trim().min(1).max(120), ...Provenance }),
+    z.object({ fieldKey: z.literal('employeeCount'), value: z.number().int().positive().max(10_000_000), ...Provenance }),
     z.object({
       fieldKey: z.literal('annualRevenueMicros'),
       // Micros (int × 1e6); bounded to the same €9e15 float8-exact ceiling
       // the analytics engine documents.
       value: z.number().int().positive().max(9e15),
+      // Currency the figure was read in; omitted means EUR, as before.
+      currency: z.enum(MANUAL_REVENUE_CURRENCIES).nullish(),
+      ...Provenance,
+    }),
+    z.object({ fieldKey: z.literal('registryId'), value: z.string().trim().min(1).max(64), ...Provenance }),
+    z.object({
+      fieldKey: z.literal('registryJurisdiction'),
+      // ISO 3166-1 alpha-2, optionally with a subdivision (US-DE, GB-SCT).
+      value: z
+        .string()
+        .trim()
+        .toUpperCase()
+        .regex(/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/, 'Use a country code such as GB, FR or US-DE'),
+      ...Provenance,
     }),
   ]);
   const FieldOverrideResponse = z.object({
     companyKey: z.string(),
     fieldKey: z.string(),
     value: z.unknown(),
+    sourceUrl: z.string().nullable(),
+    sourceLabel: z.string().nullable(),
+    currency: z.string().nullable(),
     updatedAt: z.string().datetime(),
   });
+
+  // The account page addresses a company by id, the cockpit reads overrides by
+  // normalised name: resolve an id to its name so both meet on one key.
+  async function overrideCompanyKey(orgId: string, rawKey: string): Promise<string> {
+    if (UUID_RE.test(rawKey)) {
+      const row = await prisma.company.findFirst({
+        where: { id: rawKey, orgId, deletedAt: null },
+        select: { name: true },
+      });
+      if (row) return normalizeName(row.name);
+    }
+    return normalizeName(rawKey);
+  }
 
   server.put(
     '/crm/companies/:companyKey/field-overrides',
@@ -589,7 +635,6 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const companyKey = normalizeName(req.params.companyKey);
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const access = await canReadAccount({
         orgId: req.auth.orgId,
@@ -599,6 +644,10 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         prismaClient: prisma,
       });
       if (!access.allowed) throw server.httpErrors.notFound('Company not found');
+      const companyKey = await overrideCompanyKey(req.auth.orgId, req.params.companyKey);
+      const sourceUrl = req.body.sourceUrl || null;
+      const sourceLabel = req.body.sourceLabel || null;
+      const currency = req.body.fieldKey === 'annualRevenueMicros' ? (req.body.currency ?? 'EUR') : null;
       // Override + its audit row must land together or not at all.
       const saved = await prisma.$transaction(async (tx) => {
         const row = await tx.companyFieldOverride.upsert({
@@ -614,9 +663,12 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
             companyKey,
             fieldKey: req.body.fieldKey,
             value: req.body.value,
+            sourceUrl,
+            sourceLabel,
+            currency,
             overriddenById: req.auth.userId,
           },
-          update: { value: req.body.value, overriddenById: req.auth.userId },
+          update: { value: req.body.value, sourceUrl, sourceLabel, currency, overriddenById: req.auth.userId },
         });
         await tx.auditLog.create({
           data: {
@@ -625,7 +677,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'company.field_override',
             targetType: 'company',
             targetId: companyKey,
-            diff: { fieldKey: req.body.fieldKey, value: req.body.value },
+            diff: { fieldKey: req.body.fieldKey, value: req.body.value, sourceUrl, sourceLabel, currency },
           },
         });
         return row;
@@ -635,6 +687,9 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         companyKey,
         fieldKey: saved.fieldKey,
         value: saved.value,
+        sourceUrl: saved.sourceUrl,
+        sourceLabel: saved.sourceLabel,
+        currency: saved.currency,
         updatedAt: saved.updatedAt.toISOString(),
       };
     },
@@ -647,13 +702,12 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         params: z.object({
           companyKey: z.string().min(1).max(255),
-          fieldKey: z.enum(['industry', 'employeeCount', 'annualRevenueMicros']),
+          fieldKey: z.enum(COMPANY_FIELD_OVERRIDE_KEYS),
         }),
         response: { 204: z.null() },
       },
     },
     async (req, reply) => {
-      const companyKey = normalizeName(req.params.companyKey);
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const access = await canReadAccount({
         orgId: req.auth.orgId,
@@ -663,6 +717,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         prismaClient: prisma,
       });
       if (!access.allowed) throw server.httpErrors.notFound('Company not found');
+      const companyKey = await overrideCompanyKey(req.auth.orgId, req.params.companyKey);
       await prisma.companyFieldOverride.deleteMany({
         where: { orgId: req.auth.orgId, companyKey, fieldKey: req.params.fieldKey },
       });

@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
+import { __setAccountIntelEnqueueForTest, type AccountIntelRefreshJob } from '../queues/account-intel.js';
 import { buildServer } from '../server.js';
 import {
   createIsolatedOrg,
@@ -56,6 +57,20 @@ afterAll(async () => {
 });
 
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
+
+const bareCompany = (name: string) => ({
+  name,
+  legalName: null,
+  domain: null,
+  industry: null,
+  employeeCount: null,
+  countryCode: null,
+  address: null,
+  billingEmail: null,
+  taxId: null,
+  logoUrl: null,
+  website: null,
+});
 
 describe('companies routes', () => {
   skipIfNoDb(
@@ -151,6 +166,55 @@ describe('companies routes', () => {
       expect(genericRows).toHaveLength(0);
     },
   );
+
+  skipIfNoDb(
+    'queues one registry and filings refresh for a new company and marks both sources queued',
+    async () => {
+      // WHY: a new account otherwise shows "No data" until someone clicks
+      // refresh, and a Standard account never gets filings automatically.
+      const jobs: AccountIntelRefreshJob[] = [];
+      __setAccountIntelEnqueueForTest(async (job) => {
+        jobs.push(job);
+        return 'job-1';
+      });
+      try {
+        const suffix = randomUUID().slice(0, 8);
+        const res = await server.inject({
+          method: 'POST',
+          url: '/api/v1/companies',
+          payload: { ...bareCompany(`Intel Company ${suffix}`), tier: 'standard' },
+        });
+        expect(res.statusCode).toBe(201);
+        const companyId = res.json<{ id: string }>().id;
+        createdCompanyIds.push(companyId);
+
+        expect(jobs).toHaveLength(1);
+        expect(jobs[0]).toMatchObject({ kind: 'refresh', orgId: orgId!, companyId, sources: ['registry', 'financials'] });
+        const runs = await prisma.intelSourceRun.findMany({ where: { orgId: orgId!, companyId }, select: { source: true, status: true } });
+        expect(runs.map((r) => `${r.source}:${r.status}`).sort()).toEqual(['financials:queued', 'registry:queued']);
+      } finally {
+        __setAccountIntelEnqueueForTest(null);
+      }
+    },
+  );
+
+  skipIfNoDb('company create still succeeds when the intel queue is unavailable', async () => {
+    __setAccountIntelEnqueueForTest(async () => null);
+    try {
+      const suffix = randomUUID().slice(0, 8);
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/companies',
+        payload: bareCompany(`No Queue Company ${suffix}`),
+      });
+      expect(res.statusCode).toBe(201);
+      const companyId = res.json<{ id: string }>().id;
+      createdCompanyIds.push(companyId);
+      expect(await prisma.intelSourceRun.count({ where: { orgId: orgId!, companyId } })).toBe(0);
+    } finally {
+      __setAccountIntelEnqueueForTest(null);
+    }
+  });
 
   skipIfNoDb(
     'hierarchy endpoint terminates on a pre-existing parentId cycle instead of hanging',

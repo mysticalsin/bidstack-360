@@ -48,6 +48,32 @@ export function accountIntelJobId(job: AccountIntelRefreshJob, now = Date.now())
   return `${job.orgId}--intel--${job.companyId}--${[...job.sources].sort().join('-')}--${now}`;
 }
 
+/** Sources pulled once for a new account: registry first, so filings can use the LEI it finds. */
+export const FIRST_RUN_SOURCES: AccountIntelRefreshJob['sources'] = ['registry', 'financials'];
+
+type IntelRunDb = { intelSourceRun: { createMany(args: { data: Array<{ orgId: string; companyId: string; source: string; status: string }>; skipDuplicates?: boolean }): Promise<unknown> } };
+
+/**
+ * First registry and filings pull for a newly created account. The worker's
+ * scoped filings run ignores the Standard tier pause, so this one run happens
+ * for every account. Never throws: account creation must not depend on Redis.
+ */
+export async function queueFirstAccountIntel(db: IntelRunDb, input: { orgId: string; companyId: string; requestedBy: string | null }): Promise<string | null> {
+  try {
+    const jobId = await enqueueAccountIntel({ kind: 'refresh', ...input, sources: [...FIRST_RUN_SOURCES] });
+    if (jobId) {
+      await db.intelSourceRun.createMany({
+        data: FIRST_RUN_SOURCES.map((source) => ({ orgId: input.orgId, companyId: input.companyId, source, status: 'queued' })),
+        skipDuplicates: true,
+      });
+    }
+    return jobId;
+  } catch (err) {
+    log.warn({ err, orgId: input.orgId, companyId: input.companyId }, 'First account intel run was not queued');
+    return null;
+  }
+}
+
 /** Fail-open: null when Redis is unreachable; the caller reports queued=false. */
 export async function enqueueAccountIntel(job: AccountIntelRefreshJob): Promise<string | null> {
   if (enqueueOverride) return enqueueOverride(job);
