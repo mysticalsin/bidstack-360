@@ -100,10 +100,10 @@ export function Topbar() {
         {t('topbar.skipToContent', 'Skip to content')}
       </a>
 
-      {/* Hamburger — visible only below md breakpoint where sidebar is hidden */}
+      {/* Hamburger: visible only below 56rem, where the sidebar is hidden */}
       <button
         type="button"
-        className="iconbtn md:!hidden"
+        className="iconbtn tb-nav-toggle"
         aria-label={t('nav.openNavigation', 'Open navigation')}
         aria-controls="mobile-nav-drawer"
         aria-expanded={mobileNavOpen}

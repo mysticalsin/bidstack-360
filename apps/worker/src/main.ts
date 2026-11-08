@@ -38,6 +38,7 @@ import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
 import { startMsaReminders } from './queues/msa-reminders.js';
 import { startAccountEnrichment } from './queues/account-enrichment.js';
 import { startAccountIntel } from './queues/account-intel.js';
+import { startConsultingPartners } from './queues/consulting-partners.js';
 import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
@@ -176,6 +177,8 @@ await Promise.all([
   startAccountEnrichment(connection, log, workers, queues),
   // Account intelligence: job boards, company posts, registries, scheduled filings scan
   startAccountIntel(connection, log, workers, queues),
+  // Consulting partners: which consulting firms work with each account, cited
+  startConsultingPartners(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),
