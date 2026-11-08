@@ -107,8 +107,53 @@ preview_prepare_database() {
 preview_child_pids=()
 preview_group_pids=()
 preview_stop_redis=0
+declare -A preview_leader_start=()
 
-preview_track() { preview_child_pids+=("$1"); }
+preview_read_start() {
+  local line
+  [[ -r "/proc/${1}/stat" ]] || return 1
+  IFS= read -r line < "/proc/${1}/stat" || return 1
+  line="${line#*) }"
+  # starttime is the 20th field after the command name.
+  # One read, not set --: a negative stat field passed to set leaves bash
+  # unable to signal a still-live process group.
+  read -r _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PREVIEW_START_TOKEN _ <<< "${line}"
+  [[ -n "${PREVIEW_START_TOKEN}" ]] || return 1
+  return 0
+}
+
+preview_note_identity() {
+  local pid="$1"
+  PREVIEW_START_TOKEN=""
+  preview_read_start "${pid}" || true
+  preview_leader_start["${pid}"]="${PREVIEW_START_TOKEN}"
+}
+
+# The recorded start token still matches. A reused pid has a different token
+# and is not ours. A gone pid has no stat; that is not a reuse, so the group
+# we created can still be signaled. An empty recorded token is not identity.
+preview_identity_ok() {
+  local pid="$1" token now
+  token="${preview_leader_start[${pid}]:-}"
+  [[ -n "${token}" ]] || return 1
+  PREVIEW_START_TOKEN=""
+  if preview_read_start "${pid}"; then
+    now="${PREVIEW_START_TOKEN}"
+    [[ "${now}" == "${token}" ]] || return 1
+  fi
+  return 0
+}
+
+preview_group_live() {
+  local pid="$1"
+  preview_identity_ok "${pid}" || return 1
+  kill -s 0 -- "-${pid}" 2>/dev/null
+}
+
+preview_track() {
+  preview_child_pids+=("$1")
+  preview_note_identity "$1"
+}
 
 # A leader we started with setsid owns its process group. Cleanup signals that
 # group and no other pid.
@@ -122,7 +167,8 @@ preview_track_leader() {
 preview_signal_group() {
   local pid="$1"
   local sig="$2"
-  kill "-${sig}" -- "-${pid}" 2>/dev/null || true
+  preview_identity_ok "${pid}" || return 0
+  kill -s "${sig}" -- "-${pid}" 2>/dev/null || true
 }
 
 preview_require_file() {
@@ -160,15 +206,25 @@ preview_cleanup() {
     for leader in "${preview_group_pids[@]}"; do
       if [[ "${leader}" == "${pid}" ]]; then grouped=1; fi
     done
-    if [[ "${grouped}" == "0" ]] && kill -0 "${pid}" 2>/dev/null; then
+    if [[ "${grouped}" == "0" ]] && preview_identity_ok "${pid}" && kill -0 "${pid}" 2>/dev/null; then
       kill -TERM "${pid}" 2>/dev/null || true
     fi
   done
   waits=0
   while [[ "${waits}" -lt 20 ]]; do
     alive=0
-    for pid in "${preview_group_pids[@]}" "${preview_child_pids[@]}"; do
-      if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then alive=1; fi
+    for pid in "${preview_group_pids[@]}"; do
+      if preview_group_live "${pid}"; then alive=1; fi
+    done
+    for pid in "${preview_child_pids[@]}"; do
+      [[ -n "${pid}" ]] || continue
+      grouped=0
+      for leader in "${preview_group_pids[@]}"; do
+        if [[ "${leader}" == "${pid}" ]]; then grouped=1; fi
+      done
+      if [[ "${grouped}" == "0" ]] && preview_identity_ok "${pid}" && kill -0 "${pid}" 2>/dev/null; then
+        alive=1
+      fi
     done
     if [[ "${alive}" == "0" ]]; then break; fi
     sleep 0.1
@@ -184,13 +240,11 @@ preview_cleanup() {
     for leader in "${preview_group_pids[@]}"; do
       if [[ "${leader}" == "${pid}" ]]; then grouped=1; fi
     done
-    if [[ "${grouped}" == "0" ]] && kill -0 "${pid}" 2>/dev/null; then
+    if [[ "${grouped}" == "0" ]] && preview_identity_ok "${pid}" && kill -0 "${pid}" 2>/dev/null; then
       kill -KILL "${pid}" 2>/dev/null || true
     fi
-    if ! kill -0 "${pid}" 2>/dev/null; then
-      wait "${pid}" 2>/dev/null || true
-      echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
-    fi
+    wait "${pid}" 2>/dev/null || true
+    echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
   done
   if [[ "${why}" == "INT" ]]; then exit 130; fi
   if [[ "${why}" == "TERM" ]]; then exit 143; fi

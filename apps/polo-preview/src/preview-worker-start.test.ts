@@ -122,7 +122,7 @@ describe('preview process lifecycle', () => {
       nohup sleep 30 >/dev/null 2>&1 &
       unrelated=\$!
       disown || true
-      setsid bash -c 'sleep 30 & echo GRAND:\$!; exit 0' &
+      setsid bash -c 'bash -c "trap \\"\\" TERM; sleep 30" >/dev/null 2>&1 & echo GRAND:\$!; exit 0' &
       child=\$!
       echo UNRELATED:\$unrelated
       preview_track_leader "\$child"
@@ -150,6 +150,36 @@ describe('preview process lifecycle', () => {
     `);
     expect(result.status).toBe(1);
     expect(result.stdout).not.toContain('CONTINUED');
+  });
+
+  it('does not signal a tracked pid after its start token changes', () => {
+    // A reused pid is not the child we recorded. Cleanup must not kill it or its group.
+    const result = run(`
+      sleep 30 & child=\$!
+      preview_track "\$child"
+      preview_leader_start["\$child"]=reused-pid
+      setsid sleep 30 & leader=\$!
+      preview_track_leader "\$leader"
+      preview_leader_start["\$leader"]=reused-group
+      if preview_identity_ok "\$child"; then echo CHILD_OK; else echo CHILD_REFUSED; fi
+      preview_signal_group "\$leader" KILL
+      if /bin/kill -s 0 "\$child" 2>/dev/null; then echo CHILD_ALIVE; fi
+      if /bin/kill -s 0 -- "-\$leader" 2>/dev/null; then echo GROUP_ALIVE; fi
+      echo CHILD:\$child
+      echo LEADER:\$leader
+      /bin/kill -s KILL "\$child" 2>/dev/null || true
+      /bin/kill -s KILL -- "-\$leader" 2>/dev/null || true
+      wait "\$child" 2>/dev/null || true
+      wait "\$leader" 2>/dev/null || true
+    `);
+    expect(result.stdout).toContain('CHILD_REFUSED');
+    expect(result.stdout).toContain('CHILD_ALIVE');
+    expect(result.stdout).toContain('GROUP_ALIVE');
+    expect(result.stdout).not.toContain('CHILD_OK');
+    const child = /CHILD:(\d+)/.exec(result.stdout)?.[1];
+    const leader = /LEADER:(\d+)/.exec(result.stdout)?.[1];
+    expect(Number(child)).toBeGreaterThan(0);
+    expect(Number(leader)).toBeGreaterThan(0);
   });
 
   it('kills a child that ignores TERM and leaves an unrelated process', () => {
