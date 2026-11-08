@@ -217,6 +217,10 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     expect(current.data.deals.some((deal) => deal.id === olderAccountOnly.id)).toBe(false);
     renderSegment();
     expect(screen.getByText(/1 open deals in the latest 100/)).toBeTruthy();
+    current.data.deals = [...sample, olderAccountOnly];
+    current.data.sampleDeals = sample;
+    renderSegment();
+    expect(screen.queryByText(/2 open deals/)).toBeNull();
     expect(screen.queryByText(/9 open deals/)).toBeNull();
   });
 

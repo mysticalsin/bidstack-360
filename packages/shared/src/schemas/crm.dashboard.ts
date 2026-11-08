@@ -243,8 +243,9 @@ export const CrmDashboardSnapshot = z.object({
   cockpit: AccountCockpitSnapshot,
   companies: z.array(CrmCompany),
   /**
-   * Org sample, then any selected-account deals that are not in that sample.
-   * Older clients only read this list. The accounts board totals `sampleDeals`.
+   * The org sample page. This is the same list as `sampleDeals`.
+   * A client that totals `deals` is counting that page, not the selected
+   * account's older rows. Those rows are `accountDeals`.
    */
   deals: z.array(CrmDeal),
   /** The org deal sample alone. Absent on an older payload, which only has `deals`. */
