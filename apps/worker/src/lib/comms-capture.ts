@@ -274,7 +274,7 @@ export const ACTIVITY_BRIDGE_PENDING_CAP = 256;
 /** How many preserved ids one run retries before the cursor may move. */
 export const ACTIVITY_BRIDGE_DRAIN_BATCH = 8;
 
-export type ActivityBridgeQuarantine = { id: string; attempts: number; at: string };
+export type ActivityBridgeQuarantine = { id: string; attempts: number; at: string; kind?: ActivityBridgeKind };
 export type ActivityBridgeDelta = {
   page: string;
   failedIds: string[];
@@ -326,6 +326,21 @@ export class CursorKeyConflictError extends Error {
     this.name = 'CursorKeyConflictError';
     this.keys = keys;
   }
+}
+
+const SLOT = '\u001f';
+
+/** Mail and calendar can share a provider id. Counts use this key so one stream cannot erase the other. */
+export function activityBridgeSlot(id: string, kind?: ActivityBridgeKind): string {
+  return kind ? `${kind}${SLOT}${id}` : id;
+}
+
+function splitActivityBridgeSlot(key: string): { id: string; kind?: ActivityBridgeKind } {
+  const mark = key.indexOf(SLOT);
+  if (mark < 0) return { id: key };
+  const kind = key.slice(0, mark);
+  if (kind === 'email' || kind === 'calendar') return { id: key.slice(mark + SLOT.length), kind };
+  return { id: key };
 }
 
 const RETRY_KEYS = [
@@ -399,8 +414,11 @@ function quarantineIds(
   const prior = Array.isArray(state.activityBridgeQuarantine)
     ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
     : [];
-  const ids = new Set(entries.map((entry) => entry.id));
-  state.activityBridgeQuarantine = [...entries, ...prior.filter((entry) => !ids.has(entry.id))].slice(
+  const ids = new Set(entries.map((entry) => activityBridgeSlot(entry.id, entry.kind)));
+  state.activityBridgeQuarantine = [
+    ...entries,
+    ...prior.filter((entry) => !ids.has(activityBridgeSlot(entry.id, entry.kind))),
+  ].slice(
     0,
     ACTIVITY_BRIDGE_QUARANTINE_CAP,
   );
@@ -443,18 +461,13 @@ export function noteActivityBridgeFailures(
     const pending = readPending(state);
     let backpressure = false;
     if (parkUnseen) {
-      for (const [id, attempts] of Object.entries(counts)) {
-        if (!rememberPending(pending, id, attempts, stampStream(state, id))) {
-          backpressure = true;
-          continue;
-        }
-        delete counts[id];
-      }
+      backpressure = parkUnseenCounts(state, counts, pending, new Set(), kind) || backpressure;
       writeRetryIds(state, counts);
       writePending(state, pending);
     }
+    pruneBridgeStream(state, counts, pending);
     return {
-      hold: backpressure || pending.length > 0 || underLimit(counts),
+      hold: bridgeCursorHeld(pending, counts, backpressure, kind),
       quarantined: [],
       pending: pending.length,
       backpressure,
@@ -465,26 +478,20 @@ export function noteActivityBridgeFailures(
   const observed = new Set<string>([...(seenIds ?? []), ...failed, ...settled]);
   let backpressure = false;
   if (parkUnseen) {
-    for (const [id, attempts] of Object.entries(counts)) {
-      if (observed.has(id)) continue;
-      if (!rememberPending(pending, id, attempts, stampStream(state, id))) {
-        backpressure = true;
-        continue;
-      }
-      delete counts[id];
-    }
+    backpressure = parkUnseenCounts(state, counts, pending, observed, kind) || backpressure;
   }
   for (const id of settled) {
-    delete counts[id];
-    removePending(pending, id);
-    forgetStream(state, id);
+    delete counts[activityBridgeSlot(id, kind)];
+    removePending(pending, id, kind);
+    forgetStream(state, id, kind);
   }
   backpressure ||= pending.length > ACTIVITY_BRIDGE_PENDING_CAP;
   if (failed.length === 0) {
     writeRetryIds(state, counts);
     writePending(state, pending);
+    pruneBridgeStream(state, counts, pending);
     return {
-      hold: backpressure || pending.length > 0 || underLimit(counts),
+      hold: bridgeCursorHeld(pending, counts, backpressure, kind),
       quarantined: [],
       pending: pending.length,
       backpressure,
@@ -492,6 +499,7 @@ export function noteActivityBridgeFailures(
   }
   const already = new Set(
     (Array.isArray(state.activityBridgeQuarantine) ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[]) : [])
+      .filter((entry) => (kind ? entry.kind === kind : !entry.kind))
       .map((entry) => entry.id),
   );
   const quarantined: string[] = [];
@@ -502,29 +510,37 @@ export function noteActivityBridgeFailures(
     ...failed.filter((id) => !already.has(id) && !known.has(id)),
   ];
   for (const id of ordered) {
+    const slot = activityBridgeSlot(id, kind);
     const prior = already.has(id)
       ? ACTIVITY_BRIDGE_RETRY_LIMIT
-      : Math.max(counts[id] ?? 0, pendingAttempt(pending, id));
+      : Math.max(counts[slot] ?? 0, pendingAttempt(pending, id, kind));
     const attempts = Math.min(prior + 1, ACTIVITY_BRIDGE_RETRY_LIMIT);
-    const tagged = stampStream(state, id, kind);
+    const tagged = kind ?? readStream(state)[slot];
     if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) {
-      delete counts[id];
-      removePending(pending, id);
-      forgetStream(state, id);
+      delete counts[slot];
+      removePending(pending, id, kind);
+      forgetStream(state, id, kind);
       quarantined.push(id);
       continue;
     }
-    if (Object.keys(counts).length < ACTIVITY_BRIDGE_ACTIVE_CAP || counts[id] !== undefined) {
-      removePending(pending, id);
-      counts[id] = attempts;
+    const activeCount = Object.keys(counts).filter((key) => {
+      if (!kind) return true;
+      return splitActivityBridgeSlot(key).kind === kind;
+    }).length;
+    if (activeCount < ACTIVITY_BRIDGE_ACTIVE_CAP || counts[slot] !== undefined) {
+      removePending(pending, id, kind);
+      counts[slot] = attempts;
+      if (tagged) rememberStream(state, id, tagged);
       continue;
     }
     if (rememberPending(pending, id, attempts, tagged)) {
-      delete counts[id];
+      delete counts[slot];
+      if (tagged) rememberStream(state, id, tagged);
       continue;
     }
     // Both bounds are full. Do not grow the active map past its cap and do
     // not evict someone else. The cursor stays, so this page is read again.
+    // The stream map is not written: a refused id must not leave metadata behind.
     refused = true;
   }
   backpressure = backpressure || refused;
@@ -532,10 +548,11 @@ export function noteActivityBridgeFailures(
   writePending(state, pending);
   quarantineIds(
     state,
-    quarantined.map((id) => ({ id, attempts: ACTIVITY_BRIDGE_RETRY_LIMIT, at: now })),
+    quarantined.map((id) => ({ id, attempts: ACTIVITY_BRIDGE_RETRY_LIMIT, at: now, ...(kind ? { kind } : {}) })),
   );
+  pruneBridgeStream(state, counts, pending);
   return {
-    hold: backpressure || refused || pending.length > 0 || underLimit(counts),
+    hold: bridgeCursorHeld(pending, counts, backpressure || refused, kind),
     quarantined,
     pending: Math.min(pending.length, ACTIVITY_BRIDGE_PENDING_CAP),
     backpressure,
@@ -546,13 +563,80 @@ function underLimit(counts: Record<string, number>): boolean {
   return Object.values(counts).some((attempts) => attempts < ACTIVITY_BRIDGE_RETRY_LIMIT);
 }
 
-function pendingAttempt(rows: ActivityBridgePending[], id: string): number {
-  return rows.find((row) => row.id === id)?.attempts ?? 0;
+function sameBridgeIdentity(row: ActivityBridgePending, id: string, kind?: ActivityBridgeKind): boolean {
+  return row.id === id && (kind ? row.kind === kind : !row.kind);
 }
 
-function removePending(rows: ActivityBridgePending[], id: string): void {
-  const index = rows.findIndex((row) => row.id === id);
-  if (index >= 0) rows.splice(index, 1);
+function pendingAttempt(rows: ActivityBridgePending[], id: string, kind?: ActivityBridgeKind): number {
+  return rows.find((row) => sameBridgeIdentity(row, id, kind))?.attempts ?? 0;
+}
+
+function removePending(rows: ActivityBridgePending[], id: string, kind?: ActivityBridgeKind): void {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    if (sameBridgeIdentity(rows[index]!, id, kind)) rows.splice(index, 1);
+  }
+}
+
+function bridgeCursorHeld(
+  pending: ActivityBridgePending[],
+  counts: Record<string, number>,
+  backpressure: boolean,
+  kind?: ActivityBridgeKind,
+): boolean {
+  if (!kind) return backpressure || pending.length > 0 || underLimit(counts);
+  const minePending = pending.some((row) => row.kind === kind || !row.kind);
+  const mineCounts = Object.fromEntries(
+    Object.entries(counts).filter(([key]) => {
+      const parsed = splitActivityBridgeSlot(key);
+      return parsed.kind === kind || !parsed.kind;
+    }),
+  );
+  return backpressure || minePending || underLimit(mineCounts);
+}
+
+/** Move unseen counts into the pending queue. Another stream's slot is left untouched. */
+function parkUnseenCounts(
+  state: Record<string, unknown>,
+  counts: Record<string, number>,
+  pending: ActivityBridgePending[],
+  observed: Set<string>,
+  kind?: ActivityBridgeKind,
+): boolean {
+  let backpressure = false;
+  for (const [key, attempts] of Object.entries(counts)) {
+    const parsed = splitActivityBridgeSlot(key);
+    if (kind && parsed.kind !== kind) continue;
+    if (observed.has(parsed.id)) continue;
+    const tagged = parsed.kind ?? readStream(state)[activityBridgeSlot(parsed.id, parsed.kind)];
+    if (!rememberPending(pending, parsed.id, attempts, tagged)) {
+      backpressure = true;
+      continue;
+    }
+    delete counts[key];
+    if (tagged) rememberStream(state, parsed.id, tagged);
+  }
+  return backpressure;
+}
+
+function pruneBridgeStream(
+  state: Record<string, unknown>,
+  counts: Record<string, number>,
+  pending: ActivityBridgePending[],
+): void {
+  const live = new Set<string>([
+    ...Object.keys(counts),
+    ...pending.map((row) => activityBridgeSlot(row.id, row.kind)),
+  ]);
+  const next = readStream(state);
+  let changed = false;
+  for (const key of Object.keys(next)) {
+    if (live.has(key)) continue;
+    delete next[key];
+    changed = true;
+  }
+  if (!changed) return;
+  if (Object.keys(next).length === 0) delete state.activityBridgeStream;
+  else state.activityBridgeStream = next;
 }
 
 /** @returns false when the id was not stored because the queue is already full. */
@@ -562,7 +646,7 @@ function rememberPending(
   attempts: number,
   kind?: ActivityBridgeKind,
 ): boolean {
-  const existing = rows.find((row) => row.id === id);
+  const existing = rows.find((row) => sameBridgeIdentity(row, id, kind));
   if (existing) {
     existing.attempts = Math.max(existing.attempts, attempts);
     if (kind) existing.kind = kind;
@@ -583,21 +667,102 @@ function readStream(state: Record<string, unknown>): Record<string, ActivityBrid
   return next;
 }
 
-function stampStream(state: Record<string, unknown>, id: string, kind?: ActivityBridgeKind): ActivityBridgeKind | undefined {
-  const known = readStream(state)[id] ?? kind;
-  if (!known) return undefined;
+function rememberStream(state: Record<string, unknown>, id: string, kind: ActivityBridgeKind): void {
   const next = readStream(state);
-  next[id] = known;
+  next[activityBridgeSlot(id, kind)] = kind;
   state.activityBridgeStream = next;
-  return known;
 }
 
-function forgetStream(state: Record<string, unknown>, id: string): void {
+function forgetStream(state: Record<string, unknown>, id: string, kind?: ActivityBridgeKind): void {
   const next = readStream(state);
-  if (!(id in next)) return;
-  delete next[id];
+  const key = activityBridgeSlot(id, kind);
+  if (!(key in next)) return;
+  delete next[key];
   if (Object.keys(next).length === 0) delete state.activityBridgeStream;
   else state.activityBridgeStream = next;
+}
+
+export type LegacyBridgeClass = 'email' | 'calendar' | 'both' | 'absent' | 'unknown';
+
+/**
+ * Decide which resource an old untyped id belongs to. A lookup that cannot
+ * run, or that throws, is `unknown`: the id stays untyped and the cursor
+ * stays. Absence is returned only when both stores answered and neither has
+ * the row. One store answering present is not enough if the other did not answer.
+ */
+export async function classifyStoredBridgeId(
+  db: {
+    calendarEvent?: { findFirst?: (args: unknown) => Promise<{ id?: string } | null> };
+    emailMessage?: { findFirst?: (args: unknown) => Promise<{ id?: string } | null> };
+  },
+  scope: { orgId: string; ownerId: string },
+  id: string,
+): Promise<LegacyBridgeClass> {
+  const look = async (model: 'calendarEvent' | 'emailMessage') => {
+    const find = db[model]?.findFirst;
+    if (typeof find !== 'function') return 'unknown' as const;
+    try {
+      const row = await find({
+        where:
+          model === 'emailMessage'
+            ? { orgId: scope.orgId, userId: scope.ownerId, externalMessageId: id, deletedAt: null }
+            : { orgId: scope.orgId, ownerId: scope.ownerId, externalId: id, deletedAt: null },
+        select: { id: true },
+      });
+      return row ? ('present' as const) : ('absent' as const);
+    } catch {
+      return 'unknown' as const;
+    }
+  };
+  const calendar = await look('calendarEvent');
+  const email = await look('emailMessage');
+  if (calendar === 'unknown' || email === 'unknown') return 'unknown';
+  if (calendar === 'present' && email === 'present') return 'both';
+  if (calendar === 'present') return 'calendar';
+  if (email === 'present') return 'email';
+  return 'absent';
+}
+
+/**
+ * Give an untyped pending id a resource only after both stores have been asked.
+ * `both` keeps a row for each resource. `absent` drops the id because neither
+ * store has a capture row. `unknown` leaves it, so the cursor is not moved past it.
+ */
+export async function migrateLegacyBridgePending(
+  state: Record<string, unknown>,
+  classify: (id: string) => Promise<LegacyBridgeClass>,
+): Promise<void> {
+  const pending = readPending(state);
+  const counts = readRetryIds(state);
+  const ids = new Set<string>();
+  for (const row of pending) if (!row.kind) ids.add(row.id);
+  for (const key of Object.keys(counts)) {
+    const parsed = splitActivityBridgeSlot(key);
+    if (!parsed.kind) ids.add(parsed.id);
+  }
+  if (ids.size === 0) return;
+  for (const id of ids) {
+    let result: LegacyBridgeClass;
+    try {
+      result = await classify(id);
+    } catch {
+      result = 'unknown';
+    }
+    if (result === 'unknown') continue;
+    const attempts = Math.max(counts[id] ?? 0, pending.find((row) => row.id === id && !row.kind)?.attempts ?? 0);
+    delete counts[id];
+    removePending(pending, id);
+    forgetStream(state, id);
+    if (result === 'absent') continue;
+    const kinds: ActivityBridgeKind[] = result === 'both' ? ['email', 'calendar'] : [result];
+    for (const nextKind of kinds) {
+      rememberPending(pending, id, Math.max(attempts, 1), nextKind);
+      rememberStream(state, id, nextKind);
+    }
+  }
+  writeRetryIds(state, counts);
+  writePending(state, pending);
+  pruneBridgeStream(state, counts, pending);
 }
 
 /** The next ids a run should retry. They stay in the queue until a later observation settles or counts them. */

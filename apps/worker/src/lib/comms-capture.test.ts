@@ -10,8 +10,10 @@ import {
   ACTIVITY_BRIDGE_QUARANTINE_CAP,
   ACTIVITY_BRIDGE_RETRY_LIMIT,
   claimActivityBridgeDrain,
+  classifyStoredBridgeId,
   CursorKeyConflictError,
   drainPendingActivityBridges,
+  migrateLegacyBridgePending,
   externalParticipants,
   googleMeetingHints,
   graphMeetingHints,
@@ -302,6 +304,72 @@ describe('activity bridge retry bound', () => {
     expect(seen).toEqual(['mail']);
     const pending = state.activityBridgePending as Array<{ id: string }>;
     expect(pending.map((row) => row.id).sort()).toEqual(['legacy', 'same']);
+  });
+
+  it('settling one stream does not erase the other stream or its quarantine', () => {
+    const state: Record<string, unknown> = {};
+    noteActivityBridgeFailures(state, 'mail', ['same'], '2026-11-08T00:00:00.000Z', [], true, undefined, 'email');
+    noteActivityBridgeFailures(state, 'cal', ['same'], '2026-11-08T00:00:00.000Z', [], true, undefined, 'calendar');
+    noteActivityBridgeFailures(state, 'mail', [], '2026-11-08T00:00:00.000Z', ['same'], true, undefined, 'email');
+    const counts = state.activityBridgeRetryById as Record<string, number>;
+    expect(counts['calendar\u001fsame']).toBe(1);
+    expect(counts['email\u001fsame']).toBeUndefined();
+    const pending = (state.activityBridgePending as Array<{ id: string; kind?: string }> | undefined) ?? [];
+    expect(pending.some((row) => row.id === 'same' && row.kind === 'calendar')).toBe(false);
+    expect(state.activityBridgeStream).toEqual({ 'calendar\u001fsame': 'calendar' });
+  });
+
+  it('does not keep stream metadata for an id the caps refused', () => {
+    const state: Record<string, unknown> = {
+      activityBridgeRetryById: Object.fromEntries(
+        Array.from({ length: ACTIVITY_BRIDGE_ACTIVE_CAP }, (_, index) => [`email\u001fid-${index}`, 1]),
+      ),
+      activityBridgePending: Array.from({ length: ACTIVITY_BRIDGE_PENDING_CAP }, (_, index) => ({
+        id: `pend-${index}`,
+        attempts: 1,
+        kind: 'email' as const,
+      })),
+    };
+    noteActivityBridgeFailures(state, 'mail', ['refused'], '2026-11-08T00:00:00.000Z', [], true, undefined, 'email');
+    expect(state.activityBridgeStream ?? {}).not.toHaveProperty('email\u001frefused');
+    const pending = state.activityBridgePending as Array<{ id: string }>;
+    expect(pending.some((row) => row.id === 'refused')).toBe(false);
+  });
+
+  it('types a legacy id only after both stores answer, and leaves an unknown one', async () => {
+    const state: Record<string, unknown> = {
+      activityBridgePending: [
+        { id: 'cal-only', attempts: 2 },
+        { id: 'both', attempts: 1 },
+        { id: 'gone', attempts: 1 },
+        { id: 'unsure', attempts: 1 },
+      ],
+    };
+    await migrateLegacyBridgePending(state, async (id) => {
+      if (id === 'cal-only') return 'calendar';
+      if (id === 'both') return 'both';
+      if (id === 'gone') return 'absent';
+      return 'unknown';
+    });
+    const pending = state.activityBridgePending as Array<{ id: string; kind?: string; attempts: number }>;
+    expect(pending.find((row) => row.id === 'cal-only')).toEqual({ id: 'cal-only', attempts: 2, kind: 'calendar' });
+    expect(pending.filter((row) => row.id === 'both').map((row) => row.kind).sort()).toEqual(['calendar', 'email']);
+    expect(pending.some((row) => row.id === 'gone')).toBe(false);
+    expect(pending.find((row) => row.id === 'unsure')).toEqual({ id: 'unsure', attempts: 1 });
+    const db = {
+      calendarEvent: { findFirst: async () => ({ id: 'row' }) },
+      emailMessage: { findFirst: async () => null },
+    };
+    await expect(
+      classifyStoredBridgeId(db, { orgId, ownerId: '00000000-0000-4000-8000-0000000000b1' }, 'ev'),
+    ).resolves.toBe('calendar');
+    await expect(
+      classifyStoredBridgeId(
+        { calendarEvent: { findFirst: async () => { throw new Error('down'); } }, emailMessage: { findFirst: async () => null } },
+        { orgId, ownerId: '00000000-0000-4000-8000-0000000000b1' },
+        'ev',
+      ),
+    ).resolves.toBe('unknown');
   });
 
   it('aborts when a google page token would sit beside another sync token', () => {

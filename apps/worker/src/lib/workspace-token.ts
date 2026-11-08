@@ -14,6 +14,8 @@ import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import { microsoftRefreshScopes } from '@bidstack/shared';
 
+import { ProviderRateLimitError, retryAfterMs } from './provider-http.js';
+
 const EXPIRY_SKEW_MS = 60_000;
 const REFRESH_TIMEOUT_MS = 15_000;
 
@@ -106,6 +108,9 @@ export async function getWorkspaceAccessToken(
         data: { status: 'revoked', errorMessage: REVOKED_MESSAGE },
       });
       throw new GrantRevokedError(`${row.provider} refresh rejected: ${code}`);
+    }
+    if (res.status === 429 || (res.status === 503 && res.headers.has('Retry-After'))) {
+      throw new ProviderRateLimitError(row.provider, retryAfterMs(res.headers.get('Retry-After'), 0));
     }
     log.error({ tokenId: row.id, provider: row.provider, status: res.status }, 'workspace token refresh failed');
     await prisma.integrationToken.update({

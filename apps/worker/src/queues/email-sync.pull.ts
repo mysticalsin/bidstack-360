@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
 import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
-import { appendBridgeObservations, bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { appendBridgeObservations, bridgeActivity, captureColumns, classifyStoredBridgeId, drainPendingActivityBridges, migrateLegacyBridgePending, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { getWorkspaceAccessToken } from '../lib/workspace-token.js';
 
@@ -71,6 +71,9 @@ export async function pullDelta(
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
   let persisted = 0;
   const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
+  await migrateLegacyBridgePending(deltaState, (id) =>
+    classifyStoredBridgeId(prisma, { orgId: params.orgId, ownerId: params.userId }, id),
+  );
 
   for (const f of FOLDERS) {
     let url = (deltaState[f.next] as string | undefined) ?? (deltaState[f.link] as string | undefined) ?? initialUrl(f.folder);

@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
 import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
-import { appendBridgeObservations, bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { appendBridgeObservations, bridgeActivity, captureColumns, classifyStoredBridgeId, drainPendingActivityBridges, migrateLegacyBridgePending, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -276,6 +276,9 @@ export async function pullGmail(
   const captureHeldIds: string[] = [];
   const settledIds: string[] = [];
   const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
+  await migrateLegacyBridgePending(deltaState, (id) =>
+    classifyStoredBridgeId(prisma, { orgId: token.orgId, ownerId: token.userId }, id),
+  );
   for (const id of ids) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) {

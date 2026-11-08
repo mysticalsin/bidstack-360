@@ -20,7 +20,9 @@ import {
   googleMeetingHints,
   meetingColumns,
   appendBridgeObservations,
+  classifyStoredBridgeId,
   drainPendingActivityBridges,
+  migrateLegacyBridgePending,
   noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
@@ -220,6 +222,7 @@ export async function pullGoogleIncremental(
   let pageToken = deltaState['calendarPageToken'] as string | undefined;
   let count = 0;
   const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
+  await migrateLegacyBridgePending(deltaState, (id) => classifyStoredBridgeId(prisma, { orgId, ownerId: userId }, id));
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(

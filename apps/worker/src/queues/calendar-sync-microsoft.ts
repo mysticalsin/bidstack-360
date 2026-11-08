@@ -19,7 +19,9 @@ import {
   graphMeetingHints,
   meetingColumns,
   appendBridgeObservations,
+  classifyStoredBridgeId,
   drainPendingActivityBridges,
+  migrateLegacyBridgePending,
   noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
@@ -179,6 +181,7 @@ export async function pullMicrosoftIncremental(
     initialDeltaUrl();
   let count = 0;
   const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
+  await migrateLegacyBridgePending(deltaState, (id) => classifyStoredBridgeId(prisma, { orgId, ownerId: userId }, id));
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(url, { headers: GRAPH_READ_HEADERS(accessToken) }, { provider: 'Microsoft Graph' });

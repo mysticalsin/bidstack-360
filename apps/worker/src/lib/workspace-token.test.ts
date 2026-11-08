@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
+import { ProviderRateLimitError } from './provider-http.js';
 import { GrantRevokedError, getWorkspaceAccessToken } from './workspace-token.js';
 
 vi.mock('@bidstack/db', () => ({
@@ -95,6 +96,16 @@ describe('getWorkspaceAccessToken', () => {
         data: expect.objectContaining({ status: 'revoked', errorMessage: expect.stringMatching(/reconnect/i) }),
       }),
     );
+  });
+
+  it('keeps Retry-After when the refresh itself is throttled', async () => {
+    const fetchImpl = vi.fn(async () => new Response('slow', { status: 429, headers: { 'Retry-After': '12' } }));
+    await expect(getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl)).rejects.toMatchObject({
+      name: 'ProviderRateLimitError',
+      retryAfterMs: 12_000,
+    });
+    expect(update).not.toHaveBeenCalled();
+    await expect(getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl)).rejects.toBeInstanceOf(ProviderRateLimitError);
   });
 
   it('marks a transient provider failure as error, not revoked', async () => {
