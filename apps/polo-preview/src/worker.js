@@ -10,11 +10,13 @@ import { DurableObject } from 'cloudflare:workers';
 import { getContainer } from '@cloudflare/containers';
 import {
   CODE_TTL_MS,
+  admitNewRecord,
   checkCode,
   clearSessionCookie,
   hashCode,
   isAllowed,
   isPublicPath,
+  isRecordExpired,
   isSameOriginJson,
   issueCode,
   newCode,
@@ -33,6 +35,7 @@ import {
   filterRequestHeaders,
   isApiPath,
   rewriteResponseHeaders,
+  targetUrl,
 } from './protocol.js';
 
 const TEAM = 'https://tony-walteur.cloudflareaccess.com';
@@ -228,7 +231,8 @@ function requestHeadersForBox(req, publicOrigin) {
 // upstream; the app's own Authorization header (demo bearer token) passes.
 async function proxyUpstream(req, env, url) {
   const upstream = new URL(env.UPSTREAM_ORIGIN);
-  const target = new URL(url.pathname + url.search, upstream.origin);
+  // Never new URL(path, base): a path such as //attacker.example/x replaces the origin.
+  const target = targetUrl(url.pathname + url.search, upstream.origin);
   const headers = new Headers();
   for (const [key, value] of filterRequestHeaders(req.headers)) {
     if (key.toLowerCase().startsWith('cf-')) continue;
@@ -399,6 +403,9 @@ const STALE_MS = 35_000;
 const RECONNECT_WAIT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 90_000;
 const IDEMPOTENT = ['GET', 'HEAD', 'OPTIONS'];
+const OTP_ADMISSION_KEY = 'otp-admission';
+const OTP_SWEEP_MS = 15 * 60_000;
+const OTP_SWEEP_BATCH = 500;
 const LOST = Symbol('relay-lost');
 
 function offlineResponse(req, url) {
@@ -517,15 +524,36 @@ export class Relay extends DurableObject {
   }
 
   // One-time code records live in the "auth" instance of this class, so no
-  // new Durable Object class or migration is needed.
+  // new Durable Object class or migration is needed. Storage stays bounded: new
+  // records pass an hourly aggregate admission and an alarm sweeps expired ones.
   async otp(req, url) {
     const { email, hash } = await req.json();
     const key = `otp:${email}`;
     const record = await this.ctx.storage.get(key);
-    const result =
-      url.pathname === '/__otp/issue' ? issueCode(record, hash) : checkCode(record, hash);
-    if (result.record) await this.ctx.storage.put(key, result.record);
+    const issuing = url.pathname === '/__otp/issue';
+    if (issuing && !record) {
+      const admission = admitNewRecord(await this.ctx.storage.get(OTP_ADMISSION_KEY));
+      if (!admission.ok) return Response.json({ ok: false, retryAfterS: admission.retryAfterS });
+      await this.ctx.storage.put(OTP_ADMISSION_KEY, admission.window);
+    }
+    const result = issuing ? issueCode(record, hash) : checkCode(record, hash);
+    if (result.record) {
+      await this.ctx.storage.put(key, result.record);
+      if ((await this.ctx.storage.getAlarm()) === null) {
+        await this.ctx.storage.setAlarm(Date.now() + OTP_SWEEP_MS);
+      }
+    }
     return Response.json({ ok: result.ok, retryAfterS: result.retryAfterS });
+  }
+
+  async alarm() {
+    const now = Date.now();
+    const records = await this.ctx.storage.list({ prefix: 'otp:', limit: OTP_SWEEP_BATCH });
+    const expired = [...records].filter(([, record]) => isRecordExpired(record, now)).map(([key]) => key);
+    for (let i = 0; i < expired.length; i += 128) await this.ctx.storage.delete(expired.slice(i, i + 128));
+    if (records.size > expired.length || records.size === OTP_SWEEP_BATCH) {
+      await this.ctx.storage.setAlarm(now + OTP_SWEEP_MS);
+    }
   }
 
   async fetch(req) {

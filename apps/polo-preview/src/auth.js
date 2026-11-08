@@ -9,6 +9,9 @@ export const SESSION_TTL_S = 12 * 3600;
 export const MAX_ATTEMPTS = 5;
 export const RESEND_MS = 60_000;
 export const MAX_CODES_PER_HOUR = 5;
+/** New code records admitted per hour across all addresses, allowlisted or not. */
+export const MAX_NEW_RECORDS_PER_HOUR = 200;
+const HOUR_MS = 3600_000;
 
 const enc = new TextEncoder();
 
@@ -152,6 +155,26 @@ export function issueCode(record, codeHash, now = Date.now()) {
     ok: true,
     record: { hash: codeHash, exp: now + CODE_TTL_MS, attempts: 0, sent: [...recent, now] },
   };
+}
+
+/**
+ * Aggregate admission for a first code request from an address. Every address
+ * is counted the same way, so a full window answers 429 for known and unknown
+ * emails alike and the allowlist stays unenumerable.
+ */
+export function admitNewRecord(window, now = Date.now()) {
+  const current = window && now - window.start < HOUR_MS ? window : { start: now, count: 0 };
+  if (current.count >= MAX_NEW_RECORDS_PER_HOUR) {
+    return { ok: false, retryAfterS: Math.ceil((HOUR_MS - (now - current.start)) / 1000) };
+  }
+  return { ok: true, window: { start: current.start, count: current.count + 1 } };
+}
+
+/** True once a record's code expired and none of its sends count toward the hourly limit. */
+export function isRecordExpired(record, now = Date.now()) {
+  if (!record) return true;
+  if (record.exp > now) return false;
+  return !(record.sent || []).some((t) => now - t < HOUR_MS);
 }
 
 /** State transition for "check this code". A used code is burned. */
