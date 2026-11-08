@@ -31,36 +31,36 @@ model Org {
   microsoftTenantId  String? @map("microsoft_tenant_id")
   microsoftSsoMethod String  @default("oauth") @map("microsoft_sso_method") // oauth | saml
 
-  users              User[]
-  companies          Company[]
-  references         Reference[]
-  activities         Activity[]
+  users               User[]
+  companies           Company[]
+  references          Reference[]
+  activities          Activity[]
   externalRecordLinks ExternalRecordLink[]
-  opportunities      Opportunity[]
-  contacts           Contact[]
-  competitorInsights CompetitorInsight[]
-  competitorProfiles CompetitorProfile[]
-  tasks              Task[]
-  documents          Document[]
-  syncEvents         SyncEvent[]
-  apiKeys            ApiKey[]
-  webhookSubs        WebhookSubscription[]
-  webhookOutbox      WebhookOutbox[]
-  auditLogs          AuditLog[]
-  notes              Note[]
-  fileAttachments    FileAttachment[]
-  companyEnrichments CompanyEnrichment[]
-  aiInsights         AiInsight[]
-  dustRuns           DustRun[]
-  dashboardWidgets   DashboardWidget[]
-  bidOpportunities   BidOpportunity[]
-  riskRegisterItems  RiskRegisterItem[]
-  complianceChecks   ComplianceCheck[]
-  proposals          Proposal[]
-  proposalSections   ProposalSection[]
-  providerHealth     ProviderHealth[]
-  queueHealth        QueueHealth[]
-  releaseScores      ReleaseScore[]
+  opportunities       Opportunity[]
+  contacts            Contact[]
+  competitorInsights  CompetitorInsight[]
+  competitorProfiles  CompetitorProfile[]
+  tasks               Task[]
+  documents           Document[]
+  syncEvents          SyncEvent[]
+  apiKeys             ApiKey[]
+  webhookSubs         WebhookSubscription[]
+  webhookOutbox       WebhookOutbox[]
+  auditLogs           AuditLog[]
+  notes               Note[]
+  fileAttachments     FileAttachment[]
+  companyEnrichments  CompanyEnrichment[]
+  aiInsights          AiInsight[]
+  dustRuns            DustRun[]
+  dashboardWidgets    DashboardWidget[]
+  bidOpportunities    BidOpportunity[]
+  riskRegisterItems   RiskRegisterItem[]
+  complianceChecks    ComplianceCheck[]
+  proposals           Proposal[]
+  proposalSections    ProposalSection[]
+  providerHealth      ProviderHealth[]
+  queueHealth         QueueHealth[]
+  releaseScores       ReleaseScore[]
 
   accountSolutions     AccountSolution[]
   accountProducts      AccountProduct[]
@@ -226,6 +226,8 @@ model Org {
   winLossRecords                WinLossRecord[]
   notifications                 Notification[]
   notificationPrefs             NotificationPref[]
+  accountTeamMembers            AccountTeamMember[]
+  accountFollows                AccountFollow[]
   serumConfigVersions           SerumConfigVersion[]
   serumConnectorConnectionTests SerumConnectorConnectionTest[]
 
@@ -362,6 +364,8 @@ model User {
   msaIntakeDrafts          MsaIntakeDraft[]          @relation("MsaIntakeDraftCreatedBy")
   meetingSourceConnections MeetingSourceConnection[]
   orgChartNodesOwned       OrgChartNode[]            @relation("OrgChartNodeOwner")
+  accountTeamMemberships   AccountTeamMember[]       @relation("AccountTeamMemberUser")
+  accountFollows           AccountFollow[]
 
   @@index([orgId])
   @@index([deletedAt])
@@ -411,14 +415,14 @@ model Company {
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  org           Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  parent        Company?         @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children      Company[]        @relation("CompanyHierarchy")
-  contacts      Contact[]
-  opportunities Opportunity[]
-  projectReferences  ProjectReference[]
-  notes         Note[]
-  files         FileAttachment[]
+  org               Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent            Company?           @relation("CompanyHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Company[]          @relation("CompanyHierarchy")
+  contacts          Contact[]
+  opportunities     Opportunity[]
+  projectReferences ProjectReference[]
+  notes             Note[]
+  files             FileAttachment[]
 
   serviceCases           ServiceCase[]
   accountSolutions       AccountSolution[]
@@ -452,17 +456,19 @@ model Company {
 
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  contracts     ContractAgreement[]   @relation("CompanyContracts")
-  meetingIntel  MeetingIntel[]
-  firmographics CompanyFirmographics?
-  jobPostings   CompanyJobPosting[]
-  intelPosts    CompanyPost[]
-  intelEvidence IntelEvidence[]
-  intelThemes   InvestmentTheme[]
-  intelRuns     IntelSourceRun[]
+  contracts       ContractAgreement[]         @relation("CompanyContracts")
+  meetingIntel    MeetingIntel[]
+  firmographics   CompanyFirmographics?
+  jobPostings     CompanyJobPosting[]
+  intelPosts      CompanyPost[]
+  intelEvidence   IntelEvidence[]
+  intelThemes     InvestmentTheme[]
+  intelRuns       IntelSourceRun[]
   partnerEvidence ConsultingPartnerEvidence[]
   partnerRuns     ConsultingPartnerRun[]
-  orgChart      OrgChart?
+  orgChart        OrgChart?
+  teamMembers     AccountTeamMember[]
+  follows         AccountFollow[]
 
   @@index([orgId, domain])
   @@index([orgId])
@@ -943,26 +949,26 @@ model SyncEvent {
 }
 
 model ApiKey {
-  id         String    @id @default(uuid()) @db.Uuid
-  orgId      String    @map("org_id") @db.Uuid
-  name       String
+  id                String    @id @default(uuid()) @db.Uuid
+  orgId             String    @map("org_id") @db.Uuid
+  name              String
   // SHA-256 hex digest of the raw key. Globally unique by construction, so
   // @unique both prevents hash collisions AND backs the verifyApiKey hot path
   // (findFirst on hashedKey ran a full table scan without an index — P0 #?).
-  hashedKey  String    @unique @map("hashed_key")
-  prefix     String // first 8 chars, displayed
-  scopes     String[]  @default(["read"])
+  hashedKey         String    @unique @map("hashed_key")
+  prefix            String // first 8 chars, displayed
+  scopes            String[]  @default(["read"])
   // Existing keys are backfilled unrestricted + writable. New keys default
   // to deny (empty company/MSA lists) and read-only unless the creator
   // opts in. See docs/enterprise-readiness.md B2.
-  unrestrictedScope Boolean  @default(false) @map("unrestricted_scope")
-  readOnly          Boolean  @default(true) @map("read_only")
-  companyIds        String[] @default([]) @map("company_ids") @db.Uuid
-  msaIds            String[] @default([]) @map("msa_ids") @db.Uuid
-  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
-  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  unrestrictedScope Boolean   @default(false) @map("unrestricted_scope")
+  readOnly          Boolean   @default(true) @map("read_only")
+  companyIds        String[]  @default([]) @map("company_ids") @db.Uuid
+  msaIds            String[]  @default([]) @map("msa_ids") @db.Uuid
+  lastUsedAt        DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -5511,19 +5517,19 @@ model ContractAgreement {
   // Intake + leverage (2026-11). signingEntityId is OUR brand/branch that
   // signed; commercial clause fields stay blank when the document does not
   // contain them. parties/fieldCitations are provenance, never invented.
-  signingEntityId    String?  @map("signing_entity_id") @db.Uuid
-  termMonths         Int?     @map("term_months")
-  renewalTerms       String?  @map("renewal_terms") @db.VarChar(500)
-  ipClause           String?  @map("ip_clause")
-  confidentiality    String?
-  nonSolicit         String?  @map("non_solicit")
-  exclusivity        String?
-  insurance          String?
-  indexation         String?  @db.VarChar(500)
-  scopeOfServices    String?  @map("scope_of_services")
-  affiliatesClause   String?  @map("affiliates_clause")
-  parties            Json     @default("[]")
-  fieldCitations     Json     @default("{}") @map("field_citations")
+  signingEntityId  String? @map("signing_entity_id") @db.Uuid
+  termMonths       Int?    @map("term_months")
+  renewalTerms     String? @map("renewal_terms") @db.VarChar(500)
+  ipClause         String? @map("ip_clause")
+  confidentiality  String?
+  nonSolicit       String? @map("non_solicit")
+  exclusivity      String?
+  insurance        String?
+  indexation       String? @db.VarChar(500)
+  scopeOfServices  String? @map("scope_of_services")
+  affiliatesClause String? @map("affiliates_clause")
+  parties          Json    @default("[]")
+  fieldCitations   Json    @default("{}") @map("field_citations")
 
   org            Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   sourceFile     FileAttachment?       @relation("ContractSourceFile", fields: [sourceFileId], references: [id], onDelete: SetNull)
@@ -5576,28 +5582,28 @@ model SigningEntity {
 // One-drop intake draft. The uploaded file is stored, fields are extracted,
 // and nothing becomes a ContractAgreement until the user confirms.
 model MsaIntakeDraft {
-  id                    String    @id @default(uuid()) @db.Uuid
-  orgId                 String    @map("org_id") @db.Uuid
-  status                String    @default("pending_review") @db.VarChar(24)
-  fileName              String    @map("file_name") @db.VarChar(255)
-  contentType           String    @map("content_type") @db.VarChar(100)
-  bytes                 Int
-  sha256                String    @db.VarChar(64)
-  storageKey            String    @map("storage_key") @db.VarChar(500)
-  fileAttachmentId      String?   @map("file_attachment_id") @db.Uuid
-  extractedText         String?   @map("extracted_text")
-  pageCount             Int?      @map("page_count")
-  needsOcr              Boolean   @default(false) @map("needs_ocr")
-  usedLlm               Boolean   @default(false) @map("used_llm")
-  extractedFields       Json      @default("{}") @map("extracted_fields")
-  accountMatches        Json      @default("[]") @map("account_matches")
-  signingEntityMatches  Json      @default("[]") @map("signing_entity_matches")
-  warnings              Json      @default("[]")
-  confirmedContractId   String?   @map("confirmed_contract_id") @db.Uuid
-  createdById           String    @map("created_by_id") @db.Uuid
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt             DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id                   String    @id @default(uuid()) @db.Uuid
+  orgId                String    @map("org_id") @db.Uuid
+  status               String    @default("pending_review") @db.VarChar(24)
+  fileName             String    @map("file_name") @db.VarChar(255)
+  contentType          String    @map("content_type") @db.VarChar(100)
+  bytes                Int
+  sha256               String    @db.VarChar(64)
+  storageKey           String    @map("storage_key") @db.VarChar(500)
+  fileAttachmentId     String?   @map("file_attachment_id") @db.Uuid
+  extractedText        String?   @map("extracted_text")
+  pageCount            Int?      @map("page_count")
+  needsOcr             Boolean   @default(false) @map("needs_ocr")
+  usedLlm              Boolean   @default(false) @map("used_llm")
+  extractedFields      Json      @default("{}") @map("extracted_fields")
+  accountMatches       Json      @default("[]") @map("account_matches")
+  signingEntityMatches Json      @default("[]") @map("signing_entity_matches")
+  warnings             Json      @default("[]")
+  confirmedContractId  String?   @map("confirmed_contract_id") @db.Uuid
+  createdById          String    @map("created_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   org            Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
   fileAttachment FileAttachment?    @relation("MsaIntakeDraftFile", fields: [fileAttachmentId], references: [id], onDelete: SetNull)
@@ -6192,22 +6198,31 @@ model KamProspection {
 // @mentions, assignments, and director escalations. readAt drives the unread
 // badge; entityType/entityId/url deep-link to the source.
 model Notification {
-  id         String    @id @default(uuid()) @db.Uuid
-  orgId      String    @map("org_id") @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  type       String // mention | assignment | bid_override | stage_change | system
-  title      String
-  body       String?
-  entityType String?   @map("entity_type")
-  entityId   String?   @map("entity_id")
-  url        String?
-  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String    @id @default(uuid()) @db.Uuid
+  orgId       String    @map("org_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  type        String // mention | assignment | bid_override | stage_change | system
+  title       String
+  body        String?
+  entityType  String?   @map("entity_type")
+  entityId    String?   @map("entity_id")
+  url         String?
+  readAt      DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Account alerts: repeats on the same account within the coalescing window
+  // update one row (eventCount, lastEventAt) instead of stacking new rows.
+  groupKey    String?   @map("group_key")
+  eventCount  Int       @default(1) @map("event_count")
+  lastEventAt DateTime? @map("last_event_at") @db.Timestamptz(6)
+  actorUserId String?   @map("actor_user_id") @db.Uuid
+  emailSentAt DateTime? @map("email_sent_at") @db.Timestamptz(6)
+  teamsSentAt DateTime? @map("teams_sent_at") @db.Timestamptz(6)
 
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([orgId, userId, readAt, createdAt(sort: Desc)], map: "notifications_org_user_read_created_idx")
+  @@index([userId, groupKey, lastEventAt(sort: Desc)], map: "notifications_user_group_last_idx")
   @@map("notifications")
 }
 
@@ -6216,20 +6231,85 @@ model Notification {
 // createNotification; taskDueSoon + emailDigest persist for features that emit
 // them. Replaces the old localStorage-only toggles so prefs follow the user.
 model NotificationPref {
-  id              String   @id @default(uuid()) @db.Uuid
-  orgId           String   @map("org_id") @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  emailDigest     Boolean  @default(true) @map("email_digest")
-  mentionPush     Boolean  @default(true) @map("mention_push")
-  taskDueSoon     Boolean  @default(true) @map("task_due_soon")
-  dealStageChange Boolean  @default(false) @map("deal_stage_change")
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                 String   @id @default(uuid()) @db.Uuid
+  orgId              String   @map("org_id") @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  emailDigest        Boolean  @default(true) @map("email_digest")
+  mentionPush        Boolean  @default(true) @map("mention_push")
+  taskDueSoon        Boolean  @default(true) @map("task_due_soon")
+  dealStageChange    Boolean  @default(false) @map("deal_stage_change")
+  // Per kind group (account_activity, deals, tasks, mentions) and channel
+  // (in_app, email, teams). Shape and defaults live in @bidstack/shared
+  // resolveChannelPrefs; an empty object means all defaults.
+  channelPrefs       Json     @default("{}") @map("channel_prefs")
+  accountDigestDaily Boolean  @default(false) @map("account_digest_daily")
+  // Microsoft Teams Workflows webhook, encrypted with INTEGRATION_TOKEN_KEY.
+  teamsWebhookEnc    String?  @map("teams_webhook_enc")
+  teamsWebhookHost   String?  @map("teams_webhook_host")
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([orgId])
   @@map("notification_prefs")
+}
+
+// ─── Account team and follow (slice 21) ──────────────────────────────────────
+// Internal staffing on an account (who from our side works it, and how much).
+// Company.keyAccountOwnerId stays the account lead of record; these rows add the
+// rest of the team. Members, the key account owner and opp owners follow the
+// account automatically; AccountFollow rows add explicit followers or mute.
+
+enum AccountTeamRole {
+  account_lead
+  delivery_lead
+  pre_sales
+  bid_manager
+  executive_sponsor
+  other
+
+  @@map("account_team_role")
+}
+
+model AccountTeamMember {
+  id            String          @id @default(uuid()) @db.Uuid
+  orgId         String          @map("org_id") @db.Uuid
+  companyId     String          @map("company_id") @db.Uuid
+  userId        String          @map("user_id") @db.Uuid
+  role          AccountTeamRole @default(other)
+  allocationPct Int?            @map("allocation_pct")
+  startDate     DateTime?       @map("start_date") @db.Date
+  endDate       DateTime?       @map("end_date") @db.Date
+  createdById   String?         @map("created_by_id") @db.Uuid
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation("AccountTeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId], map: "account_team_members_company_user_key")
+  @@index([orgId, userId], map: "account_team_members_org_user_idx")
+  @@map("account_team_members")
+}
+
+model AccountFollow {
+  id        String   @id @default(uuid()) @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  muted     Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId], map: "account_follows_company_user_key")
+  @@index([orgId, userId], map: "account_follows_org_user_idx")
+  @@map("account_follows")
 }
 
 // ── Financial Watchdog (public financial events per customer account) ──

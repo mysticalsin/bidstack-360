@@ -14,12 +14,20 @@ import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
+import { AccountTeamCard } from '@/components/company/AccountTeamCard';
+import { FollowAccountButton } from '@/components/company/FollowAccountButton';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
-import { ContactTab, OpportunityTab, CasesTab, NotesTab, HierarchyTab } from './companyDetail/CompanyTabs';
+import {
+  ContactTab,
+  OpportunityTab,
+  CasesTab,
+  NotesTab,
+  HierarchyTab,
+} from './companyDetail/CompanyTabs';
 import { relatedCount } from './companyDetail/relatedCount';
 
 type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy';
@@ -98,31 +106,34 @@ export function CompanyDetailPage() {
             )}
           </div>
         </div>
-        <div
-          role="radiogroup"
-          aria-label={t('companyDetail.viewToggle.label', 'Account view')}
-          className="inline-flex shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-0.5"
-        >
-          {(
-            [
-              ['overview', t('companyDetail.viewToggle.overview', 'Overview'), 'eye'],
-              ['details', t('companyDetail.viewToggle.details', 'Edit details'), 'pencil'],
-            ] as const
-          ).map(([v, label, icon]) => (
-            <button
-              key={v}
-              role="radio"
-              aria-checked={view === v}
-              onClick={() => setView(v)}
-              className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
-                view === v
-                  ? 'bg-[var(--brand-primary)] text-white'
-                  : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
-              }`}
-            >
-              <Icon name={icon} size={14} ariaHidden /> {label}
-            </button>
-          ))}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <FollowAccountButton companyId={c.id} />
+          <div
+            role="radiogroup"
+            aria-label={t('companyDetail.viewToggle.label', 'Account view')}
+            className="inline-flex shrink-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-0.5"
+          >
+            {(
+              [
+                ['overview', t('companyDetail.viewToggle.overview', 'Overview'), 'eye'],
+                ['details', t('companyDetail.viewToggle.details', 'Edit details'), 'pencil'],
+              ] as const
+            ).map(([v, label, icon]) => (
+              <button
+                key={v}
+                role="radio"
+                aria-checked={view === v}
+                onClick={() => setView(v)}
+                className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
+                  view === v
+                    ? 'bg-[var(--brand-primary)] text-white'
+                    : 'text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]'
+                }`}
+              >
+                <Icon name={icon} size={14} ariaHidden /> {label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -147,9 +158,15 @@ export function CompanyDetailPage() {
             )}
             {c.countryCode && <span>{c.countryCode}</span>}
             {c.employeeCount && (
-              <span>{t('companyDetail.meta.employees', '{{count}} employees', { count: c.employeeCount })}</span>
+              <span>
+                {t('companyDetail.meta.employees', '{{count}} employees', {
+                  count: c.employeeCount,
+                })}
+              </span>
             )}
-            {c.taxId && <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>}
+            {c.taxId && (
+              <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>
+            )}
             {c.parent && (
               <span className="flex items-center gap-1">
                 <Icon name="git-branch" size={12} />
@@ -169,6 +186,7 @@ export function CompanyDetailPage() {
           </div>
 
           <AccountActivityCharts companyId={c.id} />
+          <AccountTeamCard companyId={c.id} />
 
           <CompanyTechStackSection companyId={c.id} />
           <ConsultingPartnersSection companyId={c.id} />
@@ -182,7 +200,9 @@ export function CompanyDetailPage() {
               [
                 {
                   key: 'contacts',
-                  label: t('companyDetail.tab.contacts', 'Contacts ({{shown}})', { shown: relatedCount(c.contacts.length) }),
+                  label: t('companyDetail.tab.contacts', 'Contacts ({{shown}})', {
+                    shown: relatedCount(c.contacts.length),
+                  }),
                 },
                 {
                   key: 'people',
@@ -196,11 +216,15 @@ export function CompanyDetailPage() {
                 },
                 {
                   key: 'cases',
-                  label: t('companyDetail.tab.cases', 'Cases ({{shown}})', { shown: relatedCount(c.openCases.length) }),
+                  label: t('companyDetail.tab.cases', 'Cases ({{shown}})', {
+                    shown: relatedCount(c.openCases.length),
+                  }),
                 },
                 {
                   key: 'notes',
-                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', { count: c.notes.length }),
+                  label: t('companyDetail.tab.notes', 'Notes ({{count}})', {
+                    count: c.notes.length,
+                  }),
                 },
                 { key: 'hierarchy', label: t('companyDetail.tab.hierarchy', 'Hierarchy') },
               ] as { key: TabKey; label: string }[]
@@ -214,7 +238,14 @@ export function CompanyDetailPage() {
                 tabIndex={tab === tabItem.key ? 0 : -1}
                 onClick={() => setTab(tabItem.key)}
                 onKeyDown={(e) => {
-                  const keys = ['contacts', 'people', 'opportunities', 'cases', 'notes', 'hierarchy'] as const;
+                  const keys = [
+                    'contacts',
+                    'people',
+                    'opportunities',
+                    'cases',
+                    'notes',
+                    'hierarchy',
+                  ] as const;
                   const idx = keys.indexOf(tabItem.key);
                   if (e.key === 'ArrowRight') {
                     e.preventDefault();
@@ -256,7 +287,11 @@ export function CompanyDetailPage() {
             </div>
           )}
           {tab === 'opportunities' && (
-            <div role="tabpanel" id={panelId('opportunities')} aria-labelledby={tabId('opportunities')}>
+            <div
+              role="tabpanel"
+              id={panelId('opportunities')}
+              aria-labelledby={tabId('opportunities')}
+            >
               <OpportunityTab opportunities={c.opportunities} />
             </div>
           )}

@@ -37,6 +37,7 @@ import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canReadAccount } from '../lib/account-access.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
 // same brand should resolve to one account. Lowercase + trim at every write
@@ -308,6 +309,18 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+
+      if (companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId,
+          kind: 'document_uploaded',
+          actorUserId: req.auth.userId,
+          entityType: 'file_attachment',
+          entityId: fileId,
+          title: (company) => `New document on ${company}: ${req.body.name}`,
+        });
+      }
 
       // Auto-extract: an account-scoped document becomes intelligence the moment
       // it lands, so the user never has to hunt for a separate "Extract" action

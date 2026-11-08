@@ -23,3 +23,4 @@ export * from './comms/index.js';
 // server-only '@bidstack/shared/public-sector' subpath.
 export * from './public-sector/attribution.js';
 export * from './consulting-partners/index.js';
+export * from './account-alerts/index.js';

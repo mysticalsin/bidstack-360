@@ -18,6 +18,7 @@ import {
 
 import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 
 function linkStateFor(companyId: string | null): ContactLinkState {
   // Reads do not invent a link. A historical row with a null companyId stays
@@ -195,6 +196,18 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
         name: created.name,
         customer: created.customer,
       });
+      if (created.companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId: created.companyId,
+          kind: 'contact_added',
+          actorUserId: req.auth.userId,
+          entityType: 'contact',
+          entityId: created.id,
+          title: (company) => `New contact on ${company}: ${created.name}`,
+          sourceUrl: `/contacts/${created.id}`,
+        });
+      }
       return reply.code(201).send(serializeContact(created));
     },
   );
