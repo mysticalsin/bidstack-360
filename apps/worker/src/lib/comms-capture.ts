@@ -506,7 +506,7 @@ export function noteActivityBridgeFailures(
       .filter((entry) => (kind ? entry.kind === kind || !entry.kind : !entry.kind))
       .map((entry) => entry.id),
   );
-  const quarantined: string[] = [];
+  const quarantined: Array<{ id: string; attempts: number }> = [];
   let refused = false;
   const known = new Set<string>([...Object.keys(counts), ...pending.map((row) => row.id)]);
   const ordered = [
@@ -515,16 +515,20 @@ export function noteActivityBridgeFailures(
   ];
   for (const id of ordered) {
     const slot = activityBridgeSlot(id, kind);
+    const untypedFloor = Math.max(counts[id] ?? 0, pendingAttempt(pending, id));
+    const typedFloor = Math.max(counts[slot] ?? 0, pendingAttempt(pending, id, kind));
     const prior = already.has(id)
-      ? ACTIVITY_BRIDGE_RETRY_LIMIT
-      : Math.max(counts[slot] ?? 0, pendingAttempt(pending, id, kind));
-    const attempts = Math.min(prior + 1, ACTIVITY_BRIDGE_RETRY_LIMIT);
+      ? Math.max(ACTIVITY_BRIDGE_RETRY_LIMIT, untypedFloor, typedFloor)
+      : Math.max(typedFloor, untypedFloor);
+    // A surviving untyped attempt is a floor. Saturating at the limit must not
+    // restart that id at 1, and it must not store a lower number than the floor.
+    const attempts = Math.max(prior, Math.min(prior + 1, ACTIVITY_BRIDGE_RETRY_LIMIT));
     const tagged = kind ?? readStream(state)[slot];
     if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) {
       delete counts[slot];
       removePending(pending, id, kind);
       forgetStream(state, id, kind);
-      quarantined.push(id);
+      quarantined.push({ id, attempts });
       continue;
     }
     const activeCount = Object.keys(counts).filter((key) => {
@@ -552,12 +556,12 @@ export function noteActivityBridgeFailures(
   writePending(state, pending);
   quarantineIds(
     state,
-    quarantined.map((id) => ({ id, attempts: ACTIVITY_BRIDGE_RETRY_LIMIT, at: now, ...(kind ? { kind } : {}) })),
+    quarantined.map((row) => ({ id: row.id, attempts: row.attempts, at: now, ...(kind ? { kind } : {}) })),
   );
   pruneBridgeStream(state, counts, pending);
   return {
     hold: bridgeCursorHeld(pending, counts, backpressure || refused, kind),
-    quarantined,
+    quarantined: quarantined.map((row) => row.id),
     pending: Math.min(pendingForKind(pending, kind).length, ACTIVITY_BRIDGE_PENDING_CAP),
     backpressure,
   };
@@ -757,9 +761,13 @@ function pendingRoom(rows: ActivityBridgePending[], kind: ActivityBridgeKind, id
  * every destination fits; otherwise the untyped row stays. Absent removes
  * the untyped row only after both stores have answered empty.
  */
-export function applyLegacyMigration(state: Record<string, unknown>, plans: readonly LegacyBridgeMigration[]): boolean {
+export function applyLegacyMigration(
+  state: Record<string, unknown>,
+  plans: readonly LegacyBridgeMigration[],
+): { refused: boolean; streams: ActivityBridgeKind[] } {
   let refused = false;
-  if (plans.length === 0) return false;
+  const streams = new Set<ActivityBridgeKind>();
+  if (plans.length === 0) return { refused: false, streams: [] };
   const pending = readPending(state);
   const counts = readRetryIds(state);
   const quarantine = Array.isArray(state.activityBridgeQuarantine)
@@ -783,6 +791,9 @@ export function applyLegacyMigration(state: Record<string, unknown>, plans: read
     const needsPending = Boolean(legacyPending) || legacyCount !== undefined;
     if (needsPending && !kinds.every((kind) => pendingRoom(pending, kind, plan.id))) {
       refused = true;
+      for (const kind of kinds) {
+        if (!pendingRoom(pending, kind, plan.id)) streams.add(kind);
+      }
       continue;
     }
     delete counts[plan.id];
@@ -801,6 +812,11 @@ export function applyLegacyMigration(state: Record<string, unknown>, plans: read
       });
       if (!fits) {
         refused = true;
+        for (const kind of kinds) {
+          const present = quarantine.some((entry) => entry.id === plan.id && entry.kind === kind);
+          const room = quarantine.filter((entry) => entry.kind === kind).length < ACTIVITY_BRIDGE_QUARANTINE_CAP;
+          if (!present && !room) streams.add(kind);
+        }
       } else {
         const rest = quarantine.filter((entry) => !(entry.id === plan.id && !entry.kind));
         quarantine.splice(0, quarantine.length, ...rest);
@@ -816,7 +832,7 @@ export function applyLegacyMigration(state: Record<string, unknown>, plans: read
   if (quarantine.length === 0) delete state.activityBridgeQuarantine;
   else state.activityBridgeQuarantine = quarantine;
   pruneBridgeStream(state, counts, pending);
-  return refused;
+  return { refused, streams: [...streams] };
 }
 
 export async function migrateLegacyBridgePending(
@@ -899,6 +915,32 @@ const CURSOR_GROUPS = [
   ['calendarNextLink', 'calendarDeltaLink'],
   ['calendarSyncToken', 'calendarPageToken'],
 ] as const;
+
+const EMAIL_CURSOR_KEYS = new Set([
+  'mailNextLink',
+  'mailDeltaLink',
+  'mailSentNextLink',
+  'mailSentDeltaLink',
+  'gmailHistoryId',
+  'gmailHistoryPageToken',
+  'gmailHistoryResumeCount',
+  'gmailListPageToken',
+  'gmailListResumeCount',
+  'gmailSeedHistoryId',
+]);
+
+const CALENDAR_CURSOR_KEYS = new Set([
+  'calendarNextLink',
+  'calendarDeltaLink',
+  'calendarSyncToken',
+  'calendarPageToken',
+]);
+
+function cursorFamily(key: string): ActivityBridgeKind | undefined {
+  if (EMAIL_CURSOR_KEYS.has(key)) return 'email';
+  if (CALENDAR_CURSOR_KEYS.has(key)) return 'calendar';
+  return undefined;
+}
 
 function sameCursorGroup(left: Record<string, unknown>, right: Record<string, unknown>, keys: readonly string[]): boolean {
   return keys.every((key) => samePresence(cursorPresence(left, key), cursorPresence(right, key)));
@@ -984,9 +1026,12 @@ export function mergeBridgeDeltaState(
     if (key in stored) result[key] = structuredClone(stored[key]);
     else delete result[key];
   }
-  const migrationRefused = applyLegacyMigration(result, migrations);
-  if (migrationRefused) {
+  const migration = applyLegacyMigration(result, migrations);
+  if (migration.refused) {
+    const refusedStreams = new Set(migration.streams);
     for (const key of writes) {
+      const family = cursorFamily(key);
+      if (!family || !refusedStreams.has(family)) continue;
       if (key in stored) result[key] = structuredClone(stored[key]);
       else delete result[key];
     }

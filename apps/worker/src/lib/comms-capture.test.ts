@@ -644,6 +644,44 @@ describe('activity bridge commit lock', () => {
     expect(pending.find((row) => row.id === 'legacy')).toEqual({ id: 'legacy', attempts: 5 });
   });
 
+  it('keeps a refused id at its locked attempt and rolls back only that stream cursor', async () => {
+    const stored = {
+      delta: {
+        mailNextLink: 'page-1',
+        calendarDeltaLink: 'cal-1',
+        activityBridgePending: [
+          ...Array.from({ length: 256 }, (_, index) => ({ id: `e${index}`, attempts: 1, kind: 'email' as const })),
+          { id: 'legacy', attempts: 5 },
+        ],
+      } as Record<string, unknown>,
+    };
+    const update = vi.fn(async (args: { data: { deltaState: Record<string, unknown> } }) => {
+      stored.delta = args.data.deltaState;
+    });
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ delta_state: structuredClone(stored.delta) }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await commitTokenDeltaState(
+      db,
+      'tok-1',
+      stored.delta,
+      { mailNextLink: 'page-2', calendarDeltaLink: 'cal-2' },
+      [{ page: 'mail', failedIds: ['legacy'], settledIds: [], parkUnseen: false, kind: 'email' }],
+      [{ id: 'legacy', result: 'email', attempts: 1 }],
+    );
+    expect(stored.delta.mailNextLink).toBe('page-1');
+    expect(stored.delta.calendarDeltaLink).toBe('cal-2');
+    const pending = stored.delta.activityBridgePending as Array<{ id: string; attempts: number; kind?: string }>;
+    const quarantine = (stored.delta.activityBridgeQuarantine ?? []) as Array<{ id: string; attempts: number; kind?: string }>;
+    const legacyRows = [...pending, ...quarantine].filter((row) => row.id === 'legacy');
+    expect(legacyRows.length).toBeGreaterThan(0);
+    expect(legacyRows.every((row) => row.attempts >= 5)).toBe(true);
+    expect(legacyRows.some((row) => row.attempts === 1)).toBe(false);
+  });
+
   it('does not let one stream hold another that is under its own cap', () => {
     const state: Record<string, unknown> = {
       activityBridgePending: Array.from({ length: 300 }, (_, index) => ({
