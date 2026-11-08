@@ -28,6 +28,8 @@ import type { CalendarEvent } from './types';
 const HOUR_PX = 48;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const LANE_ROW_PX = 28;
+/** WCAG 2.5.8 floor for fine pointers; coarse pointers get 44px via pointer-coarse:min-h-11. */
+const MIN_EVENT_PX = 24;
 
 function columns(count: number): CSSProperties {
   return { gridTemplateColumns: `56px repeat(${count}, minmax(0, 1fr))` };
@@ -175,14 +177,14 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
                   onClick={() => onSelect(b.event)}
                   data-testid="calendar-event"
                   className={cn(
-                    'absolute z-10 flex min-w-0 flex-col overflow-hidden rounded px-1.5 py-0.5 text-left text-xs leading-tight text-white shadow-[var(--shadow-sm)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]',
+                    'absolute z-10 flex min-w-0 flex-col overflow-hidden rounded pointer-coarse:min-h-11 focus-visible:z-20 px-1.5 py-0.5 text-left text-xs leading-tight text-white shadow-[var(--shadow-sm)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]',
                     eventFill(b.event),
                     b.event.syncState === 'CONFLICT' && 'ring-2 ring-[var(--warning)]',
                     b.event.syncState === 'PENDING_PUSH' && 'opacity-80',
                   )}
                   style={{
                     top: (b.startMin / 60) * HOUR_PX + 1,
-                    height: Math.max(height, 18),
+                    height: Math.max(height, MIN_EVENT_PX),
                     left: `calc(${(b.col / b.cols) * 100}% + 2px)`,
                     width: `calc(${100 / b.cols}% - 4px)`,
                   }}

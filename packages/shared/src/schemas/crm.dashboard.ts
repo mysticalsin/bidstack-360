@@ -203,7 +203,7 @@ export const CockpitKpi = z.object({
 });
 export type CockpitKpi = z.infer<typeof CockpitKpi>;
 
-export const AccountCockpitSnapshot = z.object({
+const AccountCockpitBase = z.object({
   company: CrmCompany,
   kpis: z.array(CockpitKpi),
   // Apollo refresh timestamp for the External Intelligence block header
@@ -227,14 +227,25 @@ export const AccountCockpitSnapshot = z.object({
     })
     .optional(),
   technicalStack: z.array(TechnicalStackCategory),
-  health: CompanyHealth,
   keyContacts: z.array(CrmPerson),
   recentActivity: z.array(CrmActivity),
   risks: z.array(RiskItem),
   compliance: z.array(ComplianceCheck),
   roadmap: z.array(RoadmapItem),
 });
+
+/** The live cockpit: the builder always computes a signal-coverage score. */
+export const AccountCockpitSnapshot = AccountCockpitBase.extend({ health: CompanyHealth });
 export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;
+
+/**
+ * A cockpit whose score may be unknown. The stored-snapshot path serves a
+ * company the snapshot was not built for; there is no contact, deal or task
+ * data for it, so it carries `health: null` instead of another company's score.
+ * An AccountCockpitSnapshot is always assignable to this type.
+ */
+export const AccountCockpitMaybeScored = AccountCockpitBase.extend({ health: CompanyHealth.nullable() });
+export type AccountCockpitMaybeScored = z.infer<typeof AccountCockpitMaybeScored>;
 
 export const CrmDashboardSnapshot = z.object({
   generatedAt: z.string().datetime(),

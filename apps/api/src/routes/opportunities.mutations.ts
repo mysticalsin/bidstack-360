@@ -23,6 +23,7 @@ import {
 } from '@bidstack/shared';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 import { serializeOpportunity } from '../serializers/opportunity.js';
 import {
   isUniqueViolation,
@@ -207,6 +208,18 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         stage: created.stage,
         ownerId: created.ownerId,
       });
+      if (created.companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId: created.companyId,
+          kind: 'opportunity_created',
+          actorUserId: req.auth.userId,
+          entityType: 'opportunity',
+          entityId: created.id,
+          title: (company) => `New opportunity on ${company}: ${created.name}`,
+          sourceUrl: `/opportunities/${created.id}`,
+        });
+      }
       return reply.code(201).send(serializeOpportunity(created));
     },
   );

@@ -3,8 +3,11 @@
 // The deployment env names the OAuth apps only (MICROSOFT_GRAPH_CLIENT_ID /
 // MICROSOFT_GRAPH_CLIENT_SECRET, DOCUSIGN_INTEGRATION_KEY /
 // DOCUSIGN_CLIENT_SECRET). Data access always runs as the org's own grant:
-//  - SharePoint: the Entra tenant whose admin consented; tokens are minted
-//    for that tenant and every drive must belong to it.
+//  - SharePoint: the Entra tenant provisioned for the org by an operator
+//    (Org.microsoftTenantId, which no tenant route can write) and consented
+//    by its admin. The callback's tenant parameter is unsigned, so it must
+//    equal the provisioned tenant; tokens are minted for that tenant and
+//    every drive must belong to it.
 //  - DocuSign: the account the consenting user belongs to; a refresh token
 //    (encrypted with INTEGRATION_TOKEN_KEY) and a userinfo check each run.
 // A source may only use a connection of its own org. Env data-access
@@ -112,6 +115,15 @@ export async function connectionReady(orgId: string, kind: AgreementSourceKind, 
   return kind === 'sharepoint' ? graphCredentialsFromEnv(env) !== null : docuSignCredentialsFromEnv(env) !== null;
 }
 
+/** The Entra tenant an operator provisioned for the org, lower-cased, or null. */
+async function provisionedTenant(orgId: string): Promise<string | null> {
+  const org = await prisma.org.findUnique({ where: { id: orgId }, select: { microsoftTenantId: true } });
+  const tenant = org?.microsoftTenantId?.trim().toLowerCase();
+  return tenant && GUID.test(tenant) ? tenant : null;
+}
+
+const NOT_PROVISIONED_TENANT = 'The Microsoft tenant is not the tenant provisioned for this organization';
+
 export type SourceAccess =
   | { kind: 'sharepoint'; token: string; tenantId: string }
   | { kind: 'docusign'; token: string; accountId: string; baseUrl: string };
@@ -125,6 +137,9 @@ async function sharePointAccess(source: SourceRef, conn: ConnectionRow | null, f
     const app = graphApp(env);
     if (!app) throw new ConnectionError('not_configured', 'The Microsoft Graph app is not configured');
     if (!conn.externalTenantId) throw new ConnectionError('not_connected', 'SharePoint is not connected');
+    if (conn.externalTenantId.toLowerCase() !== (await provisionedTenant(source.orgId))) {
+      throw new ConnectionError('ownership', NOT_PROVISIONED_TENANT);
+    }
     creds = { tenantId: conn.externalTenantId, ...app };
   } else {
     creds = graphCredentialsFromEnv(env);
@@ -198,6 +213,10 @@ export async function startConnection(
   const docusign = docuSignAppFromEnv(env);
   if (provider === 'sharepoint' && !graph) throw new ConnectionError('not_configured', 'The Microsoft Graph app is not configured');
   if (provider === 'docusign' && !docusign) throw new ConnectionError('not_configured', 'The DocuSign app is not configured');
+  const tenant = provider === 'sharepoint' ? await provisionedTenant(who.orgId) : null;
+  if (provider === 'sharepoint' && !tenant) {
+    throw new ConnectionError('not_configured', 'No Microsoft tenant is provisioned for this organization; ask an operator to set it');
+  }
   const { state, nonce } = issueOAuthState(provider === 'sharepoint' ? 'agreement_sharepoint' : 'agreement_docusign', who);
   const row = await prisma.agreementConnection.upsert({
     where: { orgId_provider: { orgId: who.orgId, provider } },
@@ -213,7 +232,7 @@ export async function startConnection(
     redirect_uri: redirectUri,
     state,
   });
-  return { url: `https://login.microsoftonline.com/organizations/v2.0/adminconsent?${params.toString()}`, connectionId: row.id };
+  return { url: `https://login.microsoftonline.com/${tenant}/v2.0/adminconsent?${params.toString()}`, connectionId: row.id };
 }
 
 /** Open the sealed state and consume its nonce once (compare-and-swap on the row). */
@@ -240,7 +259,7 @@ async function auditConnection(orgId: string, userId: string, id: string, action
   });
 }
 
-/** Graph admin consent callback: record the consenting tenant after a token works for it. */
+/** Graph admin consent callback: bind the org's provisioned tenant once its admin consented and a token works. */
 export async function completeSharePointConsent(
   q: { state: string; tenant?: string; adminConsent?: string },
   deps: { fetch?: FetchFn; env?: NodeJS.ProcessEnv } = {},
@@ -252,6 +271,7 @@ export async function completeSharePointConsent(
   if (!q.tenant || !GUID.test(q.tenant) || String(q.adminConsent).toLowerCase() !== 'true') {
     throw new ConnectionError('not_connected', 'Admin consent was not granted');
   }
+  if (q.tenant.toLowerCase() !== (await provisionedTenant(who.orgId))) throw new ConnectionError('ownership', NOT_PROVISIONED_TENANT);
   await getGraphAppToken(deps.fetch ?? connectionFetch(), { tenantId: q.tenant, ...app });
   await prisma.agreementConnection.updateMany({
     where: { id: who.id, orgId: who.orgId },

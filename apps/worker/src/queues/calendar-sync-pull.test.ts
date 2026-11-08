@@ -3,20 +3,45 @@
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const bridgeStore = vi.hoisted(() => {
+  const persisted = { delta: {} as Record<string, unknown> };
+  const tokenUpdate = vi.fn(async (args: { data?: { deltaState?: Record<string, unknown> } }) => {
+    if (args?.data?.deltaState) persisted.delta = structuredClone(args.data.deltaState);
+  });
+  const prismaMock = {
+    calendarEvent: {
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      upsert: vi.fn(async () => ({ id: 'row-1' })),
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => ({ id: 'row-1' })),
+    },
+    integrationToken: {
+      update: tokenUpdate,
+      findFirst: vi.fn(async () => ({ deltaState: persisted.delta })),
+    },
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => [{ delta_state: structuredClone(persisted.delta) }]),
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(prismaMock)),
+  };
+  return { persisted, tokenUpdate, prismaMock };
+});
+
+import { ACTIVITY_BRIDGE_RETRY_LIMIT } from '../lib/comms-capture.js';
 import type * as CommsCapture from '../lib/comms-capture.js';
 
-import { prisma } from '@bidstack/db';
+import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { checkSerumConnectorRuntimePolicy } from '@bidstack/db/serum-runtime-policy';
 
 import { pullMicrosoftIncremental } from './calendar-sync-microsoft.js';
-import { pullGoogleIncremental } from './calendar-sync-google.js';
+import { pullGoogleIncremental, renewGoogleWatchChannel } from './calendar-sync-google.js';
 import { ProviderRateLimitError } from '../lib/provider-http.js';
 
 vi.mock('@bidstack/db', () => ({
-  prisma: {
-    calendarEvent: { update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() },
-    integrationToken: { update: vi.fn() },
-  },
+  prisma: bridgeStore.prismaMock,
+  syncCalendarEventActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
+  syncEmailMessageActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
+  EmailProvider: { GMAIL: 'GMAIL', OUTLOOK: 'OUTLOOK' },
 }));
 
 vi.mock('@bidstack/db/serum-runtime-policy', () => ({
@@ -73,6 +98,10 @@ function expectFilingPreserved(provider: string, externalId: string): void {
 }
 
 beforeEach(() => {
+  upsert.mockReset();
+  upsert.mockResolvedValue({ id: 'row-1' } as never);
+  vi.mocked(syncCalendarEventActivity).mockReset();
+  vi.mocked(syncCalendarEventActivity).mockResolvedValue({ action: 'created', activityId: 'act-1' });
   vi.mocked(checkSerumConnectorRuntimePolicy).mockResolvedValue({
     configType: 'connectors',
     configKey: 'registry',
@@ -88,6 +117,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  bridgeStore.persisted.delta = {};
+  vi.mocked(syncCalendarEventActivity).mockResolvedValue({ action: 'created', activityId: 'act-1' });
 });
 
 describe('Microsoft calendar pull', () => {
@@ -124,6 +155,7 @@ describe('Microsoft calendar pull', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
 
+    bridgeStore.persisted.delta = { mailDeltaLink: 'keep-me' };
     await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', { mailDeltaLink: 'keep-me' }, log, 'tony@amaris.com');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -198,6 +230,200 @@ describe('Microsoft calendar pull', () => {
     expectFilingPreserved('microsoft_graph', 'ev-1');
   });
 
+  it('hands each saved event to the activity bridge with Teams, private and declined hints', async () => {
+    upsert.mockResolvedValue({ id: 'row-1' } as never);
+    vi.mocked(syncCalendarEventActivity).mockRejectedValueOnce(new Error('db down'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        json({
+          value: [
+            {
+              id: 'ev-teams',
+              iCalUId: '040000008200E00074C5B7101A82E008',
+              subject: 'Weekly sync',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+              isOnlineMeeting: true,
+              onlineMeetingProvider: 'teamsForBusiness',
+              onlineMeeting: { joinUrl: 'https://teams.microsoft.com/l/meetup-join/abc' },
+            },
+            {
+              id: 'ev-private',
+              subject: 'Doctor',
+              start: { dateTime: '2026-11-09T16:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T17:00:00.0000000', timeZone: 'UTC' },
+              sensitivity: 'private',
+              responseStatus: { response: 'declined' },
+            },
+          ],
+          '@odata.deltaLink': 'd',
+        }),
+      ),
+    );
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log, 'tony@amaris.com');
+
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(syncCalendarEventActivity).toHaveBeenNthCalledWith(1, orgId, 'row-1', {
+      hints: { channel: 'teams', isPrivate: false, ownerDeclined: false },
+    });
+    expect(syncCalendarEventActivity).toHaveBeenNthCalledWith(2, orgId, 'row-1', {
+      hints: { channel: 'in_person_or_other', isPrivate: true, ownerDeclined: true },
+    });
+    // Stored so a colleague's copy of the same meeting merges into one activity.
+    const [teams, priv] = upsert.mock.calls.map((c) => (c[0] as unknown as { update: Record<string, unknown> }).update);
+    expect(teams).toMatchObject({
+      iCalUid: '040000008200E00074C5B7101A82E008',
+      isPrivate: false,
+      ownerResponse: null,
+      meetingChannel: 'teams',
+    });
+    expect(priv).toMatchObject({ iCalUid: null, isPrivate: true, ownerResponse: 'declined' });
+    // The first bridge failed. The saved events stay, but the delta link must
+    // not advance or Graph will never offer those unchanged items again.
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as {
+      data: { deltaState: Record<string, unknown> };
+    };
+    expect(saved.data.deltaState.calendarDeltaLink).toBeUndefined();
+    expect(saved.data.deltaState.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
+  });
+
+  it('quarantines a poison event after the retry bound so the cursor can move', async () => {
+    upsert.mockResolvedValue({ id: 'row-1' } as never);
+    vi.mocked(syncCalendarEventActivity).mockRejectedValue(new Error('db down'));
+    const poison = {
+      value: [
+        {
+          id: 'ev-poison',
+          subject: 'Stuck',
+          start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+          end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+        },
+      ],
+      '@odata.deltaLink': 'd-next',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => json(poison)));
+    let state: Record<string, unknown> = {};
+    for (let attempt = 0; attempt < ACTIVITY_BRIDGE_RETRY_LIMIT - 1; attempt++) {
+      await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', state, log, 'tony@amaris.com');
+      state = (
+        tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }
+      ).data.deltaState;
+      expect(state.calendarDeltaLink).toBeUndefined();
+      expect(state.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
+    }
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', state, log, 'tony@amaris.com');
+    const last = (
+      tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }
+    ).data.deltaState;
+    expect(last.calendarDeltaLink).toBe('d-next');
+    expect(last.calendarNextLink).toBeUndefined();
+    expect(last.activityBridgeQuarantine).toEqual([
+      expect.objectContaining({ id: 'ev-poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
+    ]);
+    expect(JSON.stringify(last.activityBridgeQuarantine)).not.toContain('Stuck');
+  });
+
+  it('holds the page when saving an event throws', async () => {
+    upsert.mockRejectedValueOnce(new Error('write failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'ev-throw',
+              subject: 'Secret subject',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+            },
+          ],
+          '@odata.deltaLink': 'd-next',
+        }),
+      ),
+    );
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log, 'tony@amaris.com');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.calendarDeltaLink).toBeUndefined();
+    expect(saved.data.deltaState.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgePending).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+
+  it('still has not quarantined a row that was never written after repeated failures', async () => {
+    // WHY: three write failures used to spend the bridge budget and then let
+    // the delta link move past an event Polo never stored.
+    upsert.mockRejectedValue(new Error('write failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'ev-throw',
+              subject: 'Secret subject',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+            },
+          ],
+          '@odata.deltaLink': 'd-next',
+        }),
+      ),
+    );
+    let state: Record<string, unknown> = {};
+    for (let attempt = 0; attempt < ACTIVITY_BRIDGE_RETRY_LIMIT; attempt++) {
+      bridgeStore.persisted.delta = structuredClone(state);
+      await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', state, log, 'tony@amaris.com');
+      state = (
+        tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }
+      ).data.deltaState;
+      expect(state.calendarDeltaLink).toBeUndefined();
+      expect(state.activityBridgeQuarantine).toBeUndefined();
+      expect(state.activityBridgeRetryById).toBeUndefined();
+      expect(JSON.stringify(state)).not.toContain('Secret subject');
+    }
+  });
+
+  it('retries a saved event through findFirst and the commit drops it', async () => {
+    // WHY: drain success has to be in the locked merge. The next process
+    // reads that row, not the memory of the process that just exited.
+    const findFirst = vi.mocked(prisma.calendarEvent.findFirst);
+    findFirst.mockResolvedValue({ id: 'row-old' } as never);
+    const start = { activityBridgePending: [{ id: 'ev-old', attempts: 1, kind: 'calendar' as const }] };
+    bridgeStore.persisted.delta = structuredClone(start);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'ev-new',
+              subject: 'New',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+            },
+          ],
+          '@odata.deltaLink': 'd-next',
+        }),
+      ),
+    );
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', start, log, 'tony@amaris.com');
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ externalId: 'ev-old', provider: 'microsoft_graph' }),
+      }),
+    );
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.activityBridgePending).toBeUndefined();
+    expect(saved.data.deltaState.calendarDeltaLink).toBe('d-next');
+    findFirst.mockClear();
+    bridgeStore.persisted.delta = structuredClone(saved.data.deltaState);
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', saved.data.deltaState, log, 'tony@amaris.com');
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
   it('raises a rate limit error with the Retry-After wait on 429', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({}, 429, { 'Retry-After': '9' })));
     const err = await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log).catch((e: unknown) => e);
@@ -233,6 +459,7 @@ describe('Google calendar pull', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
 
+    bridgeStore.persisted.delta = { watchChannelId: 'ch-1' };
     await pullGoogleIncremental('tok-2', orgId, userId, 'at', { watchChannelId: 'ch-1' }, log, 'tony@amaris.com');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -274,11 +501,175 @@ describe('Google calendar pull', () => {
     expectFilingPreserved('google_workspace', 'g-1');
   });
 
+  it('stores a calendar identity per instance of a recurring meeting', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        json({
+          items: [
+            {
+              id: 'g-1',
+              iCalUID: 'weekly@google.com',
+              recurringEventId: 'g-series',
+              originalStartTime: { dateTime: '2026-11-09T10:00:00-05:00' },
+              summary: 'Weekly client sync',
+              start: { dateTime: '2026-11-09T11:00:00-05:00' },
+              end: { dateTime: '2026-11-09T12:00:00-05:00' },
+              attendees: [{ email: 'buyer@acme.com' }],
+            },
+            {
+              id: 'g-2',
+              iCalUID: 'once@google.com',
+              summary: 'Kickoff',
+              start: { dateTime: '2026-11-10T10:00:00-05:00' },
+              end: { dateTime: '2026-11-10T11:00:00-05:00' },
+              attendees: [{ email: 'buyer@acme.com' }],
+            },
+          ],
+          nextSyncToken: 'sync-1',
+        }),
+      ),
+    );
+    await pullGoogleIncremental('tok-2', orgId, userId, 'at', {}, log, 'tony@amaris.com');
+    const ids = upsert.mock.calls.map((c) => (c[0] as unknown as { update: { iCalUid: unknown } }).update.iCalUid);
+    // Moving one instance keeps its original slot, so every attendee's copy still matches.
+    expect(ids).toEqual(['weekly@google.com#2026-11-09T15:00:00.000Z', 'once@google.com']);
+  });
+
+  it('holds the page when saving an event throws', async () => {
+    upsert.mockRejectedValueOnce(new Error('write failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          items: [
+            {
+              id: 'g-throw',
+              summary: 'Secret subject',
+              start: { dateTime: '2026-11-09T10:00:00Z' },
+              end: { dateTime: '2026-11-09T11:00:00Z' },
+            },
+          ],
+          nextSyncToken: 'sync-next',
+        }),
+      ),
+    );
+    bridgeStore.persisted.delta = { watchChannelId: 'ch-1' };
+    await pullGoogleIncremental('tok-2', orgId, userId, 'at', { watchChannelId: 'ch-1' }, log, 'tony@amaris.com');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
+    expect(saved.data.deltaState.watchChannelId).toBe('ch-1');
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+
   it('drops only the calendar cursor when the sync token expires', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({}, 410)));
+    bridgeStore.persisted.delta = { calendarSyncToken: 'old', gmailHistoryId: '77' };
     await pullGoogleIncremental('tok-2', orgId, userId, 'at', { calendarSyncToken: 'old', gmailHistoryId: '77' }, log);
     expect(tokenUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '77' } }) }),
     );
+  });
+
+  it('keeps a drain settlement when a later page returns 410', async () => {
+    // WHY: retry keys are replayed only from the delta list. A 410 that commits
+    // an empty list puts the pending id back on the locked row.
+    bridgeStore.persisted.delta = {
+      calendarSyncToken: 'old',
+      gmailHistoryId: '77',
+      activityBridgePending: [{ id: 'ev-old', attempts: 1, kind: 'calendar' }],
+    };
+    vi.mocked(prisma.calendarEvent.findFirst).mockResolvedValue({ id: 'row-old' } as never);
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          json({
+            items: [
+              {
+                id: 'g-new',
+                summary: 'New',
+                start: { dateTime: '2026-11-09T10:00:00Z' },
+                end: { dateTime: '2026-11-09T11:00:00Z' },
+              },
+            ],
+            nextPageToken: 'page-2',
+          }),
+        )
+        .mockResolvedValueOnce(json({}, 410)),
+    );
+    await pullGoogleIncremental(
+      'tok-2',
+      orgId,
+      userId,
+      'at',
+      {
+        calendarSyncToken: 'old',
+        gmailHistoryId: '77',
+        activityBridgePending: [{ id: 'ev-old', attempts: 1, kind: 'calendar' }],
+      },
+      log,
+    );
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.gmailHistoryId).toBe('77');
+    expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
+    expect(saved.data.deltaState.calendarPageToken).toBeUndefined();
+    const pending = (saved.data.deltaState.activityBridgePending as Array<{ id: string }> | undefined) ?? [];
+    expect(pending.map((row) => row.id)).not.toContain('ev-old');
+  });
+
+  it('a filing failure after the upsert does not enter the bridge budget', async () => {
+    updateMany.mockRejectedValueOnce(new Error('filing failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          items: [
+            {
+              id: 'g-file',
+              summary: 'Secret subject',
+              start: { dateTime: '2026-11-09T10:00:00Z' },
+              end: { dateTime: '2026-11-09T11:00:00Z' },
+            },
+          ],
+          nextSyncToken: 'sync-should-not-land',
+        }),
+      ),
+    );
+    bridgeStore.persisted.delta = { watchChannelId: 'ch-1' };
+    await pullGoogleIncremental('tok-2', orgId, userId, 'at', { watchChannelId: 'ch-1' }, log, 'tony@amaris.com');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgePending).toBeUndefined();
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('g-file');
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+});
+
+describe('Google watch renewal', () => {
+  it('writes the channel through the locked cursor merge and keeps a newer calendar cursor', async () => {
+    process.env.GOOGLE_CALENDAR_WEBHOOK_URL = 'https://example.test/hook';
+    bridgeStore.persisted.delta = { mailDeltaLink: 'keep-mail', calendarDeltaLink: 'keep-delta' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => json({ id: 'channel-1', expiration: String(Date.now() + 86_400_000) })),
+    );
+    await renewGoogleWatchChannel(
+      orgId,
+      'tok-2',
+      'at',
+      log,
+      { calendarNextLink: 'stale-page', calendarDeltaLink: 'old' },
+    );
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.mailDeltaLink).toBe('keep-mail');
+    expect(saved.data.deltaState.calendarDeltaLink).toBe('keep-delta');
+    expect(saved.data.deltaState.calendarNextLink).toBeUndefined();
+    expect(saved.data.deltaState.watchChannelId).toBe('channel-1');
+    delete process.env.GOOGLE_CALENDAR_WEBHOOK_URL;
   });
 });

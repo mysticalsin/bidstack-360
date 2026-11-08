@@ -282,8 +282,13 @@ export async function resolveCockpitCompany(
           [],
           [company],
         );
-    // buildCompanies always appends a Mantu fallback and sorts by name, so pick by name, not position.
-    const resolved = list.find((c) => normalizeName(c.name) === normalizeName(company.name)) ?? null;
+    // buildCompanies always appends a Mantu fallback and sorts by name, so pick by
+    // identity, not position. An enrichment keeps its id unless its display name
+    // matches the Company row, in which case the row's id is stamped on it.
+    const resolved =
+      (byNameEnrichment
+        ? list.find((c) => c.id === byNameEnrichment.id || c.id === company.id)
+        : list.find((c) => normalizeName(c.name) === normalizeName(company.name))) ?? null;
     if (resolved) {
       resolved.id = company.id;
       if (company.domain) resolved.domain = company.domain;
@@ -438,7 +443,7 @@ export async function buildCompanyCockpit(
       // resolved above. Mirrors the shipped pattern in dashboard.service.ts.
       prismaClient.companyFieldOverride.findMany({
         where: { orgId, companyKey: normalizeName(company.name) },
-        select: { fieldKey: true, value: true },
+        select: { fieldKey: true, value: true, currency: true },
         take: 10,
       }),
     ]);

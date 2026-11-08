@@ -20,6 +20,7 @@ import {
 } from '@bidstack/shared';
 
 import { assertCompanyVisible, assertUserInOrg } from './kam-access.js';
+import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
 
 type TaskRow = Prisma.TaskGetPayload<Record<string, never>>;
 
@@ -89,6 +90,7 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       await bumpInitiative(init.id, req.auth.orgId);
+      emitTaskAccountEventSafe({ orgId: req.auth.orgId, taskId: created.id, kind: 'task_created', actorUserId: req.auth.userId });
       reply.code(201);
       return toTaskDetail(created);
     },
@@ -149,6 +151,9 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       await bumpInitiative(existing.initiativeId, req.auth.orgId);
+      if (existing.status !== 'done' && updated.status === 'done') {
+        emitTaskAccountEventSafe({ orgId: req.auth.orgId, taskId: updated.id, kind: 'task_completed', actorUserId: req.auth.userId });
+      }
       return toTaskDetail(updated);
     },
   );

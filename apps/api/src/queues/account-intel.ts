@@ -16,7 +16,9 @@ let connectionSingleton: IORedis | null = null;
 
 /** One account refresh request. */
 export type AccountIntelRefreshJob = Extract<AccountIntelQueueJob, { kind: 'refresh' }>;
-type Enqueue = (job: AccountIntelRefreshJob) => Promise<string | null>;
+/** Every public source plus Apollo organization data for one company (slice 14). */
+export type CompanyFullRefreshJob = Extract<AccountIntelQueueJob, { kind: 'full-refresh' }>;
+type Enqueue = (job: AccountIntelRefreshJob | CompanyFullRefreshJob) => Promise<string | null>;
 let enqueueOverride: Enqueue | null = null;
 
 /** Tests capture enqueues instead of talking to Redis. Pass null to reset. */
@@ -46,6 +48,32 @@ export function accountIntelJobId(job: AccountIntelRefreshJob, now = Date.now())
   return `${job.orgId}--intel--${job.companyId}--${[...job.sources].sort().join('-')}--${now}`;
 }
 
+/** Sources pulled once for a new account: registry first, so filings can use the LEI it finds. */
+export const FIRST_RUN_SOURCES: AccountIntelRefreshJob['sources'] = ['registry', 'financials'];
+
+type IntelRunDb = { intelSourceRun: { createMany(args: { data: Array<{ orgId: string; companyId: string; source: string; status: string }>; skipDuplicates?: boolean }): Promise<unknown> } };
+
+/**
+ * First registry and filings pull for a newly created account. The worker's
+ * scoped filings run ignores the Standard tier pause, so this one run happens
+ * for every account. Never throws: account creation must not depend on Redis.
+ */
+export async function queueFirstAccountIntel(db: IntelRunDb, input: { orgId: string; companyId: string; requestedBy: string | null }): Promise<string | null> {
+  try {
+    const jobId = await enqueueAccountIntel({ kind: 'refresh', ...input, sources: [...FIRST_RUN_SOURCES] });
+    if (jobId) {
+      await db.intelSourceRun.createMany({
+        data: FIRST_RUN_SOURCES.map((source) => ({ orgId: input.orgId, companyId: input.companyId, source, status: 'queued' })),
+        skipDuplicates: true,
+      });
+    }
+    return jobId;
+  } catch (err) {
+    log.warn({ err, orgId: input.orgId, companyId: input.companyId }, 'First account intel run was not queued');
+    return null;
+  }
+}
+
 /** Fail-open: null when Redis is unreachable; the caller reports queued=false. */
 export async function enqueueAccountIntel(job: AccountIntelRefreshJob): Promise<string | null> {
   if (enqueueOverride) return enqueueOverride(job);
@@ -55,6 +83,24 @@ export async function enqueueAccountIntel(job: AccountIntelRefreshJob): Promise<
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue account intel refresh');
+    return null;
+  }
+}
+
+/** One full refresh per company and minute, so double clicks collapse. */
+export function companyFullRefreshJobId(job: CompanyFullRefreshJob, now = Date.now()): string {
+  return `${job.orgId}--intel-full--${job.companyId}--${Math.floor(now / 60_000)}`;
+}
+
+/** Fail-open like enqueueAccountIntel. */
+export async function enqueueCompanyFullRefresh(job: CompanyFullRefreshJob): Promise<string | null> {
+  if (enqueueOverride) return enqueueOverride(job);
+  if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
+  try {
+    const queued = await getQueue().add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) });
+    return queued.id ?? null;
+  } catch (err) {
+    log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue company intel full refresh');
     return null;
   }
 }

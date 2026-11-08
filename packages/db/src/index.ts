@@ -148,6 +148,7 @@ export type {
   KamSessionDraft,
   KamHandoff,
   KamProspection,
+  AccessPolicyVersion,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -189,6 +190,7 @@ export {
   markWebhookOutboxFailed,
   recordWebhookOutboxEvent,
   webhookOutboxBackoffMs,
+  type WebhookOutboxClaimMode,
   type WebhookOutboxRow,
 } from './webhook-outbox.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';
@@ -198,6 +200,7 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
+export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
@@ -227,6 +230,25 @@ export {
   getCompanyActivitySummary,
   weekStartIn,
 } from './services/account-activity.js';
+// Synced meetings and emails as account activities (slice 20).
+export {
+  commsActivityKey,
+  createCommsActivityBridge,
+  syncCalendarEventActivity,
+  syncEmailMessageActivity,
+  type CommsBridgeDb,
+  type CommsBridgeResult,
+  type CommsCaptureMeta,
+  type CommsSkipReason,
+  type MeetingHints,
+} from './services/comms-activity.js';
+export { listAccountConversations } from './services/account-conversations.js';
+export {
+  onAccountActivityCreated,
+  subscribeAccountActivityCreated,
+  type AccountActivityCreated,
+  type AccountActivityListener,
+} from './services/account-activity-events.js';
 
 // Agreement ingest staging (slice 13a), shared by the REST route and MCP.
 export {
@@ -235,6 +257,8 @@ export {
   serializeIngestItem,
   stageAgreementIngest,
 } from './agreements/stage.js';
+export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
+export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
 export type {
   IngestActor as AgreementIngestActor,
   StageAgreementInput,
@@ -242,6 +266,17 @@ export type {
 } from './agreements/stage.js';
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';
+export {
+  intelConnections,
+  loadIntelSummaryInput,
+  markImportBatchCompany,
+  openImportBatch,
+  parseIntelSummary,
+  pruneImportBatches,
+  readCompanyIntelSummaries,
+  readImportBatches,
+  recomputeCompanyIntelSummary,
+} from './company-intel-summary.js';
 export {
   countPartnerEngagements,
   isInternalPartnerRow,

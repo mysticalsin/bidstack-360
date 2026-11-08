@@ -8,6 +8,7 @@ export * from './calendar/index.js';
 export * from './rfp-crew.js';
 export * from './competitor-intel/index.js';
 export * from './company-intel/index.js';
+export * from './company-figures/index.js';
 export * from './tech-stack/index.js';
 export * from './bid-classification/index.js';
 export * from './stage-transitions/index.js';
@@ -23,3 +24,4 @@ export * from './comms/index.js';
 // server-only '@bidstack/shared/public-sector' subpath.
 export * from './public-sector/attribution.js';
 export * from './consulting-partners/index.js';
+export * from './account-alerts/index.js';

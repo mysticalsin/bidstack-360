@@ -53,9 +53,26 @@ a.ci-line-label:hover, .ci-line-label a:hover, .ci-table a:hover, .ci-meta a:hov
 .ci-big { font-size: 26px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; color: var(--sg-ink); font-variant-numeric: tabular-nums; }
 .ci-bars { display: flex; align-items: flex-end; gap: 4px; height: 32px; }
 .ci-bar { flex: 1; min-width: 6px; border-radius: 2px; background: var(--sg-accent); opacity: 0.8; }
+.ci-bars[data-empty] { border-bottom: 1px solid var(--sg-line); }
+.ci-empty { display: grid; gap: 6px; justify-items: start; padding: 12px; border: 1px dashed var(--sg-line); border-radius: 12px; }
+.ci-link:disabled { cursor: default; opacity: 0.6; }
+.ci-nd { font-size: 12px; color: var(--sg-muted); cursor: help; }
 .ci-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
 .ci-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .ci-chip { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--sg-line); color: var(--sg-ink-2); }
+.ci-chip-quiet { color: var(--sg-muted); }
+.ci-focus { display: grid; gap: 4px; margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--surface-subtle, transparent); border: 1px solid var(--sg-line); font-size: 13px; line-height: 1.5; color: var(--sg-ink); }
+.ci-share { display: grid; gap: 4px; }
+.ci-share-label { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--sg-ink); cursor: pointer; text-align: left; }
+.ci-share-label:hover { color: var(--sg-accent); text-decoration: underline; }
+.ci-share-label[aria-pressed='true'] { color: var(--sg-accent); font-weight: 500; }
+.ci-share-label:focus-visible, .ci-link:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: 2px; border-radius: 4px; }
+.ci-share-track { display: block; height: 4px; border-radius: 2px; background: var(--sg-line); overflow: hidden; }
+.ci-share-fill { display: block; height: 100%; background: var(--sg-accent); }
+.ci-posting { display: grid; gap: 6px; }
+.ci-note { margin: 6px 0 0; }
+.ci-link { justify-self: start; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--sg-accent); cursor: pointer; }
+.ci-link:hover { text-decoration: underline; }
 .ci-table-wrap { overflow-x: auto; }
 .ci-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .ci-table th, .ci-table td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--sg-line); color: var(--sg-ink-2); white-space: nowrap; }
@@ -87,3 +104,9 @@ a.ci-line-label:hover, .ci-line-label a:hover, .ci-table a:hover, .ci-meta a:hov
   .ci-refresh [data-spin='true'] { animation: none; }
   .ci-tab { transition: none; }
 }
+
+/* Slice 22: registry rows keep the label and value apart and wrap long identifiers instead of overlapping. */
+.ci-registry-row { min-width: 0; }
+.ci-registry-label { min-width: 0; overflow-wrap: anywhere; }
+.ci-registry-value { display: inline-flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 2px 8px; min-width: 0; max-width: 100%; }
+.ci-registry-text { min-width: 0; overflow-wrap: anywhere; color: var(--sg-ink); }

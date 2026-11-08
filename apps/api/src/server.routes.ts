@@ -64,6 +64,7 @@ import { msaRoutes } from './routes/msa.js';
 import { msaIntakeRoutes } from './routes/msa-intake.js';
 import { agreementIngestRoutes } from './routes/agreement-ingest.js';
 import { msaLeverageRoutes } from './routes/msa-leverage.js';
+import { msaWhitespaceRoutes } from './routes/msa-whitespace.js';
 import { signingEntityRoutes } from './routes/signing-entities.js';
 import { meetingIntelRoutes } from './routes/meeting-intel.js';
 import { marsRoutes } from './routes/mars.js';
@@ -92,8 +93,11 @@ import { leadRotRoutes } from './routes/lead-rot.js';
 import { savedViewsRoutes } from './routes/saved-views.js';
 import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
+import { webhookMessagesRoutes } from './routes/webhook-messages.js';
+import { accessPoliciesRoutes } from './routes/access-policies.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
+import { accountTeamRoutes } from './routes/account-team.js';
 import { accountPeopleRoutes } from './routes/account-people.js';
 import { duplicatesRoutes } from './routes/duplicates.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
@@ -197,6 +201,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(msaIntakeRoutes, { prefix: '/api/v1' });
 await server.register(agreementIngestRoutes, { prefix: '/api/v1' });
   await server.register(msaLeverageRoutes, { prefix: '/api/v1' });
+await server.register(msaWhitespaceRoutes, { prefix: '/api/v1' });
   await server.register(signingEntityRoutes, { prefix: '/api/v1' });
   await server.register(msaRoutes, { prefix: '/api/v1' });
   await server.register(meetingIntelRoutes, { prefix: '/api/v1' });
@@ -283,7 +288,10 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
   await server.register(pluginRoutes, { prefix: '/api/v1' });
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
+  await server.register(webhookMessagesRoutes, { prefix: '/api/v1' });
+  await server.register(accessPoliciesRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
+  await server.register(accountTeamRoutes, { prefix: '/api/v1' });
   await server.register(accountPeopleRoutes, { prefix: '/api/v1' });
   await server.register(duplicatesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
@@ -352,7 +360,7 @@ await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
 
   // Wave 7 — Real-time collaboration REST endpoints (lock + presence snapshot)
   // WHY /api/v1: consistent with other authenticated endpoints.
-  // The WebSocket endpoint /api/realtime is registered by the realtimePlugin above.
+  // The WebSocket endpoint /api/v1/realtime is registered by the realtimePlugin above.
   await server.register(realtimeRoutes, { prefix: '/api/v1' });
 
   // Wave 8 — Voice + Video calls

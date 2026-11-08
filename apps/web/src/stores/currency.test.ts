@@ -24,24 +24,73 @@ describe('useCurrencyStore', () => {
     vi.resetModules();
   });
 
-  it('has correct initial state', async () => {
+  it('starts on the workspace default currency, not the browser time zone', async () => {
+    // WHY: a UTC-3 browser (America/Sao_Paulo) showed R$ on a Canadian
+    // account. The time zone says where the user sits, not how the workspace
+    // reports money.
     const spyLocale = vi.spyOn(Intl.NumberFormat.prototype, 'resolvedOptions').mockReturnValue({
-      locale: 'fr-FR',
+      locale: 'pt-BR',
     } as unknown as Intl.ResolvedNumberFormatOptions);
     const spyTZ = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({
-      timeZone: 'Europe/Paris',
+      timeZone: 'America/Sao_Paulo',
     } as unknown as Intl.ResolvedDateTimeFormatOptions);
 
     const { useCurrencyStore } = await loadCurrency();
     const state = useCurrencyStore.getState();
 
-    expect(state.currency).toBe('EUR');
-    expect(state.autoDetect).toBe(true);
+    expect(state.currency).toBe('CAD');
+    expect(state.autoDetect).toBe(false);
+    expect(state.followOrg).toBe(true);
     expect(state.ratesLoading).toBe(false);
     expect(state.ratesError).toBe(null);
 
     spyLocale.mockRestore();
     spyTZ.mockRestore();
+  });
+
+  it('follows the workspace currency until the user picks one', async () => {
+    const { useCurrencyStore } = await loadCurrency();
+
+    useCurrencyStore.getState().applyOrgCurrency('EUR');
+    expect(useCurrencyStore.getState().currency).toBe('EUR');
+
+    useCurrencyStore.getState().setCurrency('GBP');
+    useCurrencyStore.getState().applyOrgCurrency('USD');
+    expect(useCurrencyStore.getState().currency).toBe('GBP');
+    expect(useCurrencyStore.getState().orgCurrency).toBe('USD');
+
+    useCurrencyStore.getState().followOrgDefault();
+    expect(useCurrencyStore.getState().currency).toBe('USD');
+    expect(useCurrencyStore.getState().followOrg).toBe(true);
+  });
+
+  it('ignores a workspace currency the chooser does not support', async () => {
+    const { useCurrencyStore } = await loadCurrency();
+    useCurrencyStore.getState().applyOrgCurrency('XYZ');
+    expect(useCurrencyStore.getState().currency).toBe('CAD');
+  });
+
+  it('moves a legacy time-zone guess onto the workspace currency but keeps an explicit pick', async () => {
+    const { migratePersistedCurrency } = await loadCurrency();
+    expect(migratePersistedCurrency({ currency: 'BRL', autoDetect: true })).toMatchObject({
+      currency: 'CAD',
+      autoDetect: false,
+      followOrg: true,
+    });
+    expect(migratePersistedCurrency({ currency: 'GBP', autoDetect: false })).toMatchObject({
+      currency: 'GBP',
+      followOrg: false,
+    });
+  });
+
+  it('restores a legacy persisted time-zone guess as the workspace default on load', async () => {
+    localStorage.setItem(
+      'bidstack:currency-locale',
+      JSON.stringify({ state: { currency: 'BRL', autoDetect: true }, version: 0 }),
+    );
+    const { useCurrencyStore } = await loadCurrency();
+    expect(useCurrencyStore.getState().currency).toBe('CAD');
+    expect(useCurrencyStore.getState().followOrg).toBe(true);
   });
 
   it('detects currency correctly based on locale or timezone', async () => {
@@ -181,7 +230,7 @@ describe('useCurrencyStore', () => {
 
     const { useCurrencyStore } = await loadCurrency();
 
-    expect(useCurrencyStore.getState().currency).toBe('USD');
+    expect(useCurrencyStore.getState().currency).toBe('CAD');
     await useCurrencyStore.getState().enableAutoDetect();
 
     expect(getCurrentPosition).toHaveBeenCalled();

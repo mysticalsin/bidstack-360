@@ -12,6 +12,7 @@ import {
   useDeleteProduct,
 } from '@/hooks/useAccountIntel';
 import { useFiles } from '@/hooks/useFiles';
+import { useScrollableTabs } from '@/hooks/useScrollableTabs';
 import { SectionHeader } from '@/components/ui/Card';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
@@ -53,6 +54,7 @@ export function AccountIntelPanel({ accountId }: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
   const [activeTab, setActiveTab] = useState<IntelTabKey>('solutions');
+  const tabStrip = useScrollableTabs(activeTab);
 
   const solutions = intel.data?.solutions ?? [];
   const products = intel.data?.products ?? [];
@@ -113,7 +115,8 @@ export function AccountIntelPanel({ accountId }: Props) {
       />
 
       <div
-        className="flex items-center gap-1 border-b border-[var(--border-subtle)]"
+        ref={tabStrip}
+        className="tab-scroll items-center gap-1 border-b border-[var(--border-subtle)]"
         role="tablist"
         aria-label={t('accountIntel.tablistLabel', 'Account intelligence views')}
       >

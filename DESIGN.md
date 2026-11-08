@@ -675,7 +675,7 @@ Delete all demonstration data? This action cannot be undone.
 - Keyboard: all controls reachable in order; Escape closes drawers and popovers; focus returns to the
   trigger; visible focus ring from `--border-focus`. MatchField rule rows are reorderable by keyboard.
 - Live regions: delivery replay and policy publish results announce via `aria-live="polite"`.
-- Reduced motion honoured everywhere (9.2). Hit targets at least 24 x 24 px.
+- Reduced motion honoured everywhere (9.2). Touch targets at least 44 x 44 px, even when the visible control is smaller.
 - Lighthouse a11y stays at 100 on `/login` and `/dashboard` (baseline in `docs/factory/RECON.md`).
 
 ### 9.7 Account direction (slice 12)
@@ -767,3 +767,97 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Header: section title, last fetched time, and Refresh (lucide `RefreshCw`) for users with `account-intel:write`. Not configured status shows the detail text.
 - Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
+
+### 9.11 Account team, follow and alerts (slice 21)
+
+Internal staffing on an account plus alerts when someone else acts on it. Recipients are Polo users only; nothing here messages customers.
+
+- Account team card, on the company page after the activity charts. Header: "Account team" and, for `companies:write`, an "Add member" button (lucide `UserPlus`). The key account owner shows first as "Account lead" with the "Owner of record" tag and no edit controls (edited on the account record, not here). One row per member: avatar initials, name, role label, allocation as a number plus a 64px bar (`--brand-primary` fill, `--surface-sunken` track; red `--danger` fill when the person's total across accounts is over 100%), and dates ("from Nov 1, 2026", "until ..."). Row actions (Edit, Remove, lucide `Pencil` and `Trash2`, 36px hit area) only for `companies:write`. Empty: one line, "No one on the team yet".
+- Add or edit dialog (existing `Dialog`): person (select of workspace users, add only), role, allocation % (0 to 100), start and end dates. Under allocation, the person's total across accounts with this change applied; over 100% shows a warning line ("Ana would be at 120% across accounts") in `--warning`. Over 100% warns, never blocks. End before start blocks with an inline error.
+- Follow button in the company header, before the view toggle. States: "Follow" (lucide `Bell`), "Following" (lucide `BellRing`, accent), "Muted" (lucide `BellOff`). Automatic followers (team, owner, opp owner) see "Following" with a menu offering "Mute"; a muted user sees "Unmute"; an explicit follower sees "Unfollow" and "Mute". `aria-pressed` reflects following; the reason ("You are on the team") is in the button `title`.
+- Toast for a new alert: the existing `Toast` stack, tone info, title from the alert, description is actor and item, one "Open" action that navigates in-app. Motion follows the toast system, which already respects `prefers-reduced-motion`. A coalesced alert refreshes the same toast instead of stacking.
+- Settings, Notifications: below the existing toggles, a "Delivery" grid. Rows: Account activity, Deals, Tasks, Mentions. Columns: In-app, Email, Teams (checkboxes with visible labels for screen readers). A "Daily digest email" toggle under the grid. Teams block: webhook URL field (password-style, never echoed back; shows the saved host), Save, Send test, Remove. Copy explains to paste the URL from a Teams Workflows "post to a chat or channel when a webhook request is received" flow.
+- Tokens: `.sg` variables, both themes, 12px card radius, tabular numbers for percentages, lucide icons only. Nothing overlaps at 1440, 1024 or 390.
+### 9.11 Conversations on the account page (slice 20)
+
+Synced Outlook, Teams and Gmail meetings and emails filed to the account, shown under the activity charts on the account page. Read-only: Polo never sends mail or writes calendars.
+
+- Section "Conversations": header with the count shown and the source line "From your connected Outlook and Google calendars and mailboxes". One row per meeting or email, newest first, 25 rows, "Show more" pages by 25.
+- Row: lucide icon (`Video` for Teams, `CalendarDays` for other meetings, `Mail` for email), subject (truncates, full text in `title`), date and time in the browser zone, participant count, direction for email (Received, Sent).
+- Source chip on every row, so each fact names its source: `Outlook`, `Teams`, `Gmail`, `Google Calendar`; rows logged in Polo or pushed by the ingest API show `Logged in Polo` or the ingest source name.
+- Filing hint after the chip: "Filed automatically" (matched by attendee or domain) or "Filed by you". When the account has more than one open opportunity and none was picked, a "Needs opportunity" tag shows instead of a guess.
+- Re-file: meetings you own get a "File to opportunity" select (open opportunities on this account plus "Account only"). It calls the existing `PATCH /calendar/events/:id`; emails have no re-file route yet, so no control.
+- Cancelled meetings stay in the list with a "Cancelled" tag and struck subject.
+- Empty: one line, "No synced meetings or emails yet." Error: one line plus Retry. Loading: skeleton rows.
+- Tokens: `--fg-*`, `--border-subtle`, `--brand-primary`; `Badge` for chips; both themes; nothing overlaps at 1440, 1024 or 390.
+### 9.11 Company intel on the Companies page (slice 14)
+
+Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.
+
+- List columns, after Company and Domain: Revenue, Revenue growth, Headcount, Headcount growth (6m), Open roles, New roles (30d), Hiring trend, Funding, Signal, Direction. All sortable on the loaded page; filters run on the server.
+- Saved views as a segmented row above the table: Hiring fast (5 or more new postings in 30 days), Revenue over 1B (USD equivalent), Contracting. `aria-pressed` on the active one; one click again clears it. A Direction select sits beside them.
+- Columns button (lucide `Columns3`) opens a checkbox menu; hidden columns persist per browser in `localStorage` key `polo.companies.columns.v1`.
+- Every number names its source, year or as-of date and method in its hover title and accessible label. Derived numbers (revenue growth, filed headcount growth, direction) say "inferred"; growth values render italic when inferred.
+- Empty values render an en dash with the reason on hover: Not connected, Private company, No public data, plus one line of detail.
+- New roles (30d) is the hiring proxy: postings first published in the last 30 days, with the delta against the prior 30 days. It is never called hires.
+- Hiring trend: vendored TUFFUI sparkline (72 x 28), six monthly points, last point dotted; success tone when the 30 day trend is up, danger when down, tertiary when flat.
+- Direction: `StatusPill` sm with lucide `TrendingUp`, `Minus` or `TrendingDown` and the word Growing, Steady or Contracting; reasons in a tooltip ending with "Inferred". Signal: `StatusPill` with the post kind.
+- Import progress: one row above the table while an import's companies are enriched: origin, done of total, then the result counts when complete (with revenue, headcount growth, new roles 30d).
+- Account header: a compact strip under the name with five buttons: Revenue (with FY), Headcount (with 6m growth), Open roles (with 30 day delta), Funding, Direction. Each opens the matching Intel tab (financials, hiring, hiring, financials, direction). A Refresh button (lucide `RefreshCw`) for `account-intel:write` queues every source.
+- Intel tab on the account page mounts the slice 12 section (9.7).
+- Widths: the table scrolls horizontally inside its card; the strip wraps to two rows at 1024 and stacks at 390. No overlapping text at 1440, 1024 and 390.
+- No taglines or helper text. Tokens only, both themes, tabular numbers, sample data tagged.
+### 9.11 Slice 5 as built (2026-11-07)
+
+Appended by factory slice 5 (Settings > Access policies).
+
+- Builder: one card per rule with When, Then, Conditions and Except fieldsets, a plain sentence that
+  reads the rule back, and Move up / Move down / Remove buttons (keyboard reorder). MatchField was not
+  vendored: upstream it is a fit chart, not a form, so the rule rows use native checkboxes and inputs.
+- Impact preview: the shared `DivergingBars` from `components/charts/tuffui` (gains above the line in `--success`, losses below in
+  `--danger`) with a "View as table" toggle; people and example events per side, one sentence when
+  nothing changes.
+- Approvals and versions: `StatusPill` for Pending, Approved and Live; the author sees a sentence
+  instead of Approve; "Publish vN" and "Roll back to vN" announce through `aria-live="polite"`.
+- Review fixes: the author or submitter sees Withdraw instead of Approve; checkbox groups are named
+  groups; hour inputs say UTC. "Roll back to vN" files a pending request that a second admin approves
+  before it can be published. The preview headline counts people, the sub-line counts actions, and
+  two sentences say what it cannot show: changes that depend on the record country (not enforced at
+  route level yet) and reads (not in the audit log). The tab and its API are Admin only.
+### 9.x Hiring detail and source rules (2026-11-07)
+
+- Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
+- Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
+- Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.
+
+### 9.12 Account and company page layout rules (factory 23, 2026-11-08)
+
+Fix-only rules for the account cockpit (`/accounts/:id`) and company detail (`/companies/:id`). They hold at 1440, 1024, 768 and 390.
+
+- Grid tracks never size to content: use `minmax(0, 1fr)`, never bare `1fr` or `auto 1fr`, for any track that holds text. Cards and every grid or flex child that holds text get `min-width: 0`.
+- Chips wrap. A chip label may wrap onto a second line; a single long word breaks (`overflow-wrap: anywhere`). If a chip must stay on one line it truncates with an ellipsis and carries the full text in `title`.
+- Clipped text always has a way back: any `text-overflow: ellipsis` or line clamp ships with a `title` (or the same text in an `aria-label`) on the clipped element or its row.
+- Tab strips scroll sideways, they never clip: `overflow-x: auto`, `scroll-snap-type: x proximity`, tabs do not shrink (`flex: none`, `white-space: nowrap`), a fade on the trailing edge while more tabs are hidden, and the selected tab scrolls into view. Every tab stays reachable and clickable at 390.
+- Topbar at 390: breadcrumb segments truncate with an ellipsis and a `title`; they never paint over each other. "Skip to content" is invisible and takes no space until it has keyboard focus.
+- Severity reads as a word (High, Medium, Critical, Low), never a single letter. Compliance rows say "Compliance".
+- One logo per header. A decorative status graphic never sits next to the company logo where it reads as a second, empty logo.
+- Empty data shows a sentence, not empty chrome: a chart with no data shows a zero baseline and "No postings in the last 6 months"; empty lists show one muted line and, when the user can act, the action ("Refresh from job boards").
+- A figure the source did not report shows muted "Not disclosed" with a `title` naming the source checked, never a bare "-".
+- Money uses one compact format everywhere on these pages: currency code first, then the amount (`EUR 29.9bn`, `CAD 935m`), from `formatCompactMoney` in `@bidstack/shared`.
+- Display currency defaults to the workspace currency (Settings, Currency and locale). The browser time zone or location is used only when the user picks "Auto"; an explicit pick always wins.
+- Pinned by `e2e/audit/account-company.layout.audit.spec.ts` (overlap per line box, clipped to overflow ancestors, ignoring runs hidden under an opaque positioned layer) and unit tests next to each component.
+
+### 9.11 Sourced company figures (slice 22, 2026-11-08)
+
+Revenue, employees, industry and registry identifiers on the account page show where each number came from, and the user can correct them. Additive only: no existing section is removed or moved.
+
+- Source chip: every revenue, employees and registry value shows a small visible chip under it, `Label · Year` (for example `SEC EDGAR · FY2025`, `Wikidata · 2024`, `Manual · source`). The chip is a link when a source URL exists (new tab, `rel="noopener noreferrer"`), plain text otherwise. 12px, `--fg-tertiary`, underline on hover and focus.
+- Precedence, one rule everywhere: filed statements, then a manual value that carries a source link, then Wikidata (P2123 with its point in time), then a manual value without a source, then the data provider (Apollo or Seamless), then the account's own CRM record. The tile names whichever won.
+- Edit: a quiet `Edit` text button (24 x 24 minimum hit area) next to the chip opens a small inline form: value, source URL (http or https only), source label. Save and Cancel; Escape closes; focus returns to `Edit`. Revenue has a currency select (EUR default; USD, GBP, CAD, CHF, NOK, SEK, DKK, BRL and more) and is stored and shown in that currency. Saved values are audited and show as `Manual`.
+- Empty states say what is missing ("No filed revenue and no public figure found") and offer two actions: `Refresh from public sources` (queues registry and filings refresh plus the Wikidata lookup) and `Add manually` (opens the same form). Never a bare "No data", "Not known" or "Not verified" where an action is possible.
+- Industry never renders as a bare one or two character code: NACE sections, NAICS sectors and SIC divisions map to their names; an unmapped short code shows as "Not known".
+- Registry block (Financials panel): registration number and jurisdiction rows, each with its source chip and Edit; identifiers already matched (LEI, SIREN, Companies House, Brreg, SEC CIK) link to their public register page.
+- Layout: no overlap or spill at 390, 768, 1024 and 1440. Value and chip containers use `min-width: 0`; long values wrap (`overflow-wrap: anywhere`), chips truncate with the full text in `title`; strips and grids collapse to fewer columns. Pinned by `sourced-figures.contract.test.ts`.
+- CRM record: when nothing else has a figure, the number on the account's own record shows with the chip `CRM record · unverified`, so it is visible and honestly labelled. Wikidata headcount gets the same chip as revenue (`Wikidata · Year`, linked to the entity); with no stated year the chip is `Wikidata`.
+- No placeholder text: a tile with nothing to say about its period omits the period line, and a tile with no source and no period shows no hover tip. The words `n/a` and `None` never render.
+- Touch targets: buttons and fields in the technology stack editor are 44px tall; the chip remove control is 44 x 44.

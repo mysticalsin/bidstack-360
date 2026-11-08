@@ -8,7 +8,7 @@
 // empty state.
 
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from 'motion/react';
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
 import { EASE_OUT, enter, exit } from '@/lib/motion-tokens';
@@ -51,13 +51,15 @@ const AXIS = 22;
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 function useWidth() {
-  const ref = useRef<HTMLDivElement>(null);
+  // Callback ref: the chart can mount on its empty state and gain data later,
+  // so measurement attaches whenever the element appears.
+  const [el, ref] = useState<HTMLDivElement | null>(null);
   // null until measured: the chart draws once at its real width, so entrance
   // animations don't tween from a guessed size.
   const [width, setWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- first layout measurement of the attached element.
     setWidth(el.getBoundingClientRect().width || null);
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(([entry]) => {
@@ -65,7 +67,7 @@ function useWidth() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [el]);
   return [ref, width ?? 520, width !== null] as const;
 }
 
@@ -106,17 +108,20 @@ export function DotHistogram({
   const median = quantile(sorted, 0.5);
   const p95 = quantile(sorted, 0.95);
   const top = Math.max(sorted.at(-1) ?? 1, threshold ? threshold * 1.04 : 0) || 1;
-  // Put the threshold on a column edge, so no column is half flagged.
+  // Put the threshold on a column edge, so no column is half flagged. Rounding
+  // down keeps binCount columns wide enough to reach the largest sample; extra
+  // columns are added only when even one column per threshold falls short.
   const size =
-    threshold && threshold < top ? threshold / Math.max(1, Math.round((binCount * threshold) / top)) : top / binCount;
+    threshold && threshold < top ? threshold / Math.max(1, Math.floor((binCount * threshold) / top)) : top / binCount;
+  const cols = Math.max(binCount, Math.ceil(top / size - 1e-9));
 
-  const bins: DotHistogramBin[] = Array.from({ length: binCount }, (_, i) => ({
+  const bins: DotHistogramBin[] = Array.from({ length: cols }, (_, i) => ({
     from: r2(i * size),
     to: r2((i + 1) * size),
     count: 0,
     flagged: threshold !== undefined && i * size >= threshold - size / 1000,
   }));
-  for (const v of values) bins[Math.max(0, Math.min(Math.floor(v / size), binCount - 1))]!.count++;
+  for (const v of values) bins[Math.max(0, Math.min(Math.floor(v / size), cols - 1))]!.count++;
 
   const peak = Math.max(1, ...bins.map((b) => b.count));
   // Tall columns switch to one dot per group so the chart keeps its height.
@@ -124,8 +129,8 @@ export function DotHistogram({
   const rows = Math.ceil(peak / per);
   const plotH = Math.max(rows, 6) * STEP + STEP;
   const mid = plotH / 2;
-  const colW = width / binCount;
-  const x = (v: number) => r2((v / (binCount * size)) * width);
+  const colW = width / cols;
+  const x = (v: number) => r2((v / (cols * size)) * width);
   const flagged = values.filter((v) => threshold !== undefined && v >= threshold).length;
   const binText = (b: DotHistogramBin) => `${format(b.from)} to ${format(b.to)}: ${b.count} ${unit}`;
 

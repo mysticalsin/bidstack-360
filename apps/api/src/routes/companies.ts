@@ -1,9 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, readCompanyIntelSummaries, type Prisma } from '@bidstack/db';
 import {
   Company,
+  COMPANY_INTEL_VIEWS,
+  CompanyIntelSummary,
+  CompanyIntelView,
+  IntelDirection,
   CompanyCreate,
   CompanyDetail,
   CompanyPatch,
@@ -12,12 +16,35 @@ import {
 } from '@bidstack/shared';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
+import { queueFirstAccountIntel } from '../queues/account-intel.js';
 import { queueCompanyTechDetect } from '../queues/company-tech-detect.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
+
+/** A list row: the company plus its stored intel summary (null until the first refresh). */
+const CompanyListItem = Company.extend({ intel: CompanyIntelSummary.nullable() });
+
+/** Saved views and filters on the stored summary columns. */
+function intelFilter(q: {
+  view?: CompanyIntelView;
+  direction?: IntelDirection;
+  minRevenueUsd?: number;
+  minNewRoles30d?: number;
+}): Prisma.CompanyWhereInput {
+  const v = q.view ? COMPANY_INTEL_VIEWS[q.view] : null;
+  const minRevenue = q.minRevenueUsd ?? (v && 'minRevenueUsd' in v ? v.minRevenueUsd : undefined);
+  const minNew = q.minNewRoles30d ?? (v && 'minNewRoles30d' in v ? v.minNewRoles30d : undefined);
+  const direction = q.direction ?? (v && 'direction' in v ? v.direction : undefined);
+  const where: Prisma.CompanyIntelSummaryWhereInput = {
+    ...(minRevenue !== undefined ? { revenueUsdApprox: { gte: minRevenue } } : {}),
+    ...(minNew !== undefined ? { newRoles30d: { gte: minNew } } : {}),
+    ...(direction ? { direction } : {}),
+  };
+  return Object.keys(where).length ? { intelSummary: { is: where } } : {};
+}
 
 /** Per-relation row cap on GET /companies/:id; the full lists have their own paginated routes. */
 const COMPANY_DETAIL_RELATED_CAP = 200;
@@ -33,9 +60,16 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           industry: z.string().max(100).optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
           cursor: z.string().uuid().optional(),
+          view: CompanyIntelView.optional(),
+          direction: IntelDirection.optional(),
+          minRevenueUsd: z.coerce.number().min(0).optional(),
+          minNewRoles30d: z.coerce.number().int().min(0).optional(),
         }),
         response: {
-          200: z.object({ items: z.array(Company), nextCursor: z.string().uuid().optional() }),
+          200: z.object({
+            items: z.array(CompanyListItem),
+            nextCursor: z.string().uuid().optional(),
+          }),
         },
       },
     },
@@ -45,12 +79,14 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       // /crm/companies/search: a restricted user must not list or search
       // companies outside their access groups through this older route.
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const canIntel = await server.hasPermission(req, 'account-intel:read');
       const items = await prisma.company.findMany({
         where: applyCompanyScope(
           {
             orgId: req.auth.orgId,
             deletedAt: null,
             ...(req.query.industry ? { industry: req.query.industry } : {}),
+            ...(canIntel ? intelFilter(req.query) : {}),
             ...(s
               ? {
                   OR: [
@@ -93,8 +129,18 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       const hasMore = items.length > req.query.limit;
       const sliced = hasMore ? items.slice(0, -1) : items;
       const nextCursor = hasMore ? sliced[sliced.length - 1]?.id : undefined;
+      const intel = canIntel
+        ? await readCompanyIntelSummaries(
+            prisma,
+            req.auth.orgId,
+            sliced.map((c) => c.id),
+          )
+        : new Map<string, never>();
 
-      return { items: sliced.map(serializeCompany), nextCursor };
+      return {
+        items: sliced.map((c) => ({ ...serializeCompany(c), intel: intel.get(c.id) ?? null })),
+        nextCursor,
+      };
     },
   );
 
@@ -110,7 +156,10 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const c = await prisma.company.findFirst({
-        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
+        where: applyCompanyScope(
+          { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          scope,
+        ),
         include: {
           parent: { select: { id: true, name: true } },
           children: {
@@ -207,6 +256,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       queueCompanyTechDetect([{ kind: 'refresh', orgId: req.auth.orgId, companyId: c.id, reason: 'create' }]);
+      await queueFirstAccountIntel(prisma, { orgId: req.auth.orgId, companyId: c.id, requestedBy: req.auth.userId });
       reply.status(201);
       return serializeCompany(c);
     },
@@ -258,7 +308,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           'company',
           patch.customFieldValues.map((v) => v.definitionId),
         );
-        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
+        if (foreign.length > 0)
+          throw server.httpErrors.badRequest('Unknown custom field definition');
       }
       // CF upserts included in the same transaction so a CF failure rolls back
       // the company update — prevents partial-update / data corruption (P0 #5).
@@ -308,7 +359,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       ]);
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
       // v23: a tier change starts or stops the financials schedule right away.
-      if (patch.tier !== undefined && patch.tier !== null) await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
+      if (patch.tier !== undefined && patch.tier !== null)
+        await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
 
       const changedFields: string[] = [];
       const changes: Record<string, unknown> = {};
@@ -351,7 +403,10 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const root = await prisma.company.findFirst({
-        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
+        where: applyCompanyScope(
+          { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          scope,
+        ),
         select: { id: true, name: true, parentId: true },
       });
       if (!root) throw server.httpErrors.notFound('Company not found');

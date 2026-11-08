@@ -106,11 +106,11 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
     'account header must show its key numbers',
   ).toBeVisible();
 
-  // 5c. Everything else folds behind "Account details"; open it, then the KPI
-  //     region must mount. Count may be 0 for accounts without enrichment data.
+  // 5c. The cockpit sits in "Account details", open by default; the KPI region
+  //     must mount. Count may be 0 for accounts without enrichment data.
   const fold = page.getByRole('button', { name: /^Account details/ });
   await expect(fold, 'account details fold must be present').toBeVisible();
-  await fold.click();
+  if ((await fold.getAttribute('aria-expanded')) !== 'true') await fold.click();
   await expect(fold).toHaveAttribute('aria-expanded', 'true');
   const kpiGrid = page.getByRole('region', { name: /account metrics/i });
   await expect(kpiGrid, 'account metrics region must mount').toBeVisible();
@@ -184,7 +184,9 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
   await expect(issues, 'open issues card must mount').toBeVisible();
   for (const bucket of ['Critical', 'High', 'Medium', 'Low']) {
     await expect(
-      issues.getByText(new RegExp(`^${bucket}$`)),
+      // Scoped to the bucket row: an open risk row now spells its severity
+      // out too (High), so the bare label can appear twice in the card.
+      issues.locator('.issue-bucket').getByText(new RegExp(`^${bucket}$`)),
       `open issues must always show the "${bucket}" bucket — even at zero`,
     ).toBeVisible();
   }
