@@ -139,4 +139,14 @@ describe('worker source stays on the shared contract', () => {
     expect(worker).toContain("idFromName('box')");
     expect(worker).not.toContain('wrangler deploy');
   });
+
+  it('pins upstream proxy targets to the configured origin', () => {
+    const worker = readFileSync(join(here, 'worker.js'), 'utf8');
+    expect(worker).toContain('const target = targetUrl(url.pathname + url.search, upstream.origin);');
+    expect(worker).not.toMatch(/new URL\(url\.pathname \+ url\.search/);
+    const escaped = new URL('https://polo-preview.example//attacker.example/payload?x=1');
+    const target = targetUrl(escaped.pathname + escaped.search, 'https://upstream.example');
+    expect(target.origin).toBe('https://upstream.example');
+    expect(target.search).toBe('?x=1');
+  });
 });
