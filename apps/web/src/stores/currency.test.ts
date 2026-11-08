@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { microsToUnits } from '@bidstack/shared';
 
-import { convertMicrosByRates, useCurrencyStore } from './currency';
+import { convertMicrosByRates, restoreStoredCurrency, useCurrencyStore } from './currency';
 import { useDisplayMoney } from '../hooks/useDisplayMoney';
 import { formatStoredMicros, useFormatMoney } from '../hooks/useFormatMoney';
 import { formatMoney, formatMoneyMicros } from '../lib/format';
@@ -295,6 +295,22 @@ describe('useCurrencyStore', () => {
     expect(useCurrencyStore.getState().rates?.rates.BRL).toBe(6);
   });
 
+  it('does not restore a persisted currency outside the supported codes', async () => {
+    expect(restoreStoredCurrency('EUR', 'USD')).toBe('EUR');
+    expect(restoreStoredCurrency('NOTREAL', 'USD')).toBe('USD');
+    expect(restoreStoredCurrency('usd', 'GBP')).toBe('GBP');
+    expect(restoreStoredCurrency(12, 'USD')).toBe('USD');
+    expect(restoreStoredCurrency({ code: 'EUR' }, 'GBP')).toBe('GBP');
+    localStorage.setItem(
+      'bidstack:currency-locale',
+      JSON.stringify({ state: { currency: 12, autoDetect: false }, version: 0 }),
+    );
+    await useCurrencyStore.persist.rehydrate();
+    expect(useCurrencyStore.getState().currency).not.toBe(12 as unknown as string);
+    expect(typeof useCurrencyStore.getState().currency).toBe('string');
+    expect(useCurrencyStore.getState().currency).toMatch(/^[A-Z]{3}$/);
+  });
+
   it('updates currency state via setCurrency and clears autoDetect', async () => {
     const { useCurrencyStore } = await loadCurrency();
 
@@ -456,6 +472,17 @@ describe('useCurrencyStore', () => {
     expect(result.current).toContain('9,907,919,180,215,092');
     const formatted = renderHook(() => useFormatMoney());
     expect(formatted.result.current.formatMoney(huge, 'EUR')).toBe(full);
+  });
+
+  it('keeps the source cents when unit conversion is unavailable', () => {
+    useCurrencyStore.setState({ currency: 'USD', rates: null });
+    const shown = renderHook(() => useDisplayMoney(2.5, 'EUR'));
+    expect(shown.result.current).toContain('2.50');
+    expect(shown.result.current).toContain('€');
+    expect(shown.result.current).not.toContain('$');
+    const formatted = renderHook(() => useFormatMoney());
+    expect(formatted.result.current.formatMoney(2.5, 'EUR')).toContain('2.50');
+    expect(formatted.result.current.formatMoney(2.5, 'EUR')).toContain('€');
   });
 
   it('does not print a collapsed number when the micros converter is omitted', () => {

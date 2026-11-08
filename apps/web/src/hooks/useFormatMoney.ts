@@ -14,13 +14,14 @@ import { formatConvertedMicros, formatMoney, formatMoneyMicros } from '@/lib/for
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 
-function formatPlainMoney(value: number, currency: string): string {
-  try {
-    return formatMoney(value, currency);
-  } catch {
-    const label = currency.trim() || 'unspecified';
-    return `${value} ${label}`;
-  }
+/** Unit amount in its own currency, including cents. A failed conversion uses this instead of the display code. */
+export function formatPlainMoney(value: number, currency: string): string {
+  const label = currency.trim() || 'unspecified';
+  if (!Number.isFinite(value)) return `${value} ${label}`;
+  const negative = value < 0;
+  const micros = unitsToMicros(negative ? -value : value);
+  if (micros == null) return `${value} ${label}`;
+  return formatMoneyMicros(negative ? -micros : micros, currency, { compact: false });
 }
 
 function formatSourceOrDisplay(micros: bigint, currency: string, compact: boolean): string {

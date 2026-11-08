@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 
 import { useCurrencyStore } from '@/stores/currency';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
-import { formatConvertedMicros, formatMoney } from '@/lib/format';
-import { formatStoredMicros } from '@/hooks/useFormatMoney';
+import { formatConvertedMicros } from '@/lib/format';
+import { formatPlainMoney, formatStoredMicros } from '@/hooks/useFormatMoney';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 
@@ -20,7 +20,7 @@ export function useDisplayMoney(value: number, sourceCurrency?: string | null): 
   const source = sourceCurrency?.trim();
   if (!source) return formatUnspecifiedAmount(value);
   const converted = convertAmountMicros(value, source);
-  if (converted == null) return formatMoney(value, currency);
+  if (converted == null) return formatPlainMoney(value, source);
   return formatConvertedMicros(converted, currency);
 }
 

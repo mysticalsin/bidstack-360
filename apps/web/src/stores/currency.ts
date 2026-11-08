@@ -26,6 +26,13 @@ export const SUPPORTED_CURRENCIES = [
 
 export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]['code'];
 
+/** A persisted display currency is one of the 13 codes. Anything else, including a non-string, is not restored. */
+export function restoreStoredCurrency(value: unknown, fallback: CurrencyCode): CurrencyCode {
+  if (typeof value !== 'string') return fallback;
+  const match = SUPPORTED_CURRENCIES.find((item) => item.code === value);
+  return match ? match.code : fallback;
+}
+
 interface ExchangeRates {
   base: string;
   rates: Record<string, number>;
@@ -490,6 +497,14 @@ export const useCurrencyStore = create<CurrencyStore>()(
     {
       name: 'bidstack:currency-locale',
       partialize: (state) => ({ currency: state.currency, autoDetect: state.autoDetect }),
+      merge: (persisted, current) => {
+        const saved = persisted as { currency?: unknown; autoDetect?: unknown } | undefined;
+        return {
+          ...current,
+          currency: restoreStoredCurrency(saved?.currency, current.currency),
+          autoDetect: typeof saved?.autoDetect === 'boolean' ? saved.autoDetect : current.autoDetect,
+        };
+      },
     },
   ),
 );
