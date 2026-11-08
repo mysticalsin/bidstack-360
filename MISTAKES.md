@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-08 BUG: `formatMoneyMicros` rendered a Number, not the stored micros
+
+- **What went wrong:** The hook fix passed exact micros to `formatMoneyMicros`, which then computed `Number(whole) + Number(remainder) / 1e6` before Intl. `9007199254740993000000n` rendered `€9,007,199,254,740,992.00`, and inside the int8 column range `9223372036854774999n` rendered `.78` instead of `.77`.
+- **Root cause:** The precision tests compared hook output to the same formatter, so a formatter that rounds passed. A spy on the argument proved the input, not the screen.
+- **Prevention rule:** Money rendering tests assert literal expected strings. Give Intl the exact decimal string built with BigInt, never a Number of units.
+- **Files affected:** `apps/web/src/lib/format.ts`, `apps/web/src/lib/format.test.ts`, `apps/web/src/stores/currency.test.ts`.
+
+---
+
 ### 2026-11-08 BUG: display micros were rebuilt with `amount * 1e6` even when the currency did not change
 
 - **What went wrong:** `formatConvertedMicros` turned a bigint into a Number of units and back with `Math.round(amount * 1e6)` before `formatMoneyMicros`. For `9007199254740993000000n` the integer became `9007199254740992000000` even when source and display currency were the same, or the rate quote was exactly 1. A finite cross rate whose scaled micros overflowed became an em dash.

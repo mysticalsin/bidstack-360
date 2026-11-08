@@ -628,15 +628,40 @@ describe('micros precision before formatting', () => {
     expect(fractional.result.current).toBe('—');
   });
 
-  it('does not treat the formatter output as the stored integer past its safe range', () => {
-    // formatMoneyMicros itself turns the unit count into a Number. Past
-    // Number.MAX_SAFE_INTEGER the rendered text is not the stored integer.
-    const rendered = formatMoneyMicros(HUGE_MICROS.toString(), 'EUR', {
-      compact: false,
-      locale: 'en-US',
+  it('renders the exact stored digits on screen, not just the formatter argument', () => {
+    // Literal expectations: agreeing with the formatter would also pass a
+    // renderer that rounds 9007199254740993 to ...992.
+    const full = { compact: false };
+    useCurrencyStore.setState({ currency: 'EUR', rates: null });
+    const same = renderHook(() => useFormatMoney()).result.current;
+    expect(same.formatMoneyMicros(HUGE_MICROS, 'EUR', full)).toBe('€9,007,199,254,740,993.00');
+    expect(same.formatMoneyMicros(-HUGE_MICROS, 'EUR', full)).toBe('-€9,007,199,254,740,993.00');
+
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 1 }, date: 'parity' },
     });
-    expect(rendered).toContain('€');
-    expect(rendered).not.toContain('9007199254740993');
+    const parity = renderHook(() => useFormatMoney()).result.current;
+    expect(parity.formatMoneyMicros(HUGE_MICROS, 'EUR', full)).toBe('$9,007,199,254,740,993.00');
+    expect(parity.formatMoneyMicros(-HUGE_MICROS, 'EUR', full)).toBe('-$9,007,199,254,740,993.00');
+    const display = renderHook(() => useDisplayMoneyMicros(HUGE_MICROS, 'EUR', full));
+    expect(display.result.current).toBe('$9,007,199,254,740,993.00');
+
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 1.1 }, date: 'live' },
+    });
+    const cross = renderHook(() => useFormatMoney()).result.current;
+    expect(cross.formatMoneyMicros(HUGE_MICROS, 'EUR', full)).toBe('€9,007,199,254,740,993.00');
+    expect(cross.formatMoneyMicros(-HUGE_MICROS, 'EUR', full)).toBe('-€9,007,199,254,740,993.00');
+    expect(cross.formatMoneyMicros(100_000_000n, 'EUR', full)).toBe('$110.00');
+    expect(cross.formatMoneyMicros(-100_000_000n, 'EUR', full)).toBe('-$110.00');
+  });
+
+  it('keeps the formatter exact when called directly past Number.MAX_SAFE_INTEGER units', () => {
+    expect(
+      formatMoneyMicros(HUGE_MICROS.toString(), 'EUR', { compact: false, locale: 'en-US' }),
+    ).toBe('€9,007,199,254,740,993.00');
   });
 });
 

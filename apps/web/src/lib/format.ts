@@ -99,16 +99,20 @@ export function formatMoneyMicros(
         ? BigInt(Math.trunc(micros))
         : BigInt(micros);
   const million = BigInt(1_000_000);
-  const whole = asBigInt / million;
-  const remainder = asBigInt % million;
-  const value = Number(whole) + Number(remainder) / 1_000_000;
-  const compact = options.compact ?? Math.abs(value) >= 1000;
+  const negative = asBigInt < BigInt(0);
+  const magnitude = negative ? -asBigInt : asBigInt;
+  // Intl rounds a decimal string exactly; a Number cannot hold 6 fraction
+  // digits past ~1e9 units, so cents and whole units would drift.
+  const exact = `${negative ? '-' : ''}${magnitude / million}.${(magnitude % million)
+    .toString()
+    .padStart(6, '0')}` as `${number}`;
+  const compact = options.compact ?? magnitude >= BigInt(1000) * million;
   return new Intl.NumberFormat(resolvedLocale, {
     style: 'currency',
     currency: resolvedCurrency,
     notation: compact ? 'compact' : 'standard',
     maximumFractionDigits: compact ? 1 : 2,
-  }).format(value);
+  }).format(exact);
 }
 
 /** Same as formatMoneyMicros but always returns full-precision (e.g. tooltips). */
