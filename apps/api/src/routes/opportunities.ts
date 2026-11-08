@@ -16,10 +16,10 @@ import {
   OpportunityFull,
   OpportunityPage,
   OpportunityPatch,
-  QueryFlag,
   opportunityDocumentPage,
   opportunityDocumentTake,
   unitsToMicros,
+  QueryBoolean,
 } from '@bidstack/shared';
 
 import {
@@ -177,7 +177,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           pipelineStageId: z.string().uuid().optional(),
-          excludeClosed: QueryFlag.optional(),
+          excludeClosed: QueryBoolean.optional(),
         }),
         response: { 200: z.object({ count: z.number().int() }) },
       },

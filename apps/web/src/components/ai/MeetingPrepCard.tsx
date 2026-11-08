@@ -101,7 +101,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
                 {result.openOpps.map((opp) => (
                   <li key={opp.id} className="text-xs text-[var(--fg-primary)]">
                     {opp.title}{' '}
-                    <span className="rounded-sm bg-[var(--surface-sunken)] px-1.5 py-0.5 text-[10px] text-[var(--fg-tertiary)]">
+                    <span className="rounded-sm bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs text-[var(--fg-tertiary)]">
                       {opp.stage}
                     </span>
                   </li>
@@ -158,7 +158,7 @@ export function MeetingPrepCard({ calendarEventId }: MeetingPrepCardProps) {
             </div>
           ) : null}
 
-          <p className="text-[10px] text-[var(--fg-muted)]">
+          <p className="text-xs text-[var(--fg-muted)]">
             {t('meetingPrep.cost', 'Cost: ${{amount}}', {
               amount: (result.costMicros / 1_000_000).toFixed(4),
             })}

@@ -859,10 +859,11 @@ select:focus-visible {
      modal/overlay layer (z-40+) so dialogs still cover the sidebar. */
   z-index: 20;
   overflow-y: auto;
-  /* Width comes from the parent grid (--sidebar-w on .app-shell). We claim
-     the full track width so collapse can never produce a stale gutter. */
+  /* While the track eases wider, labels are already back at full width;
+     clip them instead of flashing a horizontal scrollbar. */
+  overflow-x: hidden;
   /* Width is driven solely by the parent grid track (--sidebar-w on
-     .app-shell): 220px expanded, 56px collapsed. We fill that track at 100%.
+     .app-shell): 232px expanded, 64px collapsed. We fill that track at 100%.
      DO NOT hard-code a px width here — a second width declaration overrides
      this 100% and pins the element at one size inside a resizing track, which
      produced the broken "220px sidebar jammed into a 56px rail" regression. */
@@ -876,11 +877,11 @@ select:focus-visible {
    take over labeling on hover/focus. The actual width comes from the
    parent grid via --sidebar-w (set by .app-shell.has-collapsed-sidebar). */
 .sidebar.is-collapsed {
-  /* 5px, not 8 — see the --sidebar-w note on .app-shell: at a 56px rail this is
-     what keeps the icon buttons ≥44px wide for coarse pointers. */
-  padding-left: 5px;
-  padding-right: 5px;
-  /* Let the section hover-flyouts escape the 56px rail as popovers. With
+  /* 64 - 0.5 border - 16 padding leaves 47.5px items, above the 44px
+     coarse-pointer touch target. */
+  padding-left: 8px;
+  padding-right: 8px;
+  /* Let the section hover-flyouts escape the 64px rail as popovers. With
      overflow-y:auto the browser also computes overflow-x:auto, so the absolute
      flyouts (left:100%, 180px wide) extended the rail's scroll width to ~251px
      and produced a stray horizontal scrollbar + a scrollable second column.
@@ -1281,7 +1282,8 @@ select:focus-visible {
   left: -8px;
   width: 8px;
 }
-.sb-parent-container:hover .sb-flyout {
+.sb-parent-container:hover .sb-flyout,
+.sb-parent-container:focus-within .sb-flyout {
   opacity: 1;
   visibility: visible;
 }
@@ -2553,24 +2555,24 @@ select:focus-visible {
 
 /* ---------- App shell ---------- */
 .app-shell {
-  /* WHY a CSS var: the sidebar itself is 220px (or 56px collapsed) — driving
+  /* WHY a CSS var: the sidebar itself is 232px (or 64px collapsed); driving
      both the grid AND the sidebar width from one variable keeps them in sync
      so a collapsed icon rail can't leave a stale gutter beside the content. */
-  --sidebar-w: 220px;
+  --sidebar-w: 232px;
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
-  /* Do not animate the grid track: it reflows the full CRM dashboard during
-     sidebar toggles and pushes INP over the enterprise performance budget. */
+  /* Keep this at or under 250ms: every frame reflows the page column. The
+     toggle handler only flips a class, so the click itself stays cheap. */
+  transition: grid-template-columns 200ms var(--ease-ui-out);
+}
+.app-shell:has(> .sidebar[data-motion='instant']) {
   transition: none;
 }
 .app-shell.has-collapsed-sidebar,
 [data-sidebar-collapsed='true'] .app-shell {
-  /* 56px = the reference's w-14 rail. The rail's own 0.5px right border eats
-     into that, so the collapsed padding is 5px per side, not 8: 56 − 0.5 − 10
-     leaves items 45.5px wide, which clears the 44px coarse-pointer touch-target
-     floor. Widening the padding drops below it — measured, not guessed. */
-  --sidebar-w: 56px;
+  /* DESIGN.md 9.4: 64px collapsed rail (see the .sidebar.is-collapsed padding). */
+  --sidebar-w: 64px;
 }
 .app-shell .main {
   min-width: 0;
@@ -2656,10 +2658,22 @@ select:focus-visible {
     min-width: 0;
   }
 }
-@media (max-width: 767px) {
+/* Console shell breakpoint (shellBreakpoint.ts): below 56rem the rail is
+   replaced by the in-place drawer, so the grid drops to one column. */
+@media (max-width: 55.99rem) {
   .app-shell {
     grid-template-columns: 1fr;
   }
+  .sidebar {
+    display: none;
+  }
+}
+@media (min-width: 56rem) {
+  .tb-nav-toggle {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
   .app-shell .page {
     gap: 16px;
     padding: 16px 14px 48px;
@@ -2669,9 +2683,6 @@ select:focus-visible {
   }
   .app-shell .page:has([data-fab-clear]) {
     padding-bottom: calc(var(--fab-clearance) + var(--fab-size));
-  }
-  .sidebar {
-    display: none;
   }
   .topbar {
     gap: 6px;
@@ -2710,20 +2721,41 @@ select:focus-visible {
   }
 }
 
-/* ---------- Mobile navigation ---------- */
-.mobile-nav-backdrop {
+/* ---------- Navigation drawer (below 56rem) ---------- */
+/* Always mounted below 56rem; closed = hidden after the slide-out finishes
+   (visibility waits out the exit transition, then drops it from the
+   accessibility tree and the tab order). */
+.mobile-nav-root {
   position: fixed;
   inset: 0;
   z-index: 50;
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s linear 220ms;
+}
+.mobile-nav-root[data-state='open'] {
+  visibility: visible;
+  pointer-events: auto;
+  transition: none;
+}
+.mobile-nav-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  cursor: default;
   background: var(--surface-overlay);
   backdrop-filter: blur(4px);
-  animation: mobile-nav-fade-in 180ms ease-out;
+  opacity: 0;
+  transition: opacity 150ms var(--ease-ui-out);
 }
-.mobile-nav-backdrop[data-state='closed'] {
-  animation: mobile-nav-fade-out 140ms ease-in;
+.mobile-nav-root[data-state='open'] .mobile-nav-backdrop {
+  opacity: 1;
+  transition-duration: 210ms;
 }
 .mobile-nav-drawer {
-  position: fixed;
+  position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
@@ -2732,56 +2764,31 @@ select:focus-visible {
   background: var(--surface-card);
   border-right: 1px solid var(--border-default);
   box-shadow: var(--shadow-lg);
-  z-index: 51;
   display: flex;
   flex-direction: column;
-  /* Clip at the drawer edge so only the inner <nav> scrolls (vertically) — no
+  /* Clip at the drawer edge so only the inner <nav> scrolls (vertically): no
      drawer-level horizontal/vertical overflow or rubber-band. */
   overflow: hidden;
   overscroll-behavior: contain;
-  animation: mobile-nav-slide-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+  transform: translateX(-105%);
+  transition: transform 220ms var(--ease-drawer);
 }
-.mobile-nav-drawer[data-state='closed'] {
-  animation: mobile-nav-slide-out 180ms cubic-bezier(0.4, 0, 0.2, 1);
+.mobile-nav-root[data-state='open'] .mobile-nav-drawer {
+  transform: none;
+  transition-duration: 320ms;
 }
-@keyframes mobile-nav-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes mobile-nav-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-@keyframes mobile-nav-slide-in {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-@keyframes mobile-nav-slide-out {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-100%);
-  }
+.mobile-nav-root[data-motion='instant'],
+.mobile-nav-root[data-motion='instant'] * {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
 }
 @media (prefers-reduced-motion: reduce) {
-  .mobile-nav-backdrop,
-  .mobile-nav-backdrop[data-state='closed'],
-  .mobile-nav-drawer,
-  .mobile-nav-drawer[data-state='closed'] {
-    animation-duration: 1ms;
+  .app-shell,
+  .mobile-nav-root,
+  .mobile-nav-root * {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
   }
 }
 

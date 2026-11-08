@@ -12,6 +12,8 @@ import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 
+import { resolveRegionalBucket, type DataRegion } from '@bidstack/shared';
+
 /**
  * RFC 5987 safe Content-Disposition filename encoding. Rejects control chars
  * outright and percent-encodes everything else that isn't a safe token char.
@@ -241,9 +243,9 @@ class S3Storage implements StorageAdapter {
     this.signer = args.signer;
   }
 
-  static async create(): Promise<S3Storage> {
-    const bucket = process.env.S3_BUCKET;
-    const region = process.env.S3_REGION ?? 'us-east-1';
+  static async create(target?: { bucket: string; s3Region: string }): Promise<S3Storage> {
+    const bucket = target?.bucket ?? process.env.S3_BUCKET;
+    const region = target?.s3Region ?? process.env.S3_REGION ?? 'us-east-1';
     const endpoint = process.env.S3_ENDPOINT || undefined;
     const forcePathStyle = process.env.S3_FORCE_PATH_STYLE === 'true';
     if (!bucket) throw new Error('S3_BUCKET env var required when STORAGE_DRIVER=s3');
@@ -388,7 +390,28 @@ export async function getStorage(): Promise<StorageAdapter> {
   return cached;
 }
 
+const regional = new Map<DataRegion, StorageAdapter>();
+
+/**
+ * Storage for an org's data residency tag. With STORAGE_DRIVER=s3 and
+ * S3_BUCKET_<REGION> set, returns a client bound to that bucket; otherwise the
+ * default adapter (or a DataResidencyError when DATA_RESIDENCY_ENFORCE=true).
+ * Used by tenant exports today; file uploads still use getStorage().
+ */
+export async function getStorageForRegion(region: DataRegion | null): Promise<StorageAdapter> {
+  const driver = (process.env.STORAGE_DRIVER ?? 'local').toLowerCase();
+  if (driver !== 's3' || !region) return getStorage();
+  const target = resolveRegionalBucket(region, process.env);
+  if (!target.regional || !target.bucket) return getStorage();
+  const hit = regional.get(region);
+  if (hit) return hit;
+  const adapter = await S3Storage.create({ bucket: target.bucket, s3Region: target.s3Region });
+  regional.set(region, adapter);
+  return adapter;
+}
+
 // Test seam: lets unit tests inject a fake adapter.
 export function __setStorageForTest(adapter: StorageAdapter | null): void {
   cached = adapter;
+  regional.clear();
 }

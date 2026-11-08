@@ -65,7 +65,12 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
+    if (message.type() !== 'error') return;
+    // /api/v1/logo fetches brand icons from public CDNs and answers 404 when a
+    // CDN is unreachable (CI runners); the tech stack falls back to a monogram,
+    // so a failed icon load is not an app error. Every other error still fails.
+    if (message.location().url.includes('/api/v1/logo')) return;
+    errors.push(message.text());
   });
 
   const { accountId, snapshot } = await fetchAccountSnapshot(page.request);

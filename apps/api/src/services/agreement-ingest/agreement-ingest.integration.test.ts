@@ -100,6 +100,7 @@ beforeAll(async () => {
   _resetIntegrationTokenKey();
   org = await createIsolatedOrg('agreement-ingest');
   const admin = (await prisma.user.findFirstOrThrow({ where: { orgId: org.orgId }, orderBy: { createdAt: 'asc' } })).id;
+  await prisma.org.update({ where: { id: org.orgId }, data: { microsoftTenantId: TENANT } });
   await prisma.agreementConnection.create({ data: { orgId: org.orgId, provider: 'sharepoint', status: 'connected', externalTenantId: TENANT, createdById: admin } });
   await prisma.agreementConnection.create({
     data: { orgId: org.orgId, provider: 'docusign', status: 'connected', accountId: 'acct', baseUri: 'https://demo.docusign.net', secretEncrypted: encryptToken('refresh-0'), createdById: admin },
