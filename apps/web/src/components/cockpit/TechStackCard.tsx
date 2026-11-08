@@ -306,7 +306,7 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
                 />
                 {visibleStack.map((cat) => (
                   <ReadOnlyStackCategory
-                    key={cat.label}
+                    key={`${cat.stack ?? ''}-${cat.label}`}
                     category={cat}
                     reducedMotion={reducedMotion}
                   />
@@ -645,7 +645,9 @@ function ReadOnlyStackCategory({
 }) {
   return (
     <div>
-      <div className="tech-category-label">{category.label}</div>
+      <div className="tech-category-label">
+        {category.stack ? `${category.stack} · ${category.label}` : category.label}
+      </div>
       <div className="tech-pills">
         {category.items.slice(0, 6).map((item, index) => (
           <motion.span
@@ -1513,6 +1515,19 @@ function TechStackEditor({
           {draft.map((category, categoryIndex) => (
             <div className="tech-editor-category" key={`${category.label}-${categoryIndex}`}>
               <div className="tech-editor-category-header">
+                <input
+                  value={category.stack ?? ''}
+                  placeholder={t('techStack.mainStack', 'Main stack')}
+                  onChange={(event) =>
+                    onDraftChange(
+                      draft.map((item, index) =>
+                        index === categoryIndex ? { ...item, stack: event.target.value } : item,
+                      ),
+                    )
+                  }
+                  aria-label={`Stack for category ${categoryIndex + 1}`}
+                  className="tech-editor-category-input"
+                />
                 <input
                   value={category.label}
                   onChange={(event) =>
@@ -2499,7 +2514,7 @@ function isReadableStackFile(file: File): boolean {
 
 function cloneStack(stack: TechnicalStackCategory[]): TechnicalStackCategory[] {
   return stack.map((category) => ({
-    label: category.label,
+    ...category,
     items: category.items.map((item) => ({ ...item })),
   }));
 }
@@ -2539,6 +2554,7 @@ function removeDraftItem(
 function cleanStack(stack: TechnicalStackCategory[]): TechnicalStackCategory[] {
   return stack
     .map((category) => ({
+      ...(category.stack?.trim() ? { stack: category.stack.trim() } : {}),
       label: category.label.trim() || 'Other',
       items: category.items
         .map((item) => ({

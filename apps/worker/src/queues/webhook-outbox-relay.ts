@@ -18,8 +18,12 @@
  * WEBHOOK_OUTBOX_MAX_ATTEMPTS the row is dead-lettered (status 'dead', kept for
  * inspection, never retried).
  *
- * Started only when WEBHOOK_OUTBOX_ENABLED=true, the same flag that makes the
- * API write to the outbox.
+ * Always started. With WEBHOOK_OUTBOX_ENABLED=true (the flag that makes the API
+ * write domain events to the outbox) it relays every row; otherwise it claims
+ * only targeted replay rows (subscription_id set by the replay route), so a
+ * replay works on every tenant without turning on domain-event relaying.
+ * A replay row goes to its one subscription, carries replayOfId, and is
+ * dropped as dispatched if that subscription is gone or paused.
  */
 import { Queue, Worker, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
@@ -30,6 +34,7 @@ import {
   markWebhookOutboxDispatched,
   markWebhookOutboxFailed,
   prisma,
+  type WebhookOutboxClaimMode,
   type WebhookOutboxRow,
 } from '@bidstack/db';
 import { WEBHOOK_DELIVERY } from '@bidstack/shared';
@@ -45,6 +50,7 @@ export type OutboxDeliveryJob = {
     event: string;
     payload: Record<string, unknown>;
     eventTimestamp: string;
+    replayOfId?: string;
   };
   opts: { jobId: string } & typeof WEBHOOK_DELIVERY.defaultJobOptions;
 };
@@ -52,6 +58,8 @@ export type OutboxDeliveryJob = {
 export interface OutboxRelayDeps {
   claim(limit: number): Promise<WebhookOutboxRow[]>;
   subscriptionIds(orgId: string, event: string): Promise<string[]>;
+  /** Whether a replay row's one target subscription can still receive. */
+  targetActive(orgId: string, subscriptionId: string): Promise<boolean>;
   enqueue(jobs: OutboxDeliveryJob[]): Promise<void>;
   markDispatched(id: string): Promise<void>;
   markFailed(id: string, error: string): Promise<'retry' | 'dead'>;
@@ -78,7 +86,11 @@ export async function relayWebhookOutboxOnce(
 
   for (const row of rows) {
     try {
-      const subs = await deps.subscriptionIds(row.orgId, row.event);
+      const subs = row.subscriptionId
+        ? (await deps.targetActive(row.orgId, row.subscriptionId))
+          ? [row.subscriptionId]
+          : []
+        : await deps.subscriptionIds(row.orgId, row.event);
       if (subs.length > 0) {
         await deps.enqueue(
           subs.map((subscriptionId) => ({
@@ -88,6 +100,7 @@ export async function relayWebhookOutboxOnce(
               event: row.event,
               payload: row.payload,
               eventTimestamp: row.createdAt.toISOString(),
+              ...(row.replayOfId ? { replayOfId: row.replayOfId } : {}),
             },
             opts: {
               jobId: outboxDeliveryJobId(row.id, subscriptionId),
@@ -123,6 +136,10 @@ export function webhookOutboxRelayEnabled(env: NodeJS.ProcessEnv = process.env):
   return env.WEBHOOK_OUTBOX_ENABLED === 'true';
 }
 
+export function webhookOutboxRelayMode(env: NodeJS.ProcessEnv = process.env): WebhookOutboxClaimMode {
+  return webhookOutboxRelayEnabled(env) ? 'all' : 'replays';
+}
+
 export async function startWebhookOutboxRelay(
   connection: IORedis,
   log: pino.Logger,
@@ -130,11 +147,10 @@ export async function startWebhookOutboxRelay(
   queues: Queue[],
   deliveryQueue: Queue,
 ): Promise<void> {
-  if (!webhookOutboxRelayEnabled()) return;
-
+  const mode = webhookOutboxRelayMode();
   const relayLog = log.child({ worker: QUEUE_NAME });
   const deps: OutboxRelayDeps = {
-    claim: (limit) => claimWebhookOutboxBatch(prisma, limit),
+    claim: (limit) => claimWebhookOutboxBatch(prisma, limit, mode),
     subscriptionIds: async (orgId, event) => {
       const subs = await prisma.webhookSubscription.findMany({
         where: { orgId, active: true, deletedAt: null, events: { has: event } },
@@ -143,6 +159,10 @@ export async function startWebhookOutboxRelay(
       });
       return subs.map((s) => s.id);
     },
+    targetActive: async (orgId, subscriptionId) =>
+      (await prisma.webhookSubscription.count({
+        where: { id: subscriptionId, orgId, active: true, deletedAt: null },
+      })) > 0,
     enqueue: async (jobs) => {
       await deliveryQueue.addBulk(jobs);
     },
@@ -177,5 +197,5 @@ export async function startWebhookOutboxRelay(
     {},
     { repeat: { every: RELAY_INTERVAL_MS }, jobId: 'webhook-outbox-relay' },
   );
-  relayLog.info({ intervalMs: RELAY_INTERVAL_MS }, 'webhook outbox relay started');
+  relayLog.info({ intervalMs: RELAY_INTERVAL_MS, mode }, 'webhook outbox relay started');
 }

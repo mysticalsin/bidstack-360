@@ -5,8 +5,10 @@
  *                                  ACCOUNT_INTEL_AUTO_REFRESH=true refresh stale key and top accounts
  *   account-intel.financials-scan  repeatable (daily) filings scan for tier-gated accounts, on when
  *                                  a contact User-Agent is set, unless FINANCIALS_SCAN_ENABLED=false
+ *   account-intel.full-refresh     every public source plus Apollo organization data for one
+ *                                  company, then its list summary (manual Refresh, imports)
  */
-import { prisma } from '@bidstack/db';
+import { intelConnections, prisma, pruneImportBatches, recomputeCompanyIntelSummary } from '@bidstack/db';
 import { ACCOUNT_INTEL, IntelSourceKey, type AccountIntelQueueJob } from '@bidstack/shared';
 import { type Job, Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
@@ -16,6 +18,7 @@ import { runFinancialsScan } from '../lib/financials/scan.js';
 import { defaultIntelFetch, intelUserAgent } from '../lib/account-intel/http.js';
 import { financialsForAccount, prismaIntelStore, pruneAccountIntel } from '../lib/account-intel/prisma-store.js';
 import { runAccountIntel } from '../lib/account-intel/run.js';
+import { fullRefreshDeps, runCompanyFullRefresh } from '../lib/company-intel/full-refresh.js';
 
 const DAY_MS = 24 * 60 * 60_000;
 const STALE_DAYS = 7;
@@ -40,6 +43,7 @@ async function sweep(queue: Queue, env: NodeJS.ProcessEnv, log: pino.Logger): Pr
   for (const org of orgs) {
     const pruned = await pruneAccountIntel(org.id, now);
     if (pruned.postings || pruned.posts || pruned.evidence) log.info({ orgId: org.id, ...pruned }, 'account intel retention applied');
+    await pruneImportBatches(prisma, org.id, now).catch(() => 0);
     if (enqueued >= limit) continue;
     const accounts = await prisma.company.findMany({
       where: { orgId: org.id, deletedAt: null, OR: [{ tier: { in: ['key', 'top'] } }, { topAccountRank: { not: null } }], NOT: { intelRuns: { some: { source: 'hiring', lastFetchedAt: { gte: stale } } } } },
@@ -61,6 +65,7 @@ export async function startAccountIntel(connection: IORedis, log: pino.Logger, w
   const store = prismaIntelStore();
   const fetchImpl = defaultIntelFetch();
   const financials = financialsForAccount(env, log);
+  const full = fullRefreshDeps({ env, store, intelFetch: fetchImpl, financials });
 
   const worker = new Worker<AccountIntelQueueJob>(
     ACCOUNT_INTEL.name,
@@ -72,6 +77,12 @@ export async function startAccountIntel(connection: IORedis, log: pino.Logger, w
         log.info({ jobId: job.id, scheduled: s.scheduled, paused: s.paused, due: s.due, pulled: s.pulled.length }, 'scheduled financials scan finished');
         return { due: s.due, pulled: s.pulled.length };
       }
+      if (data.kind === 'full-refresh') {
+        const finalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+        const res = await runCompanyFullRefresh(data, full, { finalAttempt });
+        log.info({ jobId: job.id, orgId: data.orgId, companyId: data.companyId, batchId: data.batchId, intel: res.intel, apollo: res.apollo }, 'company intel full refresh finished');
+        return res;
+      }
       let res: Awaited<ReturnType<typeof runAccountIntel>>;
       try {
         res = await runAccountIntel({ orgId: data.orgId, companyId: data.companyId, sources: data.sources }, { store, env, fetchImpl, now: new Date(), financials });
@@ -82,6 +93,7 @@ export async function startAccountIntel(connection: IORedis, log: pino.Logger, w
         });
         throw err;
       }
+      await recomputeCompanyIntelSummary(prisma, data.orgId, data.companyId, { now: new Date(), connections: intelConnections(env) }).catch((err: Error) => log.warn({ companyId: data.companyId, err: err.message }, 'intel summary not rebuilt'));
       log.info({ jobId: job.id, orgId: data.orgId, companyId: data.companyId, results: Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v?.status])) }, 'account intel refresh finished');
       return res;
     },

@@ -44,6 +44,21 @@ function writeKeys(...resources: string[]) {
 
 const PERMISSION_SEEDS = [
   permission(
+    'access-policies:approve',
+    'Approve access policies',
+    'Approve or reject an access policy another admin submitted. Never your own.',
+  ),
+  permission(
+    'access-policies:read',
+    'Read access policies',
+    'View access policy drafts, the approval queue and published versions.',
+  ),
+  permission(
+    'access-policies:write',
+    'Manage access policies',
+    'Draft, simulate, submit, publish and roll back access policies that narrow the RBAC matrix.',
+  ),
+  permission(
     'account-intel:read',
     'Read account intelligence',
     'View hiring, company posts, financials, investment themes and direction for an account.',
@@ -193,13 +208,21 @@ const PERMISSION_SEEDS = [
   permission('users:read', 'Read users', 'View organization users.'),
   permission('users:write', 'Manage users', 'Update organization users and role assignments.'),
   permission('webhooks:read', 'Read webhooks', 'View webhook subscriptions.'),
+  permission(
+    'webhooks:replay',
+    'Replay webhooks',
+    'Re-send a stored webhook message to its endpoint through the outbox.',
+  ),
   permission('webhooks:write', 'Manage webhooks', 'Create and update webhook subscriptions.'),
   permission('workflows:read', 'Read workflows', 'View workflow automation definitions and runs.'),
   permission('workflows:write', 'Manage workflows', 'Create, update, and run workflow automation.'),
 ] as const;
 
 export const ALL_PERMISSION_KEYS = PERMISSION_SEEDS.map((p) => p.key);
-const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter((key) => key.endsWith(':read'));
+// access-policies:read stays Admin-only: the rule set shows how access is restricted.
+const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => key.endsWith(':read') && key !== 'access-policies:read',
+);
 // Administrator is not the commercial approver. proposals:approve is granted
 // only to Manager (below), whose description already covers approvals.
 export const ADMIN_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(

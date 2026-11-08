@@ -81,6 +81,14 @@ X-Polo-Signature: t=1748000000,v1=3d7a5c2f...
 
 The signing secret is shown once when you create the subscription. Store it securely.
 
+While a secret rotation overlap window is open, the header carries one `v1` per active secret, newest first:
+
+```
+X-Polo-Signature: t=1748000000,v1=<signed with the new secret>,v1=<signed with the old secret>
+```
+
+Accept the delivery when any `v1` matches. Do not parse the header into a map that keeps only one `v1`: it would keep the old signature and fail as soon as you switch to the new secret. A second rotation is refused until the current window closes.
+
 ### Verification: Node.js
 
 ```ts
@@ -92,18 +100,20 @@ function verifySignature(
   secret: string,
   toleranceMs = 300_000, // 5 minutes
 ): boolean {
-  const parts = Object.fromEntries(header.split(',').map((p) => p.split('=')));
-  const t = parts['t'];
-  const v1 = parts['v1'];
+  const pairs = header.split(',').map((p) => p.split('=', 2) as [string, string]);
+  const t = pairs.find(([k]) => k === 't')?.[1];
+  const sigs = pairs.filter(([k]) => k === 'v1').map(([, v]) => v);
 
-  if (!t || !v1) return false;
+  if (!t || sigs.length === 0) return false;
 
   const ageMs = Date.now() - Number(t) * 1000;
   if (ageMs > toleranceMs || ageMs < -30_000) return false; // replay protection
 
   const expected = createHmac('sha256', secret).update(`${t}.`).update(rawBody).digest('hex');
 
-  return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(v1, 'hex'));
+  return sigs.some(
+    (v1) => v1.length === expected.length && timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(v1, 'hex')),
+  );
 }
 ```
 
@@ -115,9 +125,10 @@ import hmac
 import time
 
 def verify_signature(raw_body: bytes, header: str, secret: str, tolerance_s: int = 300) -> bool:
-    parts = dict(p.split("=", 1) for p in header.split(","))
-    t, v1 = parts.get("t"), parts.get("v1")
-    if not t or not v1:
+    pairs = [p.split("=", 1) for p in header.split(",")]
+    t = next((v for k, v in pairs if k == "t"), None)
+    sigs = [v for k, v in pairs if k == "v1"]
+    if not t or not sigs:
         return False
 
     age_s = time.time() - int(t)
@@ -127,7 +138,7 @@ def verify_signature(raw_body: bytes, header: str, secret: str, tolerance_s: int
     expected = hmac.new(
         secret.encode(), f"{t}.".encode() + raw_body, hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(expected, v1)
+    return any(hmac.compare_digest(expected, v1) for v1 in sigs)
 ```
 
 ### Verification: Ruby
@@ -136,15 +147,16 @@ def verify_signature(raw_body: bytes, header: str, secret: str, tolerance_s: int
 require 'openssl'
 
 def verify_signature(raw_body, header, secret, tolerance_s: 300)
-  parts = header.split(',').map { |p| p.split('=', 2) }.to_h
-  t, v1 = parts['t'], parts['v1']
-  return false unless t && v1
+  pairs = header.split(',').map { |p| p.split('=', 2) }
+  t = pairs.find { |k, _| k == 't' }&.last
+  sigs = pairs.select { |k, _| k == 'v1' }.map(&:last)
+  return false unless t && sigs.any?
 
   age = Time.now.to_i - t.to_i
   return false if age.abs > tolerance_s
 
   expected = OpenSSL::HMAC.hexdigest('SHA256', secret, "#{t}.#{raw_body}")
-  Rack::Utils.secure_compare(expected, v1)
+  sigs.any? { |v1| Rack::Utils.secure_compare(expected, v1) }
 end
 ```
 
@@ -167,17 +179,19 @@ app.post('/webhooks/polo-presales', express.raw({ type: '*/*' }), (req, res) => 
 
 ## Retry Schedule
 
-Polo PreSales retries failed deliveries with exponential backoff:
+Each endpoint has its own retry policy, set in **Settings → Webhooks → Retry schedule** or with `PUT /api/v1/webhook-subscriptions/{id}/retry-policy`: 1 to 10 attempts, an exponential, linear or fixed curve from a base delay of 5 seconds to 1 hour, and a timeout of 1 to 30 seconds. The default is 5 attempts, exponential from 30 seconds:
 
 | Attempt | Delay after previous |
 | ------- | -------------------- |
 | 1       | immediate            |
 | 2       | 30 seconds           |
-| 3       | 2 minutes            |
-| 4       | 15 minutes           |
-| 5       | 1 hour               |
+| 3       | 1 minute             |
+| 4       | 2 minutes            |
+| 5       | 4 minutes            |
 
-After 5 failed attempts, the delivery is dead-lettered and the `failureCount` counter on the subscription increments. Subscriptions with `failureCount ≥ 10` are auto-disabled — re-enable them in **Settings → Webhooks**.
+A `429` or `503` with a `Retry-After` header sets the next delay (capped at one hour). A `4xx` that a retry cannot fix, such as `404` or `410 Gone`, fails at once. The timeout covers the whole response, including the body. Every failed attempt increments `failureCount` on the subscription; subscriptions with `failureCount ≥ 10` are auto-disabled. Re-enable them in **Settings → Webhooks**.
+
+Admins can replay any logged message from the message log. A replay goes to the original endpoint only, carries the original event id, and is refused while the endpoint is paused or deleted.
 
 ## Testing Your Endpoint
 

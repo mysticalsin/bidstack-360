@@ -34,6 +34,7 @@ import { ConsultingPartnersSection } from '@/components/consulting-partners/Cons
 import { AccountVisuals } from '@/components/account/AccountVisuals';
 import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
+import { WhoWorksWithThem } from '@/components/agreements/WhoWorksWithThem';
 import { WhoWeMetCard } from '@/components/meetings/WhoWeMetCard';
 import { OrgChartCard } from '@/components/orgchart/OrgChartCard';
 import { FirmographicsStrip } from '@/components/enrichment/FirmographicsStrip';
@@ -447,6 +448,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           </div>
           <OrgChartCard companyId={cockpit.company.id} />
           <AgreementsSummaryCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
+          <WhoWorksWithThem companyId={cockpit.company.id} />
           <OppDrill
             rows={(oppRows.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === cockpit.company.name.toLowerCase())}
             filter={drill}
