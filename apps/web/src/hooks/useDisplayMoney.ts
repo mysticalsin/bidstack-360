@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useCurrencyStore } from '@/stores/currency';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 import { formatConvertedMicros } from '@/lib/format';
-import { formatPlainMoney, formatStoredMicros } from '@/hooks/useFormatMoney';
+import { formatPlainMoney, formatStoredMicros, unitConversionFromAmount } from '@/hooks/useFormatMoney';
 
 const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 
@@ -30,12 +30,19 @@ export function useDisplayMoneyMicros(
   sourceCurrency?: string | null,
   options?: { compact?: boolean },
 ): string {
-  const { currency, convert, convertMicros, fetchRates } = useCurrencyStore();
+  const { currency, convertAmountMicros, convertMicros, fetchRates } = useCurrencyStore();
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
     void fetchRates();
   }, [fetchRates]);
-  return formatStoredMicros(micros, sourceCurrency, convert, currency, options, convertMicros);
+  return formatStoredMicros(
+    micros,
+    sourceCurrency,
+    (amount, from) => unitConversionFromAmount(amount, from, convertAmountMicros),
+    currency,
+    options,
+    convertMicros,
+  );
 }
 
 /** Same as useDisplayMoneyMicros but always full precision. */

@@ -489,7 +489,7 @@ describe('useCurrencyStore', () => {
     // WHY: dividing these micros by 1e6 is one unit low, and formatting that
     // float used to show the wrong amount in the display currency.
     const huge = (9007199254740993n * 1_000_000n).toString();
-    const formatted = formatStoredMicros(huge, 'EUR', (amount) => amount * 1.1, 'USD');
+    const formatted = formatStoredMicros(huge, 'EUR', () => ({ ok: false }), 'USD');
     expect(formatted).toContain('9,007,199,254,740,993');
     expect(formatted).not.toContain('9,007,199,254,740,992');
     const safe = formatStoredMicros('100000000', 'EUR', (amount) => ({ ok: true, amount: amount * 1.1 }), 'USD', {

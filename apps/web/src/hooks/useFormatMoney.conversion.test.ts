@@ -8,11 +8,16 @@ import { fmtMoney } from '@/components/financials/financials-format';
 import * as format from '@/lib/format';
 import { formatConvertedMicros, formatMoney, formatMoneyMicros } from '@/lib/format';
 
-import { formatPlainMoney, formatStoredMicros } from './useFormatMoney';
+import { formatPlainMoney, formatStoredMicros, type UnitConversionResult } from './useFormatMoney';
+
+/** A legacy callback still returns a number. The formatter must not treat that as success. */
+function legacyNumber(amount: number, _from: string): UnitConversionResult {
+  return (amount * 2) as unknown as UnitConversionResult;
+}
 
 describe('failed conversion keeps the source currency', () => {
   it('does not label a non-finite conversion with the display currency', () => {
-    const text = formatStoredMicros(2_500_000n, 'EUR', () => Number.NaN, 'USD');
+    const text = formatStoredMicros(2_500_000n, 'EUR', () => ({ ok: false }), 'USD');
     expect(text).toContain('€');
     expect(text).not.toContain('$');
     expect(text).toContain('2.50');
@@ -31,7 +36,7 @@ describe('failed conversion keeps the source currency', () => {
   });
 
   it('keeps integer parity in the display currency', () => {
-    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD', undefined, () => 2_500_000n);
+    const text = formatStoredMicros(2_500_000n, 'EUR', () => ({ ok: false }), 'USD', undefined, () => 2_500_000n);
     expect(text).toContain('$');
     expect(text).toContain('2.50');
     expect(text).not.toContain('€');
@@ -45,21 +50,21 @@ describe('failed conversion keeps the source currency', () => {
   });
 
   it('keeps the source label when a numeric converter echoes the amount', () => {
-    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD');
+    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => legacyNumber(amount / 2, 'EUR'), 'USD');
     expect(text).toContain('€');
     expect(text).toContain('2.50');
     expect(text).not.toContain('$');
   });
 
   it('does not treat a changed bare number as a successful conversion', () => {
-    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount * 2, 'USD');
+    const text = formatStoredMicros(2_500_000n, 'EUR', legacyNumber, 'USD');
     expect(text).toContain('€');
     expect(text).toContain('2.50');
     expect(text).not.toContain('$');
   });
 
   it('keeps the source label when integer conversion is unavailable', () => {
-    const text = formatStoredMicros(2_500_000n, 'EUR', (amount) => amount, 'USD', undefined, () => null);
+    const text = formatStoredMicros(2_500_000n, 'EUR', () => ({ ok: false }), 'USD', undefined, () => null);
     expect(text).toContain('€');
     expect(text).toContain('2.50');
     expect(text).not.toContain('$');
@@ -78,7 +83,7 @@ describe('failed conversion keeps the source currency', () => {
   });
 
   it('renders an invalid source currency as plain text', () => {
-    const text = formatStoredMicros(2_500_000n, 'NOTREAL', () => Number.NaN, 'USD');
+    const text = formatStoredMicros(2_500_000n, 'NOTREAL', () => ({ ok: false }), 'USD');
     expect(text).toContain('2.50');
     expect(text).toContain('NOTREAL');
     expect(text).not.toContain('$');

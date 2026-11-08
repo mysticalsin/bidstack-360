@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { formatMicrosAmount, unitsToMicros } from '@bidstack/shared';
+import { formatMicrosAmount, microsToUnits, unitsToMicros } from '@bidstack/shared';
 
 import {
   formatExactUnspecified,
@@ -65,14 +65,27 @@ function convertedCentSurvives(amount: number): boolean {
   return Math.abs(amount) < 2 ** 42 && Number.isSafeInteger(Math.round(Math.abs(amount) * 100));
 }
 
-/** Explicit numeric conversion. A bare number is neither success nor failure. */
+/** Explicit numeric conversion. A bare number is not accepted as success. */
 export type UnitConversionResult = { ok: true; amount: number } | { ok: false };
+
+/** Proof is convertAmountMicros, which is null when the rate was not applied. */
+export function unitConversionFromAmount(
+  amount: number,
+  from: string,
+  convertAmountMicros: (value: number, source: string) => bigint | null,
+): UnitConversionResult {
+  const micros = convertAmountMicros(amount, from);
+  if (micros == null) return { ok: false };
+  const units = microsToUnits(micros);
+  if (!Number.isFinite(units)) return { ok: false };
+  return { ok: true, amount: units };
+}
 
 /** Format stored micros. An unchanged FX result keeps the integer. A count past the safe range is not converted through a JavaScript number. */
 export function formatStoredMicros(
   micros: string | number | bigint,
   sourceCurrency: string | null | undefined,
-  convert: (amount: number, from: string) => number | UnitConversionResult,
+  convert: (amount: number, from: string) => UnitConversionResult,
   displayCurrency: string,
   options?: { compact?: boolean },
   convertMicros?: (micros: bigint, from: string) => bigint | null,
@@ -115,6 +128,8 @@ export function formatStoredMicros(
  */
 export function useFormatMoney() {
   const { currency, convert, convertAmountMicros, convertMicros, fetchRates } = useCurrencyStore();
+  const convertUnit = (amount: number, from: string) =>
+    unitConversionFromAmount(amount, from, convertAmountMicros);
 
   useEffect(() => {
     if (!SHOULD_AUTO_FETCH_RATES) return;
@@ -136,6 +151,6 @@ export function useFormatMoney() {
       // No source currency means the amount is unspecified. Do not assume EUR.
       sourceCurrency?: string | null,
       options?: { compact?: boolean },
-    ) => formatStoredMicros(micros, sourceCurrency, convert, currency, options, convertMicros),
+    ) => formatStoredMicros(micros, sourceCurrency, convertUnit, currency, options, convertMicros),
   };
 }
