@@ -23,8 +23,14 @@ const oppRows = vi.hoisted(() => ({
     { id: 'o2', stage: 's1_lead', value: 400, dueDate: '2099-01-15', customer: 'B', industry: 'healthcare' },
   ] as unknown[],
 }));
+const oppQuery = vi.hoisted(() => ({ isError: false, complete: true, refetch: vi.fn() }));
 vi.mock('@/hooks/useOpportunityRows', () => ({
-  useOpportunityRows: () => ({ data: { items: oppRows.items }, isLoading: false, isError: false }),
+  useAllOpportunityRows: () => ({
+    data: oppQuery.isError ? undefined : { items: oppRows.items, complete: oppQuery.complete },
+    isLoading: false,
+    isError: oppQuery.isError,
+    refetch: oppQuery.refetch,
+  }),
 }));
 
 vi.mock('@/components/territories/WorldMap', () => ({
@@ -75,6 +81,8 @@ beforeEach(() => {
   const idle = { data: { items: [] }, isLoading: false, isError: false } as never;
   vi.mocked(useTerritoryAnalytics).mockReturnValue(idle);
   vi.mocked(useTerritorySegments).mockReturnValue(idle);
+  oppQuery.isError = false;
+  oppQuery.complete = true;
 });
 
 afterEach(() => {
@@ -184,5 +192,23 @@ describe('SectorViewPage pipeline by sector', () => {
     mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
     renderPage();
     expect(within(screen.getByTestId('sector-pipeline-iso')).getByText('No open pipeline yet.')).toBeTruthy();
+  });
+
+  it('shows an error with retry, not the empty sentence, when the request fails', () => {
+    oppQuery.isError = true;
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    renderPage();
+    const card = screen.getByTestId('sector-pipeline-iso');
+    expect(within(card).getByRole('alert').textContent).toContain('Could not load pipeline');
+    expect(within(card).queryByText('No open pipeline yet.')).toBeNull();
+    fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
+    expect(oppQuery.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('says when the totals stop at the page cap', () => {
+    oppQuery.complete = false;
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    renderPage();
+    expect(within(screen.getByTestId('sector-pipeline-iso')).getByText(/Later pages are not included/)).toBeTruthy();
   });
 });

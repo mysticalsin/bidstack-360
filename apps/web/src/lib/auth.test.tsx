@@ -16,10 +16,10 @@
 // (grep `dist/assets/index-*.js` for "clerk").
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, type ReactNode } from 'react';
 
-import { AuthProvider, DEMO_TOKEN_KEY, useAuth, useSignOut, useUser } from './auth';
+import { AuthProvider, DEMO_SIGNED_OUT_KEY, DEMO_TOKEN_KEY, useAuth, useSignOut, useUser } from './auth';
 import { api } from './api';
 
 // Mocked Clerk SDK. The real one would attempt to fetch session JWKs and
@@ -238,6 +238,23 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer demo-token-abc' }),
       }),
     );
+  });
+
+  it('marks an explicit sign-out and ends the edge session, so /login does not sign straight back in', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(localStorage.getItem(DEMO_TOKEN_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
+    expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
+    expect(screen.getByTestId('signed-in').textContent).toBe('false');
   });
 });
 

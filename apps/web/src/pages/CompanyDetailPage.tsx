@@ -19,12 +19,12 @@ import { AccountActivityCharts } from '@/components/company/AccountActivityChart
 import { AccountConversations } from '@/components/company/AccountConversations';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
-import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyIntelSummary, useRefreshCompanyIntel } from '@/hooks/useCompanyIntelSummary';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
+import { CompanyPeopleTab } from './companyDetail/CompanyPeopleTab';
 import {
   ContactTab,
   OpportunityTab,
@@ -323,13 +323,7 @@ export function CompanyDetailPage() {
 
           {tab === 'people' && (
             <div role="tabpanel" id={panelId('people')} aria-labelledby={tabId('people')}>
-              <AccountPeopleSection
-                companyId={c.id}
-                deals={c.opportunities.map((opportunity) => ({
-                  id: opportunity.id,
-                  name: opportunity.name,
-                }))}
-              />
+              <CompanyPeopleTab companyId={c.id} opportunities={c.opportunities} />
             </div>
           )}
           {tab === 'contacts' && (

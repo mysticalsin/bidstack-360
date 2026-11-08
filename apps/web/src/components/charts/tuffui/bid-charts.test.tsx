@@ -228,3 +228,52 @@ describe('IsoBars', () => {
     expect(screen.getByText('No open pipeline.')).toBeTruthy();
   });
 });
+
+describe('chart regressions', () => {
+  const lastBinTo = (container: HTMLElement) => {
+    const rows = container.querySelectorAll('table tbody th');
+    return Number(rows[rows.length - 1]!.textContent!.split(' to ')[1]);
+  };
+
+  it('DotHistogram counts the largest sample in a bin that contains it', () => {
+    for (const big of [128, 1400]) {
+      const { container } = render(
+        <DotHistogram title="Sales cycle" values={[10, 40, 95, big]} threshold={90} bins={24} />,
+      );
+      expect(lastBinTo(container)).toBeGreaterThanOrEqual(big);
+      cleanup();
+    }
+  });
+
+  it('measures charts that start empty and gain data later', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 480 } as DOMRect);
+    const iso = { title: 'Pipeline by sector', back: [{ id: 'open', label: 'Open', values: [] as number[] }] };
+    const { container, rerender } = render(<IsoBars {...iso} labels={[]} empty="None." />);
+    rerender(<IsoBars {...iso} labels={['Finance']} back={[{ id: 'open', label: 'Open', values: [5] }]} />);
+    expect(container.querySelector('svg')!.getAttribute('visibility')).toBeNull();
+    cleanup();
+
+    const dot = render(<DotHistogram title="Cycle" values={[]} />);
+    dot.rerender(<DotHistogram title="Cycle" values={[10, 20]} />);
+    expect(dot.container.querySelector('svg')!.getAttribute('visibility')).toBeNull();
+    cleanup();
+
+    const empty = { id: 's', label: 'S', values: [] as number[] };
+    const radar = render(<RadarChart title="Bid" axes={[]} max={5} series={empty} />);
+    radar.rerender(<RadarChart title="Bid" axes={['A', 'B', 'C']} max={5} series={{ ...empty, values: [1, 2, 3] }} />);
+    expect(radar.container.querySelector('svg')!.getAttribute('visibility')).toBeNull();
+  });
+
+  it('RadarChart drops an active axis that a refresh removed instead of crashing', () => {
+    const ten = Array.from({ length: 10 }, (_, i) => `Criterion ${i + 1}`);
+    const { rerender } = render(
+      <RadarChart title="Bid" axes={ten} max={5} series={{ id: 's', label: 'S', values: ten.map(() => 3) }} />,
+    );
+    fireEvent.keyDown(screen.getByRole('group', { name: /bid/i }), { key: 'End' });
+    expect(screen.getByRole('status').textContent).toContain('Criterion 10');
+    expect(() =>
+      rerender(<RadarChart title="Bid" axes={ten.slice(0, 3)} max={5} series={{ id: 's', label: 'S', values: [3, 3, 3] }} />),
+    ).not.toThrow();
+    expect(screen.getByRole('status').textContent).toBe('');
+  });
+});
