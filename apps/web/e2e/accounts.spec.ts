@@ -184,7 +184,9 @@ test('accounts → cockpit drill-down renders all required surfaces', async ({
   await expect(issues, 'open issues card must mount').toBeVisible();
   for (const bucket of ['Critical', 'High', 'Medium', 'Low']) {
     await expect(
-      issues.getByText(new RegExp(`^${bucket}$`)),
+      // Scoped to the bucket row: an open risk row now spells its severity
+      // out too (High), so the bare label can appear twice in the card.
+      issues.locator('.issue-bucket').getByText(new RegExp(`^${bucket}$`)),
       `open issues must always show the "${bucket}" bucket — even at zero`,
     ).toBeVisible();
   }

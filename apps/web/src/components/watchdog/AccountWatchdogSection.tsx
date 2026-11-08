@@ -100,7 +100,7 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
         onClick={() => setOpen((v) => !v)}
       >
         <span className="wd-row-main">
-          <span className="wd-row-title">
+          <span className="wd-row-title" title={titleOf(e)}>
             {important ? <span className="wd-imp" title="High importance">Important</span> : null}
             {titleOf(e)}
           </span>
@@ -249,7 +249,7 @@ function Results({ data }: { data: AccountWatchdog }) {
         return (
           <li key={d.id} className="wd-row wd-row-static wd-arrive" style={stagger(i)}>
             <span className="wd-row-main">
-              <span className="wd-row-title">{d.fiscalPeriod.replace('-', ' ')} results</span>
+              <span className="wd-row-title" title={`${d.fiscalPeriod.replace('-', ' ')} results`}>{d.fiscalPeriod.replace('-', ' ')} results</span>
               <span className="wd-row-meta">
                 <time dateTime={d.expectedAt}>{shortFmt.format(new Date(d.expectedAt))}</time> ·{' '}
                 {d.confirmed ? 'Confirmed' : 'Expected'}
@@ -328,7 +328,7 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
             {data.pastProjects.map((p) => (
               <li key={p.id} className="wd-row wd-row-static">
                 <span className="wd-row-main">
-                  <span className="wd-row-title">{p.name}</span>
+                  <span className="wd-row-title" title={p.name}>{p.name}</span>
                   <span className="wd-row-meta">
                     <time dateTime={p.closedAt}>{dateFmt.format(new Date(p.closedAt))}</time> ·{' '}
                     <span title={UNSPECIFIED_CURRENCY_BASIS}>{amount(BigInt(p.valueMicros))}</span>
@@ -372,7 +372,7 @@ function RelatedHistory({ data }: { data: AccountWatchdog }) {
             {shown.map((h) => (
               <li key={h.id} className="wd-row wd-row-static">
                 <span className="wd-row-main">
-                  <span className="wd-row-title">{h.title}</span>
+                  <span className="wd-row-title" title={h.title}>{h.title}</span>
                   <span className="wd-row-meta">
                     {HISTORY_TYPE[h.type]} · <time dateTime={h.at}>{dateFmt.format(new Date(h.at))}</time>
                     {h.detail ? ` · ${h.detail}` : ''}

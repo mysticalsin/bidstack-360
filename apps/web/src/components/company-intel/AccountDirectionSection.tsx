@@ -16,6 +16,7 @@ import {
   useCompanyNewsIntel,
   useRefreshIntelSource,
 } from '@/hooks/useCompanyIntel';
+import { useScrollableTabs } from '@/hooks/useScrollableTabs';
 import { useSourcedFigures } from '@/hooks/useSourcedFigures';
 
 import { fmtDate } from './intel-format';
@@ -86,6 +87,7 @@ function SourcesStrip({ sources, canRefresh, onRefresh, pending }: {
 export function AccountDirectionSection({ companyId, initialTab = 'direction' }: { companyId: string; initialTab?: TabKey }) {
   const [tab, setTab] = useState<TabKey>(initialTab);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabStrip = useScrollableTabs(tab);
   const canRefresh = useHasPermission('account-intel:write');
   const refresh = useRefreshIntelSource(companyId);
   const direction = useCompanyDirection(companyId, refresh.pollUntil);
@@ -113,7 +115,7 @@ export function AccountDirectionSection({ companyId, initialTab = 'direction' }:
           Where they&apos;re heading {sample ? <span className="sg-sample">Sample</span> : null}
         </h2>
       </header>
-      <div role="tablist" aria-label="Account intelligence" className="ci-tabs">
+      <div ref={tabStrip} role="tablist" aria-label="Account intelligence" className="ci-tabs tab-scroll">
         {TABS.map((t, i) => (
           <button
             key={t.key}
@@ -142,7 +144,11 @@ export function AccountDirectionSection({ companyId, initialTab = 'direction' }:
         ) : tab === 'direction' && direction.data ? (
           <DirectionPanel d={direction.data} />
         ) : tab === 'hiring' && hiring.data ? (
-          <HiringPanel h={hiring.data} />
+          <HiringPanel
+            h={hiring.data}
+            onRefresh={canRefresh ? () => refresh.mutate('hiring') : undefined}
+            refreshing={refresh.isPending && refresh.variables === 'hiring'}
+          />
         ) : tab === 'financials' && financials.data ? (
           <FinancialsPanel f={financials.data} company={sourced.companyName ? { id: companyId, name: sourced.companyName } : undefined} />
         ) : tab === 'news' && news.data ? (
