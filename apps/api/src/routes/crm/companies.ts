@@ -5,6 +5,7 @@ import { prisma } from '@bidstack/db';
 import {
   AccountCockpitSnapshot,
   COMPANY_FIELD_OVERRIDE_KEYS,
+  MANUAL_REVENUE_CURRENCIES,
   isHttpUrl,
   CompanyAutopopulateResponse,
   CrmCompany,
@@ -584,6 +585,8 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       // Micros (int × 1e6); bounded to the same €9e15 float8-exact ceiling
       // the analytics engine documents.
       value: z.number().int().positive().max(9e15),
+      // Currency the figure was read in; omitted means EUR, as before.
+      currency: z.enum(MANUAL_REVENUE_CURRENCIES).nullish(),
       ...Provenance,
     }),
     z.object({ fieldKey: z.literal('registryId'), value: z.string().trim().min(1).max(64), ...Provenance }),
@@ -604,6 +607,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
     value: z.unknown(),
     sourceUrl: z.string().nullable(),
     sourceLabel: z.string().nullable(),
+    currency: z.string().nullable(),
     updatedAt: z.string().datetime(),
   });
 
@@ -643,6 +647,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
       const companyKey = await overrideCompanyKey(req.auth.orgId, req.params.companyKey);
       const sourceUrl = req.body.sourceUrl || null;
       const sourceLabel = req.body.sourceLabel || null;
+      const currency = req.body.fieldKey === 'annualRevenueMicros' ? (req.body.currency ?? 'EUR') : null;
       // Override + its audit row must land together or not at all.
       const saved = await prisma.$transaction(async (tx) => {
         const row = await tx.companyFieldOverride.upsert({
@@ -660,9 +665,10 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
             value: req.body.value,
             sourceUrl,
             sourceLabel,
+            currency,
             overriddenById: req.auth.userId,
           },
-          update: { value: req.body.value, sourceUrl, sourceLabel, overriddenById: req.auth.userId },
+          update: { value: req.body.value, sourceUrl, sourceLabel, currency, overriddenById: req.auth.userId },
         });
         await tx.auditLog.create({
           data: {
@@ -671,7 +677,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'company.field_override',
             targetType: 'company',
             targetId: companyKey,
-            diff: { fieldKey: req.body.fieldKey, value: req.body.value, sourceUrl, sourceLabel },
+            diff: { fieldKey: req.body.fieldKey, value: req.body.value, sourceUrl, sourceLabel, currency },
           },
         });
         return row;
@@ -683,6 +689,7 @@ export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
         value: saved.value,
         sourceUrl: saved.sourceUrl,
         sourceLabel: saved.sourceLabel,
+        currency: saved.currency,
         updatedAt: saved.updatedAt.toISOString(),
       };
     },

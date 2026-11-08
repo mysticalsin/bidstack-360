@@ -499,6 +499,8 @@ model CompanyFieldOverride {
   /// Provenance for a manual value: where the user read it. http(s) only.
   sourceUrl      String?  @map("source_url") @db.VarChar(2048)
   sourceLabel    String?  @map("source_label") @db.VarChar(120)
+  /// ISO 4217 code for a manual annualRevenueMicros value. Null reads as EUR.
+  currency       String?  @map("currency") @db.VarChar(3)
   overriddenById String   @map("overridden_by_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)

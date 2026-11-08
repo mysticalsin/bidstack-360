@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { industryLabel, isHttpUrl, pickFigure, provenanceText } from './index.js';
+import { industryLabel, isHttpUrl, MANUAL_REVENUE_CURRENCIES, pickFigure, provenanceText } from './index.js';
 
 describe('pickFigure', () => {
   // The product owner's rule: filed > manual with source > Wikidata > Apollo.
@@ -63,5 +63,22 @@ describe('provenanceText', () => {
   it('joins label and year', () => {
     expect(provenanceText({ label: 'Wikidata', year: '2024' })).toBe('Wikidata · 2024');
     expect(provenanceText({ label: 'Manual', year: null })).toBe('Manual');
+  });
+});
+
+describe('unverified CRM figures and manual currencies', () => {
+  it('writes unverified into the chip text, after the year when there is one', () => {
+    expect(provenanceText({ label: 'CRM record', year: null, unverified: true })).toBe('CRM record · unverified');
+    expect(provenanceText({ label: 'CRM record', year: '2026', unverified: true })).toBe('CRM record · 2026 · unverified');
+    expect(provenanceText({ label: 'Wikidata', year: '2024' })).toBe('Wikidata · 2024');
+  });
+
+  it('ranks the CRM record last, below the data provider', () => {
+    expect(pickFigure([{ origin: 'crm' as const }, { origin: 'provider' as const }])?.origin).toBe('provider');
+    expect(pickFigure([{ origin: 'crm' as const }])?.origin).toBe('crm');
+  });
+
+  it('offers the currencies the account page needs', () => {
+    for (const c of ['EUR', 'USD', 'GBP', 'CAD', 'CHF', 'NOK', 'SEK', 'DKK', 'BRL']) expect(MANUAL_REVENUE_CURRENCIES).toContain(c);
   });
 });

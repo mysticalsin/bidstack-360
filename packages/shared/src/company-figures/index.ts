@@ -6,14 +6,14 @@
 import { z } from 'zod';
 
 /** Where a figure came from, strongest first in FIGURE_PRECEDENCE. */
-export const FigureOrigin = z.enum(['filed', 'manual_sourced', 'wikidata', 'manual', 'provider', 'record']);
+export const FigureOrigin = z.enum(['filed', 'manual_sourced', 'wikidata', 'manual', 'provider', 'crm']);
 export type FigureOrigin = z.infer<typeof FigureOrigin>;
 
 /**
  * Filed statements beat everything. A manual value the user backed with a
  * source link beats Wikidata; a manual value without a source does not.
  */
-export const FIGURE_PRECEDENCE: readonly FigureOrigin[] = ['filed', 'manual_sourced', 'wikidata', 'manual', 'provider', 'record'];
+export const FIGURE_PRECEDENCE: readonly FigureOrigin[] = ['filed', 'manual_sourced', 'wikidata', 'manual', 'provider', 'crm'];
 
 /** The visible source chip under a figure: label, year and link. */
 export const FigureProvenance = z.object({
@@ -21,6 +21,8 @@ export const FigureProvenance = z.object({
   label: z.string(),
   year: z.string().nullable(),
   url: z.string().nullable(),
+  /** True for a figure nobody has checked against a public source (the CRM record). */
+  unverified: z.boolean().optional(),
 });
 export type FigureProvenance = z.infer<typeof FigureProvenance>;
 
@@ -49,10 +51,14 @@ export function isHttpUrl(value: string | null | undefined): boolean {
   }
 }
 
-/** Short chip text: "SEC EDGAR · FY2025", or the label alone. */
-export function provenanceText(p: Pick<FigureProvenance, 'label' | 'year'>): string {
-  return p.year ? `${p.label} · ${p.year}` : p.label;
+/** Short chip text: "SEC EDGAR · FY2025", "CRM record · unverified", or the label alone. */
+export function provenanceText(p: Pick<FigureProvenance, 'label' | 'year'> & { unverified?: boolean }): string {
+  return [p.label, p.year, p.unverified ? 'unverified' : null].filter(Boolean).join(' · ');
 }
+
+/** Currencies a manual revenue figure can be entered in (ISO 4217). */
+export const MANUAL_REVENUE_CURRENCIES = ['EUR', 'USD', 'GBP', 'CAD', 'CHF', 'NOK', 'SEK', 'DKK', 'BRL', 'AUD', 'JPY', 'PLN'] as const;
+export type ManualRevenueCurrency = (typeof MANUAL_REVENUE_CURRENCIES)[number];
 
 const NACE_SECTIONS: Record<string, string> = {
   A: 'Agriculture, forestry and fishing',

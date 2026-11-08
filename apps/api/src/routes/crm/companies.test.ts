@@ -314,6 +314,30 @@ describe('crm companies routes', () => {
     await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/annualRevenueMicros' });
   });
 
+  skipIfNoDb('field override stores the currency of a manual revenue, EUR when none is given', async () => {
+    const put = (payload: object) => server.inject({ method: 'PUT', url: '/api/crm/companies/Mantu/field-overrides', payload });
+    const row = () => prisma.companyFieldOverride.findFirst({ where: { orgId: orgId!, companyKey: 'mantu', fieldKey: 'annualRevenueMicros' } });
+
+    const usd = await put({ fieldKey: 'annualRevenueMicros', value: 2_000_000_000_000_000, currency: 'USD' });
+    expect(usd.statusCode).toBe(200);
+    expect(usd.json()).toMatchObject({ currency: 'USD' });
+    expect((await row())?.currency).toBe('USD');
+    const audit = await prisma.auditLog.findFirst({ where: { orgId: orgId!, action: 'company.field_override', targetId: 'mantu' }, orderBy: { id: 'desc' } });
+    expect(audit?.diff).toMatchObject({ currency: 'USD' });
+
+    expect((await put({ fieldKey: 'annualRevenueMicros', value: 2_100_000_000_000_000 })).json()).toMatchObject({ currency: 'EUR' });
+    expect((await row())?.currency).toBe('EUR');
+
+    for (const currency of ['XXX', 'usd', 'US']) {
+      expect((await put({ fieldKey: 'annualRevenueMicros', value: 1_000_000, currency })).statusCode).toBe(400);
+    }
+    // Only revenue carries a currency.
+    const emp = await put({ fieldKey: 'employeeCount', value: 500, currency: 'USD' });
+    expect(emp.json()).toMatchObject({ currency: null });
+    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/annualRevenueMicros' });
+    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/employeeCount' });
+  });
+
   skipIfNoDb('field override refuses a source link that is not http or https', async () => {
     for (const sourceUrl of ['javascript:alert(1)', 'ftp://files.example.com/a', 'not a url']) {
       const res = await server.inject({

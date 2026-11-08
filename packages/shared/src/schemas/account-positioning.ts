@@ -139,7 +139,8 @@ export const KeyNumber = z.object({
   /** Short secondary line, e.g. "of 4 senior contacts". */
   sub: z.string().nullable(),
   source: z.string(),
-  period: z.string(),
+  /** Basis of the figure ("FY2025"); null when there is nothing to describe, never a placeholder. */
+  period: z.string().nullable(),
   sourceUrl: z.string().nullable(),
   anchor: z.string().nullable(),
   missing: z.string().nullable(),
