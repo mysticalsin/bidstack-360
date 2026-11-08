@@ -86,7 +86,7 @@ export class PreviewOrigin extends Container {
     const last = (await this.ctx.storage.get('snapshot')) || {};
     const since = last.bootId === state.bootId ? last.counter : -1;
     const res = await this.containerFetch(internal(this.env, `/__internal/snapshot?since=${since}`));
-    if (res.status === 204) return { phase: state.phase, snapshot: 'unchanged' };
+    if (res.status === 204) return { phase: state.phase, booted: state.detail, worker: state.workerUp, snapshot: 'unchanged' };
     if (!res.ok) return { phase: state.phase, snapshot: `failed ${res.status}` };
     const body = await res.arrayBuffer();
     const counter = Number(res.headers.get('x-polo-change-counter') || 0);
@@ -94,7 +94,7 @@ export class PreviewOrigin extends Container {
     await this.env.BACKUPS.put(SNAPSHOT_KEY, body);
     await this.env.BACKUPS.put(`polo-preview/daily/${day}.tgz`, body);
     await this.ctx.storage.put('snapshot', { bootId: state.bootId, counter, at: Date.now(), bytes: body.byteLength });
-    return { phase: state.phase, snapshot: 'saved', bytes: body.byteLength };
+    return { phase: state.phase, booted: state.detail, worker: state.workerUp, snapshot: 'saved', bytes: body.byteLength };
   }
 
   async health() {
