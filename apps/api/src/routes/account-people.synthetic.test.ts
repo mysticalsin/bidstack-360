@@ -59,7 +59,39 @@ describe('account people routes without a database', () => {
         opportunity: { id: otherDeal, name: 'Other' },
       },
     ]);
-    db.contactFact.findMany.mockImplementation(async (args: { where: { OR?: Array<{ opportunityId?: string }> } }) => {
+    db.contactFact.findMany.mockImplementation(async (args: { take?: number; where: { status?: { in?: string[] }; OR?: Array<{ opportunityId?: string }> } }) => {
+      if (args.where.status?.in?.includes('excluded')) throw new Error('invalid ContactFactStatus');
+      const wantsOther = args.take === undefined && args.where.OR?.some((branch) => branch.opportunityId === otherDeal);
+      if (wantsOther) {
+        return [
+          {
+            id: factId,
+            contactId,
+            kind: 'buying_role',
+            status: 'accepted',
+            claim: 'buyer',
+            reportsToContactId: null,
+            opportunityId: dealId,
+            companyId,
+            linkLabel: 'buyer',
+            evidenceDetail: null,
+            observedAt: new Date('2026-11-01T00:00:00.000Z'),
+          },
+          {
+            id: '00000000-0000-4000-8000-0000000000f3',
+            contactId,
+            kind: 'buying_role',
+            status: 'accepted',
+            claim: 'buyer',
+            reportsToContactId: null,
+            opportunityId: otherDeal,
+            companyId,
+            linkLabel: 'buyer',
+            evidenceDetail: null,
+            observedAt: new Date('2026-11-01T00:00:00.000Z'),
+          },
+        ];
+      }
       const scoped = args.where.OR?.some((branch) => branch.opportunityId === dealId);
       if (!scoped) {
         return Array.from({ length: 1000 }, (_, index) => ({
@@ -107,9 +139,16 @@ describe('account people routes without a database', () => {
       OR: Array<{ contactId: string; opportunityId: string }>;
     };
     expect(supplemental.OR).toEqual([{ contactId, opportunityId: otherDeal }]);
-    const evidence = db.contactFact.findMany.mock.calls[2]?.[0] as { take?: number; distinct?: string[] };
+    const evidence = db.contactFact.findMany.mock.calls.find((call) => {
+      const args = call[0] as { take?: number; where?: { kind?: string } };
+      return args.take === undefined && args.where?.kind === 'buying_role';
+    })?.[0] as { take?: number; distinct?: string[]; where: { status: { in: string[] } } };
     expect(evidence.take).toBeUndefined();
-    expect(evidence.distinct).toEqual(['contactId', 'opportunityId', 'status', 'linkLabel']);
+    expect(evidence.where.status.in).toEqual(['accepted', 'needs_review']);
+    expect(evidence.where.status.in).not.toContain('excluded');
+    expect(evidence.distinct).toEqual(['contactId', 'opportunityId', 'status', 'linkLabel', 'observedAt']);
+    const body = res.json() as { people: Array<{ dealLinks: Array<{ opportunityId: string; evidence: string }> }> };
+    expect(body.people[0]?.dealLinks.find((link) => link.opportunityId === otherDeal)?.evidence).toBe('accepted');
     await app.close();
   });
 

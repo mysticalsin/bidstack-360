@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PEOPLE_MAP_FACT_TAKE,
   contactFactListArgs,
+  accountClassificationFactListArgs,
   evidenceFactListArgs,
   linkedDealFactListArgs,
   mergeMapFacts,
@@ -147,7 +148,11 @@ describe('contact fact query scope', () => {
       ],
     );
     expect(evidence).not.toHaveProperty('take');
-    expect(evidence.distinct).toEqual(['contactId', 'opportunityId', 'status', 'linkLabel']);
+    expect(evidence.where.status.in).toEqual(['accepted', 'needs_review']);
+    expect(evidence.distinct).toEqual(['contactId', 'opportunityId', 'status', 'linkLabel', 'observedAt']);
+    const account = accountClassificationFactListArgs(orgId, [contactId]);
+    expect(account.where.status.in).toEqual(['accepted', 'needs_review']);
+    expect(account.distinct).toContain('observedAt');
     const crowded = Array.from({ length: PEOPLE_MAP_FACT_TAKE }, (_, index) => ({
       id: `new-${index}`,
       contactId,

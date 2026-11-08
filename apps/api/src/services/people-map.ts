@@ -99,13 +99,33 @@ export function evidenceFactListArgs(
       orgId,
       deletedAt: null,
       kind: 'buying_role' as const,
-      status: { in: ['accepted', 'needs_review', 'excluded'] as FactStatus[] },
+      status: { in: ['accepted', 'needs_review'] as const },
       OR: [...unique.values()].map((pair) => ({
         contactId: pair.contactId,
         opportunityId: pair.opportunityId,
       })),
     },
-    distinct: ['contactId', 'opportunityId', 'status', 'linkLabel'] as const,
+    distinct: ['contactId', 'opportunityId', 'status', 'linkLabel', 'observedAt'] as const,
+    select: FACT_SELECT,
+  };
+}
+
+/**
+ * Accepted and review facts that account standing and reporting lines use.
+ * Buying-role history is not in this query, so a full page of proposals cannot
+ * hide a company link or a reporting line. `observedAt` stays in the distinct
+ * key so a fresh fact is not collapsed into a stale one.
+ */
+export function accountClassificationFactListArgs(orgId: string, contactIds: readonly string[]) {
+  return {
+    where: {
+      orgId,
+      contactId: { in: [...contactIds] },
+      deletedAt: null,
+      status: { in: ['accepted', 'needs_review'] as const },
+      OR: [{ kind: 'reports_to' as const }, { kind: 'company_link' as const }],
+    },
+    distinct: ['contactId', 'kind', 'status', 'linkLabel', 'reportsToContactId', 'observedAt'] as const,
     select: FACT_SELECT,
   };
 }
@@ -342,8 +362,12 @@ async function finishMap(
   const evidence =
     ids.length === 0 || evidenceArgs.where.OR.length === 0
       ? ([] as FactRow[])
-      : await prisma.contactFact.findMany(evidenceArgs as never);
-  const merged = mergeMapFacts(primary, supplemental, evidence);
+      : await prisma.contactFact.findMany(evidenceArgs);
+  const accountClassification =
+    ids.length === 0
+      ? ([] as FactRow[])
+      : await prisma.contactFact.findMany(accountClassificationFactListArgs(orgId, ids));
+  const merged = mergeMapFacts(primary, supplemental, [...evidence, ...accountClassification]);
   const facts = merged.facts;
   const reportIds = facts
     .map((fact) => fact.reportsToContactId)
