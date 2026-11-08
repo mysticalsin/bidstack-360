@@ -71,7 +71,7 @@ export async function pullDelta(
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
   let persisted = 0;
   const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
-  await migrateLegacyBridgePending(deltaState, (id) =>
+  const legacyPlan = await migrateLegacyBridgePending(deltaState, (id) =>
     classifyStoredBridgeId(prisma, { orgId: params.orgId, ownerId: params.userId }, id),
   );
 
@@ -215,7 +215,7 @@ export async function pullDelta(
     }
   }
 
-  await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas);
+  await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas, legacyPlan);
 
   return { persisted };
 }

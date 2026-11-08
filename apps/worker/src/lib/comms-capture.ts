@@ -415,13 +415,17 @@ function quarantineIds(
     ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
     : [];
   const ids = new Set(entries.map((entry) => activityBridgeSlot(entry.id, entry.kind)));
-  state.activityBridgeQuarantine = [
-    ...entries,
-    ...prior.filter((entry) => !ids.has(activityBridgeSlot(entry.id, entry.kind))),
-  ].slice(
-    0,
-    ACTIVITY_BRIDGE_QUARANTINE_CAP,
-  );
+  const merged = [...entries, ...prior.filter((entry) => !ids.has(activityBridgeSlot(entry.id, entry.kind)))];
+  const byKind = new Map<string, ActivityBridgeQuarantine[]>();
+  for (const entry of merged) {
+    const key = entry.kind ?? '';
+    const list = byKind.get(key) ?? [];
+    list.push(entry);
+    byKind.set(key, list);
+  }
+  const kept: ActivityBridgeQuarantine[] = [];
+  for (const list of byKind.values()) kept.push(...list.slice(0, ACTIVITY_BRIDGE_QUARANTINE_CAP));
+  state.activityBridgeQuarantine = kept;
 }
 
 /**
@@ -499,7 +503,7 @@ export function noteActivityBridgeFailures(
   }
   const already = new Set(
     (Array.isArray(state.activityBridgeQuarantine) ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[]) : [])
-      .filter((entry) => (kind ? entry.kind === kind : !entry.kind))
+      .filter((entry) => (kind ? entry.kind === kind || !entry.kind : !entry.kind))
       .map((entry) => entry.id),
   );
   const quarantined: string[] = [];
@@ -652,7 +656,8 @@ function rememberPending(
     if (kind) existing.kind = kind;
     return true;
   }
-  if (rows.length >= ACTIVITY_BRIDGE_PENDING_CAP) return false;
+  const used = rows.filter((row) => (kind ? row.kind === kind : !row.kind)).length;
+  if (used >= ACTIVITY_BRIDGE_PENDING_CAP) return false;
   rows.push({ id, attempts, ...(kind ? { kind } : {}) });
   return true;
 }
@@ -683,6 +688,9 @@ function forgetStream(state: Record<string, unknown>, id: string, kind?: Activit
 }
 
 export type LegacyBridgeClass = 'email' | 'calendar' | 'both' | 'absent' | 'unknown';
+
+/** A classification to apply to the locked row. Unknown is recorded and does not delete anything. */
+export type LegacyBridgeMigration = { id: string; result: LegacyBridgeClass; attempts: number };
 
 /**
  * Decide which resource an old untyped id belongs to. A lookup that cannot
@@ -728,19 +736,82 @@ export async function classifyStoredBridgeId(
  * `both` keeps a row for each resource. `absent` drops the id because neither
  * store has a capture row. `unknown` leaves it, so the cursor is not moved past it.
  */
+function pendingRoom(rows: ActivityBridgePending[], kind: ActivityBridgeKind, id: string): boolean {
+  if (rows.some((row) => row.id === id && row.kind === kind)) return true;
+  return rows.filter((row) => row.kind === kind).length < ACTIVITY_BRIDGE_PENDING_CAP;
+}
+
+/**
+ * Apply classifications to untyped pending, counts, and quarantine.
+ * Unknown leaves the untyped rows. A `both` result is admitted only when
+ * every destination fits; otherwise the untyped row stays. Absent removes
+ * the untyped row only after both stores have answered empty.
+ */
+export function applyLegacyMigration(state: Record<string, unknown>, plans: readonly LegacyBridgeMigration[]): void {
+  if (plans.length === 0) return;
+  const pending = readPending(state);
+  const counts = readRetryIds(state);
+  const quarantine = Array.isArray(state.activityBridgeQuarantine)
+    ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
+    : [];
+  for (const plan of plans) {
+    if (plan.result === 'unknown') continue;
+    const legacyPending = pending.find((row) => row.id === plan.id && !row.kind);
+    const legacyCount = counts[plan.id];
+    const legacyQuarantine = quarantine.find((entry) => entry.id === plan.id && !entry.kind);
+    const attempts = Math.max(plan.attempts, legacyCount ?? 0, legacyPending?.attempts ?? 0, 1);
+    if (plan.result === 'absent') {
+      delete counts[plan.id];
+      removePending(pending, plan.id);
+      forgetStream(state, plan.id);
+      const nextQuarantine = quarantine.filter((entry) => !(entry.id === plan.id && !entry.kind));
+      quarantine.splice(0, quarantine.length, ...nextQuarantine);
+      continue;
+    }
+    const kinds: ActivityBridgeKind[] = plan.result === 'both' ? ['email', 'calendar'] : [plan.result];
+    const needsPending = Boolean(legacyPending) || legacyCount !== undefined;
+    if (needsPending && !kinds.every((kind) => pendingRoom(pending, kind, plan.id))) continue;
+    delete counts[plan.id];
+    removePending(pending, plan.id);
+    forgetStream(state, plan.id);
+    if (needsPending) {
+      for (const kind of kinds) {
+        rememberPending(pending, plan.id, attempts, kind);
+        rememberStream(state, plan.id, kind);
+      }
+    }
+    if (legacyQuarantine) {
+      const rest = quarantine.filter((entry) => !(entry.id === plan.id && !entry.kind));
+      quarantine.splice(0, quarantine.length, ...rest);
+      for (const kind of kinds) {
+        quarantine.unshift({ id: plan.id, attempts: legacyQuarantine.attempts, at: legacyQuarantine.at, kind });
+      }
+    }
+  }
+  writeRetryIds(state, counts);
+  writePending(state, pending);
+  if (quarantine.length === 0) delete state.activityBridgeQuarantine;
+  else state.activityBridgeQuarantine = quarantine;
+  pruneBridgeStream(state, counts, pending);
+}
+
 export async function migrateLegacyBridgePending(
   state: Record<string, unknown>,
   classify: (id: string) => Promise<LegacyBridgeClass>,
-): Promise<void> {
+): Promise<LegacyBridgeMigration[]> {
   const pending = readPending(state);
   const counts = readRetryIds(state);
+  const quarantine = Array.isArray(state.activityBridgeQuarantine)
+    ? (state.activityBridgeQuarantine as ActivityBridgeQuarantine[])
+    : [];
   const ids = new Set<string>();
   for (const row of pending) if (!row.kind) ids.add(row.id);
   for (const key of Object.keys(counts)) {
     const parsed = splitActivityBridgeSlot(key);
     if (!parsed.kind) ids.add(parsed.id);
   }
-  if (ids.size === 0) return;
+  for (const entry of quarantine) if (!entry.kind) ids.add(entry.id);
+  const plans: LegacyBridgeMigration[] = [];
   for (const id of ids) {
     let result: LegacyBridgeClass;
     try {
@@ -748,21 +819,11 @@ export async function migrateLegacyBridgePending(
     } catch {
       result = 'unknown';
     }
-    if (result === 'unknown') continue;
-    const attempts = Math.max(counts[id] ?? 0, pending.find((row) => row.id === id && !row.kind)?.attempts ?? 0);
-    delete counts[id];
-    removePending(pending, id);
-    forgetStream(state, id);
-    if (result === 'absent') continue;
-    const kinds: ActivityBridgeKind[] = result === 'both' ? ['email', 'calendar'] : [result];
-    for (const nextKind of kinds) {
-      rememberPending(pending, id, Math.max(attempts, 1), nextKind);
-      rememberStream(state, id, nextKind);
-    }
+    const attempts = Math.max(counts[id] ?? 0, pending.find((row) => row.id === id && !row.kind)?.attempts ?? 0, 1);
+    plans.push({ id, result, attempts });
   }
-  writeRetryIds(state, counts);
-  writePending(state, pending);
-  pruneBridgeStream(state, counts, pending);
+  applyLegacyMigration(state, plans);
+  return plans;
 }
 
 /** The next ids a run should retry. They stay in the queue until a later observation settles or counts them. */
@@ -857,6 +918,7 @@ export function mergeBridgeDeltaState(
   desired: Record<string, unknown>,
   deltas: ActivityBridgeDelta[],
   now = new Date().toISOString(),
+  migrations: readonly LegacyBridgeMigration[] = [],
 ): Record<string, unknown> {
   const result: Record<string, unknown> = structuredClone(stored);
   const retryKeySet = new Set<string>(RETRY_KEYS);
@@ -898,6 +960,7 @@ export function mergeBridgeDeltaState(
     if (key in stored) result[key] = structuredClone(stored[key]);
     else delete result[key];
   }
+  applyLegacyMigration(result, migrations);
   for (const delta of deltas) {
     noteActivityBridgeFailures(
       result,

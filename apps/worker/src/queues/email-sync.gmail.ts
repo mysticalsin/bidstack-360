@@ -221,6 +221,9 @@ export async function pullGmail(
 ): Promise<number> {
   const deltaState = structuredClone((token.deltaState ?? {}) as Record<string, unknown>);
   const baseline = structuredClone(deltaState);
+  const legacyPlan = await migrateLegacyBridgePending(deltaState, (id) =>
+    classifyStoredBridgeId(prisma, { orgId: token.orgId, ownerId: token.userId }, id),
+  );
   const cursor = deltaState['gmailHistoryId'] as string | undefined;
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
 
@@ -242,7 +245,7 @@ export async function pullGmail(
         gmailHistoryResumeCount: _r,
         ...rest
       } = deltaState;
-      await commitTokenDeltaState(prisma, token.id, baseline, rest, []);
+      await commitTokenDeltaState(prisma, token.id, baseline, rest, [], legacyPlan);
       return 0;
     }
     ids = res.ids;
@@ -276,9 +279,6 @@ export async function pullGmail(
   const captureHeldIds: string[] = [];
   const settledIds: string[] = [];
   const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
-  await migrateLegacyBridgePending(deltaState, (id) =>
-    classifyStoredBridgeId(prisma, { orgId: token.orgId, ownerId: token.userId }, id),
-  );
   for (const id of ids) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) {
@@ -380,7 +380,7 @@ export async function pullGmail(
   }
   if (captureHeldIds.length > 0 || bridge.backpressure || (drained?.hold ?? bridge.hold)) {
     log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
-    await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas);
+    await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas, legacyPlan);
     return persisted;
   }
 
@@ -392,7 +392,7 @@ export async function pullGmail(
     gmailSeedHistoryId: _sh,
     ...cursorBase
   } = deltaState;
-  await commitTokenDeltaState(prisma, token.id, baseline, { ...cursorBase, ...checkpoint }, bridgeDeltas);
+  await commitTokenDeltaState(prisma, token.id, baseline, { ...cursorBase, ...checkpoint }, bridgeDeltas, legacyPlan);
   log.info({ tokenId: token.id, persisted }, 'Gmail pull complete');
   return persisted;
 }

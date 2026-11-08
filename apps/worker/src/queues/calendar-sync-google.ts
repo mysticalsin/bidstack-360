@@ -222,7 +222,7 @@ export async function pullGoogleIncremental(
   let pageToken = deltaState['calendarPageToken'] as string | undefined;
   let count = 0;
   const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
-  await migrateLegacyBridgePending(deltaState, (id) => classifyStoredBridgeId(prisma, { orgId, ownerId: userId }, id));
+  const legacyPlan = await migrateLegacyBridgePending(deltaState, (id) => classifyStoredBridgeId(prisma, { orgId, ownerId: userId }, id));
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(
@@ -234,7 +234,7 @@ export async function pullGoogleIncremental(
     if (res.status === 410) {
       log.warn({ tokenId }, 'Google sync token expired; clearing for full re-sync');
       const { calendarSyncToken: _s, calendarPageToken: _p, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, baseline, rest, bridgeDeltas);
+      await commitTokenDeltaState(prisma, tokenId, baseline, rest, bridgeDeltas, legacyPlan);
       return;
     }
     if (!res.ok) throw new Error(`Google events list failed: ${res.status}`);
@@ -267,6 +267,7 @@ export async function pullGoogleIncremental(
         baseline,
         { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
         bridgeDeltas,
+        legacyPlan,
       );
       log.warn({ tokenId }, 'Account activity bridge failed; calendar page will be retried before the cursor advances');
       return;
@@ -274,7 +275,7 @@ export async function pullGoogleIncremental(
 
     if (body.nextSyncToken) {
       const { calendarPageToken: _p, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, baseline, { ...rest, calendarSyncToken: body.nextSyncToken }, bridgeDeltas);
+      await commitTokenDeltaState(prisma, tokenId, baseline, { ...rest, calendarSyncToken: body.nextSyncToken }, bridgeDeltas, legacyPlan);
       log.debug({ tokenId, count }, 'Google incremental pull complete');
       return;
     }
@@ -288,6 +289,7 @@ export async function pullGoogleIncremental(
     baseline,
     { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
     bridgeDeltas,
+    legacyPlan,
   );
   log.info({ tokenId, count }, 'Google calendar pull paused at page cap; resuming next tick');
 }

@@ -562,6 +562,53 @@ describe('activity bridge retry bound', () => {
 });
 
 describe('activity bridge commit lock', () => {
+  it('keeps a classified legacy id on the locked row when the other stream settles that id', async () => {
+    const stored = {
+      delta: {
+        gmailHistoryId: '77',
+        activityBridgePending: [{ id: 'same', attempts: 2 }],
+        activityBridgeQuarantine: [{ id: 'old', attempts: 3, at: '2026-11-01T00:00:00.000Z' }],
+      } as Record<string, unknown>,
+    };
+    const update = vi.fn(async (args: { data: { deltaState: Record<string, unknown> } }) => {
+      stored.delta = args.data.deltaState;
+    });
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ delta_state: structuredClone(stored.delta) }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    const baseline = structuredClone(stored.delta);
+    await commitTokenDeltaState(
+      db,
+      'tok-1',
+      baseline,
+      { gmailHistoryId: '77' },
+      [{ page: 'mail', failedIds: [], settledIds: ['same'], kind: 'email', parkUnseen: false }],
+      [
+        { id: 'same', result: 'calendar', attempts: 2 },
+        { id: 'old', result: 'email', attempts: 3 },
+        { id: 'unsure', result: 'unknown', attempts: 1 },
+      ],
+    );
+    const pending = stored.delta.activityBridgePending as Array<{ id: string; kind?: string; attempts: number }>;
+    expect(pending).toEqual([{ id: 'same', attempts: 2, kind: 'calendar' }]);
+    const quarantine = stored.delta.activityBridgeQuarantine as Array<{ id: string; kind?: string }>;
+    expect(quarantine).toEqual([expect.objectContaining({ id: 'old', kind: 'email' })]);
+    const crowded = {
+      activityBridgePending: [
+        ...Array.from({ length: 256 }, (_, index) => ({ id: `e${index}`, attempts: 1, kind: 'email' as const })),
+        { id: 'legacy', attempts: 3 },
+      ],
+    };
+    stored.delta = crowded;
+    await commitTokenDeltaState(db, 'tok-1', crowded, crowded, [], [{ id: 'legacy', result: 'both', attempts: 3 }]);
+    const after = stored.delta.activityBridgePending as Array<{ id: string; kind?: string }>;
+    expect(after.some((row) => row.id === 'legacy' && row.kind === undefined)).toBe(true);
+    expect(after.filter((row) => row.id === 'legacy')).toHaveLength(1);
+  });
+
   it('applies each pull onto the locked row so a stale snapshot cannot erase the other folder', async () => {
     const stored = { delta: { calendarDeltaLink: 'cal-keep' } as Record<string, unknown> };
     const update = vi.fn(async (args: { data: { deltaState: Record<string, unknown> } }) => {

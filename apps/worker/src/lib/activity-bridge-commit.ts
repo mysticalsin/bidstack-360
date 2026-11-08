@@ -1,4 +1,4 @@
-import { mergeBridgeDeltaState, type ActivityBridgeDelta } from './comms-capture.js';
+import { mergeBridgeDeltaState, type ActivityBridgeDelta, type LegacyBridgeMigration } from './comms-capture.js';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -55,6 +55,7 @@ export async function commitTokenDeltaState(
   baseline: Record<string, unknown>,
   desired: Record<string, unknown>,
   deltas: ActivityBridgeDelta[],
+  migrations: LegacyBridgeMigration[] = [],
 ): Promise<void> {
   const client = db as TokenTx;
   const write = async (tx: TokenTx) => {
@@ -85,7 +86,7 @@ export async function commitTokenDeltaState(
         'Refusing an unlocked cursor write. The client needs $queryRaw and $executeRaw so the row lock and lock_timeout are both set.',
       );
     }
-    const merged = mergeBridgeDeltaState(stored, baseline, desired, deltas);
+    const merged = mergeBridgeDeltaState(stored, baseline, desired, deltas, new Date().toISOString(), migrations);
     await tx.integrationToken.update({
       where: { id: tokenId },
       data: { deltaState: merged, lastSyncedAt: new Date() },
