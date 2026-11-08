@@ -22,6 +22,7 @@ vi.mock('@bidstack/db', () => ({
   },
   ingestActivities: vi.fn(),
   getCompanyActivitySummary: vi.fn(),
+  listAccountConversations: vi.fn(),
 }));
 
 vi.mock('../lib/access-scope.js', () => ({
@@ -43,7 +44,7 @@ vi.mock('../services/sync-now/index.js', () => ({
   getSyncOverview: vi.fn(),
 }));
 
-import { getCompanyActivitySummary, ingestActivities, prisma } from '@bidstack/db';
+import { getCompanyActivitySummary, ingestActivities, listAccountConversations, prisma } from '@bidstack/db';
 
 import { clearRbacDecisionCacheForTest } from '../lib/rbac-decision-cache.js';
 import { rbacPlugin } from '../plugins/rbac.js';
@@ -79,6 +80,11 @@ const ROUTE_TABLE: Row[] = [
   {
     method: 'GET',
     url: `/api/v1/companies/${COMPANY_ID}/activity-summary`,
+    permission: 'activities:read',
+  },
+  {
+    method: 'GET',
+    url: `/api/v1/companies/${COMPANY_ID}/conversations`,
     permission: 'activities:read',
   },
   { method: 'GET', url: '/api/v1/sync-now/dust', permission: 'integrations:read' },
@@ -169,6 +175,12 @@ beforeEach(() => {
     weekly: [],
     overdue: { count: 0, oldestDueAt: null },
   } as never);
+  vi.mocked(listAccountConversations).mockResolvedValue({
+    companyId: COMPANY_ID,
+    items: [],
+    nextCursor: null,
+    openOpportunities: [],
+  });
   const run = {
     runId: 'run-1',
     source: 'dust',
@@ -211,6 +223,7 @@ describe('slice 9 route authorization table', () => {
     await app.ready();
     expect(openapiTags.get('POST /api/v1/ingest/activities')).toContain('Activities');
     expect(openapiTags.get('GET /api/v1/companies/:id/activity-summary')).toContain('Activities');
+    expect(openapiTags.get('GET /api/v1/companies/:id/conversations')).toContain('Activities');
     expect(openapiTags.get('POST /api/v1/sync-now/:source')).toContain('Integrations');
     await app.close();
   });

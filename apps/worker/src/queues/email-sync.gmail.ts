@@ -8,9 +8,9 @@
  */
 import type pino from 'pino';
 
-import { prisma, EmailProvider } from '@bidstack/db';
+import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
-import { captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -182,7 +182,7 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
       // Mail that matches no CRM record stays out of Polo (pay slips, HR, personal mail).
       if (!target) continue;
 
-      await prisma.emailMessage.upsert({
+      const saved = await prisma.emailMessage.upsert({
         where: { orgId_externalMessageId: { orgId: token.orgId, externalMessageId: msg.id } },
         create: {
           orgId: token.orgId,
@@ -205,7 +205,9 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
           ...captureColumns(target),
         },
         update: {},
+        select: { id: true },
       });
+      await bridgeActivity(() => syncEmailMessageActivity(token.orgId, saved.id), log, { msgId: msg.id });
       persisted++;
     } catch (err) {
       log.warn({ err, msgId: msg.id }, 'Failed to persist Gmail message');

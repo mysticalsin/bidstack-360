@@ -28,6 +28,17 @@ describe('Microsoft 365 plugin contract (mocked Graph, no real keys)', () => {
     });
   });
 
+  it('asks for read-only Graph scopes on connect and on refresh, Calendars.Read included', async () => {
+    const url = new URL(await plugin.getAuthUrl('org_7', 'https://app.example.test/ms/cb'));
+    const { calls } = mockFetch([{ json: { access_token: 'at2' } }]);
+    await plugin.refresh(makeConfig({ credentials: { accessToken: 'at', refreshToken: 'rt' } }));
+    const refreshScope = new URLSearchParams(calls[0]!.body).get('scope') ?? '';
+    for (const scope of [url.searchParams.get('scope') ?? '', refreshScope]) {
+      expect(scope).toContain('https://graph.microsoft.com/Calendars.Read');
+      expect(scope).not.toMatch(/ReadWrite|Send/);
+    }
+  });
+
   it("falls back to the 'common' tenant when none is configured", async () => {
     vi.stubEnv('MICROSOFT_TENANT_ID', undefined as unknown as string);
     delete process.env.MICROSOFT_TENANT_ID;

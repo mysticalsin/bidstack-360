@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CommsCapture from '../lib/comms-capture.js';
 import { resolveCaptureTarget } from '../lib/comms-capture.js';
 
-import { prisma } from '@bidstack/db';
+import { prisma, syncEmailMessageActivity } from '@bidstack/db';
 
 import { pullDelta } from './email-sync.pull.js';
 import { pullGmail } from './email-sync.gmail.js';
@@ -17,6 +17,7 @@ vi.mock('@bidstack/db', () => ({
     integrationToken: { findFirst: vi.fn(), update: vi.fn() },
     emailMessage: { upsert: vi.fn() },
   },
+  syncEmailMessageActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
 }));
 
 vi.mock('../lib/workspace-token.js', () => ({
@@ -133,6 +134,34 @@ describe('Outlook inbox capture', () => {
         }),
       }),
     );
+  });
+
+  it('turns each stored message into an account activity, and a bridge failure keeps the mail', async () => {
+    upsert.mockResolvedValueOnce({ id: 'row-1' } as never).mockResolvedValueOnce({ id: 'row-2' } as never);
+    vi.mocked(syncEmailMessageActivity).mockRejectedValueOnce(new Error('db down'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'm-x',
+              from: { emailAddress: { address: 'buyer@acme.com' } },
+              toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+              subject: 'Hello',
+              receivedDateTime: '2026-11-06T14:00:00Z',
+            },
+          ],
+          '@odata.deltaLink': 'delta',
+        }),
+      ),
+    );
+
+    const result = await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
+
+    expect(result.persisted).toBe(2);
+    expect(syncEmailMessageActivity).toHaveBeenCalledWith(orgId, 'row-1');
+    expect(syncEmailMessageActivity).toHaveBeenCalledWith(orgId, 'row-2');
   });
 
   it('does not store mail that matches no contact, company or opportunity', async () => {

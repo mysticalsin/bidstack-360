@@ -13,6 +13,7 @@ import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
+import { AccountConversations } from '@/components/company/AccountConversations';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
@@ -168,6 +169,7 @@ export function CompanyDetailPage() {
           </div>
 
           <AccountActivityCharts companyId={c.id} />
+          <AccountConversations companyId={c.id} />
 
           <CompanyTechStackSection companyId={c.id} />
           <ConsultingPartnersSection companyId={c.id} />

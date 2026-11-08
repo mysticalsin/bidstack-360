@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { externalParticipants, resolveCaptureTarget, type CaptureDb } from './comms-capture.js';
+import {
+  externalParticipants,
+  googleMeetingHints,
+  graphMeetingHints,
+  resolveCaptureTarget,
+  type CaptureDb,
+} from './comms-capture.js';
 
 const orgId = '00000000-0000-4000-8000-0000000000a1';
 
@@ -115,5 +121,38 @@ describe('resolveCaptureTarget', () => {
     );
     expect(target).toBeNull();
     expect(db.calls.contact).toBe(0);
+  });
+});
+
+describe('meeting hints', () => {
+  it('marks Graph meetings with a Teams join link as Teams, others as in person or other', () => {
+    expect(graphMeetingHints({ isOnlineMeeting: true, onlineMeetingProvider: 'teamsForBusiness' }).channel).toBe('teams');
+    expect(graphMeetingHints({ onlineMeeting: { joinUrl: 'https://teams.microsoft.com/l/meetup-join/x' } }).channel).toBe(
+      'teams',
+    );
+    expect(graphMeetingHints({ isOnlineMeeting: false }).channel).toBe('in_person_or_other');
+    expect(graphMeetingHints({ onlineMeetingUrl: 'https://teams.evil.example/l' }).channel).toBe('in_person_or_other');
+  });
+
+  it('reads Graph sensitivity and the owner response', () => {
+    expect(graphMeetingHints({ sensitivity: 'private' }).isPrivate).toBe(true);
+    expect(graphMeetingHints({ sensitivity: 'confidential' }).isPrivate).toBe(true);
+    expect(graphMeetingHints({ sensitivity: 'normal' }).isPrivate).toBe(false);
+    expect(graphMeetingHints({ responseStatus: { response: 'declined' } }).ownerDeclined).toBe(true);
+    expect(graphMeetingHints({ responseStatus: { response: 'accepted' } }).ownerDeclined).toBe(false);
+  });
+
+  it('reads Google visibility, Meet and Teams links, and the self response', () => {
+    expect(googleMeetingHints({ hangoutLink: 'https://meet.google.com/abc' }).channel).toBe('google_meet');
+    expect(
+      googleMeetingHints({ conferenceData: { entryPoints: [{ uri: 'https://teams.microsoft.com/l/meetup-join/y' }] } })
+        .channel,
+    ).toBe('teams');
+    expect(googleMeetingHints({ visibility: 'private' }).isPrivate).toBe(true);
+    expect(googleMeetingHints({ visibility: 'default' }).isPrivate).toBe(false);
+    expect(
+      googleMeetingHints({ attendees: [{ responseStatus: 'accepted' }, { self: true, responseStatus: 'declined' }] })
+        .ownerDeclined,
+    ).toBe(true);
   });
 });

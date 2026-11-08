@@ -214,6 +214,25 @@ export {
   getCompanyActivitySummary,
   weekStartIn,
 } from './services/account-activity.js';
+// Synced meetings and emails as account activities (slice 20).
+export {
+  commsActivityKey,
+  createCommsActivityBridge,
+  syncCalendarEventActivity,
+  syncEmailMessageActivity,
+  type CommsBridgeDb,
+  type CommsBridgeResult,
+  type CommsCaptureMeta,
+  type CommsSkipReason,
+  type MeetingHints,
+} from './services/comms-activity.js';
+export { listAccountConversations } from './services/account-conversations.js';
+export {
+  onAccountActivityCreated,
+  subscribeAccountActivityCreated,
+  type AccountActivityCreated,
+  type AccountActivityListener,
+} from './services/account-activity-events.js';
 
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';

@@ -9,8 +9,10 @@ import {
   grantsMailSend,
   googleEventTime,
   graphEventTime,
+  commsSourceFor,
   maySendMail,
   mayWriteCalendar,
+  microsoftRefreshScopes,
   readOnlyScopes,
   zonedWallTimeToUtc,
 } from './index.js';
@@ -82,6 +84,33 @@ describe('workspace scopes', () => {
       'https://www.googleapis.com/auth/calendar.readonly',
       'offline_access',
     ]);
+  });
+
+  it('refreshes Microsoft with read scopes only, Calendars.Read included', () => {
+    const legacy = [
+      'https://graph.microsoft.com/Mail.Read',
+      'https://graph.microsoft.com/Calendars.ReadWrite',
+      'https://graph.microsoft.com/Mail.Send',
+      'User.Read',
+    ];
+    const scopes = microsoftRefreshScopes(legacy);
+    expect(scopes).toEqual([
+      'https://graph.microsoft.com/Mail.Read',
+      'https://graph.microsoft.com/Calendars.Read',
+      'User.Read',
+      'offline_access',
+    ]);
+    expect(grantsMailSend(scopes) || grantsCalendarWrite(scopes)).toBe(false);
+    expect(microsoftRefreshScopes([])).toEqual([...WORKSPACE_READ_SCOPES.microsoft]);
+    expect(microsoftRefreshScopes(['Mail.Send'])).toContain('https://graph.microsoft.com/Calendars.Read');
+  });
+
+  it('labels synced items by source, Teams over the calendar', () => {
+    expect(commsSourceFor('microsoft_graph', 'teams')).toBe('teams');
+    expect(commsSourceFor('microsoft_graph', 'in_person_or_other')).toBe('outlook');
+    expect(commsSourceFor('OUTLOOK', null)).toBe('outlook');
+    expect(commsSourceFor('GMAIL', null)).toBe('gmail');
+    expect(commsSourceFor('google_workspace', 'google_meet')).toBe('google_calendar');
   });
 
   it('never allows provider writes, even on a legacy send or write grant', () => {

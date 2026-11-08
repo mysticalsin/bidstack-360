@@ -7,27 +7,18 @@
  * 3. Otherwise the first participant domain that matches an account's
  *    domain (free mail domains never match).
  * 4. The opportunity is filled only when the account has exactly one open
- *    bid, so a thread is never filed on the wrong deal.
+ *    bid, so a thread is never filed on the wrong deal. With several, the
+ *    item stays on the account and its activity is marked as needing one
+ *    (packages/db services/comms-activity.ts).
  *
  * Three bounded queries per item at most; no per-participant lookups.
  */
-import { prisma } from '@bidstack/db';
+import type pino from 'pino';
 
-const FREE_MAIL = new Set([
-  'gmail.com',
-  'googlemail.com',
-  'outlook.com',
-  'hotmail.com',
-  'live.com',
-  'msn.com',
-  'yahoo.com',
-  'icloud.com',
-  'me.com',
-  'aol.com',
-  'proton.me',
-  'protonmail.com',
-  'gmx.com',
-]);
+import { prisma, type MeetingHints } from '@bidstack/db';
+import { FREE_MAIL_DOMAINS } from '@bidstack/shared';
+
+const FREE_MAIL = FREE_MAIL_DOMAINS;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PARTICIPANTS = 50;
@@ -187,4 +178,70 @@ export async function refileUnlessManual(
     where: { ...key, filedManually: false },
     data: filing,
   });
+}
+
+const TEAMS_LINK = /^https:\/\/teams\.(microsoft|live)\.com\//i;
+const MEET_LINK = /^https:\/\/meet\.google\.com\//i;
+
+/** The Graph event fields the timeline needs and CalendarEvent has no column for. */
+export interface GraphMeetingFields {
+  isOnlineMeeting?: boolean;
+  onlineMeetingProvider?: string;
+  onlineMeeting?: { joinUrl?: string } | null;
+  onlineMeetingUrl?: string | null;
+  sensitivity?: string;
+  responseStatus?: { response?: string };
+}
+
+export function graphMeetingHints(item: GraphMeetingFields): MeetingHints {
+  const joinUrl = item.onlineMeeting?.joinUrl ?? item.onlineMeetingUrl ?? '';
+  const teams =
+    item.onlineMeetingProvider === 'teamsForBusiness' ||
+    item.onlineMeetingProvider === 'teamsForConsumer' ||
+    TEAMS_LINK.test(joinUrl);
+  const sensitivity = (item.sensitivity ?? '').toLowerCase();
+  return {
+    channel: teams ? 'teams' : MEET_LINK.test(joinUrl) ? 'google_meet' : 'in_person_or_other',
+    isPrivate: sensitivity === 'private' || sensitivity === 'confidential',
+    ownerDeclined: (item.responseStatus?.response ?? '').toLowerCase() === 'declined',
+  };
+}
+
+export interface GoogleMeetingFields {
+  visibility?: string;
+  hangoutLink?: string;
+  conferenceData?: {
+    conferenceSolution?: { key?: { type?: string } };
+    entryPoints?: Array<{ uri?: string }>;
+  };
+  attendees?: Array<{ self?: boolean; responseStatus?: string }>;
+}
+
+export function googleMeetingHints(item: GoogleMeetingFields): MeetingHints {
+  const uris = (item.conferenceData?.entryPoints ?? []).map((e) => e.uri ?? '');
+  const type = item.conferenceData?.conferenceSolution?.key?.type ?? '';
+  const visibility = (item.visibility ?? '').toLowerCase();
+  const self = (item.attendees ?? []).find((a) => a.self);
+  return {
+    channel: uris.some((u) => TEAMS_LINK.test(u))
+      ? 'teams'
+      : type === 'hangoutsMeet' || Boolean(item.hangoutLink) || uris.some((u) => MEET_LINK.test(u))
+        ? 'google_meet'
+        : 'in_person_or_other',
+    isPrivate: visibility === 'private' || visibility === 'confidential',
+    ownerDeclined: (self?.responseStatus ?? '').toLowerCase() === 'declined',
+  };
+}
+
+/** Run the activity bridge for a synced item; a failure never undoes the capture. */
+export async function bridgeActivity(
+  run: () => Promise<unknown>,
+  log: pino.Logger,
+  ctx: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await run();
+  } catch (err) {
+    log.warn({ err, ...ctx }, 'Could not update the account activity for a synced item');
+  }
 }

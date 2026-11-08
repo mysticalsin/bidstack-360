@@ -8,9 +8,9 @@
  */
 import type pino from 'pino';
 
-import { prisma, EmailProvider } from '@bidstack/db';
+import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
-import { captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { bridgeActivity, captureColumns, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { getWorkspaceAccessToken } from '../lib/workspace-token.js';
 
@@ -109,7 +109,7 @@ export async function pullDelta(
           if (!target) continue;
           const html = msg.body?.contentType?.toLowerCase() === 'html';
 
-          await prisma.emailMessage.upsert({
+          const saved = await prisma.emailMessage.upsert({
             where: { orgId_externalMessageId: { orgId: params.orgId, externalMessageId: msg.id } },
             create: {
               orgId: params.orgId,
@@ -132,7 +132,9 @@ export async function pullDelta(
               ...captureColumns(target),
             },
             update: {},
+            select: { id: true },
           });
+          await bridgeActivity(() => syncEmailMessageActivity(params.orgId, saved.id), log, { msgId: msg.id });
           persisted++;
         } catch (err) {
           log.warn({ err, msgId: msg.id }, 'Failed to persist Graph message');

@@ -2,7 +2,7 @@
 
 import type pino from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { graphEventTime } from '@bidstack/shared';
 
 import {
@@ -13,7 +13,14 @@ import {
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
 
-import { calendarFiling, refileUnlessManual, resolveCaptureTarget } from '../lib/comms-capture.js';
+import {
+  bridgeActivity,
+  calendarFiling,
+  graphMeetingHints,
+  refileUnlessManual,
+  resolveCaptureTarget,
+  type GraphMeetingFields,
+} from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
@@ -203,7 +210,7 @@ export async function pullMicrosoftIncremental(
   log.info({ tokenId, count }, 'MS Graph calendar pull paused at page cap; resuming next tick');
 }
 
-interface MsGraphEventItem {
+interface MsGraphEventItem extends GraphMeetingFields {
   id: string;
   subject?: string;
   bodyPreview?: string;
@@ -237,6 +244,7 @@ async function upsertMicrosoftEvents(
         where: { provider: 'microsoft_graph', externalId: item.id, orgId, ownerId: userId },
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
+      await syncRemovedEvents(orgId, userId, 'microsoft_graph', item.id, log);
       continue;
     }
 
@@ -278,7 +286,7 @@ async function upsertMicrosoftEvents(
       };
       const filing = calendarFiling(target);
 
-      await prisma.calendarEvent.upsert({
+      const saved = await prisma.calendarEvent.upsert({
         where: {
           orgId_ownerId_provider_externalId: {
             orgId,
@@ -289,10 +297,38 @@ async function upsertMicrosoftEvents(
         },
         create: { orgId, ownerId: userId, externalId: item.id, provider: 'microsoft_graph', ...fields, ...filing },
         update: fields,
+        select: { id: true },
       });
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'microsoft_graph', externalId: item.id }, filing);
+      await bridgeActivity(
+        () => syncCalendarEventActivity(orgId, saved.id, { hints: graphMeetingHints(item) }),
+        log,
+        { eventId: item.id },
+      );
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert MS event; skipping');
     }
   }
+}
+
+/** Cancel the activity of an event the provider removed. */
+export async function syncRemovedEvents(
+  orgId: string,
+  ownerId: string,
+  provider: 'microsoft_graph' | 'google_workspace',
+  externalId: string,
+  log: pino.Logger,
+): Promise<void> {
+  await bridgeActivity(
+    async () => {
+      const rows = await prisma.calendarEvent.findMany({
+        where: { orgId, ownerId, provider, externalId },
+        select: { id: true },
+        take: 5,
+      });
+      for (const row of rows) await syncCalendarEventActivity(orgId, row.id);
+    },
+    log,
+    { eventId: externalId },
+  );
 }

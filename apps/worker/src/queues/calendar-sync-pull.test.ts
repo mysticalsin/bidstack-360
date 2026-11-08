@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as CommsCapture from '../lib/comms-capture.js';
 
-import { prisma } from '@bidstack/db';
+import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { checkSerumConnectorRuntimePolicy } from '@bidstack/db/serum-runtime-policy';
 
 import { pullMicrosoftIncremental } from './calendar-sync-microsoft.js';
@@ -14,9 +14,10 @@ import { ProviderRateLimitError } from '../lib/provider-http.js';
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
-    calendarEvent: { update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() },
+    calendarEvent: { update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn(), findMany: vi.fn(async () => []) },
     integrationToken: { update: vi.fn() },
   },
+  syncCalendarEventActivity: vi.fn(async () => ({ action: 'created', activityId: 'act-1' })),
 }));
 
 vi.mock('@bidstack/db/serum-runtime-policy', () => ({
@@ -196,6 +197,47 @@ describe('Microsoft calendar pull', () => {
     );
     await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log, 'tony@amaris.com');
     expectFilingPreserved('microsoft_graph', 'ev-1');
+  });
+
+  it('hands each saved event to the activity bridge with Teams, private and declined hints', async () => {
+    upsert.mockResolvedValue({ id: 'row-1' } as never);
+    vi.mocked(syncCalendarEventActivity).mockRejectedValueOnce(new Error('db down'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        json({
+          value: [
+            {
+              id: 'ev-teams',
+              subject: 'Weekly sync',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+              isOnlineMeeting: true,
+              onlineMeetingProvider: 'teamsForBusiness',
+              onlineMeeting: { joinUrl: 'https://teams.microsoft.com/l/meetup-join/abc' },
+            },
+            {
+              id: 'ev-private',
+              subject: 'Doctor',
+              start: { dateTime: '2026-11-09T16:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T17:00:00.0000000', timeZone: 'UTC' },
+              sensitivity: 'private',
+              responseStatus: { response: 'declined' },
+            },
+          ],
+          '@odata.deltaLink': 'd',
+        }),
+      ),
+    );
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', {}, log, 'tony@amaris.com');
+
+    expect(upsert).toHaveBeenCalledTimes(2);
+    expect(syncCalendarEventActivity).toHaveBeenNthCalledWith(1, orgId, 'row-1', {
+      hints: { channel: 'teams', isPrivate: false, ownerDeclined: false },
+    });
+    expect(syncCalendarEventActivity).toHaveBeenNthCalledWith(2, orgId, 'row-1', {
+      hints: { channel: 'in_person_or_other', isPrivate: true, ownerDeclined: true },
+    });
   });
 
   it('raises a rate limit error with the Retry-After wait on 429', async () => {

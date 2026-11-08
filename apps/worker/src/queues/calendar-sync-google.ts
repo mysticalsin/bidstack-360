@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import type pino from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { googleEventTime } from '@bidstack/shared';
 
 import {
@@ -14,7 +14,15 @@ import {
 } from './calendar-sync-claim.js';
 import { CalendarConflictError } from './calendar-sync-types.js';
 import type { PushParams } from './calendar-sync-types.js';
-import { calendarFiling, refileUnlessManual, resolveCaptureTarget } from '../lib/comms-capture.js';
+import {
+  bridgeActivity,
+  calendarFiling,
+  googleMeetingHints,
+  refileUnlessManual,
+  resolveCaptureTarget,
+  type GoogleMeetingFields,
+} from '../lib/comms-capture.js';
+import { syncRemovedEvents } from './calendar-sync-microsoft.js';
 import { providerFetch } from '../lib/provider-http.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
@@ -141,7 +149,7 @@ export async function handleGooglePush({
 
 // ─── Google incremental pull ───────────────────────────────────────────────
 
-interface GoogleEventItem {
+interface GoogleEventItem extends Omit<GoogleMeetingFields, 'attendees'> {
   id: string;
   status?: string;
   summary?: string;
@@ -149,7 +157,7 @@ interface GoogleEventItem {
   start?: { dateTime?: string; date?: string; timeZone?: string };
   end?: { dateTime?: string; date?: string; timeZone?: string };
   location?: string;
-  attendees?: Array<{ email: string; displayName?: string; responseStatus?: string }>;
+  attendees?: Array<{ email: string; displayName?: string; responseStatus?: string; self?: boolean }>;
   organizer?: { email?: string };
   updated?: string;
   etag?: string;
@@ -246,6 +254,7 @@ async function upsertGoogleEvents(
         where: { provider: 'google_workspace', externalId: item.id, orgId, ownerId: userId },
         data: { syncState: 'DELETED_REMOTE', isCancelled: true },
       });
+      await syncRemovedEvents(orgId, userId, 'google_workspace', item.id, log);
       continue;
     }
 
@@ -281,7 +290,7 @@ async function upsertGoogleEvents(
         lastSyncedAt: new Date(),
       };
       const filing = calendarFiling(target);
-      await prisma.calendarEvent.upsert({
+      const saved = await prisma.calendarEvent.upsert({
         where: {
           orgId_ownerId_provider_externalId: {
             orgId,
@@ -292,8 +301,14 @@ async function upsertGoogleEvents(
         },
         create: { orgId, ownerId: userId, externalId: item.id, provider: 'google_workspace', ...fields, ...filing },
         update: fields,
+        select: { id: true },
       });
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'google_workspace', externalId: item.id }, filing);
+      await bridgeActivity(
+        () => syncCalendarEventActivity(orgId, saved.id, { hints: googleMeetingHints(item) }),
+        log,
+        { eventId: item.id },
+      );
     } catch (err) {
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
     }

@@ -36,7 +36,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
       response_type: 'code',
       redirect_uri: redirectUri,
       response_mode: 'query',
-      scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.ReadWrite https://graph.microsoft.com/User.Read offline_access',
+      scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.Read https://graph.microsoft.com/User.Read offline_access',
       state,
     });
     return `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?${params.toString()}`;
@@ -121,7 +121,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
         client_secret: clientSecret,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
-        scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.ReadWrite https://graph.microsoft.com/User.Read offline_access',
+        scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.Read https://graph.microsoft.com/User.Read offline_access',
       }),
     });
 
