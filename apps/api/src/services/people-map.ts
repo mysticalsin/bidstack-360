@@ -73,6 +73,43 @@ export function linkedDealFactListArgs(
   };
 }
 
+/**
+ * Classification rows for the loaded pairs. No take: a newer history page for
+ * one pair must not hide an accepted or review fact for another pair.
+ */
+export function evidenceFactListArgs(
+  orgId: string,
+  contactIds: readonly string[],
+  opportunityId: string | null,
+  pairs: readonly { contactId: string; opportunityId: string }[],
+) {
+  const unique = new Map<string, { contactId: string; opportunityId: string }>();
+  if (opportunityId) {
+    for (const contactId of contactIds) {
+      if (!contactId) continue;
+      unique.set(`${contactId}:${opportunityId}`, { contactId, opportunityId });
+    }
+  }
+  for (const pair of pairs) {
+    if (!pair.contactId || !pair.opportunityId) continue;
+    unique.set(`${pair.contactId}:${pair.opportunityId}`, pair);
+  }
+  return {
+    where: {
+      orgId,
+      deletedAt: null,
+      kind: 'buying_role' as const,
+      status: { in: ['accepted', 'needs_review', 'excluded'] as FactStatus[] },
+      OR: [...unique.values()].map((pair) => ({
+        contactId: pair.contactId,
+        opportunityId: pair.opportunityId,
+      })),
+    },
+    distinct: ['contactId', 'opportunityId', 'status', 'linkLabel'] as const,
+    select: FACT_SELECT,
+  };
+}
+
 const FACT_SELECT = {
   id: true,
   contactId: true,
@@ -144,6 +181,24 @@ function dealEvidence(facts: PersonFactView[], opportunityId: string, label: str
   return 'label_on_file';
 }
 
+export function mergeMapFacts(
+  primary: FactRow[],
+  supplemental: FactRow[],
+  evidence: FactRow[],
+): { facts: FactRow[]; factsTruncated: boolean } {
+  const seen = new Set<string>();
+  const facts: FactRow[] = [];
+  for (const fact of [...evidence, ...primary, ...supplemental]) {
+    if (seen.has(fact.id)) continue;
+    seen.add(fact.id);
+    facts.push(fact);
+  }
+  return {
+    facts,
+    factsTruncated: primary.length >= PEOPLE_MAP_FACT_TAKE || supplemental.length >= PEOPLE_MAP_FACT_TAKE,
+  };
+}
+
 export function assemblePeopleMap(input: {
   companyId: string | null;
   opportunityId: string | null;
@@ -152,6 +207,7 @@ export function assemblePeopleMap(input: {
   deals: DealRow[];
   names: Map<string, string>;
   now: Date;
+  factsTruncated?: boolean;
 }) {
   const factsByContact = new Map<string, FactRow[]>();
   for (const fact of input.facts) {
@@ -169,6 +225,7 @@ export function assemblePeopleMap(input: {
   return {
     companyId: input.companyId,
     opportunityId: input.opportunityId,
+    factsTruncated: input.factsTruncated === true,
     people: input.people.map((person) => {
       const rows = factsByContact.get(person.id) ?? [];
       const views = rows.map(toView);
@@ -281,18 +338,28 @@ async function finishMap(
     supplementalPairs.length === 0
       ? ([] as FactRow[])
       : await prisma.contactFact.findMany(linkedDealFactListArgs(orgId, supplementalPairs));
-  const seenFact = new Set<string>();
-  const facts = [...primary, ...supplemental].filter((fact) => {
-    if (seenFact.has(fact.id)) return false;
-    seenFact.add(fact.id);
-    return true;
-  });
+  const evidenceArgs = evidenceFactListArgs(orgId, ids, opportunityId, supplementalPairs);
+  const evidence =
+    ids.length === 0 || evidenceArgs.where.OR.length === 0
+      ? ([] as FactRow[])
+      : await prisma.contactFact.findMany(evidenceArgs as never);
+  const merged = mergeMapFacts(primary, supplemental, evidence);
+  const facts = merged.facts;
   const reportIds = facts
     .map((fact) => fact.reportsToContactId)
     .filter((id): id is string => Boolean(id));
   const names = await loadNames(orgId, reportIds);
   for (const person of people) names.set(person.id, person.name);
-  return assemblePeopleMap({ companyId, opportunityId, people, facts, deals, names, now });
+  return assemblePeopleMap({
+    companyId,
+    opportunityId,
+    people,
+    facts,
+    deals,
+    names,
+    now,
+    factsTruncated: merged.factsTruncated || deals.length >= 1000,
+  });
 }
 
 export async function assertContactInOrg(orgId: string, contactId: string) {

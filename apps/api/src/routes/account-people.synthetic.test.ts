@@ -107,6 +107,9 @@ describe('account people routes without a database', () => {
       OR: Array<{ contactId: string; opportunityId: string }>;
     };
     expect(supplemental.OR).toEqual([{ contactId, opportunityId: otherDeal }]);
+    const evidence = db.contactFact.findMany.mock.calls[2]?.[0] as { take?: number; distinct?: string[] };
+    expect(evidence.take).toBeUndefined();
+    expect(evidence.distinct).toEqual(['contactId', 'opportunityId', 'status', 'linkLabel']);
     await app.close();
   });
 

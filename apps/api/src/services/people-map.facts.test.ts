@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { PEOPLE_MAP_FACT_TAKE, contactFactListArgs, linkedDealFactListArgs } from './people-map.js';
+import {
+  PEOPLE_MAP_FACT_TAKE,
+  contactFactListArgs,
+  evidenceFactListArgs,
+  linkedDealFactListArgs,
+  mergeMapFacts,
+} from './people-map.js';
 
 type Row = {
   id: string;
@@ -126,5 +132,53 @@ describe('contact fact query scope', () => {
     );
     expect(matches(linked, args.where)).toBe(false);
     expect(matches(unrelated, args.where)).toBe(false);
+  });
+
+  it('keeps an older accepted link when a newer pair fills the display cap', () => {
+    const pairA = '00000000-0000-4000-8000-0000000000d1';
+    const pairB = '00000000-0000-4000-8000-0000000000d2';
+    const evidence = evidenceFactListArgs(
+      orgId,
+      [contactId],
+      pairA,
+      [
+        { contactId, opportunityId: pairA },
+        { contactId, opportunityId: pairB },
+      ],
+    );
+    expect(evidence).not.toHaveProperty('take');
+    expect(evidence.distinct).toEqual(['contactId', 'opportunityId', 'status', 'linkLabel']);
+    const crowded = Array.from({ length: PEOPLE_MAP_FACT_TAKE }, (_, index) => ({
+      id: `new-${index}`,
+      contactId,
+      kind: 'buying_role' as const,
+      status: 'accepted' as const,
+      claim: 'new',
+      reportsToContactId: null,
+      opportunityId: pairA,
+      companyId,
+      linkLabel: 'buyer',
+      evidenceDetail: null,
+      observedAt: null,
+    }));
+    const older = {
+      id: 'older-accepted',
+      contactId,
+      kind: 'buying_role' as const,
+      status: 'accepted' as const,
+      claim: 'buyer',
+      reportsToContactId: null,
+      opportunityId: pairB,
+      companyId,
+      linkLabel: 'buyer',
+      evidenceDetail: null,
+      observedAt: null,
+    };
+    const merged = mergeMapFacts(crowded, [], [older]);
+    expect(merged.factsTruncated).toBe(true);
+    expect(merged.facts[0]?.id).toBe('older-accepted');
+    expect(merged.facts[0]?.status).toBe('accepted');
+    expect(merged.facts[0]?.opportunityId).toBe(pairB);
+    expect(merged.facts).toHaveLength(PEOPLE_MAP_FACT_TAKE + 1);
   });
 });
