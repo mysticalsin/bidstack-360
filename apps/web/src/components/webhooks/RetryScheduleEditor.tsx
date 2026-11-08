@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
-import { DotHistogram } from '@/components/vendor/tuffui/dot-histogram';
+import { DotHistogram } from '@/components/charts/tuffui/dot-histogram';
 import { Panel, Shell, ShellHeader } from '@/components/vendor/tuffui/surface';
 import {
   useResetWebhookRetryPolicy,
@@ -270,36 +270,30 @@ export function RetryScheduleEditor({ subscriptions }: { subscriptions: Endpoint
         </Panel>
       </Shell>
 
-      {latency.length > 0 ? (
-        <DotHistogram
-          className="max-w-none"
-          values={latency}
+      <Shell>
+        <ShellHeader
           title={t('webhooks.retry.responseTime', 'Response time')}
           subtitle={t(
             'webhooks.retry.responseTimeSubtitle',
             'Every attempt in the last 7 days. The dashed line is the timeout.',
           )}
-          threshold={timeoutMs ?? undefined}
-          thresholdLabel={t('webhooks.retry.overTimeout', 'at or over the timeout')}
-          unit={t('webhooks.retry.attemptsUnit', 'attempts')}
-          format={(v) => formatLatency(v)}
         />
-      ) : (
-        <Shell>
-          <ShellHeader title={t('webhooks.retry.responseTime', 'Response time')} />
-          <Panel className="p-4">
-            <p
-              role="group"
-              aria-label={t('webhooks.retry.responseTime', 'Response time')}
-              className="text-sm text-[var(--fg-secondary)]"
-            >
-              {stats.isLoading
+        <Panel className="p-4">
+          <DotHistogram
+            values={latency}
+            title={t('webhooks.retry.responseTime', 'Response time')}
+            threshold={timeoutMs ?? undefined}
+            thresholdLabel={t('webhooks.retry.overTimeout', 'at or over the timeout')}
+            unit={t('webhooks.retry.attemptsUnit', 'attempts')}
+            format={(v) => formatLatency(v)}
+            empty={
+              stats.isLoading
                 ? t('webhooks.retry.latencyLoading', 'Loading response times…')
-                : t('webhooks.retry.noLatency', 'No attempts in the last 7 days.')}
-            </p>
-          </Panel>
-        </Shell>
-      )}
+                : t('webhooks.retry.noLatency', 'No attempts in the last 7 days.')
+            }
+          />
+        </Panel>
+      </Shell>
     </div>
   );
 }
