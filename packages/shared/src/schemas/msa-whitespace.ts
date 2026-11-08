@@ -77,10 +77,20 @@ export const WhitespaceListQuery = z.object({
 });
 export type WhitespaceListQuery = z.infer<typeof WhitespaceListQuery>;
 
+/** Filter options drawn from every flag the caller can see, before filters and limit. */
+export const WhitespaceFacets = z.object({
+  entities: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
+  countries: z.array(z.string()),
+  lines: z.array(z.string()),
+  owners: z.array(z.object({ id: z.string().uuid(), name: z.string() })),
+});
+export type WhitespaceFacets = z.infer<typeof WhitespaceFacets>;
+
 export const WhitespaceListResponse = z.object({
   items: z.array(WhitespaceFlag),
   total: z.number().int(),
   byLine: z.array(z.object({ line: z.string(), count: z.number().int(), topScore: z.number().int() })),
+  facets: WhitespaceFacets,
 });
 export type WhitespaceListResponse = z.infer<typeof WhitespaceListResponse>;
 
