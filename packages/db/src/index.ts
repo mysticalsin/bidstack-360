@@ -244,9 +244,14 @@ export {
 } from './services/comms-activity.js';
 export { listAccountConversations } from './services/account-conversations.js';
 export {
+  digestAccountActivity,
   onAccountActivityCreated,
+  runAccountActivityBatch,
   subscribeAccountActivityCreated,
+  subscribeAccountActivityDigest,
   type AccountActivityCreated,
+  type AccountActivityDigest,
+  type AccountActivityDigestListener,
   type AccountActivityListener,
 } from './services/account-activity-events.js';
 

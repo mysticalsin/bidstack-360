@@ -18,7 +18,7 @@ import { DelayedError, Queue, Worker, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { prisma, runAccountActivityBatch } from '@bidstack/db';
 import {
   CALENDAR_PUSH,
   CALENDAR_PULL_INCREMENTAL,
@@ -238,7 +238,10 @@ export async function startCalendarSync(
       const data = PullJobData.parse(raw);
       const childLog = log.child({ ...data });
       try {
-        await runIncrementalPull(data.integrationTokenId, data.orgId, data.userId, childLog);
+        // One sync run, one alert per account: imported items are digested at the end.
+        await runAccountActivityBatch(() =>
+          runIncrementalPull(data.integrationTokenId, data.orgId, data.userId, childLog),
+        );
       } catch (err) {
         await handleProviderError(err, job, childLog);
       }

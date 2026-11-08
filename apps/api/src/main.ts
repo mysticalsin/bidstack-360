@@ -31,6 +31,9 @@ const host = env.HOST;
 
 const server = await buildServer();
 const { startAgreementIngestConsumer, stopAgreementIngestConsumer } = await import('./queues/agreement-ingest.js');
+const { startAccountActivityAlertsConsumer, stopAccountActivityAlertsConsumer } = await import(
+  './queues/account-activity-alerts.js'
+);
 
 // Global process hardening: log and exit on unrecoverable errors.
 process.on('unhandledRejection', (reason, _promise) => {
@@ -52,6 +55,7 @@ const shutdown = async (signal: string) => {
   try {
     await server.close();
     await stopAgreementIngestConsumer();
+    await stopAccountActivityAlertsConsumer();
     await prisma.$disconnect();
     await redis.quit();
     await shutdownSentry();
@@ -71,6 +75,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 try {
   await server.listen({ port, host });
   await startAgreementIngestConsumer();
+  await startAccountActivityAlertsConsumer();
   server.log.info({ port, host }, 'Polo PreSales API ready');
 } catch (err) {
   server.log.error(err, 'failed to start');

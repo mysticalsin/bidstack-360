@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { subscribeAccountActivityCreated } from './account-activity-events.js';
+import {
+  runAccountActivityBatch,
+  subscribeAccountActivityCreated,
+  subscribeAccountActivityDigest,
+  type AccountActivityDigest,
+} from './account-activity-events.js';
 import { commsActivityKey, createCommsActivityBridge, type CommsBridgeDb } from './comms-activity.js';
 
 const ORG = '00000000-0000-4000-8000-000000000001';
@@ -341,10 +346,47 @@ describe('comms activity bridge: meetings', () => {
       const bridge = bridgeFor(db);
       const created = await bridge.syncCalendarEvent(ORG, EVENT);
       await bridge.syncCalendarEvent(ORG, EVENT);
-      expect(seen).toEqual([{ orgId: ORG, companyId: COMPANY, activityId: created.activityId, actorUserId: null }]);
+      expect(seen).toEqual([
+        {
+          orgId: ORG,
+          companyId: COMPANY,
+          activityId: created.activityId,
+          actorUserId: null,
+          involvedUserIds: [OWNER, COLLEAGUE],
+        },
+      ]);
     } finally {
       off();
       failing();
+    }
+  });
+
+  it('raises one digest per account for a whole import run, naming the mailbox owner', async () => {
+    const digests: AccountActivityDigest[] = [];
+    const off = subscribeAccountActivityDigest((d) => {
+      digests.push(d);
+    });
+    try {
+      const second = '00000000-0000-4000-8000-000000000051';
+      const db = fakeDb({ events: [event(), event({ id: second, externalId: 'AAMk-2', subject: 'Follow-up' })] });
+      const bridge = bridgeFor(db);
+      const ids = await runAccountActivityBatch(async () => {
+        const a = await bridge.syncCalendarEvent(ORG, EVENT);
+        const b = await bridge.syncCalendarEvent(ORG, second);
+        expect(digests).toEqual([]);
+        return [a.activityId, b.activityId];
+      });
+      expect(digests).toEqual([
+        {
+          orgId: ORG,
+          companyId: COMPANY,
+          activityIds: ids,
+          actorUserId: OWNER,
+          excludeUserIds: [OWNER, COLLEAGUE],
+        },
+      ]);
+    } finally {
+      off();
     }
   });
 });

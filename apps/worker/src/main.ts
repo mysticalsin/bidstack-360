@@ -42,6 +42,7 @@ import { startAccountIntel } from './queues/account-intel.js';
 import { startCompanyTechDetect } from './queues/company-tech-detect.js';
 import { startConsultingPartners } from './queues/consulting-partners.js';
 import { startNotificationDelivery } from './queues/notification-delivery.js';
+import { startAccountActivityAlertRelay } from './queues/account-activity-alerts.js';
 import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
@@ -193,6 +194,8 @@ await Promise.all([
   startConsultingPartners(connection, log, workers, queues),
   // Account alerts: instant email and Teams copies, daily account digest
   startNotificationDelivery(connection, log, workers, queues),
+  // Synced meetings and emails: one follower alert per account per run, sent by apps/api
+  startAccountActivityAlertRelay(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),

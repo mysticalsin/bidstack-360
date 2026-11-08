@@ -7,7 +7,7 @@
 // Recipients are Polo users only; this never messages customer contacts.
 // Callers fire and forget (emitAccountEventSafe); an alert failure must never
 // fail the write that caused it.
-import { prisma } from '@bidstack/db';
+import { prisma, subscribeAccountActivityDigest } from '@bidstack/db';
 import {
   ACCOUNT_ALERT_IN_APP_HOURLY_LIMIT,
   ACCOUNT_ALERT_COALESCE_MS,
@@ -341,66 +341,96 @@ const ACTIVITY_LABEL: Record<string, string> = {
 /** Only person-to-person activity is alert-worthy; system timeline rows are not. */
 const ALERTABLE_ACTIVITY_TYPES = new Set(Object.keys(ACTIVITY_LABEL));
 
-/**
- * Activities logged manually or ingested (Dust, CRMs, MCP). Resolves each
- * activity to its account (company, opportunity or contact parent) and emits
- * one event per account; a batch on one account becomes one counted alert.
- */
-export function emitActivitiesAccountEventsSafe(input: {
+export interface ActivitiesAccountEventsInput {
   orgId: string;
   activityIds: string[];
   actorUserId: string | null;
-}): void {
+  /** Polo users already on the items (mailbox owner, internal attendees). */
+  excludeUserIds?: string[];
+}
+
+/**
+ * Activities logged manually, ingested (REST, MCP) or imported by mail and
+ * calendar sync. Resolves each activity to its account (company, opportunity
+ * or contact parent) and emits one event per account; a batch on one account
+ * becomes one counted alert.
+ */
+export function emitActivitiesAccountEventsSafe(input: ActivitiesAccountEventsInput): void {
+  void emitActivitiesAccountEvents(input).catch((err) =>
+    log.warn({ err, orgId: input.orgId }, 'activity account events failed'),
+  );
+}
+
+export async function emitActivitiesAccountEvents(input: ActivitiesAccountEventsInput): Promise<void> {
   if (input.activityIds.length === 0) return;
-  void (async () => {
-    const rows = await prisma.activity.findMany({
-      where: { orgId: input.orgId, id: { in: input.activityIds.slice(0, 500) }, deletedAt: null },
-      select: { id: true, type: true, entityType: true, entityId: true },
+  const rows = await prisma.activity.findMany({
+    where: { orgId: input.orgId, id: { in: input.activityIds.slice(0, 500) }, deletedAt: null },
+    select: { id: true, type: true, entityType: true, entityId: true },
+    take: 500,
+  });
+  const alertable = rows.filter((r) => ALERTABLE_ACTIVITY_TYPES.has(r.type));
+  if (alertable.length === 0) return;
+  const ids = (t: string) => alertable.filter((r) => r.entityType === t).map((r) => r.entityId);
+  const [opps, contacts] = await Promise.all([
+    prisma.opportunity.findMany({
+      where: { orgId: input.orgId, id: { in: ids('opportunity') } },
+      select: { id: true, companyId: true },
       take: 500,
+    }),
+    prisma.contact.findMany({
+      where: { orgId: input.orgId, id: { in: ids('contact') } },
+      select: { id: true, companyId: true },
+      take: 500,
+    }),
+  ]);
+  const parent = new Map<string, string | null>([
+    ...opps.map((o) => [o.id, o.companyId] as const),
+    ...contacts.map((c) => [c.id, c.companyId] as const),
+  ]);
+  const byCompany = new Map<string, typeof alertable>();
+  for (const r of alertable) {
+    const companyId = r.entityType === 'company' ? r.entityId : (parent.get(r.entityId) ?? null);
+    if (!companyId) continue;
+    byCompany.set(companyId, [...(byCompany.get(companyId) ?? []), r]);
+  }
+  for (const [companyId, items] of byCompany) {
+    const first = items[0]!;
+    const label = ACTIVITY_LABEL[first.type] ?? 'New activity';
+    await emitAccountEvent({
+      orgId: input.orgId,
+      companyId,
+      kind: 'activity_logged',
+      actorUserId: input.actorUserId,
+      entityType: 'activity',
+      entityId: first.id,
+      title: (company) =>
+        items.length > 1
+          ? `${items.length} new activities on ${company}`
+          : `${label} on ${company}`,
+      weight: items.length,
+      excludeUserIds: input.excludeUserIds,
     });
-    const alertable = rows.filter((r) => ALERTABLE_ACTIVITY_TYPES.has(r.type));
-    if (alertable.length === 0) return;
-    const ids = (t: string) => alertable.filter((r) => r.entityType === t).map((r) => r.entityId);
-    const [opps, contacts] = await Promise.all([
-      prisma.opportunity.findMany({
-        where: { orgId: input.orgId, id: { in: ids('opportunity') } },
-        select: { id: true, companyId: true },
-        take: 500,
-      }),
-      prisma.contact.findMany({
-        where: { orgId: input.orgId, id: { in: ids('contact') } },
-        select: { id: true, companyId: true },
-        take: 500,
-      }),
-    ]);
-    const parent = new Map<string, string | null>([
-      ...opps.map((o) => [o.id, o.companyId] as const),
-      ...contacts.map((c) => [c.id, c.companyId] as const),
-    ]);
-    const byCompany = new Map<string, typeof alertable>();
-    for (const r of alertable) {
-      const companyId = r.entityType === 'company' ? r.entityId : (parent.get(r.entityId) ?? null);
-      if (!companyId) continue;
-      byCompany.set(companyId, [...(byCompany.get(companyId) ?? []), r]);
-    }
-    for (const [companyId, items] of byCompany) {
-      const first = items[0]!;
-      const label = ACTIVITY_LABEL[first.type] ?? 'New activity';
-      await emitAccountEvent({
-        orgId: input.orgId,
-        companyId,
-        kind: 'activity_logged',
-        actorUserId: input.actorUserId,
-        entityType: 'activity',
-        entityId: first.id,
-        title: (company) =>
-          items.length > 1
-            ? `${items.length} new activities on ${company}`
-            : `${label} on ${company}`,
-        weight: items.length,
-      });
-    }
-  })().catch((err) => log.warn({ err, orgId: input.orgId }, 'activity account events failed'));
+  }
+}
+
+let unsubscribeDigests: (() => void) | null = null;
+
+/**
+ * Alert followers for account activity raised in this process (calendar
+ * filing, REST ingest). Idempotent, so every buildServer can call it.
+ * Activity raised by apps/worker and apps/mcp-server arrives through the
+ * account-activity-alerts queue instead.
+ */
+export function installAccountActivityAlerts(): void {
+  if (unsubscribeDigests) return;
+  unsubscribeDigests = subscribeAccountActivityDigest((digest) => {
+    emitActivitiesAccountEventsSafe(digest);
+  });
+}
+
+export function uninstallAccountActivityAlerts(): void {
+  unsubscribeDigests?.();
+  unsubscribeDigests = null;
 }
 
 /** Task on an account (accountId) or on one of its opportunities. */

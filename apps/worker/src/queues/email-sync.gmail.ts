@@ -19,6 +19,7 @@ const MAX_LIST_PAGES = 5;
 const MAX_MESSAGES_PER_RUN = 500;
 const MAX_BODY_CHARS = 200_000;
 const SKIP_LABELS = new Set(['DRAFT', 'SPAM', 'TRASH']);
+const GMAIL_GONE_STATUSES = new Set([404, 410]);
 
 interface GmailTokenRow {
   id: string;
@@ -280,10 +281,10 @@ export async function pullGmail(
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) {
       // A missing body is not a reason to move the cursor past this id.
-      // 404 means Gmail already dropped it. Any other status failed before a
+      // 404 or 410 means Gmail already dropped it. Any other status failed before a
       // row existed, so it holds the cursor and does not spend the bridge budget.
-      if (detail.status !== 404) captureHeldIds.push(id);
-      else settledIds.push(id);
+      if (GMAIL_GONE_STATUSES.has(detail.status)) settledIds.push(id);
+      else captureHeldIds.push(id);
       continue;
     }
     const msg = detail.body;

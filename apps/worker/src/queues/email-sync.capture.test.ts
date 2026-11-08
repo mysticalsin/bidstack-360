@@ -419,6 +419,22 @@ describe('Gmail inbox capture', () => {
     }
   });
 
+  it.each([404, 410])('treats a %i message fetch as deleted and moves the cursor on', async (status) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.includes('/messages?')) return json({ messages: [{ id: 'g-gone', threadId: 't-1' }] });
+        return json({ error: 'gone' }, status);
+      }),
+    );
+    const persisted = await pullGmail(tokenRow('gmail', { calendarSyncToken: 'keep' }), 'access-token', log);
+    expect(persisted).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState).toEqual({ calendarSyncToken: 'keep', gmailHistoryId: '900' });
+  });
+
   it('keeps the list page token when a later page is only partly stored', async () => {
     vi.stubGlobal(
       'fetch',

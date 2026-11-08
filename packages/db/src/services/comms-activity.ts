@@ -524,7 +524,16 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
       }
       throw err;
     }
-    await onAccountActivityCreated(orgId, n.companyId, activityId, n.filedManually ? actorUserId : null);
+    const involved = [
+      ...new Set([n.ownerUserId, ...attendees.flatMap((a) => (a.userId ? [a.userId] : []))]),
+    ];
+    await onAccountActivityCreated(
+      orgId,
+      n.companyId,
+      activityId,
+      n.filedManually ? actorUserId : null,
+      involved,
+    );
     return { action: 'created', activityId };
   }
 

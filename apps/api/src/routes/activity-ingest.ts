@@ -24,7 +24,6 @@ import {
 } from '@bidstack/shared';
 
 import { applyCompanyScope, applyOpportunityScope, getAccessScope, isApiKeyActor } from '../lib/access-scope.js';
-import { emitActivitiesAccountEventsSafe } from '../services/account-events.service.js';
 
 const INGEST_RATE_LIMIT_PER_MINUTE = 60;
 
@@ -70,7 +69,8 @@ export const activityIngestRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const apiKey = isApiKeyActor(userId);
       const scope = await getAccessScope(orgId, userId);
-      const result = await ingestActivities({
+      // Follower alerts ride the account activity digest ingestActivities raises.
+      return ingestActivities({
         orgId,
         channel: 'rest',
         actor: apiKey
@@ -79,12 +79,6 @@ export const activityIngestRoutes: FastifyPluginAsyncZod = async (server) => {
         companyScope: apiKey && !scope.unrestricted ? scope.companyIds : null,
         activities: req.body.activities,
       });
-      emitActivitiesAccountEventsSafe({
-        orgId,
-        activityIds: result.accepted.map((a) => a.activityId),
-        actorUserId: apiKey ? null : userId,
-      });
-      return result;
     },
   );
 

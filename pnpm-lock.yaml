@@ -335,6 +335,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.2
         version: 1.32.2(zod@3.25.76)
+      bullmq:
+        specifier: ^5.34.6
+        version: 5.76.6
       dotenv-flow:
         specifier: ^4.1.0
         version: 4.1.0

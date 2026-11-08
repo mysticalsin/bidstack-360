@@ -34,6 +34,7 @@ import { rbacPlugin } from './plugins/rbac.js';
 import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
+import { installAccountActivityAlerts } from './services/account-events.service.js';
 
 /** Options for {@link buildServer}. */
 export interface BuildServerOptions {
@@ -93,6 +94,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
   }).withTypeProvider<ZodTypeProvider>();
 
   if (options.onRoute) server.addHook('onRoute', options.onRoute);
+  installAccountActivityAlerts();
 
   // First hook: drop traffic that bypassed Front Door before any other work.
   registerFrontDoorGuard(server, config.AZURE_FRONT_DOOR_ID);

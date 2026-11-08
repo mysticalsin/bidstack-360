@@ -19,7 +19,7 @@ import { DelayedError, Queue, Worker } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { prisma, IntegrationProvider } from '@bidstack/db';
+import { prisma, IntegrationProvider, runAccountActivityBatch } from '@bidstack/db';
 import {
   OUTLOOK_PULL_HISTORICAL,
   OUTLOOK_PULL_INCREMENTAL,
@@ -95,7 +95,7 @@ export function startEmailSync(
       log.info({ jobId: job.id, orgId: data.orgId }, 'outlook pull-incremental start');
 
       try {
-        const { persisted } = await pullDelta(data, log);
+        const { persisted } = await runAccountActivityBatch(() => pullDelta(data, log));
         log.info({ jobId: job.id, persisted }, 'outlook pull-incremental complete');
       } catch (err) {
         if (err instanceof ProviderRateLimitError) {
@@ -143,7 +143,7 @@ export function startEmailSync(
         data: { deltaState: rest as object },
       });
 
-      const { persisted } = await pullDelta(data, log);
+      const { persisted } = await runAccountActivityBatch(() => pullDelta(data, log));
       log.info({ jobId: job.id, persisted }, 'outlook pull-historical complete');
     },
     { connection, concurrency: 2 },
