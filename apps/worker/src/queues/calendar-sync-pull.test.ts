@@ -572,6 +572,82 @@ describe('Google calendar pull', () => {
       expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '77' } }) }),
     );
   });
+
+  it('keeps a drain settlement when a later page returns 410', async () => {
+    // WHY: retry keys are replayed only from the delta list. A 410 that commits
+    // an empty list puts the pending id back on the locked row.
+    bridgeStore.persisted.delta = {
+      calendarSyncToken: 'old',
+      gmailHistoryId: '77',
+      activityBridgePending: [{ id: 'ev-old', attempts: 1, kind: 'calendar' }],
+    };
+    vi.mocked(prisma.calendarEvent.findFirst).mockResolvedValue({ id: 'row-old' } as never);
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          json({
+            items: [
+              {
+                id: 'g-new',
+                summary: 'New',
+                start: { dateTime: '2026-11-09T10:00:00Z' },
+                end: { dateTime: '2026-11-09T11:00:00Z' },
+              },
+            ],
+            nextPageToken: 'page-2',
+          }),
+        )
+        .mockResolvedValueOnce(json({}, 410)),
+    );
+    await pullGoogleIncremental(
+      'tok-2',
+      orgId,
+      userId,
+      'at',
+      {
+        calendarSyncToken: 'old',
+        gmailHistoryId: '77',
+        activityBridgePending: [{ id: 'ev-old', attempts: 1, kind: 'calendar' }],
+      },
+      log,
+    );
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.gmailHistoryId).toBe('77');
+    expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
+    expect(saved.data.deltaState.calendarPageToken).toBeUndefined();
+    const pending = (saved.data.deltaState.activityBridgePending as Array<{ id: string }> | undefined) ?? [];
+    expect(pending.map((row) => row.id)).not.toContain('ev-old');
+  });
+
+  it('a filing failure after the upsert does not enter the bridge budget', async () => {
+    updateMany.mockRejectedValueOnce(new Error('filing failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          items: [
+            {
+              id: 'g-file',
+              summary: 'Secret subject',
+              start: { dateTime: '2026-11-09T10:00:00Z' },
+              end: { dateTime: '2026-11-09T11:00:00Z' },
+            },
+          ],
+          nextSyncToken: 'sync-should-not-land',
+        }),
+      ),
+    );
+    bridgeStore.persisted.delta = { watchChannelId: 'ch-1' };
+    await pullGoogleIncremental('tok-2', orgId, userId, 'at', { watchChannelId: 'ch-1' }, log, 'tony@amaris.com');
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgePending).toBeUndefined();
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('g-file');
+    expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
 });
 
 describe('Google watch renewal', () => {
