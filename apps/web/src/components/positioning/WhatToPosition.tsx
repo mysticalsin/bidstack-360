@@ -6,7 +6,7 @@ import './positioning.css';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { composeBrief, type AccountGap, type EvidenceChip, type PositioningPlay } from '@bidstack/shared';
+import { composeBrief, formatMicrosAmount, type AccountGap, type EvidenceChip, type PositioningPlay } from '@bidstack/shared';
 
 import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { fmtMoney } from '@/components/financials/financials-format';
@@ -160,9 +160,11 @@ function Gap({ g }: { g: AccountGap }) {
 export function WhatToPosition({ companyId }: { companyId: string }) {
   const q = useAccountPositioning(companyId);
   const leverage = useMsaLeverage(companyId);
-  // Open pipeline micros have no currency. composeBrief does not send them
-  // through a currency formatter.
-  const micros = (m: string) => `${m} unspecified`;
+  // Deal-range endpoints are micros with no currency. Scale them to units.
+  const micros = (m: string) => {
+    if (!/^-?\d+$/.test(m)) return 'amount not readable';
+    return `${formatMicrosAmount(BigInt(m))} unspecified`;
+  };
   if (q.isLoading) return <div className="sg wp" aria-busy="true"><div className="sg-skel" style={{ minHeight: 320 }} /></div>;
   if (q.isError || !q.data) {
     return (

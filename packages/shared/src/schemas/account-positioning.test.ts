@@ -141,6 +141,16 @@ describe('composeBrief', () => {
     expect(dealTxt).toContain('worth 2.50 unspecified');
     expect(dealTxt).not.toContain('EUR 2500000');
     expect(fx).not.toHaveBeenCalled();
+    expect(() =>
+      composeBrief({ ...f, pipeline: { ...f.pipeline, openCount: 0, openMicros: 'not-a-number' } }, (v, c) => `${c} ${v}`, fx),
+    ).not.toThrow();
+    const badOpen = composeBrief(
+      { ...withDeal, pipeline: { openCount: 1, openMicros: '12.5', won24m: 0, lost24m: 0 } },
+      (v, c) => `${c} ${v}`,
+      fx,
+    );
+    expect(badOpen).toContain('amount not readable');
+    expect(fx).not.toHaveBeenCalled();
     expect(txt).toContain('No contacts are mapped yet.');
     expect(txt).not.toMatch(/employees/);
     expect(txt).not.toContain('\u2014');
