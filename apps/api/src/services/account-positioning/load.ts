@@ -343,7 +343,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const nowOpen = opps.filter((o) => OPEN.includes(o.stage)).reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
   const series = [150, 120, 90, 60, 30].map((d) => openAt(new Date(now.getTime() - d * DAY))).concat(nowOpen);
   const ago = series[2]!;
-  items.push(base({ id: 'pipeline', group: 'health', label: 'Open pipeline', unit: 'money_micros', value: nowOpen, delta: pctChange(nowOpen, ago), deltaUnit: 'pct', series, sub: `${opps.filter((o) => OPEN.includes(o.stage)).length} open deals`, source: 'Polo pipeline', period: 'Now, change vs 90 days ago', anchor: 'deals' }));
+  items.push(base({ id: 'pipeline', group: 'health', label: 'Open pipeline', unit: 'money_micros', currency: 'EUR', value: nowOpen, delta: pctChange(nowOpen, ago), deltaUnit: 'pct', series, sub: `${opps.filter((o) => OPEN.includes(o.stage)).length} open deals`, source: 'Polo pipeline', period: 'Now, change vs 90 days ago', anchor: 'deals' }));
 
   // Financial warnings.
   const warnings = fin.sample ? [] : fin.signals.filter((s) => s.implication === 'RISK' && !s.sample);
