@@ -33,14 +33,44 @@ log() {
 # Migrate and the API use DATABASE_URL. A remote host would send the preview
 # password and seed off this machine. Only the Postgres started here is allowed.
 preview_require_local_database() {
-  case "${DATABASE_URL}" in
-    postgres://*@127.0.0.1:*|postgres://*@localhost:*|postgresql://*@127.0.0.1:*|postgresql://*@localhost:*)
-      ;;
+  local url="${DATABASE_URL}"
+  case "${url}" in
+    postgres://*|postgresql://*) ;;
     *)
       log "DATABASE_URL must point at the preview Postgres on 127.0.0.1 or localhost"
       exit 1
       ;;
   esac
+  local rest="${url#*://}"
+  rest="${rest%%\?*}"
+  rest="${rest%%#*}"
+  rest="${rest%%/*}"
+  rest="${rest##*@}"
+  local host="${rest%%:*}"
+  local port=""
+  if [[ "${rest}" == *:* ]]; then
+    port="${rest##*:}"
+  fi
+  if [[ "${host}" != "127.0.0.1" && "${host}" != "localhost" ]]; then
+    log "DATABASE_URL must point at the preview Postgres on 127.0.0.1 or localhost"
+    exit 1
+  fi
+  if [[ -n "${port}" && "${port}" != "5432" ]]; then
+    log "DATABASE_URL must use the preview Postgres port"
+    exit 1
+  fi
+}
+
+# Replace the known preview default before any child starts. The value is not logged.
+preview_prepare_database() {
+  if [[ -z "${POSTGRES_PASSWORD}" || "${POSTGRES_PASSWORD}" == "bidstack" ]]; then
+    POSTGRES_PASSWORD="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+    export POSTGRES_PASSWORD
+    export POSTGRES_USER="${POSTGRES_USER:-bidstack}"
+    export POSTGRES_DB="${POSTGRES_DB:-bidstack}"
+    export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}"
+  fi
+  preview_require_local_database
 }
 
 preview_child_pids=()
@@ -79,17 +109,22 @@ preview_cleanup() {
   done
   for pid in "${preview_child_pids[@]}"; do
     [[ -n "${pid}" ]] || continue
+    # Poll. A blocking wait here never reaches kill -9 if the child ignores TERM.
     waits=0
     while kill -0 "${pid}" 2>/dev/null && [[ "${waits}" -lt 20 ]]; do
-      wait "${pid}" 2>/dev/null || true
-      waits=$((waits + 1))
       sleep 0.1
+      waits=$((waits + 1))
     done
     if kill -0 "${pid}" 2>/dev/null; then
       kill -9 "${pid}" 2>/dev/null || true
-      wait "${pid}" 2>/dev/null || true
+      waits=0
+      while kill -0 "${pid}" 2>/dev/null && [[ "${waits}" -lt 10 ]]; do
+        sleep 0.1
+        waits=$((waits + 1))
+      done
     fi
     if ! kill -0 "${pid}" 2>/dev/null; then
+      wait "${pid}" 2>/dev/null || true
       echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
     fi
   done
@@ -103,7 +138,11 @@ preview_install_trap() { trap preview_cleanup EXIT INT TERM; }
 
 preview_start_redis() {
   log "starting redis"
-  if ! redis-server --daemonize yes --bind 127.0.0.1 --protected-mode yes --port 6379 --save "" >>"$LOG" 2>&1; then
+  redis-server --daemonize no --bind 127.0.0.1 --protected-mode yes --port 6379 --save "" >>"$LOG" 2>&1 &
+  local redis_pid=$!
+  preview_track "${redis_pid}"
+  sleep 0.1
+  if ! kill -0 "${redis_pid}" 2>/dev/null; then
     log "redis failed"
     exit 1
   fi
@@ -142,7 +181,7 @@ preview_watch_children() {
 }
 
 preview_main() {
-preview_require_local_database
+preview_prepare_database
 preview_install_trap
 preview_stop_redis=1
 
@@ -250,8 +289,10 @@ if preview_wait_postgres "${pg_pid}"; then
   tsx_bin="$(find /app -path '*/node_modules/.bin/tsx' -print -quit || true)"
   preview_require_file "tsx binary" "${tsx_bin}"
   preview_seed() {
-    cd /app/packages/db || return 1
-    "${tsx_bin}" src/seed.ts
+    (
+      cd /app/packages/db || exit 1
+      "${tsx_bin}" src/seed.ts
+    )
   }
   preview_run_or_die "seed" preview_seed
   # The worker is what consumes the jobs the API enqueues. Do not leave the

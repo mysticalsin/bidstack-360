@@ -73,8 +73,10 @@ describe('preview process lifecycle', () => {
     expect(reaped).toContain(`reaped ${a}`);
     expect(reaped).toContain(`reaped ${b}`);
     expect(result.log).toContain('a preview process exited (9)');
-    expect(spawnSync('kill', ['-0', a ?? '']).status).not.toBe(0);
-    expect(spawnSync('kill', ['-0', b ?? '']).status).not.toBe(0);
+    expect(Number(a)).toBeGreaterThan(0);
+    expect(Number(b)).toBeGreaterThan(0);
+    expect(spawnSync('kill', ['-0', String(a)]).status).not.toBe(0);
+    expect(spawnSync('kill', ['-0', String(b)]).status).not.toBe(0);
   });
 
   it('stops after a failed command and does not run the next one', () => {
@@ -85,6 +87,40 @@ describe('preview process lifecycle', () => {
     expect(result.status).toBe(1);
     expect(result.stdout).not.toContain('CONTINUED');
     expect(result.log).toContain('step failed');
+  });
+
+  it('rejects a remote host hidden after an at-sign in the path', () => {
+    const result = run(`
+      export DATABASE_URL='postgres://evil.example/db@127.0.0.1:5432'
+      preview_require_local_database
+      echo CONTINUED
+    `);
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('CONTINUED');
+  });
+
+  it('kills a child that ignores TERM and leaves an unrelated process', () => {
+    const result = run(`
+      preview_install_trap
+      nohup sleep 30 >/dev/null 2>&1 &
+      unrelated=\$!
+      disown || true
+      bash -c 'trap "" TERM; sleep 30' &
+      child=\$!
+      preview_track "\$child"
+      echo UNRELATED:\$unrelated
+      echo CHILD:\$child
+      preview_cleanup
+    `);
+    const unrelated = /UNRELATED:(\d+)/.exec(result.stdout)?.[1];
+    const child = /CHILD:(\d+)/.exec(result.stdout)?.[1];
+    expect(Number(child)).toBeGreaterThan(0);
+    expect(Number(unrelated)).toBeGreaterThan(0);
+    expect(spawnSync('kill', ['-0', String(child)]).status).not.toBe(0);
+    expect(readFileSync(result.reap, 'utf8')).toContain(`reaped ${child}`);
+    expect(readFileSync(result.reap, 'utf8')).not.toContain(`reaped ${unrelated}`);
+    expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
+    spawnSync('kill', ['-9', String(unrelated)]);
   });
 
   it('refuses a remote DATABASE_URL before any migrate', () => {
