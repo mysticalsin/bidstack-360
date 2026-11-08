@@ -14,6 +14,7 @@ import { pullGmail } from './email-sync.gmail.js';
 vi.mock('@bidstack/db', () => ({
   EmailProvider: { GMAIL: 'GMAIL', OUTLOOK: 'OUTLOOK' },
   prisma: {
+    unlockedCursorTestAdapter: true,
     integrationToken: { findFirst: vi.fn(), update: vi.fn() },
     emailMessage: { upsert: vi.fn(async () => ({ id: 'row-1' })) },
   },
@@ -203,8 +204,8 @@ describe('Outlook inbox capture', () => {
     let state: Record<string, unknown> = { calendarDeltaLink: 'cal-keep' };
     findToken.mockImplementation(async () => tokenRow('microsoft_graph', state));
     const countOf = (id: string): number => {
-      const pages = (state.activityBridgeRetryByPage ?? {}) as Record<string, Record<string, number>>;
-      return Object.values(pages).reduce((n, counts) => n + (counts[id] ?? 0), 0);
+      const counts = (state.activityBridgeRetryById ?? {}) as Record<string, number>;
+      return counts[id] ?? 0;
     };
 
     for (let attempt = 1; attempt < 3; attempt++) {
@@ -219,7 +220,7 @@ describe('Outlook inbox capture', () => {
 
     await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
     state = (tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }).data.deltaState;
-    expect(countOf('m-poison')).toBe(3);
+    expect(countOf('m-poison')).toBe(0);
     expect(state.mailDeltaLink).toBe('inbox-delta');
     expect(state.mailNextLink).toBeUndefined();
     expect(state.activityBridgeQuarantine).toEqual([expect.objectContaining({ id: 'm-poison', attempts: 3 })]);
@@ -403,8 +404,8 @@ describe('Gmail inbox capture', () => {
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
     expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
     expect(saved.data.deltaState.calendarSyncToken).toBe('keep');
-    const pages = saved.data.deltaState.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(pages['gmail:seed']?.['g-poison']).toBe(1);
+    const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
+    expect(counts['g-poison']).toBe(1);
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
   });
 });

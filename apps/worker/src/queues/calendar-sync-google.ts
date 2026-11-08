@@ -213,6 +213,7 @@ export async function pullGoogleIncremental(
     writeRequested: false,
   });
 
+  const baseline = structuredClone(deltaState);
   const syncToken = deltaState['calendarSyncToken'] as string | undefined;
   let pageToken = deltaState['calendarPageToken'] as string | undefined;
   let count = 0;
@@ -228,7 +229,7 @@ export async function pullGoogleIncremental(
     if (res.status === 410) {
       log.warn({ tokenId }, 'Google sync token expired; clearing for full re-sync');
       const { calendarSyncToken: _s, calendarPageToken: _p, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, rest, []);
+      await commitTokenDeltaState(prisma, tokenId, baseline, rest, []);
       return;
     }
     if (!res.ok) throw new Error(`Google events list failed: ${res.status}`);
@@ -247,6 +248,7 @@ export async function pullGoogleIncremental(
       await commitTokenDeltaState(
         prisma,
         tokenId,
+        baseline,
         { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
         bridgeDeltas,
       );
@@ -256,7 +258,7 @@ export async function pullGoogleIncremental(
 
     if (body.nextSyncToken) {
       const { calendarPageToken: _p, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, { ...rest, calendarSyncToken: body.nextSyncToken }, bridgeDeltas);
+      await commitTokenDeltaState(prisma, tokenId, baseline, { ...rest, calendarSyncToken: body.nextSyncToken }, bridgeDeltas);
       log.debug({ tokenId, count }, 'Google incremental pull complete');
       return;
     }
@@ -267,6 +269,7 @@ export async function pullGoogleIncremental(
   await commitTokenDeltaState(
     prisma,
     tokenId,
+    baseline,
     { ...deltaState, ...(pageToken ? { calendarPageToken: pageToken } : {}) },
     bridgeDeltas,
   );
