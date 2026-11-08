@@ -3392,7 +3392,7 @@
     "severityMedium": "Medium",
     "severityLow": "Low",
     "emptyTitle": "No open issues",
-    "emptyMessage": "Everything is green here.",
+    "emptyMessage": "No risks or compliance checks are recorded for this account yet.",
     "unassigned": "Unassigned",
     "dueSuffix": " - due {{dueDate}}",
     "noOwner": "No owner"

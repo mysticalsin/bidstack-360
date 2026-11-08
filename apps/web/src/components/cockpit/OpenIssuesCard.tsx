@@ -95,7 +95,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
         {total === 0 ? (
           <EmptyState
             title={t('openIssues.emptyTitle', 'No open issues')}
-            message={t('openIssues.emptyMessage', 'Everything is green here.')}
+            message={t('openIssues.emptyMessage', 'No risks or compliance checks are recorded for this account yet.')}
           />
         ) : (
           <ul className="open-issues">

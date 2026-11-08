@@ -18,7 +18,7 @@ import type {
   SignalFactor,
 } from '@bidstack/shared';
 
-import { defaultCompliance, defaultTechnicalStack } from './dashboard.defaults.js';
+import { defaultTechnicalStack } from './dashboard.defaults.js';
 import {
   asComplianceStatus,
   asRiskSeverity,
@@ -740,9 +740,9 @@ export function buildCockpit({
     // Only this account's own register rows: a canned fallback put the same
     // "Security scope" risk and owner on every account.
     risks: visibleRisks.map(serializeRisk),
-    compliance: visibleCompliance.length
-      ? visibleCompliance.map(serializeCompliance)
-      : defaultCompliance(),
+    // Same rule as risks: the canned ISO 27001 / SOC 2 library rows claimed
+    // checks nobody ran for this account. No rows means none recorded.
+    compliance: visibleCompliance.map(serializeCompliance),
     roadmap: [
       { id: 'road-q1', quarter: 'Q1 2026', title: 'Windows 11 migration', status: 'in_progress' },
       { id: 'road-q2', quarter: 'Q2 2026', title: 'Zero Trust initiative', status: 'planned' },
@@ -754,14 +754,30 @@ export function buildCockpit({
 
 // ─── Cockpit derivation from snapshot ────────────────────────────────────────
 
+/**
+ * The stored snapshot describes one company (`snapshot.cockpit.company`). For
+ * any other company only identity-scoped data may carry over: its contacts and
+ * activity. Risks, compliance, KPIs, revenue, win/loss, stack and roadmap
+ * belong to the snapshot company, so copying them showed one account's risks
+ * (and "Open risks 2") on every other account. Those become empty; callers
+ * that need them for another company should use `buildCockpit`.
+ */
 export function buildCockpitFromCompany(
   snapshot: z.infer<typeof CrmDashboardSnapshot>,
   company: z.infer<typeof CrmCompany>,
 ) {
   if (company.id === snapshot.cockpit.company.id) return snapshot.cockpit;
+  const { revenueEvolution: _revenue, winLoss: _winLoss, externalLastSyncedAt: _synced, ...shared } =
+    snapshot.cockpit;
   return {
-    ...snapshot.cockpit,
+    ...shared,
     company,
+    kpis: [],
+    technicalStack: [],
+    roadmap: [],
+    risks: [],
+    compliance: [],
     keyContacts: snapshot.cockpit.keyContacts.filter((contact) => contact.companyId === company.id),
+    recentActivity: snapshot.cockpit.recentActivity.filter((a) => a.companyId === company.id),
   };
 }

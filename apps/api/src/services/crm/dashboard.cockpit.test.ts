@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { CrmCompany } from '@bidstack/shared';
 
-import { applyFieldOverrides, buildCockpit, computeSignalCoverage } from './dashboard.cockpit.js';
+import {
+  applyFieldOverrides,
+  buildCockpit,
+  buildCockpitFromCompany,
+  computeSignalCoverage,
+} from './dashboard.cockpit.js';
 
 function company(partial: Partial<CrmCompany> = {}): CrmCompany {
   return {
@@ -277,5 +282,102 @@ describe('buildCockpit risks are scoped to the account', () => {
     const cockpit = buildCockpit(args([risk({}), risk({ id: 'r2', title: 'Globex budget freeze', companyName: 'Globex' })]));
     expect(cockpit.risks.map((r) => r.title)).toEqual(['Data residency clause not agreed']);
     expect(cockpit.risks[0]!.owner).toBe('Ana Lopez');
+  });
+});
+
+describe('buildCockpit compliance is scoped to the account', () => {
+  // WHY: an account with no compliance rows used to get the canned ISO 27001
+  // and SOC 2 library rows, claiming checks nobody ran for it.
+  const args = (compliance: unknown[]) => ({
+    company: company({ id: 'acme', name: 'Acme' }),
+    companies: [],
+    opportunities: [],
+    contacts: [],
+    tasks: [],
+    risks: [],
+    compliance: compliance as never,
+    fieldOverrides: [],
+  });
+  const check = (over: Record<string, unknown>) => ({
+    id: 'c1',
+    label: 'GDPR DPA signed',
+    status: 'compliant',
+    owner: 'Ana Lopez',
+    sourceAttribution: [
+      {
+        source: 'manual',
+        label: 'Compliance register',
+        sourceUrl: null,
+        fetchedAt: '2026-05-01T00:00:00.000Z',
+        confidence: 0.9,
+        providerMetadata: { companyName: over.companyName ?? 'Acme' },
+      },
+    ],
+    ...over,
+  });
+
+  it('returns no compliance rows when the account has none', () => {
+    const cockpit = buildCockpit(args([check({ id: 'other', companyName: 'Globex' })]));
+    expect(cockpit.compliance).toEqual([]);
+    expect(JSON.stringify(cockpit.compliance)).not.toMatch(/ISO 27001|SOC 2/);
+  });
+
+  it('returns only the account own compliance rows', () => {
+    const cockpit = buildCockpit(
+      args([check({}), check({ id: 'c2', label: 'Globex audit', companyName: 'Globex' })]),
+    );
+    expect(cockpit.compliance.map((c) => c.label)).toEqual(['GDPR DPA signed']);
+  });
+});
+
+describe('buildCockpitFromCompany scopes the stored snapshot to its company', () => {
+  // WHY: the snapshot holds one company's cockpit. Spreading it onto another
+  // company showed that company's risks and compliance on every account.
+  const risk = { id: 'r1', title: 'Security scope needs final sign-off', severity: 'high', owner: 'Sarah Bennett', status: 'open' };
+  const snapshotCompany = company({ id: 'snap', name: 'Snap Co' });
+  const snapshot = {
+    cockpit: {
+      company: snapshotCompany,
+      kpis: [{ label: 'Revenue' }],
+      technicalStack: [{ label: 'Cloud', items: [] }],
+      health: { score: 80 },
+      keyContacts: [
+        { id: 'p1', companyId: 'snap', name: 'Sarah Bennett' },
+        { id: 'p2', companyId: 'other', name: 'Ana Lopez' },
+      ],
+      recentActivity: [
+        { id: 'a1', companyId: 'snap', title: 'Call with Snap' },
+        { id: 'a2', companyId: 'other', title: 'Call with Other' },
+      ],
+      risks: [risk],
+      compliance: [{ id: 'c1', label: 'ISO 27001', status: 'compliant' }],
+      roadmap: [{ id: 'road-q1', title: 'Windows 11 migration' }],
+      revenueEvolution: [{ period: '2026-01', revenueMicros: 1 }],
+      winLoss: { wonCount: 1 },
+      externalLastSyncedAt: '2026-05-01T00:00:00.000Z',
+    },
+  } as never;
+
+  it('returns the snapshot untouched for the company it belongs to', () => {
+    const cockpit = buildCockpitFromCompany(snapshot, snapshotCompany);
+    expect(cockpit.risks).toHaveLength(1);
+    expect(cockpit.compliance).toHaveLength(1);
+  });
+
+  it('carries no risks, compliance or other-account data onto a different company', () => {
+    const other = company({ id: 'other', name: 'Other' });
+    const cockpit = buildCockpitFromCompany(snapshot, other);
+    expect(cockpit.company.id).toBe('other');
+    expect(cockpit.risks).toEqual([]);
+    expect(cockpit.compliance).toEqual([]);
+    expect(cockpit.kpis).toEqual([]);
+    expect(cockpit.technicalStack).toEqual([]);
+    expect(cockpit.roadmap).toEqual([]);
+    expect(cockpit).not.toHaveProperty('revenueEvolution');
+    expect(cockpit).not.toHaveProperty('winLoss');
+    expect(cockpit).not.toHaveProperty('externalLastSyncedAt');
+    expect(cockpit.keyContacts.map((c) => c.id)).toEqual(['p2']);
+    expect(cockpit.recentActivity.map((a) => a.id)).toEqual(['a2']);
+    expect(JSON.stringify(cockpit)).not.toContain('Sarah Bennett');
   });
 });
