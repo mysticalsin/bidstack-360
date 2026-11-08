@@ -120,6 +120,33 @@ export function conversionOutcome(
   return { ok: true, amount: converted };
 }
 
+/**
+ * How two currency codes relate, without looking at an amount.
+ * `parity` means the two rate quotes are the same number, so a 1:1
+ * conversion does not change the stored integer. It is not a comparison
+ * of the money before and after, and it is not a failure signal.
+ */
+export type RateRelation = 'same' | 'parity' | 'cross' | 'unavailable';
+
+export function rateRelation(
+  from: string,
+  to: string,
+  rates: ExchangeRateTable | null,
+): RateRelation {
+  const source = normalizeCurrencyCode(from);
+  const target = normalizeCurrencyCode(to);
+  if (!source || !target) return 'unavailable';
+  if (source === target) return 'same';
+  if (!rates?.rates) return 'unavailable';
+  const base = normalizeCurrencyCode(rates.base);
+  if (!base) return 'unavailable';
+  const fromRate = source === base ? 1.0 : rates.rates[source];
+  const toRate = target === base ? 1.0 : rates.rates[target];
+  if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return 'unavailable';
+  if (fromRate === toRate) return 'parity';
+  return 'cross';
+}
+
 const REGION_TO_CURRENCY: Partial<Record<string, CurrencyCode>> = {
   AT: 'EUR',
   BE: 'EUR',

@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-08 BUG: display micros were rebuilt with `amount * 1e6` even when the currency did not change
+
+- **What went wrong:** `formatConvertedMicros` turned a bigint into a Number of units and back with `Math.round(amount * 1e6)` before `formatMoneyMicros`. For `9007199254740993000000n` the integer became `9007199254740992000000` even when source and display currency were the same, or the rate quote was exactly 1. A finite cross rate whose scaled micros overflowed became an em dash.
+- **Root cause:** The parent hook already round-tripped every micros value through `Number`. The label fix kept that path for successes. `Number` cannot store every integer the micros bigint can.
+- **Prevention rule:** Pass the stored micros through when the currency is unchanged or the rate quotes are identical. Use the Number cross-rate path only when the rebuilt micros are a safe integer. Otherwise keep the original micros and the source currency. Do not treat a rendered Intl string as the stored integer, and do not treat equal money amounts as a failed conversion.
+- **Files affected:** `apps/web/src/hooks/useFormatMoney.ts`, `apps/web/src/stores/currency.ts`.
+
+---
+
 ### 2026-11-02 TESTING: B2 `readOnly` default 403'd write-scoped integration keys
 
 - **What went wrong:** M2 defaulted new `ApiKey.readOnly` to true. Integration tests that insert write-scoped keys via `prisma.apiKey.create` did not set `readOnly: false`, so `requirePermission` returned "API key is read-only" before the intended admin / human-actor / missing-scope message. CI Integration failed on 7 assertions.

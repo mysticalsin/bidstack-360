@@ -1,8 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useDisplayMoney } from '../hooks/useDisplayMoney';
-import { conversionOutcome, useCurrencyStore } from './currency';
+import { useDisplayMoney, useDisplayMoneyMicros } from '../hooks/useDisplayMoney';
+import { formatMoneyMicros } from '@/lib/format';
+import { conversionOutcome, rateRelation, useCurrencyStore } from './currency';
 import { useFormatMoney } from '../hooks/useFormatMoney';
+
+const { microsSeen } = vi.hoisted(() => ({
+  microsSeen: [] as { micros: string; currency?: string }[],
+}));
+
+vi.mock('@/lib/format', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/format')>('@/lib/format');
+  return {
+    ...actual,
+    formatMoneyMicros: (
+      micros: string | number | bigint,
+      currency?: string,
+      options?: { compact?: boolean; locale?: string },
+    ) => {
+      microsSeen.push({
+        micros: typeof micros === 'bigint' ? micros.toString() : String(micros),
+        currency,
+      });
+      return actual.formatMoneyMicros(micros, currency, options);
+    },
+  };
+});
+
+/** One unit past the largest integer Number can store exactly, in micros. */
+const HUGE_MICROS = 9007199254740993000000n;
 
 async function loadCurrency() {
   vi.resetModules();
@@ -508,6 +534,120 @@ describe('useFormatMoney hook integration', () => {
     useCurrencyStore.setState({ currency: 'USD', rates: null });
     const { result } = renderHook(() => useDisplayMoney(100, 'CAD'));
     expect(result.current).toContain('CA$');
+  });
+});
+
+describe('micros precision before formatting', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('bidstack-locale', 'en-US');
+    microsSeen.length = 0;
+  });
+
+  it('passes the stored micros through when the currency is unchanged', () => {
+    // WHY: the unit integer 9007199254740993 does not fit in a Number.
+    // Rebuilding micros with amount * 1e6 would store a different integer
+    // before the formatter runs, even though no exchange is required.
+    useCurrencyStore.setState({ currency: 'EUR', rates: null });
+    const { result } = renderHook(() => useFormatMoney());
+    const rendered = result.current.formatMoneyMicros(HUGE_MICROS, 'EUR');
+    expect(microsSeen.at(-1)).toEqual({ micros: HUGE_MICROS.toString(), currency: 'EUR' });
+    expect(rendered).toContain('€');
+    expect(rendered).not.toContain('9007199254740993');
+
+    microsSeen.length = 0;
+    const negative = renderHook(() => useFormatMoney());
+    negative.result.current.formatMoneyMicros(-HUGE_MICROS, 'EUR');
+    expect(microsSeen.at(-1)).toEqual({ micros: (-HUGE_MICROS).toString(), currency: 'EUR' });
+  });
+
+  it('passes the stored micros through on a real 1:1 rate and labels the display currency', () => {
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 1 }, date: 'parity' },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    const rendered = result.current.formatMoneyMicros(HUGE_MICROS, 'EUR');
+    expect(microsSeen.at(-1)).toEqual({ micros: HUGE_MICROS.toString(), currency: 'USD' });
+    expect(rendered).toContain('$');
+    expect(rendered).not.toContain('€');
+    expect(rendered).not.toContain('9007199254740993');
+
+    microsSeen.length = 0;
+    const other = renderHook(() => useDisplayMoneyMicros(HUGE_MICROS, 'EUR'));
+    expect(other.result.current).toContain('$');
+    expect(microsSeen.at(-1)).toEqual({ micros: HUGE_MICROS.toString(), currency: 'USD' });
+  });
+
+  it('converts a safe cross rate and keeps the source micros when the integer cannot be rebuilt', () => {
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 1.1 }, date: 'live' },
+    });
+    const { result } = renderHook(() => useFormatMoney());
+    result.current.formatMoneyMicros(100_000_000n, 'EUR');
+    expect(microsSeen.at(-1)).toEqual({ micros: '110000000', currency: 'USD' });
+    microsSeen.length = 0;
+    result.current.formatMoneyMicros(-100_000_000n, 'EUR');
+    expect(microsSeen.at(-1)).toEqual({ micros: '-110000000', currency: 'USD' });
+
+    microsSeen.length = 0;
+    result.current.formatMoneyMicros(HUGE_MICROS, 'EUR');
+    expect(microsSeen.at(-1)).toEqual({ micros: HUGE_MICROS.toString(), currency: 'EUR' });
+
+    microsSeen.length = 0;
+    result.current.formatMoneyMicros(-HUGE_MICROS, 'EUR');
+    expect(microsSeen.at(-1)).toEqual({ micros: (-HUGE_MICROS).toString(), currency: 'EUR' });
+  });
+
+  it('keeps the source micros when a finite cross rate overflows the micros scale', () => {
+    // 1e15 units times 1e290 is still a finite Number. Multiplying by 1e6
+    // is not. That must not become an em dash or a display-currency amount.
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 1e290 }, date: 'overflow' },
+    });
+    const micros = 1000000000000000000000n;
+    const { result } = renderHook(() => useFormatMoney());
+    const rendered = result.current.formatMoneyMicros(micros, 'EUR');
+    expect(rendered).not.toBe('—');
+    expect(microsSeen.at(-1)).toEqual({ micros: micros.toString(), currency: 'EUR' });
+  });
+
+  it('rejects invalid micros from both hooks', () => {
+    useCurrencyStore.setState({ currency: 'USD', rates: null });
+    const format = renderHook(() => useFormatMoney());
+    expect(format.result.current.formatMoneyMicros('not-a-number', 'CAD')).toBe('—');
+    expect(format.result.current.formatMoneyMicros('1.5', 'CAD')).toBe('—');
+    expect(format.result.current.formatMoneyMicros(Number.NaN, 'CAD')).toBe('—');
+    expect(format.result.current.formatMoneyMicros(Number.POSITIVE_INFINITY, 'CAD')).toBe('—');
+    expect(format.result.current.formatMoneyMicros(1.5, 'CAD')).toBe('—');
+    const display = renderHook(() => useDisplayMoneyMicros('not-a-number', 'CAD'));
+    expect(display.result.current).toBe('—');
+    const fractional = renderHook(() => useDisplayMoneyMicros(1.5, 'CAD'));
+    expect(fractional.result.current).toBe('—');
+  });
+
+  it('does not treat the formatter output as the stored integer past its safe range', () => {
+    // formatMoneyMicros itself turns the unit count into a Number. Past
+    // Number.MAX_SAFE_INTEGER the rendered text is not the stored integer.
+    const rendered = formatMoneyMicros(HUGE_MICROS.toString(), 'EUR', {
+      compact: false,
+      locale: 'en-US',
+    });
+    expect(rendered).toContain('€');
+    expect(rendered).not.toContain('9007199254740993');
+  });
+});
+
+describe('rateRelation', () => {
+  it('names same currency, an identical rate quote, a real cross rate, and a missing rate', () => {
+    // The quote comparison is not a check that the money amount came back unchanged.
+    expect(rateRelation('eur', 'EUR', null)).toBe('same');
+    expect(rateRelation('EUR', 'USD', { base: 'EUR', rates: { USD: 1 }, date: 'parity' })).toBe('parity');
+    expect(rateRelation('EUR', 'USD', { base: 'EUR', rates: { USD: 1.1 }, date: 'live' })).toBe('cross');
+    expect(rateRelation('GBP', 'USD', { base: 'EUR', rates: { USD: 1.1 }, date: 'partial' })).toBe('unavailable');
+    expect(rateRelation('CAD', 'USD', null)).toBe('unavailable');
   });
 });
 
