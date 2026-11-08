@@ -111,6 +111,8 @@ const domainOf = (email: string) => email.slice(email.lastIndexOf('@') + 1);
 interface Directory {
   /** Org user email (lower case) to user id. */
   users: Map<string, string>;
+  /** User id to their primary email (lower case). */
+  emailOf: Map<string, string>;
   /** Org user domains, consumer mail domains excluded. */
   domains: Set<string>;
 }
@@ -137,6 +139,10 @@ interface Normalized {
   filedManually: boolean;
   direction: 'inbound' | 'outbound' | null;
   hints: MeetingHints;
+  /** Calendar identity shared by every attendee's copy; one activity per identity. */
+  identity?: string;
+  /** Per-copy keys written before the identity was stored. */
+  legacyKeys?: string[];
 }
 
 function cleanParticipants(raw: Array<string | null | undefined>): string[] {
@@ -196,17 +202,19 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
       })
       .then((rows) => {
         const users = new Map<string, string>();
+        const emailOf = new Map<string, string>();
         const domains = new Set<string>();
         for (const row of rows) {
           for (const raw of [row.email, row.microsoftEmail]) {
             const email = (raw ?? '').trim().toLowerCase();
             if (!EMAIL.test(email)) continue;
             users.set(email, row.id);
+            if (!emailOf.has(row.id)) emailOf.set(row.id, email);
             const domain = domainOf(email);
             if (!FREE_MAIL_DOMAINS.has(domain)) domains.add(domain);
           }
         }
-        return { users, domains };
+        return { users, emailOf, domains };
       });
     directories.set(orgId, { at: Date.now(), dir });
     dir.catch(() => directories.delete(orgId));
@@ -222,9 +230,68 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
     return open.length > 1;
   }
 
+  /**
+   * Move a per-copy activity written before the shared identity was stored onto
+   * the identity key, so the upgrade does not show the meeting twice.
+   */
+  async function adoptLegacy(orgId: string, key: string, legacyKeys: string[], sourceId: string): Promise<void> {
+    if (!legacyKeys.length) return;
+    const existing =
+      (await db.activity.findFirst({ where: { orgId, idempotencyKey: key }, select: { id: true } })) ??
+      (await db.activity.findFirst({
+        where: { orgId, idempotencyKey: key, deletedAt: { not: null } },
+        select: { id: true },
+      }));
+    if (existing) return;
+    const live = await db.activity.findMany({
+      where: { orgId, idempotencyKey: { in: legacyKeys } },
+      select: { id: true, metadata: true },
+      take: legacyKeys.length,
+    });
+    let keeper: { id: string; metadata: unknown } | undefined;
+    let deleted = false;
+    if (live.length) {
+      keeper = live.find((a) => storedMeta(a.metadata)?.sourceId === sourceId) ?? live[0];
+    } else {
+      const tombs = await db.activity.findMany({
+        where: { orgId, idempotencyKey: { in: legacyKeys }, deletedAt: { not: null } },
+        select: { id: true, metadata: true },
+        take: legacyKeys.length,
+      });
+      // A person's delete outranks a sync tomb.
+      keeper = tombs.find((a) => storedMeta(a.metadata)?.removedBy !== 'sync') ?? tombs[0];
+      deleted = true;
+    }
+    if (!keeper) return;
+    try {
+      await db.$transaction(async (tx) => {
+        await tx.activity.updateMany({
+          where: { id: keeper.id, orgId, ...(deleted ? { deletedAt: { not: null } } : {}) },
+          data: { idempotencyKey: key },
+        });
+        for (const extra of live) {
+          if (extra.id === keeper.id) continue;
+          await tx.activity.updateMany({
+            where: { id: extra.id, orgId },
+            data: {
+              deletedAt: new Date(),
+              metadata: { commsCapture: { ...storedMeta(extra.metadata), removedBy: 'sync' } } as Prisma.InputJsonObject,
+            },
+          });
+        }
+      });
+    } catch (err) {
+      // Another copy adopted it first.
+      if ((err as { code?: string }).code !== 'P2002') throw err;
+    }
+  }
+
   async function sync(n: Normalized, actorUserId: string | null): Promise<CommsBridgeResult> {
     const { orgId } = n;
-    const key = commsActivityKey(orgId, n.provider, n.kind, n.externalId);
+    const key = n.identity
+      ? commsActivityKey(orgId, 'ical', n.kind, n.identity)
+      : commsActivityKey(orgId, n.provider, n.kind, n.externalId);
+    if (n.identity) await adoptLegacy(orgId, key, n.legacyKeys ?? [], n.sourceId);
     const live = await db.activity.findFirst({
       where: { orgId, idempotencyKey: key },
       select: { id: true, metadata: true, status: true },
@@ -236,7 +303,8 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
           select: { id: true, metadata: true },
         });
     const prior = storedMeta((live ?? tomb)?.metadata);
-    if (prior && prior.sourceId !== n.sourceId) {
+    // Copies sharing an identity take turns as the source; without one, the first copy owns it.
+    if (prior && !n.identity && prior.sourceId !== n.sourceId) {
       return { action: 'skipped', reason: 'other_owner', activityId: (live ?? tomb)?.id ?? null };
     }
 
@@ -482,6 +550,11 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
       opportunityId: true,
       contactId: true,
       filedManually: true,
+      iCalUid: true,
+      isPrivate: true,
+      ownerResponse: true,
+      meetingChannel: true,
+      createdAt: true,
     } as const;
     const liveRow = await db.calendarEvent.findFirst({ where: { id: calendarEventId, orgId }, select });
     const row =
@@ -495,32 +568,99 @@ export function createCommsActivityBridge(db: CommsBridgeDb = prisma as unknown 
     if (row.provider !== 'microsoft_graph' && row.provider !== 'google_workspace') {
       return { action: 'skipped', reason: 'not_found', activityId: null };
     }
-    const attendees = emailsOf(row.attendees);
-    return sync(
-      {
+    type EventRow = NonNullable<typeof row>;
+
+    // Stored columns only speak when set, so rows synced before they existed
+    // fall back to the flags kept on the activity.
+    const hintsOf = (copy: EventRow): MeetingHints =>
+      copy.id === row.id && opts.hints
+        ? opts.hints
+        : {
+            channel: (copy.meetingChannel as MeetingChannel | null) ?? undefined,
+            isPrivate: copy.isPrivate || undefined,
+            ownerDeclined: copy.ownerResponse === 'declined' || undefined,
+          };
+    const base = (copy: EventRow, gone: boolean): Normalized => {
+      const attendees = emailsOf(copy.attendees);
+      return {
         orgId,
         kind: 'meeting',
-        provider: row.provider,
-        externalId: row.externalId,
+        provider: copy.provider as 'microsoft_graph' | 'google_workspace',
+        externalId: copy.externalId ?? '',
         sourceType: 'calendar_event',
-        sourceId: row.id,
-        ownerUserId: row.ownerId,
-        subject: row.subject,
-        occurredAt: row.startAt,
-        endAt: row.endAt,
-        participants: cleanParticipants([...attendees.map((a) => a.email), row.organizerEmail]),
+        sourceId: copy.id,
+        ownerUserId: copy.ownerId,
+        subject: copy.subject,
+        occurredAt: copy.startAt,
+        endAt: copy.endAt,
+        participants: cleanParticipants([...attendees.map((a) => a.email), copy.organizerEmail]),
         responses: new Map(attendees.map((a) => [a.email.trim().toLowerCase(), a.responseStatus ?? ''])),
-        cancelled: row.isCancelled,
-        gone: !liveRow || row.syncState === 'DELETED_REMOTE',
-        companyId: row.companyId,
-        opportunityId: row.opportunityId,
-        contactId: row.contactId,
-        filedManually: row.filedManually,
+        cancelled: copy.isCancelled,
+        gone,
+        companyId: copy.companyId,
+        opportunityId: copy.opportunityId,
+        contactId: copy.contactId,
+        filedManually: copy.filedManually,
         direction: null,
-        hints: opts.hints ?? {},
-      },
-      opts.actorUserId ?? null,
+        hints: hintsOf(copy),
+      };
+    };
+
+    const rowGone = !liveRow || row.syncState === 'DELETED_REMOTE';
+    if (!row.iCalUid) return sync(base(row, rowGone), opts.actorUserId ?? null);
+
+    const siblings = await db.calendarEvent.findMany({
+      where: { orgId, iCalUid: row.iCalUid },
+      select,
+      take: 50,
+    });
+    const copies = siblings.some((c) => c.id === row.id) ? siblings : [...siblings, row];
+    const goneOf = (c: EventRow) =>
+      c.id === row.id ? rowGone : !c.externalId || c.syncState === 'DELETED_REMOTE';
+    const present = copies.filter((c) => !goneOf(c));
+    const attending = present
+      .filter((c) => !c.isCancelled && !hintsOf(c).ownerDeclined)
+      .sort(
+        (a, b) =>
+          Number(b.filedManually) - Number(a.filedManually) ||
+          Number(Boolean(b.companyId)) - Number(Boolean(a.companyId)) ||
+          (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0) ||
+          a.id.localeCompare(b.id),
+      );
+    const primary = attending[0] ?? row;
+    const n = base(primary, present.length === 0);
+    n.cancelled = present.length > 0 && attending.length === 0 && present.some((c) => c.isCancelled);
+    const anyPrivate = present.some((c) => hintsOf(c).isPrivate) || (rowGone && hintsOf(row).isPrivate);
+    n.hints = {
+      channel: hintsOf(primary).channel,
+      isPrivate: anyPrivate ? true : copies.some((c) => hintsOf(c).isPrivate === false) ? false : undefined,
+      ownerDeclined: present.length > 0 && attending.length === 0 && !n.cancelled,
+    };
+    n.identity = row.iCalUid;
+    n.legacyKeys = copies.flatMap((c) =>
+      c.externalId ? [commsActivityKey(orgId, c.provider, 'meeting', c.externalId)] : [],
     );
+
+    // Every colleague attending their copy is an internal attendee of the one activity.
+    const dir = await directory(orgId);
+    const merged = attending.length ? attending : [primary];
+    const raw: Array<string | null> = [];
+    for (const copy of merged) {
+      const each = base(copy, false);
+      raw.push(...each.participants);
+      for (const [email, status] of each.responses) {
+        if (status && !n.responses.get(email)) n.responses.set(email, status);
+      }
+    }
+    for (const copy of attending) {
+      const email = dir.emailOf.get(copy.ownerId);
+      if (!email) continue;
+      raw.push(email);
+      const status = responseOf(n.responses.get(email));
+      if (status === 'needs_action') n.responses.set(email, 'accepted');
+    }
+    n.participants = cleanParticipants(raw);
+    return sync(n, opts.actorUserId ?? null);
   }
 
   /** Bring the activity for one captured email in line with the message. */

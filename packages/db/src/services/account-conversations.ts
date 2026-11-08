@@ -170,6 +170,7 @@ export async function listAccountConversations(input: {
           body: true,
           _count: { select: { attendees: { where: { deletedAt: null } } } },
         },
+        take: orderedIds.length,
       })
     : [];
   const byId = new Map(found.map((row) => [row.id, row]));

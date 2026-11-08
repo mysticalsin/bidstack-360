@@ -17,6 +17,7 @@ import {
   bridgeActivity,
   calendarFiling,
   graphMeetingHints,
+  meetingColumns,
   noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
@@ -233,6 +234,7 @@ export async function pullMicrosoftIncremental(
 
 interface MsGraphEventItem extends GraphMeetingFields {
   id: string;
+  iCalUId?: string;
   subject?: string;
   bodyPreview?: string;
   start?: { dateTime: string; timeZone: string };
@@ -286,6 +288,7 @@ async function upsertMicrosoftEvents(
         responseStatus: a.status?.response,
       }));
       const organizerEmail = item.organizer?.emailAddress?.address ?? null;
+      const hints = graphMeetingHints(item);
       const target = await resolveCaptureTarget({
         orgId,
         ownerEmail,
@@ -306,6 +309,7 @@ async function upsertMicrosoftEvents(
         etag: item['@odata.etag'] ?? null,
         syncState: 'SYNCED' as const,
         lastSyncedAt: new Date(),
+        ...meetingColumns(hints, item.iCalUId),
       };
       const filing = calendarFiling(target);
 
@@ -324,7 +328,7 @@ async function upsertMicrosoftEvents(
       });
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'microsoft_graph', externalId: item.id }, filing);
       const ok = await bridgeActivity(
-        () => syncCalendarEventActivity(orgId, saved.id, { hints: graphMeetingHints(item) }),
+        () => syncCalendarEventActivity(orgId, saved.id, { hints }),
         log,
         { eventId: item.id },
       );

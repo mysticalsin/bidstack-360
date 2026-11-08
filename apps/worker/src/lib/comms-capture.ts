@@ -233,6 +233,16 @@ export function googleMeetingHints(item: GoogleMeetingFields): MeetingHints {
   };
 }
 
+/** CalendarEvent columns the activity bridge reads across every attendee's copy. */
+export function meetingColumns(hints: MeetingHints, iCalUid: string | null | undefined) {
+  return {
+    iCalUid: iCalUid?.trim() || null,
+    isPrivate: hints.isPrivate ?? false,
+    ownerResponse: hints.ownerDeclined ? 'declined' : null,
+    meetingChannel: hints.channel ?? null,
+  };
+}
+
 /**
  * How many times one provider item may fail the activity bridge on the same
  * page before it stops pinning that page. The capture row is already saved;

@@ -18,6 +18,7 @@ import {
   bridgeActivity,
   calendarFiling,
   googleMeetingHints,
+  meetingColumns,
   noteActivityBridgeFailures,
   refileUnlessManual,
   resolveCaptureTarget,
@@ -152,6 +153,9 @@ export async function handleGooglePush({
 
 interface GoogleEventItem extends Omit<GoogleMeetingFields, 'attendees'> {
   id: string;
+  iCalUID?: string;
+  recurringEventId?: string;
+  originalStartTime?: { dateTime?: string; date?: string };
   status?: string;
   summary?: string;
   description?: string;
@@ -162,6 +166,18 @@ interface GoogleEventItem extends Omit<GoogleMeetingFields, 'attendees'> {
   organizer?: { email?: string };
   updated?: string;
   etag?: string;
+}
+
+/** Google gives every instance of a recurring series the same iCalUID. */
+export function googleMeetingIdentity(
+  item: Pick<GoogleEventItem, 'iCalUID' | 'recurringEventId' | 'originalStartTime'>,
+): string | null {
+  if (!item.iCalUID) return null;
+  if (!item.recurringEventId) return item.iCalUID;
+  const original = item.originalStartTime?.dateTime ?? item.originalStartTime?.date;
+  if (!original) return null;
+  const at = new Date(original);
+  return `${item.iCalUID}#${Number.isNaN(at.getTime()) ? original : at.toISOString()}`;
 }
 
 const MAX_PAGES_PER_RUN = 20;
@@ -287,6 +303,7 @@ async function upsertGoogleEvents(
     try {
       const attendees = item.attendees ?? [];
       const organizerEmail = item.organizer?.email ?? null;
+      const hints = googleMeetingHints(item);
       const target = await resolveCaptureTarget({
         orgId,
         ownerEmail,
@@ -306,6 +323,7 @@ async function upsertGoogleEvents(
         etag: item.etag ?? null,
         syncState: 'SYNCED' as const,
         lastSyncedAt: new Date(),
+        ...meetingColumns(hints, googleMeetingIdentity(item)),
       };
       const filing = calendarFiling(target);
       const saved = await prisma.calendarEvent.upsert({
@@ -323,7 +341,7 @@ async function upsertGoogleEvents(
       });
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'google_workspace', externalId: item.id }, filing);
       const ok = await bridgeActivity(
-        () => syncCalendarEventActivity(orgId, saved.id, { hints: googleMeetingHints(item) }),
+        () => syncCalendarEventActivity(orgId, saved.id, { hints }),
         log,
         { eventId: item.id },
       );

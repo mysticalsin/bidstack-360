@@ -3581,6 +3581,14 @@ model CalendarEvent {
   opportunityId     String?             @map("opportunity_id") @db.Uuid
   /// A user filed this event by hand; the provider pull never refiles it.
   filedManually     Boolean             @default(false) @map("filed_manually")
+  /// Calendar identity shared by every attendee's copy (Graph `iCalUId`, Google `iCalUID`).
+  iCalUid           String?             @map("ical_uid")
+  /// Provider sensitivity private or confidential, as of the last pull.
+  isPrivate         Boolean             @default(false) @map("is_private")
+  /// "declined" when the owner declined their copy, else null.
+  ownerResponse     String?             @map("owner_response") @db.VarChar(32)
+  /// teams, google_meet or in_person_or_other.
+  meetingChannel    String?             @map("meeting_channel") @db.VarChar(32)
   /// Client-supplied retry key so a repeated create returns the same row.
   clientRequestId   String?             @map("client_request_id") @db.VarChar(64)
   externalUpdatedAt DateTime?           @map("external_updated_at") @db.Timestamptz(6)
@@ -3604,6 +3612,7 @@ model CalendarEvent {
   @@index([orgId, companyId, startAt])
   @@index([orgId, contactId, startAt])
   @@index([orgId, ownerId, startAt])
+  @@index([orgId, iCalUid])
   @@index([orgId, startAt])
   @@index([orgId, syncState])
   @@index([orgId])

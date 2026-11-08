@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Prisma } from '../../generated/client/index.js';
+import type { Prisma } from '../../generated/client/index.js';
 
 import {
   CONVERSATION_ORDER_SQL,

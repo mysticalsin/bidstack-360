@@ -95,20 +95,8 @@ describe('Microsoft 365 plugin contract (mocked Graph, no real keys)', () => {
     expect(calls[0].headers.authorization).toBe('Bearer at');
   });
 
-  it('microsoft_send_email posts a Graph sendMail payload and reports sent', async () => {
-    const { calls } = mockFetch([{ status: 202 }]);
-    const tool = plugin.getTools().find((t) => t.name === 'microsoft_send_email')!;
-    const cfg = makeConfig({ credentials: { accessToken: 'at' } });
-    await expect(tool.execute({ to: 'a@example.test', subject: 'Hi', body: '<p>x</p>' }, ctx(cfg))).resolves.toEqual({
-      sent: true,
-    });
-    expect(JSON.parse(calls[0].body!)).toEqual({
-      message: {
-        subject: 'Hi',
-        body: { contentType: 'HTML', content: '<p>x</p>' },
-        toRecipients: [{ emailAddress: { address: 'a@example.test' } }],
-      },
-    });
+  it('offers no tool that sends mail or writes a calendar', () => {
+    expect(plugin.getTools().map((t) => t.name)).toEqual(['microsoft_list_events']);
   });
 
   it('tools refuse to run when not connected', async () => {

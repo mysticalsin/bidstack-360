@@ -403,3 +403,88 @@ describe('comms activity bridge: emails', () => {
     expect(meta(gmail.activity.rows[0]).source).toBe('gmail');
   });
 });
+
+describe('comms activity bridge: one meeting, several calendars', () => {
+  const EVENT_B = '00000000-0000-4000-8000-000000000051';
+  const UID = '040000008200E00074C5B7101A82E0080000000012345';
+  const copies = () => [
+    event({ iCalUid: UID, createdAt: new Date('2026-11-01T09:00:00Z') }),
+    event({
+      id: EVENT_B,
+      ownerId: COLLEAGUE,
+      externalId: 'AAMk-sam',
+      iCalUid: UID,
+      createdAt: new Date('2026-11-01T09:05:00Z'),
+      attendees: [
+        { email: 'jane@acme.com', responseStatus: 'accepted' },
+        { email: 'bob@acme.com' },
+        { email: 'tony@amaris.com', responseStatus: 'accepted' },
+      ],
+    }),
+  ];
+  const internalUsers = (db: ReturnType<typeof fakeDb>) =>
+    db.activityAttendee.rows.filter((r) => r.userId).map((r) => r.userId);
+
+  it('files a meeting two colleagues both synced as one activity with both as attendees', async () => {
+    const db = fakeDb({ events: copies() });
+    const bridge = bridgeFor(db);
+
+    const first = await bridge.syncCalendarEvent(ORG, EVENT);
+    const second = await bridge.syncCalendarEvent(ORG, EVENT_B);
+
+    expect(first.action).toBe('created');
+    expect(second).toEqual({ action: 'updated', activityId: first.activityId });
+    expect(db.activity.rows).toHaveLength(1);
+    expect(db.activity.rows[0]!.idempotencyKey).toBe(commsActivityKey(ORG, 'ical', 'meeting', UID));
+    expect(meta(db.activity.rows[0])).toMatchObject({ sourceId: EVENT, ownerUserId: OWNER });
+    expect(internalUsers(db).sort()).toEqual([OWNER, COLLEAGUE].sort());
+    expect(db.activityAttendee.rows).toHaveLength(4);
+  });
+
+  it('keeps the activity when one colleague leaves, and cancels it when the last one does', async () => {
+    const db = fakeDb({ events: copies() });
+    const bridge = bridgeFor(db);
+    const created = await bridge.syncCalendarEvent(ORG, EVENT);
+    await bridge.syncCalendarEvent(ORG, EVENT_B);
+
+    // The first owner declines their copy: the colleague's copy now carries the meeting.
+    db.calendarEvent.rows[0]!.ownerResponse = 'declined';
+    const left = await bridge.syncCalendarEvent(ORG, EVENT, { hints: { ownerDeclined: true } });
+    expect(left).toEqual({ action: 'updated', activityId: created.activityId });
+    const row = db.activity.rows[0]!;
+    expect(row.status).toBe('completed');
+    expect(row.deletedAt).toBeNull();
+    expect(row.ownerId).toBe(COLLEAGUE);
+    expect(meta(row)).toMatchObject({ sourceId: EVENT_B, ownerUserId: COLLEAGUE });
+    expect(internalUsers(db)).toContain(COLLEAGUE);
+
+    // The colleague's copy disappears from their calendar too.
+    db.calendarEvent.rows[1]!.syncState = 'DELETED_REMOTE';
+    const gone = await bridge.syncCalendarEvent(ORG, EVENT_B);
+    expect(gone).toEqual({ action: 'cancelled', activityId: created.activityId });
+    expect(db.activity.rows).toHaveLength(1);
+  });
+
+  it('moves an activity written before the identity was stored instead of adding a second one', async () => {
+    const db = fakeDb({ events: copies().map((c) => ({ ...c, iCalUid: null })) });
+    const bridge = bridgeFor(db);
+    const legacy = await bridge.syncCalendarEvent(ORG, EVENT);
+    expect(db.activity.rows[0]!.idempotencyKey).toBe(commsActivityKey(ORG, 'microsoft_graph', 'meeting', 'AAMk-1'));
+
+    for (const row of db.calendarEvent.rows) row.iCalUid = UID;
+    const out = await bridge.syncCalendarEvent(ORG, EVENT_B);
+    expect(out).toEqual({ action: 'updated', activityId: legacy.activityId });
+    expect(db.activity.rows).toHaveLength(1);
+    expect(db.activity.rows[0]!.idempotencyKey).toBe(commsActivityKey(ORG, 'ical', 'meeting', UID));
+  });
+
+  it('keeps a meeting hidden when any copy is private', async () => {
+    const db = fakeDb({ events: copies() });
+    const bridge = bridgeFor(db);
+    await bridge.syncCalendarEvent(ORG, EVENT);
+    db.calendarEvent.rows[1]!.isPrivate = true;
+    const out = await bridge.syncCalendarEvent(ORG, EVENT);
+    expect(out.action).toBe('removed');
+    expect(db.activity.rows[0]!.subject).toBeNull();
+  });
+});
