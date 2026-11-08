@@ -9,6 +9,8 @@ export interface SourcedOverride {
   value: unknown;
   sourceUrl: string | null;
   sourceLabel: string | null;
+  /** ISO 4217 code of a manual revenue value; null reads as EUR. */
+  currency: string | null;
   updatedAt: Date;
 }
 
@@ -18,6 +20,18 @@ export interface WikidataRevenue {
   pointInTime: string;
   year: number;
   sourceUrl: string;
+}
+
+export interface WikidataEmployees {
+  count: number;
+  year: number | null;
+  sourceUrl: string;
+}
+
+/** The account's own CRM record, the weakest figure and never verified. */
+export interface CrmRecordFigures {
+  annualRevenueMicros: number | null;
+  employeeCount: number | null;
 }
 
 const OVERRIDE_KEYS = ['employeeCount', 'annualRevenueMicros', 'registryId', 'registryJurisdiction'] as const;
@@ -37,9 +51,23 @@ export const manualProvenance = (o: SourcedOverride): FigureProvenance => ({
   url: o.sourceUrl,
 });
 
+type WikidataMeta = {
+  wikidataFacts?: { revenue?: Partial<WikidataRevenue> | null; employees?: Partial<WikidataEmployees> | null } | null;
+  openCompanyProfile?: { revenue?: Partial<WikidataRevenue> | null; employees?: Partial<WikidataEmployees> | null } | null;
+} | null;
+
+/** Employees as the open profile stores them: `count`, an optional `year`, and the entity link. */
+function readWikidataEmployees(providerMetadata: unknown): WikidataEmployees | null {
+  const meta = providerMetadata as WikidataMeta;
+  const e = meta?.wikidataFacts?.employees ?? meta?.openCompanyProfile?.employees;
+  if (!e || typeof e.count !== 'number' || e.count <= 0 || typeof e.sourceUrl !== 'string') return null;
+  return { count: e.count, year: typeof e.year === 'number' ? e.year : null, sourceUrl: e.sourceUrl };
+}
+
 function readWikidataRevenue(providerMetadata: unknown): WikidataRevenue | null {
-  const meta = providerMetadata as { openCompanyProfile?: { revenue?: Partial<WikidataRevenue> | null } | null } | null;
-  const r = meta?.openCompanyProfile?.revenue;
+  const meta = providerMetadata as WikidataMeta;
+  // wikidataFacts survives a Seamless profile; openCompanyProfile is the older home of the same data.
+  const r = meta?.wikidataFacts?.revenue ?? meta?.openCompanyProfile?.revenue;
   if (!r || typeof r.amount !== 'number' || typeof r.currency !== 'string' || typeof r.year !== 'number' || typeof r.sourceUrl !== 'string') return null;
   return { amount: r.amount, currency: r.currency, pointInTime: typeof r.pointInTime === 'string' ? r.pointInTime : String(r.year), year: r.year, sourceUrl: r.sourceUrl };
 }
@@ -97,20 +125,31 @@ export async function registryRows(orgId: string, companyId: string, companyName
 export async function loadSourcedExtras(
   orgId: string,
   companyName: string,
-): Promise<{ overrides: Partial<Record<OverrideKey, SourcedOverride>>; wikidataRevenue: WikidataRevenue | null }> {
+): Promise<{
+  overrides: Partial<Record<OverrideKey, SourcedOverride>>;
+  wikidataRevenue: WikidataRevenue | null;
+  wikidataEmployees: WikidataEmployees | null;
+  crm: CrmRecordFigures;
+}> {
   const key = normalizeName(companyName);
   const [rows, enrichment] = await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: key, fieldKey: { in: [...OVERRIDE_KEYS] } },
-      select: { fieldKey: true, value: true, sourceUrl: true, sourceLabel: true, updatedAt: true },
+      select: { fieldKey: true, value: true, sourceUrl: true, sourceLabel: true, currency: true, updatedAt: true },
       take: OVERRIDE_KEYS.length,
     }),
     prisma.companyEnrichment.findUnique({
       where: { orgId_normalizedName: { orgId, normalizedName: key } },
-      select: { providerMetadata: true },
+      select: { providerMetadata: true, annualRevenueMicros: true, employeeCount: true, deletedAt: true },
     }),
   ]);
   const overrides: Partial<Record<OverrideKey, SourcedOverride>> = {};
-  for (const r of rows) overrides[r.fieldKey as OverrideKey] = { value: r.value, sourceUrl: r.sourceUrl, sourceLabel: r.sourceLabel, updatedAt: r.updatedAt };
-  return { overrides, wikidataRevenue: readWikidataRevenue(enrichment?.providerMetadata) };
+  for (const r of rows) overrides[r.fieldKey as OverrideKey] = { value: r.value, sourceUrl: r.sourceUrl, sourceLabel: r.sourceLabel, currency: r.currency, updatedAt: r.updatedAt };
+  const live = enrichment && !enrichment.deletedAt ? enrichment : null;
+  return {
+    overrides,
+    wikidataRevenue: readWikidataRevenue(enrichment?.providerMetadata),
+    wikidataEmployees: readWikidataEmployees(enrichment?.providerMetadata),
+    crm: { annualRevenueMicros: live?.annualRevenueMicros ? Number(live.annualRevenueMicros) : null, employeeCount: live?.employeeCount ?? null },
+  };
 }

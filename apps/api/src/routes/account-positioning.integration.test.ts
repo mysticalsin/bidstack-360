@@ -134,8 +134,12 @@ describe('GET /accounts/:id/key-numbers', () => {
     expect(by.sentiment!.value).toBeCloseTo(-0.1, 2);
     for (const i of body.items) {
       expect(i.source).toBeTruthy();
-      expect(i.period).toBeTruthy();
-      if (i.value === null) expect(i.missing).toBeTruthy();
+      // A missing figure has no period to state; never a placeholder the owner reads as broken.
+      if (i.value === null) {
+        expect(i.missing).toBeTruthy();
+        expect(i.period).toBeNull();
+      } else expect(i.period).toBeTruthy();
+      expect(i.period ?? '').not.toMatch(/^n\/a$/i);
     }
   });
 
@@ -187,6 +191,63 @@ describe('GET /accounts/:id/key-numbers', () => {
       unit: 'money_micros',
       provenance: { origin: 'manual_sourced', label: 'Annual report', url: 'https://example.com/annual-report.pdf' },
     });
+  });
+
+  async function seedEnrichment(name: string, data: { providerMetadata?: object; annualRevenueMicros?: bigint; employeeCount?: number }) {
+    const normalizedName = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    await prisma.companyEnrichment.create({
+      data: { orgId: orgA.orgId, normalizedName, legalName: name, registryIds: {}, address: {}, formerNames: [], industryCodes: [], status: 'active', confidenceBps: 8000, sourceAttribution: [], providerMetadata: data.providerMetadata ?? {}, annualRevenueMicros: data.annualRevenueMicros ?? null, employeeCount: data.employeeCount ?? null, cacheExpiresAt: new Date(Date.now() + DAY) },
+    });
+    return normalizedName;
+  }
+  const figure = async (id: string, which: 'revenue' | 'employees') => (await get(`/accounts/${id}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === which)!;
+
+  it('falls back to the CRM record as the last, unverified source, and every real source beats it', async () => {
+    // WHY: seeded accounts carry revenue and headcount on the CRM record while the tiles said "No data".
+    const name = `${TAG} Crm`;
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name, employeeCount: 800 } })).id;
+    await seedEnrichment(name, { annualRevenueMicros: 1_200_000_000_000_000n });
+    expect(await figure(id, 'revenue')).toMatchObject({
+      value: 1_200_000_000_000_000,
+      unit: 'money_micros',
+      source: 'CRM record',
+      period: null,
+      editKey: 'annualRevenueMicros',
+      provenance: { origin: 'crm', label: 'CRM record', unverified: true, url: null },
+    });
+    expect(await figure(id, 'employees')).toMatchObject({ value: 800, source: 'CRM record', provenance: { origin: 'crm', unverified: true } });
+
+    await prisma.companyEnrichment.updateMany({
+      where: { orgId: orgA.orgId, legalName: name },
+      data: { providerMetadata: { wikidataFacts: { revenue: { amount: 1_150_000_000, currency: 'CAD', pointInTime: '2024', year: 2024, sourceUrl: 'https://www.wikidata.org/wiki/Q2#P2123' }, employees: { count: 2100, year: 2024, sourceUrl: 'https://www.wikidata.org/wiki/Q2#P1128' } } } },
+    });
+    expect(await figure(id, 'revenue')).toMatchObject({ value: 1_150_000_000, currency: 'CAD', provenance: { origin: 'wikidata', year: '2024' } });
+    expect(await figure(id, 'employees')).toMatchObject({
+      value: 2100,
+      source: 'Wikidata',
+      sourceUrl: 'https://www.wikidata.org/wiki/Q2#P1128',
+      provenance: { origin: 'wikidata', label: 'Wikidata', year: '2024', url: 'https://www.wikidata.org/wiki/Q2#P1128' },
+    });
+  });
+
+  it('keeps a Wikidata headcount without a year as a chip with no year', async () => {
+    const name = `${TAG} WikiEmp`;
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name } })).id;
+    await seedEnrichment(name, { providerMetadata: { openCompanyProfile: { employees: { count: 640, year: null, sourceUrl: 'https://www.wikidata.org/wiki/Q3#P1128' } } } });
+    expect((await figure(id, 'employees')).provenance).toEqual({ origin: 'wikidata', label: 'Wikidata', year: null, url: 'https://www.wikidata.org/wiki/Q3#P1128' });
+  });
+
+  it('shows a manual revenue in the currency it was entered in', async () => {
+    const name = `${TAG} Usd`;
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name } })).id;
+    const key = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const user = await prisma.user.findFirst({ where: { orgId: orgA.orgId }, select: { id: true } });
+    await prisma.companyFieldOverride.create({
+      data: { orgId: orgA.orgId, companyKey: key, fieldKey: 'annualRevenueMicros', value: 2_500_000_000_000_000, currency: 'USD', sourceUrl: 'https://example.com/10k', sourceLabel: '10-K', overriddenById: user!.id },
+    });
+    expect(await figure(id, 'revenue')).toMatchObject({ value: 2_500_000_000, unit: 'money', currency: 'USD', provenance: { origin: 'manual_sourced', label: '10-K' } });
+    await prisma.companyFieldOverride.updateMany({ where: { orgId: orgA.orgId, companyKey: key }, data: { currency: 'EUR' } });
+    expect(await figure(id, 'revenue')).toMatchObject({ value: 2_500_000_000_000_000, unit: 'money_micros', currency: null });
   });
 
   it('says what is missing and stays editable when no source has revenue', async () => {

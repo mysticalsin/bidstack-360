@@ -14,6 +14,7 @@ import {
   tierLabel,
   pickFigure,
   type FigureOrigin,
+  type FigureProvenance,
   type AccountKeyNumbers,
   type AccountPositioning,
   type BriefFacts,
@@ -231,7 +232,16 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
 
 // ── key numbers ─────────────────────────────────────────────────────────────
 
-const base = (over: Partial<KeyNumber> & Pick<KeyNumber, 'id' | 'group' | 'label' | 'unit' | 'source' | 'period'>): KeyNumber => ({
+/** A manual revenue value is micros of the currency it was entered in; EUR stays on the micros path that follows the display currency. */
+function manualRevenueUnit(o: { value: unknown; currency: string | null }): Pick<KeyNumber, 'unit' | 'currency' | 'value'> {
+  const micros = o.value as number;
+  return !o.currency || o.currency === 'EUR'
+    ? { unit: 'money_micros', currency: null, value: micros }
+    : { unit: 'money', currency: o.currency, value: micros / 1_000_000 };
+}
+
+const base = (over: Partial<KeyNumber> & Pick<KeyNumber, 'id' | 'group' | 'label' | 'unit' | 'source'>): KeyNumber => ({
+  period: null,
   value: null,
   currency: null,
   delta: null,
@@ -293,6 +303,12 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   // Employees: filings, then a manual value, then enrichment cache, then the account record.
   const hc = latest?.metrics.headcount;
   const empOverride = extra.overrides.employeeCount;
+  const wikiEmp = extra.wikidataEmployees;
+  // The CRM record is the last resort: the account's own number, checked against nothing.
+  const crmEmployees = company.employeeCount ?? extra.crm.employeeCount;
+  const crmRevenueMicros = extra.crm.annualRevenueMicros;
+  const CRM_LABEL = 'CRM record';
+  const CRM_PROVENANCE: FigureProvenance = { origin: 'crm', label: CRM_LABEL, year: null, url: null, unverified: true };
   const employees = pickFigure<{ origin: FigureOrigin; item: () => KeyNumber }>([
     hc && latest
       ? { origin: 'filed', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: hc.value, delta: pctChange(hc.value, prev?.metrics.headcount?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.headcount?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
@@ -300,15 +316,18 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     empOverride && typeof empOverride.value === 'number'
       ? { origin: manualOrigin(empOverride), item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: empOverride.value as number, source: empOverride.sourceLabel ?? 'Manual entry', period: `Entered ${empOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: empOverride.sourceUrl, provenance: manualProvenance(empOverride) }) }
       : null,
+    wikiEmp
+      ? { origin: 'wikidata', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: wikiEmp.count, source: 'Wikidata', period: wikiEmp.year ? `Headcount, point in time ${wikiEmp.year}` : null, sourceUrl: wikiEmp.sourceUrl, provenance: { origin: 'wikidata', label: 'Wikidata', year: wikiEmp.year ? String(wikiEmp.year) : null, url: wikiEmp.sourceUrl } }) }
+      : null,
     firmo?.employeeCount
       ? { origin: 'provider', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: firmo.employeeCount!, delta: firmo.headcountGrowth12m != null ? Math.round(firmo.headcountGrowth12m * 1000) / 10 : null, deltaUnit: 'pct', source: 'Enrichment cache', period: `As of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}, change over 12 months`, anchor: 'firmographics', provenance: { origin: 'provider', label: providerName('employeeCount'), year: fetchedYear, url: null } }) }
       : null,
-    company.employeeCount
-      ? { origin: 'record', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: company.employeeCount!, source: 'Account record', period: 'Entered on the account, no trend yet', provenance: { origin: 'record', label: 'Account record', year: null, url: null } }) }
+    crmEmployees
+      ? { origin: 'crm', item: () => base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', value: crmEmployees, source: CRM_LABEL, provenance: CRM_PROVENANCE }) }
       : null,
   ]);
   items.push({
-    ...(employees?.item() ?? base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', source: 'None', period: 'n/a', missing: 'No headcount on record or in public sources' })),
+    ...(employees?.item() ?? base({ id: 'employees', group: 'company', label: 'Employees', unit: 'count', source: 'None', missing: 'No headcount on record or in public sources' })),
     editKey: 'employeeCount',
   });
 
@@ -321,7 +340,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
       ? { origin: 'filed', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: latest.source === FINANCIAL_SOURCE_LABEL.fixture, provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
       : null,
     revOverride && typeof revOverride.value === 'number'
-      ? { origin: manualOrigin(revOverride), item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money_micros', value: revOverride.value as number, source: revOverride.sourceLabel ?? 'Manual entry', period: `Annual, entered ${revOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: revOverride.sourceUrl, provenance: manualProvenance(revOverride) }) }
+      ? { origin: manualOrigin(revOverride), item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', ...manualRevenueUnit(revOverride), source: revOverride.sourceLabel ?? 'Manual entry', period: `Annual, entered ${revOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: revOverride.sourceUrl, provenance: manualProvenance(revOverride) }) }
       : null,
     wiki
       ? { origin: 'wikidata', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: wiki.currency, value: wiki.amount, source: 'Wikidata', period: `Total revenue, point in time ${wiki.pointInTime}`, sourceUrl: wiki.sourceUrl, provenance: { origin: 'wikidata', label: 'Wikidata', year: String(wiki.year), url: wiki.sourceUrl } }) }
@@ -329,9 +348,12 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     firmo?.annualRevenueUsd
       ? { origin: 'provider', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: 'USD', value: Number(firmo.annualRevenueUsd), source: 'Enrichment cache', period: `Annual, as of ${firmo.fetchedAt ? firmo.fetchedAt.toISOString().slice(0, 10) : 'last refresh'}`, anchor: 'firmographics', provenance: { origin: 'provider', label: providerName('annualRevenueUsd'), year: fetchedYear, url: null } }) }
       : null,
+    crmRevenueMicros
+      ? { origin: 'crm', item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money_micros', value: crmRevenueMicros, source: CRM_LABEL, provenance: CRM_PROVENANCE }) }
+      : null,
   ]);
   items.push({
-    ...(revenue?.item() ?? base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', source: 'None', period: 'n/a', missing: `${finMissing}. No public revenue figure found yet` })),
+    ...(revenue?.item() ?? base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', source: 'None', missing: `${finMissing}. No public revenue figure found yet` })),
     editKey: 'annualRevenueMicros',
   });
 
@@ -341,7 +363,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     const pm = prev ? marginOf(prev) : null;
     const series = asc.map((p) => (lm.label === 'Operating margin' ? p.derived.operatingMargin : p.derived.netMargin)).filter((v): v is number => v != null);
     items.push(base({ id: 'margin', group: 'company', label: lm.label, unit: 'pct', value: Math.round(lm.value * 10) / 10, delta: pm && pm.label === lm.label ? Math.round((lm.value - pm.value) * 10) / 10 : null, deltaUnit: 'pts', series, source: `${latest.source}, derived by Polo`, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
-  } else items.push(base({ id: 'margin', group: 'company', label: 'Margin', unit: 'pct', source: 'None', period: 'n/a', missing: latest ? 'No margin in the filed numbers' : finMissing }));
+  } else items.push(base({ id: 'margin', group: 'company', label: 'Margin', unit: 'pct', source: 'None', missing: latest ? 'No margin in the filed numbers' : finMissing }));
 
   // Open jobs and hiring trend.
   const openJobs = postings.filter((p) => (p.lastSeenAt ?? p.postedAt) >= new Date(now.getTime() - 45 * DAY)).length;
@@ -349,7 +371,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const prev90 = postings.filter((p) => p.postedAt >= d180 && p.postedAt < d90).length;
   if (postings.length) {
     items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', value: openJobs, delta: pctChange(last90, prev90), deltaUnit: 'pct', series: monthly(postings.map((p) => p.postedAt), now, 6), sub: `${last90} posted in 90 days`, source: 'Job postings cache', period: 'Seen in 45 days; trend is last 90 days vs the 90 before', anchor: 'hiring-now' }));
-  } else items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', source: 'None', period: 'n/a', missing: 'No job postings tracked yet' }));
+  } else items.push(base({ id: 'open_jobs', group: 'company', label: 'Open jobs', unit: 'count', source: 'None', missing: 'No job postings tracked yet' }));
 
   // Momentum.
   const loaded = momentumIn.get(companyId);
@@ -357,7 +379,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   items.push(
     m.coverage > 0
       ? base({ id: 'momentum', group: 'health', label: 'Momentum', unit: 'score', value: m.score, delta: m.delta, deltaUnit: 'pts', series: m.series.map((s) => s.score), sub: m.trend === 'gaining' ? 'Gaining' : m.trend === 'declining' ? 'Declining' : 'Steady', source: 'Polo account pulse', period: 'Now, change over 4 weeks', anchor: 'pulse', sample: loaded?.sample ?? false })
-      : base({ id: 'momentum', group: 'health', label: 'Momentum', unit: 'score', source: 'Polo account pulse', period: 'n/a', missing: 'Not enough signals yet' }),
+      : base({ id: 'momentum', group: 'health', label: 'Momentum', unit: 'score', source: 'Polo account pulse', missing: 'Not enough signals yet' }),
   );
 
   // Senior contact coverage.
@@ -383,8 +405,8 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const warnings = fin.sample ? [] : fin.signals.filter((s) => s.implication === 'RISK' && !s.sample);
   items.push(
     periods.length
-      ? base({ id: 'fin_warnings', group: 'health', label: 'Financial warnings', unit: 'count', value: warnings.length, goodWhen: 'down', sub: warnings[0]?.title ?? 'None in the latest filings', source: latest?.source ?? 'Filed financials', period: latest ? `Latest filings, ${fy(latest)}` : 'n/a', anchor: 'financial-health' })
-      : base({ id: 'fin_warnings', group: 'health', label: 'Financial warnings', unit: 'count', goodWhen: 'down', source: 'Filed financials', period: 'n/a', missing: finMissing }),
+      ? base({ id: 'fin_warnings', group: 'health', label: 'Financial warnings', unit: 'count', value: warnings.length, goodWhen: 'down', sub: warnings[0]?.title ?? 'None in the latest filings', source: latest?.source ?? 'Filed financials', period: latest ? `Latest filings, ${fy(latest)}` : null, anchor: 'financial-health' })
+      : base({ id: 'fin_warnings', group: 'health', label: 'Financial warnings', unit: 'count', goodWhen: 'down', source: 'Filed financials', missing: finMissing }),
   );
 
   // News sentiment: mean over 90 days vs the 90 before.
