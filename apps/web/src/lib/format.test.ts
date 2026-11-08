@@ -119,8 +119,84 @@ describe('formatMoneyMicros Number input', () => {
     expect(full(Number.POSITIVE_INFINITY)).toBe('—');
   });
 
-  it('still shows compact figures for large Numbers, where rounding is the display contract', () => {
-    expect(formatMoneyMicros(-9223372036854775000, 'EUR', { locale: 'en-US' })).toBe('-€9.2T');
+  it('refuses unsafe Numbers in compact notation too, where a lost digit can move the rounding', () => {
+    // 9149999999999999999 is stored as the Number 9150000000000000000, so a
+    // compact Number reads €9.2T where the intended amount reads €9.1T.
+    expect(formatMoneyMicros(9149999999999999999n, 'EUR', { locale: 'en-US' })).toBe('€9.1T');
+    const rounded = Number('9149999999999999999');
+    expect(rounded).toBe(9150000000000000000);
+    expect(formatMoneyMicros(rounded, 'EUR', { locale: 'en-US' })).toBe('—');
+    expect(formatMoneyMicros(rounded, 'EUR', { compact: true, locale: 'en-US' })).toBe('—');
+    expect(formatMoneyMicros(-9223372036854775000, 'EUR', { locale: 'en-US' })).toBe('—');
+    expect(formatMoneyMicros(9007199254740992, 'EUR', { compact: true, locale: 'en-US' })).toBe('—');
+  });
+
+  it('keeps compact figures for safe Numbers', () => {
+    expect(formatMoneyMicros(9007199254740991, 'EUR', { locale: 'en-US' })).toBe('€9B');
+    expect(formatMoneyMicros(-9007199254740991, 'EUR', { locale: 'en-US' })).toBe('-€9B');
+    expect(formatMoneyMicros(1_234_000_000, 'USD', { locale: 'en-US' })).toBe('$1.2K');
+  });
+});
+
+describe('formatMoneyMicros capability probe', () => {
+  const RealNumberFormat = Intl.NumberFormat;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  async function withNumberFormat(NumberFormat: unknown) {
+    vi.resetModules();
+    vi.stubGlobal('Intl', Object.create(Intl, { NumberFormat: { value: NumberFormat } }));
+    return import('./format.js');
+  }
+
+  it('falls back when only fractional strings are coerced (second probe case)', async () => {
+    class FractionCoercing {
+      private readonly inner: Intl.NumberFormat;
+      constructor(locale?: string | string[], options?: Intl.NumberFormatOptions) {
+        this.inner = new RealNumberFormat(locale, options);
+      }
+      format(value: number | bigint | string): string {
+        const coerced = typeof value === 'string' && value.includes('.') ? Number(value) : value;
+        return this.inner.format(coerced as number);
+      }
+      resolvedOptions() {
+        return this.inner.resolvedOptions();
+      }
+    }
+    const partial = await withNumberFormat(FractionCoercing);
+    expect(new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format('9223372036854.774999')).toBe(
+      '9,223,372,036,854.78',
+    );
+    expect(
+      partial.formatMoneyMicros(9223372036854774999n, 'EUR', { compact: false, locale: 'en-US' }),
+    ).toBe('€9,223,372,036,854.77');
+  });
+
+  it('probes once per module load', async () => {
+    let probes = 0;
+    class Counting extends RealNumberFormat {
+      constructor(locale?: string | string[], options?: Intl.NumberFormatOptions) {
+        super(locale, options);
+        if (options?.useGrouping === false) probes += 1;
+      }
+    }
+    const counted = await withNumberFormat(Counting);
+    counted.formatMoneyMicros(1n, 'EUR', { locale: 'en-US' });
+    counted.formatMoneyMicros(2n, 'EUR', { locale: 'en-US' });
+    counted.formatMoneyMicros(3n, 'EUR', { compact: true, locale: 'en-US' });
+    expect(probes).toBe(1);
+  });
+
+  it('without Intl: the probe does not throw, the direct formatter does, the hook shows an em dash', async () => {
+    vi.resetModules();
+    vi.stubGlobal('Intl', undefined);
+    const bare = await import('./format.js');
+    const hook = await import('@/hooks/useFormatMoney');
+    expect(() => bare.formatMoneyMicros(1n, 'EUR', { locale: 'en-US' })).toThrow(TypeError);
+    expect(hook.formatConvertedMicros(1n, 'EUR', 'EUR', null)).toBe('—');
   });
 });
 
@@ -173,6 +249,29 @@ describe('formatMoneyMicros on an Intl that coerces decimal strings', () => {
     expect(full(1099511627776005000n)).toBe('€1,099,511,627,776.01');
     expect(full('1005000')).toBe('€1.01');
     expect(full(0n)).toBe('€0.00');
+    expect(full(9223372036854775807n)).toBe('€9,223,372,036,854.78');
+    expect(full(-1n)).toBe('-€0.00');
+    expect(full(-4999n)).toBe('-€0.00');
+    expect(full(-5000n)).toBe('-€0.01');
+  });
+
+  it('needs at most 15 digits in the rounded cents integer, trailing zeros included', async () => {
+    const legacy = await legacyFormat();
+    const full = (m: bigint) =>
+      legacy.formatMoneyMicros(m, 'EUR', { compact: false, locale: 'en-US' });
+    expect(full(9999999999999994999n)).toBe('€9,999,999,999,999.99');
+    expect(full(9999999999999995000n)).toBe('—');
+    expect(full(10000000000000000000n)).toBe('—');
+  });
+
+  it('refuses unsafe Numbers and keeps safe ones', async () => {
+    const legacy = await legacyFormat();
+    expect(legacy.formatMoneyMicros(Number('9149999999999999999'), 'EUR', { locale: 'en-US' })).toBe(
+      '—',
+    );
+    expect(
+      legacy.formatMoneyMicros(9007199254740991, 'EUR', { compact: false, locale: 'en-US' }),
+    ).toBe('€9,007,199,254.74');
   });
 
   it('shows an em dash rather than digits it cannot render exactly', async () => {

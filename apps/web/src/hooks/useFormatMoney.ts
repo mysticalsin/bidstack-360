@@ -38,12 +38,14 @@ const MAX_SAFE_UNITS = BigInt(Number.MAX_SAFE_INTEGER);
 
 /**
  * Integer micros only. A fractional number is not truncated: that would
- * change the stored amount before anyone sees it.
+ * change the stored amount before anyone sees it. A Number past
+ * MAX_SAFE_INTEGER may already be rounded, so it is refused before any
+ * conversion route can present it as exact.
  */
 function parseMicros(micros: string | number | bigint): bigint | null {
   if (typeof micros === 'bigint') return micros;
   if (typeof micros === 'number') {
-    if (!Number.isInteger(micros)) return null;
+    if (!Number.isSafeInteger(micros)) return null;
     return BigInt(micros);
   }
   if (!/^-?\d+$/.test(micros)) return null;
@@ -84,8 +86,7 @@ function crossRateMicros(
  * Show micros in the display currency only when that label is honest.
  * Same currency and an exact 1:1 rate quote pass the stored integer through.
  * The parent hook always rebuilt micros with `amount * 1e6`, which changes
- * integers Number cannot store. Number input is passed on as a Number so
- * formatMoneyMicros can refuse exact digits for an unsafe integer.
+ * integers Number cannot store.
  */
 export function formatConvertedMicros(
   micros: string | number | bigint,
@@ -97,7 +98,7 @@ export function formatConvertedMicros(
   return contained(() => {
     const stored = parseMicros(micros);
     if (stored == null) return '—';
-    const unchanged = typeof micros === 'number' ? micros : stored.toString();
+    const unchanged = stored.toString();
     const relation = rateRelation(sourceCurrency, displayCurrency, rates);
     if (relation === 'same' || relation === 'parity') {
       return formatMoneyMicros(unchanged, displayCurrency, options);

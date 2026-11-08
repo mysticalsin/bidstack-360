@@ -674,6 +674,41 @@ describe('micros precision before formatting', () => {
     expect(display.result.current).toBe('—');
   });
 
+  it('refuses an unsafe Number source on every conversion route, compact or not', () => {
+    // 1e16 micros as a Number may already be a rounded integer. A successful
+    // EUR->USD conversion at 0.5 must not turn it into a precise $5B.
+    const unsafe = 10_000_000_000_000_000;
+    const routes = [
+      { currency: 'USD', rates: { base: 'EUR', rates: { USD: 0.5 }, date: 'fx' } },
+      { currency: 'EUR', rates: null },
+      { currency: 'USD', rates: { base: 'EUR', rates: { USD: 1 }, date: 'parity' } },
+      { currency: 'USD', rates: null },
+      { currency: 'USD', rates: { base: 'EUR', rates: { USD: 1e290 }, date: 'overflow' } },
+    ] as const;
+    for (const route of routes) {
+      useCurrencyStore.setState({ currency: route.currency, rates: route.rates });
+      const format = renderHook(() => useFormatMoney()).result.current;
+      expect(format.formatMoneyMicros(unsafe, 'EUR', { compact: false })).toBe('—');
+      expect(format.formatMoneyMicros(unsafe, 'EUR')).toBe('—');
+      expect(format.formatMoneyMicros(unsafe, 'EUR', { compact: true })).toBe('—');
+      expect(renderHook(() => useDisplayMoneyMicros(unsafe, 'EUR')).result.current).toBe('—');
+    }
+  });
+
+  it('still converts the same amount as bigint, and safe Numbers', () => {
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 0.5 }, date: 'fx' },
+    });
+    const format = renderHook(() => useFormatMoney()).result.current;
+    expect(format.formatMoneyMicros(10_000_000_000_000_000n, 'EUR', { compact: false })).toBe(
+      '$5,000,000,000.00',
+    );
+    expect(format.formatMoneyMicros(100_000_000, 'EUR', { compact: false })).toBe('$50.00');
+    expect(format.formatMoneyMicros(-100_000_000, 'EUR', { compact: false })).toBe('-$50.00');
+    expect(format.formatMoneyMicros(9_007_199_254_740_991, 'EUR')).toBe('$4.5B');
+  });
+
   it('keeps the formatter exact when called directly past Number.MAX_SAFE_INTEGER units', () => {
     expect(
       formatMoneyMicros(HUGE_MICROS.toString(), 'EUR', { compact: false, locale: 'en-US' }),

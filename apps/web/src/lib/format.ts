@@ -80,8 +80,8 @@ export function formatStage(stage: string): string {
     .join(' ');
 }
 
-const MAX_SAFE_MICROS = BigInt(Number.MAX_SAFE_INTEGER);
-// A decimal with at most 15 significant digits survives a Number round trip.
+// A rounded scaled integer of at most 15 digits (trailing zeros counted)
+// survives a Number round trip; the bound is conservative.
 const NUMBER_EXACT_DIGITS = 15;
 let decimalStringsExact: boolean | undefined;
 
@@ -129,18 +129,25 @@ function formatPreRounded(
  * Compacts ≥ 1M as `$1.2M`, ≥ 1k as `$12k`, otherwise full currency.
  * The string-encoded micros preserve BigInt precision over JSON.
  *
- * Exact digits need string or bigint micros. A Number past
- * Number.MAX_SAFE_INTEGER has already lost digits, so it only renders in
- * compact notation. Without Intl decimal-string support, compact requests
- * render the exact full amount. Anything that cannot be shown exactly
- * returns an em dash.
+ * Exact digits need string or bigint micros, or a safe integer Number. A
+ * Number past Number.MAX_SAFE_INTEGER may already be rounded, so it returns
+ * an em dash in every notation. Without Intl decimal-string support,
+ * compact requests render the exact full amount. Anything that cannot be
+ * shown exactly returns an em dash.
  */
 export function formatMoneyMicros(
   micros: string | number | bigint,
   currency?: string,
   options: { compact?: boolean; locale?: string } = {},
 ): string {
-  if (typeof micros === 'number' && !Number.isFinite(micros)) return '—';
+  // A Number past MAX_SAFE_INTEGER may already be a rounded integer, and
+  // even compact rounding can show its lost digits.
+  if (
+    typeof micros === 'number' &&
+    !(Number.isFinite(micros) && Math.abs(Math.trunc(micros)) <= Number.MAX_SAFE_INTEGER)
+  ) {
+    return '—';
+  }
   const resolvedCurrency = currency ?? detectCurrency();
   const resolvedLocale = options.locale ?? detectLocale();
   const asBigInt =
@@ -153,9 +160,7 @@ export function formatMoneyMicros(
   const negative = asBigInt < BigInt(0);
   const magnitude = negative ? -asBigInt : asBigInt;
   const compact = options.compact ?? magnitude >= BigInt(1000) * million;
-  const roundedNumber = typeof micros === 'number' && magnitude > MAX_SAFE_MICROS;
   const exactIntl = intlFormatsDecimalStringsExactly();
-  if (roundedNumber && !(compact && exactIntl)) return '—';
   const standard = (): Intl.NumberFormat =>
     new Intl.NumberFormat(resolvedLocale, {
       style: 'currency',

@@ -26,8 +26,8 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 ### 2026-11-08 BUG: exact money display assumed Intl decimal strings and safe Number input
 
 - **What went wrong:** The exact-digit fix passed a decimal string to Intl and documented that older engines give "the old output". They coerce the string to a Number without throwing, and the output can differ from the parent. Integer Numbers past `Number.MAX_SAFE_INTEGER` were also accepted as if exact: `-9223372036854775000` printed `.77` instead of `.78`.
-- **Root cause:** A capability was treated as guaranteed because the local Node had it, and input provenance was not checked.
-- **Prevention rule:** Probe an Intl capability whose absence is silent; never rely on catch. Render exact digits only from string or bigint micros, or a safe integer Number.
+- **Root cause:** Decimal-string formatting was assumed rather than probed, and the input type was not checked. A follow-up review found two more routes: a successful cross-rate conversion turned an unsafe Number into a safe string, and compact notation was exempted although a lost digit can move its rounding (`9149999999999999999` read `€9.2T`, not `€9.1T`).
+- **Prevention rule:** Probe an Intl capability whose absence is silent; never rely on catch. Refuse an unsafe integer Number at the entry point, before any conversion, notation or stringification branch.
 - **Files affected:** `apps/web/src/lib/format.ts`, `apps/web/src/hooks/useFormatMoney.ts`, `apps/web/src/lib/format.test.ts`, `apps/web/src/stores/currency.test.ts`, `docs/solutions/display-micros-safe-integer.md`.
 
 ---
