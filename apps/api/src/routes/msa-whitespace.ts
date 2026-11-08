@@ -27,6 +27,7 @@ import {
   WhitespaceFlag,
   WhitespaceListQuery,
   WhitespaceListResponse,
+  type WhitespaceFacets as WhitespaceFacetsT,
   type WhitespaceFlag as WhitespaceFlagT,
 } from '@bidstack/shared';
 
@@ -57,6 +58,27 @@ async function nextDecidedAt(tx: Prisma.TransactionClient, orgId: string, contra
     select: { decidedAt: true },
   });
   return later(latest?.decidedAt);
+}
+
+export function whitespaceFacets(flags: WhitespaceFlagT[]): WhitespaceFacetsT {
+  const entities = new Map<string, string>();
+  const owners = new Map<string, string>();
+  const countries = new Set<string>();
+  const lines = new Set<string>();
+  for (const f of flags) {
+    entities.set(f.signingEntity.id, f.signingEntity.name);
+    if (f.owner) owners.set(f.owner.id, f.owner.name);
+    f.countries.forEach((c) => countries.add(c));
+    f.lines.forEach((l) => lines.add(l));
+    f.decisions.forEach((d) => lines.add(d.line));
+  }
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+  return {
+    entities: [...entities].map(([id, name]) => ({ id, name })).sort(byName),
+    countries: [...countries].sort(),
+    lines: [...lines].sort(),
+    owners: [...owners].map(([id, name]) => ({ id, name })).sort(byName),
+  };
 }
 
 export function filterWhitespace(flags: WhitespaceFlagT[], q: z.infer<typeof WhitespaceListQuery>): WhitespaceFlagT[] {
@@ -111,6 +133,7 @@ export const msaWhitespaceRoutes: FastifyPluginAsyncZod = async (server) => {
         items: filtered.slice(0, req.query.limit),
         total: filtered.length,
         byLine: [...byLine.entries()].map(([line, v]) => ({ line, ...v })).sort((a, b) => b.count - a.count),
+        facets: whitespaceFacets(all),
       };
     },
   );
