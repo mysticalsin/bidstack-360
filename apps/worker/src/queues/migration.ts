@@ -32,6 +32,7 @@ import { MIGRATION, MigrationJobPayload, type MigrationJobError } from '@bidstac
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
 import { serumConnectorDenialMessage } from '../lib/serum-connector-policy.js';
+import { queueTechDetectAfterImport } from './company-tech-detect.js';
 
 // ─── Entity normalization ──────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag, confidence: 1 },
     select: { id: true },
   });
+  queueTechDetectAfterImport(ctx.orgId, created.id);
   return created.id;
 }
 

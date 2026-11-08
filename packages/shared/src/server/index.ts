@@ -2,5 +2,6 @@
 // on node built-ins but must NEVER be imported by the web bundle. Reached only
 // via the '@bidstack/shared/server' subpath (not re-exported from the root).
 export * from './dust-credentials.js';
+export * from './open-tech-stack.js';
 export * from './safe-outbound-fetch.js';
 export * from './trust-proxy.js';

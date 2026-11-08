@@ -14,6 +14,7 @@ import { opportunitiesGet, opportunitiesList, opportunityUpdate } from './opport
 import { accountUpdates, recordsResolve } from './records.js';
 import { rfpSummary } from './rfp.js';
 import { tasksCreate } from './tasks.js';
+import { companyTechStack } from './tech-stack.js';
 import type { AgentTool } from './types.js';
 
 export const agentTools = {
@@ -31,6 +32,7 @@ export const agentTools = {
   account_hiring: accountHiring,
   account_financials_summary: accountFinancialsSummary,
   account_news: accountNews,
+  company_tech_stack: companyTechStack,
   consulting_partners: consultingPartners,
 } as const satisfies Record<string, AgentTool>;
 
@@ -45,6 +47,7 @@ export {
   accountNews,
   accountUpdates,
   bidsOverdue,
+  companyTechStack,
   consultingPartners,
   opportunitiesGet,
   opportunitiesList,
