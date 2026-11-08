@@ -4,7 +4,7 @@
 // shared local uploads dir and prod against S3/R2 without code changes.
 
 import { createWriteStream, existsSync } from 'node:fs';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
@@ -72,6 +72,7 @@ interface S3Module {
   S3Client: new (cfg: unknown) => { send(cmd: unknown): Promise<unknown> };
   PutObjectCommand: new (input: unknown) => unknown;
   GetObjectCommand: new (input: unknown) => unknown;
+  DeleteObjectCommand: new (input: unknown) => unknown;
 }
 interface SignerModule {
   getSignedUrl(client: unknown, cmd: unknown, opts: { expiresIn: number }): Promise<string>;
@@ -125,6 +126,17 @@ async function uploadS3({ key, body, region }: UploadArchiveArgs): Promise<Uploa
 /** Upload the gzipped NDJSON archive. Returns the byte count and the bucket region used. */
 export async function uploadExportArchive(args: UploadArchiveArgs): Promise<UploadResult> {
   return driver() === 's3' ? uploadS3(args) : uploadLocal(args);
+}
+
+/** Delete an archive. A missing object is not an error. */
+export async function deleteExportArchive(key: string, region?: DataRegion | null): Promise<void> {
+  if (driver() !== 's3') {
+    await rm(safeJoin(resolveLocalUploadsRoot(), key), { force: true });
+    return;
+  }
+  const { bucket, s3Region } = s3Target(region);
+  const { s3 } = await loadS3();
+  await s3Client(s3, s3Region).send(new s3.DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
 
 /**
