@@ -15,10 +15,14 @@ import { Queue } from 'bullmq';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
 
-function makeConnection() {
+export function makeConnection(url: string = redisUrl) {
+  const parsed = new URL(url);
   return {
-    host: new URL(redisUrl).hostname,
-    port: Number(new URL(redisUrl).port || 6379),
+    host: parsed.hostname,
+    port: Number(parsed.port || 6379),
+    ...(parsed.username ? { username: decodeURIComponent(parsed.username) } : {}),
+    ...(parsed.password ? { password: decodeURIComponent(parsed.password) } : {}),
+    ...(parsed.protocol === 'rediss:' ? { tls: {} } : {}),
   };
 }
 

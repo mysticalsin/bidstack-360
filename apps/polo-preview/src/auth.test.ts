@@ -7,13 +7,16 @@ import {
   CODE_TTL_MS,
   MAX_ATTEMPTS,
   MAX_CODES_PER_HOUR,
+  MAX_NEW_RECORDS_PER_HOUR,
   RESEND_MS,
   SESSION_TTL_S,
+  admitNewRecord,
   checkCode,
   clearSessionCookie,
   hashCode,
   isAllowed,
   isPublicPath,
+  isRecordExpired,
   isSameOriginJson,
   issueCode,
   newCode,
@@ -154,6 +157,31 @@ describe('email message', () => {
   });
 });
 
+describe('code record storage stays bounded', () => {
+  const now = 1_800_000_000_000;
+
+  it('admits new records up to the hourly aggregate, then asks every address to wait', () => {
+    let window: { start: number; count: number } | undefined;
+    for (let i = 0; i < MAX_NEW_RECORDS_PER_HOUR; i++) {
+      const r = admitNewRecord(window, now + i);
+      expect(r.ok).toBe(true);
+      window = r.window;
+    }
+    const full = admitNewRecord(window, now + 1000);
+    expect(full.ok).toBe(false);
+    expect(full.retryAfterS).toBeGreaterThan(0);
+    expect(admitNewRecord(window, now + 3600_000).ok).toBe(true);
+  });
+
+  it('marks a record deletable only after its code expired and its sends left the hour', () => {
+    const issued = issueCode(undefined, 'h', now).record;
+    expect(isRecordExpired(issued, now)).toBe(false);
+    expect(isRecordExpired(issued, now + CODE_TTL_MS + 1)).toBe(false);
+    expect(isRecordExpired(issued, now + 3600_000 + 1)).toBe(true);
+    expect(isRecordExpired(undefined, now)).toBe(true);
+  });
+});
+
 describe('worker wiring', () => {
   const worker = readFileSync(join(here, 'worker.js'), 'utf8');
   const index = readFileSync(join(here, 'index.js'), 'utf8');
@@ -162,9 +190,25 @@ describe('worker wiring', () => {
   it('keeps the live entry, classes and bindings', () => {
     expect(toml).toMatch(/^main = "src\/index\.js"$/m);
     expect(index).toMatch(/export \{ default, Relay \} from '\.\/worker\.js'/);
-    expect(index).toMatch(/class PreviewOrigin/);
-    expect(toml).toMatch(/UPSTREAM_ORIGIN = "https:\/\/bidstack-demo\.vercel\.app"/);
-    expect(toml.match(/^\[\[migrations\]\]$/gm)).toHaveLength(1);
+    expect(index).toMatch(/export \{ PreviewOrigin \} from '\.\/polo-container\.js'/);
+    expect(toml).not.toMatch(/UPSTREAM_ORIGIN/);
+    expect(toml).not.toMatch(/vercel/i);
+    expect(toml).toMatch(/tag = "v1"\nnew_classes = \["Relay"\]/);
+    expect(toml).toMatch(/tag = "v2"\nnew_sqlite_classes = \["PreviewOrigin"\]/);
+    expect(toml).toMatch(/\[\[containers\]\]\nclass_name = "PreviewOrigin"/);
+    expect(toml).toMatch(/max_instances = 1/);
+    expect(toml).toMatch(/^preview_urls = false$/m);
+    const container = readFileSync(join(here, 'polo-container.js'), 'utf8');
+    for (const taken of ['state', 'ctx', 'env', 'container', 'start', 'stop', 'destroy']) {
+      expect(container, `PreviewOrigin must not shadow Container.${taken}`).not.toMatch(new RegExp(`^  (async )?${taken}\\(`, 'm'));
+    }
+    expect(toml).toMatch(/crons = \["\*\/5 \* \* \* \*"\]/);
+  });
+
+  it('gates new code records and sweeps expired ones', () => {
+    expect(worker).toMatch(/if \(issuing && !record\) \{\n\s+const admission = admitNewRecord\(/);
+    expect(worker).toMatch(/async alarm\(\) \{[\s\S]*isRecordExpired\(record, now\)/);
+    expect(worker).toMatch(/setAlarm\(Date\.now\(\) \+ OTP_SWEEP_MS\)/);
   });
 
   it('stays Access-only until every sign-in secret and binding exists', () => {

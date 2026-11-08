@@ -1,19 +1,22 @@
 // polo-preview Worker: the front door. v28 = live v27 plus Polo sign-in.
 // Identity comes from, in order: a verified Cloudflare Access JWT, then a Polo
 // session cookie minted after a one-time code (only when SESSION_SECRET,
-// OTP_EMAIL and OTP_FROM are configured). With UPSTREAM_ORIGIN set (the
-// always-on Vercel demo) verified requests are proxied there; without it, HTTP
-// is relayed to the box (web :4180 -> API :4020) over the Relay Durable Object.
+// OTP_EMAIL and OTP_FROM are configured). With PREVIEW bound (v29) verified
+// requests go to the Polo container (polo-container.js); otherwise to
+// UPSTREAM_ORIGIN when set, else relayed to the box over the Relay DO.
 // Do not upload this script from CI: a binding mismatch drops the relay.
 import { EmailMessage } from 'cloudflare:email';
 import { DurableObject } from 'cloudflare:workers';
+import { getContainer } from '@cloudflare/containers';
 import {
   CODE_TTL_MS,
+  admitNewRecord,
   checkCode,
   clearSessionCookie,
   hashCode,
   isAllowed,
   isPublicPath,
+  isRecordExpired,
   isSameOriginJson,
   issueCode,
   newCode,
@@ -32,6 +35,7 @@ import {
   filterRequestHeaders,
   isApiPath,
   rewriteResponseHeaders,
+  targetUrl,
 } from './protocol.js';
 
 const TEAM = 'https://tony-walteur.cloudflareaccess.com';
@@ -227,7 +231,8 @@ function requestHeadersForBox(req, publicOrigin) {
 // upstream; the app's own Authorization header (demo bearer token) passes.
 async function proxyUpstream(req, env, url) {
   const upstream = new URL(env.UPSTREAM_ORIGIN);
-  const target = new URL(url.pathname + url.search, upstream.origin);
+  // Never new URL(path, base): a path such as //attacker.example/x replaces the origin.
+  const target = targetUrl(url.pathname + url.search, upstream.origin);
   const headers = new Headers();
   for (const [key, value] of filterRequestHeaders(req.headers)) {
     if (key.toLowerCase().startsWith('cf-')) continue;
@@ -268,6 +273,46 @@ async function proxyUpstream(req, env, url) {
   });
 }
 
+// Container mode (v29). Identity is checked before this call. The container
+// API trusts the verified email only from loopback, so any client copy of the
+// identity or forwarding headers is dropped here.
+const CONTAINER_NAME = 'main';
+
+async function toContainer(req, env, url, who) {
+  const headers = new Headers();
+  for (const [key, value] of filterRequestHeaders(req.headers)) {
+    if (key.toLowerCase().startsWith('cf-')) continue;
+    headers.append(key, value);
+  }
+  if (who?.email) headers.set('cf-access-authenticated-user-email', String(who.email));
+  headers.set('x-forwarded-host', url.host);
+  headers.set('x-forwarded-proto', 'https');
+  const init = { method: req.method, headers, redirect: 'manual' };
+  if (!['GET', 'HEAD'].includes(req.method)) init.body = await req.arrayBuffer();
+  try {
+    const res = await getContainer(env.PREVIEW, CONTAINER_NAME).fetch(new Request(url, init));
+    const out = new Headers(res.headers);
+    out.set('x-robots-tag', 'noindex');
+    return new Response([101, 204, 304].includes(res.status) ? null : res.body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: out,
+    });
+  } catch (err) {
+    console.log(JSON.stringify({ container: 'unavailable', path: url.pathname, error: String(err) }));
+    return offlineResponse(req, url);
+  }
+}
+
+async function containerHealth(env) {
+  try {
+    const health = await getContainer(env.PREVIEW, CONTAINER_NAME).health();
+    return { mode: 'container', relay: health.phase === 'ready', ...health };
+  } catch (err) {
+    return { mode: 'container', relay: false, phase: 'starting', error: String(err) };
+  }
+}
+
 function relayToBox(req, env, who) {
   const headers = new Headers(req.headers);
   if (who?.email) headers.set('cf-access-authenticated-user-email', String(who.email));
@@ -305,6 +350,14 @@ export default {
       if (!isPublicPath(url.pathname)) return signInRedirect(req, url);
       if (req.method !== 'GET' && req.method !== 'HEAD') return json({ error: 'sign_in_required' }, 401);
     }
+    if (env.PREVIEW) {
+      if (url.pathname.startsWith('/__internal')) return json({ error: 'not_found' }, 404);
+      if (url.pathname === '/__health') return json(await containerHealth(env));
+      if (req.headers.get('upgrade') === 'websocket') {
+        return new Response('WebSockets are not relayed in the preview', { status: 501 });
+      }
+      return toContainer(req, env, url, who);
+    }
     if (env.UPSTREAM_ORIGIN) {
       if (url.pathname === '/__health') {
         const health = await proxyUpstream(new Request(new URL('/api/health', req.url)), env, new URL('/api/health', req.url));
@@ -326,6 +379,16 @@ export default {
     }
     return relayToBox(req, env, who);
   },
+
+  async scheduled(_event, env, ctx) {
+    if (!env.PREVIEW) return;
+    ctx.waitUntil(
+      getContainer(env.PREVIEW, CONTAINER_NAME)
+        .tick()
+        .then((result) => console.log(JSON.stringify({ tick: result })))
+        .catch((err) => console.log(JSON.stringify({ tick: 'failed', error: String(err) }))),
+    );
+  },
 };
 
 // Relay liveness (v26). The box VM is paused/snapshotted when idle, which leaves a
@@ -340,6 +403,9 @@ const STALE_MS = 35_000;
 const RECONNECT_WAIT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 90_000;
 const IDEMPOTENT = ['GET', 'HEAD', 'OPTIONS'];
+const OTP_ADMISSION_KEY = 'otp-admission';
+const OTP_SWEEP_MS = 15 * 60_000;
+const OTP_SWEEP_BATCH = 500;
 const LOST = Symbol('relay-lost');
 
 function offlineResponse(req, url) {
@@ -458,15 +524,36 @@ export class Relay extends DurableObject {
   }
 
   // One-time code records live in the "auth" instance of this class, so no
-  // new Durable Object class or migration is needed.
+  // new Durable Object class or migration is needed. Storage stays bounded: new
+  // records pass an hourly aggregate admission and an alarm sweeps expired ones.
   async otp(req, url) {
     const { email, hash } = await req.json();
     const key = `otp:${email}`;
     const record = await this.ctx.storage.get(key);
-    const result =
-      url.pathname === '/__otp/issue' ? issueCode(record, hash) : checkCode(record, hash);
-    if (result.record) await this.ctx.storage.put(key, result.record);
+    const issuing = url.pathname === '/__otp/issue';
+    if (issuing && !record) {
+      const admission = admitNewRecord(await this.ctx.storage.get(OTP_ADMISSION_KEY));
+      if (!admission.ok) return Response.json({ ok: false, retryAfterS: admission.retryAfterS });
+      await this.ctx.storage.put(OTP_ADMISSION_KEY, admission.window);
+    }
+    const result = issuing ? issueCode(record, hash) : checkCode(record, hash);
+    if (result.record) {
+      await this.ctx.storage.put(key, result.record);
+      if ((await this.ctx.storage.getAlarm()) === null) {
+        await this.ctx.storage.setAlarm(Date.now() + OTP_SWEEP_MS);
+      }
+    }
     return Response.json({ ok: result.ok, retryAfterS: result.retryAfterS });
+  }
+
+  async alarm() {
+    const now = Date.now();
+    const records = await this.ctx.storage.list({ prefix: 'otp:', limit: OTP_SWEEP_BATCH });
+    const expired = [...records].filter(([, record]) => isRecordExpired(record, now)).map(([key]) => key);
+    for (let i = 0; i < expired.length; i += 128) await this.ctx.storage.delete(expired.slice(i, i + 128));
+    if (records.size > expired.length || records.size === OTP_SWEEP_BATCH) {
+      await this.ctx.storage.setAlarm(now + OTP_SWEEP_MS);
+    }
   }
 
   async fetch(req) {

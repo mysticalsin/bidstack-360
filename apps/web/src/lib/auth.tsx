@@ -31,7 +31,7 @@ import {
 } from 'react';
 
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { api, setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
+import { api, ApiError, setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
 
 const ORG_ADMIN_PERMISSION = 'settings:write';
 import { AUTH_FINGERPRINT_EVENT } from '@/lib/queryCache';
@@ -474,9 +474,34 @@ interface MeIdentity {
   role: string;
 }
 
+export interface CfAccessFailure {
+  status: number | null;
+  message: string;
+}
+
+const CfAccessStatusContext = createContext<{
+  failure: CfAccessFailure | null;
+  retry: () => void;
+}>({ failure: null, retry: () => undefined });
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useCfAccessStatus() {
+  return useContext(CfAccessStatusContext);
+}
+
+// The box can be waking up or restoring its snapshot; only 401/403 are final.
+const CF_ACCESS_RETRY_DELAYS_MS = [1000, 2000, 3000, 5000, 8000, 10000, 15000, 15000];
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function isTransientMeFailure(status: number | null): boolean {
+  return status === null || status === 0 || status === 408 || status === 429 || status >= 500;
+}
+
 function CfAccessAuthProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [me, setMe] = useState<MeIdentity | null>(null);
+  const [failure, setFailure] = useState<CfAccessFailure | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useState(() => {
     setApiTokenProvider(null);
@@ -486,18 +511,38 @@ function CfAccessAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      try {
-        const body = await api<MeIdentity>('/api/v1/me');
-        if (!cancelled) setMe(body);
-      } catch {
-        if (!cancelled) setMe(null);
-      } finally {
-        if (!cancelled) setLoaded(true);
+      for (let i = 0; ; i++) {
+        try {
+          const body = await api<MeIdentity>('/api/v1/me');
+          if (cancelled) return;
+          setMe(body);
+          setFailure(null);
+          break;
+        } catch (err) {
+          if (cancelled) return;
+          const status = err instanceof ApiError ? err.status : null;
+          const message = err instanceof Error ? err.message : String(err);
+          if (isTransientMeFailure(status) && i < CF_ACCESS_RETRY_DELAYS_MS.length) {
+            await new Promise((r) => setTimeout(r, CF_ACCESS_RETRY_DELAYS_MS[i]));
+            if (cancelled) return;
+            continue;
+          }
+          setMe(null);
+          setFailure({ status, message });
+          break;
+        }
       }
+      if (!cancelled) setLoaded(true);
     })();
     return () => {
       cancelled = true;
     };
+  }, [attempt]);
+
+  const retry = useCallback(() => {
+    setLoaded(false);
+    setFailure(null);
+    setAttempt((n) => n + 1);
   }, []);
 
   useEffect(() => {
@@ -536,7 +581,7 @@ function CfAccessAuthProvider({ children }: { children: ReactNode }) {
         signOut,
       }}
     >
-      {children}
+      <CfAccessStatusContext.Provider value={{ failure, retry }}>{children}</CfAccessStatusContext.Provider>
     </AuthContext.Provider>
   );
 }

@@ -20,8 +20,9 @@ export interface LeiRecord {
 }
 
 /** Fuzzy legal-name search, filtered by country when known. */
-export function gleifSearchUrl(name: string, country: string | null): string {
-  const p = new URLSearchParams({ 'filter[fulltext]': name, 'page[size]': '5' });
+export function gleifSearchUrl(name: string, country: string | null, field: 'fulltext' | 'entity.legalName' = 'fulltext'): string {
+  // Full-text ranking buries the parent entity under subsidiaries, so read a wide page.
+  const p = new URLSearchParams({ [`filter[${field}]`]: name, 'page[size]': '50' });
   if (country) p.set('filter[entity.legalAddress.country]', country.toUpperCase());
   return `${API}?${p.toString()}`;
 }
@@ -48,11 +49,21 @@ export function parseGleifRecords(body: string): LeiRecord[] {
   });
 }
 
+/** Active records whose normalised legal name equals the account name, deduplicated by LEI. */
+export function leiNameMatches(records: LeiRecord[], name: string, country: string | null): LeiRecord[] {
+  const want = normaliseLegalName(name);
+  if (!want) return [];
+  const seen = new Set<string>();
+  return records.filter((r) => {
+    if (seen.has(r.lei)) return false;
+    seen.add(r.lei);
+    return (r.status ?? 'ACTIVE') === 'ACTIVE' && normaliseLegalName(r.legalName) === want && (!country || !r.country || r.country.toUpperCase() === country.toUpperCase());
+  });
+}
+
 /** Exactly one active record whose normalised legal name equals the account name. */
 export function uniqueLeiMatch(records: LeiRecord[], name: string, country: string | null): LeiRecord | null {
-  const want = normaliseLegalName(name);
-  if (!want) return null;
-  const hits = records.filter((r) => (r.status ?? 'ACTIVE') === 'ACTIVE' && normaliseLegalName(r.legalName) === want && (!country || !r.country || r.country.toUpperCase() === country.toUpperCase()));
+  const hits = leiNameMatches(records, name, country);
   return hits.length === 1 ? hits[0]! : null;
 }
 
@@ -61,9 +72,22 @@ export async function readLei(client: IntelClient, lei: string): Promise<LeiReco
   return parseGleifRecords(await client.get(`${API}/${encodeURIComponent(lei)}`, { accept: 'application/vnd.api+json' }))[0] ?? null;
 }
 
-/** Search GLEIF and return the unique match, if any. */
-export async function matchLei(client: IntelClient, name: string, country: string | null): Promise<{ record: LeiRecord | null; url: string; candidates: number }> {
+/**
+ * Search GLEIF by full text, then by legal name, and return the unique match.
+ * When several entities share the name, they come back as `matches` so a
+ * person picks one; nothing is adopted on a guess.
+ */
+export async function matchLei(
+  client: IntelClient,
+  name: string,
+  country: string | null,
+): Promise<{ record: LeiRecord | null; url: string; candidates: number; matches: LeiRecord[] }> {
   const url = gleifSearchUrl(name, country);
   const records = parseGleifRecords(await client.get(url, { accept: 'application/vnd.api+json' }));
-  return { record: uniqueLeiMatch(records, name, country), url, candidates: records.length };
+  let matches = leiNameMatches(records, name, country);
+  if (matches.length !== 1) {
+    const byName = parseGleifRecords(await client.get(gleifSearchUrl(name, country, 'entity.legalName'), { accept: 'application/vnd.api+json' }));
+    matches = leiNameMatches([...matches, ...byName], name, country);
+  }
+  return { record: matches.length === 1 ? matches[0]! : null, url, candidates: records.length, matches };
 }
