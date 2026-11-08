@@ -69,8 +69,9 @@ function Tile({ n, fmtMicros }: { n: KeyNumber; fmtMicros: MicrosFormatter }) {
 
 export function KeyNumbersStrip({ companyId }: { companyId: string }) {
   const money = useFormatMoney();
-  // Pipeline micros are EUR at rest; show them in the user's display currency like the rest of the page.
-  const fmtMicros: MicrosFormatter = (m) => money.formatMoneyMicros(m, 'EUR', { compact: true });
+  // formatValue calls this only when the key number recorded an ISO currency.
+  // The code is that currency, not a default of EUR.
+  const fmtMicros: MicrosFormatter = (m, currency) => money.formatMoneyMicros(m, currency, { compact: true });
   const q = useAccountKeyNumbers(companyId);
   if (q.isLoading) return <div className="kn" aria-busy="true"><div className="sg-skel" style={{ minHeight: 196 }} /></div>;
   if (q.isError || !q.data) {

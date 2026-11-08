@@ -46,6 +46,23 @@ describe('positioning-format', () => {
   it('formats values, deltas and direction tones', () => {
     expect(formatValue(kn({ value: 1234 }))).toBe('1,234');
     expect(formatValue(kn({ value: 1.7e9, unit: 'money', currency: 'EUR' }))).toBe('EUR 1.70bn');
+    expect(formatValue(kn({ value: 1.7e9, unit: 'money' }))).toBe('1.70bn unspecified');
+    expect(formatValue(kn({ value: 1.7e9, unit: 'money' }))).not.toContain('USD');
+    const calls: Array<{ micros: number; currency: string }> = [];
+    const convert = (m: number, currency: string) => {
+      calls.push({ micros: m, currency });
+      return `shown:${currency}:${m}`;
+    };
+    expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros', currency: 'EUR' }), convert)).toBe('shown:EUR:2500000');
+    expect(calls).toEqual([{ micros: 2_500_000, currency: 'EUR' }]);
+    // A missing currency must not be sent through FX. Opportunity.valueMicros has no currency column.
+    expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros', currency: null }), convert)).toBe('2.50 unspecified');
+    expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros' }), convert)).toBe('2.50 unspecified');
+    expect(formatValue(kn({ value: 2_500_000, unit: 'money_micros', currency: 'USD' }), convert)).toBe('shown:USD:2500000');
+    expect(calls).toEqual([
+      { micros: 2_500_000, currency: 'EUR' },
+      { micros: 2_500_000, currency: 'USD' },
+    ]);
     expect(formatValue(kn({ value: 18.34, unit: 'pct' }))).toBe('18.3%');
     expect(formatValue(kn({ value: -0.4, unit: 'sentiment' }))).toBe('Negative');
     expect(formatValue(kn({ value: 12, unit: 'days' }))).toBe('12d ago');
@@ -151,6 +168,9 @@ describe('WhatToPosition', () => {
     expect(more.getAttribute('aria-expanded')).toBe('true');
     expect(within(play).getByText('Point one.')).toBeTruthy();
     expect(within(play).getByText(/Middle half of 4 won/)).toBeTruthy();
+    expect(within(play).getByText(/100,000 unspecified/)).toBeTruthy();
+    expect(within(play).getByText(/300,000 unspecified/)).toBeTruthy();
+    expect(play.textContent).not.toContain('100000000000');
     expect(within(play).getAllByRole('link')).toHaveLength(3);
     expect(within(screen.getByTestId('gaps-risks')).getByText('No senior contacts mapped')).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);

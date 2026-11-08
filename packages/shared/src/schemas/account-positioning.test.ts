@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildGaps,
@@ -132,6 +132,25 @@ describe('composeBrief', () => {
     expect(txt).toContain('NOS is a Strategic account in Telecom, based in PT.');
     expect(txt).toContain('EUR 1.7bn in FY2024 (up 5% on the year), operating margin 18.3% (-1.1 pts)');
     expect(txt).toContain('no open deals; 1 won and 0 lost');
+    const withDeal: BriefFacts = {
+      ...f,
+      pipeline: { openCount: 1, openMicros: '2500000', won24m: 0, lost24m: 0 },
+    };
+    const fx = vi.fn((m: string) => `EUR ${m}`);
+    const dealTxt = composeBrief(withDeal, (v, c) => `${c} ${v}`, fx);
+    expect(dealTxt).toContain('worth 2.50 unspecified');
+    expect(dealTxt).not.toContain('EUR 2500000');
+    expect(fx).not.toHaveBeenCalled();
+    expect(() =>
+      composeBrief({ ...f, pipeline: { ...f.pipeline, openCount: 0, openMicros: 'not-a-number' } }, (v, c) => `${c} ${v}`, fx),
+    ).not.toThrow();
+    const badOpen = composeBrief(
+      { ...withDeal, pipeline: { openCount: 1, openMicros: '12.5', won24m: 0, lost24m: 0 } },
+      (v, c) => `${c} ${v}`,
+      fx,
+    );
+    expect(badOpen).toContain('amount not readable');
+    expect(fx).not.toHaveBeenCalled();
     expect(txt).toContain('No contacts are mapped yet.');
     expect(txt).not.toMatch(/employees/);
     expect(txt).not.toContain('\u2014');

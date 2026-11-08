@@ -6,12 +6,11 @@ import './positioning.css';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { composeBrief, type AccountGap, type EvidenceChip, type PositioningPlay } from '@bidstack/shared';
+import { composeBrief, formatMicrosAmount, type AccountGap, type EvidenceChip, type PositioningPlay } from '@bidstack/shared';
 
 import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { fmtMoney } from '@/components/financials/financials-format';
 import { useAccountPositioning } from '@/hooks/useAccountPositioning';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 
 const CONF_LABEL: Record<PositioningPlay['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
@@ -161,9 +160,11 @@ function Gap({ g }: { g: AccountGap }) {
 export function WhatToPosition({ companyId }: { companyId: string }) {
   const q = useAccountPositioning(companyId);
   const leverage = useMsaLeverage(companyId);
-  const money = useFormatMoney();
-  // Pipeline micros are EUR at rest; show them in the user's display currency.
-  const micros = (m: string) => money.formatMoneyMicros(m, 'EUR', { compact: true });
+  // Deal-range endpoints are micros with no currency. Scale them to units.
+  const micros = (m: string) => {
+    if (!/^-?\d+$/.test(m)) return 'amount not readable';
+    return `${formatMicrosAmount(BigInt(m))} unspecified`;
+  };
   if (q.isLoading) return <div className="sg wp" aria-busy="true"><div className="sg-skel" style={{ minHeight: 320 }} /></div>;
   if (q.isError || !q.data) {
     return (
