@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +16,7 @@ describe('preview queue worker', () => {
     const entry = readFileSync(join(here, 'preview-entrypoint.sh'), 'utf8');
     expect(dockerfile).toContain('pnpm --filter @bidstack/worker build');
     expect(dockerfile).toContain('apps/worker/dist/main.js');
-    const readyAt = entry.indexOf('if [[ "${ready}" == "1" ]]');
+    const readyAt = entry.indexOf('if preview_wait_postgres');
     const apiAt = entry.indexOf('starting api');
     const workerAt = entry.indexOf('starting queue worker');
     const launchAt = entry.indexOf('cd /app/apps/worker && node dist/main.js');
@@ -73,6 +73,65 @@ describe('preview process lifecycle', () => {
     expect(reaped).toContain(`reaped ${a}`);
     expect(reaped).toContain(`reaped ${b}`);
     expect(result.log).toContain('a preview process exited (9)');
+    expect(spawnSync('kill', ['-0', a ?? '']).status).not.toBe(0);
+    expect(spawnSync('kill', ['-0', b ?? '']).status).not.toBe(0);
+  });
+
+  it('stops after a failed command and does not run the next one', () => {
+    const result = run(`
+      preview_run_or_die step false
+      echo CONTINUED
+    `);
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('CONTINUED');
+    expect(result.log).toContain('step failed');
+  });
+
+  it('refuses a remote DATABASE_URL before any migrate', () => {
+    const result = run(`
+      export DATABASE_URL='postgres://bidstack:bidstack@db.example:5432/bidstack'
+      preview_require_local_database
+      echo CONTINUED
+    `);
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('CONTINUED');
+    expect(result.log).toContain('DATABASE_URL must point at the preview Postgres');
+  });
+
+  it('stops when redis does not start', () => {
+    const bin = mkdtempSync(join(tmpdir(), 'polo-redis-'));
+    const fake = join(bin, 'redis-server');
+    writeFileSync(fake, '#!/bin/bash\nexit 1\n');
+    chmodSync(fake, 0o755);
+    const result = run(`
+      export PATH='${bin}':"$PATH"
+      preview_start_redis
+      echo CONTINUED
+    `);
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('CONTINUED');
+    expect(result.log).toContain('redis failed');
+  });
+
+  it('gives up on Postgres after the attempt bound', () => {
+    const bin = mkdtempSync(join(tmpdir(), 'polo-pg-'));
+    const fake = join(bin, 'pg_isready');
+    writeFileSync(fake, '#!/bin/bash\nexit 1\n');
+    chmodSync(fake, 0o755);
+    const started = Date.now();
+    const result = run(`
+      preview_install_trap
+      export PATH='${bin}':"$PATH"
+      export PREVIEW_POSTGRES_ATTEMPTS=2
+      export PREVIEW_READY_SLEEP=0
+      sleep 30 & pg=$!
+      preview_track "$pg"
+      if preview_wait_postgres "$pg"; then echo READY; else echo NOTREADY; fi
+    `);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(result.stdout).toContain('NOTREADY');
+    expect(result.stdout).not.toContain('\nREADY');
+    expect(result.log).toContain('postgres was not ready after 2 attempts');
   });
 
   it('does not start the API when the worker binary or a migration is missing', () => {

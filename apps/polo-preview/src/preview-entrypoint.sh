@@ -1,6 +1,6 @@
 #!/bin/bash
-# One process tree for the Cloudflare Container. A Node listener on 8080
-# stays up even when Postgres is still booting, and /__boot shows the log.
+# One process tree for the Cloudflare Container. Postgres and Redis are
+# local to this container. A failed start, migrate, or seed stops the box.
 set -uo pipefail
 
 export PATH="/usr/local/bin:${PATH}"
@@ -18,9 +18,30 @@ export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-bidstack}"
 export POSTGRES_DB="${POSTGRES_DB:-bidstack}"
 
 LOG="${LOG:-/tmp/polo-boot.log}"
-touch "$LOG"
+if ! touch "$LOG"; then
+  echo "[polo-preview] cannot write ${LOG}" >&2
+  exit 1
+fi
 
-log() { echo "[polo-preview] $*" | tee -a "$LOG" >&2; }
+log() {
+  if ! echo "[polo-preview] $*" | tee -a "$LOG" >&2; then
+    echo "[polo-preview] cannot write ${LOG}" >&2
+    exit 1
+  fi
+}
+
+# Migrate and the API use DATABASE_URL. A remote host would send the preview
+# password and seed off this machine. Only the Postgres started here is allowed.
+preview_require_local_database() {
+  case "${DATABASE_URL}" in
+    postgres://*@127.0.0.1:*|postgres://*@localhost:*|postgresql://*@127.0.0.1:*|postgresql://*@localhost:*)
+      ;;
+    *)
+      log "DATABASE_URL must point at the preview Postgres on 127.0.0.1 or localhost"
+      exit 1
+      ;;
+  esac
+}
 
 preview_child_pids=()
 preview_stop_redis=0
@@ -39,7 +60,9 @@ preview_require_file() {
 preview_run_or_die() {
   local label="$1"
   shift
-  if ! "$@"; then
+  # The redirect lives inside the check. A caller redirect that cannot open
+  # the log would skip this function, and the next command would still run.
+  if ! "$@" >>"$LOG" 2>&1; then
     log "${label} failed"
     exit 1
   fi
@@ -48,15 +71,27 @@ preview_run_or_die() {
 preview_cleanup() {
   local status=$?
   trap - EXIT INT TERM
-  local pid
+  local pid waits
   for pid in "${preview_child_pids[@]}"; do
     if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
-      echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
       kill "${pid}" 2>/dev/null || true
     fi
   done
   for pid in "${preview_child_pids[@]}"; do
-    wait "${pid}" 2>/dev/null || true
+    [[ -n "${pid}" ]] || continue
+    waits=0
+    while kill -0 "${pid}" 2>/dev/null && [[ "${waits}" -lt 20 ]]; do
+      wait "${pid}" 2>/dev/null || true
+      waits=$((waits + 1))
+      sleep 0.1
+    done
+    if kill -0 "${pid}" 2>/dev/null; then
+      kill -9 "${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+    fi
+    if ! kill -0 "${pid}" 2>/dev/null; then
+      echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+    fi
   done
   if [[ "${preview_stop_redis}" == "1" ]] && command -v redis-cli >/dev/null 2>&1; then
     redis-cli -h 127.0.0.1 -p 6379 shutdown nosave >/dev/null 2>&1 || true
@@ -65,6 +100,33 @@ preview_cleanup() {
 }
 
 preview_install_trap() { trap preview_cleanup EXIT INT TERM; }
+
+preview_start_redis() {
+  log "starting redis"
+  if ! redis-server --daemonize yes --bind 127.0.0.1 --protected-mode yes --port 6379 --save "" >>"$LOG" 2>&1; then
+    log "redis failed"
+    exit 1
+  fi
+}
+
+# Returns 0 when Postgres accepts connections inside the attempt bound.
+preview_wait_postgres() {
+  local pg_pid="$1"
+  local attempts="${PREVIEW_POSTGRES_ATTEMPTS:-90}"
+  local try
+  for try in $(seq 1 "${attempts}"); do
+    if pg_isready -h 127.0.0.1 -t 1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
+      return 0
+    fi
+    if ! kill -0 "${pg_pid}" 2>/dev/null; then
+      log "postgres exited before it accepted connections"
+      return 1
+    fi
+    sleep "${PREVIEW_READY_SLEEP:-1}"
+  done
+  log "postgres was not ready after ${attempts} attempts"
+  return 1
+}
 
 # The first child to exit fails the container. The EXIT trap reaps the rest.
 preview_watch_children() {
@@ -80,6 +142,7 @@ preview_watch_children() {
 }
 
 preview_main() {
+preview_require_local_database
 preview_install_trap
 preview_stop_redis=1
 
@@ -89,7 +152,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = '/app/apps/web/dist';
-const logFile = '/tmp/polo-boot.log';
 const apiPrefixes = ['/api', '/readyz', '/livez', '/health', '/metrics', '/webhooks'];
 
 function isApi(url) {
@@ -127,16 +189,11 @@ function sendFile(res, file) {
 
 const server = http.createServer((req, res) => {
   const pathname = (req.url || '/').split('?')[0];
-  if (pathname === '/__boot') {
-    res.setHeader('content-type', 'text/plain; charset=utf-8');
-    res.end(fs.existsSync(logFile) ? fs.readFileSync(logFile) : 'no log');
-    return;
-  }
   if (isApi(req.url || '/')) {
     const upstream = http.request(
       {
         hostname: '127.0.0.1',
-        port: 4000,
+        port: Number(process.env.PORT_API || 4000),
         path: req.url,
         method: req.method,
         headers: req.headers,
@@ -173,10 +230,7 @@ log "node listener $node_pid"
 log "id $(id)"
 log "shm $(df -h /dev/shm 2>/dev/null | tail -1)"
 
-log "starting redis"
-if ! redis-server --daemonize yes --bind 127.0.0.1 --protected-mode yes --port 6379 --save "" >>"$LOG" 2>&1; then
-  log "redis failed"
-fi
+preview_start_redis
 
 log "starting postgres"
 docker-entrypoint.sh postgres \
@@ -187,28 +241,19 @@ docker-entrypoint.sh postgres \
 pg_pid=$!
 preview_track "${pg_pid}"
 
-ready=0
-for _ in $(seq 1 90); do
-  if pg_isready -h 127.0.0.1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
-    ready=1
-    break
-  fi
-  if ! kill -0 "${pg_pid}" 2>/dev/null; then
-    log "postgres exited before it accepted connections"
-    break
-  fi
-  sleep 1
-done
-
-if [[ "${ready}" == "1" ]]; then
+if preview_wait_postgres "${pg_pid}"; then
   log "migrating"
   prisma_bin="$(find /app -path '*/node_modules/.bin/prisma' -print -quit || true)"
   preview_require_file "prisma binary" "${prisma_bin}"
-  preview_run_or_die "migrate" "${prisma_bin}" migrate deploy --schema /app/packages/db/prisma/schema.prisma >>"$LOG" 2>&1
+  preview_run_or_die "migrate" "${prisma_bin}" migrate deploy --schema /app/packages/db/prisma/schema.prisma
   log "seeding"
   tsx_bin="$(find /app -path '*/node_modules/.bin/tsx' -print -quit || true)"
   preview_require_file "tsx binary" "${tsx_bin}"
-  preview_run_or_die "seed" bash -c "cd /app/packages/db && \"${tsx_bin}\" src/seed.ts" >>"$LOG" 2>&1
+  preview_seed() {
+    cd /app/packages/db || return 1
+    "${tsx_bin}" src/seed.ts
+  }
+  preview_run_or_die "seed" preview_seed
   # The worker is what consumes the jobs the API enqueues. Do not leave the
   # API up when that binary was not built.
   preview_require_file "queue worker dist" /app/apps/worker/dist/main.js
@@ -225,6 +270,7 @@ if [[ "${ready}" == "1" ]]; then
   log "queue worker ${worker_pid}"
 else
   log "postgres did not become ready"
+  exit 1
 fi
 
 preview_watch_children
