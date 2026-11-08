@@ -7,6 +7,8 @@ export PATH="/usr/local/bin:${PATH}"
 export NODE_ENV="${NODE_ENV:-development}"
 export PORT_API="${PORT_API:-4000}"
 export HOST="${HOST:-127.0.0.1}"
+# Preview-only defaults for the Postgres and Redis this container starts.
+# They are local to the preview, not production credentials.
 export DATABASE_URL="${DATABASE_URL:-postgres://bidstack:bidstack@127.0.0.1:5432/bidstack}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 export PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://polo-preview.tony-walteur.workers.dev}"
@@ -15,10 +17,71 @@ export POSTGRES_USER="${POSTGRES_USER:-bidstack}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-bidstack}"
 export POSTGRES_DB="${POSTGRES_DB:-bidstack}"
 
-LOG=/tmp/polo-boot.log
+LOG="${LOG:-/tmp/polo-boot.log}"
 touch "$LOG"
 
 log() { echo "[polo-preview] $*" | tee -a "$LOG" >&2; }
+
+preview_child_pids=()
+preview_stop_redis=0
+
+preview_track() { preview_child_pids+=("$1"); }
+
+preview_require_file() {
+  local label="$1"
+  local path="$2"
+  if [[ ! -f "${path}" ]]; then
+    log "${label} missing; API will not start"
+    exit 1
+  fi
+}
+
+preview_run_or_die() {
+  local label="$1"
+  shift
+  if ! "$@"; then
+    log "${label} failed"
+    exit 1
+  fi
+}
+
+preview_cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+  local pid
+  for pid in "${preview_child_pids[@]}"; do
+    if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+      echo "reaped ${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+      kill "${pid}" 2>/dev/null || true
+    fi
+  done
+  for pid in "${preview_child_pids[@]}"; do
+    wait "${pid}" 2>/dev/null || true
+  done
+  if [[ "${preview_stop_redis}" == "1" ]] && command -v redis-cli >/dev/null 2>&1; then
+    redis-cli -h 127.0.0.1 -p 6379 shutdown nosave >/dev/null 2>&1 || true
+  fi
+  exit "${status}"
+}
+
+preview_install_trap() { trap preview_cleanup EXIT INT TERM; }
+
+# The first child to exit fails the container. The EXIT trap reaps the rest.
+preview_watch_children() {
+  local status=0
+  wait -n || status=$?
+  if [[ "${status}" -eq 0 ]]; then
+    log "a preview process exited"
+    status=1
+  else
+    log "a preview process exited (${status})"
+  fi
+  return "${status}"
+}
+
+preview_main() {
+preview_install_trap
+preview_stop_redis=1
 
 node --input-type=module <<'JS' &
 import http from 'node:http';
@@ -104,6 +167,7 @@ const server = http.createServer((req, res) => {
 server.listen(8080, '0.0.0.0');
 JS
 node_pid=$!
+preview_track "${node_pid}"
 
 log "node listener $node_pid"
 log "id $(id)"
@@ -121,6 +185,7 @@ docker-entrypoint.sh postgres \
   -c max_connections=40 \
   >>"$LOG" 2>&1 &
 pg_pid=$!
+preview_track "${pg_pid}"
 
 ready=0
 for _ in $(seq 1 90); do
@@ -138,33 +203,33 @@ done
 if [[ "${ready}" == "1" ]]; then
   log "migrating"
   prisma_bin="$(find /app -path '*/node_modules/.bin/prisma' -print -quit || true)"
-  if [[ -n "${prisma_bin}" ]]; then
-    "${prisma_bin}" migrate deploy --schema /app/packages/db/prisma/schema.prisma >>"$LOG" 2>&1 || log "migrate failed"
-  else
-    log "prisma binary missing"
-  fi
+  preview_require_file "prisma binary" "${prisma_bin}"
+  preview_run_or_die "migrate" "${prisma_bin}" migrate deploy --schema /app/packages/db/prisma/schema.prisma >>"$LOG" 2>&1
   log "seeding"
   tsx_bin="$(find /app -path '*/node_modules/.bin/tsx' -print -quit || true)"
-  if [[ -n "${tsx_bin}" ]]; then
-    (cd /app/packages/db && "${tsx_bin}" src/seed.ts) >>"$LOG" 2>&1 || log "seed failed"
-  else
-    log "tsx binary missing"
-  fi
+  preview_require_file "tsx binary" "${tsx_bin}"
+  preview_run_or_die "seed" bash -c "cd /app/packages/db && \"${tsx_bin}\" src/seed.ts" >>"$LOG" 2>&1
+  # The worker is what consumes the jobs the API enqueues. Do not leave the
+  # API up when that binary was not built.
+  preview_require_file "queue worker dist" /app/apps/worker/dist/main.js
   log "starting api"
   (cd /app/apps/api && node dist/main.js) >>"$LOG" 2>&1 &
   api_pid=$!
+  preview_track "${api_pid}"
   # Same database, Redis, and upload root as the API. MSA extract and crew
   # runs are queued by the API and consumed only by this process.
   log "starting queue worker"
-  if [[ -f /app/apps/worker/dist/main.js ]]; then
-    (cd /app/apps/worker && node dist/main.js) >>"$LOG" 2>&1 &
-    worker_pid=$!
-    log "queue worker ${worker_pid}"
-  else
-    log "queue worker dist missing; uploaded contracts and crew runs will stay queued"
-  fi
+  (cd /app/apps/worker && node dist/main.js) >>"$LOG" 2>&1 &
+  worker_pid=$!
+  preview_track "${worker_pid}"
+  log "queue worker ${worker_pid}"
 else
   log "postgres did not become ready"
 fi
 
-wait "${node_pid}"
+preview_watch_children
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  preview_main
+fi
