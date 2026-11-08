@@ -243,11 +243,20 @@ preview_cleanup() {
     if [[ "${grouped}" == "0" ]] && preview_identity_ok "${pid}" && kill -0 "${pid}" 2>/dev/null; then
       kill -KILL "${pid}" 2>/dev/null || true
     fi
-    # Record wait's own status. A line written only after the shell exits
-    # would also be true of a child the kernel reaped for us.
+    # A live child whose stat we cannot read is not signaled and is not waited.
+    # Waiting it would block cleanup. The receipt says ownership is unresolved.
     local wait_status=0
-    wait "${pid}" 2>/dev/null || wait_status=$?
-    printf 'wait %s %s\n' "${pid}" "${wait_status}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+    if preview_identity_ok "${pid}"; then
+      wait "${pid}" 2>/dev/null || wait_status=$?
+      printf 'wait %s %s\n' "${pid}" "${wait_status}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+    elif kill -0 "${pid}" 2>/dev/null; then
+      # No signal and no wait. This bash still delays process exit while a
+      # direct child remains; that limit is not closed by guessing a signal.
+      printf 'unresolved %s identity\n' "${pid}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+    else
+      wait "${pid}" 2>/dev/null || wait_status=$?
+      printf 'wait %s %s\n' "${pid}" "${wait_status}" >>"${PREVIEW_REAP_LOG:-/dev/null}"
+    fi
   done
   if [[ "${why}" == "INT" ]]; then exit 130; fi
   if [[ "${why}" == "TERM" ]]; then exit 143; fi

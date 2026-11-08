@@ -139,8 +139,30 @@ describe('preview process lifecycle', () => {
     expect(Number(unrelated)).toBeGreaterThan(0);
     expect(spawnSync('kill', ['-0', String(grand)]).status).toBe(0);
     expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
+    expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${grand}`);
     spawnSync('kill', ['-9', String(grand)]);
     spawnSync('kill', ['-9', String(unrelated)]);
+  });
+
+  it('reports unresolved ownership and returns while a live child stat cannot be read', () => {
+    const started = Date.now();
+    const result = run(`
+      preview_install_trap
+      # The sleeper is not this shell's child. This bash waits for its own
+      # children at exit even after cleanup refuses to wait or signal them.
+      leader=\$(bash -c 'setsid sleep 30 >/dev/null 2>&1 & echo \$!')
+      preview_track_leader "\$leader"
+      preview_read_start() { return 1; }
+      echo LEADER:\$leader
+      preview_cleanup
+    `);
+    const leader = /LEADER:(\d+)/.exec(result.stdout)?.[1];
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(Number(leader)).toBeGreaterThan(0);
+    expect(readFileSync(result.reap, 'utf8')).toContain(`unresolved ${leader} identity`);
+    expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${leader}`);
+    expect(spawnSync('kill', ['-0', String(leader)]).status).toBe(0);
+    spawnSync('kill', ['-9', String(leader)]);
   });
 
   it('rejects a remote host hidden after an at-sign in the path', () => {
@@ -221,9 +243,14 @@ describe('preview process lifecycle', () => {
       nohup sleep 30 >/dev/null 2>&1 &
       unrelated=\$!
       disown || true
-      bash -c 'trap "" TERM; sleep 30' &
+      ready=\$(mktemp)
+      bash -c "trap '' TERM; echo ready > '\$ready'; sleep 30" &
       child=\$!
       preview_track "\$child"
+      for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        [[ -s "\$ready" ]] && break
+        sleep 0.05
+      done
       echo UNRELATED:\$unrelated
       echo CHILD:\$child
       preview_cleanup
@@ -233,7 +260,7 @@ describe('preview process lifecycle', () => {
     expect(Number(child)).toBeGreaterThan(0);
     expect(Number(unrelated)).toBeGreaterThan(0);
     expect(spawnSync('kill', ['-0', String(child)]).status).toBe(1);
-    expect(readFileSync(result.reap, 'utf8')).toMatch(new RegExp(`wait ${child} (137|143)`));
+    expect(readFileSync(result.reap, 'utf8')).toContain(`wait ${child} 137`);
     expect(readFileSync(result.reap, 'utf8')).not.toContain(`wait ${unrelated}`);
     expect(spawnSync('kill', ['-0', String(unrelated)]).status).toBe(0);
     spawnSync('kill', ['-9', String(unrelated)]);
