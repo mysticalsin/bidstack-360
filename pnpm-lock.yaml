@@ -372,6 +372,9 @@ importers:
 
   apps/polo-preview:
     dependencies:
+      '@cloudflare/containers':
+        specifier: 0.3.7
+        version: 0.3.7
       ws:
         specifier: 8.21.0
         version: 8.21.0
@@ -1065,6 +1068,9 @@ packages:
         optional: true
       react-dom:
         optional: true
+
+  '@cloudflare/containers@0.3.7':
+    resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
 
   '@dagrejs/dagre@3.1.3':
     resolution: {integrity: sha512-X4aUTwOReZvthaZWOVHqlJ52/ZdhZFEM4+Lh/uR4XooUSLE6p71bcy7MPGzYnNUcNh+nj+i/qJQpCMIdQnSmrg==}
@@ -4160,8 +4166,8 @@ packages:
     engines: {node: '>=12.13.0'}
     hasBin: true
 
-  chromedriver@156.0.2:
-    resolution: {integrity: sha512-tnbStQXrModzo3nvGeEIA7tQxmO2Xsa6ZU7B5ghKjnzOLNF33SyFUTpfK339hjY5Uw5bPuQdc4u28pftgZDd0g==}
+  chromedriver@157.0.0:
+    resolution: {integrity: sha512-IwYuey+2f+yczWMxei84oF2MMKbrrDU+G4AQT95fXLG3rURvB7pemRgZWDLVZHDMV6g5eDPKE0TT9s6Lw45Kbg==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -7578,7 +7584,7 @@ snapshots:
     dependencies:
       '@axe-core/webdriverjs': 4.11.3(selenium-webdriver@4.41.0)
       axe-core: 4.11.4
-      chromedriver: 156.0.2
+      chromedriver: 157.0.0
       colors: 1.4.0
       commander: 9.5.0
       dotenv: 17.4.2
@@ -7777,6 +7783,8 @@ snapshots:
     optionalDependencies:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
+
+  '@cloudflare/containers@0.3.7': {}
 
   '@dagrejs/dagre@3.1.3':
     dependencies:
@@ -11124,7 +11132,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  chromedriver@156.0.2:
+  chromedriver@157.0.0:
     dependencies:
       '@testim/chrome-version': 1.1.4
       adm-zip: 0.6.1

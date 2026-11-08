@@ -9,6 +9,7 @@
 // an empty VITE_API_URL so the browser stays on the Worker origin.
 
 import WebSocket from 'ws';
+import { createHeartbeat, reconnectDelayMs } from './heartbeat.js';
 import {
   PUBLIC_PREVIEW_ORIGIN,
   base64ToBytes,
@@ -60,18 +61,32 @@ async function handleRequest(message) {
   };
 }
 
+let attempt = 0;
+
 function connect() {
   if (!RELAY_KEY) die('RELAY_KEY is required');
   const socket = new WebSocket(RELAY_URL, {
     headers: { 'x-relay-key': RELAY_KEY },
   });
+  const heartbeat = createHeartbeat({
+    send: (frame) => socket.readyState === WebSocket.OPEN && socket.send(frame),
+    terminate: () => {
+      log('no reply from the Worker, dropping the socket');
+      socket.terminate();
+    },
+  });
   socket.addEventListener('open', () => {
+    attempt = 0;
+    heartbeat.start();
     log(`connected ${RELAY_URL} (web ${WEB_ORIGIN} api ${API_ORIGIN})`);
   });
   socket.addEventListener('message', async (event) => {
+    heartbeat.onPong();
+    const text = typeof event.data === 'string' ? event.data : event.data.toString();
+    if (text === 'pong') return;
     let message;
     try {
-      message = JSON.parse(typeof event.data === 'string' ? event.data : event.data.toString());
+      message = JSON.parse(text);
     } catch {
       return;
     }
@@ -91,8 +106,10 @@ function connect() {
     }
   });
   socket.addEventListener('close', (event) => {
-    log(`socket closed ${event.code} ${event.reason || ''}`.trim());
-    setTimeout(connect, 2000);
+    heartbeat.stop();
+    const delay = reconnectDelayMs(attempt++);
+    log(`socket closed ${event.code} ${event.reason || ''}, retry in ${delay}ms`.trim());
+    setTimeout(connect, delay);
   });
   socket.addEventListener('error', (event) => {
     log(`socket error ${event.message || event}`);

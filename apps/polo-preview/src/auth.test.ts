@@ -162,9 +162,14 @@ describe('worker wiring', () => {
   it('keeps the live entry, classes and bindings', () => {
     expect(toml).toMatch(/^main = "src\/index\.js"$/m);
     expect(index).toMatch(/export \{ default, Relay \} from '\.\/worker\.js'/);
-    expect(index).toMatch(/class PreviewOrigin/);
-    expect(toml).toMatch(/UPSTREAM_ORIGIN = "https:\/\/bidstack-demo\.vercel\.app"/);
-    expect(toml.match(/^\[\[migrations\]\]$/gm)).toHaveLength(1);
+    expect(index).toMatch(/export \{ PreviewOrigin \} from '\.\/polo-container\.js'/);
+    expect(toml).not.toMatch(/UPSTREAM_ORIGIN/);
+    expect(toml).not.toMatch(/vercel/i);
+    expect(toml).toMatch(/tag = "v1"\nnew_classes = \["Relay"\]/);
+    expect(toml).toMatch(/tag = "v2"\nnew_sqlite_classes = \["PreviewOrigin"\]/);
+    expect(toml).toMatch(/\[\[containers\]\]\nclass_name = "PreviewOrigin"/);
+    expect(toml).toMatch(/max_instances = 1/);
+    expect(toml).toMatch(/crons = \["\*\/5 \* \* \* \*"\]/);
   });
 
   it('stays Access-only until every sign-in secret and binding exists', () => {
