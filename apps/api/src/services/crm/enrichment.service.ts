@@ -9,6 +9,7 @@ import {
 import {
   faviconProfile,
   fetchOpenCompanyProfile,
+  resolveWikidataFacts,
 } from '../../providers/company-open-enrichment.js';
 import { fetchSeamlessCompany } from '../../providers/company-seamless-enrichment.js';
 import {
@@ -47,6 +48,13 @@ export function canQueueApolloEnrichment({
   );
   const apolloApiConfigured = Boolean(env.APOLLO_API_KEY?.trim() && domain?.trim());
   return apolloMcpConfigured || apolloApiConfigured;
+}
+
+/** Rows enriched before wikidataFacts existed kept the facts inside the Wikidata profile. */
+function legacyWikidataFacts(metadata: Record<string, unknown>) {
+  const open = record(metadata.openCompanyProfile);
+  if (!open.revenue && !open.employees) return null;
+  return { wikidataId: typeof open.wikidataId === 'string' ? open.wikidataId : null, revenue: open.revenue ?? null, employees: open.employees ?? null };
 }
 
 export async function upsertVerifiedCompanyEnrichment({
@@ -122,6 +130,13 @@ export async function upsertVerifiedCompanyEnrichment({
           log.warn({ err, company: name }, 'open company data verification failed');
           return null;
         }));
+  // Seamless replaces the profile, not the public Wikidata facts (revenue, headcount).
+  const wikidataFacts = await resolveWikidataFacts({
+    profile: openProfile,
+    seamlessWon: Boolean(seamlessProfile),
+    enabled: process.env.NODE_ENV !== 'test' && process.env.BIDSTACK_OPEN_ENRICHMENT_DISABLED !== '1',
+    input: { name, domain: requestedDomain, website: requestedWebsite, now },
+  });
   const techStackMcpSources = techStackMcpSourceConfigsFromEnv();
   const techStackMcpProfile =
     techStackMcpSources.length > 0 && process.env.NODE_ENV !== 'test'
@@ -173,6 +188,10 @@ export async function upsertVerifiedCompanyEnrichment({
     openCompanyProfile: (openProfile?.providerMetadata ??
       existingMetadata.openCompanyProfile ??
       null) as Prisma.InputJsonValue | null,
+    wikidataFacts: (wikidataFacts ??
+      existingMetadata.wikidataFacts ??
+      legacyWikidataFacts(existingMetadata) ??
+      null) as unknown as Prisma.InputJsonValue | null,
     companyImageUrl: (openProfile?.imageUrl ??
       existingMetadata.companyImageUrl ??
       null) as Prisma.InputJsonValue | null,
