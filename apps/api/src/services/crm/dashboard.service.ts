@@ -480,11 +480,10 @@ export async function buildDashboardSnapshot(
     fetchBuyingRoleFacts(orgId, contactIds, prisma),
   ]);
 
+  // The accounts board sums `deals` and, when the org sample is full, labels that
+  // sum as the latest 100. The selected account's own query can include older
+  // deals, so those rows stay on `accountDeals` and are not folded into `deals`.
   const accountDeals = accountOpportunities.map((opportunity) => serializeDeal(opportunity));
-  const snapshotDeals = [
-    ...deals.filter((deal) => deal.companyId !== selectedCompany.id),
-    ...accountDeals,
-  ];
 
   return {
     generatedAt: new Date().toISOString(),
@@ -502,7 +501,8 @@ export async function buildDashboardSnapshot(
       performance,
     }),
     companies,
-    deals: snapshotDeals,
+    deals,
+    accountDeals,
     dealsSampleCapped,
     activities,
     insights,

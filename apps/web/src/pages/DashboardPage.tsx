@@ -198,9 +198,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  // A matching customer name is not a link. The snapshot deals for this
-  // account are the rows whose companyId points here.
-  const companyDeals = snapshot.deals.filter((deal) => deal.companyId === cockpit.company.id);
+  // The account's own recent deals are separate from the org sample in
+  // snapshot.deals, which is what the accounts board totals.
+  const companyDeals =
+    snapshot.accountDeals ??
+    snapshot.deals.filter((deal) => deal.companyId === cockpit.company.id);
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.

@@ -180,6 +180,29 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     expect(screen.queryByText(/latest 100 deals/i)).toBeNull();
   });
 
+  it('counts only the snapshot deals when it says they are the latest 100', () => {
+    // WHY: an older deal that belongs only to the selected account's own query
+    // must not be added to this total. The number next to "latest 100" is the
+    // deals array the server returned.
+    setDashboard(1);
+    const current = dashboardState.current as {
+      data: { dealsSampleCapped?: boolean; deals: Array<Record<string, unknown>>; companies: Array<{ id: string }> };
+    };
+    current.data.dealsSampleCapped = true;
+    current.data.deals = [
+      {
+        id: 'in-sample',
+        companyId: current.data.companies[0].id,
+        stage: 'qualification',
+        amountMicros: '1000000',
+        probability: 100,
+      },
+    ];
+    renderSegment();
+    expect(screen.getByText(/1 open deals in the latest 100/)).toBeTruthy();
+    expect(screen.queryByText(/9 open deals/)).toBeNull();
+  });
+
   it('names the pipeline as the latest 100 deals when the deal sample is full', () => {
     // WHY: 100 deals is the server cap. Showing that sum as the portfolio pipeline
     // hides every older deal.
