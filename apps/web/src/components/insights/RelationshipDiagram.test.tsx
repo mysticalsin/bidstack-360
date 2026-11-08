@@ -58,6 +58,20 @@ describe('relationship diagram frame', () => {
     expect(screen.queryByText('Could not load this view')).toBeNull();
   });
 
+  it('keeps the cached diagram and shows the follow-up error when a refresh fails', () => {
+    companies.current = query({ isSuccess: true, data: { items: [companyRow] } });
+    start.current = query({ isError: true, isSuccess: false, data: 'co-1', error: new Error('start failed') });
+    company.current = query({
+      isSuccess: true,
+      data: { name: 'Acme', contacts: [{ id: 'p1', name: 'Ada', role: 'Buyer' }] },
+    });
+    render(<RelationshipDiagram />);
+    expect(screen.getByText('Ada')).toBeTruthy();
+    expect(screen.getByText('Could not refresh the company list')).toBeTruthy();
+    expect(screen.getByText('start failed')).toBeTruthy();
+    expect(screen.queryByText('Could not load this view')).toBeNull();
+  });
+
   it('shows the follow-up error, not a company error, when the company list succeeded', () => {
     companies.current = query({ isSuccess: true, data: { items: [companyRow] } });
     start.current = query({ isError: true, error: new Error('start failed') });

@@ -49,8 +49,15 @@ describe('account people routes without a database', () => {
       if (args.where.orgId !== orgId || args.where.id !== dealId) return null;
       return { id: dealId, companyId };
     });
+    const otherDeal = '00000000-0000-4000-8000-0000000000d2';
     db.opportunityContact.findMany.mockResolvedValue([
-      { contact: { id: contactId, name: 'Ada', role: 'Buyer' } },
+      {
+        contact: { id: contactId, name: 'Ada', role: 'Buyer' },
+        contactId,
+        role: 'buyer',
+        opportunityId: otherDeal,
+        opportunity: { id: otherDeal, name: 'Other' },
+      },
     ]);
     db.contactFact.findMany.mockImplementation(async (args: { where: { OR?: Array<{ opportunityId?: string }> } }) => {
       const scoped = args.where.OR?.some((branch) => branch.opportunityId === dealId);
@@ -95,6 +102,13 @@ describe('account people routes without a database', () => {
     };
     expect(where.orgId).toBe(orgId);
     expect(where.OR.some((branch) => branch.opportunityId === dealId)).toBe(true);
+    const linked = where.OR.find(
+      (branch) =>
+        branch.opportunityId !== null &&
+        typeof branch.opportunityId === 'object' &&
+        'in' in (branch.opportunityId as object),
+    ) as { opportunityId: { in: string[] } } | undefined;
+    expect(linked?.opportunityId.in).toContain(otherDeal);
     await app.close();
   });
 
@@ -119,6 +133,36 @@ describe('account people routes without a database', () => {
     });
     expect(res.statusCode).toBe(201);
     expect(db.customerCommitment.create.mock.calls[0]?.[0].data.createdByUserId).toBeNull();
+    await app.close();
+  });
+
+  it('stores an ambiguous commitment as needs_review with no deal', async () => {
+    // WHY: create has no status field. Ambiguous text is the only needs_review
+    // path, and intake clears the deal instead of saving a linked review row.
+    db.company.findFirst.mockResolvedValue({ id: companyId });
+    db.customerCommitment.create.mockResolvedValue({ id: commitmentId });
+    db.customerCommitment.findFirst.mockResolvedValue({
+      id: commitmentId,
+      promise: 'They might renew',
+      dueDate: null,
+      status: 'needs_review',
+      ownerContactId: null,
+      opportunityId: null,
+      sourceNote: null,
+      ownerContact: null,
+    });
+    const app = await appFor('00000000-0000-4000-8000-0000000000b1');
+    const res = await app.inject({
+      method: 'POST',
+      url: `/companies/${companyId}/commitments`,
+      payload: { promise: 'They might renew', ambiguous: true, opportunityId: dealId },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(db.customerCommitment.create.mock.calls[0]?.[0].data).toMatchObject({
+      status: 'needs_review',
+      opportunityId: null,
+    });
+    expect(db.opportunity.findFirst).not.toHaveBeenCalled();
     await app.close();
   });
 

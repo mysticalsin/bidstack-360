@@ -22,7 +22,9 @@ function matches(row: Row, where: ReturnType<typeof contactFactListArgs>['where'
         'companyId' in company ? row.companyId === company.companyId : row.companyId === null,
       );
     }
-    return row.opportunityId === branch.opportunityId;
+    const opportunity = branch.opportunityId as string | { in: string[] } | undefined;
+    if (opportunity && typeof opportunity === 'object') return opportunity.in.includes(row.opportunityId ?? '');
+    return row.opportunityId === opportunity;
   });
 }
 
@@ -77,5 +79,28 @@ describe('contact fact query scope', () => {
     expect(page.map((row) => row.id)).toContain('report');
     expect(page.some((row) => row.opportunityId === otherDeal)).toBe(false);
     expect(page.some((row) => row.orgId === otherOrg)).toBe(false);
+  });
+
+  it('includes a fact for a deal this map links, and still excludes an unlinked deal', () => {
+    const third = '00000000-0000-4000-8000-0000000000d3';
+    const args = contactFactListArgs(orgId, [contactId], dealId, companyId, [otherDeal]);
+    const linked: Row = {
+      id: 'linked-role',
+      orgId,
+      contactId,
+      opportunityId: otherDeal,
+      companyId,
+      createdAt: '2026-11-01T00:00:00.000Z',
+    };
+    const unrelated: Row = {
+      id: 'unrelated-role',
+      orgId,
+      contactId,
+      opportunityId: third,
+      companyId,
+      createdAt: '2026-11-02T00:00:00.000Z',
+    };
+    expect(matches(linked, args.where)).toBe(true);
+    expect(matches(unrelated, args.where)).toBe(false);
   });
 });

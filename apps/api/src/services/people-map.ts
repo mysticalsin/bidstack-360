@@ -30,16 +30,33 @@ export function contactFactListArgs(
   contactIds: string[],
   opportunityId: string | null,
   companyId: string | null,
+  linkedOpportunityIds: readonly string[] = [],
 ) {
   const accountEvidence = companyId
     ? { opportunityId: null, OR: [{ companyId: null }, { companyId }] }
     : { opportunityId: null };
+  // Deal links on this map still need their own buying-role facts. Those
+  // deals are part of the scope. A deal this contact is not linked to stays
+  // out, so it cannot crowd the take.
+  const linked = [
+    ...new Set(
+      linkedOpportunityIds.filter((id): id is string => typeof id === 'string' && id.length > 0 && id !== opportunityId),
+    ),
+  ];
   return {
     where: {
       orgId,
       contactId: { in: contactIds },
       deletedAt: null,
-      ...(opportunityId ? { OR: [{ opportunityId }, accountEvidence] } : {}),
+      ...(opportunityId
+        ? {
+            OR: [
+              { opportunityId },
+              ...(linked.length > 0 ? [{ opportunityId: { in: linked } }] : []),
+              accountEvidence,
+            ],
+          }
+        : {}),
     },
     select: FACT_SELECT,
     orderBy: { createdAt: 'desc' as const },
@@ -231,13 +248,10 @@ async function finishMap(
   now: Date,
 ) {
   const ids = people.map((person) => person.id);
-  const [facts, deals] = await Promise.all([
+  const deals =
     ids.length === 0
-      ? Promise.resolve([] as FactRow[])
-      : prisma.contactFact.findMany(contactFactListArgs(orgId, ids, opportunityId, companyId)),
-    ids.length === 0
-      ? Promise.resolve([] as DealRow[])
-      : prisma.opportunityContact.findMany({
+      ? ([] as DealRow[])
+      : await prisma.opportunityContact.findMany({
           where: { orgId, contactId: { in: ids }, deletedAt: null },
           select: {
             contactId: true,
@@ -246,8 +260,19 @@ async function finishMap(
             opportunity: { select: { id: true, name: true } },
           },
           take: 1000,
-        }),
-  ]);
+        });
+  const facts =
+    ids.length === 0
+      ? ([] as FactRow[])
+      : await prisma.contactFact.findMany(
+          contactFactListArgs(
+            orgId,
+            ids,
+            opportunityId,
+            companyId,
+            deals.map((deal) => deal.opportunityId),
+          ),
+        );
   const reportIds = facts
     .map((fact) => fact.reportsToContactId)
     .filter((id): id is string => Boolean(id));
