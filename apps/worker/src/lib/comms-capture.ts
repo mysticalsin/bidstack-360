@@ -489,7 +489,7 @@ export function noteActivityBridgeFailures(
     removePending(pending, id, kind);
     forgetStream(state, id, kind);
   }
-  backpressure ||= pending.length > ACTIVITY_BRIDGE_PENDING_CAP;
+  backpressure ||= pendingOverCap(pending, kind);
   if (failed.length === 0) {
     writeRetryIds(state, counts);
     writePending(state, pending);
@@ -558,7 +558,7 @@ export function noteActivityBridgeFailures(
   return {
     hold: bridgeCursorHeld(pending, counts, backpressure || refused, kind),
     quarantined,
-    pending: Math.min(pending.length, ACTIVITY_BRIDGE_PENDING_CAP),
+    pending: Math.min(pendingForKind(pending, kind).length, ACTIVITY_BRIDGE_PENDING_CAP),
     backpressure,
   };
 }
@@ -579,6 +579,16 @@ function removePending(rows: ActivityBridgePending[], id: string, kind?: Activit
   for (let index = rows.length - 1; index >= 0; index -= 1) {
     if (sameBridgeIdentity(rows[index]!, id, kind)) rows.splice(index, 1);
   }
+}
+
+function pendingForKind(rows: ActivityBridgePending[], kind?: ActivityBridgeKind): ActivityBridgePending[] {
+  if (!kind) return rows.filter((row) => !row.kind);
+  return rows.filter((row) => row.kind === kind);
+}
+
+/** Another stream's queue does not fill this stream's cap. */
+function pendingOverCap(rows: ActivityBridgePending[], kind?: ActivityBridgeKind): boolean {
+  return pendingForKind(rows, kind).length > ACTIVITY_BRIDGE_PENDING_CAP;
 }
 
 function bridgeCursorHeld(
@@ -747,8 +757,9 @@ function pendingRoom(rows: ActivityBridgePending[], kind: ActivityBridgeKind, id
  * every destination fits; otherwise the untyped row stays. Absent removes
  * the untyped row only after both stores have answered empty.
  */
-export function applyLegacyMigration(state: Record<string, unknown>, plans: readonly LegacyBridgeMigration[]): void {
-  if (plans.length === 0) return;
+export function applyLegacyMigration(state: Record<string, unknown>, plans: readonly LegacyBridgeMigration[]): boolean {
+  let refused = false;
+  if (plans.length === 0) return false;
   const pending = readPending(state);
   const counts = readRetryIds(state);
   const quarantine = Array.isArray(state.activityBridgeQuarantine)
@@ -770,7 +781,10 @@ export function applyLegacyMigration(state: Record<string, unknown>, plans: read
     }
     const kinds: ActivityBridgeKind[] = plan.result === 'both' ? ['email', 'calendar'] : [plan.result];
     const needsPending = Boolean(legacyPending) || legacyCount !== undefined;
-    if (needsPending && !kinds.every((kind) => pendingRoom(pending, kind, plan.id))) continue;
+    if (needsPending && !kinds.every((kind) => pendingRoom(pending, kind, plan.id))) {
+      refused = true;
+      continue;
+    }
     delete counts[plan.id];
     removePending(pending, plan.id);
     forgetStream(state, plan.id);
@@ -781,10 +795,19 @@ export function applyLegacyMigration(state: Record<string, unknown>, plans: read
       }
     }
     if (legacyQuarantine) {
-      const rest = quarantine.filter((entry) => !(entry.id === plan.id && !entry.kind));
-      quarantine.splice(0, quarantine.length, ...rest);
-      for (const kind of kinds) {
-        quarantine.unshift({ id: plan.id, attempts: legacyQuarantine.attempts, at: legacyQuarantine.at, kind });
+      const fits = kinds.every((kind) => {
+        if (quarantine.some((entry) => entry.id === plan.id && entry.kind === kind)) return true;
+        return quarantine.filter((entry) => entry.kind === kind).length < ACTIVITY_BRIDGE_QUARANTINE_CAP;
+      });
+      if (!fits) {
+        refused = true;
+      } else {
+        const rest = quarantine.filter((entry) => !(entry.id === plan.id && !entry.kind));
+        quarantine.splice(0, quarantine.length, ...rest);
+        for (const kind of kinds) {
+          if (quarantine.some((entry) => entry.id === plan.id && entry.kind === kind)) continue;
+          quarantine.unshift({ id: plan.id, attempts: legacyQuarantine.attempts, at: legacyQuarantine.at, kind });
+        }
       }
     }
   }
@@ -793,6 +816,7 @@ export function applyLegacyMigration(state: Record<string, unknown>, plans: read
   if (quarantine.length === 0) delete state.activityBridgeQuarantine;
   else state.activityBridgeQuarantine = quarantine;
   pruneBridgeStream(state, counts, pending);
+  return refused;
 }
 
 export async function migrateLegacyBridgePending(
@@ -960,7 +984,13 @@ export function mergeBridgeDeltaState(
     if (key in stored) result[key] = structuredClone(stored[key]);
     else delete result[key];
   }
-  applyLegacyMigration(result, migrations);
+  const migrationRefused = applyLegacyMigration(result, migrations);
+  if (migrationRefused) {
+    for (const key of writes) {
+      if (key in stored) result[key] = structuredClone(stored[key]);
+      else delete result[key];
+    }
+  }
   for (const delta of deltas) {
     noteActivityBridgeFailures(
       result,

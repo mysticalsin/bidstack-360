@@ -9,6 +9,7 @@ import {
   ACTIVITY_BRIDGE_PENDING_CAP,
   ACTIVITY_BRIDGE_QUARANTINE_CAP,
   ACTIVITY_BRIDGE_RETRY_LIMIT,
+  applyLegacyMigration,
   claimActivityBridgeDrain,
   classifyStoredBridgeId,
   CursorKeyConflictError,
@@ -607,6 +608,88 @@ describe('activity bridge commit lock', () => {
     const after = stored.delta.activityBridgePending as Array<{ id: string; kind?: string }>;
     expect(after.some((row) => row.id === 'legacy' && row.kind === undefined)).toBe(true);
     expect(after.filter((row) => row.id === 'legacy')).toHaveLength(1);
+  });
+
+  it('does not lower a locked attempt count or advance the cursor when migration does not fit', async () => {
+    const stored = {
+      delta: {
+        mailNextLink: 'page-1',
+        activityBridgePending: [{ id: 'legacy', attempts: 5 }],
+      } as Record<string, unknown>,
+    };
+    const update = vi.fn(async (args: { data: { deltaState: Record<string, unknown> } }) => {
+      stored.delta = args.data.deltaState;
+    });
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ delta_state: structuredClone(stored.delta) }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    const full = Array.from({ length: 256 }, (_, index) => ({ id: `e${index}`, attempts: 1, kind: 'email' as const }));
+    stored.delta = {
+      mailNextLink: 'page-1',
+      activityBridgePending: [...full, { id: 'legacy', attempts: 5 }],
+    };
+    await commitTokenDeltaState(
+      db,
+      'tok-1',
+      stored.delta,
+      { mailNextLink: 'page-2' },
+      [],
+      [{ id: 'legacy', result: 'email', attempts: 1 }],
+    );
+    expect(stored.delta.mailNextLink).toBe('page-1');
+    const pending = stored.delta.activityBridgePending as Array<{ id: string; attempts: number; kind?: string }>;
+    expect(pending.find((row) => row.id === 'legacy')).toEqual({ id: 'legacy', attempts: 5 });
+  });
+
+  it('does not let one stream hold another that is under its own cap', () => {
+    const state: Record<string, unknown> = {
+      activityBridgePending: Array.from({ length: 300 }, (_, index) => ({
+        id: `mail-${index}`,
+        attempts: 1,
+        kind: 'email' as const,
+      })),
+    };
+    const out = noteActivityBridgeFailures(
+      state,
+      'calendar',
+      [],
+      '2026-11-08T00:00:00.000Z',
+      ['seen'],
+      false,
+      undefined,
+      'calendar',
+    );
+    expect(out.backpressure).toBe(false);
+    expect(out.hold).toBe(false);
+  });
+
+  it('does not duplicate or overflow a stream quarantine cap', () => {
+    const state: Record<string, unknown> = {
+      activityBridgeQuarantine: [
+        ...Array.from({ length: 49 }, (_, index) => ({
+          id: `q${index}`,
+          attempts: 3,
+          at: '2026-11-01T00:00:00.000Z',
+          kind: 'email' as const,
+        })),
+        { id: 'legacy', attempts: 3, at: '2026-11-01T00:00:00.000Z' },
+        { id: 'same', attempts: 3, at: '2026-11-01T00:00:00.000Z', kind: 'email' as const },
+        { id: 'same', attempts: 3, at: '2026-11-02T00:00:00.000Z' },
+      ],
+    };
+    applyLegacyMigration(state, [
+      { id: 'legacy', result: 'email', attempts: 3 },
+      { id: 'same', result: 'email', attempts: 1 },
+    ]);
+    const quarantine = state.activityBridgeQuarantine as Array<{ id: string; kind?: string; attempts: number }>;
+    const email = quarantine.filter((entry) => entry.kind === 'email');
+    expect(email.length).toBeLessThanOrEqual(50);
+    expect(email.filter((entry) => entry.id === 'same')).toHaveLength(1);
+    expect(quarantine.find((entry) => entry.id === 'legacy' && entry.kind === undefined)?.attempts).toBe(3);
+    expect(quarantine.find((entry) => entry.id === 'same' && entry.kind === 'email')?.attempts).toBe(3);
   });
 
   it('applies each pull onto the locked row so a stale snapshot cannot erase the other folder', async () => {
