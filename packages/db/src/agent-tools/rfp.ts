@@ -2,7 +2,14 @@ import { z } from 'zod';
 
 import { prisma } from '../index.js';
 
-import { isoDate, oppCitation, type AgentCitation, type AgentTool } from './types.js';
+import {
+  callerCan,
+  isoDate,
+  oppCitation,
+  proposalOwnerWhere,
+  type AgentCitation,
+  type AgentTool,
+} from './types.js';
 
 const GAP_STATUSES = new Set(['suggested', 'blocked']);
 const OPEN_ROW_STATUSES = new Set(['open', 'blocked']);
@@ -33,6 +40,7 @@ export const rfpSummary: AgentTool<typeof Input> = {
     });
     if (!opp) throw new Error('Opportunity not found');
 
+    const showProposals = await callerCan(ctx, 'proposals:read');
     const [requirements, documents, proposals] = await Promise.all([
       prisma.requirement.findMany({
         where: { orgId: ctx.orgId, opportunityId: opp.id, deletedAt: null },
@@ -55,11 +63,13 @@ export const rfpSummary: AgentTool<typeof Input> = {
         orderBy: { createdAt: 'desc' },
         take: 20,
       }),
-      prisma.proposal.findMany({
-        where: { orgId: ctx.orgId, opportunityId: opp.id, deletedAt: null },
-        select: { id: true, name: true, status: true, dueDate: true },
-        take: 10,
-      }),
+      showProposals
+        ? prisma.proposal.findMany({
+            where: { orgId: ctx.orgId, opportunityId: opp.id, deletedAt: null, ...proposalOwnerWhere(ctx) },
+            select: { id: true, name: true, status: true, dueDate: true },
+            take: 10,
+          })
+        : Promise.resolve([]),
     ]);
 
     const byStatus: Record<string, number> = {};

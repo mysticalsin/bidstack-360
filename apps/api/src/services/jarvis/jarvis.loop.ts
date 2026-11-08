@@ -24,6 +24,7 @@ import {
 } from '../ai-assistant.helpers.js';
 
 import { collectCitations, collectMissing, composeAnswer, summarizeStep } from './jarvis.answer.js';
+import { jarvisToolCtx } from './jarvis.ctx.js';
 import { nextFallbackTurn } from './jarvis.fallback.js';
 import {
   MAX_ANSWER_CHARS,
@@ -224,8 +225,8 @@ async function runTool(
       error: 'Invalid arguments',
     });
   }
-  const ctx = { orgId: input.orgId, userId: input.userId, surface: 'jarvis' as const };
   try {
+    const ctx = await jarvisToolCtx(input.orgId, input.userId);
     if (tool.kind === 'write') {
       if (!tool.preview) {
         return finish('error', 'No preview', { tool: name, ok: false, error: 'No preview' });
@@ -304,5 +305,11 @@ export async function runJarvisLoop(input: JarvisRunInput, view: JarvisRunView):
     view.status = 'error';
     view.answer = { text: 'Jarvis hit an error. Try again.', citations: [], missing: [] };
   }
-  await saveRun(input, view);
+  // The route launches this loop without awaiting it; a rejection here would
+  // reach the process-level unhandledRejection handler and stop the API.
+  try {
+    await saveRun(input, view);
+  } catch (err) {
+    input.log.error({ err, runId: input.runId }, 'jarvis: final run state not saved');
+  }
 }

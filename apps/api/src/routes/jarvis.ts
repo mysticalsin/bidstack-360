@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { AGENT_TOOL_NAMES, agentTools, type AgentToolName } from '@bidstack/db/agent-tools';
 
+import { jarvisToolCtx } from '../services/jarvis/jarvis.ctx.js';
 import { runJarvisLoop } from '../services/jarvis/jarvis.loop.js';
 import { MAX_MESSAGE_CHARS } from '../services/jarvis/jarvis.prompt.js';
 import {
@@ -162,7 +163,7 @@ export const jarvisRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!args.success) throw server.httpErrors.badRequest('Pending action is invalid');
       let result: unknown;
       try {
-        result = await tool.handler(args.data as never, { ...who, surface: 'jarvis' });
+        result = await tool.handler(args.data as never, await jarvisToolCtx(who.orgId, who.userId));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Action failed';
         await auditAction(req, action, 'failed', { error: message.slice(0, 300) });

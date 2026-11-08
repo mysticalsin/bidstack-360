@@ -18,7 +18,7 @@ function row(over: Partial<PartnerEvidenceRow>): PartnerEvidenceRow {
   } as PartnerEvidenceRow;
 }
 
-const rows: PartnerEvidenceRow[] = [
+const baseRows: PartnerEvidenceRow[] = [
   row({ id: 'pub1', key: 'pub:1' }),
   row({
     id: 'int1', key: 'int:note:n1', origin: 'internal', source: 'note', method: 'keyword_match', url: null, recordType: 'note', recordId: '33333333-3333-4333-8333-333333333333',
@@ -27,6 +27,7 @@ const rows: PartnerEvidenceRow[] = [
   }),
 ];
 
+let rows = baseRows;
 const findFirst = vi.fn();
 const owned = vi.fn();
 const engagements = vi.fn();
@@ -47,6 +48,7 @@ type Out = { partners: Array<{ firmKey: string; internalCount: number; scorecard
 
 describe('consulting_partners shared agent tool', () => {
   beforeEach(() => {
+    rows = baseRows;
     findFirst.mockReset().mockResolvedValue({ id: COMPANY, name: 'MAPFRE' });
     owned.mockReset().mockResolvedValue(new Set(['int1']));
     engagements.mockReset().mockResolvedValue({ won: 1, open: 1 });
@@ -87,5 +89,40 @@ describe('consulting_partners shared agent tool', () => {
     findFirst.mockResolvedValue(null);
     await expect(tool.handler({ companyName: 'Nobody', limit: 6 }, { orgId: 'org-1' })).rejects.toThrow(/not found/i);
     expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-1', deletedAt: null }) }));
+  });
+
+  it('keeps a scoped MCP key inside its assigned accounts', async () => {
+    findFirst.mockResolvedValue(null);
+    const key = { orgId: 'org-1', keyId: 'key-1', unrestrictedScope: false, companyIds: ['allowed-co'] };
+    await expect(tool.handler({ companyId: COMPANY, limit: 6 }, key)).rejects.toThrow('Account not found');
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: COMPANY, AND: [{ id: { in: ['allowed-co'] } }] }) }),
+    );
+  });
+
+  it('applies the Jarvis user access scope to the account lookup', async () => {
+    const companyScope = { countryCode: { in: ['FR'] } };
+    await tool.handler({ companyId: COMPANY, limit: 6 }, { orgId: 'org-1', userId: USER, surface: 'jarvis', companyScope });
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ AND: [companyScope] }) }));
+  });
+
+  it('returns every evidence row a returned score or angle cites, even past 50 rows', async () => {
+    const firms = ['kpmg', 'accenture', 'capgemini', 'deloitte', 'ey', 'pwc'];
+    rows = firms.flatMap((firmKey, f) =>
+      Array.from({ length: 20 }, (_, i) =>
+        row({
+          id: `${firmKey}-${i}`, key: `pub:${firmKey}:${i}`, firmKey, firmName: firmKey.toUpperCase(),
+          occurredAt: new Date(NOW.getTime() - (f * 20 + i) * 3_600_000),
+          title: `MAPFRE works with ${firmKey}`, excerpt: `MAPFRE selects ${firmKey} for advisory.`,
+        }),
+      ),
+    );
+    const out = (await tool.handler({ companyId: COMPANY, limit: 6 }, { orgId: 'org-1' })) as Out;
+    const ids = new Set(out.evidence.map((e) => e.id));
+    expect(out.evidence.length).toBeLessThanOrEqual(50);
+    const cited = out.partners.flatMap((p) => [...p.angles, ...p.scorecard].flatMap((x) => x.evidenceIds));
+    expect(cited.length).toBeGreaterThan(0);
+    for (const id of cited) expect(ids.has(id)).toBe(true);
+    for (const p of out.partners) for (const a of p.angles) expect(a.evidenceIds.length).toBeGreaterThan(0);
   });
 });
