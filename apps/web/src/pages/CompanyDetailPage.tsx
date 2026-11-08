@@ -13,6 +13,7 @@ import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
 import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
@@ -169,6 +170,9 @@ export function CompanyDetailPage() {
               </a>
             )}
             {c.countryCode && <span>{c.countryCode}</span>}
+            {!canReadIntel && c.employeeCount ? (
+              <span>{t('companyDetail.meta.employees', '{{count}} employees', { count: c.employeeCount })}</span>
+            ) : null}
             {c.taxId && (
               <span>{t('companyDetail.meta.taxId', 'Tax ID: {{taxId}}', { taxId: c.taxId })}</span>
             )}
@@ -217,6 +221,7 @@ export function CompanyDetailPage() {
               )}
             </div>
           )}
+          <AccountActivityCharts companyId={c.id} />
 
           <CompanyTechStackSection companyId={c.id} />
           <ConsultingPartnersSection companyId={c.id} />

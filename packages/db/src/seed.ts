@@ -26,6 +26,8 @@ import { seedRolesAndPermissions } from './seed.rbac.js';
 import { seedSigningEntities } from './seed-signing-entities.js';
 import { seedAccountIntel } from './seed-account-intel.js';
 import { seedCompanyIntel } from './seed-company-intel.js';
+import { seedBidChartDemo } from './seed-bid-charts.js';
+import { demoWinLoss, fixtureClosedDeals } from './seed-data.bid-charts.js';
 import { seedConsultingPartners } from './seed-consulting-partners.js';
 
 // PERMISSION_SEEDS, ROLE_SEEDS, LEGACY_ROLE_ASSIGNMENTS, helper functions,
@@ -175,6 +177,7 @@ async function main() {
         intel: intelFor(o.code) as Prisma.InputJsonValue,
       },
       update: {
+        name: o.name,
         stage: o.stage,
         valueMicros: Math.round(o.value * 1_000_000),
         probability: o.probability,
@@ -378,108 +381,11 @@ async function main() {
   // Spread won/lost deals across the last ~10 months for the enrichment-backed
   // accounts (ci-financial, rush, mantu) so the cockpit revenue-evolution chart
   // and win/loss block render real, dated data on first boot.
-  const HISTORY: Array<{
-    code: string;
-    customer: string;
-    name: string;
-    stage: 'closed_won' | 'closed_lost';
-    value: number;
-    monthsAgo: number;
-    country: string;
-  }> = [
-    {
-      code: 'OP-H01',
-      customer: 'CI Financial',
-      name: 'CI Financial — Cloud migration phase 1',
-      stage: 'closed_won',
-      value: 880_000,
-      monthsAgo: 9,
-      country: 'CA',
-    },
-    {
-      code: 'OP-H02',
-      customer: 'CI Financial',
-      name: 'CI Financial — Data platform pilot',
-      stage: 'closed_won',
-      value: 540_000,
-      monthsAgo: 7,
-      country: 'CA',
-    },
-    {
-      code: 'OP-H03',
-      customer: 'CI Financial',
-      name: 'CI Financial — Managed SOC RFP',
-      stage: 'closed_lost',
-      value: 1_200_000,
-      monthsAgo: 6,
-      country: 'CA',
-    },
-    {
-      code: 'OP-H04',
-      customer: 'CI Financial',
-      name: 'CI Financial — Endpoint security rollout',
-      stage: 'closed_won',
-      value: 720_000,
-      monthsAgo: 4,
-      country: 'CA',
-    },
-    {
-      code: 'OP-H05',
-      customer: 'CI Financial',
-      name: 'CI Financial — Zero Trust expansion',
-      stage: 'closed_won',
-      value: 1_350_000,
-      monthsAgo: 2,
-      country: 'CA',
-    },
-    {
-      code: 'OP-H06',
-      customer: 'CI Financial',
-      name: 'CI Financial — Legacy app retirement',
-      stage: 'closed_lost',
-      value: 300_000,
-      monthsAgo: 1,
-      country: 'CA',
-    },
-    {
-      code: 'OP-H07',
-      customer: 'Rush University System for Health',
-      name: 'Rush — EHR integration',
-      stage: 'closed_won',
-      value: 2_100_000,
-      monthsAgo: 8,
-      country: 'US',
-    },
-    {
-      code: 'OP-H08',
-      customer: 'Rush University System for Health',
-      name: 'Rush — Clinical analytics',
-      stage: 'closed_won',
-      value: 1_450_000,
-      monthsAgo: 3,
-      country: 'US',
-    },
-    {
-      code: 'OP-H09',
-      customer: 'Mantu',
-      name: 'Mantu — Internal tooling refresh',
-      stage: 'closed_won',
-      value: 410_000,
-      monthsAgo: 5,
-      country: 'FR',
-    },
-    {
-      code: 'OP-H10',
-      customer: 'Mantu',
-      name: 'Mantu — Workspace consolidation',
-      stage: 'closed_lost',
-      value: 260_000,
-      monthsAgo: 2,
-      country: 'FR',
-    },
-  ];
-  for (const h of HISTORY) {
+  const cycleByCode = new Map(demoWinLoss.map((r) => [r.code, r.cycleDays]));
+  for (const h of fixtureClosedDeals) {
     const closedAt = new Date(Date.now() - h.monthsAgo * 30 * 86_400_000);
+    // Backdated so the win/loss sales-cycle chart reads a real open-to-close span.
+    const openedAt = new Date(closedAt.getTime() - (cycleByCode.get(h.code) ?? 0) * 86_400_000);
     await prisma.opportunity.upsert({
       where: { orgId_code: { orgId: org.id, code: h.code } },
       create: {
@@ -492,16 +398,23 @@ async function main() {
         probability: h.stage === 'closed_won' ? 100 : 0,
         dueDate: closedAt,
         country: h.country,
+        createdAt: openedAt,
       },
       update: {
+        name: h.name,
         stage: h.stage,
         valueMicros: BigInt(h.value) * 1_000_000n,
         dueDate: closedAt,
         country: h.country,
+        createdAt: openedAt,
       },
     });
   }
-  console.log(`  ✓ historical closed deals: ${HISTORY.length}`);
+  console.log(`  ✓ historical closed deals: ${fixtureClosedDeals.length}`);
+  const demo = await seedBidChartDemo(prisma, org.id, seedUserId);
+  console.log(
+    `  ✓ bid chart demo: ${demo.outcomes} outcomes, bid score ${demo.bidScore ?? 'skipped'}, ${demo.activities} activities`,
+  );
 
   // ─── Real Company rows + opp/contact linkage (F2) ──────────────────────────
   // Account rollups (/accounts/top, /accounts/key, sector-view) read the Company
