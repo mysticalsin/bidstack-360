@@ -196,10 +196,21 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
+export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+
+// Open data technology stack refresh (slice 16), shared by the API and worker.
+export {
+  apolloOrgEnrichmentConfigured,
+  loadOpenTechCoverage,
+  normalizeEnrichmentName,
+  openTechNetworkEnabled,
+  refreshCompanyOpenTechStack,
+} from './open-tech-refresh.js';
+export type { ApolloFallbackDecision, OpenTechApolloJob, OpenTechRefreshResult } from './open-tech-refresh.js';
 // Inbound activity API + account activity aggregates. One service behind the
 // REST route (apps/api) and the MCP tools (apps/mcp-server).
 export {
@@ -216,6 +227,20 @@ export {
   weekStartIn,
 } from './services/account-activity.js';
 
+// Agreement ingest staging (slice 13a), shared by the REST route and MCP.
+export {
+  AgreementStageError,
+  INGEST_ITEM_SELECT,
+  serializeIngestItem,
+  stageAgreementIngest,
+} from './agreements/stage.js';
+export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
+export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
+export type {
+  IngestActor as AgreementIngestActor,
+  StageAgreementInput,
+  StageAgreementResult,
+} from './agreements/stage.js';
 // GDPR data subject export / erase and retention per data class (compliance pack).
 export * from './compliance/index.js';
 export {

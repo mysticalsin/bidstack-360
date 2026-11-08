@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { TechLogo } from '@/components/company/TechLogo';
 import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
@@ -17,6 +18,7 @@ import { springLayout, springSnap } from '@/lib/motion';
 import {
   healthLabel,
   healthTone,
+  rankedTechFor,
   sourcePillsFor,
   techStackPillsFor,
   titleCase,
@@ -35,6 +37,8 @@ export const AccountCard = memo(function AccountCard({
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
+  const rankedTech = rankedTechFor(company);
+  const topTech = rankedTech.slice(0, 3);
   const imageUrl = displayableLogoUrl(company.imageUrl);
   return (
     <motion.div
@@ -102,9 +106,20 @@ export const AccountCard = memo(function AccountCard({
             ))}
           </div>
 
-          <div className={`account-card-tech${techPills.length === 0 ? ' is-empty' : ''}`}>
+          <div
+            data-testid="account-card-tech"
+            className={`account-card-tech${techPills.length === 0 ? ' is-empty' : ''}`}
+            title={rankedTech.length > 0 ? rankedTech.map((tech) => tech.name).join(', ') : undefined}
+          >
             <Icon name="zap" size={13} ariaHidden />
-            {techPills.length > 0 ? (
+            {topTech.length > 0 ? (
+              topTech.map((tech) => (
+                <span key={tech.name} className="account-card-tech-item" data-tech-name={tech.name}>
+                  <TechLogo name={tech.name} size={16} />
+                  <span className="account-card-tech-name">{tech.name}</span>
+                </span>
+              ))
+            ) : techPills.length > 0 ? (
               techPills.map((tech) => <span key={tech}>{tech}</span>)
             ) : (
               <span>{t('account.techStackPending', 'Tech stack pending')}</span>
