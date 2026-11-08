@@ -24,7 +24,7 @@ import type pino from 'pino';
 
 import { Worker as BullWorker } from 'bullmq';
 import { prisma } from '@bidstack/db';
-import { TENANT_EXPORT, TenantExportJob } from '@bidstack/shared';
+import { DataRegion, TENANT_EXPORT, TenantExportJob } from '@bidstack/shared';
 
 import { uploadExportArchive } from '../lib/tenant-export-storage.js';
 import {
@@ -199,11 +199,16 @@ export async function processTenantExportJob(
   }
 
   try {
+    const settings = await prisma.orgSettings.findFirst({
+      where: { orgId, deletedAt: null },
+      select: { dataRegion: true },
+    });
+    const region = DataRegion.safeParse(settings?.dataRegion).data ?? null;
     const { body, done } = buildArchiveStream(orgId, exportId, log);
     const storageKey = exportStorageKey(orgId, exportId);
     // Upload consumes the gzip stream; `done` resolves when production finishes.
-    const [{ bytes }, counts] = await Promise.all([
-      uploadExportArchive({ key: storageKey, body }),
+    const [{ bytes, storageRegion }, counts] = await Promise.all([
+      uploadExportArchive({ key: storageKey, body, region }),
       done,
     ]);
 
@@ -217,6 +222,7 @@ export async function processTenantExportJob(
       data: {
         status: 'ready',
         storageKey,
+        storageRegion,
         sizeBytes: BigInt(bytes),
         expiresAt,
         completedAt: new Date(),

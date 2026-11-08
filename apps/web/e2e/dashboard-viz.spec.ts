@@ -40,7 +40,7 @@ test.describe('Dashboard visuals', () => {
     await expect(toggle).toBeVisible();
     await toggle.click();
     await expect(hero.getByRole('table')).toBeVisible();
-    await expect(hero.getByRole('columnheader', { name: 'Won to date' })).toBeVisible();
+    await expect(hero.getByRole('columnheader', { name: 'Overdue' })).toBeVisible();
   });
 
   test('reduced motion still renders the hero figures', async ({ page, gotoAndWait }) => {

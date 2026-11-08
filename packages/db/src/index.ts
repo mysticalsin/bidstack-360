@@ -139,6 +139,7 @@ export type {
   ReleaseScore,
   Lead,
   TenantExport,
+  DataSubjectRequest,
   SavedView,
   SavedViewEntity,
   KamConsultant,
@@ -198,3 +199,19 @@ export { seedSigningEntities } from './seed-signing-entities.js';
 // Account intelligence read model (slice 12), shared by the API, MCP and worker.
 export { loadCompanyIntel } from './company-intel-read.js';
 export type { CompanyIntelSnapshot } from './company-intel-read.js';
+
+// GDPR data subject export / erase and retention per data class (compliance pack).
+export * from './compliance/index.js';
+export {
+  countPartnerEngagements,
+  isInternalPartnerRow,
+  loadOrgFirmCatalog,
+  loadPartnerEvidenceRows,
+  loadPartnerRun,
+  ownedPartnerRowIds,
+  prunePartnerEvidence,
+  savePartnerEvidence,
+  scanInternalPartnerEvidence,
+  toPartnerEvidence,
+} from './consulting-partners.js';
+export type { PartnerEvidenceRow, PartnerSaveResult } from './consulting-partners.js';

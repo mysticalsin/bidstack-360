@@ -21,3 +21,4 @@ export * from './comms/index.js';
 // ChileCompra attribution strings only (pure data). Adapters stay behind the
 // server-only '@bidstack/shared/public-sector' subpath.
 export * from './public-sector/attribution.js';
+export * from './consulting-partners/index.js';
