@@ -42,6 +42,8 @@ describe('microsToUnits', () => {
   it('prints a large amount on the exact cent without a float', () => {
     expect(formatMicrosAmount(8_598_204_328_457_184_962n)).toBe('8,598,204,328,457.18');
     expect(formatMicrosAmount(2_500_000_000_000n)).toBe('2,500,000');
+    expect(formatMicrosAmount(100_000_000_000n)).toBe('100,000');
+    expect(formatMicrosAmount(300_000_000_000n)).toBe('300,000');
     expect(formatMicrosAmount(0n)).toBe('0');
   });
 

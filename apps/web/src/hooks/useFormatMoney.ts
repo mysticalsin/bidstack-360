@@ -59,10 +59,13 @@ export function formatStoredMicros(
   }
   if (convertMicros) {
     const converted = convertMicros(asBigInt, source);
+    const unchanged = converted === asBigInt && source !== displayCurrency;
+    const amount = unchanged ? asBigInt : converted;
+    const code = unchanged ? source : displayCurrency;
     if (options?.compact === false) {
-      return formatMoneyMicros(converted.toString(), displayCurrency, { compact: false });
+      return formatMoneyMicros(amount.toString(), code, { compact: false });
     }
-    return formatConvertedMicros(converted, displayCurrency);
+    return formatConvertedMicros(amount, code);
   }
   // No integer converter. A unit count past the safe range has already lost digits
   // inside a JavaScript number, so print the stored integer in its own currency.
@@ -70,8 +73,8 @@ export function formatStoredMicros(
   if (!fitsSafeUnitCount(asBigInt)) return exactSource();
   const value = unitsFromMicros(asBigInt);
   const converted = convert(value, source);
-  if (!Number.isFinite(converted) || converted === value) {
-    return formatMoneyMicros(asBigInt.toString(), displayCurrency, options);
+  if (!Number.isFinite(converted) || (converted === value && source !== displayCurrency)) {
+    return exactSource();
   }
   const convertedMicros = unitsToMicros(converted);
   if (convertedMicros == null || !convertedCentSurvives(converted)) return exactSource();
@@ -97,7 +100,7 @@ export function useFormatMoney() {
       const source = sourceCurrency?.trim();
       if (!source) return formatUnspecifiedAmount(value);
       const converted = convertAmountMicros(value, source);
-      if (converted == null) return formatMoney(value, currency);
+      if (converted == null) return formatMoney(value, source);
       return formatConvertedMicros(converted, currency);
     },
     formatMoneyMicros: (
