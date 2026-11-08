@@ -67,6 +67,7 @@ export async function pullDelta(
 
   const accessToken = await getWorkspaceAccessToken(token, log);
   const deltaState: Record<string, unknown> = structuredClone((token.deltaState ?? {}) as Record<string, unknown>);
+  const baseline = structuredClone(deltaState);
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
   let persisted = 0;
   const bridgeDeltas: Array<{ page: string; failedIds: string[] }> = [];
@@ -187,7 +188,7 @@ export async function pullDelta(
     }
   }
 
-  await commitTokenDeltaState(prisma, token.id, deltaState, bridgeDeltas);
+  await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas);
 
   return { persisted };
 }

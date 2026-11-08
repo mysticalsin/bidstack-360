@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const bridgeStore = vi.hoisted(() => {
   const persisted = { delta: {} as Record<string, unknown> };
   const tokenUpdate = vi.fn(async (args: { data?: { deltaState?: Record<string, unknown> } }) => {
-    if (args?.data?.deltaState) persisted.delta = args.data.deltaState;
+    if (args?.data?.deltaState) persisted.delta = structuredClone(args.data.deltaState);
   });
   const prismaMock = {
     calendarEvent: {
@@ -19,7 +19,7 @@ const bridgeStore = vi.hoisted(() => {
       update: tokenUpdate,
       findFirst: vi.fn(async () => ({ deltaState: persisted.delta })),
     },
-    $queryRaw: vi.fn(async () => [{ delta_state: persisted.delta }]),
+    $queryRaw: vi.fn(async () => [{ delta_state: structuredClone(persisted.delta) }]),
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(prismaMock)),
   };
   return { persisted, tokenUpdate, prismaMock };
@@ -153,6 +153,7 @@ describe('Microsoft calendar pull', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
 
+    bridgeStore.persisted.delta = { mailDeltaLink: 'keep-me' };
     await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', { mailDeltaLink: 'keep-me' }, log, 'tony@amaris.com');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -333,8 +334,8 @@ describe('Microsoft calendar pull', () => {
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
     expect(saved.data.deltaState.calendarDeltaLink).toBeUndefined();
     expect(saved.data.deltaState.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
-    const pages = saved.data.deltaState.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(Object.values(pages).some((counts) => counts['ev-throw'] === 1)).toBe(true);
+    const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
+    expect(counts['ev-throw']).toBe(1);
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
   });
 
@@ -373,6 +374,7 @@ describe('Google calendar pull', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
 
+    bridgeStore.persisted.delta = { watchChannelId: 'ch-1' };
     await pullGoogleIncremental('tok-2', orgId, userId, 'at', { watchChannelId: 'ch-1' }, log, 'tony@amaris.com');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -432,17 +434,19 @@ describe('Google calendar pull', () => {
         }),
       ),
     );
+    bridgeStore.persisted.delta = { watchChannelId: 'ch-1' };
     await pullGoogleIncremental('tok-2', orgId, userId, 'at', { watchChannelId: 'ch-1' }, log, 'tony@amaris.com');
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
     expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
     expect(saved.data.deltaState.watchChannelId).toBe('ch-1');
-    const pages = saved.data.deltaState.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(pages['google::']?.['g-throw']).toBe(1);
+    const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
+    expect(counts['g-throw']).toBe(1);
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
   });
 
   it('drops only the calendar cursor when the sync token expires', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({}, 410)));
+    bridgeStore.persisted.delta = { calendarSyncToken: 'old', gmailHistoryId: '77' };
     await pullGoogleIncremental('tok-2', orgId, userId, 'at', { calendarSyncToken: 'old', gmailHistoryId: '77' }, log);
     expect(tokenUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ deltaState: { gmailHistoryId: '77' } }) }),

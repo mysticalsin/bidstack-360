@@ -184,9 +184,9 @@ describe('activity bridge retry bound', () => {
     const mixed = noteActivityBridgeFailures(state, 'page-1', ['poison', 'fresh']);
     expect(mixed.quarantined).toEqual(['poison']);
     expect(mixed.hold).toBe(true);
-    const pages = state.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(pages['page-1']?.poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
-    expect(pages['page-1']?.fresh).toBe(1);
+    const counts = state.activityBridgeRetryById as Record<string, number>;
+    expect(counts.poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect(counts.fresh).toBe(1);
   });
 
   it('keeps Inbox and Sent counts when the folders interleave', () => {
@@ -197,51 +197,68 @@ describe('activity bridge retry bound', () => {
     const third = noteActivityBridgeFailures(state, 'inbox', ['poison']);
     expect(third.hold).toBe(false);
     expect(third.quarantined).toEqual(['poison']);
-    const pages = state.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(pages.inbox?.poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
-    expect(pages.sent?.other).toBe(1);
+    const counts = state.activityBridgeRetryById as Record<string, number>;
+    expect(counts.poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect(counts.other).toBe(1);
     expect(noteActivityBridgeFailures(state, 'sent', []).hold).toBe(false);
-    expect((state.activityBridgeRetryByPage as Record<string, Record<string, number>>).inbox?.poison).toBe(
-      ACTIVITY_BRIDGE_RETRY_LIMIT,
-    );
+    expect((state.activityBridgeRetryById as Record<string, number>).poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
   });
 
   it('applies concurrent pulls in order so neither folder loses an increment', () => {
     const now = '2026-11-08T03:00:00.000Z';
     const start = { calendarDeltaLink: 'cal-keep' };
-    const afterInbox = mergeBridgeDeltaState(start, { ...start, mailNextLink: 'inbox-page' }, [
+    const inboxDesired = { ...start, mailNextLink: 'inbox-page' };
+    const afterInbox = mergeBridgeDeltaState(start, start, inboxDesired, [
       { page: 'inbox', failedIds: ['poison'] },
     ], now);
-    const staleSent = { calendarDeltaLink: 'cal-keep', mailSentNextLink: 'sent-page' };
-    const afterSent = mergeBridgeDeltaState(afterInbox, staleSent, [{ page: 'sent', failedIds: ['other'] }], now);
-    const pages = afterSent.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(pages.inbox?.poison).toBe(1);
-    expect(pages.sent?.other).toBe(1);
+    const sentBaseline = { calendarDeltaLink: 'cal-keep' };
+    const sentDesired = { calendarDeltaLink: 'cal-keep', mailSentNextLink: 'sent-page' };
+    const afterSent = mergeBridgeDeltaState(afterInbox, sentBaseline, sentDesired, [
+      { page: 'sent', failedIds: ['other'] },
+    ], now);
+    const counts = afterSent.activityBridgeRetryById as Record<string, number>;
+    expect(counts.poison).toBe(1);
+    expect(counts.other).toBe(1);
     expect(afterSent.calendarDeltaLink).toBe('cal-keep');
+    expect(afterSent.mailNextLink).toBe('inbox-page');
     expect(afterSent.mailSentNextLink).toBe('sent-page');
-    const again = mergeBridgeDeltaState(afterSent, staleSent, [{ page: 'inbox', failedIds: ['poison'] }], now);
-    expect((again.activityBridgeRetryByPage as Record<string, Record<string, number>>).inbox?.poison).toBe(2);
+    const again = mergeBridgeDeltaState(afterSent, sentBaseline, sentDesired, [
+      { page: 'inbox-next', failedIds: ['poison'] },
+    ], now);
+    expect((again.activityBridgeRetryById as Record<string, number>).poison).toBe(2);
+    expect(again.mailNextLink).toBe('inbox-page');
   });
 
-  it('drops the oldest page and quarantines its open ids once the page cap is reached', () => {
+  it('keeps counting one poison id when the page url changes', () => {
     const state: Record<string, unknown> = {};
     const now = '2026-11-08T03:00:00.000Z';
-    for (let i = 0; i < 9; i++) noteActivityBridgeFailures(state, `page-${i}`, [`id-${i}`], now);
-    const pages = state.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(Object.keys(pages)).toHaveLength(8);
-    expect(pages['page-0']).toBeUndefined();
-    expect(pages['page-8']?.['id-8']).toBe(1);
-    expect(state.activityBridgeQuarantine).toEqual([{ id: 'id-0', attempts: 1, at: now }]);
+    expect(noteActivityBridgeFailures(state, 'https://graph/page-a', ['poison'], now).hold).toBe(true);
+    expect(noteActivityBridgeFailures(state, 'https://graph/page-b', ['poison'], now).hold).toBe(true);
+    const done = noteActivityBridgeFailures(state, 'https://graph/page-c', ['poison'], now);
+    expect(done.hold).toBe(false);
+    expect(done.quarantined).toEqual(['poison']);
+    expect((state.activityBridgeRetryById as Record<string, number>).poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect(noteActivityBridgeFailures(state, 'https://graph/page-d', ['poison'], now).hold).toBe(false);
   });
 
-  it('quarantines ids past the per-page cap instead of growing the map', () => {
+  it('folds an older per-page count into the provider id before the next failure', () => {
+    const state: Record<string, unknown> = {
+      activityBridgeRetryByPage: { 'https://graph/old': { poison: 2 } },
+    };
+    const done = noteActivityBridgeFailures(state, 'https://graph/new', ['poison'], '2026-11-08T03:00:00.000Z');
+    expect(done.hold).toBe(false);
+    expect(done.quarantined).toEqual(['poison']);
+    expect(state.activityBridgeRetryByPage).toBeUndefined();
+  });
+
+  it('quarantines ids past the cap instead of growing the map', () => {
     const state: Record<string, unknown> = {};
     const ids = Array.from({ length: 33 }, (_, i) => `id-${i}`);
     noteActivityBridgeFailures(state, 'page-1', ids, '2026-11-08T03:00:00.000Z');
-    const counts = (state.activityBridgeRetryByPage as Record<string, Record<string, number>>)['page-1'] ?? {};
+    const counts = state.activityBridgeRetryById as Record<string, number>;
     expect(Object.keys(counts)).toHaveLength(32);
     const quarantined = state.activityBridgeQuarantine as Array<{ id: string }>;
-    expect(quarantined.map((entry) => entry.id)).toContain('id-32');
+    expect(quarantined.map((entry) => entry.id)).toContain('id-0');
     expect(JSON.stringify(quarantined)).not.toContain('subject');
   });
 });
@@ -258,33 +275,75 @@ describe('activity bridge commit lock', () => {
       $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
     };
 
-    await commitTokenDeltaState(db, 'tok-1', { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox-page' }, [
-      { page: 'inbox', failedIds: ['poison'] },
-    ]);
+    const inboxBaseline = { calendarDeltaLink: 'cal-keep' };
+    await commitTokenDeltaState(
+      db,
+      'tok-1',
+      inboxBaseline,
+      { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox-page' },
+      [{ page: 'inbox', failedIds: ['poison'] }],
+    );
     // Sent pull started before the inbox commit and still holds the old snapshot.
-    await commitTokenDeltaState(db, 'tok-1', { calendarDeltaLink: 'cal-keep', mailSentNextLink: 'sent-page' }, [
-      { page: 'sent', failedIds: ['other'] },
-    ]);
-    const pages = stored.delta.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(pages.inbox?.poison).toBe(1);
-    expect(pages.sent?.other).toBe(1);
+    await commitTokenDeltaState(
+      db,
+      'tok-1',
+      { calendarDeltaLink: 'cal-keep' },
+      { calendarDeltaLink: 'cal-keep', mailSentNextLink: 'sent-page' },
+      [{ page: 'sent', failedIds: ['other'] }],
+    );
+    const counts = stored.delta.activityBridgeRetryById as Record<string, number>;
+    expect(counts.poison).toBe(1);
+    expect(counts.other).toBe(1);
+    expect(stored.delta.mailNextLink).toBe('inbox-page');
     expect(stored.delta.mailSentNextLink).toBe('sent-page');
     expect(stored.delta.calendarDeltaLink).toBe('cal-keep');
 
-    await commitTokenDeltaState(db, 'tok-1', { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox-page' }, [
-      { page: 'inbox', failedIds: ['poison'] },
-    ]);
-    await commitTokenDeltaState(db, 'tok-1', { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox-page' }, [
-      { page: 'inbox', failedIds: ['poison'] },
-    ]);
+    const later = { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox-page', mailSentNextLink: 'sent-page' };
+    await commitTokenDeltaState(db, 'tok-1', later, later, [{ page: 'inbox-2', failedIds: ['poison'] }]);
+    await commitTokenDeltaState(db, 'tok-1', later, later, [{ page: 'inbox-3', failedIds: ['poison'] }]);
     const last = stored.delta;
-    expect((last.activityBridgeRetryByPage as Record<string, Record<string, number>>).inbox?.poison).toBe(
-      ACTIVITY_BRIDGE_RETRY_LIMIT,
-    );
-    expect((last.activityBridgeRetryByPage as Record<string, Record<string, number>>).sent?.other).toBe(1);
+    expect((last.activityBridgeRetryById as Record<string, number>).poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect((last.activityBridgeRetryById as Record<string, number>).other).toBe(1);
+    expect(last.mailSentNextLink).toBe('sent-page');
     expect(last.activityBridgeQuarantine).toEqual([
       expect.objectContaining({ id: 'poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
     ]);
-    expect(Object.keys(last.activityBridgeRetryByPage as object).length).toBeLessThanOrEqual(8);
+  });
+
+  it('does not write when the row lock fails', async () => {
+    const update = vi.fn();
+    const findFirst = vi.fn();
+    const db = {
+      integrationToken: { findFirst, update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => {
+        throw new Error('canceling statement due to lock timeout');
+      }),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await expect(
+      commitTokenDeltaState(db, 'tok-1', { calendarDeltaLink: 'cal-keep' }, { calendarDeltaLink: 'cal-next' }, []),
+    ).rejects.toThrow(/lock timeout/);
+    expect(update).not.toHaveBeenCalled();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  it('sets a transaction-local lock wait and stops when that statement fails', async () => {
+    const update = vi.fn();
+    const executeRaw = vi.fn(async () => {
+      throw new Error('lock_timeout rejected');
+    });
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: executeRaw,
+      $queryRaw: vi.fn(async () => [{ delta_state: {} }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await expect(
+      commitTokenDeltaState(db, 'tok-1', {}, { mailNextLink: 'inbox-page' }, []),
+    ).rejects.toThrow(/lock_timeout rejected/);
+    expect(String(executeRaw.mock.calls[0]?.[0])).toContain('lock_timeout');
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 });

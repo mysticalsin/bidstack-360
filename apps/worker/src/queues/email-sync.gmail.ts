@@ -138,6 +138,7 @@ async function historyIds(
 /** Pull new Gmail messages for one grant. Returns how many were stored. */
 export async function pullGmail(token: GmailTokenRow, accessToken: string, log: pino.Logger): Promise<number> {
   const deltaState = structuredClone((token.deltaState ?? {}) as Record<string, unknown>);
+  const baseline = structuredClone(deltaState);
   const cursor = deltaState['gmailHistoryId'] as string | undefined;
   const ownerEmail = token.externalAccountEmail?.toLowerCase() ?? null;
 
@@ -148,7 +149,7 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
     if (res.expired) {
       log.warn({ tokenId: token.id }, 'Gmail history id expired (404); reseeding next tick');
       const { gmailHistoryId: _h, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, token.id, rest, []);
+      await commitTokenDeltaState(prisma, token.id, baseline, rest, []);
       return 0;
     }
     ids = res.ids;
@@ -231,13 +232,14 @@ export async function pullGmail(token: GmailTokenRow, accessToken: string, log: 
   }
   if (bridge.hold) {
     log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
-    await commitTokenDeltaState(prisma, token.id, deltaState, bridgeDeltas);
+    await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas);
     return persisted;
   }
 
   await commitTokenDeltaState(
     prisma,
     token.id,
+    baseline,
     { ...deltaState, ...(nextHistoryId ? { gmailHistoryId: nextHistoryId } : {}) },
     bridgeDeltas,
   );

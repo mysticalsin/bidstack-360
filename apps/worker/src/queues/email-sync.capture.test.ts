@@ -203,8 +203,8 @@ describe('Outlook inbox capture', () => {
     let state: Record<string, unknown> = { calendarDeltaLink: 'cal-keep' };
     findToken.mockImplementation(async () => tokenRow('microsoft_graph', state));
     const countOf = (id: string): number => {
-      const pages = (state.activityBridgeRetryByPage ?? {}) as Record<string, Record<string, number>>;
-      return Object.values(pages).reduce((n, counts) => n + (counts[id] ?? 0), 0);
+      const counts = (state.activityBridgeRetryById ?? {}) as Record<string, number>;
+      return counts[id] ?? 0;
     };
 
     for (let attempt = 1; attempt < 3; attempt++) {
@@ -403,8 +403,8 @@ describe('Gmail inbox capture', () => {
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
     expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
     expect(saved.data.deltaState.calendarSyncToken).toBe('keep');
-    const pages = saved.data.deltaState.activityBridgeRetryByPage as Record<string, Record<string, number>>;
-    expect(pages['gmail:seed']?.['g-poison']).toBe(1);
+    const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
+    expect(counts['g-poison']).toBe(1);
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
   });
 });

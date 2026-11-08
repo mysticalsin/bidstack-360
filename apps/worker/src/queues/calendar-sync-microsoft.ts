@@ -166,6 +166,7 @@ export async function pullMicrosoftIncremental(
     writeRequested: false,
   });
 
+  const baseline = structuredClone(deltaState);
   let url =
     (deltaState['calendarNextLink'] as string | undefined) ??
     (deltaState['calendarDeltaLink'] as string | undefined) ??
@@ -179,7 +180,7 @@ export async function pullMicrosoftIncremental(
     if (res.status === 410) {
       log.warn({ tokenId }, 'Graph calendar delta expired (410); resyncing from scratch');
       const { calendarDeltaLink: _d, calendarNextLink: _n, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, rest, []);
+      await commitTokenDeltaState(prisma, tokenId, baseline, rest, []);
       return;
     }
     if (!res.ok) throw new Error(`MS Graph delta failed: ${res.status}`);
@@ -203,14 +204,14 @@ export async function pullMicrosoftIncremental(
     if (bridge.hold) {
       // The calendar row is already saved. Holding this page lets the next
       // tick retry the activity write before Graph moves past the item.
-      await commitTokenDeltaState(prisma, tokenId, { ...deltaState, calendarNextLink: url }, bridgeDeltas);
+      await commitTokenDeltaState(prisma, tokenId, baseline, { ...deltaState, calendarNextLink: url }, bridgeDeltas);
       log.warn({ tokenId }, 'Account activity bridge failed; calendar page will be retried before the cursor advances');
       return;
     }
 
     if (body['@odata.deltaLink']) {
       const { calendarNextLink: _n, ...rest } = deltaState;
-      await commitTokenDeltaState(prisma, tokenId, { ...rest, calendarDeltaLink: body['@odata.deltaLink'] }, bridgeDeltas);
+      await commitTokenDeltaState(prisma, tokenId, baseline, { ...rest, calendarDeltaLink: body['@odata.deltaLink'] }, bridgeDeltas);
       log.debug({ tokenId, count }, 'MS Graph incremental pull complete');
       return;
     }
@@ -218,7 +219,7 @@ export async function pullMicrosoftIncremental(
     url = body['@odata.nextLink'];
   }
 
-  await commitTokenDeltaState(prisma, tokenId, { ...deltaState, calendarNextLink: url }, bridgeDeltas);
+  await commitTokenDeltaState(prisma, tokenId, baseline, { ...deltaState, calendarNextLink: url }, bridgeDeltas);
   log.info({ tokenId, count }, 'MS Graph calendar pull paused at page cap; resuming next tick');
 }
 

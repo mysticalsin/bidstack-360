@@ -10,50 +10,56 @@ type TokenTx = {
     update: (args: unknown) => Promise<unknown>;
   };
   $queryRaw?: (query: TemplateStringsArray, ...values: unknown[]) => Promise<Array<{ delta_state?: unknown }>>;
+  $executeRaw?: (query: TemplateStringsArray, ...values: unknown[]) => Promise<unknown>;
   $transaction?: (fn: (tx: TokenTx) => Promise<void>) => Promise<unknown>;
 };
 
 /**
- * Persist cursor fields from this run and fold bridge retries into the
- * locked token row. Callers pass the client they already use so the write
- * hits that connection. Two pulls of the same grant serialize on the row
- * (`SELECT … FOR UPDATE` when the client supports it). Each applies its own
- * page deltas to the latest stored counts. A map on a stale snapshot is not
- * enough: the second writer would replace the first.
+ * How long to wait for the token row lock. Postgres releases that lock when
+ * the transaction commits or rolls back. This is not an application lease:
+ * nothing is retained after the transaction ends. On timeout the statement
+ * fails and the transaction rolls back, so the cursor is not written.
+ */
+const LOCK_TIMEOUT = '2000';
+
+/**
+ * Persist this run's cursor edits onto the locked token row and fold bridge
+ * retries into the counts already stored there. Callers pass the snapshot
+ * they started from and the snapshot they want now. Only keys that differ
+ * are written, so a concurrent folder or provider keeps the keys this run
+ * did not change.
+ *
+ * When the client can lock the row, a lock or read error aborts the write.
+ * There is no unlocked fallback. Clients without `$queryRaw` are test
+ * doubles; they are not a database lock.
  */
 export async function commitTokenDeltaState(
   db: unknown,
   tokenId: string,
+  baseline: Record<string, unknown>,
   desired: Record<string, unknown>,
   deltas: ActivityBridgeDelta[],
 ): Promise<void> {
   const client = db as TokenTx;
   const write = async (tx: TokenTx) => {
-    let stored: Record<string, unknown> = {};
-    let locked = false;
+    let stored: Record<string, unknown>;
     if (typeof tx.$queryRaw === 'function') {
-      try {
-        const rows = await tx.$queryRaw`
-          SELECT delta_state FROM integration_tokens WHERE id = ${tokenId}::uuid FOR UPDATE
-        `;
-        locked = true;
-        stored = asRecord(rows[0]?.delta_state);
-      } catch {
-        locked = false;
+      if (typeof tx.$executeRaw === 'function') {
+        await tx.$executeRaw`SELECT set_config('lock_timeout', ${LOCK_TIMEOUT}, true)`;
       }
+      const rows = await tx.$queryRaw`
+        SELECT delta_state FROM integration_tokens WHERE id = ${tokenId}::uuid FOR UPDATE
+      `;
+      if (!rows[0]) throw new Error(`integration token ${tokenId} not found for cursor update`);
+      stored = asRecord(rows[0].delta_state);
+    } else {
+      const row = await tx.integrationToken.findFirst({
+        where: { id: tokenId },
+        select: { deltaState: true },
+      });
+      stored = row ? asRecord(row.deltaState) : baseline;
     }
-    if (!locked) {
-      try {
-        const row = await tx.integrationToken.findFirst({
-          where: { id: tokenId },
-          select: { deltaState: true },
-        });
-        stored = asRecord(row?.deltaState);
-      } catch {
-        stored = {};
-      }
-    }
-    const merged = mergeBridgeDeltaState(stored, desired, deltas);
+    const merged = mergeBridgeDeltaState(stored, baseline, desired, deltas);
     await tx.integrationToken.update({
       where: { id: tokenId },
       data: { deltaState: merged, lastSyncedAt: new Date() },
