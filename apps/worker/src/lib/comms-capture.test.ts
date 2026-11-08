@@ -692,7 +692,7 @@ describe('activity bridge commit lock', () => {
     noteActivityBridgeFailures(state, 'mail', ['legacy'], '2026-11-08T00:00:00.000Z', [], false, undefined, 'email');
     noteActivityBridgeFailures(state, 'mail', ['legacy'], '2026-11-08T00:00:00.000Z', [], false, undefined, 'email');
     const quarantine = state.activityBridgeQuarantine as Array<{ id: string; attempts: number; kind?: string }>;
-    expect(quarantine.find((row) => row.id === 'legacy' && row.kind === 'email')?.attempts).toBeGreaterThanOrEqual(5);
+    expect(quarantine.find((row) => row.id === 'legacy' && row.kind === 'email')?.attempts).toBe(5);
     expect(quarantine.find((row) => row.id === 'legacy' && row.kind === 'calendar')?.attempts).toBe(9);
   });
 
