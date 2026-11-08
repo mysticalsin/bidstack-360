@@ -8,6 +8,7 @@
 import { type z } from 'zod';
 
 import type {
+  AccountCockpitMaybeScored,
   AccountCockpitSnapshot,
   AiInsight,
   BidOpportunity,
@@ -743,12 +744,9 @@ export function buildCockpit({
     // Same rule as risks: the canned ISO 27001 / SOC 2 library rows claimed
     // checks nobody ran for this account. No rows means none recorded.
     compliance: visibleCompliance.map(serializeCompliance),
-    roadmap: [
-      { id: 'road-q1', quarter: 'Q1 2026', title: 'Windows 11 migration', status: 'in_progress' },
-      { id: 'road-q2', quarter: 'Q2 2026', title: 'Zero Trust initiative', status: 'planned' },
-      { id: 'road-q3', quarter: 'Q3 2026', title: 'Data center modernization', status: 'planned' },
-      { id: 'road-q4', quarter: 'Q4 2026', title: 'Endpoint security upgrade', status: 'planned' },
-    ],
+    // There is no per-account roadmap source yet. The four canned quarters
+    // (Windows 11 migration, Zero Trust, ...) showed on every account.
+    roadmap: [],
   };
 }
 
@@ -759,19 +757,22 @@ export function buildCockpit({
  * any other company only identity-scoped data may carry over: its contacts and
  * activity. Risks, compliance, KPIs, revenue, win/loss, stack and roadmap
  * belong to the snapshot company, so copying them showed one account's risks
- * (and "Open risks 2") on every other account. Those become empty; callers
- * that need them for another company should use `buildCockpit`.
+ * (and "Open risks 2") on every other account. Those become empty, and the
+ * signal-coverage score becomes null ("Not scored yet"): scoring needs that
+ * company's contacts, deals and tasks, which the snapshot does not hold.
+ * Callers that need the real cockpit for another company use `buildCockpit`.
  */
 export function buildCockpitFromCompany(
   snapshot: z.infer<typeof CrmDashboardSnapshot>,
   company: z.infer<typeof CrmCompany>,
-) {
+): AccountCockpitMaybeScored {
   if (company.id === snapshot.cockpit.company.id) return snapshot.cockpit;
   const { revenueEvolution: _revenue, winLoss: _winLoss, externalLastSyncedAt: _synced, ...shared } =
     snapshot.cockpit;
   return {
     ...shared,
     company,
+    health: null,
     kpis: [],
     technicalStack: [],
     roadmap: [],

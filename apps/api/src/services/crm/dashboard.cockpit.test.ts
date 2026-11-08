@@ -4,7 +4,7 @@
 // that silently stays "external" violates the account-view data contract.
 import { describe, expect, it } from 'vitest';
 
-import type { CrmCompany } from '@bidstack/shared';
+import { AccountCockpitMaybeScored, AccountCockpitSnapshot, type CrmCompany } from '@bidstack/shared';
 
 import {
   applyFieldOverrides,
@@ -362,6 +362,14 @@ describe('buildCockpitFromCompany scopes the stored snapshot to its company', ()
     const cockpit = buildCockpitFromCompany(snapshot, snapshotCompany);
     expect(cockpit.risks).toHaveLength(1);
     expect(cockpit.compliance).toHaveLength(1);
+    expect(cockpit.health).toEqual({ score: 80 });
+  });
+
+  it('is accepted by the shared maybe-scored schema, and rejected by the scored one', () => {
+    const other = company({ id: 'other', name: 'Other' });
+    const cockpit = buildCockpitFromCompany(snapshot, other);
+    expect(AccountCockpitMaybeScored.shape.health.safeParse(cockpit.health).success).toBe(true);
+    expect(AccountCockpitSnapshot.shape.health.safeParse(cockpit.health).success).toBe(false);
   });
 
   it('carries no risks, compliance or other-account data onto a different company', () => {
@@ -373,11 +381,32 @@ describe('buildCockpitFromCompany scopes the stored snapshot to its company', ()
     expect(cockpit.kpis).toEqual([]);
     expect(cockpit.technicalStack).toEqual([]);
     expect(cockpit.roadmap).toEqual([]);
+    expect(cockpit.health).toBeNull();
     expect(cockpit).not.toHaveProperty('revenueEvolution');
     expect(cockpit).not.toHaveProperty('winLoss');
     expect(cockpit).not.toHaveProperty('externalLastSyncedAt');
     expect(cockpit.keyContacts.map((c) => c.id)).toEqual(['p2']);
     expect(cockpit.recentActivity.map((a) => a.id)).toEqual(['a2']);
     expect(JSON.stringify(cockpit)).not.toContain('Sarah Bennett');
+  });
+});
+
+describe('buildCockpit roadmap is scoped to the account', () => {
+  // WHY: four canned quarters (Windows 11 migration, Zero Trust, ...) were
+  // returned for every account. There is no per-account roadmap source, so an
+  // account has no roadmap items until one exists.
+  it('returns no roadmap items and never the canned quarters', () => {
+    const cockpit = buildCockpit({
+      company: company({ id: 'acme', name: 'Acme' }),
+      companies: [],
+      opportunities: [],
+      contacts: [],
+      tasks: [],
+      risks: [],
+      compliance: [],
+      fieldOverrides: [],
+    });
+    expect(cockpit.roadmap).toEqual([]);
+    expect(JSON.stringify(cockpit)).not.toMatch(/Windows 11 migration|Zero Trust initiative/);
   });
 });
