@@ -36,7 +36,7 @@ export async function renderEmailTemplate(args: {
     where: { id: args.templateId, orgId: args.orgId, deletedAt: null },
   });
   if (!template) {
-    throw new Error('Email template not found');
+    throw Object.assign(new Error('Email template not found'), { statusCode: 404 });
   }
 
   const ctx = await buildRenderContext({
@@ -49,7 +49,7 @@ export async function renderEmailTemplate(args: {
   });
 
   const missingTokens = new Set<string>();
-  const fillBody = (input: string): string =>
+  const fill = (input: string, encode: (v: string) => string): string =>
     input.replace(PLACEHOLDER_RE, (_, token: string) => {
       if (!PLACEHOLDER_TOKEN_SET.has(token)) {
         missingTokens.add(token);
@@ -60,12 +60,13 @@ export async function renderEmailTemplate(args: {
         missingTokens.add(token);
         return MISSING_SENTINEL;
       }
-      return String(value);
+      return encode(String(value));
     });
 
-  const subject = fillBody(template.subject);
-  const bodyHtml = fillBody(template.bodyHtml);
-  const bodyText = fillBody(template.bodyText ?? stripHtml(template.bodyHtml));
+  const subject = fill(template.subject, String);
+  // CRM values are user-entered: in HTML they are text, never markup.
+  const bodyHtml = fill(template.bodyHtml, escapeHtml);
+  const bodyText = fill(template.bodyText ?? stripHtml(template.bodyHtml), String);
 
   return {
     subject,
@@ -208,6 +209,15 @@ function formatToday(): string {
     month: 'long',
     year: 'numeric',
   });
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function stripHtml(input: string): string {

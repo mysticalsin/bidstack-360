@@ -360,6 +360,7 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
           endAt: booking.endAt,
           bookingId: booking.id,
           cancelToken: booking.cancelToken,
+          timeZone: tz,
         },
         server.log,
       );
