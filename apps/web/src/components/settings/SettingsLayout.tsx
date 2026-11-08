@@ -19,6 +19,7 @@ export type SettingsSection =
   | 'data-import'
   | 'top-accounts'
   | 'groups'
+  | 'access-policies'
   | 'opportunity-filters'
   | 'rfp-analytics'
   | 'modules'
@@ -70,6 +71,7 @@ const GROUPS: Group[] = [
       { id: 'data-import', label: 'Data import', icon: 'upload', admin: true },
       { id: 'top-accounts', label: 'Top accounts', icon: 'star', admin: true },
       { id: 'groups', label: 'Access groups', icon: 'contacts', admin: true },
+      { id: 'access-policies', label: 'Access policies', icon: 'shield', admin: true },
       { id: 'opportunity-filters', label: 'Opportunity filters', icon: 'sliders', admin: true },
       { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
       { id: 'modules', label: 'Modules', icon: 'package', admin: true },
@@ -139,6 +141,8 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemTopAccounts', 'Top accounts');
       case 'groups':
         return t('settingsLayout.itemGroups', 'Access groups');
+      case 'access-policies':
+        return t('settingsLayout.itemAccessPolicies', 'Access policies');
       case 'opportunity-filters':
         return t('settingsLayout.itemOpportunityFilters', 'Opportunity filters');
       case 'rfp-analytics':

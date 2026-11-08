@@ -768,6 +768,23 @@ One section on the account page and the `/accounts/:id` cockpit, after Account d
 - Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
 - Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
 
+### 9.11 Slice 5 as built (2026-11-07)
+
+Appended by factory slice 5 (Settings > Access policies).
+
+- Builder: one card per rule with When, Then, Conditions and Except fieldsets, a plain sentence that
+  reads the rule back, and Move up / Move down / Remove buttons (keyboard reorder). MatchField was not
+  vendored: upstream it is a fit chart, not a form, so the rule rows use native checkboxes and inputs.
+- Impact preview: the shared `DivergingBars` from `components/charts/tuffui` (gains above the line in `--success`, losses below in
+  `--danger`) with a "View as table" toggle; people and example events per side, one sentence when
+  nothing changes.
+- Approvals and versions: `StatusPill` for Pending, Approved and Live; the author sees a sentence
+  instead of Approve; "Publish vN" and "Roll back to vN" announce through `aria-live="polite"`.
+- Review fixes: the author or submitter sees Withdraw instead of Approve; checkbox groups are named
+  groups; hour inputs say UTC. "Roll back to vN" files a pending request that a second admin approves
+  before it can be published. The preview headline counts people, the sub-line counts actions, and
+  two sentences say what it cannot show: changes that depend on the record country (not enforced at
+  route level yet) and reads (not in the audit log). The tab and its API are Admin only.
 ### 9.x Hiring detail and source rules (2026-11-07)
 
 - Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.

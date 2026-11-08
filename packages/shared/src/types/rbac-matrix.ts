@@ -65,6 +65,7 @@ const ALL_READ: PermissionKey[] = [
 ];
 
 const ALL_WRITE: PermissionKey[] = [
+  'access-policies:write',
   'account-intel:write',
   'accounts:write',
   'activities:write',
@@ -112,7 +113,18 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
   // msa:admin (archive MSAs and file versions, edit any MSA),
   // webhooks:replay (re-send a stored payload to an endpoint) and
   // ingest:write (bulk activity import by API key) are Admin-only.
-  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin', 'webhooks:replay', 'ingest:write'],
+  // access-policies:* is Admin-only: the rule set shows how access is
+  // restricted. The API refuses self-approval, so publishing a policy always
+  // takes two admins.
+  Admin: [
+    ...ALL_READ,
+    ...ALL_WRITE,
+    'msa:admin',
+    'webhooks:replay',
+    'ingest:write',
+    'access-policies:read',
+    'access-policies:approve',
+  ],
 
   'Sales Manager': [
     ...ALL_READ,
@@ -227,6 +239,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
 /** Resources that appear in the permission matrix (for matrix display) */
 export const MATRIX_RESOURCES = [
+  'access-policies',
   // Account intelligence: hiring, posts, financials and direction (slice 12).
   'account-intel',
   'accounts',
