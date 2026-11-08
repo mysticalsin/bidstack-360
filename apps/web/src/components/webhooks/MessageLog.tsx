@@ -206,11 +206,13 @@ function MessageDrawer({ id }: { id: string }) {
 
   const doReplay = async () => {
     setAnnounce('');
-    const rid = replayed ? newRequestId() : requestId;
-    if (rid !== requestId) setRequestId(rid);
+    // Keep this id until the server confirms the replay. A lost response must
+    // retry the same id so the outbox idempotency key does not enqueue a second delivery.
+    const rid = requestId;
     try {
       const result = await replay.mutateAsync({ id, requestId: rid });
       setReplayed(true);
+      setRequestId(newRequestId());
       setAnnounce(
         result.duplicate
           ? t('webhooks.log.replayDuplicate', 'Replay was already queued')

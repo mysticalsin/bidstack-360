@@ -329,7 +329,13 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
   });
 
   if (!sub) {
-    // Subscription was deleted or disabled between enqueue and processing — skip silently.
+    // A retry can arrive after the endpoint was paused, deleted, or auto-disabled.
+    // The previous attempt left the message pending; leave it failed so the log
+    // does not show "Retrying" after no retry remains.
+    await prisma.webhookMessage.updateMany({
+      where: { id: stableEventId, status: 'pending' },
+      data: { status: 'failed' },
+    });
     log.debug({ subscriptionId }, 'webhook subscription not found or inactive — skipping delivery');
     return;
   }
@@ -344,6 +350,9 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
 
   const attempt = (job.attemptsMade ?? 0) + 1;
   const policy = policyOf(sub);
+  // A policy edit applies to the next attempt. Do not send when this try is
+  // already past the budget the endpoint has now.
+  const attemptLimit = Math.min(policy.maxAttempts, job.opts?.attempts ?? WEBHOOK_MAX_ATTEMPTS_CEILING);
 
   /** One message per stable event id; every attempt refreshes its status. */
   const recordMessage = async (status: 'pending' | 'succeeded' | 'failed', r: DeliveryResult) => {
@@ -370,6 +379,16 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
       },
     });
   };
+
+  if (attempt > attemptLimit) {
+    await recordMessage('failed', {
+      statusCode: null,
+      durationMs: 0,
+      success: false,
+      error: 'Attempt budget exhausted',
+    });
+    throw new UnrecoverableError('webhook attempt budget exhausted');
+  }
 
   const denial = await serumConnectorDenialMessage({
     orgId: sub.orgId,
@@ -449,9 +468,6 @@ export async function processDeliveryJob(job: Job<DeliveryJob>, log: pino.Logger
     result.success ? 'webhook delivery succeeded' : 'webhook delivery failed',
   );
 
-  // The job's own attempt budget wins when it is lower: jobs queued before a
-  // policy change, or by another producer, keep the attempts they were given.
-  const attemptLimit = Math.min(policy.maxAttempts, job.opts?.attempts ?? WEBHOOK_MAX_ATTEMPTS_CEILING);
   const retryable =
     !unrecoverableDecryptError &&
     !result.unsafeUrl &&
