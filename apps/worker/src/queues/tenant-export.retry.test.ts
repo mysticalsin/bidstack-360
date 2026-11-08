@@ -37,6 +37,7 @@ vi.mock('@bidstack/db', () => ({
         return { count: 1 };
       }),
     },
+    orgSettings: { findFirst: vi.fn(async () => null) },
   },
 }));
 
