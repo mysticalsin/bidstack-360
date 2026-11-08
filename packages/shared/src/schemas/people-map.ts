@@ -56,10 +56,6 @@ export const PeopleMap = z.object({
   companyId: z.string().uuid().nullable(),
   opportunityId: z.string().uuid().nullable(),
   people: z.array(PeopleMapPerson),
-  /** True when a display query stopped at its cap. Classification does not use that page alone. */
-  factsTruncated: z.boolean().optional(),
-  /** True when the deal-link query stopped at 1000, so some pairs were not loaded. */
-  linksTruncated: z.boolean().optional(),
 });
 export type PeopleMap = z.infer<typeof PeopleMap>;
 

@@ -47,89 +47,6 @@ export function contactFactListArgs(
   };
 }
 
-/** Buying-role facts for the exact contact/deal pairs this map will label. */
-export function linkedDealFactListArgs(
-  orgId: string,
-  pairs: readonly { contactId: string; opportunityId: string }[],
-) {
-  const unique = new Map<string, { contactId: string; opportunityId: string }>();
-  for (const pair of pairs) {
-    if (!pair.contactId || !pair.opportunityId) continue;
-    unique.set(`${pair.contactId}:${pair.opportunityId}`, pair);
-  }
-  return {
-    where: {
-      orgId,
-      deletedAt: null,
-      kind: 'buying_role' as const,
-      OR: [...unique.values()].map((pair) => ({
-        contactId: pair.contactId,
-        opportunityId: pair.opportunityId,
-      })),
-    },
-    select: FACT_SELECT,
-    orderBy: { createdAt: 'desc' as const },
-    take: PEOPLE_MAP_FACT_TAKE,
-  };
-}
-
-/**
- * Classification rows for the loaded pairs. No take: a newer history page for
- * one pair must not hide an accepted or review fact for another pair.
- */
-export function evidenceFactListArgs(
-  orgId: string,
-  contactIds: readonly string[],
-  opportunityId: string | null,
-  pairs: readonly { contactId: string; opportunityId: string }[],
-) {
-  const unique = new Map<string, { contactId: string; opportunityId: string }>();
-  if (opportunityId) {
-    for (const contactId of contactIds) {
-      if (!contactId) continue;
-      unique.set(`${contactId}:${opportunityId}`, { contactId, opportunityId });
-    }
-  }
-  for (const pair of pairs) {
-    if (!pair.contactId || !pair.opportunityId) continue;
-    unique.set(`${pair.contactId}:${pair.opportunityId}`, pair);
-  }
-  return {
-    where: {
-      orgId,
-      deletedAt: null,
-      kind: 'buying_role' as const,
-      status: { in: ['accepted', 'needs_review'] as const },
-      OR: [...unique.values()].map((pair) => ({
-        contactId: pair.contactId,
-        opportunityId: pair.opportunityId,
-      })),
-    },
-    distinct: ['contactId', 'opportunityId', 'status', 'linkLabel', 'observedAt'] as const,
-    select: FACT_SELECT,
-  };
-}
-
-/**
- * Accepted and review facts that account standing and reporting lines use.
- * Buying-role history is not in this query, so a full page of proposals cannot
- * hide a company link or a reporting line. `observedAt` stays in the distinct
- * key so a fresh fact is not collapsed into a stale one.
- */
-export function accountClassificationFactListArgs(orgId: string, contactIds: readonly string[]) {
-  return {
-    where: {
-      orgId,
-      contactId: { in: [...contactIds] },
-      deletedAt: null,
-      status: { in: ['accepted', 'needs_review'] as const },
-      OR: [{ kind: 'reports_to' as const }, { kind: 'company_link' as const }],
-    },
-    distinct: ['contactId', 'kind', 'status', 'companyId', 'linkLabel', 'reportsToContactId', 'observedAt'] as const,
-    select: FACT_SELECT,
-  };
-}
-
 const FACT_SELECT = {
   id: true,
   contactId: true,
@@ -201,24 +118,6 @@ function dealEvidence(facts: PersonFactView[], opportunityId: string, label: str
   return 'label_on_file';
 }
 
-export function mergeMapFacts(
-  primary: FactRow[],
-  supplemental: FactRow[],
-  evidence: FactRow[],
-): { facts: FactRow[]; factsTruncated: boolean } {
-  const seen = new Set<string>();
-  const facts: FactRow[] = [];
-  for (const fact of [...evidence, ...primary, ...supplemental]) {
-    if (seen.has(fact.id)) continue;
-    seen.add(fact.id);
-    facts.push(fact);
-  }
-  return {
-    facts,
-    factsTruncated: primary.length >= PEOPLE_MAP_FACT_TAKE || supplemental.length >= PEOPLE_MAP_FACT_TAKE,
-  };
-}
-
 export function assemblePeopleMap(input: {
   companyId: string | null;
   opportunityId: string | null;
@@ -227,7 +126,6 @@ export function assemblePeopleMap(input: {
   deals: DealRow[];
   names: Map<string, string>;
   now: Date;
-  factsTruncated?: boolean;
 }) {
   const factsByContact = new Map<string, FactRow[]>();
   for (const fact of input.facts) {
@@ -245,7 +143,6 @@ export function assemblePeopleMap(input: {
   return {
     companyId: input.companyId,
     opportunityId: input.opportunityId,
-    factsTruncated: input.factsTruncated === true,
     people: input.people.map((person) => {
       const rows = factsByContact.get(person.id) ?? [];
       const views = rows.map(toView);
@@ -334,10 +231,13 @@ async function finishMap(
   now: Date,
 ) {
   const ids = people.map((person) => person.id);
-  const deals =
+  const [facts, deals] = await Promise.all([
     ids.length === 0
-      ? ([] as DealRow[])
-      : await prisma.opportunityContact.findMany({
+      ? Promise.resolve([] as FactRow[])
+      : prisma.contactFact.findMany(contactFactListArgs(orgId, ids, opportunityId, companyId)),
+    ids.length === 0
+      ? Promise.resolve([] as DealRow[])
+      : prisma.opportunityContact.findMany({
           where: { orgId, contactId: { in: ids }, deletedAt: null },
           select: {
             contactId: true,
@@ -346,44 +246,14 @@ async function finishMap(
             opportunity: { select: { id: true, name: true } },
           },
           take: 1000,
-        });
-  const primary =
-    ids.length === 0
-      ? ([] as FactRow[])
-      : await prisma.contactFact.findMany(contactFactListArgs(orgId, ids, opportunityId, companyId));
-  const supplementalPairs = deals
-    .filter((deal) => deal.contactId && deal.opportunityId && deal.opportunityId !== opportunityId)
-    .map((deal) => ({ contactId: deal.contactId, opportunityId: deal.opportunityId }));
-  const supplemental =
-    supplementalPairs.length === 0
-      ? ([] as FactRow[])
-      : await prisma.contactFact.findMany(linkedDealFactListArgs(orgId, supplementalPairs));
-  const evidenceArgs = evidenceFactListArgs(orgId, ids, opportunityId, supplementalPairs);
-  const evidence =
-    ids.length === 0 || evidenceArgs.where.OR.length === 0
-      ? ([] as FactRow[])
-      : await prisma.contactFact.findMany(evidenceArgs);
-  const accountClassification =
-    ids.length === 0
-      ? ([] as FactRow[])
-      : await prisma.contactFact.findMany(accountClassificationFactListArgs(orgId, ids));
-  const merged = mergeMapFacts(primary, supplemental, [...evidence, ...accountClassification]);
-  const facts = merged.facts;
+        }),
+  ]);
   const reportIds = facts
     .map((fact) => fact.reportsToContactId)
     .filter((id): id is string => Boolean(id));
   const names = await loadNames(orgId, reportIds);
   for (const person of people) names.set(person.id, person.name);
-  return assemblePeopleMap({
-    companyId,
-    opportunityId,
-    people,
-    facts,
-    deals,
-    names,
-    now,
-    factsTruncated: merged.factsTruncated || deals.length >= 1000,
-  });
+  return assemblePeopleMap({ companyId, opportunityId, people, facts, deals, names, now });
 }
 
 export async function assertContactInOrg(orgId: string, contactId: string) {

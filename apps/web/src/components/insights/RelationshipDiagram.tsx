@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 
 import { InsightFrame } from './InsightFrame';
 import { CountTable } from './PipelineStageChart';
-import { relationshipFrameStatus, relationshipRefreshFailed } from './relationship-frame.js';
+import { relationshipFrameStatus } from './relationship-frame.js';
 import { insightErrorText, shapeCompanyRelationships } from './shapeInsights';
 
 function useFirstLinkedCompanyId(ids: string[]) {
@@ -40,7 +40,7 @@ export function RelationshipDiagram() {
   const contacts = company.data?.contacts ?? [];
   const diagram = company.data ? shapeCompanyRelationships(company.data.name, contacts) : null;
 
-  const frameInput = {
+  const frameStatus = relationshipFrameStatus({
     companiesPending: companies.isPending,
     companiesError: companies.isError,
     companyCount: items.length,
@@ -49,9 +49,7 @@ export function RelationshipDiagram() {
     startFetching: start.isFetching,
     startError: start.isError,
     startHasData: start.data !== undefined,
-  };
-  const frameStatus = relationshipFrameStatus(frameInput);
-  const refreshFailed = relationshipRefreshFailed(frameInput);
+  });
 
   return (
     <InsightFrame
@@ -69,17 +67,6 @@ export function RelationshipDiagram() {
     >
       {frameStatus === 'ready' ? (
         <div className="flex flex-col gap-4 px-4 py-4">
-          {refreshFailed ? (
-            <ErrorState
-              title="Could not refresh the company list"
-              message={insightErrorText(start.error)}
-              action={
-                <Button type="button" variant="secondary" size="lg" onClick={() => void start.refetch()}>
-                  Retry
-                </Button>
-              }
-            />
-          ) : null}
           <label className="flex flex-col gap-2 text-xs text-[var(--fg-secondary)]">
             Company
             <select

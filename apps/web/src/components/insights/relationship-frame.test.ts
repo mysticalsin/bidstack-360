@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { relationshipFrameStatus, relationshipRefreshFailed } from './relationship-frame.js';
+import { relationshipFrameStatus } from './relationship-frame.js';
 
 describe('relationship frame', () => {
   it('shows the empty state when the company list is empty even if the follow-up query is still pending', () => {
@@ -10,8 +10,6 @@ describe('relationship frame', () => {
         companiesError: false,
         companyCount: 0,
         manualCompany: false,
-        startPending: true,
-        startHasData: false,
         startFetching: false,
         startError: false,
       }),
@@ -25,8 +23,6 @@ describe('relationship frame', () => {
         companiesError: true,
         companyCount: 0,
         manualCompany: false,
-        startPending: true,
-        startHasData: false,
         startFetching: false,
         startError: false,
       }),
@@ -47,20 +43,15 @@ describe('relationship frame', () => {
     expect(
       relationshipFrameStatus({ ...base, startPending: false, startFetching: true, startHasData: true }),
     ).toBe('ready');
-    const cachedFailure = {
-      ...base,
-      startPending: false,
-      startFetching: false,
-      startError: true,
-      startHasData: true,
-    };
-    // The cached company stays on screen. The failure is a separate signal,
-    // not a status of ready that swallows the error.
-    expect(relationshipFrameStatus(cachedFailure)).toBe('ready');
-    expect(relationshipRefreshFailed(cachedFailure)).toBe(true);
     expect(
-      relationshipRefreshFailed({ ...cachedFailure, startError: false }),
-    ).toBe(false);
+      relationshipFrameStatus({
+        ...base,
+        startPending: false,
+        startFetching: false,
+        startError: true,
+        startHasData: true,
+      }),
+    ).toBe('ready');
     expect(
       relationshipFrameStatus({
         ...base,
