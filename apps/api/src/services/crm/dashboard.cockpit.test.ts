@@ -240,3 +240,42 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     expect(cockpit.winLoss?.wonCount).toBe(0);
   });
 });
+
+describe('buildCockpit risks are scoped to the account', () => {
+  // WHY: the account header and open-risk count read cockpit.risks. A canned
+  // fallback showed "Security scope needs final sign-off" (owner Sarah
+  // Bennett) and "Open risks 2" on every account that had no risk of its own.
+  const risk = (over: Record<string, unknown>) => ({
+    id: 'r1',
+    title: 'Data residency clause not agreed',
+    severity: 'high',
+    owner: 'Ana Lopez',
+    mitigation: null,
+    dueDate: null,
+    status: 'open',
+    companyName: 'Acme',
+    ...over,
+  });
+  const args = (risks: unknown[]) => ({
+    company: company({ id: 'acme', name: 'Acme' }),
+    companies: [],
+    opportunities: [],
+    contacts: [],
+    tasks: [],
+    risks: risks as never,
+    compliance: [],
+    fieldOverrides: [],
+  });
+
+  it('returns no risks for an account with none in the register', () => {
+    const cockpit = buildCockpit(args([risk({ id: 'other', companyName: 'Globex' })]));
+    expect(cockpit.risks).toEqual([]);
+    expect(JSON.stringify(cockpit.risks)).not.toContain('Sarah Bennett');
+  });
+
+  it('returns only the account own risks', () => {
+    const cockpit = buildCockpit(args([risk({}), risk({ id: 'r2', title: 'Globex budget freeze', companyName: 'Globex' })]));
+    expect(cockpit.risks.map((r) => r.title)).toEqual(['Data residency clause not agreed']);
+    expect(cockpit.risks[0]!.owner).toBe('Ana Lopez');
+  });
+});

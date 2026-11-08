@@ -18,7 +18,7 @@ import type {
   SignalFactor,
 } from '@bidstack/shared';
 
-import { defaultCompliance, defaultRisks, defaultTechnicalStack } from './dashboard.defaults.js';
+import { defaultCompliance, defaultTechnicalStack } from './dashboard.defaults.js';
 import {
   asComplianceStatus,
   asRiskSeverity,
@@ -737,7 +737,9 @@ export function buildCockpit({
     recentActivity: buildActivities(
       tasks.filter((task) => task.opportunity?.customer === company.name),
     ).slice(0, 5),
-    risks: visibleRisks.length ? visibleRisks.map(serializeRisk) : defaultRisks(),
+    // Only this account's own register rows: a canned fallback put the same
+    // "Security scope" risk and owner on every account.
+    risks: visibleRisks.map(serializeRisk),
     compliance: visibleCompliance.length
       ? visibleCompliance.map(serializeCompliance)
       : defaultCompliance(),
