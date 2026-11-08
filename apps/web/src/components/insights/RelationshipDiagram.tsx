@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 
 import { InsightFrame } from './InsightFrame';
 import { CountTable } from './PipelineStageChart';
+import { relationshipFrameStatus } from './relationship-frame.js';
 import { insightErrorText, shapeCompanyRelationships } from './shapeInsights';
 
 function useFirstLinkedCompanyId(ids: string[]) {
@@ -39,13 +40,14 @@ export function RelationshipDiagram() {
   const contacts = company.data?.contacts ?? [];
   const diagram = company.data ? shapeCompanyRelationships(company.data.name, contacts) : null;
 
-  const frameStatus = companies.isPending || (!manualId && start.isPending)
-    ? 'loading'
-    : companies.isError || start.isError
-      ? 'error'
-      : items.length === 0
-        ? 'empty'
-        : 'ready';
+  const frameStatus = relationshipFrameStatus({
+    companiesPending: companies.isPending,
+    companiesError: companies.isError,
+    companyCount: items.length,
+    manualCompany: manualId !== null,
+    startFetching: start.isFetching,
+    startError: start.isError,
+  });
 
   return (
     <InsightFrame

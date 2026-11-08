@@ -63,6 +63,20 @@ const UNLINKED: Omit<FactLink, 'status'> = {
  * A person with no accepted fact is unknown. A suggestion (proposed) is not
  * evidence. needs_review is only for text we refused to link.
  */
+/**
+ * On a deal, standing is only that deal's buying-role facts. A company link,
+ * a reporting line, or a role accepted on another deal is not evidence that
+ * this buying group was accepted. An account map has no opportunity id and
+ * still uses the full fact list.
+ */
+export function factsForOpportunityStanding(
+  facts: PersonFactView[],
+  opportunityId: string | null,
+): PersonFactView[] {
+  if (!opportunityId) return facts;
+  return facts.filter((fact) => fact.kind === 'buying_role' && fact.opportunityId === opportunityId);
+}
+
 export function connectionStanding(facts: PersonFactView[], now: Date): ConnectionStanding {
   const accepted = facts.filter((fact) => fact.status === 'accepted');
   if (accepted.length === 0) {

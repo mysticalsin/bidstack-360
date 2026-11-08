@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyFactDecision,
   connectionStanding,
+  factsForOpportunityStanding,
   intakePersonFact,
   recordedDecisionRole,
   resolvedReportsToId,
@@ -38,6 +39,34 @@ describe('connectionStanding', () => {
     });
     expect(connectionStanding([suggested], NOW)).toBe('unknown');
     expect(resolvedReportsToId([suggested], NOW)).toBeNull();
+  });
+
+  it('does not treat another deal or a company link as evidence on this deal', () => {
+    const otherDeal = fact({
+      id: 'other',
+      status: 'accepted',
+      kind: 'buying_role',
+      opportunityId: 'deal-1',
+      linkLabel: 'buyer',
+    });
+    const company = fact({
+      id: 'company',
+      status: 'accepted',
+      kind: 'company_link',
+      companyId: 'co-1',
+    });
+    const thisDeal = fact({
+      id: 'this',
+      status: 'accepted',
+      kind: 'buying_role',
+      opportunityId: 'deal-2',
+      linkLabel: 'champion',
+    });
+    const onDeal2 = factsForOpportunityStanding([otherDeal, company, thisDeal], 'deal-2');
+    expect(onDeal2.map((item) => item.id)).toEqual(['this']);
+    expect(connectionStanding(onDeal2, NOW)).toBe('evidenced');
+    expect(connectionStanding(factsForOpportunityStanding([otherDeal, company], 'deal-2'), NOW)).toBe('unknown');
+    expect(factsForOpportunityStanding([company], null)).toEqual([company]);
   });
 
   it('becomes evidenced only after a fact is accepted', () => {

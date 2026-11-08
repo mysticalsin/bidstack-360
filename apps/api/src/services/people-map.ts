@@ -4,6 +4,7 @@ import { prisma } from '@bidstack/db';
 import {
   applyFactDecision,
   connectionStanding,
+  factsForOpportunityStanding,
   factIsStale,
   intakeCommitment,
   intakePersonFact,
@@ -118,7 +119,7 @@ export function assemblePeopleMap(input: {
         id: person.id,
         name: person.name,
         title: person.role,
-        standing: connectionStanding(views, input.now),
+        standing: connectionStanding(factsForOpportunityStanding(views, input.opportunityId), input.now),
         reportsToContactId,
         reportsToName: reportsToContactId ? (input.names.get(reportsToContactId) ?? null) : null,
         dealLinks: (dealsByContact.get(person.id) ?? []).map((deal) => ({

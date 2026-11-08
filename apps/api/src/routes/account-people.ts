@@ -15,7 +15,9 @@ import {
   PersonFact,
 } from '@bidstack/shared';
 
+import { actorUserId } from '../lib/actor-user-id.js';
 import { apiKeyScopeSatisfiesPermission } from '../lib/api-key-scopes.js';
+import { commitmentDealMatchesCompany } from '../lib/commitment-account.js';
 import { userHasPermission } from '../lib/rbac-decision-cache.js';
 import {
   applyFactDecision,
@@ -299,7 +301,7 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
           opportunityId: next.opportunityId,
           companyId: next.companyId,
           linkLabel: next.linkLabel,
-          decidedByUserId: req.auth.userId,
+          decidedByUserId: actorUserId(req.auth.userId),
           decidedAt: new Date(),
         },
       });
@@ -379,9 +381,11 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
       if (intake.opportunityId) {
         const deal = await prisma.opportunity.findFirst({
           where: { id: intake.opportunityId, orgId: req.auth.orgId, deletedAt: null },
-          select: { id: true },
+          select: { id: true, companyId: true },
         });
-        if (!deal) badRequest(server, 'That deal is not in this account');
+        if (!deal || !commitmentDealMatchesCompany(company.id, deal.companyId)) {
+          badRequest(server, 'That deal is not on this account');
+        }
       }
       const created = await prisma.customerCommitment.create({
         data: {
@@ -393,7 +397,7 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
           ownerContactId: req.body.ownerContactId ?? null,
           status: intake.status,
           sourceNote: req.body.sourceNote ?? null,
-          createdByUserId: req.auth.userId,
+          createdByUserId: actorUserId(req.auth.userId),
         },
         select: { id: true },
       });
@@ -440,7 +444,7 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
           ownerContactId: req.body.ownerContactId ?? null,
           status: intake.status,
           sourceNote: req.body.sourceNote ?? null,
-          createdByUserId: req.auth.userId,
+          createdByUserId: actorUserId(req.auth.userId),
         },
         select: { id: true },
       });
@@ -468,9 +472,11 @@ export const accountPeopleRoutes: FastifyPluginAsyncZod = async (server) => {
       if (opportunityId) {
         const deal = await prisma.opportunity.findFirst({
           where: { id: opportunityId, orgId: req.auth.orgId, deletedAt: null },
-          select: { id: true },
+          select: { id: true, companyId: true },
         });
-        if (!deal) badRequest(server, 'That deal is not in this account');
+        if (!deal || !commitmentDealMatchesCompany(existing.companyId, deal.companyId)) {
+          badRequest(server, 'That deal is not on this account');
+        }
       }
       if (req.body.ownerContactId) {
         const owner = await assertContactInOrg(req.auth.orgId, req.body.ownerContactId);
