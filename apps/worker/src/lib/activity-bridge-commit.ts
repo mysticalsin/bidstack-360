@@ -59,7 +59,7 @@ export async function commitTokenDeltaState(
     const hasExec = typeof tx.$executeRaw === 'function';
     const hasTx = typeof client.$transaction === 'function';
     if (hasQuery || hasExec || hasTx) {
-      if (!hasQuery || !hasExec || !hasTx) {
+      if (!tx.$queryRaw || !tx.$executeRaw || !hasTx) {
         throw new Error(
           'Refusing a cursor write. The client is missing $queryRaw, $executeRaw, or a transaction, so the row lock would not be held.',
         );
