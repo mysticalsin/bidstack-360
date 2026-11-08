@@ -111,6 +111,29 @@ describe('company intel routes', () => {
     expect(news.items[0]).toMatchObject({ origin: 'own', kind: 'product' });
   });
 
+  skipIfNoDb('registry shows the manual registration number with its source, matched identifiers with links, and no bare industry code', async () => {
+    // WHY: the registry block was empty or showed a single letter. Every row
+    // must carry a source the user can open, and a manual entry names its own.
+    const c = await seededCompany();
+    await prisma.accountWatchSubject.create({ data: { orgId: orgId!, companyId: c.id, lei: '5493001KJTIIGC8Y1R12', frSiren: '552100554' } });
+    await prisma.intelEvidence.create({ data: { orgId: orgId!, companyId: c.id, source: 'brreg', kind: 'registry', key: 'fact:Industry (NACE)', label: 'Industry (NACE)', url: 'https://virksomhet.brreg.no/x', excerpt: 'Industry (NACE): M', fetchedAt: new Date() } });
+    await prisma.intelEvidence.create({ data: { orgId: orgId!, companyId: c.id, source: 'brreg', kind: 'registry', key: 'fact:Activity (NAF)', label: 'Activity (NAF)', url: 'https://virksomhet.brreg.no/x', excerpt: 'Activity (NAF): Z', fetchedAt: new Date() } });
+    const put = await server.inject({
+      method: 'PUT',
+      url: `/api/crm/companies/${c.id}/field-overrides`,
+      payload: { fieldKey: 'registryId', value: 'RCS Paris 552 100 554', sourceUrl: 'https://www.infogreffe.fr/x', sourceLabel: 'Infogreffe' },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const fin = AccountFinancialsIntel.parse((await server.inject({ method: 'GET', url: `/api/v1/companies/${c.id}/intel/financials` })).json());
+    expect(fin.registry[0]).toMatchObject({ label: 'Registration number', value: 'RCS Paris 552 100 554', source: 'Infogreffe', sourceUrl: 'https://www.infogreffe.fr/x', fieldKey: 'registryId' });
+    expect(fin.registry.find((r) => r.label === 'LEI')).toMatchObject({ source: 'GLEIF', sourceUrl: 'https://search.gleif.org/#/record/5493001KJTIIGC8Y1R12' });
+    expect(fin.registry.find((r) => r.label === 'SIREN')?.sourceUrl).toBe('https://annuaire-entreprises.data.gouv.fr/entreprise/552100554');
+    expect(fin.registry.find((r) => r.label === 'Industry (NACE)')?.value).toBe('M Professional, scientific and technical activities');
+    expect(fin.registry.find((r) => r.label === 'Activity (NAF)')).toBeUndefined();
+    for (const r of fin.registry) expect(r.value.trim().length).toBeGreaterThan(2);
+  });
+
   skipIfNoDb('refresh queues one source with a 202 and records it as queued', async () => {
     const c = await seededCompany();
     const res = await server.inject({ method: 'POST', url: `/api/v1/companies/${c.id}/intel/refresh`, payload: { source: 'posts' } });

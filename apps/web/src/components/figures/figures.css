@@ -1,0 +1,40 @@
+/* Slice 22 sourced figures: source chip, Edit, and the small inline form.
+   Every box can shrink (min-width: 0) and long text wraps or truncates with
+   the full text in title, so nothing overlaps at 390 to 1440. */
+.sf-line { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; max-width: 100%; }
+.sf-chip {
+  display: inline-block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; line-height: 1.4; color: var(--fg-tertiary, #6b6b6b); text-decoration: none;
+}
+a.sf-chip:hover, a.sf-chip:focus-visible { color: var(--brand-primary, #006b4f); text-decoration: underline; }
+a.sf-chip:focus-visible { outline: 2px solid var(--brand-primary, #006b4f); outline-offset: 1px; border-radius: 2px; }
+.sf-btn {
+  display: inline-flex; align-items: center; min-height: 24px; min-width: 24px; padding: 0 4px; border: 0; border-radius: 4px;
+  background: none; font: inherit; font-size: 12px; color: var(--fg-tertiary, #6b6b6b); cursor: pointer; white-space: nowrap;
+}
+.sf-btn:hover, .sf-btn:focus-visible { color: var(--fg-primary, #171717); text-decoration: underline; }
+.sf-btn:focus-visible { outline: 2px solid var(--brand-primary, #006b4f); outline-offset: 1px; }
+.sf-btn:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
+.sf-btn[data-primary='true'] { color: var(--brand-primary, #006b4f); font-weight: 500; }
+.sf-empty { display: grid; gap: 2px; min-width: 0; }
+.sf-empty-text { margin: 0; font-size: 12px; line-height: 1.4; color: var(--fg-tertiary, #6b6b6b); overflow-wrap: anywhere; }
+.sf-form { display: grid; gap: 6px; min-width: 0; width: 100%; margin: 4px 0 0; }
+.sf-form label { display: grid; gap: 2px; min-width: 0; font-size: 12px; color: var(--fg-secondary, #444); }
+.sf-form input, .sf-form select {
+  min-width: 0; width: 100%; min-height: 32px; padding: 4px 8px; font: inherit; font-size: 13px; color: var(--fg-primary, #171717);
+  background: var(--surface, #fff); border: 1px solid var(--border, #d9d9d9); border-radius: 6px;
+}
+.sf-form input:focus-visible, .sf-form select:focus-visible { outline: 2px solid var(--brand-primary, #006b4f); outline-offset: 0; }
+.sf-form-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sf-error, .sf-status { margin: 0; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.sf-error { color: var(--danger, #b82032); }
+.sf-status { color: var(--fg-tertiary, #6b6b6b); }
+/* Business snapshot rows are right aligned; the empty state and form follow suit without squeezing the label. */
+.kvlist dd .sf-empty { justify-items: end; text-align: right; }
+.kvlist dd .sf-line { justify-content: flex-end; }
+.kvlist dd .sf-form { text-align: left; }
+.kvlist dd:has(.sf-form) { flex: 1 1 100%; }
+.kvlist .kv:has(.sf-form) { flex-wrap: wrap; }
+/* The command center footer styles every span as an uppercase caption; the chip and status text opt out. */
+.command-center-footer .sf-chip, .command-center-footer .sf-line span { display: inline-block; font-size: 12px; font-weight: 400; text-transform: none; }
+.command-center-footer .sf-form { grid-column: 1 / -1; }
