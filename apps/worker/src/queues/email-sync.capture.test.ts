@@ -14,6 +14,7 @@ import { pullGmail } from './email-sync.gmail.js';
 vi.mock('@bidstack/db', () => ({
   EmailProvider: { GMAIL: 'GMAIL', OUTLOOK: 'OUTLOOK' },
   prisma: {
+    unlockedCursorTestAdapter: true,
     integrationToken: { findFirst: vi.fn(), update: vi.fn() },
     emailMessage: { upsert: vi.fn(async () => ({ id: 'row-1' })) },
   },
@@ -219,7 +220,7 @@ describe('Outlook inbox capture', () => {
 
     await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
     state = (tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }).data.deltaState;
-    expect(countOf('m-poison')).toBe(3);
+    expect(countOf('m-poison')).toBe(0);
     expect(state.mailDeltaLink).toBe('inbox-delta');
     expect(state.mailNextLink).toBeUndefined();
     expect(state.activityBridgeQuarantine).toEqual([expect.objectContaining({ id: 'm-poison', attempts: 3 })]);

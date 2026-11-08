@@ -312,7 +312,10 @@ function quarantineIds(
  * Record bridge failures. Counts are per provider id, shared across page
  * URLs, so Inbox and Sent cannot reset each other and a new page URL cannot
  * restart a poison id at 1. Counts saturate at the limit. An id at the limit
- * does not hold the cursor. An empty failure list does not clear other ids.
+ * leaves the active map and does not hold the cursor. The map stays at or
+ * under the cap. A new id that does not fit is not quarantined early; the
+ * page is held until a finished id frees a slot. An empty failure list does
+ * not clear other ids.
  * `page` is the caller's cursor key and is not part of the count.
  */
 export function noteActivityBridgeFailures(
@@ -330,32 +333,40 @@ export function noteActivityBridgeFailures(
       .map((entry) => entry.id),
   );
   const quarantined: string[] = [];
-  for (const id of failed) {
+  const deferred: string[] = [];
+  const ordered = [
+    ...failed.filter((id) => already.has(id) || counts[id] !== undefined),
+    ...failed.filter((id) => !already.has(id) && counts[id] === undefined),
+  ];
+  for (const id of ordered) {
     const prior = already.has(id) ? ACTIVITY_BRIDGE_RETRY_LIMIT : (counts[id] ?? 0);
     const attempts = Math.min(prior + 1, ACTIVITY_BRIDGE_RETRY_LIMIT);
+    if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) {
+      // Finished ids leave the active map so the cap is only unresolved work.
+      quarantined.push(id);
+      delete counts[id];
+      continue;
+    }
+    if (counts[id] === undefined && Object.keys(counts).length >= MAX_RETRY_IDS) {
+      // No room. Hold the page and try this id next time. Do not quarantine it early.
+      deferred.push(id);
+      continue;
+    }
     delete counts[id];
     counts[id] = attempts;
-    if (attempts >= ACTIVITY_BRIDGE_RETRY_LIMIT) quarantined.push(id);
-  }
-  const evicted: ActivityBridgeQuarantine[] = [];
-  while (Object.keys(counts).length > MAX_RETRY_IDS) {
-    const oldest = Object.keys(counts).find((id) => !failed.includes(id)) ?? Object.keys(counts)[0];
-    if (!oldest) break;
-    const attempts = counts[oldest] ?? 1;
-    delete counts[oldest];
-    if (attempts < ACTIVITY_BRIDGE_RETRY_LIMIT) evicted.push({ id: oldest, attempts, at: now });
   }
   writeRetryIds(state, counts);
-  quarantineIds(state, [
-    ...quarantined.map((id) => ({
-      id,
-      attempts: counts[id] ?? ACTIVITY_BRIDGE_RETRY_LIMIT,
-      at: now,
-    })),
-    ...evicted,
-  ]);
-  const hold = failed.some((id) => (counts[id] ?? ACTIVITY_BRIDGE_RETRY_LIMIT) < ACTIVITY_BRIDGE_RETRY_LIMIT);
-  return { hold, quarantined: [...quarantined, ...evicted.map((entry) => entry.id)] };
+  quarantineIds(
+    state,
+    quarantined.map((id) => ({ id, attempts: ACTIVITY_BRIDGE_RETRY_LIMIT, at: now })),
+  );
+  const hold =
+    deferred.length > 0 ||
+    failed.some((id) => {
+      const attempts = counts[id];
+      return typeof attempts === 'number' && attempts < ACTIVITY_BRIDGE_RETRY_LIMIT;
+    });
+  return { hold, quarantined };
 }
 
 function sameCursorValue(left: unknown, right: unknown): boolean {

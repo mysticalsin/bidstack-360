@@ -19,6 +19,7 @@ const bridgeStore = vi.hoisted(() => {
       update: tokenUpdate,
       findFirst: vi.fn(async () => ({ deltaState: persisted.delta })),
     },
+    $executeRaw: vi.fn(async () => 1),
     $queryRaw: vi.fn(async () => [{ delta_state: structuredClone(persisted.delta) }]),
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<void>) => fn(prismaMock)),
   };

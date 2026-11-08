@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { CALENDAR_PULL_INCREMENTAL, OUTLOOK_PULL_HISTORICAL, OUTLOOK_PULL_INCREMENTAL } from '@bidstack/shared';
+
 import { commitTokenDeltaState } from './activity-bridge-commit.js';
 import {
   ACTIVITY_BRIDGE_RETRY_LIMIT,
@@ -185,7 +187,7 @@ describe('activity bridge retry bound', () => {
     expect(mixed.quarantined).toEqual(['poison']);
     expect(mixed.hold).toBe(true);
     const counts = state.activityBridgeRetryById as Record<string, number>;
-    expect(counts.poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect(counts.poison).toBeUndefined();
     expect(counts.fresh).toBe(1);
   });
 
@@ -198,10 +200,13 @@ describe('activity bridge retry bound', () => {
     expect(third.hold).toBe(false);
     expect(third.quarantined).toEqual(['poison']);
     const counts = state.activityBridgeRetryById as Record<string, number>;
-    expect(counts.poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect(counts.poison).toBeUndefined();
     expect(counts.other).toBe(1);
     expect(noteActivityBridgeFailures(state, 'sent', []).hold).toBe(false);
-    expect((state.activityBridgeRetryById as Record<string, number>).poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect((state.activityBridgeRetryById as Record<string, number>).other).toBe(1);
+    expect(state.activityBridgeQuarantine).toEqual([
+      expect.objectContaining({ id: 'poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
+    ]);
   });
 
   it('applies concurrent pulls in order so neither folder loses an increment', () => {
@@ -237,7 +242,10 @@ describe('activity bridge retry bound', () => {
     const done = noteActivityBridgeFailures(state, 'https://graph/page-c', ['poison'], now);
     expect(done.hold).toBe(false);
     expect(done.quarantined).toEqual(['poison']);
-    expect((state.activityBridgeRetryById as Record<string, number>).poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect((state.activityBridgeRetryById as Record<string, number> | undefined)?.poison).toBeUndefined();
+    expect(state.activityBridgeQuarantine).toEqual([
+      expect.objectContaining({ id: 'poison', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT }),
+    ]);
     expect(noteActivityBridgeFailures(state, 'https://graph/page-d', ['poison'], now).hold).toBe(false);
   });
 
@@ -251,15 +259,31 @@ describe('activity bridge retry bound', () => {
     expect(state.activityBridgeRetryByPage).toBeUndefined();
   });
 
-  it('quarantines ids past the cap instead of growing the map', () => {
+  it('holds a full retry map instead of quarantining an id before its budget', () => {
     const state: Record<string, unknown> = {};
+    const now = '2026-11-08T03:00:00.000Z';
     const ids = Array.from({ length: 33 }, (_, i) => `id-${i}`);
-    noteActivityBridgeFailures(state, 'page-1', ids, '2026-11-08T03:00:00.000Z');
+    const first = noteActivityBridgeFailures(state, 'page-1', ids, now);
     const counts = state.activityBridgeRetryById as Record<string, number>;
     expect(Object.keys(counts)).toHaveLength(32);
-    const quarantined = state.activityBridgeQuarantine as Array<{ id: string }>;
-    expect(quarantined.map((entry) => entry.id)).toContain('id-0');
-    expect(JSON.stringify(quarantined)).not.toContain('subject');
+    expect(first.hold).toBe(true);
+    expect(first.quarantined).toEqual([]);
+    expect(state.activityBridgeQuarantine).toBeUndefined();
+    expect(counts['id-32']).toBeUndefined();
+    const kept = noteActivityBridgeFailures(state, 'page-2', ['id-0', 'id-new'], now);
+    const afterKept = state.activityBridgeRetryById as Record<string, number>;
+    expect(afterKept['id-0']).toBe(2);
+    expect(afterKept['id-new']).toBeUndefined();
+    expect(kept.hold).toBe(true);
+    expect(kept.quarantined).toEqual([]);
+    const third = noteActivityBridgeFailures(state, 'page-1', ids, now);
+    expect(third.quarantined).toEqual(['id-0']);
+    expect(third.hold).toBe(true);
+    expect((state.activityBridgeRetryById as Record<string, number>)['id-32']).toBe(1);
+    expect((state.activityBridgeRetryById as Record<string, number>)['id-0']).toBeUndefined();
+    const listed = state.activityBridgeQuarantine as Array<{ id: string; attempts: number }>;
+    expect(listed).toEqual([expect.objectContaining({ id: 'id-0', attempts: ACTIVITY_BRIDGE_RETRY_LIMIT })]);
+    expect(JSON.stringify(listed)).not.toContain('subject');
   });
 });
 
@@ -271,6 +295,7 @@ describe('activity bridge commit lock', () => {
     });
     const db = {
       integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
       $queryRaw: vi.fn(async () => [{ delta_state: stored.delta }]),
       $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
     };
@@ -302,7 +327,7 @@ describe('activity bridge commit lock', () => {
     await commitTokenDeltaState(db, 'tok-1', later, later, [{ page: 'inbox-2', failedIds: ['poison'] }]);
     await commitTokenDeltaState(db, 'tok-1', later, later, [{ page: 'inbox-3', failedIds: ['poison'] }]);
     const last = stored.delta;
-    expect((last.activityBridgeRetryById as Record<string, number>).poison).toBe(ACTIVITY_BRIDGE_RETRY_LIMIT);
+    expect((last.activityBridgeRetryById as Record<string, number>).poison).toBeUndefined();
     expect((last.activityBridgeRetryById as Record<string, number>).other).toBe(1);
     expect(last.mailSentNextLink).toBe('sent-page');
     expect(last.activityBridgeQuarantine).toEqual([
@@ -345,5 +370,49 @@ describe('activity bridge commit lock', () => {
     expect(String(executeRaw.mock.calls[0]?.[0])).toContain('lock_timeout');
     expect(db.$queryRaw).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a client that cannot lock and is not an explicit test adapter', async () => {
+    const update = vi.fn();
+    const db = {
+      integrationToken: { findFirst: vi.fn(async () => ({ deltaState: {} })), update },
+    };
+    await expect(commitTokenDeltaState(db, 'tok-1', {}, { mailNextLink: 'x' }, [])).rejects.toThrow(/unlocked cursor write/);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a row lock that cannot set lock_timeout', async () => {
+    const update = vi.fn();
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $queryRaw: vi.fn(async () => [{ delta_state: {} }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    await expect(commitTokenDeltaState(db, 'tok-1', {}, { mailNextLink: 'x' }, [])).rejects.toThrow(/unlocked cursor write/);
+    expect(update).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('lets an explicit test adapter write without claiming the write was locked', async () => {
+    const update = vi.fn();
+    const db = {
+      unlockedCursorTestAdapter: true,
+      integrationToken: {
+        findFirst: vi.fn(async () => ({ deltaState: { calendarDeltaLink: 'cal-keep' } })),
+        update,
+      },
+    };
+    await commitTokenDeltaState(db, 'tok-1', { calendarDeltaLink: 'cal-keep' }, { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox' }, []);
+    expect(update).toHaveBeenCalledOnce();
+    expect(db.integrationToken.findFirst).toHaveBeenCalled();
+  });
+
+  it('leaves lock-timeout retries to the pull jobs that already back off', () => {
+    expect(CALENDAR_PULL_INCREMENTAL.defaultJobOptions.attempts).toBe(3);
+    expect(CALENDAR_PULL_INCREMENTAL.defaultJobOptions.backoff).toEqual({ type: 'exponential', delay: 5_000 });
+    expect(OUTLOOK_PULL_INCREMENTAL.defaultJobOptions.attempts).toBe(5);
+    expect(OUTLOOK_PULL_INCREMENTAL.defaultJobOptions.backoff).toEqual({ type: 'exponential', delay: 10_000 });
+    expect(OUTLOOK_PULL_HISTORICAL.defaultJobOptions.attempts).toBe(3);
+    expect(OUTLOOK_PULL_HISTORICAL.defaultJobOptions.backoff).toEqual({ type: 'fixed', delay: 30_000 });
   });
 });
