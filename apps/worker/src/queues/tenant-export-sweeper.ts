@@ -66,42 +66,61 @@ export async function sweepTenantExports(
   log: pino.Logger,
   now: Date = new Date(),
 ): Promise<SweepResult> {
-  const stale = await prisma.tenantExport.updateMany({
-    where: {
-      status: 'running',
-      deletedAt: null,
-      updatedAt: { lt: new Date(now.getTime() - RUNNING_STALE_MS) },
-    },
-    data: {
-      status: 'failed',
-      error: 'Export stopped reporting progress and was marked failed',
-      completedAt: now,
-    },
-  });
-
-  const pending = await prisma.tenantExport.findMany({
-    where: {
-      status: 'pending',
-      deletedAt: null,
-      createdAt: { lt: new Date(now.getTime() - PENDING_GRACE_MS) },
-    },
-    select: { id: true, orgId: true },
-    orderBy: { createdAt: 'asc' },
+  const staleWhere = {
+    status: 'running' as const,
+    deletedAt: null,
+    updatedAt: { lt: new Date(now.getTime() - RUNNING_STALE_MS) },
+  };
+  const pendingWhere = {
+    status: 'pending' as const,
+    deletedAt: null,
+    createdAt: { lt: new Date(now.getTime() - PENDING_GRACE_MS) },
+  };
+  // TenantExport queries must carry orgId (BIDSTACK_TENANT_SCOPE_GUARD=enforce
+  // rejects them otherwise), so find the orgs with stuck rows first; Org itself
+  // is not tenant scoped.
+  const orgs = await prisma.org.findMany({
+    where: { tenantExports: { some: { OR: [staleWhere, pendingWhere] } } },
+    select: { id: true },
+    orderBy: { id: 'asc' },
     take: SWEEP_BATCH,
   });
+
+  let failed = 0;
   let requeued = 0;
-  for (const row of pending) {
-    try {
-      if (await redrive({ exportId: row.id, orgId: row.orgId })) requeued += 1;
-    } catch (err) {
-      log.warn({ exportId: row.id, err }, 'tenant-export sweeper: re-enqueue failed');
+  let budget = SWEEP_BATCH;
+  for (const { id: orgId } of orgs) {
+    const stale = await prisma.tenantExport.updateMany({
+      where: { orgId, ...staleWhere },
+      data: {
+        status: 'failed',
+        error: 'Export stopped reporting progress and was marked failed',
+        completedAt: now,
+      },
+    });
+    failed += stale.count;
+    if (budget === 0) continue;
+
+    const pending = await prisma.tenantExport.findMany({
+      where: { orgId, ...pendingWhere },
+      select: { id: true, orgId: true },
+      orderBy: { createdAt: 'asc' },
+      take: budget,
+    });
+    budget -= pending.length;
+    for (const row of pending) {
+      try {
+        if (await redrive({ exportId: row.id, orgId: row.orgId })) requeued += 1;
+      } catch (err) {
+        log.warn({ exportId: row.id, err }, 'tenant-export sweeper: re-enqueue failed');
+      }
     }
   }
 
-  if (stale.count > 0 || requeued > 0) {
-    log.warn({ failed: stale.count, requeued }, 'tenant-export sweeper: recovered stuck exports');
+  if (failed > 0 || requeued > 0) {
+    log.warn({ failed, requeued }, 'tenant-export sweeper: recovered stuck exports');
   }
-  return { requeued, failed: stale.count };
+  return { requeued, failed };
 }
 
 export async function startTenantExportSweeper(

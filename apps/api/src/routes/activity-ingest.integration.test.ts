@@ -292,4 +292,42 @@ describe('POST /api/v1/ingest/activities', () => {
     const res = await post(scopedKey, [call('m-4', { company: { domain: 'nobody.example.org' } })]);
     expect(res.json().skipped[0].reason).toBe('out_of_scope');
   });
+
+  it('a scoped key cannot write to an opportunity with no account by naming an allowed company', async () => {
+    const unassigned = await prisma.opportunity.create({
+      data: {
+        orgId,
+        code: `OP-U${run}`,
+        customer: 'Nobody yet',
+        name: 'Unassigned deal',
+        stage: 's1_ongoing',
+        valueMicros: 1_000_000,
+        probability: 10,
+        intel: {},
+      },
+    });
+    const res = await post(scopedKey, [
+      call('m-5', { company: { id: otherCompanyId }, opportunity: { id: unassigned.id } }),
+    ]);
+    expect(res.json().skipped).toEqual([
+      expect.objectContaining({ externalId: 'm-5', reason: 'out_of_scope' }),
+    ]);
+    expect(
+      await prisma.activity.count({ where: { orgId, entityType: 'opportunity', entityId: unassigned.id } }),
+    ).toBe(0);
+  });
+
+  it('a link learned early in a batch resolves a later item that only has the external id', async () => {
+    const fresh = await prisma.company.create({
+      data: { orgId, name: `Fresh Co ${run}`, domain: `fresh-${run}.example.com` },
+    });
+    const res = await post(rawKey, [
+      call('l-1', { company: { domain: `fresh-${run}.example.com`, externalId: `fresh-${run}` } }),
+      call('l-2', { company: { externalId: `fresh-${run}` } }),
+    ]);
+    expect(res.json().counts).toEqual({ accepted: 2, updated: 0, skipped: 0 });
+    expect(
+      await prisma.activity.count({ where: { orgId, entityType: 'company', entityId: fresh.id } }),
+    ).toBe(2);
+  });
 });

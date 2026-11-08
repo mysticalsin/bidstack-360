@@ -106,6 +106,34 @@ describe('SyncNowControl', () => {
     );
   });
 
+  // After a reload the start mutation is gone; only the overview knows the run.
+  it('polls a run still in flight from the overview until it finishes', async () => {
+    let overviews = 0;
+    apiMock.mockImplementation((async (path: string) => {
+      if (path.includes('/runs/dust-abc')) {
+        return run({
+          state: 'completed',
+          progress: 100,
+          finishedAt: new Date().toISOString(),
+          result: { new: 1, updated: 0, skipped: 0, failed: 0 },
+        });
+      }
+      overviews += 1;
+      return {
+        source: 'dust',
+        lastSyncedAt: null,
+        lastRun: overviews === 1 ? run({ state: 'running', progress: 30 }) : run({ state: 'completed', progress: 100 }),
+      };
+    }) as never);
+    renderControl();
+    await waitFor(() =>
+      expect(apiMock.mock.calls.some(([p]) => String(p).includes('/runs/dust-abc'))).toBe(true),
+    );
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: /sync/i }) as HTMLButtonElement).disabled).toBe(false),
+    );
+  });
+
   it('has no helper text or tagline', async () => {
     apiMock.mockResolvedValue({ source: 'dust', lastSyncedAt: null, lastRun: null });
     const { container } = renderControl();

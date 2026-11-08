@@ -2,9 +2,20 @@ import { z } from 'zod';
 
 import { prisma } from '../index.js';
 
-import { isoDate, oppCitation, type AgentCitation, type AgentTool } from './types.js';
+import {
+  callerCan,
+  isoDate,
+  oppCitation,
+  proposalOwnerWhere,
+  type AgentCitation,
+  type AgentTool,
+  type AgentToolCtx,
+} from './types.js';
 
 const OPEN_PROPOSAL_STATUSES = ['draft', 'review', 'approved'] as const;
+// Approved proposals are immutable; a substantive edit needs a revision first
+// (apps/api/src/routes/proposals.approval.ts).
+const EDITABLE_PROPOSAL_STATUSES = ['draft', 'review'] as const;
 const CLOSED_STAGES = ['closed_won', 'closed_lost'] as const;
 
 async function userNames(orgId: string, ids: Array<string | null>): Promise<Map<string, string>> {
@@ -53,7 +64,7 @@ export const proposalStatus: AgentTool<typeof StatusInput> = {
         ? { opportunityId: args.opportunityId }
         : { opportunity: { companyId: args.accountId } };
     const proposals = await prisma.proposal.findMany({
-      where: { orgId: ctx.orgId, deletedAt: null, ...scope },
+      where: { orgId: ctx.orgId, deletedAt: null, ...scope, ...proposalOwnerWhere(ctx) },
       include: {
         opportunity: { select: { id: true, code: true, name: true, stage: true, dueDate: true } },
         sections: {
@@ -137,6 +148,7 @@ export const bidsOverdue: AgentTool<typeof OverdueInput> = {
   },
   handler: async (args, ctx) => {
     const today = new Date(new Date().toISOString().slice(0, 10));
+    const showProposals = await callerCan(ctx, 'proposals:read');
     const [opps, proposals] = await Promise.all([
       prisma.opportunity.findMany({
         where: {
@@ -149,17 +161,20 @@ export const bidsOverdue: AgentTool<typeof OverdueInput> = {
         orderBy: { dueDate: 'asc' },
         take: args.limit,
       }),
-      prisma.proposal.findMany({
-        where: {
-          orgId: ctx.orgId,
-          deletedAt: null,
-          status: { in: [...OPEN_PROPOSAL_STATUSES] },
-          dueDate: { lt: today },
-        },
-        include: { opportunity: { select: { code: true } } },
-        orderBy: { dueDate: 'asc' },
-        take: args.limit,
-      }),
+      showProposals
+        ? prisma.proposal.findMany({
+            where: {
+              orgId: ctx.orgId,
+              deletedAt: null,
+              status: { in: [...OPEN_PROPOSAL_STATUSES] },
+              dueDate: { lt: today },
+              ...proposalOwnerWhere(ctx),
+            },
+            include: { opportunity: { select: { code: true } } },
+            orderBy: { dueDate: 'asc' },
+            take: args.limit,
+          })
+        : Promise.resolve([]),
     ]);
     const owners = await userNames(
       ctx.orgId,
@@ -214,13 +229,13 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-async function findOpenProposal(orgId: string, id: string) {
+async function findOpenProposal(ctx: AgentToolCtx, id: string) {
   const proposal = await prisma.proposal.findFirst({
-    where: { id, orgId, deletedAt: null },
+    where: { id, orgId: ctx.orgId, deletedAt: null, ...proposalOwnerWhere(ctx) },
     select: { id: true, name: true, status: true, dueDate: true },
   });
   if (!proposal) throw new Error('Proposal not found');
-  if (!(OPEN_PROPOSAL_STATUSES as readonly string[]).includes(proposal.status)) {
+  if (!(EDITABLE_PROPOSAL_STATUSES as readonly string[]).includes(proposal.status)) {
     throw new Error(`Proposal is ${proposal.status}; sections are locked`);
   }
   return proposal;
@@ -244,7 +259,7 @@ export const proposalSectionDraft: AgentTool<typeof SectionInput> = {
     additionalProperties: false,
   },
   preview: async (args, ctx) => {
-    const proposal = await findOpenProposal(ctx.orgId, args.proposalId);
+    const proposal = await findOpenProposal(ctx, args.proposalId);
     const existing = await prisma.proposalSection.findFirst({
       where: { orgId: ctx.orgId, proposalId: proposal.id, key: args.key, deletedAt: null },
       select: { wordCount: true },
@@ -268,7 +283,7 @@ export const proposalSectionDraft: AgentTool<typeof SectionInput> = {
     };
   },
   handler: async (args, ctx) => {
-    const proposal = await findOpenProposal(ctx.orgId, args.proposalId);
+    const proposal = await findOpenProposal(ctx, args.proposalId);
     const words = wordCount(args.content);
     const section = await prisma.proposalSection.upsert({
       where: { proposalId_key: { proposalId: proposal.id, key: args.key } },

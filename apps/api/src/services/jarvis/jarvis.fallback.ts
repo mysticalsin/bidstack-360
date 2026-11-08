@@ -106,9 +106,12 @@ export function nextFallbackTurn(input: FallbackInput): JarvisFallbackTurn {
 
     case 'task': {
       if (has(results, 'tasks.create')) return composeAnswer(results);
-      const oppId = ctxOpp ?? resolved?.opportunities[0]?.id;
+      // A record the message names wins over the page; the page only fills in
+      // "this opportunity" or an ask that names nothing.
+      const implicit = wantsThis && ctxOpp !== undefined;
+      if (!implicit && !resolved) return resolve();
+      const oppId = (implicit ? undefined : resolved?.opportunities[0]?.id) ?? ctxOpp;
       if (!oppId) {
-        if (!resolved) return resolve();
         return missing(
           'I need an opportunity to attach the task to. Open one, or name it.',
           results,

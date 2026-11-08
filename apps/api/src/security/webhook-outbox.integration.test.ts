@@ -41,10 +41,18 @@ beforeAll(async () => {
   otherOrgId = await makeOrg('b');
 });
 
-beforeEach(async () => {
-  // Nothing else writes the outbox with WEBHOOK_OUTBOX_ENABLED unset; clear
-  // leftovers so claims only see this test's rows.
-  await prisma.$executeRaw`DELETE FROM webhook_outbox`;
+beforeEach(async (ctx) => {
+  await prisma.$executeRaw`DELETE FROM webhook_outbox WHERE org_id IN (${orgId}::uuid, ${otherOrgId}::uuid)`;
+  // Claims are global (one relay serves every org), so on a database that
+  // holds other tenants' pending events these tests would claim and mutate
+  // them. Run only where the outbox is otherwise empty, never clear it.
+  const [foreign] = await prisma.$queryRaw<Array<{ n: number }>>`
+    SELECT count(*)::int AS n FROM webhook_outbox
+     WHERE status = 'pending' AND org_id NOT IN (${orgId}::uuid, ${otherOrgId}::uuid)`;
+  if ((foreign?.n ?? 0) > 0) {
+    console.warn('webhook outbox suite skipped: other tenants have pending outbox rows');
+    ctx.skip();
+  }
 });
 
 afterAll(async () => {
