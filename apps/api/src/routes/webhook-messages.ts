@@ -22,6 +22,8 @@ import {
   redactWebhookText,
 } from '@bidstack/shared';
 
+import { decodeWebhookMessageCursor, encodeWebhookMessageCursor } from './webhook-message-cursor.js';
+
 const MessageRow = z.object({
   id: z.string().uuid(),
   subscriptionId: z.string().uuid(),
@@ -61,20 +63,6 @@ const ListQuery = z.object({
 const STATS_WINDOWS = { '24h': 24, '7d': 24 * 7, '30d': 24 * 30 } as const;
 const LATENCY_SAMPLE_CAP = 2000;
 
-type Cursor = { createdAt: Date; id: string };
-
-function encodeCursor(c: Cursor): string {
-  return Buffer.from(`${c.createdAt.toISOString()}|${c.id}`).toString('base64url');
-}
-
-function decodeCursor(raw: string): Cursor | null {
-  const text = Buffer.from(raw, 'base64url').toString('utf8');
-  const [iso, id] = text.split('|');
-  if (!iso || !id || !z.string().uuid().safeParse(id).success) return null;
-  const createdAt = new Date(iso);
-  if (Number.isNaN(createdAt.getTime()) || createdAt.toISOString() !== iso) return null;
-  return { createdAt, id };
-}
 
 function safeHeaders(raw: Prisma.JsonValue | null): Record<string, string> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
@@ -109,35 +97,45 @@ export const webhookMessagesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const q = req.query;
-      const cursor = q.cursor ? decodeCursor(q.cursor) : null;
+      const cursor = q.cursor ? decodeWebhookMessageCursor(q.cursor) : null;
       if (q.cursor && !cursor) throw server.httpErrors.badRequest('Invalid cursor');
-      const createdAt: Prisma.DateTimeFilter = {};
-      if (q.from) createdAt.gte = new Date(q.from);
-      if (q.to) createdAt.lte = new Date(q.to);
-      const rows = await prisma.webhookMessage.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          ...(q.subscriptionId ? { subscriptionId: q.subscriptionId } : {}),
-          ...(q.event ? { event: q.event } : {}),
-          ...(q.status ? { status: q.status } : {}),
-          ...(q.from || q.to ? { createdAt } : {}),
-          ...(cursor
-            ? {
-                OR: [
-                  { createdAt: { lt: cursor.createdAt } },
-                  { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-                ],
-              }
-            : {}),
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: q.limit + 1,
-        include: { subscription: { select: { url: true } } },
+      const filters: Prisma.Sql[] = [Prisma.sql`org_id = ${req.auth.orgId}::uuid`];
+      if (q.subscriptionId) filters.push(Prisma.sql`subscription_id = ${q.subscriptionId}::uuid`);
+      if (q.event) filters.push(Prisma.sql`event = ${q.event}`);
+      if (q.status) filters.push(Prisma.sql`status::text = ${q.status}`);
+      if (q.from) filters.push(Prisma.sql`created_at >= ${new Date(q.from)}`);
+      if (q.to) filters.push(Prisma.sql`created_at <= ${new Date(q.to)}`);
+      if (cursor) {
+        // Bind the cursor text. Casting it in SQL keeps microseconds that a Date would drop.
+        filters.push(Prisma.sql`(
+          created_at < ${cursor.createdAt}::timestamptz
+          OR (created_at = ${cursor.createdAt}::timestamptz AND id < ${cursor.id}::uuid)
+        )`);
+      }
+      const ordered = await prisma.$queryRaw<Array<{ id: string; created_at_text: string }>>`
+        SELECT id,
+               to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at_text
+        FROM webhook_messages
+        WHERE ${Prisma.join(filters, ' AND ')}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ${q.limit + 1}
+      `;
+      const found = ordered.length
+        ? await prisma.webhookMessage.findMany({
+            where: { orgId: req.auth.orgId, id: { in: ordered.map((row) => row.id) } },
+            take: ordered.length,
+            include: { subscription: { select: { url: true } } },
+          })
+        : [];
+      const byId = new Map(found.map((row) => [row.id, row]));
+      const rows = ordered.flatMap((row) => {
+        const message = byId.get(row.id);
+        return message ? [{ message, createdAtText: row.created_at_text }] : [];
       });
       const page = rows.slice(0, q.limit);
       const last = page.at(-1);
       return {
-        items: page.map((m) => ({
+        items: page.map(({ message: m }) => ({
           id: m.id,
           subscriptionId: m.subscriptionId,
           url: m.subscription.url,
@@ -149,7 +147,10 @@ export const webhookMessagesRoutes: FastifyPluginAsyncZod = async (server) => {
           replayOfId: m.replayOfId,
           createdAt: m.createdAt.toISOString(),
         })),
-        nextCursor: rows.length > q.limit && last ? encodeCursor(last) : null,
+        nextCursor:
+          ordered.length > q.limit && last
+            ? encodeWebhookMessageCursor(last.createdAtText, last.message.id)
+            : null,
       };
     },
   );

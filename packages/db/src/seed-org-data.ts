@@ -22,6 +22,7 @@ import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
 import { seedRolesAndPermissions } from './seed.rbac.js';
 import { seedSigningEntities } from './seed-signing-entities.js';
+import { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 
 /**
  * A Prisma client capable of running the seed. Accepts either the top-level
@@ -890,6 +891,7 @@ export async function seedOrgData(
   const companyByName = await seedCompanies(prisma, orgId, visitorId);
   await seedCompanyEnrichments(prisma, orgId);
   await seedHemaLeverageMsa(prisma, orgId, visitorId, companyByName);
+  await seedPfizerWhitespaceFixture(prisma, orgId, visitorId);
 
   const oppByCode = await seedOpps(prisma, orgId, byInitials, companyByName);
   await seedProposals(prisma, orgId, byInitials, oppByCode, visitorId);

@@ -117,12 +117,82 @@ export function maskWebhookSignature(header: string): string {
 }
 
 const SENSITIVE_KEY =
-  /("(?:[\w-]*(?:secret|token|password|passwd|authorization|api[_-]?key|apikey|private[_-]?key|signature)[\w-]*)"\s*:\s*)("(?:[^"\\]|\\.)*"|[^,}\]\s]+)/gi;
+  /"(?:[\w-]*(?:secret|token|password|passwd|authorization|api[_-]?key|apikey|private[_-]?key|signature)[\w-]*)"\s*:/gi;
+
+/**
+ * End index of one JSON value, including arrays and objects. A comma-stopped
+ * scan leaks every credential after the first element of an array.
+ */
+function jsonValueEnd(text: string, start: number): number | null {
+  let i = start;
+  while (i < text.length && /\s/.test(text[i] ?? '')) i += 1;
+  if (i >= text.length) return null;
+  const first = text[i] ?? '';
+  if (first === '"') {
+    i += 1;
+    while (i < text.length) {
+      if (text[i] === '\\') {
+        i += 2;
+        continue;
+      }
+      if (text[i] === '"') return i + 1;
+      i += 1;
+    }
+    return null;
+  }
+  if (first === '{' || first === '[') {
+    const stack = [first === '{' ? '}' : ']'];
+    i += 1;
+    let inString = false;
+    while (i < text.length && stack.length > 0) {
+      const ch = text[i] ?? '';
+      if (inString) {
+        if (ch === '\\') {
+          i += 2;
+          continue;
+        }
+        if (ch === '"') inString = false;
+        i += 1;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        i += 1;
+        continue;
+      }
+      if (ch === '{') stack.push('}');
+      else if (ch === '[') stack.push(']');
+      else if (ch === '}' || ch === ']') {
+        if (stack[stack.length - 1] !== ch) return null;
+        stack.pop();
+      }
+      i += 1;
+    }
+    return stack.length === 0 ? i : null;
+  }
+  const primitive = /^[^,}\]\s]+/.exec(text.slice(i));
+  return primitive ? i + primitive[0].length : null;
+}
 
 /** Masks secret-looking values so a stored body never leaks a credential. */
 export function redactWebhookText(text: string): string {
-  return text
-    .replace(SENSITIVE_KEY, `$1"${MASK}"`)
+  const keys = new RegExp(SENSITIVE_KEY.source, 'gi');
+  let out = '';
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = keys.exec(text)) !== null) {
+    const valueStart = match.index + match[0].length;
+    const valueEnd = jsonValueEnd(text, valueStart);
+    if (valueEnd === null || valueEnd <= valueStart) {
+      keys.lastIndex = valueStart;
+      continue;
+    }
+    out += `${text.slice(last, valueStart)}"${MASK}"`;
+    last = valueEnd;
+    keys.lastIndex = valueEnd;
+  }
+  out += text.slice(last);
+  return out
     .replace(/whsec_[A-Za-z0-9+/=_-]+/g, `whsec_${MASK}`)
     .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, `$1 ${MASK}`);
 }

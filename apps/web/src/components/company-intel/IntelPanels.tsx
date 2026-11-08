@@ -1,11 +1,19 @@
 // Slice 12 panels: direction, hiring, financials, news and posts. Every line
 // names its basis and links the evidence it came from.
 import { ArrowDown, ArrowUp, ExternalLink } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import {
   compactAmount,
+  FUNCTION_THEME,
+  hiringBreakdown,
+  OFFERING_HOOKS,
   POST_KIND_LABEL,
+  postingSkills,
   postingSourceLabel,
+  themeForSkill,
+  type HiringShare,
+  type IntelPosting,
   type AccountDirection,
   type AccountFinancialsIntel,
   type AccountHiringIntel,
@@ -148,8 +156,35 @@ export function DirectionPanel({ d }: { d: AccountDirection }) {
 
 /** Hiring: open roles, trend, monthly strip, function mix, skills, postings. */
 export function HiringPanel({ h }: { h: AccountHiringIntel }) {
+  // Keyed so a role filter picked on one account never carries to the next.
+  return <HiringPanelBody key={h.companyId} h={h} />;
+}
+
+function HiringPanelBody({ h }: { h: AccountHiringIntel }) {
   const s = h.summary;
   const max = Math.max(1, ...s.monthly);
+  const [filter, setFilter] = useState<HiringFilter | null>(null);
+  const [all, setAll] = useState(false);
+  const b = useMemo(() => hiringBreakdown(h.summary, h.postings, (t) => OFFERING_HOOKS[t]?.label ?? t), [h.summary, h.postings]);
+  const filtered = filter ? h.postings.filter((p) => matches(p, filter)) : h.postings;
+  const shown = all ? filtered : filtered.slice(0, POSTINGS_SHOWN);
+  const pick = (f: HiringFilter) => {
+    setAll(false);
+    setFilter((cur) => (cur?.kind === f.kind && cur.key === f.key ? null : f));
+  };
+  const topTheme = b.themes[0];
+  const topTech = b.tech.slice(0, 3);
+  const focus =
+    s.openRoles && (topTheme || topTech.length)
+      ? [
+          topTheme ? `Most postings point to ${topTheme.label} (${topTheme.pct}%).` : null,
+          topTech.length ? `Tech named most: ${topTech.map((t) => `${t.label} ${t.pct}%`).join(', ')} of open roles.` : null,
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : null;
+  const fit = focus && topTheme ? OFFERING_HOOKS[topTheme.theme].offering : null;
+  const sourceNames = s.sources.map(postingSourceLabel).join(', ');
   return (
     <div className="ci-panel">
       <div className="ci-stats">
@@ -176,17 +211,23 @@ export function HiringPanel({ h }: { h: AccountHiringIntel }) {
           </span>
         </div>
       </div>
+      {focus ? (
+        <div className="ci-focus" data-testid="hiring-focus">
+          <p className="ci-line-text">{focus}</p>
+          {fit ? (
+            <p className="ci-line-text">
+              Where we fit: {fit}. <span className="ci-basis">Inferred</span>
+            </p>
+          ) : null}
+          <p className="ci-meta" data-testid="hiring-focus-source">
+            Source: {s.openRoles} open roles from {sourceNames || 'job boards'}. Each role below links to its posting.
+          </p>
+        </div>
+      ) : null}
       <div className="ci-plan">
         <div className="ci-col">
           <h4 className="ci-k">Function mix</h4>
-          <ul className="ci-list ci-compact">
-            {s.byFunction.map((f) => (
-              <li key={f.key} className="ci-row">
-                <span>{f.label}</span>
-                <span className="ci-num">{f.count}</span>
-              </li>
-            ))}
-          </ul>
+          <ShareList rows={b.functions} kind="function" filter={filter} onFilter={pick} unit="of open roles" />
         </div>
         <div className="ci-col">
           <h4 className="ci-k">Skills</h4>
@@ -199,32 +240,165 @@ export function HiringPanel({ h }: { h: AccountHiringIntel }) {
           </ul>
         </div>
       </div>
+      {b.tech.length || b.themes.length || b.seniority.length ? (
+        <div className="ci-plan ci-block" data-testid="hiring-breakdown">
+          {b.tech.length ? (
+            <div className="ci-col">
+              <h4 className="ci-k">Tech they are hiring for</h4>
+              <ShareList rows={b.tech} kind="tech" filter={filter} onFilter={pick} unit="of open roles" />
+              <p className="ci-meta ci-note">A role can name several technologies, so shares do not add up to 100%.</p>
+            </div>
+          ) : null}
+          {b.themes.length ? (
+            <div className="ci-col">
+              <h4 className="ci-k">Practice areas</h4>
+              <ShareList rows={b.themes} kind="theme" filter={filter} onFilter={pick} unit={`of ${b.postingsBase} postings`} />
+            </div>
+          ) : null}
+          {b.seniority.length ? (
+            <div className="ci-col">
+              <h4 className="ci-k">Seniority</h4>
+              <ShareList rows={b.seniority} kind="seniority" filter={filter} onFilter={pick} unit={`of ${b.postingsBase} postings`} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="ci-block">
-        <h4 className="ci-k">Recent postings</h4>
+        <div className="ci-row">
+          <h4 className="ci-k">{filter ? `Roles: ${filter.label}` : 'Recent postings'}</h4>
+          {filter ? (
+            <button type="button" className="ci-link" onClick={() => setFilter(null)}>
+              Show every role
+            </button>
+          ) : null}
+        </div>
         {h.postings.length ? (
-          <ul className="ci-list ci-compact">
-            {h.postings.map((p) => (
-              <li key={p.id} className="ci-row">
-                <span className="ci-line-label">
-                  {safeHref(p.url) ? (
-                    <a href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">
-                      {p.title}
-                    </a>
-                  ) : (
-                    p.title
-                  )}
-                </span>
-                <span className="ci-meta">
-                  {[p.department, p.location, postingSourceLabel(p.source), fmtDate(p.postedAt)].filter(Boolean).join(', ')}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="ci-list ci-compact" data-testid="hiring-postings">
+              {shown.map((p) => {
+                const skills = postingSkills(p);
+                return (
+                  <li key={p.id} className="ci-posting">
+                    <div className="ci-row">
+                      <span className="ci-line-label">
+                        {safeHref(p.url) ? (
+                          <a href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">
+                            {p.title}
+                          </a>
+                        ) : (
+                          p.title
+                        )}
+                      </span>
+                      <span className="ci-meta">
+                        {[p.department, p.location, postingSourceLabel(p.source), fmtDate(p.postedAt)].filter(Boolean).join(', ')}
+                      </span>
+                    </div>
+                    {p.seniority || skills.length ? (
+                      <ul className="ci-chips" aria-label={`${p.title}: seniority and skills`}>
+                        {p.seniority ? <li className="ci-chip ci-chip-quiet">{p.seniority}</li> : null}
+                        {skills.map((k) => (
+                          <li key={k} className="ci-chip">
+                            {k}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+            {filtered.length === 0 ? <p className="ci-none">No listed posting matches this filter.</p> : null}
+            {filtered.length > POSTINGS_SHOWN ? (
+              <button type="button" className="ci-link" onClick={() => setAll((v) => !v)}>
+                {all ? 'Show fewer' : `Show all ${filtered.length} roles`}
+              </button>
+            ) : null}
+            {h.postings.length < s.openRoles ? (
+              <p className="ci-meta ci-note">
+                Listing the latest {h.postings.length} of {s.openRoles} open roles. Function and tech shares cover all of them.
+              </p>
+            ) : null}
+          </>
         ) : (
           <p className="ci-none">No open roles found</p>
         )}
       </div>
     </div>
+  );
+}
+
+type ShareKind = 'function' | 'tech' | 'theme' | 'seniority';
+interface HiringFilter {
+  kind: ShareKind;
+  key: string;
+  label: string;
+}
+
+const POSTINGS_SHOWN = 8;
+
+function postingThemes(p: IntelPosting): Set<string> {
+  const out = new Set<string>();
+  const fn = FUNCTION_THEME[p.function];
+  if (fn) out.add(fn);
+  for (const k of postingSkills(p)) {
+    const th = themeForSkill(k);
+    if (th) out.add(th);
+  }
+  return out;
+}
+
+function matches(p: IntelPosting, f: HiringFilter): boolean {
+  if (f.kind === 'function') return p.function === f.key;
+  if (f.kind === 'tech') return postingSkills(p).includes(f.key);
+  if (f.kind === 'theme') return postingThemes(p).has(f.key);
+  return (p.seniority?.trim() || 'Not stated') === f.key;
+}
+
+function ShareList({
+  rows,
+  kind,
+  filter,
+  onFilter,
+  unit,
+}: {
+  rows: HiringShare[];
+  kind: ShareKind;
+  filter: HiringFilter | null;
+  onFilter: (f: HiringFilter) => void;
+  unit: string;
+}) {
+  return (
+    <>
+      <p className="ci-meta" data-testid={`share-unit-${kind}`}>
+        Percent {unit}
+      </p>
+      <ul className="ci-list ci-compact">
+        {rows.map((r) => {
+          const active = filter?.kind === kind && filter.key === r.key;
+          return (
+            <li key={r.key} className="ci-share">
+              <div className="ci-row">
+                <button
+                  type="button"
+                  className="ci-share-label"
+                  aria-pressed={active}
+                  aria-label={`${r.label}: ${r.count}, ${r.pct}% ${unit}. Show these roles`}
+                  onClick={() => onFilter({ kind, key: r.key, label: r.label })}
+                >
+                  {r.label}
+                </button>
+                <span className="ci-num">
+                  {r.count} <span className="ci-meta">· {r.pct}%</span>
+                </span>
+              </div>
+              <span className="ci-share-track" aria-hidden>
+                <span className="ci-share-fill" style={{ width: `${Math.min(100, r.pct)}%` }} />
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
@@ -307,27 +481,61 @@ export function FinancialsPanel({ f }: { f: AccountFinancialsIntel }) {
 
 /** News and posts: newest first, kind and origin on every item. */
 export function NewsPanel({ n }: { n: AccountNewsIntel }) {
+  const [showUnlinked, setShowUnlinked] = useState(false);
   if (!n.items.length) return <p className="ci-none">No posts or news found</p>;
+  const linked = n.items.filter((p) => safeHref(p.url));
+  const unlinked = n.items.filter((p) => !safeHref(p.url));
+  const row = (p: AccountNewsIntel['items'][number]) => {
+    const href = safeHref(p.url);
+    return (
+      <li key={p.id} className="ci-row" data-testid={`news-${p.id}`}>
+        <span className="ci-line-head">
+          <span className="ci-tag" data-kind={p.kind}>{POST_KIND_LABEL[p.kind]}</span>
+          {href ? (
+            <a className="ci-line-label" href={href} target="_blank" rel="noopener noreferrer">
+              {p.title}
+              <ExternalLink size={12} aria-hidden />
+            </a>
+          ) : (
+            <span className="ci-line-label">{p.title}</span>
+          )}
+          {href ? null : <span className="ci-basis">No source link</span>}
+        </span>
+        <span className="ci-meta">
+          {[p.origin === 'own' ? 'Company' : 'Press', fmtDate(p.publishedAt)].filter(Boolean).join(', ')}
+          {' · Source: '}
+          {href ? (
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {p.sourceLabel || hostOf(href)}
+              {p.sourceLabel && hostOf(href) && hostOf(href) !== p.sourceLabel ? ` (${hostOf(href)})` : ''}
+            </a>
+          ) : (
+            p.sourceLabel || 'not given'
+          )}
+        </span>
+      </li>
+    );
+  };
   return (
-    <ul className="ci-list ci-panel">
-      {n.items.map((p) => (
-        <li key={p.id} className="ci-row">
-          <span className="ci-line-head">
-            <span className="ci-tag" data-kind={p.kind}>{POST_KIND_LABEL[p.kind]}</span>
-            {safeHref(p.url) ? (
-              <a className="ci-line-label" href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">
-                {p.title}
-                <ExternalLink size={12} aria-hidden />
-              </a>
-            ) : (
-              <span className="ci-line-label">{p.title}</span>
-            )}
-          </span>
-          <span className="ci-meta">
-            {[p.origin === 'own' ? 'Company' : 'Press', p.sourceLabel, fmtDate(p.publishedAt)].filter(Boolean).join(', ')}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="ci-panel">
+      {linked.length ? <ul className="ci-list">{linked.map(row)}</ul> : <p className="ci-none">No posts or news with a source link</p>}
+      {unlinked.length ? (
+        <div className="ci-block">
+          <button type="button" className="ci-link" aria-expanded={showUnlinked} onClick={() => setShowUnlinked((v) => !v)}>
+            {showUnlinked ? 'Hide' : 'Show'} {unlinked.length} {unlinked.length === 1 ? 'item' : 'items'} without a source link
+          </button>
+          <p className="ci-meta ci-note">Kept apart because they cannot be checked against the original.</p>
+          {showUnlinked ? <ul className="ci-list">{unlinked.map(row)}</ul> : null}
+        </div>
+      ) : null}
+    </div>
   );
+}
+
+function hostOf(href: string): string {
+  try {
+    return new URL(href).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
 }

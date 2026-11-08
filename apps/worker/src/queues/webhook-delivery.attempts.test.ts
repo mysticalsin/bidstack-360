@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   deliveryCreate: vi.fn(),
   subUpdate: vi.fn(),
   messageUpsert: vi.fn(),
+  messageUpdate: vi.fn(),
   decrypt: vi.fn((s: string) => s),
   isLegacySecret: vi.fn(() => false),
   serumDenial: vi.fn(async () => null as string | null),
@@ -18,7 +19,7 @@ vi.mock('@bidstack/db', () => ({
   prisma: {
     webhookSubscription: { findFirst: mocks.subFindFirst, update: mocks.subUpdate },
     webhookDelivery: { create: mocks.deliveryCreate },
-    webhookMessage: { upsert: mocks.messageUpsert },
+    webhookMessage: { upsert: mocks.messageUpsert, updateMany: mocks.messageUpdate },
   },
 }));
 vi.mock('@bidstack/shared/server-crypto', () => ({
@@ -158,6 +159,25 @@ describe('webhook delivery: per-endpoint retry policy', () => {
     expect(err).not.toBeInstanceOf(UnrecoverableError);
     expect(mocks.messageUpsert.mock.calls[0]![0].update).toMatchObject({ status: 'pending' });
     expect((err as { retryDelayMs?: number }).retryDelayMs).toBe(30_000);
+  });
+
+  it('does not send once a lowered maxAttempts is already below this attempt', async () => {
+    mocks.safeFetch.mockResolvedValue(response(500));
+    const err = await processDeliveryJob(job(3, { maxAttempts: 1 }), log).catch((e: unknown) => e);
+    expect(mocks.safeFetch).not.toHaveBeenCalled();
+    expect(err).toBeInstanceOf(UnrecoverableError);
+    expect(mocks.messageUpsert.mock.calls[0]![0].update).toMatchObject({ status: 'failed' });
+  });
+
+  it('marks a pending message failed when the endpoint is no longer active', async () => {
+    const queued = job(2);
+    mocks.subFindFirst.mockResolvedValue(null);
+    await processDeliveryJob(queued, log);
+    expect(mocks.safeFetch).not.toHaveBeenCalled();
+    expect(mocks.messageUpdate).toHaveBeenCalledWith({
+      where: { id: EVENT_ID, status: 'pending' },
+      data: { status: 'failed' },
+    });
   });
 
   it('stops at the endpoint max attempts, not the queue ceiling', async () => {

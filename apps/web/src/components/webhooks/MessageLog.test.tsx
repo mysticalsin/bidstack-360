@@ -160,6 +160,26 @@ describe('MessageLog', () => {
     expect(live.closest('[aria-live="polite"]')).not.toBeNull();
   });
 
+  it('reuses the request id when replay again fails before the server confirms it', async () => {
+    m.useHasPermission.mockReturnValue(true);
+    m.replay
+      .mockResolvedValueOnce({ outboxId: 'o1', duplicate: false })
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ outboxId: 'o2', duplicate: true });
+    render(<MessageLog filters={{}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Open lead\.created/ }));
+    const drawer = await screen.findByRole('dialog');
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Replay' }));
+    await screen.findByText('Replay queued');
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Replay again' }));
+    await screen.findByText('Replay failed. Try again.');
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Replay again' }));
+    await waitFor(() => expect(m.replay).toHaveBeenCalledTimes(3));
+    const ids = m.replay.mock.calls.map((call) => (call[0] as { requestId: string }).requestId);
+    expect(ids[1]).not.toBe(ids[0]);
+    expect(ids[2]).toBe(ids[1]);
+  });
+
   it('shows one sentence and no table when there are no messages', () => {
     m.useHasPermission.mockReturnValue(true);
     m.useWebhookMessages.mockReturnValue({

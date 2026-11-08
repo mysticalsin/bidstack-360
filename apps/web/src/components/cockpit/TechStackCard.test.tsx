@@ -204,6 +204,41 @@ describe('TechStackCard provenance', () => {
     });
   });
 
+  it('keeps an existing stack name when the editor is opened and saved', async () => {
+    const named = cockpit();
+    named.technicalStack = [
+      {
+        stack: 'Oncology R&D',
+        label: 'Cloud',
+        items: [{ name: 'Azure', source: 'manual', confidence: 1 }],
+      },
+    ];
+    render(<TechStackCard cockpit={named} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save technical stack' }));
+    await waitFor(() => {
+      expect(hookMocks.saveStack).toHaveBeenCalledWith([
+        expect.objectContaining({ stack: 'Oncology R&D', label: 'Cloud' }),
+      ]);
+    });
+  });
+
+  it('keeps a named stack when a category moves to another business unit', async () => {
+    render(<TechStackCard cockpit={cockpit()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit technical stack' }));
+    fireEvent.change(screen.getByLabelText('Stack for category 1'), {
+      target: { value: ' Oncology R&D ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save technical stack' }));
+
+    await waitFor(() => {
+      expect(hookMocks.saveStack).toHaveBeenCalledWith([
+        expect.objectContaining({ stack: 'Oncology R&D', label: 'Cloud' }),
+      ]);
+    });
+  });
+
   it('surfaces an error toast and keeps the editor open when a save fails', async () => {
     // WHY: a swallowed save error would silently drop the user's draft. Must fail
     // if the catch is removed (no toast) or if the editor closes on failure.

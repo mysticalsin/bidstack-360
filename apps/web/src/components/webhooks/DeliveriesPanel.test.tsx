@@ -62,7 +62,10 @@ describe('DeliveriesPanel', () => {
 
   it('offers the heatmap as a table', () => {
     render(<DeliveriesPanel subscriptions={SUBS} filters={{}} onFiltersChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'View as table' }));
+    const toggle = screen.getByRole('button', { name: 'View as table' });
+    expect(toggle.className).toContain('pointer-coarse:min-h-11');
+    expect(toggle.className).toContain('pointer-coarse:min-w-11');
+    fireEvent.click(toggle);
     const table = screen.getByRole('table', { name: 'Attempts by endpoint and hour' });
     expect(table.textContent).toContain('a.example.com');
     expect(table.textContent).toContain('14:00');

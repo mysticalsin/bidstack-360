@@ -183,6 +183,36 @@ describe('GET /webhook-messages', () => {
     expect(seen).toEqual(messages);
   });
 
+  it('never skips rows that share a millisecond at a page boundary', async () => {
+    const subC = await seedSubscription(orgId, 'https://c.example.com/hook');
+    const base = new Date(Date.now() - 3600_000);
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      ids.push(await seedMessage({ org: orgId, sub: subC, event: 'lead.created', status: 'succeeded', createdAt: base, attempts: [{ statusCode: 200, durationMs: 10 }] }));
+    }
+    // Same millisecond, distinct microseconds, newest first: ids[0] is the newest.
+    for (let i = 0; i < ids.length; i += 1) {
+      await prisma.$executeRaw`UPDATE webhook_messages SET created_at = ${base}::timestamptz + make_interval(secs => ${(900 - i * 100) / 1_000_000}) WHERE id = ${ids[i]}::uuid`;
+    }
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 6; page += 1) {
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/v1/webhook-messages?subscriptionId=${subC}&limit=1${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const body = res.json() as ListBody;
+      seen.push(...body.items.map((m) => m.id));
+      cursor = body.nextCursor;
+      if (!cursor) break;
+    }
+    await prisma.webhookDelivery.deleteMany({ where: { subscriptionId: subC } });
+    await prisma.webhookMessage.deleteMany({ where: { subscriptionId: subC } });
+    await prisma.webhookSubscription.deleteMany({ where: { id: subC } });
+    expect(seen).toEqual(ids);
+  });
+
   it('filters by endpoint, event, status and time', async () => {
     const byEndpoint = (await server.inject({ method: 'GET', url: `/api/v1/webhook-messages?subscriptionId=${subB}` })).json() as ListBody;
     expect(byEndpoint.items.every((m) => m.subscriptionId === subB && m.url === 'https://b.example.com/hook')).toBe(true);

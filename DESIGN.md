@@ -711,6 +711,32 @@ Appended by factory slice 1. Values only; no existing token changed.
 - Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
   that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
 
+### 9.16 Technology stack from open data (slice 16)
+
+One technology stack per account, on `/accounts/:accountId` (Technical Stack card) and on
+`/companies/:id` (Technology stack section). Same data, same wall.
+
+- Wall: grouped by category (Cloud, Collaboration, Email security, Identity, CRM and marketing,
+  ITSM, Data and analytics, ERP, Web platform, DevOps, Languages, Other). Category label in
+  uppercase `--fg-tertiary` 12px; items as pills with `TechLogo` (20px), name, a source chip and
+  the confidence as a whole percent in tabular numbers.
+- Source chips, plain words only: DNS, Cert, Website, Jobs, GitHub, Apollo, Manual, Meeting notes,
+  Seamless, Tech intel. Chip uses `--surface-sunken` with `--fg-secondary`; Manual uses
+  `--brand-primary` text. No colour-only meaning: the word is always there.
+- Evidence: each pill is a button that opens a popover (Radix HoverCard on hover, click toggles a
+  pinned popover; Escape closes and focus returns to the pill). Content: source, the record or URL
+  observed (URLs are links, `rel="noreferrer"`), observed date, confidence.
+- Coverage line under the wall: `Coverage: DNS 6, Cert 2, Website 4, Jobs 3. Nothing found in
+  GitHub.` Lanes that failed say `Cert unavailable`. Last checked date on the right, `Checked 7 Nov`.
+  Sample data carries the `Sample` tag next to the coverage line.
+- Empty: `No technology found yet` plus the coverage line when lanes ran. Loading: skeleton rows.
+  Error: `Could not load technology stack` with Retry.
+- Accounts list card: up to three `TechLogo` (16px) with names, in the existing `account-card-tech`
+  row; it truncates with an ellipsis and carries a `title` with the full list. No new row.
+- Layout: no overlap at 1440, 1024 and 390, light and dark; pills wrap; popover stays inside the
+  viewport (collision padding 8px). Hit targets 24 x 24 minimum. Copy: no em dashes, no taglines.
+- Build note: the empty state keeps the existing copy `No technology detected yet` so current tests
+  and screenshots stay valid. Chip and Sample text use 12px (`text-xs`), the audit floor.
 ### 9.9 Slice 2 console shell as built (2026-11-07)
 
 Appended by factory slice 2. Refines the existing shell (AppShell, Sidebar, MobileNav, Topbar); the look
@@ -759,3 +785,8 @@ Appended by factory slice 5 (Settings > Access policies).
   before it can be published. The preview headline counts people, the sub-line counts actions, and
   two sentences say what it cannot show: changes that depend on the record country (not enforced at
   route level yet) and reads (not in the audit log). The tab and its API are Admin only.
+### 9.x Hiring detail and source rules (2026-11-07)
+
+- Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
+- Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
+- Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.

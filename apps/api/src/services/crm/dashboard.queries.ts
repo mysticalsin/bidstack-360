@@ -282,7 +282,13 @@ export async function resolveCockpitCompany(
           [],
           [company],
         );
-    const resolved = list[0];
+    // buildCompanies always appends a Mantu fallback and sorts by name, so pick by
+    // identity, not position. An enrichment keeps its id unless its display name
+    // matches the Company row, in which case the row's id is stamped on it.
+    const resolved =
+      (byNameEnrichment
+        ? list.find((c) => c.id === byNameEnrichment.id || c.id === company.id)
+        : list.find((c) => normalizeName(c.name) === normalizeName(company.name))) ?? null;
     if (resolved) {
       resolved.id = company.id;
       if (company.domain) resolved.domain = company.domain;

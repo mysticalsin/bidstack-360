@@ -6,3 +6,4 @@ export * from './match-signing-entity.js';
 export * from './leverage.js';
 export * from './value-panel.js';
 export * from './synthetic-msa.js';
+export * from './whitespace.js';

@@ -89,6 +89,16 @@ describe('stored request and response text', () => {
     expect(out).toContain('"ok":true');
   });
 
+  it('redacts every credential in an array-valued secret field', () => {
+    // A comma-stopped match kept the second token and broke the JSON.
+    const out = redactWebhookText('{"tokens":["credential-one","credential-two"],"ok":true}');
+    expect(out).not.toContain('credential-one');
+    expect(out).not.toContain('credential-two');
+    expect(out).toContain('"tokens":"****"');
+    expect(out).toContain('"ok":true');
+    expect(JSON.parse(out.slice(0, out.indexOf('}') + 1))).toEqual({ tokens: '****', ok: true });
+  });
+
   it('caps stored text by UTF-8 bytes and says so', () => {
     const big = 'é'.repeat(WEBHOOK_BODY_CAP_BYTES);
     const capped = capWebhookText(big);

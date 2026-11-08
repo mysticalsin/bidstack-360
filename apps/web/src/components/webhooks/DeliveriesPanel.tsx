@@ -217,7 +217,7 @@ function AttemptsHeatmap({
             type="button"
             onClick={() => setAsTable((v) => !v)}
             aria-pressed={asTable}
-            className="h-8 rounded-md px-2.5 text-xs font-medium text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+            className="h-8 rounded-md px-2.5 text-xs font-medium text-[var(--fg-secondary)] pointer-coarse:min-h-11 pointer-coarse:min-w-11 hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
           >
             {asTable
               ? t('webhooks.heatmap.viewChart', 'View as chart')
