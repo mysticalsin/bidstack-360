@@ -30,6 +30,7 @@ import { PulseHero } from '@/components/signals/PulseHero';
 import { KeyNumbersStrip } from '@/components/positioning/KeyNumbersStrip';
 import { WhatToPosition } from '@/components/positioning/WhatToPosition';
 import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
+import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountVisuals } from '@/components/account/AccountVisuals';
 import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
@@ -409,6 +410,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           <KeyNumbersStrip companyId={cockpit.company.id} />
           <WhatToPosition companyId={cockpit.company.id} />
           <AccountDirectionSection companyId={cockpit.company.id} />
+          <ConsultingPartnersSection companyId={cockpit.company.id} />
           <div id="pulse" style={{ scrollMarginTop: 80 }}>
             <PulseHero companyId={cockpit.company.id} />
           </div>

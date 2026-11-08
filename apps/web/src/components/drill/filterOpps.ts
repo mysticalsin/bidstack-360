@@ -8,6 +8,8 @@ export interface OppDrillFilter {
   account?: string | null;
   /** Won within the current calendar year (hero "Won this year"). */
   thisYear?: boolean;
+  /** Close month as 'YYYY-MM' (hero "Bids by close month" column). */
+  closeMonth?: string | null;
 }
 
 export function filterOpps(rows: OppRow[], f: OppDrillFilter, q = '', year = new Date().getUTCFullYear()): OppRow[] {
@@ -19,6 +21,11 @@ export function filterOpps(rows: OppRow[], f: OppDrillFilter, q = '', year = new
     if (f.thisYear) {
       const d = closeDate(o);
       if (!d || new Date(d).getUTCFullYear() !== year) return false;
+    }
+    if (f.closeMonth) {
+      const d = closeDate(o);
+      const t = d ? new Date(d).getTime() : Number.NaN;
+      if (Number.isNaN(t) || new Date(t).toISOString().slice(0, 7) !== f.closeMonth) return false;
     }
     if (needle && !`${o.name ?? ''} ${o.customer ?? ''} ${o.code ?? ''}`.toLowerCase().includes(needle)) return false;
     return true;
