@@ -19,6 +19,7 @@ import { leadsConvert } from './leads-convert.js';
 import { notesList } from './notes-list.js';
 import { notesCreate } from './notes-create.js';
 import { salesToolkitsList } from './sales-toolkits-list.js';
+import { agreementsIngest } from './agreements-ingest.js';
 import {
   crmSearchCompanies,
   crmCreateDeal,
@@ -38,6 +39,7 @@ import {
   kamReadProspections,
   kamLogProspection,
 } from './kam-tools.js';
+import { activityTools, activityToolScopes } from './activity-tools.js';
 
 export interface Tool<I extends z.ZodTypeAny = z.ZodTypeAny, O = unknown> {
   description: string;
@@ -110,6 +112,12 @@ export const tools = {
   account_news: agentTools.account_news,
   // Open data technology stack (slice 16).
   company_tech_stack: agentTools.company_tech_stack,
+  // Agreement pull (slice 13a): stages a document for MSA intake review.
+  agreements_ingest: agreementsIngest,
+  // Account activity (Dust, CRMs): additive, defined in activity-tools.ts
+  ...activityTools,
+  // Consulting partners (slice 15): public evidence only for API keys.
+  consulting_partners: agentTools.consulting_partners,
 } as const;
 
 export type ToolName = keyof typeof tools;
@@ -165,6 +173,9 @@ export const toolScopes = {
   account_financials_summary: 'read',
   account_news: 'read',
   company_tech_stack: 'read',
+  agreements_ingest: 'write',
+  ...activityToolScopes,
+  consulting_partners: 'read',
 } satisfies Record<ToolName, ToolScope>;
 
 export function requiredScopeForTool(name: ToolName): ToolScope {

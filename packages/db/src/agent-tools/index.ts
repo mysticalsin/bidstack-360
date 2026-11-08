@@ -8,6 +8,7 @@ import {
   accountHiring,
   accountNews,
 } from './account-intel.js';
+import { consultingPartners } from './consulting-partners.js';
 import { bidsOverdue, proposalSectionDraft, proposalStatus } from './bids.js';
 import { opportunitiesGet, opportunitiesList, opportunityUpdate } from './opportunities.js';
 import { accountUpdates, recordsResolve } from './records.js';
@@ -32,6 +33,7 @@ export const agentTools = {
   account_financials_summary: accountFinancialsSummary,
   account_news: accountNews,
   company_tech_stack: companyTechStack,
+  consulting_partners: consultingPartners,
 } as const satisfies Record<string, AgentTool>;
 
 export type AgentToolName = keyof typeof agentTools;
@@ -46,6 +48,7 @@ export {
   accountUpdates,
   bidsOverdue,
   companyTechStack,
+  consultingPartners,
   opportunitiesGet,
   opportunitiesList,
   opportunityUpdate,

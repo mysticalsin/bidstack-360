@@ -7,6 +7,8 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
 
+import { DataResidencySection } from '@/components/settings/DataResidencySection';
+
 export function SecuritySection() {
   const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
@@ -90,6 +92,8 @@ export function SecuritySection() {
           </div>
         </Card>
       )}
+
+      <DataResidencySection />
     </div>
   );
 }

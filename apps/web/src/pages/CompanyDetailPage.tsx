@@ -10,9 +10,12 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { useCompany, useCompanyHierarchy } from '@/hooks/useCompanies';
+import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { AccountActivityCharts } from '@/components/company/AccountActivityCharts';
 import { CompanyTechStackSection } from '@/components/company/CompanyTechStackSection';
+import { ConsultingPartnersSection } from '@/components/consulting-partners/ConsultingPartnersSection';
 import { AccountPeopleSection } from '@/components/people/AccountPeopleSection';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
@@ -165,7 +168,10 @@ export function CompanyDetailPage() {
             )}
           </div>
 
+          <AccountActivityCharts companyId={c.id} />
+
           <CompanyTechStackSection companyId={c.id} />
+          <ConsultingPartnersSection companyId={c.id} />
 
           <div
             className="flex gap-2 border-b border-[var(--border-subtle)]"
@@ -270,6 +276,7 @@ export function CompanyDetailPage() {
             </div>
           )}
 
+          <EmailPanel filter={{ companyId: c.id }} />
           <CustomFieldValuesSection entityType="company" entityId={id!} />
         </>
       )}

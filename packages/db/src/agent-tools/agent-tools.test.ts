@@ -25,6 +25,7 @@ describe('shared agent tool registry', () => {
       'account_financials_summary',
       'account_news',
       'company_tech_stack',
+      'consulting_partners',
     ]) {
       expect(AGENT_TOOL_NAMES).toContain(name);
     }

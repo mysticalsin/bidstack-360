@@ -25,6 +25,7 @@ import { KpiRow } from './widgets/KpiRow';
 import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
 import { QuickLinksCard } from './widgets/SidebarCards';
 import { RecentActivityCard } from './widgets/RecentActivityCard';
+import { ActivityByHourCard } from './ActivityByHourCard';
 import { DashboardHero, NeedsYou, PerformanceCard, PipelineCard } from './DashboardVisuals';
 import { OppDrill, type OppDrillFilter } from '@/components/drill/OppDrill';
 import { GettingStarted } from './widgets/GettingStarted';
@@ -266,7 +267,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <PortfolioMomentum />
         </Suspense>
         <HemaLeverageTile />
-        <PipelineCard rows={oppRows} onDrill={setDrill} />
+        <div className="viz-grid-3">
+          <PipelineCard rows={oppRows} onDrill={setDrill} />
+          <ActivityByHourCard />
+        </div>
         <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
         <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
 
