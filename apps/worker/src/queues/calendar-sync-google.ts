@@ -19,6 +19,7 @@ import {
   calendarFiling,
   googleMeetingHints,
   meetingColumns,
+  appendBridgeObservations,
   drainPendingActivityBridges,
   noteActivityBridgeFailures,
   refileUnlessManual,
@@ -218,7 +219,7 @@ export async function pullGoogleIncremental(
   const syncToken = deltaState['calendarSyncToken'] as string | undefined;
   let pageToken = deltaState['calendarPageToken'] as string | undefined;
   let count = 0;
-  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
+  const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const res = await providerFetch(
@@ -238,7 +239,7 @@ export async function pullGoogleIncremental(
     const body = (await res.json()) as { items?: GoogleEventItem[]; nextSyncToken?: string; nextPageToken?: string };
     const items = body.items ?? [];
     count += items.length;
-    const { failed, settled } = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
+    const { failed, settled, captureHeld } = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
     const pageKey = `google:${syncToken ?? ''}:${pageToken ?? ''}`;
     const bridge = noteActivityBridgeFailures(deltaState, pageKey, failed, new Date().toISOString(), settled);
     const drained = typeof prisma.calendarEvent?.findFirst === 'function'
@@ -252,11 +253,11 @@ export async function pullGoogleIncremental(
       return ok;
     })
       : null;
-    bridgeDeltas.push({ page: pageKey, failedIds: failed, settledIds: settled });
+    appendBridgeObservations(bridgeDeltas, pageKey, failed, settled, drained);
     if (bridge.quarantined.length > 0) {
       log.warn({ tokenId, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
     }
-    if (bridge.backpressure || (drained?.hold ?? bridge.hold)) {
+    if (captureHeld.length > 0 || bridge.backpressure || (drained?.hold ?? bridge.hold)) {
       await commitTokenDeltaState(
         prisma,
         tokenId,
@@ -294,9 +295,10 @@ async function upsertGoogleEvents(
   userId: string,
   ownerEmail: string | null,
   log: pino.Logger,
-): Promise<{ failed: string[]; settled: string[] }> {
+): Promise<{ failed: string[]; settled: string[]; captureHeld: string[] }> {
   const failed: string[] = [];
   const settled: string[] = [];
+  const captureHeld: string[] = [];
   for (const item of items) {
     if (!item.id) continue;
 
@@ -320,6 +322,7 @@ async function upsertGoogleEvents(
     }
     const isAllDay = Boolean(item.start?.date && !item.start?.dateTime);
 
+    let captured = false;
     try {
       const attendees = item.attendees ?? [];
       const organizerEmail = item.organizer?.email ?? null;
@@ -359,6 +362,7 @@ async function upsertGoogleEvents(
         update: fields,
         select: { id: true },
       });
+      captured = true;
       await refileUnlessManual({ orgId, ownerId: userId, provider: 'google_workspace', externalId: item.id }, filing);
       const ok = await bridgeActivity(
         () => syncCalendarEventActivity(orgId, saved.id, { hints }),
@@ -368,11 +372,12 @@ async function upsertGoogleEvents(
       if (!ok) failed.push(item.id);
       else settled.push(item.id);
     } catch (err) {
-      failed.push(item.id);
+      if (captured) failed.push(item.id);
+      else captureHeld.push(item.id);
       log.warn({ err, eventId: item.id }, 'Failed to upsert Google event; skipping');
     }
   }
-  return { failed, settled };
+  return { failed, settled, captureHeld };
 }
 
 // ─── Google watch channel renewal ─────────────────────────────────────────

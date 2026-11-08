@@ -14,6 +14,7 @@ const bridgeStore = vi.hoisted(() => {
       updateMany: vi.fn(),
       upsert: vi.fn(async () => ({ id: 'row-1' })),
       findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => ({ id: 'row-1' })),
     },
     integrationToken: {
       update: tokenUpdate,
@@ -345,9 +346,82 @@ describe('Microsoft calendar pull', () => {
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
     expect(saved.data.deltaState.calendarDeltaLink).toBeUndefined();
     expect(saved.data.deltaState.calendarNextLink).toEqual(expect.stringContaining('/calendarView/delta'));
-    const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
-    expect(counts['ev-throw']).toBe(1);
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgePending).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+
+  it('still has not quarantined a row that was never written after repeated failures', async () => {
+    // WHY: three write failures used to spend the bridge budget and then let
+    // the delta link move past an event Polo never stored.
+    upsert.mockRejectedValue(new Error('write failed'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'ev-throw',
+              subject: 'Secret subject',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+            },
+          ],
+          '@odata.deltaLink': 'd-next',
+        }),
+      ),
+    );
+    let state: Record<string, unknown> = {};
+    for (let attempt = 0; attempt < ACTIVITY_BRIDGE_RETRY_LIMIT; attempt++) {
+      bridgeStore.persisted.delta = structuredClone(state);
+      await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', state, log, 'tony@amaris.com');
+      state = (
+        tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }
+      ).data.deltaState;
+      expect(state.calendarDeltaLink).toBeUndefined();
+      expect(state.activityBridgeQuarantine).toBeUndefined();
+      expect(state.activityBridgeRetryById).toBeUndefined();
+      expect(JSON.stringify(state)).not.toContain('Secret subject');
+    }
+  });
+
+  it('retries a saved event through findFirst and the commit drops it', async () => {
+    // WHY: drain success has to be in the locked merge. The next process
+    // reads that row, not the memory of the process that just exited.
+    const findFirst = vi.mocked(prisma.calendarEvent.findFirst);
+    findFirst.mockResolvedValue({ id: 'row-old' } as never);
+    const start = { activityBridgePending: [{ id: 'ev-old', attempts: 1 }] };
+    bridgeStore.persisted.delta = structuredClone(start);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        json({
+          value: [
+            {
+              id: 'ev-new',
+              subject: 'New',
+              start: { dateTime: '2026-11-09T14:00:00.0000000', timeZone: 'UTC' },
+              end: { dateTime: '2026-11-09T15:00:00.0000000', timeZone: 'UTC' },
+            },
+          ],
+          '@odata.deltaLink': 'd-next',
+        }),
+      ),
+    );
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', start, log, 'tony@amaris.com');
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ externalId: 'ev-old', provider: 'microsoft_graph' }),
+      }),
+    );
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.activityBridgePending).toBeUndefined();
+    expect(saved.data.deltaState.calendarDeltaLink).toBe('d-next');
+    findFirst.mockClear();
+    bridgeStore.persisted.delta = structuredClone(saved.data.deltaState);
+    await pullMicrosoftIncremental('tok-1', orgId, userId, 'at', saved.data.deltaState, log, 'tony@amaris.com');
+    expect(findFirst).not.toHaveBeenCalled();
   });
 
   it('raises a rate limit error with the Retry-After wait on 429', async () => {
@@ -485,8 +559,8 @@ describe('Google calendar pull', () => {
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
     expect(saved.data.deltaState.calendarSyncToken).toBeUndefined();
     expect(saved.data.deltaState.watchChannelId).toBe('ch-1');
-    const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
-    expect(counts['g-throw']).toBe(1);
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
   });
 

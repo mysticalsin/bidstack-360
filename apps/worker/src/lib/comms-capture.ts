@@ -284,7 +284,30 @@ export type ActivityBridgeDelta = {
    * Ids this run did not see stay in the map.
    */
   settledIds?: string[];
+  /**
+   * A drain pass must not park the active page's other ids. Page observations
+   * leave this unset and do park them.
+   */
+  parkUnseen?: boolean;
 };
+
+/** Record one page observation and, when a drain ran, its outcome as a second delta. */
+export function appendBridgeObservations(
+  deltas: ActivityBridgeDelta[],
+  page: string,
+  failedIds: readonly string[],
+  settledIds: readonly string[],
+  drained: { failedIds: readonly string[]; settledIds: readonly string[] } | null,
+): void {
+  deltas.push({ page, failedIds: [...failedIds], settledIds: [...settledIds] });
+  if (!drained) return;
+  deltas.push({
+    page: `${page}#drain`,
+    failedIds: [...drained.failedIds],
+    settledIds: [...drained.settledIds],
+    parkUnseen: false,
+  });
+}
 
 /** The locked cursor changed a key this run needed to write. The job retries the whole pull. */
 export class CursorKeyConflictError extends Error {
@@ -383,8 +406,12 @@ function quarantineIds(
  * under the active cap. Ids this page did not see move to
  * `activityBridgePending` with their attempt counts. That queue is bounded.
  * At the cap a new id is not admitted and is not swapped for an older one;
- * the cursor stays. An empty observation does not clear other ids. Success
+ * the cursor stays. An empty observation does not clear other ids and does
+ * not let the cursor pass them: those ids move to the pending queue. Success
  * removes only the ids in `settledIds`. Unexhausted ids are not dropped by age.
+ * This budget is only for a row that was already captured. A fetch, target
+ * lookup, or insert that failed before the row existed is not a `failedIds`
+ * entry; the caller holds the cursor and does not spend this budget.
  * `page` is the caller's cursor key and is not part of the count.
  * `parkUnseen` is false for a drain pass, which retries specific ids and must
  * not treat the rest of the backlog as absent.
@@ -403,8 +430,26 @@ export function noteActivityBridgeFailures(
   const failedSet = new Set(failed);
   const settled = [...new Set(settledIds.filter((id) => id.length > 0 && !failedSet.has(id)))];
   if (failed.length === 0 && settled.length === 0) {
+    const counts = readRetryIds(state);
     const pending = readPending(state);
-    return { hold: pending.length > 0, quarantined: [], pending: pending.length, backpressure: false };
+    let backpressure = false;
+    if (parkUnseen) {
+      for (const [id, attempts] of Object.entries(counts)) {
+        if (!rememberPending(pending, id, attempts)) {
+          backpressure = true;
+          continue;
+        }
+        delete counts[id];
+      }
+      writeRetryIds(state, counts);
+      writePending(state, pending);
+    }
+    return {
+      hold: backpressure || pending.length > 0 || underLimit(counts),
+      quarantined: [],
+      pending: pending.length,
+      backpressure,
+    };
   }
   const counts = readRetryIds(state);
   const pending = readPending(state);
@@ -466,10 +511,9 @@ export function noteActivityBridgeFailures(
       delete counts[id];
       continue;
     }
-    // Both bounds are full. Keep the id on the active map so this observation
-    // is not discarded, and hold the cursor. Do not evict someone else.
+    // Both bounds are full. Do not grow the active map past its cap and do
+    // not evict someone else. The cursor stays, so this page is read again.
     refused = true;
-    counts[id] = attempts;
   }
   backpressure = backpressure || refused;
   writeRetryIds(state, counts);
@@ -528,17 +572,29 @@ export async function drainPendingActivityBridges(
   state: Record<string, unknown>,
   run: (providerId: string) => Promise<boolean | 'gone'>,
   now = new Date().toISOString(),
-): Promise<{ hold: boolean; quarantined: string[]; pending: number; backpressure: boolean } | null> {
+): Promise<{ hold: boolean; quarantined: string[]; pending: number; backpressure: boolean; failedIds: string[]; settledIds: string[] } | null> {
   const ids = claimActivityBridgeDrain(state);
   if (ids.length === 0) return null;
   const failed: string[] = [];
   const settled: string[] = [];
   for (const id of ids) {
-    const result = await run(id);
-    if (result === true || result === 'gone') settled.push(id);
-    else failed.push(id);
+    try {
+      const result = await run(id);
+      if (result === true || result === 'gone') settled.push(id);
+      else failed.push(id);
+    } catch {
+      // One retry throwing must not skip the rest of the batch or the commit.
+      failed.push(id);
+    }
   }
-  return noteActivityBridgeFailures(state, 'drain', failed, now, settled, false);
+  const noted = noteActivityBridgeFailures(state, 'drain', failed, now, settled, false);
+  return { ...noted, failedIds: failed, settledIds: settled };
+}
+
+const CALENDAR_CURSOR_KEYS = ['calendarNextLink', 'calendarDeltaLink'] as const;
+
+function sameCalendarGroup(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+  return CALENDAR_CURSOR_KEYS.every((key) => samePresence(cursorPresence(left, key), cursorPresence(right, key)));
 }
 
 function sameCursorValue(left: unknown, right: unknown): boolean {
@@ -566,9 +622,10 @@ function samePresence(
  * from either snapshot; `deltas` are applied once onto the stored counts.
  *
  * `calendarNextLink` and `calendarDeltaLink` are one cursor: the next read
- * follows the nextLink first. If any key this run needs to change no longer
- * matches the snapshot, and the locked row is not already the desired value,
- * the whole merge aborts. A later key is not written beside a conflicting one.
+ * follows the nextLink first. If this run changes either key, both keys must
+ * still match the snapshot, or the locked row must already be the desired
+ * pair. A moved sibling key aborts the whole merge. A later key is not
+ * written beside a conflicting one.
  * When the locked row already matches this run, the write is idempotent and
  * the retry deltas still apply.
  */
@@ -581,11 +638,26 @@ export function mergeBridgeDeltaState(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = structuredClone(stored);
   const retryKeySet = new Set<string>(RETRY_KEYS);
+  const calendarKeySet = new Set<string>(CALENDAR_CURSOR_KEYS);
   const keys = new Set([...Object.keys(baseline), ...Object.keys(desired)]);
   const conflicts: string[] = [];
   const writes: string[] = [];
+  // calendarNextLink and calendarDeltaLink are one cursor. A write of either
+  // key is refused when the other key has also moved, even if this run did
+  // not intend to change that other key.
+  if (!sameCalendarGroup(baseline, desired)) {
+    if (sameCalendarGroup(result, desired)) {
+      // The locked row already has this run's cursor. Nothing to write.
+    } else if (sameCalendarGroup(result, baseline)) {
+      for (const key of CALENDAR_CURSOR_KEYS) {
+        if (!samePresence(cursorPresence(baseline, key), cursorPresence(desired, key))) writes.push(key);
+      }
+    } else {
+      conflicts.push(...CALENDAR_CURSOR_KEYS);
+    }
+  }
   for (const key of keys) {
-    if (retryKeySet.has(key)) continue;
+    if (retryKeySet.has(key) || calendarKeySet.has(key)) continue;
     const base = cursorPresence(baseline, key);
     const want = cursorPresence(desired, key);
     if (samePresence(base, want)) continue;
@@ -597,7 +669,7 @@ export function mergeBridgeDeltaState(
     }
     writes.push(key);
   }
-  if (conflicts.length > 0) throw new CursorKeyConflictError([...conflicts].sort());
+  if (conflicts.length > 0) throw new CursorKeyConflictError([...new Set(conflicts)].sort());
   for (const key of writes) {
     const want = cursorPresence(desired, key);
     if (!want.present) delete result[key];
@@ -608,7 +680,14 @@ export function mergeBridgeDeltaState(
     else delete result[key];
   }
   for (const delta of deltas) {
-    noteActivityBridgeFailures(result, delta.page, delta.failedIds, now, delta.settledIds ?? []);
+    noteActivityBridgeFailures(
+      result,
+      delta.page,
+      delta.failedIds,
+      now,
+      delta.settledIds ?? [],
+      delta.parkUnseen !== false,
+    );
   }
   return result;
 }

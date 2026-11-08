@@ -11,7 +11,7 @@ import type pino from 'pino';
 import { prisma, EmailProvider, syncEmailMessageActivity } from '@bidstack/db';
 
 import { commitTokenDeltaState } from '../lib/activity-bridge-commit.js';
-import { bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
+import { appendBridgeObservations, bridgeActivity, captureColumns, drainPendingActivityBridges, noteActivityBridgeFailures, resolveCaptureTarget } from '../lib/comms-capture.js';
 import { providerFetch } from '../lib/provider-http.js';
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
@@ -125,6 +125,7 @@ async function seedIds(
   let token = pageToken;
   const ids: string[] = [];
   for (let page = 0; page < MAX_LIST_PAGES && ids.length < cap; page++) {
+    const requestedToken = token;
     const params = new URLSearchParams({ q: 'newer_than:30d', maxResults: '100' });
     if (token) params.set('pageToken', token);
     const list = await getJson<{ messages?: Array<{ id: string }>; nextPageToken?: string }>(
@@ -140,10 +141,18 @@ async function seedIds(
     });
     ids.push(...slice.ids);
     resume = slice.resumeCount;
-    token = slice.pageToken ?? undefined;
     if (!slice.finished && slice.pageToken === null && slice.resumeCount > 0) {
-      return { ids, historyId: profile.body.historyId ?? null, resumeCount: resume, pageToken: token ?? null, finished: false };
+      // The page was only partly stored. The next run must request this same
+      // page token again and skip `resume` ids. The token is not the next page.
+      return {
+        ids,
+        historyId: profile.body.historyId ?? null,
+        resumeCount: resume,
+        pageToken: requestedToken ?? null,
+        finished: false,
+      };
     }
+    token = slice.pageToken ?? undefined;
     if (slice.finished) {
       return { ids, historyId: profile.body.historyId ?? null, resumeCount: 0, pageToken: null, finished: true };
     }
@@ -264,14 +273,16 @@ export async function pullGmail(
 
   let persisted = 0;
   const failedIds: string[] = [];
+  const captureHeldIds: string[] = [];
   const settledIds: string[] = [];
-  const bridgeDeltas: Array<{ page: string; failedIds: string[]; settledIds: string[] }> = [];
+  const bridgeDeltas: Parameters<typeof appendBridgeObservations>[0] = [];
   for (const id of ids) {
     const detail = await getJson<GmailMessageDetail>(`${API}/messages/${encodeURIComponent(id)}?format=full`, accessToken);
     if (!detail.body) {
       // A missing body is not a reason to move the cursor past this id.
-      // 404 means Gmail already dropped it; anything else is retried.
-      if (detail.status !== 404) failedIds.push(id);
+      // 404 means Gmail already dropped it. Any other status failed before a
+      // row existed, so it holds the cursor and does not spend the bridge budget.
+      if (detail.status !== 404) captureHeldIds.push(id);
       else settledIds.push(id);
       continue;
     }
@@ -281,6 +292,7 @@ export async function pullGmail(
       continue;
     }
 
+    let captured = false;
     try {
       const headers = msg.payload?.headers ?? [];
       const header = (name: string) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
@@ -326,6 +338,7 @@ export async function pullGmail(
         update: {},
         select: { id: true },
       });
+      captured = true;
       const bridged = await bridgeActivity(
         () => syncEmailMessageActivity(token.orgId, saved.id),
         log,
@@ -335,7 +348,10 @@ export async function pullGmail(
       if (!bridged) failedIds.push(msg.id);
       else settledIds.push(msg.id);
     } catch (err) {
-      failedIds.push(msg.id);
+      // The bridge budget is only for a row that was stored. A target lookup
+      // or insert that threw has nothing for the drain to find.
+      if (captured) failedIds.push(msg.id);
+      else captureHeldIds.push(msg.id);
       log.warn({ err, msgId: msg.id }, 'Failed to persist Gmail message');
     }
   }
@@ -348,16 +364,18 @@ export async function pullGmail(
       where: { orgId: token.orgId, userId: token.userId, externalMessageId: providerId, deletedAt: null },
       select: { id: true },
     });
+    // Only ids that already used the bridge budget are drained. No row means
+    // that saved message is gone, so the activity bridge cannot run.
     if (!row) return 'gone';
     const ok = await bridgeActivity(() => syncEmailMessageActivity(token.orgId, row.id), log, { msgId: providerId });
     return ok;
   })
     : null;
-  bridgeDeltas.push({ page: pageKey, failedIds, settledIds });
+  appendBridgeObservations(bridgeDeltas, pageKey, failedIds, settledIds, drained);
   if (bridge.quarantined.length > 0) {
     log.warn({ tokenId: token.id, ids: bridge.quarantined }, 'Account activity bridge quarantined after repeated failures');
   }
-  if (bridge.backpressure || (drained?.hold ?? bridge.hold)) {
+  if (captureHeldIds.length > 0 || bridge.backpressure || (drained?.hold ?? bridge.hold)) {
     log.warn({ tokenId: token.id }, 'Account activity bridge failed; Gmail history cursor stays put for another attempt');
     await commitTokenDeltaState(prisma, token.id, baseline, deltaState, bridgeDeltas);
     return persisted;

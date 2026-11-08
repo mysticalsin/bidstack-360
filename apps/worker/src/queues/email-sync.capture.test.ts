@@ -178,7 +178,7 @@ describe('Outlook inbox capture', () => {
     expect(saved.data.deltaState.mailSentDeltaLink).toBe('delta');
   });
 
-  it('records a thrown persist error and keeps Inbox counts across later Sent pulls', async () => {
+  it('does not spend the bridge budget when the Outlook row was never written', async () => {
     const poison = {
       id: 'm-poison',
       from: { emailAddress: { address: 'buyer@acme.com' } },
@@ -203,28 +203,19 @@ describe('Outlook inbox capture', () => {
 
     let state: Record<string, unknown> = { calendarDeltaLink: 'cal-keep' };
     findToken.mockImplementation(async () => tokenRow('microsoft_graph', state));
-    const countOf = (id: string): number => {
-      const counts = (state.activityBridgeRetryById ?? {}) as Record<string, number>;
-      return counts[id] ?? 0;
-    };
 
-    for (let attempt = 1; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
       state = (tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }).data.deltaState;
-      expect(countOf('m-poison')).toBe(attempt);
+      // The row was never written, so this is not an activity-bridge failure
+      // and the inbox cursor must not move on after a quarantine.
+      expect(state.activityBridgeRetryById).toBeUndefined();
+      expect(state.activityBridgeQuarantine).toBeUndefined();
       expect(state.mailDeltaLink).toBeUndefined();
       expect(state.mailNextLink).toEqual(expect.stringContaining('mailFolders/inbox'));
       expect(state.mailSentDeltaLink).toBe('sent-delta');
       expect(JSON.stringify(state)).not.toContain('Secret subject');
     }
-
-    await pullDelta({ orgId, userId, integrationTokenId: tokenId }, log);
-    state = (tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } }).data.deltaState;
-    expect(countOf('m-poison')).toBe(0);
-    expect(state.mailDeltaLink).toBe('inbox-delta');
-    expect(state.mailNextLink).toBeUndefined();
-    expect(state.activityBridgeQuarantine).toEqual([expect.objectContaining({ id: 'm-poison', attempts: 3 })]);
-    expect(JSON.stringify(state.activityBridgeQuarantine)).not.toContain('Secret subject');
   });
 
   it('does not store mail that matches no contact, company or opportunity', async () => {
@@ -404,9 +395,63 @@ describe('Gmail inbox capture', () => {
     const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
     expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
     expect(saved.data.deltaState.calendarSyncToken).toBe('keep');
-    const counts = saved.data.deltaState.activityBridgeRetryById as Record<string, number>;
-    expect(counts['g-poison']).toBe(1);
+    expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+    expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
     expect(JSON.stringify(saved.data.deltaState)).not.toContain('Secret subject');
+  });
+
+  it('holds the seed cursor when Gmail returns no message body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.includes('/messages?')) return json({ messages: [{ id: 'g-500', threadId: 't-1' }] });
+        return json({ error: 'unavailable' }, 500);
+      }),
+    );
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await pullGmail(tokenRow('gmail', { calendarSyncToken: 'keep' }), 'access-token', log);
+      const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+      expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
+      expect(saved.data.deltaState.activityBridgeQuarantine).toBeUndefined();
+      expect(saved.data.deltaState.activityBridgeRetryById).toBeUndefined();
+      expect(upsert).not.toHaveBeenCalled();
+    }
+  });
+
+  it('keeps the list page token when a later page is only partly stored', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.includes('/messages?') && !url.includes('pageToken')) {
+          return json({ messages: [{ id: 'g-1' }], nextPageToken: 'p2' });
+        }
+        if (url.includes('pageToken=p2')) {
+          return json({ messages: [{ id: 'g-2' }, { id: 'g-3' }], nextPageToken: 'p3' });
+        }
+        const id = url.includes('/messages/g-1') ? 'g-1' : 'g-2';
+        return json({
+          id,
+          threadId: 't',
+          internalDate: '1793973600000',
+          payload: {
+            mimeType: 'text/plain',
+            headers: [
+              { name: 'From', value: 'Buyer <buyer@acme.com>' },
+              { name: 'To', value: 'tony@amaris.com' },
+              { name: 'Subject', value: id },
+            ],
+            body: { data: b64('body') },
+          },
+        });
+      }),
+    );
+    await pullGmail(tokenRow('gmail', { calendarSyncToken: 'keep' }), 'access-token', log, 2);
+    const saved = tokenUpdate.mock.calls.at(-1)?.[0] as { data: { deltaState: Record<string, unknown> } };
+    expect(saved.data.deltaState.gmailListPageToken).toBe('p2');
+    expect(saved.data.deltaState.gmailListResumeCount).toBe(1);
+    expect(saved.data.deltaState.gmailHistoryId).toBeUndefined();
   });
 
   it('does not advance history past ids the cap has not stored yet', async () => {

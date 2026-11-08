@@ -11,6 +11,7 @@ import {
   ACTIVITY_BRIDGE_RETRY_LIMIT,
   claimActivityBridgeDrain,
   CursorKeyConflictError,
+  drainPendingActivityBridges,
   externalParticipants,
   googleMeetingHints,
   graphMeetingHints,
@@ -264,6 +265,31 @@ describe('activity bridge retry bound', () => {
     expect(owned.mailNextLink).toBe('keep');
   });
 
+  it('aborts when the calendar sibling key moved even though this run did not write it', () => {
+    // WHY: nextLink and deltaLink are one cursor. Writing a new nextLink
+    // beside someone else's deltaLink resumes on a mixed pair.
+    const stored = { calendarNextLink: 'page-1', calendarDeltaLink: 'theirs' };
+    expect(() =>
+      mergeBridgeDeltaState(
+        stored,
+        { calendarNextLink: 'page-1', calendarDeltaLink: 'mine' },
+        { calendarNextLink: 'page-2', calendarDeltaLink: 'mine' },
+        [],
+        '2026-11-08T03:00:00.000Z',
+      ),
+    ).toThrow(CursorKeyConflictError);
+    expect(stored).toEqual({ calendarNextLink: 'page-1', calendarDeltaLink: 'theirs' });
+  });
+
+  it('an empty page keeps unexhausted ids and holds the cursor', () => {
+    const state: Record<string, unknown> = { activityBridgeRetryById: { poison: 1 } };
+    const out = noteActivityBridgeFailures(state, 'empty', [], '2026-11-08T03:00:00.000Z');
+    expect(out.hold).toBe(true);
+    expect(state.activityBridgeRetryById).toBeUndefined();
+    expect(state.activityBridgePending).toEqual([{ id: 'poison', attempts: 1 }]);
+    expect(state.activityBridgeQuarantine).toBeUndefined();
+  });
+
   it('forgets only the oldest quarantined id, and that id starts a new budget', () => {
     // The cap is a bound, not a permanent budget. The forgotten id can be
     // counted again. An id still inside the list does not get a new budget.
@@ -387,6 +413,8 @@ describe('activity bridge retry bound', () => {
     expect(blocked.backpressure).toBe(true);
     expect(kept).toHaveLength(ACTIVITY_BRIDGE_PENDING_CAP);
     expect(kept.some((row) => row.id === 'extra')).toBe(false);
+    expect(stuck.activityBridgeRetryById).not.toHaveProperty('extra');
+    expect(Object.keys(stuck.activityBridgeRetryById as Record<string, number>)).toHaveLength(ACTIVITY_BRIDGE_ACTIVE_CAP);
     expect(kept[0]?.id).toBe('keep-0');
     expect(kept.at(-1)?.id).toBe(`keep-${ACTIVITY_BRIDGE_PENDING_CAP - 1}`);
   });
@@ -610,6 +638,59 @@ describe('activity bridge commit lock', () => {
     ).rejects.toThrow(/Cursor key conflict/);
     expect(update).not.toHaveBeenCalled();
     expect(stored.delta).toEqual({ calendarDeltaLink: 'newer' });
+  });
+
+  it('persists a drain success onto the locked row so a restart does not retry it', async () => {
+    // WHY: the drain used to change only the in-memory snapshot. The commit
+    // copied the locked retry keys and applied the page delta, so the id was
+    // still pending after restart.
+    const stored = {
+      delta: {
+        calendarDeltaLink: 'cal-keep',
+        activityBridgePending: [{ id: 'ev-old', attempts: 1 }],
+      } as Record<string, unknown>,
+    };
+    const update = vi.fn(async (args: { data: { deltaState: Record<string, unknown> } }) => {
+      stored.delta = args.data.deltaState;
+    });
+    const db = {
+      integrationToken: { findFirst: vi.fn(), update },
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => [{ delta_state: structuredClone(stored.delta) }]),
+      $transaction: async (fn: (tx: unknown) => Promise<void>) => fn(db),
+    };
+    const baseline = { calendarDeltaLink: 'cal-keep', activityBridgePending: [{ id: 'ev-old', attempts: 1 }] };
+    await commitTokenDeltaState(db, 'tok-1', baseline, { calendarDeltaLink: 'cal-keep', mailNextLink: 'inbox' }, [
+      { page: 'inbox', failedIds: [], settledIds: ['fresh'] },
+      { page: 'inbox#drain', failedIds: [], settledIds: ['ev-old'], parkUnseen: false },
+    ]);
+    expect(stored.delta.activityBridgePending).toBeUndefined();
+    expect(stored.delta.mailNextLink).toBe('inbox');
+    const restarted = structuredClone(stored.delta);
+    expect(restarted.activityBridgePending).toBeUndefined();
+    expect(restarted.activityBridgeRetryById).toBeUndefined();
+  });
+
+  it('a thrown drain retry counts that id and still settles the next one', async () => {
+    const state: Record<string, unknown> = {
+      activityBridgePending: [
+        { id: 'bad', attempts: 1 },
+        { id: 'good', attempts: 1 },
+      ],
+    };
+    const seen: string[] = [];
+    const drained = await drainPendingActivityBridges(state, async (id) => {
+      seen.push(id);
+      if (id === 'bad') throw new Error('read failed');
+      return true;
+    });
+    expect(seen).toEqual(['bad', 'good']);
+    expect(drained?.failedIds).toEqual(['bad']);
+    expect(drained?.settledIds).toEqual(['good']);
+    // A free active slot takes the retry. The throw did not drop `good`.
+    expect(state.activityBridgeRetryById).toEqual({ bad: 2 });
+    expect(state.activityBridgePending).toBeUndefined();
+    expect(state.activityBridgeQuarantine).toBeUndefined();
   });
 
   it('persists when the locked cursor already matches and still applies a success', async () => {
