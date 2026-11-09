@@ -10,6 +10,7 @@ import IORedis from 'ioredis';
 import pino from 'pino';
 
 import { COMPANY_ENRICH_APOLLO } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = pino({ name: 'queue:apollo-enrich', level: process.env.LOG_LEVEL ?? 'info' });
 
@@ -90,9 +91,9 @@ export async function enqueueApolloEnrich(job: ApolloEnrichJob): Promise<string 
     // This jobId acts as a deduplication key so parallel enrich requests for
     // the same org+company collapse into one job.
     const safeCompanyName = job.companyName.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const queued = await getQueue().add('apollo.enrich', payload, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('apollo.enrich', payload, {
       jobId: `${job.orgId}_${safeCompanyName}`,
-    });
+    }));
     log.info({ jobId: queued.id, orgId: job.orgId }, 'Apollo enrich job enqueued');
     return queued.id ?? null;
   } catch (err) {

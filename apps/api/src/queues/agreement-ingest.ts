@@ -12,6 +12,7 @@ import { AGREEMENT_INGEST, type AgreementIngestJob } from '@bidstack/shared';
 import { createLogger } from '../lib/logger.js';
 import { processAgreementIngestItem } from '../services/agreement-ingest/process.js';
 import { runAgreementSourceSync } from '../services/agreement-sources/sync.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:agreement-ingest' });
 
@@ -61,7 +62,7 @@ export async function enqueueAgreementIngest(job: AgreementIngestJob): Promise<s
   if (enqueueOverride) return enqueueOverride(job, jobId);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queued = await getQueue().add(`agreement.${job.kind}`, job, { jobId });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add(`agreement.${job.kind}`, job, { jobId }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, kind: job.kind }, 'Failed to enqueue agreement ingest job');

@@ -9,6 +9,7 @@ import { ZodError } from 'zod';
 import { isProviderTimeoutError } from '../lib/fetch-timeout.js';
 import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-client-abort.js';
 import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
+import { isQueueUnavailableError } from '../lib/queue-enqueue.js';
 import { captureSentryServerError } from './sentry.js';
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
@@ -89,6 +90,15 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
 
     if (isOAuthRefreshLockError(err)) {
       req.log.warn({ code: err.code }, 'OAuth refresh lock unavailable');
+      return reply.status(503).send({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: err.message,
+      });
+    }
+
+    if (isQueueUnavailableError(err)) {
+      req.log.warn({ queue: err.queueName, reason: err.reason, timeoutMs: err.timeoutMs }, 'job queue unavailable');
       return reply.status(503).send({
         statusCode: 503,
         error: 'Service Unavailable',

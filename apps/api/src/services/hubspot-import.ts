@@ -15,6 +15,7 @@ import {
 } from '@bidstack/shared';
 
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 export const HUBSPOT_IMPORT_ENTITIES = ['companies', 'contacts', 'deals', 'tasks'] as const;
 export type HubspotImportEntity = (typeof HUBSPOT_IMPORT_ENTITIES)[number];
@@ -148,9 +149,9 @@ export async function startHubspotImport(input: {
       hubspotIntegrationConfigId: config.id,
     });
 
-    await input.queue.add(`${job.id}-chunk-0`, payload, {
+    await addWithinDeadline(input.queue, (q) => q.add(`${job.id}-chunk-0`, payload, {
       jobId: `${job.id}-${entity}-chunk-0`,
-    });
+    }));
 
     await prisma.auditLog.create({
       data: {

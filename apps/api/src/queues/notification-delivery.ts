@@ -7,6 +7,7 @@ import IORedis from 'ioredis';
 import { NOTIFICATION_DELIVERY, type NotificationDeliveryJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:notification-delivery' });
 
@@ -44,7 +45,7 @@ export async function enqueueNotificationDelivery(job: DeliverJob): Promise<stri
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true')
     return null;
   try {
-    const queued = await getQueue().add('notification-delivery.deliver', job);
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('notification-delivery.deliver', job));
     return queued.id ?? null;
   } catch (err) {
     log.error(

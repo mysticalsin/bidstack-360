@@ -37,6 +37,7 @@ import {
   microsoftRedirectUri,
   microsoftTenant,
 } from '../../services/workspace-connect.service.js';
+import { addWithinDeadline } from '../../lib/queue-enqueue.js';
 
 function clientId(): string {
   const v = process.env.MICROSOFT_GRAPH_CLIENT_ID;
@@ -221,11 +222,11 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (savedToken) {
         // Schedule one-shot historical backfill
-        await outlookHistoricalQueue.add(
+        await addWithinDeadline(outlookHistoricalQueue, (q) => q.add(
           'email.outlook.pull-historical',
           { orgId, userId, integrationTokenId: savedToken.id },
           { jobId: `historical-${savedToken.id}` },
-        );
+        ));
 
         // Create Graph webhook subscription (best-effort — incremental poll fallback if it fails)
         void createSubscription({ integrationTokenId: savedToken.id, orgId }, server.log).catch(

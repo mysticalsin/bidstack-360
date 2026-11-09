@@ -8,6 +8,7 @@ import IORedis from 'ioredis';
 import { DATA_SUBJECT_REQUEST, type DataSubjectJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:data-subject-request' });
 
@@ -42,7 +43,7 @@ export async function enqueueDataSubjectRequest(job: DataSubjectJob): Promise<st
     return null;
   }
   try {
-    const queued = await getQueue().add('data-subject.run', job, { jobId: job.requestId });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('data-subject.run', job, { jobId: job.requestId }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, requestId: job.requestId }, 'Failed to enqueue data subject request');

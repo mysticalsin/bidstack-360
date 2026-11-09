@@ -5,6 +5,7 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { createLogger } from '../lib/logger.js';
 import { RFP_SECTION_DRAFT } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:rfp-section-draft' });
 
@@ -53,10 +54,10 @@ export async function enqueueRfpSectionDraft(job: RfpSectionDraftJob): Promise<s
     return null;
   }
   try {
-    const queued = await getQueue().add('rfp.section-draft', job, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('rfp.section-draft', job, {
       // WHY: dedup key per section prevents duplicate drafts if orchestrator restarts
       jobId: `rfp-section-draft-${job.orchestrationId}-${job.sectionId}`,
-    });
+    }));
     log.info(
       { jobId: queued.id, orgId: job.orgId, sectionId: job.sectionId },
       'RFP section draft job enqueued',

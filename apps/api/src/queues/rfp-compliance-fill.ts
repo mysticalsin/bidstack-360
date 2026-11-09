@@ -5,6 +5,7 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { createLogger } from '../lib/logger.js';
 import { RFP_COMPLIANCE_FILL } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:rfp-compliance-fill' });
 
@@ -53,10 +54,10 @@ export async function enqueueRfpComplianceFill(job: RfpComplianceFillJob): Promi
     return null;
   }
   try {
-    const queued = await getQueue().add('rfp.compliance-fill', job, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('rfp.compliance-fill', job, {
       // WHY: dedup key per matrix item — idempotent across orchestrator restarts
       jobId: `rfp-compliance-${job.orchestrationId}-${job.matrixItemId}`,
-    });
+    }));
     log.info(
       { jobId: queued.id, orgId: job.orgId, matrixItemId: job.matrixItemId },
       'RFP compliance fill job enqueued',

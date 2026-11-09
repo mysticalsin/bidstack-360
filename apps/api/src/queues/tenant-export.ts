@@ -8,6 +8,7 @@ import IORedis from 'ioredis';
 import { TENANT_EXPORT, type TenantExportJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:tenant-export' });
 
@@ -48,7 +49,7 @@ export async function enqueueTenantExport(job: TenantExportJob): Promise<string 
     return null;
   }
   try {
-    const queued = await getQueue().add('tenant.export', job, { jobId: job.exportId });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('tenant.export', job, { jobId: job.exportId }));
     log.info({ jobId: queued.id, orgId: job.orgId, exportId: job.exportId }, 'Tenant export enqueued');
     return queued.id ?? null;
   } catch (err) {

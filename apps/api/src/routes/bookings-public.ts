@@ -27,6 +27,7 @@ import {
 } from '@bidstack/shared';
 import { redis } from '../redis.js';
 import { PublicBookingCreate, sendBookingConfirmationEmail } from './bookings.helpers.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const BOOKING_BLOCKING_LOOKUP_LIMIT = 1000;
 const bookingCreateRateLimitMax = Number(process.env.PUBLIC_BOOKING_RATE_LIMIT_MAX ?? 5);
@@ -336,12 +337,12 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
 
       try {
         const pushQueue = getPushQueue();
-        await pushQueue.add('calendar.push', {
+        await addWithinDeadline(pushQueue, (q) => q.add('calendar.push', {
           orgId: page.user.orgId,
           userId: page.userId,
           calendarEventId: calEvent.id,
           operation: 'push',
-        });
+        }));
       } catch (err) {
         server.log.warn({ err, bookingId: booking.id }, 'Failed to enqueue calendar push');
       }
@@ -418,12 +419,12 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
       if (booking.calendarEventId) {
         try {
           const pushQueue = getPushQueue();
-          await pushQueue.add('calendar.push', {
+          await addWithinDeadline(pushQueue, (q) => q.add('calendar.push', {
             orgId: booking.bookingPage.user.orgId,
             userId: booking.bookingPage.userId,
             calendarEventId: booking.calendarEventId,
             operation: 'delete',
-          });
+          }));
         } catch (err) {
           server.log.warn(
             { err, bookingId: booking.id },

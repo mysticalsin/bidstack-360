@@ -5,6 +5,7 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { createLogger } from '../lib/logger.js';
 import { COMPETITOR_RESEARCH } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:competitor-research' });
 
@@ -54,9 +55,9 @@ export async function enqueueCompetitorResearch(
     return null;
   }
   try {
-    const enqueued = await getQueue().add('competitor.research', job, {
+    const enqueued = await addWithinDeadline(getQueue(), (q) => q.add('competitor.research', job, {
       jobId: `competitor-research-${job.competitorProfileId}-${job.opportunityId ?? 'profile'}`,
-    });
+    }));
     return enqueued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId }, 'Failed to enqueue competitor research job');

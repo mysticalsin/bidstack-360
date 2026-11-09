@@ -6,6 +6,7 @@ import IORedis from 'ioredis';
 import { SENTRY_SMOKE } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:sentry-smoke' });
 
@@ -48,9 +49,9 @@ export async function enqueueSentrySmoke(job: SentrySmokeJob): Promise<string | 
   }
 
   try {
-    const queued = await getQueue().add('sentry.smoke', job, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('sentry.smoke', job, {
       jobId: `sentry-smoke-${randomUUID()}`,
-    });
+    }));
     log.info({ jobId: queued.id, marker: job.marker }, 'Sentry smoke job enqueued');
     return queued.id ?? null;
   } catch (err) {

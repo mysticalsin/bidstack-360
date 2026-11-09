@@ -14,6 +14,7 @@ import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { CALENDAR_PUSH, mayWriteCalendar } from '@bidstack/shared';
 import { Queue } from 'bullmq';
 import { redis } from '../redis.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const CalendarEventBase = z.object({
   subject: z.string().min(1).max(300),
@@ -212,7 +213,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
     data: { orgId: string; userId: string; calendarEventId: string; operation: 'push' | 'update' | 'delete' },
   ): Promise<void> {
     try {
-      await getPushQueue().add('calendar.push', data);
+      await addWithinDeadline(getPushQueue(), (q) => q.add('calendar.push', data));
     } catch (err) {
       server.log.warn({ err, eventId: data.calendarEventId }, 'Push queue unavailable; event will be re-picked on next sync');
     }

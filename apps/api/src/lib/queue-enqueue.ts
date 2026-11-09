@@ -57,7 +57,7 @@ async function waitForReady(queue: Queue, deadline: number, notReady: () => Erro
 }
 
 /**
- * Runs `add` against `queue` within one deadline covering both the wait for
+ * Runs `add(queue)` within one deadline covering both the wait for
  * Redis and the command itself. Throws QueueUnavailableError when it runs out:
  * 'not-ready' means add was never called, so nothing can be queued later;
  * 'timed-out' means add was sent and may still land if Redis recovers, so the
@@ -65,10 +65,10 @@ async function waitForReady(queue: Queue, deadline: number, notReady: () => Erro
  */
 export async function addWithinDeadline<T>(
   queue: Queue,
-  add: () => Promise<T>,
+  add: (queue: Queue) => Promise<T>,
   timeoutMs: number = QUEUE_ENQUEUE_TIMEOUT_MS,
 ): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   await waitForReady(queue, deadline, () => new QueueUnavailableError(queue.name, 'not-ready', timeoutMs));
-  return settleBy(add(), deadline, () => new QueueUnavailableError(queue.name, 'timed-out', timeoutMs));
+  return settleBy(add(queue), deadline, () => new QueueUnavailableError(queue.name, 'timed-out', timeoutMs));
 }

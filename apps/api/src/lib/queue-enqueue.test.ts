@@ -1,7 +1,11 @@
 import { EventEmitter } from 'node:events';
 
+import sensible from '@fastify/sensible';
 import type { Queue } from 'bullmq';
+import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
+
+import { errorHandlerPlugin } from '../plugins/error-handler.js';
 
 import { addWithinDeadline, isQueueUnavailableError, QueueUnavailableError } from './queue-enqueue.js';
 
@@ -72,5 +76,27 @@ describe('addWithinDeadline', () => {
       (e: unknown) => e,
     );
     expect(err).toBe(boom);
+  });
+});
+
+describe('queue unavailable through the production error handler', () => {
+  // Routes that cannot fail open (call re-analysis, provider webhooks,
+  // migrations) let this error propagate. Clients and webhook senders must get
+  // a retryable 503, not the generic masked 500 or a request that never ends.
+  it('answers 503 Service Unavailable when the add never completes', async () => {
+    const app = Fastify({ logger: false });
+    await app.register(sensible);
+    await app.register(errorHandlerPlugin);
+    app.post('/enqueue', async () => addWithinDeadline(fakeQueue(new FakeClient('ready')), never, 40));
+
+    const res = await app.inject({ method: 'POST', url: '/enqueue' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({
+      statusCode: 503,
+      error: 'Service Unavailable',
+      message: 'Background job queue is unavailable; retry shortly',
+    });
+    await app.close();
   });
 });

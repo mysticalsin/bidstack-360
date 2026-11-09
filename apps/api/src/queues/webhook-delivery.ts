@@ -17,6 +17,7 @@ import pino from 'pino';
 
 import { prisma, recordWebhookOutboxEvent, type Prisma } from '@bidstack/db';
 import { WEBHOOK_DELIVERY } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 /**
  * WEBHOOK_OUTBOX_ENABLED=true records events in the durable webhook_outbox
@@ -125,7 +126,7 @@ export async function fanOutWebhookEvent(
         ...WEBHOOK_DELIVERY.defaultJobOptions,
       },
     }));
-    await queue.addBulk(jobs);
+    await addWithinDeadline(queue, (q) => q.addBulk(jobs));
     log.info({ orgId, event, count: subs.length }, 'webhook delivery jobs enqueued');
     return { delivery: 'enqueued', count: subs.length };
   } catch (err) {

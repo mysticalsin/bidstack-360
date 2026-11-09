@@ -91,8 +91,7 @@ export async function enqueueAccountIntel(job: AccountIntelRefreshJob): Promise<
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queue = getQueue();
-    const queued = await addWithinDeadline(queue, () => queue.add('account-intel.refresh', job, { jobId: accountIntelJobId(job) }));
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('account-intel.refresh', job, { jobId: accountIntelJobId(job) }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue account intel refresh');
@@ -110,8 +109,7 @@ export async function enqueueCompanyFullRefresh(job: CompanyFullRefreshJob): Pro
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queue = getQueue();
-    const queued = await addWithinDeadline(queue, () => queue.add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) }));
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue company intel full refresh');

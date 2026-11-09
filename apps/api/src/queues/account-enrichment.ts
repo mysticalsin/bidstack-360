@@ -8,6 +8,7 @@ import IORedis from 'ioredis';
 import { ACCOUNT_ENRICHMENT, type AccountEnrichmentJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:account-enrichment' });
 
@@ -50,7 +51,7 @@ export async function enqueueAccountEnrichment(job: EnrichJob): Promise<string |
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queued = await getQueue().add('account-enrichment.enrich', job, { jobId: accountEnrichmentJobId(job) });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('account-enrichment.enrich', job, { jobId: accountEnrichmentJobId(job) }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue account enrichment');
@@ -77,7 +78,7 @@ export async function enqueueOrgChartSeed(job: SeedJob): Promise<string | null> 
   if (seedOverride) return seedOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queued = await getQueue().add('account-enrichment.orgchart-seed', job, { jobId: orgChartSeedJobId(job), attempts: 1 });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('account-enrichment.orgchart-seed', job, { jobId: orgChartSeedJobId(job), attempts: 1 }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue org chart seed');

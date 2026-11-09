@@ -32,6 +32,7 @@ import {
 
 import { previewImportRows } from '../lib/import-preview.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const ImportPreviewResponse = z.object({
   entityType: z.string(),
@@ -206,9 +207,9 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           dedupStrategy,
           externalIdColumn,
         };
-        await queue.add(`${job.id}-chunk-${i}`, payload, {
+        await addWithinDeadline(queue, (q) => q.add(`${job.id}-chunk-${i}`, payload, {
           jobId: `${job.id}-${entityType}-chunk-${i}`,
-        });
+        }));
       }
 
       const updated = await prisma.migrationJob.update({

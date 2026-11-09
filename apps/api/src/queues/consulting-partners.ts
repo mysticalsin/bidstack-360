@@ -8,6 +8,7 @@ import IORedis from 'ioredis';
 import { CONSULTING_PARTNERS, type ConsultingPartnersQueueJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:consulting-partners' });
 
@@ -46,7 +47,7 @@ export async function enqueueConsultingPartners(job: ConsultingPartnersRefreshJo
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queued = await getQueue().add('consulting-partners.refresh', job, { jobId: `${job.orgId}--partners--${job.companyId}--${Date.now()}` });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('consulting-partners.refresh', job, { jobId: `${job.orgId}--partners--${job.companyId}--${Date.now()}` }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue consulting partners refresh');

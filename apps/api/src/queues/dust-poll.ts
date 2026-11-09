@@ -14,6 +14,7 @@ import IORedis from 'ioredis';
 import pino from 'pino';
 
 import { DUST_POLL } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = pino({ name: 'queue:dust-poll', level: process.env.LOG_LEVEL ?? 'info' });
 
@@ -60,10 +61,10 @@ export interface DustPollJob {
  */
 export async function enqueueDustResync(job: DustPollJob): Promise<string | null> {
   try {
-    const queued = await getQueue().add('dust.poll', job, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('dust.poll', job, {
       // Per-org dedup window: at most one manual resync queued at a time.
       jobId: `${job.orgId}-manual-${Math.floor(Date.now() / 30_000)}`,
-    });
+    }));
     log.info({ jobId: queued.id, orgId: job.orgId, source: job.source }, 'Dust poll job enqueued');
     return queued.id ?? null;
   } catch (err) {

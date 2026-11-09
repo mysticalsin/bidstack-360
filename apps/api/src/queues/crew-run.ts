@@ -6,6 +6,7 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { createLogger } from '../lib/logger.js';
 import { CREW_RUN } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:crew-run' });
 
@@ -50,7 +51,7 @@ export async function enqueueCrewRun(job: CrewRunJob): Promise<string | null> {
     return null;
   }
   try {
-    const queued = await getQueue().add('crew.run', job, { jobId: `crew-run-${job.runId}` });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('crew.run', job, { jobId: `crew-run-${job.runId}` }));
     log.info({ jobId: queued.id, orgId: job.orgId, runId: job.runId }, 'crew-run job enqueued');
     return queued.id ?? null;
   } catch (err) {

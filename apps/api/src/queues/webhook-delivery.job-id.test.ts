@@ -4,7 +4,9 @@ const addBulk = vi.fn();
 
 vi.mock('bullmq', () => ({
   Queue: class {
+    name = 'webhook-delivery';
     addBulk = addBulk;
+    client = Promise.resolve({ status: 'ready' });
   },
 }));
 

@@ -8,6 +8,7 @@ import { prisma } from '@bidstack/db';
 import { createLogger } from '../lib/logger.js';
 
 import { DOCUMENT_EXTRACT } from '@bidstack/shared';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:document-extract' });
 
@@ -104,10 +105,10 @@ export async function enqueueDocumentExtract(job: DocumentExtractJob): Promise<s
     return null;
   }
   try {
-    const queued = await getQueue().add('document.extract', job, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('document.extract', job, {
       jobId: [job.orgId, job.documentId, job.bidDocumentId ?? job.extractionId].join('--'),
       ...(job.priority !== undefined ? { priority: job.priority } : {}),
-    });
+    }));
     log.info(
       { jobId: queued.id, orgId: job.orgId, documentId: job.documentId },
       'Document extract job enqueued',

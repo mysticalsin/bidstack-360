@@ -12,7 +12,7 @@ const {
   return {
     queueAddMock,
     queueMock: vi.fn(function QueueMock() {
-      return { add: queueAddMock };
+      return { name: 'rfp-orchestrate', add: queueAddMock, client: Promise.resolve({ status: 'ready' }) };
     }),
     redisOnMock,
     ioredisMock: vi.fn(function IORedisMock() {

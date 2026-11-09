@@ -17,7 +17,11 @@ vi.mock('../../lib/fetch-timeout.js', async (importOriginal) => ({
 }));
 
 vi.mock('../../queues/email-outlook.js', () => ({
-  outlookHistoricalQueue: { add: vi.fn(async () => undefined) },
+  outlookHistoricalQueue: {
+    name: 'email.outlook.pull-historical',
+    add: vi.fn(async () => undefined),
+    client: Promise.resolve({ status: 'ready' }),
+  },
 }));
 
 import { fetchWithTimeout } from '../../lib/fetch-timeout.js';

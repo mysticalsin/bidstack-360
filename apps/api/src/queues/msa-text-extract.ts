@@ -8,6 +8,7 @@ import IORedis from 'ioredis';
 import { MSA_TEXT_EXTRACT, type MsaTextExtractJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:msa-text-extract' });
 
@@ -49,9 +50,9 @@ export async function enqueueMsaTextExtract(job: MsaTextExtractJob): Promise<str
     return null;
   }
   try {
-    const queued = await getQueue().add('msa.text-extract', job, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('msa.text-extract', job, {
       jobId: `${job.orgId}--${job.versionId}--${Date.now()}`,
-    });
+    }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, versionId: job.versionId }, 'Failed to enqueue MSA text extract');

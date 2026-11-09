@@ -27,6 +27,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { verifyClientState } from '../../services/microsoft-graph-subscription.service.js';
 import { outlookEmailQueue } from '../../queues/email-outlook.js';
+import { addWithinDeadline } from '../../lib/queue-enqueue.js';
 
 const NotificationValueItem = z.object({
   subscriptionId: z.string(),
@@ -155,7 +156,7 @@ export const microsoftWebhookRoutes: FastifyPluginAsync = async (server) => {
         }
 
         // Enqueue delta pull for the affected user — processing is async
-        await outlookEmailQueue.add(
+        await addWithinDeadline(outlookEmailQueue, (q) => q.add(
           'email.outlook.pull-incremental',
           {
             orgId: sub.orgId,
@@ -167,7 +168,7 @@ export const microsoftWebhookRoutes: FastifyPluginAsync = async (server) => {
             attempts: 3,
             backoff: { type: 'exponential', delay: 5_000 },
           },
-        );
+        ));
 
         accepted++;
       }

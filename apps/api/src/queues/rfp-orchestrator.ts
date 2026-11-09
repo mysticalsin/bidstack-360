@@ -10,6 +10,7 @@ import {
   SERUM_RUNTIME_CONFIG_KEYS,
   checkSerumLoopRuntimePolicy,
 } from '@bidstack/db/serum-runtime-policy';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:rfp-orchestrate' });
 
@@ -97,10 +98,10 @@ export async function enqueueRfpOrchestrate(job: RfpOrchestrateJob): Promise<str
   }
   await assertRfpOrchestrateLoopAllowed(job);
   try {
-    const queued = await getQueue().add('rfp.orchestrate', job, {
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add('rfp.orchestrate', job, {
       // WHY: dedup key per org+rfpRequest so duplicate uploads don't double-launch
       jobId: `rfp-orch-${job.orgId}-${job.rfpRequestId}`,
-    });
+    }));
     log.info(
       { jobId: queued.id, orgId: job.orgId, rfpRequestId: job.rfpRequestId },
       'RFP orchestrate job enqueued',

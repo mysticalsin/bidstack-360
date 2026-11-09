@@ -32,6 +32,7 @@ import { validateTwilioVoiceSignature } from '../../services/calls/twilio-voice.
 import { verifyClientState } from '../../services/microsoft-graph-subscription.service.js';
 import { CALL_FETCH_RECORDING } from '@bidstack/shared';
 import { redis } from '../../redis.js';
+import { addWithinDeadline } from '../../lib/queue-enqueue.js';
 
 // ─── Zoom webhook routes ─────────────────────────────────────────────────────
 
@@ -133,12 +134,12 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
             connection: redis,
             defaultJobOptions: CALL_FETCH_RECORDING.defaultJobOptions,
           });
-          await queue.add('zoom-recording', {
+          await addWithinDeadline(queue, (q) => q.add('zoom-recording', {
             callSessionId: session.id,
             orgId: session.orgId,
             provider: 'ZOOM',
             meetingUuid,
-          });
+          }));
         }
       }
 
@@ -323,13 +324,13 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
           connection: redis,
           defaultJobOptions: CALL_FETCH_RECORDING.defaultJobOptions,
         });
-        await fetchQueue.add('twilio-recording', {
+        await addWithinDeadline(fetchQueue, (q) => q.add('twilio-recording', {
           callSessionId: session.id,
           orgId: session.orgId,
           provider: 'TWILIO_VOICE',
           recordingUrl: req.body.RecordingUrl,
           recordingSid: req.body.RecordingSid,
-        });
+        }));
       }
 
       return reply.send({ ok: true });

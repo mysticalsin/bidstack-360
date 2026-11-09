@@ -27,6 +27,7 @@ import {
   scoreOpportunity,
 } from '../services/predictive-scoring.service.js';
 import { redis } from '../redis.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────
 
@@ -165,12 +166,12 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
       const queue = getRetrainQueue();
 
       if (entityType) {
-        const job = await queue.add(
+        const job = await addWithinDeadline(queue, (q) => q.add(
           `manual-retrain:${orgId}:${entityType}`,
           { orgId, entityType },
           // BullMQ rejects custom ids with ':' unless they have exactly three parts.
           { jobId: `manual-retrain-${orgId}-${entityType}-${Date.now()}` },
-        );
+        ));
         reply.code(202);
         return { jobId: job.id ?? null, message: `Retrain queued for ${entityType}` };
       }
@@ -178,7 +179,7 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
       // Retrain both entity types
       const jobs = await Promise.all(
         (['lead', 'opportunity'] as const).map((et) =>
-          queue.add(`manual-retrain:${orgId}:${et}`, { orgId, entityType: et }),
+          addWithinDeadline(queue, (q) => q.add(`manual-retrain:${orgId}:${et}`, { orgId, entityType: et })),
         ),
       );
       reply.code(202);

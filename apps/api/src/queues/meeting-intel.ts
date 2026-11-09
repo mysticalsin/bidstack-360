@@ -8,6 +8,7 @@ import IORedis from 'ioredis';
 import { MEETING_INTEL, type MeetingIntelJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:meeting-intel' });
 
@@ -51,7 +52,7 @@ export async function enqueueMeetingIntel(job: MeetingIntelJob): Promise<string 
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queued = await getQueue().add(`meeting-intel.${job.kind}`, job, { jobId: jobId(job) });
+    const queued = await addWithinDeadline(getQueue(), (q) => q.add(`meeting-intel.${job.kind}`, job, { jobId: jobId(job) }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, kind: job.kind }, 'Failed to enqueue meeting intel job');

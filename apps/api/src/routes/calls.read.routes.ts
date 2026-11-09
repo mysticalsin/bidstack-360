@@ -13,6 +13,7 @@ import { Queue } from 'bullmq';
 import { CALL_ANALYZE } from '@bidstack/shared';
 import { redis } from '../redis.js';
 import { CallSessionSchema, EntityTypeEnum, ProviderEnum, getAuth } from './calls.helpers.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
@@ -236,10 +237,10 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
         defaultJobOptions: CALL_ANALYZE.defaultJobOptions,
       });
 
-      const job = await queue.add('re-analyze', {
+      const job = await addWithinDeadline(queue, (q) => q.add('re-analyze', {
         callSessionId: id,
         orgId: auth.orgId,
-      });
+      }));
 
       return reply.code(202).send({
         jobId: job.id ?? 'queued',
