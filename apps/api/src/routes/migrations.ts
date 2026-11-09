@@ -14,6 +14,7 @@
 
 import * as XLSX from '@e965/xlsx';
 import { Queue } from 'bullmq';
+import IORedis from 'ioredis';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -32,7 +33,8 @@ import {
 
 import { previewImportRows } from '../lib/import-preview.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
-import { addWithinDeadline } from '../lib/queue-enqueue.js';
+import { addWithinDeadline, QUEUE_ENQUEUE_TIMEOUT_MS, QueueUnavailableError } from '../lib/queue-enqueue.js';
+import { redis } from '../redis.js';
 
 const ImportPreviewResponse = z.object({
   entityType: z.string(),
@@ -66,11 +68,16 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   let migrationQueue: Queue | null = null;
   const getQueue = () => {
     if (!migrationQueue) {
-      const { redis } = server as unknown as {
-        redis: { status: string; duplicate: () => unknown };
-      };
+      const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6380', {
+        maxRetriesPerRequest: null,
+        enableOfflineQueue: true,
+        lazyConnect: false,
+      });
+      connection.on('error', (err) => {
+        server.log.error({ err }, 'Redis connection error in migration queue');
+      });
       migrationQueue = new Queue(MIGRATION.name, {
-        connection: (redis as unknown as { duplicate: () => unknown }).duplicate() as never,
+        connection,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,
       });
     }
@@ -162,6 +169,54 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
 
+      // Store rows in Redis with 1h TTL so the worker can read them in chunks.
+      const redisKey = `migration:${job.id}:${entityType}:rows`;
+      const CHUNK_SIZE = 100;
+      const chunks = Math.ceil(rows.length / CHUNK_SIZE);
+
+      // The job row exists first because its id keys the rows and the chunks.
+      // If either Redis step fails, the job row and the rows key are removed so
+      // a failed start (and the client's retry) leaves nothing behind. The
+      // audit log is append-only, so it is written only once the import is
+      // queued. addBulk is one MULTI, so chunks land all together or not at all;
+      // a chunk that lands after a timeout finds no job row and the worker skips it.
+      try {
+        try {
+          await redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+        } catch (err) {
+          const reason = err instanceof Error && /timed out/i.test(err.message) ? 'timed-out' : 'not-ready';
+          throw new QueueUnavailableError(MIGRATION.name, reason, QUEUE_ENQUEUE_TIMEOUT_MS);
+        }
+        const chunkJobs = Array.from({ length: chunks }, (_, i) => {
+          const payload: MigrationJobPayload = {
+            migrationJobId: job.id,
+            orgId,
+            userId,
+            source,
+            entityType,
+            chunkOffset: i * CHUNK_SIZE,
+            chunkSize: CHUNK_SIZE,
+            totalRows: rows.length,
+            redisKey,
+            mappings,
+            dedupStrategy,
+            externalIdColumn,
+          };
+          return {
+            name: `${job.id}-chunk-${i}`,
+            data: payload,
+            opts: { jobId: `${job.id}-${entityType}-chunk-${i}` },
+          };
+        });
+        await addWithinDeadline(getQueue(), (q) => q.addBulk(chunkJobs));
+      } catch (err) {
+        await prisma.migrationJob.delete({ where: { id: job.id } });
+        await redis.del(redisKey).catch((delErr: unknown) => {
+          req.log.warn({ err: delErr, redisKey }, 'could not remove rows of a failed migration start');
+        });
+        throw err;
+      }
+
       await prisma.auditLog.create({
         data: {
           orgId,
@@ -178,39 +233,6 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         create: { orgId, source, sourceEntity: entityType, mappings },
         update: { mappings },
       });
-
-      // Store rows in Redis with 1h TTL so the worker can read them in chunks.
-      const redisKey = `migration:${job.id}:${entityType}:rows`;
-      const redisConn = (
-        server as unknown as {
-          redis: { set: (k: string, v: string, ex: string, ttl: number) => Promise<void> };
-        }
-      ).redis;
-      await redisConn.set(redisKey, JSON.stringify(rows), 'EX', 3600);
-
-      const CHUNK_SIZE = 100;
-      const chunks = Math.ceil(rows.length / CHUNK_SIZE);
-      const queue = getQueue();
-
-      for (let i = 0; i < chunks; i++) {
-        const payload: MigrationJobPayload = {
-          migrationJobId: job.id,
-          orgId,
-          userId,
-          source,
-          entityType,
-          chunkOffset: i * CHUNK_SIZE,
-          chunkSize: CHUNK_SIZE,
-          totalRows: rows.length,
-          redisKey,
-          mappings,
-          dedupStrategy,
-          externalIdColumn,
-        };
-        await addWithinDeadline(queue, (q) => q.add(`${job.id}-chunk-${i}`, payload, {
-          jobId: `${job.id}-${entityType}-chunk-${i}`,
-        }));
-      }
 
       const updated = await prisma.migrationJob.update({
         where: { id: job.id },
