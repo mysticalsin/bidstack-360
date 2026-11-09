@@ -57,9 +57,10 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
   // BullMQ queue handle (producer side only — worker consumes).
   // Lazily initialised so the test environment doesn't need Redis configured.
   let migrationQueue: Queue | null = null;
+  let connection: IORedis | null = null;
   const getQueue = () => {
     if (!migrationQueue) {
-      const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6380', {
+      connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6380', {
         maxRetriesPerRequest: null,
         enableOfflineQueue: true,
         lazyConnect: false,
@@ -74,6 +75,11 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
     }
     return migrationQueue;
   };
+  // BullMQ leaves a connection it was given open, so it is quit here too.
+  server.addHook('onClose', async () => {
+    await migrationQueue?.close();
+    await connection?.quit();
+  });
 
   // ─── HubSpot OAuth: initiate ───────────────────────────────────────────
 

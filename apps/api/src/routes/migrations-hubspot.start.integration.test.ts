@@ -16,6 +16,7 @@ import { MIGRATION } from '@bidstack/shared';
 
 import type * as SerumPolicy from '../lib/serum-connector-policy.js';
 import { QueueUnavailableError } from '../lib/queue-enqueue.js';
+import { buildServer } from '../server.js';
 import { makeMigrationsTestContext } from './migrations.test-helpers.js';
 
 // The SERUM connector policy is its own gate with its own tests; here it allows the start.
@@ -109,6 +110,11 @@ async function hubspotRowsSince(since: Date) {
 
 const never = () => new Promise<never>(() => {});
 
+/** quit() resolves on Redis's OK; the client reaches 'end' when the socket closes just after. */
+async function waitForEnd(connection: IORedis) {
+  for (let i = 0; i < 40 && connection.status !== 'end'; i++) await new Promise((r) => setTimeout(r, 50));
+  expect(connection.status).toBe('end');
+}
 
 describe('POST /api/v1/migrations/start-hubspot', () => {
   skipIfNoDb('queues the first chunk of every entity and records one RUNNING job and one audit row each', async () => {
@@ -185,5 +191,24 @@ describe('POST /api/v1/migrations/start-hubspot — failed cleanup', () => {
     });
     ctx.cleanup.jobIds.push(...left.map((j) => j.id));
     expect(left).toHaveLength(1);
+  });
+});
+
+describe('HubSpot migration routes on server close', () => {
+  skipIfNoDb('close the migration queue and quit its Redis connection', async () => {
+    const server = await buildServer();
+    await server.ready();
+    const res = await startHubspot(['deals'], server);
+    expect(res.statusCode).toBe(201);
+    const { jobs } = res.json<{ jobs: Array<{ id: string }> }>();
+    ctx.cleanup.jobIds.push(...jobs.map((j) => j.id));
+    queuedJobIds.push(`${jobs[0]!.id}-deals-chunk-0`);
+    const close = vi.spyOn(Queue.prototype, 'close');
+
+    await server.close();
+
+    const closed = close.mock.contexts.filter((q) => (q as Queue).name === MIGRATION.name && q !== inspector?.queue);
+    expect(closed).toHaveLength(1);
+    await waitForEnd((closed[0] as Queue).opts.connection as IORedis);
   });
 });

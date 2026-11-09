@@ -87,6 +87,11 @@ async function leftovers(entityType: string) {
 
 const never = () => new Promise<never>(() => {});
 
+/** quit() resolves on Redis's OK; the client reaches 'end' when the socket closes just after. */
+async function waitForEnd(connection: IORedis) {
+  for (let i = 0; i < 40 && connection.status !== 'end'; i++) await new Promise((r) => setTimeout(r, 50));
+  expect(connection.status).toBe('end');
+}
 
 describe('POST /api/v1/migrations/start-csv', () => {
   skipIfNoDb('queues every chunk, stores the rows and records one RUNNING job with one audit row', async () => {
@@ -246,5 +251,24 @@ describe('POST /api/v1/migrations/start-csv — failed cleanup', () => {
     expect(res.json<{ message: string }>().message).toBe('Background job queue is unavailable; retry shortly');
     expect(await redis.keys(`migration:*:${entityType}:rows`)).toEqual([]);
     expect(await jobRows(entityType)).toHaveLength(1);
+  });
+});
+
+describe('migration routes on server close', () => {
+  skipIfNoDb('close the migration queue and quit its Redis connection', async () => {
+    const server = await buildServer();
+    await server.ready();
+    const entityType = `synthetic-${randomUUID()}`;
+    expect((await startCsv(entityType, 3, {}, server)).statusCode).toBe(201);
+    await jobRows(entityType);
+    await queuedChunks(entityType);
+    const close = vi.spyOn(Queue.prototype, 'close');
+
+    await server.close();
+
+    const closed = close.mock.contexts.filter((q) => (q as Queue).name === MIGRATION.name && q !== inspector?.queue);
+    expect(closed).toHaveLength(1);
+    const connection = (closed[0] as Queue).opts.connection as IORedis;
+    await waitForEnd(connection);
   });
 });
