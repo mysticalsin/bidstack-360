@@ -1,6 +1,8 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { fetchWithTimeout, isProviderTimeoutError } from '../lib/fetch-timeout.js';
+
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const REQUIRED_CURRENCIES = [
   'BRL',
@@ -32,6 +34,12 @@ const ExchangeRatesResponse = z.object({
   date: z.string(),
 });
 
+const ProviderFailureResponse = z.object({
+  statusCode: z.number(),
+  error: z.string(),
+  message: z.string(),
+});
+
 function normalizeCurrencyCode(code: string): string {
   return code.trim().toUpperCase();
 }
@@ -56,8 +64,9 @@ export function resetExchangeRatesCacheForTest(): void {
   cache = null;
 }
 
-// Covers connect, headers and body. Well under the client-side patience of a
-// dashboard load, so a stalled provider degrades the UI instead of hanging it.
+// fetchWithTimeout keeps the deadline armed through the body read. Well under
+// the patience of a dashboard load, so a stalled provider degrades the UI
+// instead of hanging it.
 const PROVIDER_TIMEOUT_MS = 5_000;
 
 export const exchangeRatesRoutes: FastifyPluginAsyncZod<{ providerTimeoutMs?: number }> = async (
@@ -76,6 +85,8 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod<{ providerTimeoutMs?: nu
       schema: {
         response: {
           200: ExchangeRatesResponse,
+          502: ProviderFailureResponse,
+          503: ProviderFailureResponse,
         },
       },
     },
@@ -86,35 +97,53 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod<{ providerTimeoutMs?: nu
         return cache.data;
       }
 
-      const signal = AbortSignal.timeout(providerTimeoutMs);
+      // The global error handler reports unmapped 5xx errors as a generic 500,
+      // so provider failures are answered here with their own status.
+      // Timeouts throw ProviderTimeoutError, which it maps to 504.
+      const providerFailure = (statusCode: 502 | 503, message: string) =>
+        reply
+          .code(statusCode)
+          .header('Cache-Control', 'no-store')
+          .send({
+            statusCode,
+            error: statusCode === 503 ? 'Service Unavailable' : 'Bad Gateway',
+            message,
+          });
+
       let res: Response;
       try {
-        res = await fetch('https://open.er-api.com/v6/latest/EUR', {
+        res = await fetchWithTimeout('https://open.er-api.com/v6/latest/EUR', {
           headers: { Accept: 'application/json' },
-          signal,
+          provider: 'Exchange rate provider',
+          operation: 'latest rates',
+          timeoutMs: providerTimeoutMs,
         });
       } catch (err) {
+        if (isProviderTimeoutError(err)) {
+          reply.header('Cache-Control', 'no-store');
+          throw err;
+        }
         req.log.warn(
-          { err: err instanceof Error ? err.message : String(err), timedOut: signal.aborted },
+          { err: err instanceof Error ? err.message : String(err) },
           'exchange rates upstream unreachable',
         );
-        throw server.httpErrors.serviceUnavailable('Exchange rate provider unavailable');
+        return providerFailure(503, 'Exchange rate provider unavailable');
       }
 
       if (!res.ok) {
         req.log.warn({ status: res.status }, 'exchange rates upstream error');
-        throw server.httpErrors.serviceUnavailable('Exchange rate provider unavailable');
+        return providerFailure(503, 'Exchange rate provider unavailable');
       }
 
       let upstream: Record<string, unknown>;
       try {
         upstream = (await res.json()) as Record<string, unknown>;
-      } catch {
-        if (signal.aborted) {
-          req.log.warn({ timedOut: true }, 'exchange rates upstream body timed out');
-          throw server.httpErrors.serviceUnavailable('Exchange rate provider unavailable');
+      } catch (err) {
+        if (isProviderTimeoutError(err)) {
+          reply.header('Cache-Control', 'no-store');
+          throw err;
         }
-        throw server.httpErrors.badGateway('Invalid response from exchange rate provider');
+        return providerFailure(502, 'Invalid response from exchange rate provider');
       }
       if (
         !upstream ||
@@ -125,7 +154,7 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod<{ providerTimeoutMs?: nu
         typeof upstream.time_last_update_utc !== 'string' ||
         !upstream.time_last_update_utc
       ) {
-        throw server.httpErrors.badGateway('Invalid response from exchange rate provider');
+        return providerFailure(502, 'Invalid response from exchange rate provider');
       }
 
       const base = normalizeCurrencyCode(
@@ -134,7 +163,7 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod<{ providerTimeoutMs?: nu
       const rates = normalizeRates(upstream.rates as Record<string, unknown>);
       if (!hasRequiredCurrencyCoverage(base, rates)) {
         req.log.warn({ base }, 'exchange rates missing required CRM currencies');
-        throw server.httpErrors.badGateway('Exchange rate provider missing required currencies');
+        return providerFailure(502, 'Exchange rate provider missing required currencies');
       }
 
       const data: CachedRates = {

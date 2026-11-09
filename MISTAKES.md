@@ -3457,3 +3457,16 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 - **Root cause:** function under test takes no `now` injection, fixture used absolute dates.
 - **Prevention rule:** CHECK every new test fixture date — if the code under test reads the real clock, fixture dates MUST be relative (`Date.now() +/- offset`), never absolute.
 - **Files affected:** apps/api/src/services/crm/company.service.test.ts
+
+### 2026-11-09 TESTING: route 5xx contract tested without the production error handler
+
+- **What went wrong:** The exchange-rates route threw `httpErrors.serviceUnavailable` / `badGateway`, and its unit tests (minimal Fastify app, no error handler) saw 503/502. In the real server `plugins/error-handler.ts` maps every unmapped 5xx to a generic 500, so clients never received the documented answer. My first fix repeated this; a live loopback run against the real server showed 500 where the unit tests showed 503.
+- **Root cause:** Tests built an app without `errorHandlerPlugin`, and I did not read the shared `lib/fetch-timeout.ts` (whose `ProviderTimeoutError` the handler maps to 504) before writing a bespoke timeout.
+- **Prevention rule:** Any route test that asserts a 5xx status MUST register `errorHandlerPlugin`. Provider calls MUST use `fetchWithTimeout`; intentional 502/503 answers are sent from the route, not thrown.
+- **Files affected:** apps/api/src/routes/exchange-rates.ts, apps/api/src/routes/exchange-rates.test.ts
+
+### 2026-11-09 PROCESS: display-precision chain frozen without the full web suite
+
+- **What went wrong:** The currency fallback change (unconverted amounts keep their stored currency) left `TerritoriesPage.test.tsx` asserting the old mislabel (`$15K` for an EUR total with no rates). Only selected suites ran before freezing, so the red test went unnoticed until the full web suite ran.
+- **Prevention rule:** Before freezing any change to a shared formatter or store, run the full `apps/web` vitest suite, not only the files named in the change.
+- **Files affected:** apps/web/src/pages/TerritoriesPage.test.tsx

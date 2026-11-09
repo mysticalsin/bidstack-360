@@ -7,13 +7,17 @@ import {
 } from 'fastify-type-provider-zod';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { errorHandlerPlugin } from '../plugins/error-handler.js';
 import { exchangeRatesRoutes, resetExchangeRatesCacheForTest } from './exchange-rates.js';
 
+// The production error handler masks unmapped 5xx errors as 500, so status
+// expectations only mean something with it registered.
 async function buildApp(opts: { providerTimeoutMs?: number } = {}) {
   const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   await app.register(sensible);
+  await app.register(errorHandlerPlugin);
   await app.register(exchangeRatesRoutes, opts);
   return app;
 }
@@ -29,15 +33,14 @@ describe('exchange rates route', () => {
   });
 
   it('returns normalized current rates for every CRM display currency', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.fn().mockResolvedValue(
+      okJson({
         result: 'success',
         base_code: 'eur',
         time_last_update_utc: 'Sun, 31 May 2026 00:00:01 +0000',
         rates: fullRates(),
       }),
-    } as Response);
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const app = await buildApp();
@@ -64,15 +67,14 @@ describe('exchange rates route', () => {
   it('rejects provider payloads missing Americas currencies before clients cache them', async () => {
     const rates = fullRates();
     delete rates.BRL;
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.fn().mockResolvedValue(
+      okJson({
         result: 'success',
         base_code: 'EUR',
         time_last_update_utc: 'Sun, 31 May 2026 00:00:01 +0000',
         rates,
       }),
-    } as Response);
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const app = await buildApp();
@@ -95,6 +97,8 @@ describe('exchange rates route', () => {
 
     expect(res.statusCode).toBe(503);
     expect(res.json()).toMatchObject({ message: 'Exchange rate provider unavailable' });
+    // A cacheable failure would keep the browser on "unavailable" for 15 minutes.
+    expect(res.headers['cache-control']).toBe('no-store');
 
     await app.close();
   });
@@ -114,9 +118,37 @@ describe('exchange rates route', () => {
     const started = Date.now();
     const res = await app.inject({ method: 'GET', url: '/exchange-rates' });
 
-    expect(res.statusCode).toBe(503);
+    expect(res.statusCode).toBe(504);
+    expect(res.headers['cache-control']).toBe('no-store');
     expect(Date.now() - started).toBeLessThan(2_000);
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+
+    await app.close();
+  });
+
+  it('gives up on a provider that sends headers and then stalls the body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async (_url: string, init?: RequestInit) =>
+          new Response(
+            // Headers arrive, then the body never completes until the request is aborted.
+            new ReadableStream({
+              start(controller) {
+                init?.signal?.addEventListener('abort', () =>
+                  controller.error(init.signal?.reason),
+                );
+              },
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    const app = await buildApp({ providerTimeoutMs: 50 });
+    const res = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(res.statusCode).toBe(504);
 
     await app.close();
   });
@@ -124,12 +156,7 @@ describe('exchange rates route', () => {
   it('answers 502 when the provider body is not JSON', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => {
-          throw new SyntaxError('Unexpected token < in JSON');
-        },
-      } as unknown as Response),
+      vi.fn(async () => new Response('<html>maintenance</html>', { status: 200 })),
     );
 
     const app = await buildApp();
@@ -145,10 +172,9 @@ describe('exchange rates route', () => {
   it('rejects a payload without a provider date instead of stamping it as current', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: 'success', base_code: 'EUR', rates: fullRates() }),
-      } as Response),
+      vi
+        .fn()
+        .mockResolvedValue(okJson({ result: 'success', base_code: 'EUR', rates: fullRates() })),
     );
 
     const app = await buildApp();
@@ -163,15 +189,14 @@ describe('exchange rates route', () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('fetch failed'))
-      .mockResolvedValue({
-        ok: true,
-        json: async () => ({
+      .mockResolvedValue(
+        okJson({
           result: 'success',
           base_code: 'EUR',
           time_last_update_utc: 'Sun, 31 May 2026 00:00:01 +0000',
           rates: fullRates(),
         }),
-      } as Response);
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const app = await buildApp();
@@ -193,15 +218,14 @@ describe('exchange rates route', () => {
     now.mockReturnValue(t0);
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        okJson({
           result: 'success',
           base_code: 'EUR',
           time_last_update_utc: 'Sun, 31 May 2026 00:00:01 +0000',
           rates: fullRates(),
         }),
-      } as Response)
+      )
       .mockRejectedValue(new TypeError('fetch failed'));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -217,6 +241,13 @@ describe('exchange rates route', () => {
     await app.close();
   });
 });
+
+function okJson(payload: unknown): Response {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
 
 function fullRates(): Record<string, number> {
   return {
