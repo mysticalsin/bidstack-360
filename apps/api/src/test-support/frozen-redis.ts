@@ -29,9 +29,11 @@ export type FrozenRedis = { port: number; received: string[]; close(): Promise<v
 /**
  * Answers the ioredis connection handshake and ready check so the client
  * reports 'ready', then never replies to anything else: a Redis that froze
- * after connecting (SIGSTOP, a wedged primary, a stalled proxy).
+ * after connecting (SIGSTOP, a wedged primary, a stalled proxy). `replies`
+ * maps further commands to raw RESP answers, for a Redis that is healthy for
+ * those commands.
  */
-export async function startFrozenRedis(): Promise<FrozenRedis> {
+export async function startFrozenRedis(replies: Record<string, string> = {}): Promise<FrozenRedis> {
   const received: string[] = [];
   const sockets = new Set<Socket>();
   const server: Server = createServer((socket) => {
@@ -46,6 +48,7 @@ export async function startFrozenRedis(): Promise<FrozenRedis> {
         received.push(command);
         if (command === 'INFO') socket.write(`$${READY_INFO.length}\r\n${READY_INFO}\r\n`);
         else if (command === 'CLIENT' || command === 'SELECT') socket.write('+OK\r\n');
+        else if (replies[command] !== undefined) socket.write(replies[command]);
       }
     });
   });

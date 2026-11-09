@@ -10,6 +10,7 @@ import { isProviderTimeoutError } from '../lib/fetch-timeout.js';
 import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-client-abort.js';
 import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
 import { isQueueUnavailableError } from '../lib/queue-enqueue.js';
+import { isRateLimitStoreUnavailableError } from '../lib/rate-limit-store.js';
 import { captureSentryServerError } from './sentry.js';
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
@@ -104,6 +105,17 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
         error: 'Service Unavailable',
         message: err.message,
       });
+    }
+
+    if (isRateLimitStoreUnavailableError(err)) {
+      req.log.error(
+        { err: err.cause, method: req.method, url: req.url },
+        'rate limit store unavailable; request refused (limiter does not fail open)',
+      );
+      return reply
+        .status(503)
+        .header('Retry-After', String(err.retryAfterSeconds))
+        .send({ statusCode: 503, error: 'Service Unavailable', message: err.message });
     }
 
     if (err.statusCode && err.statusCode < 500) {

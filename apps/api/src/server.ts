@@ -24,6 +24,7 @@ import { securityHeadersPlugin } from './plugins/security-headers.js';
 import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
 import { privacyLogHooks, privacyLogSerializers, SENSITIVE_HEADER_REDACT_PATHS } from './lib/logger.js';
 import { registerFrontDoorGuard } from './lib/front-door-guard.js';
+import { tagRateLimitStoreErrors } from './lib/rate-limit-store.js';
 import { parseTrustProxy } from './lib/trust-proxy.js';
 // Wave 7 — Real-time collaboration
 import { realtimePlugin } from './plugins/realtime.js';
@@ -216,11 +217,13 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     // Low envs keep a 10k floor; a larger API_RATE_LIMIT_MAX lifts it for load runs.
     max: isLowEnv ? Math.max(10_000, config.API_RATE_LIMIT_MAX) : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
-    redis: rateLimitRedis,
+    redis: rateLimitRedis ? tagRateLimitStoreErrors(rateLimitRedis) : undefined,
     // Fail OPEN when the store errors (e.g. the Redis provider's request quota
     // is exhausted). Rate limiting is a guard, not a hard dependency — a store
     // outage must never turn every request into a 500. The request is allowed
     // through; the limit simply isn't enforced until the store recovers.
+    // With POLO_DATA_MODE=real the limiter does not fail open: the request is
+    // refused with 503 + Retry-After (plugins/error-handler.ts).
     skipOnError: config.POLO_DATA_MODE !== 'real',
     keyGenerator: (req) => {
       // Registered after auth so authenticated routes get per-user buckets.
