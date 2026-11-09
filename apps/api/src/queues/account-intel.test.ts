@@ -2,6 +2,8 @@ import { createServer, type Server, type Socket } from 'node:net';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { startFrozenRedis, type FrozenRedis } from '../test-support/frozen-redis.js';
+
 // WHY: POST /companies awaits queueFirstAccountIntel, which promises account
 // creation never depends on Redis. With Redis absent the BullMQ add waited
 // for a connection forever, so the request hung after the company row was
@@ -15,6 +17,7 @@ const previous = {
 };
 
 let silent: Server | null = null;
+let frozen: FrozenRedis | null = null;
 const sockets = new Set<Socket>();
 
 async function loadWithRedis(url: string) {
@@ -36,58 +39,6 @@ async function startSilentServer(): Promise<number> {
   return address.port;
 }
 
-const READY_INFO = 'redis_version:7.0.15\r\nloading:0\r\nmaxmemory_policy:noeviction\r\n';
-
-/** Parses RESP arrays of bulk strings, enough for ioredis requests. */
-function takeCommands(buffer: string): { commands: string[][]; rest: string } {
-  const commands: string[][] = [];
-  let rest = buffer;
-  for (;;) {
-    const header = /^\*(\d+)\r\n/.exec(rest);
-    if (!header) break;
-    let pos = header[0].length;
-    const parts: string[] = [];
-    for (let i = 0; i < Number(header[1]); i++) {
-      const len = /^\$(\d+)\r\n/.exec(rest.slice(pos));
-      if (!len || rest.length < pos + len[0].length + Number(len[1]) + 2) return { commands, rest };
-      pos += len[0].length;
-      parts.push(rest.slice(pos, pos + Number(len[1])));
-      pos += Number(len[1]) + 2;
-    }
-    commands.push(parts);
-    rest = rest.slice(pos);
-  }
-  return { commands, rest };
-}
-
-/**
- * Answers the ioredis ready check so the connection reports 'ready', then
- * never replies to anything else: a Redis that froze after connecting.
- */
-async function startFrozenAfterReadyServer(): Promise<{ port: number; received: string[] }> {
-  const received: string[] = [];
-  silent = createServer((socket) => {
-    sockets.add(socket);
-    socket.on('close', () => sockets.delete(socket));
-    let buffer = '';
-    socket.on('data', (chunk) => {
-      const parsed = takeCommands(buffer + chunk.toString('latin1'));
-      buffer = parsed.rest;
-      for (const [name = ''] of parsed.commands) {
-        const command = name.toUpperCase();
-        received.push(command);
-        if (command === 'INFO') socket.write(`$${READY_INFO.length}\r\n${READY_INFO}\r\n`);
-        else if (command === 'CLIENT' || command === 'SELECT') socket.write('+OK\r\n');
-        else if (command === 'PING') socket.write('+PONG\r\n');
-      }
-    });
-  });
-  await new Promise<void>((resolve) => silent!.listen(0, '127.0.0.1', resolve));
-  const address = silent.address();
-  if (!address || typeof address === 'string') throw new Error('no port');
-  return { port: address.port, received };
-}
-
 describe('account intel enqueue without a usable Redis', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -101,6 +52,8 @@ describe('account intel enqueue without a usable Redis', () => {
     for (const socket of sockets) socket.destroy();
     await new Promise<void>((resolve) => (silent ? silent.close(() => resolve()) : resolve()));
     silent = null;
+    await frozen?.close();
+    frozen = null;
   });
 
   it('gives up within a bound when nothing listens on the Redis port', async () => {
@@ -142,8 +95,9 @@ describe('account intel enqueue without a usable Redis', () => {
   // A Redis that was already ready and then froze passed every readiness
   // check, so POST /companies hung after its rows committed (QA F1).
   it('gives up within a bound when a ready Redis stops answering the add', async () => {
-    const { port, received } = await startFrozenAfterReadyServer();
-    const { queueFirstAccountIntel } = await loadWithRedis(`redis://127.0.0.1:${port}`);
+    frozen = await startFrozenRedis();
+    const { received } = frozen;
+    const { queueFirstAccountIntel } = await loadWithRedis(`redis://127.0.0.1:${frozen.port}`);
     const createMany = vi.fn().mockResolvedValue({ count: 2 });
     const deleteMany = vi.fn().mockResolvedValue({ count: 2 });
     const started = Date.now();

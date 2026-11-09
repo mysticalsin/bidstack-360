@@ -15,6 +15,10 @@ const RECONNECT_DELAY_CAP_MS = 2_000;
 
 export const redis = new Redis(redisUrl, {
   connectTimeout: 1_000,
+  // The two options below only fail fast while disconnected. A Redis that
+  // froze after connecting never answers, and cache, idempotency and lock
+  // calls inside requests waited forever; this bounds each command.
+  commandTimeout: 2_000,
   enableOfflineQueue: false,
   maxRetriesPerRequest: 1,
   // TCP keepalive so Azure Cache for Redis' ~10-minute idle reaper doesn't
