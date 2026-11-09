@@ -3474,9 +3474,9 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 ### 2026-11-09 BUG: Redis enqueue bounded only until 'ready'
 
 - **What went wrong:** My first company-create fix bounded the wait for the Redis connection but not `queue.add`. Independent QA froze an already-ready Redis (SIGSTOP), and `POST /companies` again hung after its rows committed, so a client retry would duplicate the company.
-- **Root cause:** Tests covered only failures before readiness (refused port, silent TCP). Nothing modelled a server that completes the handshake and then stops answering, and I fixed one producer while 30+ shared the same connection settings.
-- **Prevention rule:** A request-path enqueue MUST go through `addWithinDeadline` (`lib/queue-enqueue.ts`), which bounds readiness and the command under one deadline. Timeout tests MUST include a peer that passes the handshake and then never replies. When a fix targets a shared pattern, grep every site in the same change.
-- **Files affected:** apps/api/src/lib/queue-enqueue.ts, apps/api/src/queues/account-intel.ts and every producer listed in the 2026-11-09 queue audit
+- **Root cause:** Tests covered only failures before readiness (refused port, silent TCP). Nothing modelled a server that completes the handshake and then stops answering, and I fixed one producer while 30+ shared the same connection settings. A second wait sat outside the queue: after the enqueue was bounded, a live SIGSTOP run still hung because the response-cache invalidation awaited by every successful mutation runs on the shared `redis` client, which had no `commandTimeout`.
+- **Prevention rule:** A request-path enqueue MUST go through `addWithinDeadline` (`lib/queue-enqueue.ts`), which bounds readiness and the command under one deadline. Every ioredis client used inside requests MUST set `commandTimeout`. Timeout tests MUST include a peer that passes the handshake and then never replies (`test-support/frozen-redis.ts`). Do not call a hang fixed until a live run with the dependency frozen answers in bounded time. When a fix targets a shared pattern, grep every site in the same change.
+- **Files affected:** apps/api/src/lib/queue-enqueue.ts, apps/api/src/redis.ts, apps/api/src/queues/account-intel.ts and every producer listed in the 2026-11-09 queue audit
 
 ### 2026-11-09 PROCESS: focused receipt filed as green without its command
 
