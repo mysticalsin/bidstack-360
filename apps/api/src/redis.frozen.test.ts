@@ -5,8 +5,10 @@ import { startFrozenRedis, type FrozenRedis } from './test-support/frozen-redis.
 // WHY: the shared client backs the response cache, idempotency keys and
 // locks, and every successful mutation awaits invalidateOrgCache before the
 // response is sent. Against a Redis that froze after connecting, commands
-// never settled, so POST /companies hung after its rows committed and a client
-// retry created a duplicate (QA F1, reproduced live with SIGSTOP).
+// never settled, so POST /companies hung after its rows committed (QA F1,
+// reproduced live with SIGSTOP). The unique (org_id, name) index turns a
+// client retry into a 409, not a duplicate, so the user was told the save
+// failed although the company existed.
 const ORG = '00000000-0000-4000-8000-000000000001';
 const previousUrl = process.env.REDIS_URL;
 let frozen: FrozenRedis | null = null;
