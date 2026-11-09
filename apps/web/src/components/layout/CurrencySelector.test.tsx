@@ -54,6 +54,25 @@ describe('CurrencySelector', () => {
     expect(screen.getByRole('button', { name: 'Auto' })).toBeDefined();
   });
 
+  // WHY: the store only reports an error when it holds no rates at all, so
+  // "Using cached rates" told users a cache existed exactly when none did.
+  it('says rates are unavailable, not cached, when the rates request failed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 503, headers: new Headers() })),
+    );
+    render(<CurrencySelector />);
+    await waitFor(() => expect(useCurrencyStore.getState().ratesError).toBe('HTTP 503'));
+
+    fireEvent.click(screen.getByRole('button', { name: /select currency/i }));
+
+    const listbox = await screen.findByRole('listbox', { name: 'Select currency' });
+    expect(
+      within(listbox).getByText('Rates unavailable. Amounts show in their original currency.'),
+    ).toBeDefined();
+    expect(within(listbox).queryByText('Using cached rates')).toBeNull();
+  });
+
   it('updates the compact top-bar trigger after choosing a currency', async () => {
     render(<CurrencySelector />);
 

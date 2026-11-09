@@ -1828,7 +1828,7 @@
   },
   "currencySelector": {
     "statusUpdating": "Updating live rates",
-    "statusCached": "Using cached rates",
+    "statusUnavailable": "Rates unavailable. Amounts show in their original currency.",
     "tooltipRatesUnavailable": "Rates unavailable: {{error}}",
     "tooltipCurrency": "Currency: {{name}}",
     "triggerAriaLabel": "Select currency, current: {{currency}}",

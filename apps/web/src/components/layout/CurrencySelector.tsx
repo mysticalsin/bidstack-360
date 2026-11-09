@@ -51,7 +51,10 @@ export function CurrencySelector() {
   const statusText = ratesLoading
     ? t('currencySelector.statusUpdating', 'Updating live rates')
     : ratesError
-      ? t('currencySelector.statusCached', 'Using cached rates')
+      ? t(
+          'currencySelector.statusUnavailable',
+          'Rates unavailable. Amounts show in their original currency.',
+        )
       : formatRateStatus(rates?.date, t);
 
   // WHY useLayoutEffect: syncing visual keyboard-navigation highlight before

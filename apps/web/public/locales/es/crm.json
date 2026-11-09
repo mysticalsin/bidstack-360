@@ -1860,7 +1860,7 @@
   },
   "currencySelector": {
     "statusUpdating": "Actualizando tasas en vivo",
-    "statusCached": "Usando tasas en caché",
+    "statusUnavailable": "Tasas no disponibles. Los importes se muestran en su moneda original.",
     "tooltipRatesUnavailable": "Tasas no disponibles: {{error}}",
     "tooltipCurrency": "Moneda: {{name}}",
     "triggerAriaLabel": "Seleccionar moneda, actual: {{currency}}",

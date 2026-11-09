@@ -1827,7 +1827,7 @@
   },
   "currencySelector": {
     "statusUpdating": "正在更新实时汇率",
-    "statusCached": "使用缓存汇率",
+    "statusUnavailable": "无法获取汇率。金额以原始币种显示。",
     "tooltipRatesUnavailable": "无法获取汇率：{{error}}",
     "tooltipCurrency": "货币：{{name}}",
     "triggerAriaLabel": "选择货币，当前：{{currency}}",

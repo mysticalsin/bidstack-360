@@ -1827,7 +1827,7 @@
   },
   "currencySelector": {
     "statusUpdating": "Aggiornamento tassi in tempo reale",
-    "statusCached": "Uso dei tassi memorizzati",
+    "statusUnavailable": "Tassi non disponibili. Gli importi sono mostrati nella valuta originale.",
     "tooltipRatesUnavailable": "Tassi non disponibili: {{error}}",
     "tooltipCurrency": "Valuta: {{name}}",
     "triggerAriaLabel": "Seleziona valuta, attuale: {{currency}}",

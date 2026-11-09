@@ -1882,7 +1882,7 @@
   },
   "currencySelector": {
     "statusUpdating": "Mise à jour des taux en direct",
-    "statusCached": "Utilisation des taux en cache",
+    "statusUnavailable": "Taux indisponibles. Les montants s’affichent dans leur devise d’origine.",
     "tooltipRatesUnavailable": "Taux indisponibles : {{error}}",
     "tooltipCurrency": "Devise : {{name}}",
     "triggerAriaLabel": "Sélectionner la devise, actuelle : {{currency}}",

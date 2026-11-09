@@ -9,12 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { exchangeRatesRoutes, resetExchangeRatesCacheForTest } from './exchange-rates.js';
 
-async function buildApp() {
+async function buildApp(opts: { providerTimeoutMs?: number } = {}) {
   const app = Fastify({ logger: false }).withTypeProvider<ZodTypeProvider>();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   await app.register(sensible);
-  await app.register(exchangeRatesRoutes);
+  await app.register(exchangeRatesRoutes, opts);
   return app;
 }
 
@@ -81,6 +81,139 @@ describe('exchange rates route', () => {
     expect(res.statusCode).toBe(502);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
+    await app.close();
+  });
+
+  // WHY: the provider is a third party on the public internet. When it cannot
+  // be reached the client must get the documented "provider unavailable"
+  // answer it backs off on, not an unhandled 500 that reads as an app crash.
+  it('answers 503 when the provider cannot be reached', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ message: 'Exchange rate provider unavailable' });
+
+    await app.close();
+  });
+
+  // WHY: without a deadline a provider that accepts the connection and never
+  // answers holds every dashboard request open indefinitely.
+  it('gives up on a provider that never answers, within the deadline', async () => {
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const app = await buildApp({ providerTimeoutMs: 50 });
+    const started = Date.now();
+    const res = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(res.statusCode).toBe(503);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+
+    await app.close();
+  });
+
+  it('answers 502 when the provider body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError('Unexpected token < in JSON');
+        },
+      } as unknown as Response),
+    );
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(res.statusCode).toBe(502);
+
+    await app.close();
+  });
+
+  // WHY: the date tells users how old the rates are. Stamping "now" on a
+  // payload that carries no date would present rates of unknown age as fresh.
+  it('rejects a payload without a provider date instead of stamping it as current', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ result: 'success', base_code: 'EUR', rates: fullRates() }),
+      } as Response),
+    );
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(res.statusCode).toBe(502);
+
+    await app.close();
+  });
+
+  it('recovers on the next request once the provider is back, without caching the failure', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          result: 'success',
+          base_code: 'EUR',
+          time_last_update_utc: 'Sun, 31 May 2026 00:00:01 +0000',
+          rates: fullRates(),
+        }),
+      } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const app = await buildApp();
+    const down = await app.inject({ method: 'GET', url: '/exchange-rates' });
+    const up = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(down.statusCode).toBe(503);
+    expect(up.statusCode).toBe(200);
+    expect(up.json()).toMatchObject({ base: 'EUR', rates: { BRL: 6 } });
+
+    await app.close();
+  });
+
+  // WHY: expired rates must not be served as if current while the provider
+  // is down; the client then shows amounts in their stored currency instead.
+  it('does not serve expired cached rates while the provider is down', async () => {
+    const now = vi.spyOn(Date, 'now');
+    const t0 = Date.UTC(2026, 10, 9);
+    now.mockReturnValue(t0);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          result: 'success',
+          base_code: 'EUR',
+          time_last_update_utc: 'Sun, 31 May 2026 00:00:01 +0000',
+          rates: fullRates(),
+        }),
+      } as Response)
+      .mockRejectedValue(new TypeError('fetch failed'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const app = await buildApp();
+    expect((await app.inject({ method: 'GET', url: '/exchange-rates' })).statusCode).toBe(200);
+    now.mockReturnValue(t0 + 60 * 60 * 1000 + 1);
+    const expired = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(expired.statusCode).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    now.mockRestore();
     await app.close();
   });
 });

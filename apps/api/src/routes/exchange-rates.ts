@@ -56,7 +56,16 @@ export function resetExchangeRatesCacheForTest(): void {
   cache = null;
 }
 
-export const exchangeRatesRoutes: FastifyPluginAsyncZod = async (server) => {
+// Covers connect, headers and body. Well under the client-side patience of a
+// dashboard load, so a stalled provider degrades the UI instead of hanging it.
+const PROVIDER_TIMEOUT_MS = 5_000;
+
+export const exchangeRatesRoutes: FastifyPluginAsyncZod<{ providerTimeoutMs?: number }> = async (
+  server,
+  opts,
+) => {
+  const providerTimeoutMs = opts.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS;
+
   server.get(
     '/exchange-rates',
     {
@@ -77,22 +86,44 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod = async (server) => {
         return cache.data;
       }
 
-      const res = await fetch('https://open.er-api.com/v6/latest/EUR', {
-        headers: { Accept: 'application/json' },
-      });
+      const signal = AbortSignal.timeout(providerTimeoutMs);
+      let res: Response;
+      try {
+        res = await fetch('https://open.er-api.com/v6/latest/EUR', {
+          headers: { Accept: 'application/json' },
+          signal,
+        });
+      } catch (err) {
+        req.log.warn(
+          { err: err instanceof Error ? err.message : String(err), timedOut: signal.aborted },
+          'exchange rates upstream unreachable',
+        );
+        throw server.httpErrors.serviceUnavailable('Exchange rate provider unavailable');
+      }
 
       if (!res.ok) {
         req.log.warn({ status: res.status }, 'exchange rates upstream error');
         throw server.httpErrors.serviceUnavailable('Exchange rate provider unavailable');
       }
 
-      const upstream = (await res.json()) as Record<string, unknown>;
+      let upstream: Record<string, unknown>;
+      try {
+        upstream = (await res.json()) as Record<string, unknown>;
+      } catch {
+        if (signal.aborted) {
+          req.log.warn({ timedOut: true }, 'exchange rates upstream body timed out');
+          throw server.httpErrors.serviceUnavailable('Exchange rate provider unavailable');
+        }
+        throw server.httpErrors.badGateway('Invalid response from exchange rate provider');
+      }
       if (
         !upstream ||
         typeof upstream !== 'object' ||
         upstream.result !== 'success' ||
         !upstream.rates ||
-        typeof upstream.rates !== 'object'
+        typeof upstream.rates !== 'object' ||
+        typeof upstream.time_last_update_utc !== 'string' ||
+        !upstream.time_last_update_utc
       ) {
         throw server.httpErrors.badGateway('Invalid response from exchange rate provider');
       }
@@ -109,7 +140,7 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod = async (server) => {
       const data: CachedRates = {
         base,
         rates,
-        date: (upstream.time_last_update_utc as string) ?? new Date().toISOString(),
+        date: upstream.time_last_update_utc,
       };
 
       cache = { data, ts: Date.now() };

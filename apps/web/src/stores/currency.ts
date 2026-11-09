@@ -56,6 +56,7 @@ interface CurrencyStore {
 
 let inflightRatesRequest: Promise<void> | null = null;
 let ratesRetryAt = 0;
+let ratesFetchedAt = 0;
 
 function normalizeCurrencyCode(code: string | null | undefined): string {
   return (code ?? '').trim().toUpperCase();
@@ -359,7 +360,9 @@ function loadCachedRates(): ExchangeRateTable | null {
     const age = Date.now() - Number(ts);
     if (age > RATES_CACHE_TTL_MS) return null;
     const raw = localStorage.getItem(RATES_KEY);
-    if (raw) return normalizeExchangeRates(JSON.parse(raw));
+    const rates = raw ? normalizeExchangeRates(JSON.parse(raw)) : null;
+    if (rates) ratesFetchedAt = Number(ts);
+    return rates;
   } catch {
     // ignore
   }
@@ -395,11 +398,8 @@ export const useCurrencyStore = create<CurrencyStore>()(
 
       fetchRates: async () => {
         const currentRatesTs = Number(localStorage.getItem(RATES_TS_KEY));
-        if (
-          get().rates &&
-          Number.isFinite(currentRatesTs) &&
-          Date.now() - currentRatesTs <= RATES_CACHE_TTL_MS
-        ) {
+        const fetchedAt = Math.max(ratesFetchedAt, Number.isFinite(currentRatesTs) ? currentRatesTs : 0);
+        if (get().rates && Date.now() - fetchedAt <= RATES_CACHE_TTL_MS) {
           return;
         }
         const cached = loadCachedRates();
@@ -408,11 +408,10 @@ export const useCurrencyStore = create<CurrencyStore>()(
           return;
         }
         if (inflightRatesRequest) return inflightRatesRequest;
+        // Past this point any rates still held are older than the TTL. A failed
+        // refresh drops them so conversions fall back to the stored currency.
         if (Date.now() < ratesRetryAt) {
-          set({
-            ratesLoading: false,
-            ratesError: get().rates ? null : 'Exchange rates unavailable',
-          });
+          set({ ratesLoading: false, rates: null, ratesError: 'Exchange rates unavailable' });
           return;
         }
         set({ ratesLoading: true, ratesError: null });
@@ -442,16 +441,14 @@ export const useCurrencyStore = create<CurrencyStore>()(
           } catch {
             // ignore
           }
+          ratesFetchedAt = Date.now();
           set({ rates, ratesLoading: false, ratesError: null });
         })()
           .catch((err) => {
             set({
               ratesLoading: false,
-              ratesError: get().rates
-                ? null
-                : err instanceof Error
-                  ? err.message
-                  : 'Failed to load rates',
+              rates: null,
+              ratesError: err instanceof Error ? err.message : 'Failed to load rates',
             });
           })
           .finally(() => {

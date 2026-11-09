@@ -1827,7 +1827,7 @@
   },
   "currencySelector": {
     "statusUpdating": "Atualizando taxas ao vivo",
-    "statusCached": "Usando taxas em cache",
+    "statusUnavailable": "Taxas indisponíveis. Os valores aparecem na moeda original.",
     "tooltipRatesUnavailable": "Taxas indisponíveis: {{error}}",
     "tooltipCurrency": "Moeda: {{name}}",
     "triggerAriaLabel": "Selecionar moeda, atual: {{currency}}",

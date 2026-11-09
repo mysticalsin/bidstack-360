@@ -347,6 +347,64 @@ describe('useCurrencyStore', () => {
     expect(useCurrencyStore.getState().rates?.rates.BRL).toBe(6);
   });
 
+  // WHY: rates past their TTL that cannot be refreshed are of unknown age.
+  // Converting with them while the status still reads "Rates updated" passes
+  // stale numbers off as current; dropping them falls back to stored currency.
+  it('drops expired rates when the refresh fails instead of keeping them as current', async () => {
+    const now = vi.spyOn(Date, 'now');
+    const t0 = Date.UTC(2026, 10, 9);
+    now.mockReturnValue(t0);
+    localStorage.setItem('bidstack:exchange-rates-ts', String(t0));
+    localStorage.setItem(
+      'bidstack:exchange-rates',
+      JSON.stringify({ base: 'EUR', rates: fullRates(), date: 'earlier' }),
+    );
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503, headers: new Headers() });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { useCurrencyStore } = await loadCurrency();
+    expect(useCurrencyStore.getState().rates?.date).toBe('earlier');
+
+    now.mockReturnValue(t0 + 60 * 60 * 1000 + 1);
+    await useCurrencyStore.getState().fetchRates();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(useCurrencyStore.getState().rates).toBe(null);
+    expect(useCurrencyStore.getState().ratesError).toBe('HTTP 503');
+    now.mockRestore();
+  });
+
+  it('recovers once the retry window passes and the API answers again', async () => {
+    const now = vi.spyOn(Date, 'now');
+    const t0 = Date.UTC(2026, 10, 9);
+    now.mockReturnValue(t0);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, headers: new Headers() })
+      .mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        json: async () => ({ base: 'EUR', rates: fullRates(), date: 'back' }),
+      } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { useCurrencyStore } = await loadCurrency();
+    await useCurrencyStore.getState().fetchRates();
+    expect(useCurrencyStore.getState().ratesError).toBe('HTTP 503');
+
+    now.mockReturnValue(t0 + 30_000);
+    await useCurrencyStore.getState().fetchRates();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(useCurrencyStore.getState().ratesError).toBe('Exchange rates unavailable');
+
+    now.mockReturnValue(t0 + 60_001);
+    await useCurrencyStore.getState().fetchRates();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(useCurrencyStore.getState().rates?.date).toBe('back');
+    expect(useCurrencyStore.getState().ratesError).toBe(null);
+    now.mockRestore();
+  });
+
   it('updates currency state via setCurrency and clears autoDetect', async () => {
     const { useCurrencyStore } = await loadCurrency();
 
