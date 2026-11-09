@@ -37,6 +37,17 @@ import { addWithinDeadline } from '../../lib/queue-enqueue.js';
 // ─── Zoom webhook routes ─────────────────────────────────────────────────────
 
 export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
+  // Zoom signs the exact request bytes; re-serialising the parsed body can
+  // differ (spacing, \u escapes, number forms) and reject a genuine event.
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    try {
+      const json = body.length ? JSON.parse(body as string) : {};
+      (req as unknown as { rawBody: string }).rawBody = body as string;
+      done(null, json);
+    } catch (err) {
+      done(err as Error);
+    }
+  });
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
   /**
@@ -71,8 +82,7 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const signature = req.headers['x-zm-signature'] as string | undefined;
       const timestamp = req.headers['x-zm-request-timestamp'] as string | undefined;
-      // rawBody is set by fastify/rawBody plugin on the request
-      const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
+      const rawBody = (req as unknown as { rawBody?: string }).rawBody ?? '';
 
       // URL validation handshake (no signature required for initial setup)
       if (req.body.event === 'endpoint.url_validation') {
