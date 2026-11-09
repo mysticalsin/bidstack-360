@@ -2,14 +2,14 @@ import Redis from 'ioredis';
 
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
 
-// Bounded auto-reconnect: a transient blip should self-heal without waiting for
-// the next on-demand `ensureRedisReady()` call, but the client must still give
-// up after a few tries so it lands in an `end` state that `ensureRedisReady()`
-// can reconnect (rather than retrying forever and masking a real outage).
-// Commands still fail fast (`maxRetriesPerRequest: 1` + no offline queue), and
-// the eager (non-lazy) connect never blocks boot because construction is
-// synchronous and `connectTimeout` caps each attempt.
-const MAX_RECONNECT_ATTEMPTS = 5;
+// Reconnect forever with a backoff capped at 2 s. Giving up after a few tries
+// left the client in 'end' after an outage of a few seconds, and callers that
+// never go through ensureRedisReady() (the rate-limit store) kept failing
+// until something else (e.g. /readyz) reconnected it. While reconnecting,
+// commands still fail fast (`maxRetriesPerRequest: 1` + no offline queue), so
+// an outage is reported, not masked; ensureRedisReady() still reconnects a
+// client that was closed explicitly. The eager (non-lazy) connect never blocks
+// boot because construction is synchronous and `connectTimeout` caps each attempt.
 const RECONNECT_DELAY_STEP_MS = 200;
 const RECONNECT_DELAY_CAP_MS = 2_000;
 
@@ -24,10 +24,7 @@ export const redis = new Redis(redisUrl, {
   // TCP keepalive so Azure Cache for Redis' ~10-minute idle reaper doesn't
   // silently drop this long-lived client between requests.
   keepAlive: 30_000,
-  retryStrategy: (times) =>
-    times > MAX_RECONNECT_ATTEMPTS
-      ? null
-      : Math.min(times * RECONNECT_DELAY_STEP_MS, RECONNECT_DELAY_CAP_MS),
+  retryStrategy: (times) => Math.min(times * RECONNECT_DELAY_STEP_MS, RECONNECT_DELAY_CAP_MS),
 });
 
 let reconnectPromise: Promise<void> | null = null;

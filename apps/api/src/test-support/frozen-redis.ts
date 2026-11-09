@@ -31,9 +31,10 @@ export type FrozenRedis = { port: number; received: string[]; close(): Promise<v
  * reports 'ready', then never replies to anything else: a Redis that froze
  * after connecting (SIGSTOP, a wedged primary, a stalled proxy). `replies`
  * maps further commands to raw RESP answers, for a Redis that is healthy for
- * those commands.
+ * those commands. `port` 0 picks a free port; pass one to bring a fake back
+ * on the port a client is reconnecting to.
  */
-export async function startFrozenRedis(replies: Record<string, string> = {}): Promise<FrozenRedis> {
+export async function startFrozenRedis(replies: Record<string, string> = {}, port = 0): Promise<FrozenRedis> {
   const received: string[] = [];
   const sockets = new Set<Socket>();
   const server: Server = createServer((socket) => {
@@ -52,7 +53,7 @@ export async function startFrozenRedis(replies: Record<string, string> = {}): Pr
       }
     });
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('no port');
   return {

@@ -115,6 +115,34 @@ describe('rate limiter when its Redis store fails and the limiter does not fail 
     await limited.app.close();
   });
 
+  it('serves again by itself after an outage longer than ~3 s, with no readiness probe', async () => {
+    // WHY: the shared client gave up after 5 reconnect attempts (~3 s), and
+    // the rate-limit store never calls ensureRedisReady(), so every request
+    // stayed 503 after Redis came back until /readyz reconnected the client.
+    // This app has no /readyz and nothing here reconnects the client.
+    fake = await startFrozenRedis(answering(1));
+    const port = fake.port;
+    const client = await sharedClientAt(`redis://127.0.0.1:${port}`, true);
+    const { app } = await appWith(client, false);
+    const ping = () => app.inject({ method: 'GET', url: '/ping' });
+    expect((await ping()).statusCode).toBe(200);
+
+    await fake.close();
+    fake = null;
+    expect((await ping()).statusCode).toBe(503);
+    await new Promise((r) => setTimeout(r, 4_000));
+    fake = await startFrozenRedis(answering(1), port);
+
+    let status = 0;
+    for (const deadline = Date.now() + 6_000; status !== 200 && Date.now() < deadline; ) {
+      await new Promise((r) => setTimeout(r, 250));
+      status = (await ping()).statusCode;
+    }
+    expect(status).toBe(200);
+    expect(client.status).toBe('ready');
+    await app.close();
+  }, 20_000);
+
   it('keeps failing open where skipOnError allows it (non-real modes)', async () => {
     fake = await startFrozenRedis();
     const { app } = await appWith(await sharedClientAt(`redis://127.0.0.1:${fake.port}`, true), true);
