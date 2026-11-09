@@ -3470,3 +3470,16 @@ integration_configs_org_type_name_key`, but the live local DB does not have
 - **What went wrong:** The currency fallback change (unconverted amounts keep their stored currency) left `TerritoriesPage.test.tsx` asserting the old mislabel (`$15K` for an EUR total with no rates). Only selected suites ran before freezing, so the red test went unnoticed until the full web suite ran.
 - **Prevention rule:** Before freezing any change to a shared formatter or store, run the full `apps/web` vitest suite, not only the files named in the change.
 - **Files affected:** apps/web/src/pages/TerritoriesPage.test.tsx
+
+### 2026-11-09 BUG: Redis enqueue bounded only until 'ready'
+
+- **What went wrong:** My first company-create fix bounded the wait for the Redis connection but not `queue.add`. Independent QA froze an already-ready Redis (SIGSTOP), and `POST /companies` again hung after its rows committed, so a client retry would duplicate the company.
+- **Root cause:** Tests covered only failures before readiness (refused port, silent TCP). Nothing modelled a server that completes the handshake and then stops answering, and I fixed one producer while 30+ shared the same connection settings.
+- **Prevention rule:** A request-path enqueue MUST go through `addWithinDeadline` (`lib/queue-enqueue.ts`), which bounds readiness and the command under one deadline. Timeout tests MUST include a peer that passes the handshake and then never replies. When a fix targets a shared pattern, grep every site in the same change.
+- **Files affected:** apps/api/src/lib/queue-enqueue.ts, apps/api/src/queues/account-intel.ts and every producer listed in the 2026-11-09 queue audit
+
+### 2026-11-09 PROCESS: focused receipt filed as green without its command
+
+- **What went wrong:** A focused receipt named `green/api-account-intel.txt` ended in EXIT 1: `src/routes/companies.test.ts`, which I had passed explicitly, failed on `Missing: DATABASE_URL`. The receipt did not record its command, so QA re-ran `vitest run account-intel`, hit a different DATABASE_URL-dependent file (`src/routes/account-intel.integration.test.ts`), and could not reconcile the two.
+- **Prevention rule:** Every receipt MUST start with the exact command and working directory. A receipt with a non-zero exit MUST NOT sit under `green/`; name the failing file and whether the cause is environment or code.
+- **Files affected:** evidence packets only
