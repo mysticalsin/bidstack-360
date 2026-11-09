@@ -29,6 +29,7 @@ vi.mock('@/hooks/useMigrations', () => ({
   useParseSpreadsheet: hookMocks.useParseSpreadsheet,
   useMigrationJob: hookMocks.useMigrationJob,
   downloadMigrationErrors: hookMocks.downloadMigrationErrors,
+  newUploadId: () => 'synthetic-upload-0001',
 }));
 
 import { CsvImportWizard } from './CsvImportWizard';
@@ -122,6 +123,9 @@ describe('CsvImportWizard', () => {
     const [input] = hookMocks.mutate.mock.calls[0]!;
     expect(input).toMatchObject({ source: 'CSV', entityType: 'company', dedupStrategy: 'skip' });
     expect(input.rows).toHaveLength(1);
+    // The API dedupes a retried start by this id; without it a retry after a
+    // late server failure imports every row twice.
+    expect(input.uploadId).toEqual(expect.stringMatching(/^.{8,128}$/));
   });
 
   it('rejects a file with more rows than the stated limit before ever calling the API', async () => {

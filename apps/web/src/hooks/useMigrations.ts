@@ -32,6 +32,15 @@ export interface StartCsvImportInput {
   rows: Record<string, string>[];
   mappings: Record<string, string | null>;
   dedupStrategy: 'skip' | 'update' | 'duplicate';
+  /** One per upload: the mutation's retry resends it, and the API resumes
+   *  that start instead of importing the rows a second time. */
+  uploadId: string;
+}
+
+export function newUploadId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 const TERMINAL: MigrationStatus[] = ['COMPLETE', 'FAILED', 'CANCELLED'];

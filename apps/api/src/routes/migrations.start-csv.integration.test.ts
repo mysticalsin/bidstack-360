@@ -15,6 +15,8 @@ import { prisma } from '@bidstack/db';
 import { MIGRATION } from '@bidstack/shared';
 
 import { redis } from '../redis.js';
+import { buildServer } from '../server.js';
+import { QueueUnavailableError } from '../lib/queue-enqueue.js';
 import { makeMigrationsTestContext } from './migrations.test-helpers.js';
 
 const { ctx, skipIfNoDb } = makeMigrationsTestContext();
@@ -42,8 +44,8 @@ afterAll(async () => {
   }
 });
 
-function startCsv(entityType: string, rowCount = 3) {
-  return ctx.server.inject({
+function startCsv(entityType: string, rowCount = 3, extra: Record<string, unknown> = {}, server = ctx.server) {
+  return server.inject({
     method: 'POST',
     url: '/api/v1/migrations/start-csv',
     payload: {
@@ -51,8 +53,26 @@ function startCsv(entityType: string, rowCount = 3) {
       entityType,
       rows: Array.from({ length: rowCount }, (_, i) => ({ Name: `Synthetic Import Co ${i}` })),
       mappings: { Name: 'name' },
+      ...extra,
     },
   });
+}
+
+/** Chunks queued for this entity type, in any state; registered for cleanup. */
+async function queuedChunks(entityType: string) {
+  const all = await inspectQueue().getJobs(['waiting', 'delayed', 'paused', 'prioritized', 'active', 'completed', 'failed']);
+  const mine = all.filter((j) => j.data.entityType === entityType);
+  queuedJobIds.push(...mine.map((j) => j.id!));
+  return mine;
+}
+
+/** Job rows for this entity type; registered for cleanup. */
+async function jobRows(entityType: string) {
+  const rows = await prisma.migrationJob.findMany({
+    where: { orgId: ctx.seedOrgId!, meta: { path: ['entityType'], equals: entityType } },
+  });
+  ctx.cleanup.jobIds.push(...rows.map((r) => r.id));
+  return rows;
 }
 
 async function leftovers(entityType: string) {
@@ -66,6 +86,7 @@ async function leftovers(entityType: string) {
 }
 
 const never = () => new Promise<never>(() => {});
+
 
 describe('POST /api/v1/migrations/start-csv', () => {
   skipIfNoDb('queues every chunk, stores the rows and records one RUNNING job with one audit row', async () => {
@@ -133,5 +154,97 @@ describe('POST /api/v1/migrations/start-csv', () => {
     expect(res.statusCode).toBeGreaterThanOrEqual(500);
     expect(await leftovers(entityType)).toEqual({ jobs: 0, audits: 0 });
     expect(await redis.keys(`migration:*:${entityType}:rows`)).toEqual([]);
+  });
+});
+
+// WHY: once the chunks are queued the import will run. If a database write
+// after the enqueue failed, the start answered 500 and the client's one retry
+// created a second job and imported every row again. The retry carries the
+// same uploadId and must resume the first start instead.
+// start-csv allows 10 starts a minute per server; these tests get their own.
+let own: Awaited<ReturnType<typeof buildServer>> | null = null;
+async function ownServer() {
+  if (!own) {
+    own = await buildServer();
+    await own.ready();
+  }
+  return own;
+}
+afterAll(async () => {
+  await own?.close();
+});
+
+describe('POST /api/v1/migrations/start-csv — retried upload', () => {
+  skipIfNoDb('a retry after a database failure past the enqueue resumes the first start, imported once', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    vi.spyOn(prisma.auditLog, 'create').mockRejectedValueOnce(new Error('synthetic database failure'));
+
+    const first = await startCsv(entityType, 150, { uploadId }, await ownServer());
+    const retry = await startCsv(entityType, 150, { uploadId }, await ownServer());
+
+    expect(first.statusCode).toBe(500);
+    expect(retry.statusCode).toBe(201);
+    const jobs = await jobRows(entityType);
+    expect(jobs.map((j) => j.id)).toEqual([retry.json<{ id: string }>().id]);
+    expect(jobs[0]!.status).toBe('RUNNING');
+    const chunks = await queuedChunks(entityType);
+    expect(chunks.map((c) => c.id).sort()).toEqual([0, 1].map((i) => `${jobs[0]!.id}-${entityType}-chunk-${i}`));
+    expect(await prisma.auditLog.count({ where: { action: 'migration.start', targetId: jobs[0]!.id } })).toBe(1);
+    await redis.del(`migration:${jobs[0]!.id}:${entityType}:rows`);
+  });
+
+  skipIfNoDb('a retry of a start that already succeeded returns that start and queues nothing new', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+
+    const first = await startCsv(entityType, 3, { uploadId }, await ownServer());
+    const again = await startCsv(entityType, 3, { uploadId }, await ownServer());
+
+    expect([first.statusCode, again.statusCode]).toEqual([201, 201]);
+    expect(again.json<{ id: string }>().id).toBe(first.json<{ id: string }>().id);
+    expect(await jobRows(entityType)).toHaveLength(1);
+    expect(await queuedChunks(entityType)).toHaveLength(1);
+    await redis.del(`migration:${first.json<{ id: string }>().id}:${entityType}:rows`);
+  });
+
+  skipIfNoDb('another upload of the same rows is a new import', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+
+    const a = await startCsv(entityType, 3, { uploadId: randomUUID() }, await ownServer());
+    const b = await startCsv(entityType, 3, { uploadId: randomUUID() }, await ownServer());
+
+    expect([a.statusCode, b.statusCode]).toEqual([201, 201]);
+    expect(await jobRows(entityType)).toHaveLength(2);
+  });
+
+  skipIfNoDb('an uploadId reused for a different upload is refused', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+
+    const first = await startCsv(entityType, 3, { uploadId }, await ownServer());
+    const other = await startCsv(entityType, 4, { uploadId }, await ownServer());
+
+    expect([first.statusCode, other.statusCode]).toEqual([201, 409]);
+    expect(await jobRows(entityType)).toHaveLength(1);
+  });
+});
+
+// WHY: the cleanup of a failed start ran unguarded; when it threw, its error
+// replaced the start's own, so a retryable 503 became a 500 and the stored
+// rows were never removed.
+describe('POST /api/v1/migrations/start-csv — failed cleanup', () => {
+  skipIfNoDb('keeps the original 503 and still removes the stored rows when the job row cannot be deleted', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new QueueUnavailableError(MIGRATION.name, 'not-ready', 2_000));
+    vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new QueueUnavailableError(MIGRATION.name, 'not-ready', 2_000));
+    vi.spyOn(prisma.migrationJob, 'delete').mockRejectedValue(new Error('synthetic database failure'));
+
+    const res = await startCsv(entityType, 3, {}, await ownServer());
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ message: string }>().message).toBe('Background job queue is unavailable; retry shortly');
+    expect(await redis.keys(`migration:*:${entityType}:rows`)).toEqual([]);
+    expect(await jobRows(entityType)).toHaveLength(1);
   });
 });

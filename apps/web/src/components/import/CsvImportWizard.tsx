@@ -11,6 +11,7 @@ import {
 } from '@/lib/import-fields';
 import {
   downloadMigrationErrors,
+  newUploadId,
   useMigrationJob,
   useParseSpreadsheet,
   usePreviewCsvImport,
@@ -114,6 +115,7 @@ export function CsvImportWizard() {
         rows: parsed.rows,
         mappings,
         dedupStrategy: dedup,
+        uploadId: newUploadId(),
       },
       {
         onSuccess: (created) => {
