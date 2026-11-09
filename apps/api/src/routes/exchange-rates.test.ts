@@ -185,6 +185,25 @@ describe('exchange rates route', () => {
     await app.close();
   });
 
+  // The web status line falls back to "Live rates" when it cannot parse the
+  // date, which would overstate freshness for rates of unknown age (QA F3).
+  it('rejects a provider date that is not a real date', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        okJson({ result: 'success', base_code: 'EUR', time_last_update_utc: 'soon', rates: fullRates() }),
+      ),
+    );
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/exchange-rates' });
+
+    expect(res.statusCode).toBe(502);
+    expect(res.headers['cache-control']).toBe('no-store');
+
+    await app.close();
+  });
+
   it('recovers on the next request once the provider is back, without caching the failure', async () => {
     const fetchMock = vi
       .fn()

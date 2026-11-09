@@ -152,7 +152,7 @@ export const exchangeRatesRoutes: FastifyPluginAsyncZod<{ providerTimeoutMs?: nu
         !upstream.rates ||
         typeof upstream.rates !== 'object' ||
         typeof upstream.time_last_update_utc !== 'string' ||
-        !upstream.time_last_update_utc
+        !Number.isFinite(Date.parse(upstream.time_last_update_utc))
       ) {
         return providerFailure(502, 'Invalid response from exchange rate provider');
       }
