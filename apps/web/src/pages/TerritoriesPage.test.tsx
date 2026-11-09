@@ -84,7 +84,10 @@ describe('TerritoriesPage', () => {
     // clearAllMocks() clears call history but not a permanent mockReturnValue,
     // so restate the default explicitly per test for isolation.
     capabilitiesMocks.useHasPermission.mockReturnValue(true);
-    useCurrencyStore.setState({ currency: 'USD' });
+    useCurrencyStore.setState({
+      currency: 'USD',
+      rates: { base: 'EUR', rates: { USD: 1.1 }, date: '2026-11-09' },
+    });
   });
 
   afterEach(() => {
@@ -177,12 +180,20 @@ describe('TerritoriesPage', () => {
 
     // Check header and KPI values
     expect(screen.getByRole('heading', { name: 'Territories', level: 1 })).toBeTruthy();
-    expect(screen.getByText('$15K')).toBeTruthy(); // 15,000,000,000 micros = 15,000 EUR, converted to USD and compacted
+    expect(screen.getByText('$16.5K')).toBeTruthy(); // 15,000,000,000 micros = 15,000 EUR × 1.1, converted to USD and compacted
     expect(screen.getByText('75%')).toBeTruthy();
 
     // Check list entries
     expect(screen.getByText('Europe Central')).toBeTruthy();
     expect(screen.getByText('Germany Auto Assign')).toBeTruthy();
+
+    // WHY: without rates the EUR total cannot be converted; labelling the
+    // unconverted number "$15K" would misstate it, so it keeps its own symbol.
+    cleanup();
+    useCurrencyStore.setState({ rates: null });
+    renderWithProviders(<TerritoriesPage />);
+    expect(screen.getByText('€15K')).toBeTruthy();
+    expect(screen.queryByText('$15K')).toBeNull();
   });
 
   // Regression: every write route (territories + lead-routing-rules) is
