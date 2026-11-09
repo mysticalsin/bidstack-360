@@ -258,6 +258,7 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
           entities: req.body.entities,
           dedupStrategy: req.body.dedupStrategy,
           queue: getQueue(),
+          log: req.log,
         });
         return reply.code(201).send({ jobs: jobs.map(serializeJob) });
       } catch (err) {

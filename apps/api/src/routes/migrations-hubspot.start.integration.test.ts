@@ -15,6 +15,7 @@ import { prisma } from '@bidstack/db';
 import { MIGRATION } from '@bidstack/shared';
 
 import type * as SerumPolicy from '../lib/serum-connector-policy.js';
+import { QueueUnavailableError } from '../lib/queue-enqueue.js';
 import { makeMigrationsTestContext } from './migrations.test-helpers.js';
 
 // The SERUM connector policy is its own gate with its own tests; here it allows the start.
@@ -83,8 +84,8 @@ afterAll(async () => {
   }
 });
 
-function startHubspot(entities: string[]) {
-  return ctx.server.inject({
+function startHubspot(entities: string[], server = ctx.server) {
+  return server.inject({
     method: 'POST',
     url: '/api/v1/migrations/start-hubspot',
     payload: { entities, dedupStrategy: 'update' },
@@ -107,6 +108,7 @@ async function hubspotRowsSince(since: Date) {
 }
 
 const never = () => new Promise<never>(() => {});
+
 
 describe('POST /api/v1/migrations/start-hubspot', () => {
   skipIfNoDb('queues the first chunk of every entity and records one RUNNING job and one audit row each', async () => {
@@ -161,5 +163,27 @@ describe('POST /api/v1/migrations/start-hubspot', () => {
     expect(addBulk).toHaveBeenCalledOnce();
     expect(addBulk.mock.calls[0]![0].map((j) => j.data.entityType)).toEqual(['companies', 'contacts']);
     expect(await hubspotRowsSince(since)).toEqual({ jobs: 0, audits: 0 });
+  });
+});
+
+describe('POST /api/v1/migrations/start-hubspot — failed cleanup', () => {
+  // WHY: a throwing cleanup replaced the start's own error, turning a
+  // retryable 503 into a 500.
+  skipIfNoDb('keeps the original 503 when the job rows cannot be deleted', async () => {
+    vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new QueueUnavailableError(MIGRATION.name, 'not-ready', 2_000));
+    vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new QueueUnavailableError(MIGRATION.name, 'not-ready', 2_000));
+    vi.spyOn(prisma.migrationJob, 'deleteMany').mockRejectedValue(new Error('synthetic database failure'));
+    const since = new Date();
+
+    const res = await startHubspot(['companies']);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ message: string }>().message).toBe('Background job queue is unavailable; retry shortly');
+    vi.restoreAllMocks();
+    const left = await prisma.migrationJob.findMany({
+      where: { orgId: ctx.seedOrgId!, source: 'HUBSPOT_OAUTH', createdAt: { gte: since } },
+    });
+    ctx.cleanup.jobIds.push(...left.map((j) => j.id));
+    expect(left).toHaveLength(1);
   });
 });

@@ -102,6 +102,7 @@ export async function startHubspotSync(input: StartSyncInput): Promise<SyncRun> 
           dedupStrategy: 'update',
           queue: migrationQueue(),
           syncRunId: runId,
+          log,
         });
       } catch (err) {
         if (err instanceof HubspotNotConnectedError) throw new SyncUnavailableError(err.message);

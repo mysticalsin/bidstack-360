@@ -15,6 +15,7 @@ import {
 } from '@bidstack/shared';
 
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
+import { discardFailedStart } from '../lib/failed-start-cleanup.js';
 import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 export const HUBSPOT_IMPORT_ENTITIES = ['companies', 'contacts', 'deals', 'tasks'] as const;
@@ -79,6 +80,8 @@ export async function startHubspotImport(input: {
   queue: Queue;
   /** Set by Sync now so the run can be polled across its MigrationJobs. */
   syncRunId?: string;
+  /** Receives cleanup failures of a start that could not be queued. */
+  log?: { error(obj: object, msg: string): void };
 }) {
   const { orgId, userId } = input;
 
@@ -152,7 +155,9 @@ export async function startHubspotImport(input: {
       ),
     );
   } catch (err) {
-    await prisma.migrationJob.deleteMany({ where: { id: { in: planned.map((p) => p.job.id) } } });
+    await discardFailedStart(err, input.log ?? { error: () => {} }, [
+      ['delete job rows', () => prisma.migrationJob.deleteMany({ where: { id: { in: planned.map((p) => p.job.id) } } })],
+    ]);
     throw err;
   }
 
