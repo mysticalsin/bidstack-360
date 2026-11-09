@@ -8,6 +8,7 @@ import IORedis from 'ioredis';
 import { ACCOUNT_INTEL, type AccountIntelQueueJob } from '@bidstack/shared';
 
 import { createLogger } from '../lib/logger.js';
+import { addWithinDeadline } from '../lib/queue-enqueue.js';
 
 const log = createLogger({ name: 'queue:account-intel' });
 
@@ -43,29 +44,6 @@ function getQueue(): Queue {
   return queueSingleton;
 }
 
-// The enqueue helpers below are fail-open and awaited inside requests such as
-// POST /companies. BullMQ's add waits for the connection without limit, so a
-// missing Redis held those requests open. Readiness is checked under a
-// deadline before add is called: a request that gives up leaves no add queued
-// to fire later on reconnect.
-const ENQUEUE_READY_TIMEOUT_MS = 2_000;
-
-async function readyQueue(): Promise<Queue | null> {
-  const queue = getQueue();
-  const connection = connectionSingleton!;
-  if (connection.status === 'ready') return queue;
-  return new Promise((resolve) => {
-    const finish = (result: Queue | null) => {
-      clearTimeout(timer);
-      connection.off('ready', onReady);
-      resolve(result);
-    };
-    const onReady = () => finish(queue);
-    const timer = setTimeout(() => finish(null), ENQUEUE_READY_TIMEOUT_MS);
-    connection.once('ready', onReady);
-  });
-}
-
 /** Unique per request: a reused id would be ignored by BullMQ once the earlier job completed. */
 export function accountIntelJobId(job: AccountIntelRefreshJob, now = Date.now()): string {
   return `${job.orgId}--intel--${job.companyId}--${[...job.sources].sort().join('-')}--${now}`;
@@ -74,7 +52,12 @@ export function accountIntelJobId(job: AccountIntelRefreshJob, now = Date.now())
 /** Sources pulled once for a new account: registry first, so filings can use the LEI it finds. */
 export const FIRST_RUN_SOURCES: AccountIntelRefreshJob['sources'] = ['registry', 'financials'];
 
-type IntelRunDb = { intelSourceRun: { createMany(args: { data: Array<{ orgId: string; companyId: string; source: string; status: string }>; skipDuplicates?: boolean }): Promise<unknown> } };
+type IntelRunDb = {
+  intelSourceRun: {
+    createMany(args: { data: Array<{ orgId: string; companyId: string; source: string; status: string }>; skipDuplicates?: boolean }): Promise<unknown>;
+    deleteMany(args: { where: { orgId: string; companyId: string; source: { in: string[] }; status: string } }): Promise<unknown>;
+  };
+};
 
 /**
  * First registry and filings pull for a newly created account. The worker's
@@ -83,11 +66,17 @@ type IntelRunDb = { intelSourceRun: { createMany(args: { data: Array<{ orgId: st
  */
 export async function queueFirstAccountIntel(db: IntelRunDb, input: { orgId: string; companyId: string; requestedBy: string | null }): Promise<string | null> {
   try {
+    // Rows first, as in POST /companies/:id/intel/refresh: the worker records
+    // a failure with updateMany on queued/running rows, so a fast failure
+    // before the rows existed was lost.
+    await db.intelSourceRun.createMany({
+      data: FIRST_RUN_SOURCES.map((source) => ({ orgId: input.orgId, companyId: input.companyId, source, status: 'queued' })),
+      skipDuplicates: true,
+    });
     const jobId = await enqueueAccountIntel({ kind: 'refresh', ...input, sources: [...FIRST_RUN_SOURCES] });
-    if (jobId) {
-      await db.intelSourceRun.createMany({
-        data: FIRST_RUN_SOURCES.map((source) => ({ orgId: input.orgId, companyId: input.companyId, source, status: 'queued' })),
-        skipDuplicates: true,
+    if (!jobId) {
+      await db.intelSourceRun.deleteMany({
+        where: { orgId: input.orgId, companyId: input.companyId, source: { in: [...FIRST_RUN_SOURCES] }, status: 'queued' },
       });
     }
     return jobId;
@@ -102,12 +91,8 @@ export async function enqueueAccountIntel(job: AccountIntelRefreshJob): Promise<
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queue = await readyQueue();
-    if (!queue) {
-      log.warn({ orgId: job.orgId, companyId: job.companyId }, 'Redis not ready; account intel refresh not queued');
-      return null;
-    }
-    const queued = await queue.add('account-intel.refresh', job, { jobId: accountIntelJobId(job) });
+    const queue = getQueue();
+    const queued = await addWithinDeadline(queue, () => queue.add('account-intel.refresh', job, { jobId: accountIntelJobId(job) }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue account intel refresh');
@@ -125,12 +110,8 @@ export async function enqueueCompanyFullRefresh(job: CompanyFullRefreshJob): Pro
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queue = await readyQueue();
-    if (!queue) {
-      log.warn({ orgId: job.orgId, companyId: job.companyId }, 'Redis not ready; company intel full refresh not queued');
-      return null;
-    }
-    const queued = await queue.add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) });
+    const queue = getQueue();
+    const queued = await addWithinDeadline(queue, () => queue.add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) }));
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue company intel full refresh');
