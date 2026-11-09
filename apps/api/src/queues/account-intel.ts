@@ -43,6 +43,29 @@ function getQueue(): Queue {
   return queueSingleton;
 }
 
+// The enqueue helpers below are fail-open and awaited inside requests such as
+// POST /companies. BullMQ's add waits for the connection without limit, so a
+// missing Redis held those requests open. Readiness is checked under a
+// deadline before add is called: a request that gives up leaves no add queued
+// to fire later on reconnect.
+const ENQUEUE_READY_TIMEOUT_MS = 2_000;
+
+async function readyQueue(): Promise<Queue | null> {
+  const queue = getQueue();
+  const connection = connectionSingleton!;
+  if (connection.status === 'ready') return queue;
+  return new Promise((resolve) => {
+    const finish = (result: Queue | null) => {
+      clearTimeout(timer);
+      connection.off('ready', onReady);
+      resolve(result);
+    };
+    const onReady = () => finish(queue);
+    const timer = setTimeout(() => finish(null), ENQUEUE_READY_TIMEOUT_MS);
+    connection.once('ready', onReady);
+  });
+}
+
 /** Unique per request: a reused id would be ignored by BullMQ once the earlier job completed. */
 export function accountIntelJobId(job: AccountIntelRefreshJob, now = Date.now()): string {
   return `${job.orgId}--intel--${job.companyId}--${[...job.sources].sort().join('-')}--${now}`;
@@ -79,7 +102,12 @@ export async function enqueueAccountIntel(job: AccountIntelRefreshJob): Promise<
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queued = await getQueue().add('account-intel.refresh', job, { jobId: accountIntelJobId(job) });
+    const queue = await readyQueue();
+    if (!queue) {
+      log.warn({ orgId: job.orgId, companyId: job.companyId }, 'Redis not ready; account intel refresh not queued');
+      return null;
+    }
+    const queued = await queue.add('account-intel.refresh', job, { jobId: accountIntelJobId(job) });
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue account intel refresh');
@@ -97,7 +125,12 @@ export async function enqueueCompanyFullRefresh(job: CompanyFullRefreshJob): Pro
   if (enqueueOverride) return enqueueOverride(job);
   if (process.env.NODE_ENV === 'test' && process.env.BIDSTACK_ENABLE_QUEUE_IN_TESTS !== 'true') return null;
   try {
-    const queued = await getQueue().add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) });
+    const queue = await readyQueue();
+    if (!queue) {
+      log.warn({ orgId: job.orgId, companyId: job.companyId }, 'Redis not ready; company intel full refresh not queued');
+      return null;
+    }
+    const queued = await queue.add('account-intel.full-refresh', job, { jobId: companyFullRefreshJobId(job) });
     return queued.id ?? null;
   } catch (err) {
     log.error({ err, orgId: job.orgId, companyId: job.companyId }, 'Failed to enqueue company intel full refresh');
