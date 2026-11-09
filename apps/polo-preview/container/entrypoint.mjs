@@ -13,6 +13,7 @@ import { networkInterfaces } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
+import { stopChildren } from '../src/child-shutdown.js';
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { isApiPath } from '../src/protocol.js';
 
@@ -39,6 +40,7 @@ let apiRestarts = 0;
 let workerChild = null;
 let workerRestarts = 0;
 let selfSeeded = false;
+let stopping = false;
 
 // Container stdout is not reachable from outside, so the last lines are kept
 // and returned with a failed state for the Worker to log.
@@ -144,6 +146,7 @@ function startDatabase() {
     stdio: 'inherit',
   });
   pg.on('exit', (code) => {
+    if (stopping) return;
     log(`postgres exited ${code}; stopping the container so it restarts clean`);
     process.exit(1);
   });
@@ -151,6 +154,7 @@ function startDatabase() {
     stdio: 'inherit',
   });
   redis.on('exit', (code) => {
+    if (stopping) return;
     log(`redis exited ${code}; stopping the container`);
     process.exit(1);
   });
@@ -179,6 +183,7 @@ function seed() {
 }
 
 function startApi() {
+  if (stopping) return;
   apiChild = spawn(process.execPath, ['apps/api/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
   apiChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   apiChild.stderr.on('data', (chunk) => {
@@ -187,7 +192,7 @@ function startApi() {
   });
   apiChild.on('exit', (code) => {
     apiChild = null;
-    if (phase !== 'ready') return;
+    if (stopping || phase !== 'ready') return;
     const delay = Math.min(30_000, 1_000 * 2 ** apiRestarts++);
     log(`api exited ${code}; restarting in ${delay}ms`);
     setTimeout(startApi, delay);
@@ -197,6 +202,7 @@ function startApi() {
 // Queued jobs (public registry and filings pulls, imports) run here. A crash
 // never takes the API down; the worker restarts on its own.
 function startWorker() {
+  if (stopping) return;
   workerChild = spawn(process.execPath, ['apps/worker/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
   workerChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   workerChild.stderr.on('data', (chunk) => {
@@ -205,6 +211,7 @@ function startWorker() {
   });
   workerChild.on('exit', (code) => {
     workerChild = null;
+    if (stopping) return;
     const delay = Math.min(60_000, 2_000 * 2 ** Math.min(workerRestarts++, 5));
     log(`worker exited ${code}; restarting in ${delay}ms`);
     setTimeout(startWorker, delay);
@@ -433,8 +440,11 @@ try {
 }
 
 process.on('SIGTERM', () => {
+  if (stopping) return;
+  stopping = true;
   log('SIGTERM: stopping');
-  apiChild?.kill('SIGTERM');
-  workerChild?.kill('SIGTERM');
-  process.exit(0);
+  void stopChildren([['api', apiChild], ['worker', workerChild]], { log }).then((code) => {
+    log(`stopped; exiting ${code}`);
+    process.exit(code);
+  });
 });
