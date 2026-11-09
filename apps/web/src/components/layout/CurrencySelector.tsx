@@ -8,6 +8,9 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { useCurrencyStore, SUPPORTED_CURRENCIES } from '@/stores/currency';
 import { springSnap } from '@/lib/motion';
 
+// Matches the store's back-off after a failed rates request.
+const RATES_REFRESH_INTERVAL_MS = 60_000;
+
 export function CurrencySelector() {
   const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
@@ -30,6 +33,20 @@ export function CurrencySelector() {
 
   useEffect(() => {
     fetchRates();
+    // The selector stays mounted while pages sit open for hours. fetchRates
+    // does nothing while rates are fresh or a failed attempt's back-off is
+    // pending, so these only reach the API when rates expired or may be back.
+    const refresh = () => {
+      if (document.visibilityState !== 'hidden') void fetchRates();
+    };
+    const timer = window.setInterval(refresh, RATES_REFRESH_INTERVAL_MS);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, [fetchRates]);
 
   useEffect(() => {

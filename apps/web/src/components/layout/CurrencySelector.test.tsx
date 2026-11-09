@@ -73,6 +73,76 @@ describe('CurrencySelector', () => {
     expect(within(listbox).queryByText('Using cached rates')).toBeNull();
   });
 
+  // WHY: rates were requested only on mount, so a page left open through a
+  // provider outage kept showing original-currency amounts until the user
+  // navigated or reloaded (QA F4). Recovery must not hammer the API either.
+  describe('while the page stays open', () => {
+    const okRates = () =>
+      vi.fn(async () => ({
+        ok: true,
+        headers: new Headers(),
+        json: async () => ({
+          base: 'EUR',
+          date: '2026-05-31',
+          rates: Object.fromEntries(SUPPORTED_CURRENCIES.map((c) => [c.code, 1])),
+        }),
+      }));
+
+    let clockShift = 0;
+
+    async function renderAfterFailedLoad() {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+      // The store's retry window outlives each test; start every test past
+      // any window an earlier one opened.
+      clockShift += 24 * 60 * 60_000;
+      vi.setSystemTime(Date.now() + clockShift);
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, headers: new Headers() })));
+      render(<CurrencySelector />);
+      await waitFor(() => expect(useCurrencyStore.getState().ratesError).toBe('HTTP 503'));
+      const recovered = okRates();
+      vi.stubGlobal('fetch', recovered);
+      return recovered;
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('picks up recovered rates on its own once the retry window passes', async () => {
+      const recovered = await renderAfterFailedLoad();
+
+      vi.advanceTimersByTime(61_000);
+
+      await waitFor(() => expect(useCurrencyStore.getState().rates).not.toBeNull());
+      expect(recovered).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: /select currency/i }));
+      const listbox = await screen.findByRole('listbox', { name: 'Select currency' });
+      expect(within(listbox).getByText('Rates updated May 31')).toBeDefined();
+    });
+
+    it('retries when the window regains focus after the retry window', async () => {
+      const recovered = await renderAfterFailedLoad();
+
+      vi.setSystemTime(Date.now() + 61_000);
+      fireEvent.focus(window);
+
+      await waitFor(() => expect(useCurrencyStore.getState().rates).not.toBeNull());
+      expect(recovered).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask again inside the retry window, and keeps saying rates are unavailable', async () => {
+      const recovered = await renderAfterFailedLoad();
+
+      vi.setSystemTime(Date.now() + 10_000);
+      fireEvent.focus(window);
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      expect(recovered).not.toHaveBeenCalled();
+      expect(useCurrencyStore.getState().rates).toBeNull();
+      expect(useCurrencyStore.getState().ratesError).not.toBeNull();
+    });
+  });
+
   it('updates the compact top-bar trigger after choosing a currency', async () => {
     render(<CurrencySelector />);
 
