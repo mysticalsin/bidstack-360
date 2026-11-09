@@ -9,6 +9,7 @@
 // Serializers → migrations.helpers.ts
 
 import { Queue } from 'bullmq';
+import IORedis from 'ioredis';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -58,11 +59,16 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
   let migrationQueue: Queue | null = null;
   const getQueue = () => {
     if (!migrationQueue) {
-      const { redis } = server as unknown as {
-        redis: { status: string; duplicate: () => unknown };
-      };
+      const connection = new IORedis(process.env.REDIS_URL ?? 'redis://localhost:6380', {
+        maxRetriesPerRequest: null,
+        enableOfflineQueue: true,
+        lazyConnect: false,
+      });
+      connection.on('error', (err) => {
+        server.log.error({ err }, 'Redis connection error in HubSpot migration queue');
+      });
       migrationQueue = new Queue(MIGRATION.name, {
-        connection: (redis as unknown as { duplicate: () => unknown }).duplicate() as never,
+        connection,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,
       });
     }

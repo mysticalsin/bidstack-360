@@ -101,15 +101,14 @@ export async function startHubspotImport(input: {
     tasks: {},
   };
 
-  const jobs: Awaited<ReturnType<typeof prisma.migrationJob.create>>[] = [];
-
+  const discovery = (config.config as Record<string, unknown>).discovery as Record<string, number>;
+  const planned: Array<{
+    entity: HubspotImportEntity;
+    totalRows: number;
+    job: Awaited<ReturnType<typeof prisma.migrationJob.create>>;
+  }> = [];
   for (const entity of input.entities) {
-    const discovery = (config.config as Record<string, unknown>).discovery as Record<
-      string,
-      number
-    >;
     const totalRows = discovery?.[entity] ?? 0;
-
     const job = await prisma.migrationJob.create({
       data: {
         orgId,
@@ -123,7 +122,41 @@ export async function startHubspotImport(input: {
           : { entityType: entity },
       },
     });
+    planned.push({ entity, totalRows, job });
+  }
 
+  // All entities queue together or not at all: addBulk is one MULTI, so a
+  // failed start never leaves some entities importing while the caller (and
+  // the client's retry) sees an error. On failure the job rows are removed;
+  // the audit log is append-only, so it is written only once the import is
+  // queued. A chunk that lands after the deadline finds no job row and the
+  // worker skips it.
+  try {
+    await addWithinDeadline(input.queue, (q) =>
+      q.addBulk(
+        planned.map(({ entity, totalRows, job }) => ({
+          // The worker paginates via the hubspotAfter cursor from this first chunk.
+          name: `${job.id}-chunk-0`,
+          data: buildHubSpotMigrationPayload({
+            migrationJobId: job.id,
+            orgId,
+            userId,
+            entityType: entity,
+            totalRows,
+            mappings: entityMappings[entity] ?? {},
+            dedupStrategy: input.dedupStrategy,
+            hubspotIntegrationConfigId: config.id,
+          }),
+          opts: { jobId: `${job.id}-${entity}-chunk-0` },
+        })),
+      ),
+    );
+  } catch (err) {
+    await prisma.migrationJob.deleteMany({ where: { id: { in: planned.map((p) => p.job.id) } } });
+    throw err;
+  }
+
+  for (const { entity, totalRows, job } of planned) {
     await prisma.migrationMapping.upsert({
       where: {
         orgId_source_sourceEntity: { orgId, source: 'HUBSPOT_OAUTH', sourceEntity: entity },
@@ -137,22 +170,6 @@ export async function startHubspotImport(input: {
       update: { mappings: entityMappings[entity] ?? {} },
     });
 
-    // Enqueue first chunk; the worker paginates via the hubspotAfter cursor.
-    const payload = buildHubSpotMigrationPayload({
-      migrationJobId: job.id,
-      orgId,
-      userId,
-      entityType: entity,
-      totalRows,
-      mappings: entityMappings[entity] ?? {},
-      dedupStrategy: input.dedupStrategy,
-      hubspotIntegrationConfigId: config.id,
-    });
-
-    await addWithinDeadline(input.queue, (q) => q.add(`${job.id}-chunk-0`, payload, {
-      jobId: `${job.id}-${entity}-chunk-0`,
-    }));
-
     await prisma.auditLog.create({
       data: {
         orgId,
@@ -165,9 +182,7 @@ export async function startHubspotImport(input: {
           : { source: 'HUBSPOT_OAUTH', entityType: entity, totalRows },
       },
     });
-
-    jobs.push(job);
   }
 
-  return jobs;
+  return planned.map((p) => p.job);
 }
