@@ -65,6 +65,25 @@ describe('POST /api/v1/proposals/:proposalId/rfp-approve', () => {
     expect(res.statusCode).toBe(409);
   });
 
+  skipIfNoDb('409 if the proposal is no longer a draft or in review', async () => {
+    // WHY: the RFP gate approved any row with approvedAt null, including one
+    // that had already been submitted. Approval is only from draft or review.
+    const { proposal } = await createApprovableProposal();
+    await prisma.proposal.update({ where: { id: proposal.id }, data: { status: 'submitted' } });
+
+    const res = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/proposals/${proposal.id}/rfp-approve`,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(409);
+    const stored = await prisma.proposal.findUnique({
+      where: { id: proposal.id },
+      select: { status: true, approvedAt: true },
+    });
+    expect(stored).toMatchObject({ status: 'submitted', approvedAt: null });
+  });
+
   skipIfNoDb('409 if proposal has already been approved', async () => {
     const { proposal } = await createProposal({ approvedAt: new Date() });
 

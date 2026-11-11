@@ -23,14 +23,14 @@ Status values: `FIX` (in the cleared order), `LATER`, `NOT A MACHINE`, `pending 
 | 5 | Data subject request | `data_subject_requests.status` | fixed on main; pending reconciliation | H | On main, later writes carry the claim's `startedAt` and `orgId`. On bca5 there is no status column (risk n/a). |
 | 6 | Signature request | `signature_requests.status` | fixed | H | Void compare-and-sets from `DRAFT`, `SENT`, or `VIEWED`. A signature that lands during the void is left signed. |
 | 7 | RFP orchestration | `rfp_orchestration_runs.state` | FIX | M | Approve-drafting can write `running` with no from-state. |
-| 8 | Proposal approval | `proposals.status` | FIX | H | Two writers can approve. The approval route already compare-and-sets; the other writer must share that rule. |
+| 8 | Proposal approval | `proposals.status` | fixed | H | Both writers approve only from `draft` or `review`, from one from-list. |
 | 9 | SERUM approval | `serum` approval fields | FIX | H | Characterization only. No behavior change in that commit. |
 | 10 | Opportunity stage | pipeline stage on the opportunity | NOT A MACHINE | n/a | Tony, 11 Nov 2026 17:03 BRT: keep Polo opportunity stages open. No guard. |
 | 11 | KAM draft | `kam_drafts.status` | LATER | M | Submit already compare-and-sets `pending` → `approved`. |
 | 12 | Onboarding tour | browser storage | LATER | L | Local wizard. No server record. |
 | 13 | Public sign steps | React state on `PublicSignPage` | folded | L | Guard on the signature request. Not a second writer of `signature_requests.status`. |
 
-Landed on this branch: migration (including HubSpot enqueue failure), SMS callback (forward-only and org-scoped), data-subject request (claim token), integration token (refresh from `active` or `error`), and signature void. Proposal approval's second writer is next. Then SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
+Landed on this branch: migration (including HubSpot enqueue failure), SMS callback (forward-only and org-scoped), data-subject request (claim token), integration token (refresh from `active` or `error`), signature void, and proposal approval. Next is SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
 
 ## 1. Integration token
 
@@ -164,7 +164,7 @@ Legacy / unknown: Prisma enum. `paused` and `rejected` have no writer on this tr
 
 Purpose: a proposal becomes approved from draft or review, once.
 
-Code: `apps/api/src/routes/proposals.approval.ts:59` compare-and-sets `draft|review → approved`. A second writer also sets proposal `approved`. Both must use the same from-state.
+Code: one table, `proposalFrom` in `packages/shared/src/state-machines/proposal.ts`. `proposals.approval.ts` and the RFP gate in `rfp-pipeline.ts` both match `draft` or `review`. The RFP gate also requires `approvedAt` null. A submitted proposal is not approved.
 
 States: the `ProposalStatus` enum. The approval edge is `draft|review → approved`.
 
@@ -342,7 +342,7 @@ Each Prisma enum in `packages/db/prisma/schema.prisma`, named. Status machines t
 | AccessPolicyStatus | pending reconciliation | Row 2. |
 | WebhookOutboxStatus | NOT A MACHINE | One relay. Not a second lifecycle in this pass. |
 | TenantExportStatus | LATER | Row 4. `expired` has no writer. |
-| ProposalStatus | FIX | Row 8. Not changed in this pass. |
+| ProposalStatus | fixed | Row 8. Approve matches `draft` or `review`. |
 | RfpDocumentType | NOT A MACHINE | Document type. |
 | RfpDocumentStatus | LATER | Bid document column. Related to extraction, not `ocrStatus`. |
 | RfpJobStatus | FIX | RFP extraction section. Not changed in this pass. |

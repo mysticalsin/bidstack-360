@@ -10,7 +10,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
-import { Proposal, ProposalApprove, ProposalDraftRequest, ProposalSubmitResult } from '@bidstack/shared';
+import {
+  Proposal,
+  ProposalApprove,
+  ProposalDraftRequest,
+  ProposalSubmitResult,
+  proposalFrom,
+} from '@bidstack/shared';
 
 import { canViewAllRfps } from '../lib/rfp-visibility.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
@@ -49,7 +55,7 @@ export const proposalApprovalRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { orgId: req.auth.orgId, id: req.params.id, deletedAt: null },
       });
       if (!row) return reply.notFound('Proposal not found');
-      if (row.status !== 'draft' && row.status !== 'review') {
+      if (!(proposalFrom('approve') as readonly string[]).includes(row.status)) {
         throw server.httpErrors.conflict(
           'Only a draft or in-review proposal can be approved. Revise a locked proposal into a new draft first.',
         );
@@ -60,7 +66,7 @@ export const proposalApprovalRoutes: FastifyPluginAsyncZod = async (server) => {
           where: {
             id: row.id,
             orgId: req.auth.orgId,
-            status: { in: ['draft', 'review'] },
+            status: { in: [...proposalFrom('approve')] },
             deletedAt: null,
           },
           data: {
