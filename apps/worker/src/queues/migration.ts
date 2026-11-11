@@ -715,7 +715,7 @@ export async function processMigrationChunk(
     where: { id: payload.migrationJobId },
     select: { status: true },
   });
-  if (!jobRow || jobRow.status === 'CANCELLED' || jobRow.status === 'FAILED') {
+  if (!jobRow || jobRow.status !== 'RUNNING') {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
     return;
   }
@@ -723,8 +723,9 @@ export async function processMigrationChunk(
   const entity = normalizeEntity(payload.entityType);
   if (!entity) {
     // e.g. HubSpot "tasks" — fail the job loudly instead of hanging RUNNING.
-    await prisma.migrationJob.update({
-      where: { id: payload.migrationJobId },
+    // Only from RUNNING: a cancel after the read above must stick.
+    const moved = await prisma.migrationJob.updateMany({
+      where: { id: payload.migrationJobId, status: 'RUNNING' },
       data: {
         status: 'FAILED',
         completedAt: new Date(),
@@ -737,6 +738,17 @@ export async function processMigrationChunk(
         ],
       },
     });
+    if (moved.count === 0) {
+      const current = await prisma.migrationJob.findUnique({
+        where: { id: payload.migrationJobId },
+        select: { status: true },
+      });
+      log.warn(
+        { migrationJobId: payload.migrationJobId, from: current?.status ?? null, to: 'FAILED' },
+        'illegal migration transition',
+      );
+      return;
+    }
     log.warn('unsupported entity type — job failed honestly');
     return;
   }
@@ -936,26 +948,31 @@ export async function startMigrationWorker(
     if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
       const migrationJobId = (job.data as { migrationJobId?: string }).migrationJobId;
       if (migrationJobId) {
-        await prisma.migrationJob
+        const moved = await prisma.migrationJob
           .updateMany({
             where: { id: migrationJobId, status: 'RUNNING' },
             data: { status: 'FAILED', completedAt: new Date() },
           })
-          .catch((updateErr) =>
-            log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED'),
+          .catch((updateErr) => {
+            log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED');
+            return { count: 0 };
+          });
+        if (moved.count !== 1) {
+          log.warn({ migrationJobId, to: 'FAILED' }, 'illegal migration transition');
+        } else {
+          await prisma.$executeRaw`
+            UPDATE migration_jobs
+            SET error_summary = CASE
+              WHEN jsonb_array_length(error_summary) < 200
+              THEN error_summary || ${JSON.stringify([
+                { row: 0, field: null, message: `chunk failed permanently: ${err.message}` },
+              ])}::jsonb
+              ELSE error_summary
+            END
+            WHERE id = ${migrationJobId}::uuid AND status = 'FAILED'`.catch((rawErr) =>
+            log.warn({ err: rawErr, migrationJobId }, 'best-effort error_summary append failed'),
           );
-        await prisma.$executeRaw`
-          UPDATE migration_jobs
-          SET error_summary = CASE
-            WHEN jsonb_array_length(error_summary) < 200
-            THEN error_summary || ${JSON.stringify([
-              { row: 0, field: null, message: `chunk failed permanently: ${err.message}` },
-            ])}::jsonb
-            ELSE error_summary
-          END
-          WHERE id = ${migrationJobId}::uuid`.catch((rawErr) =>
-          log.warn({ err: rawErr, migrationJobId }, 'best-effort error_summary append failed'),
-        );
+        }
       }
     }
   });

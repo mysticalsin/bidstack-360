@@ -92,6 +92,33 @@ describe('migration status races', () => {
     }
   });
 
+  t('an enqueue failure does not leave the job RUNNING', async () => {
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const started = new Date();
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'name' },
+        },
+      });
+      expect(res.statusCode).toBeGreaterThanOrEqual(500);
+      const job = await prisma.migrationJob.findFirst({
+        where: { orgId: org.orgId, createdAt: { gte: new Date(started.getTime() - 1000) } },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(job?.status).toBe('FAILED');
+    } finally {
+      add.mockRestore();
+    }
+  });
+
   t('cancel does not trust a stale RUNNING read over a finished job', async () => {
     const job = await prisma.migrationJob.create({
       data: {

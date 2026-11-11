@@ -211,24 +211,41 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const chunks = Math.ceil(rows.length / CHUNK_SIZE);
       const queue = getQueue();
 
-      for (let i = 0; i < chunks; i++) {
-        const payload: MigrationJobPayload = {
-          migrationJobId: job.id,
-          orgId,
-          userId,
-          source,
-          entityType,
-          chunkOffset: i * CHUNK_SIZE,
-          chunkSize: CHUNK_SIZE,
-          totalRows: rows.length,
-          redisKey,
-          mappings,
-          dedupStrategy,
-          externalIdColumn,
-        };
-        await queue.add(`${job.id}-chunk-${i}`, payload, {
-          jobId: `${job.id}-${entityType}-chunk-${i}`,
+      try {
+        for (let i = 0; i < chunks; i++) {
+          const payload: MigrationJobPayload = {
+            migrationJobId: job.id,
+            orgId,
+            userId,
+            source,
+            entityType,
+            chunkOffset: i * CHUNK_SIZE,
+            chunkSize: CHUNK_SIZE,
+            totalRows: rows.length,
+            redisKey,
+            mappings,
+            dedupStrategy,
+            externalIdColumn,
+          };
+          await queue.add(`${job.id}-chunk-${i}`, payload, {
+            jobId: `${job.id}-${entityType}-chunk-${i}`,
+          });
+        }
+      } catch (err) {
+        // The claim already moved the row to RUNNING. A failed enqueue must not
+        // leave it there with no chunks. A cancel that won the race is left alone.
+        const failed = await prisma.migrationJob.updateMany({
+          where: { id: job.id, orgId, status: 'RUNNING' },
+          data: {
+            status: 'FAILED',
+            completedAt: new Date(),
+            errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+          },
         });
+        if (failed.count !== 1) {
+          req.log.warn({ migrationJobId: job.id, to: 'FAILED' }, 'illegal migration transition');
+        }
+        throw err;
       }
 
       const updated = await prisma.migrationJob.findFirstOrThrow({
