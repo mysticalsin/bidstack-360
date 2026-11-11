@@ -337,7 +337,9 @@ export async function handleStatusCallback(
   // A recognized callback that cannot move the row still keeps error, price,
   // and segment facts. The where-clause matches the status just read, so a
   // concurrent forward move is not overwritten.
-  const keepFacts = async (status: string) => {
+  const keepFacts = async (
+    status: 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'UNDELIVERED',
+  ) => {
     if (Object.keys(facts).length === 0) return;
     await prisma.smsMessage.updateMany({
       where: { twilioSid: MessageSid, orgId, status },
