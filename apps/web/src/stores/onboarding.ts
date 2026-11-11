@@ -5,6 +5,15 @@
 
 import { create } from 'zustand';
 
+import {
+  ONBOARDING_PERSISTED_VERSION,
+  isTourStep,
+  tourFromStored,
+  tourTransition,
+  type TourEvent,
+  type TourState,
+} from './onboarding-tour';
+
 const STORAGE_KEY_PREFIX = 'bidstack-onboarding.v1';
 
 export type ChecklistItem =
@@ -69,15 +78,58 @@ function writePersisted(
 ): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(storageKey(userId), JSON.stringify(state));
+    localStorage.setItem(
+      storageKey(userId),
+      JSON.stringify({ version: ONBOARDING_PERSISTED_VERSION, ...state }),
+    );
   } catch {
     // Storage quota exceeded — non-fatal
   }
 }
 
-const TOTAL_STEPS = 6;
+function persistTour(get: () => OnboardingState): void {
+  const s = get();
+  const allKeys = Object.keys(localStorage ?? {});
+  const key = allKeys.find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
+  if (!key) return;
+  const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
+  writePersisted(uid, {
+    completedSteps: s.completedSteps,
+    dismissed: s.dismissed,
+    tourSeen: s.tourSeen,
+    completedChecklist: s.completedChecklist,
+  });
+}
 
-export const useOnboardingStore = create<OnboardingState>((set, get) => ({
+export const useOnboardingStore = create<OnboardingState>((set, get) => {
+  function apply(event: TourEvent): TourState | null {
+    const current = get();
+    const step = isTourStep(current.currentStepIndex) ? current.currentStepIndex : 0;
+    const result = tourTransition(
+      {
+        phase: current.tourActive ? 'active' : 'inactive',
+        step,
+        completed: current.completedSteps.filter(isTourStep),
+        dismissed: current.dismissed,
+        seen: current.tourSeen,
+      },
+      event,
+    );
+    if (!result.ok) {
+      console.warn(`[onboarding-tour] rejected: ${result.reason}`);
+      return null;
+    }
+    set({
+      tourActive: result.state.phase === 'active',
+      currentStepIndex: result.state.step,
+      completedSteps: result.state.completed,
+      dismissed: result.state.dismissed,
+      tourSeen: result.state.seen,
+    });
+    return result.state;
+  }
+
+  return {
   tourActive: false,
   currentStepIndex: 0,
   completedSteps: [],
@@ -95,76 +147,29 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   },
 
   startTour() {
-    set({ tourActive: true, currentStepIndex: 0 });
+    apply({ type: 'start' });
   },
 
   advance() {
-    const { currentStepIndex, completedSteps } = get();
-    const next = currentStepIndex + 1;
-    const newCompleted = completedSteps.includes(currentStepIndex)
-      ? completedSteps
-      : [...completedSteps, currentStepIndex];
-
-    if (next >= TOTAL_STEPS) {
-      // Tour finished
-      set({
-        tourActive: false,
-        completedSteps: newCompleted,
-        tourSeen: true,
-        dismissed: false,
-      });
-    } else {
-      set({ currentStepIndex: next, completedSteps: newCompleted });
-    }
-
-    // Persist
-    const s = get();
-    // userId is stored in the hydrated key — we re-read from storage to get it
-    const allKeys = Object.keys(localStorage ?? {});
-    const key = allKeys.find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
-    if (key) {
-      const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
-      writePersisted(uid, {
-        completedSteps: s.completedSteps,
-        dismissed: s.dismissed,
-        tourSeen: s.tourSeen,
-        completedChecklist: s.completedChecklist,
-      });
-    }
+    if (!apply({ type: 'advance' })) return;
+    persistTour(get);
   },
 
   back() {
-    const { currentStepIndex } = get();
-    if (currentStepIndex > 0) {
-      set({ currentStepIndex: currentStepIndex - 1 });
-    }
+    apply({ type: 'back' });
   },
 
   skipToStep(index: number) {
-    set({ currentStepIndex: index, tourActive: true });
+    apply({ type: 'skip', step: index });
   },
 
   dismissTour() {
-    set({ tourActive: false, dismissed: true, tourSeen: true });
-    const s = get();
-    const allKeys = Object.keys(localStorage ?? {});
-    const key = allKeys.find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
-    if (key) {
-      const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
-      writePersisted(uid, {
-        completedSteps: s.completedSteps,
-        dismissed: true,
-        tourSeen: true,
-        completedChecklist: s.completedChecklist,
-      });
-    }
+    if (!apply({ type: 'dismiss' })) return;
+    persistTour(get);
   },
 
   completeTourStep(index: number) {
-    const { completedSteps } = get();
-    if (!completedSteps.includes(index)) {
-      set({ completedSteps: [...completedSteps, index] });
-    }
+    apply({ type: 'complete', step: index });
   },
 
   markChecklistItem(item: ChecklistItem) {
@@ -172,18 +177,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     if (!completedChecklist.includes(item)) {
       const next = [...completedChecklist, item];
       set({ completedChecklist: next });
-      const allKeys = Object.keys(localStorage ?? {});
-      const key = allKeys.find((k) => k.startsWith(STORAGE_KEY_PREFIX + ':'));
-      if (key) {
-        const uid = decodeURIComponent(key.slice(STORAGE_KEY_PREFIX.length + 1));
-        const s = get();
-        writePersisted(uid, {
-          completedSteps: s.completedSteps,
-          dismissed: s.dismissed,
-          tourSeen: s.tourSeen,
-          completedChecklist: next,
-        });
-      }
+      persistTour(get);
     }
   },
 
@@ -193,15 +187,17 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hydrate(userId: string) {
     const persisted = readPersisted(userId);
-    if (persisted) {
+    const tour = tourFromStored(persisted);
+    if (persisted && tour) {
       set({
-        completedSteps: persisted.completedSteps ?? [],
-        dismissed: persisted.dismissed ?? false,
-        tourSeen: persisted.tourSeen ?? false,
+        completedSteps: tour.completed,
+        dismissed: tour.dismissed,
+        tourSeen: tour.seen,
         completedChecklist: persisted.completedChecklist ?? [],
       });
     }
     // Tours are opt-in from Quick Start/topbar. Auto-starting on route load
     // blocks primary CRM actions behind a full-screen backdrop.
   },
-}));
+};
+});
