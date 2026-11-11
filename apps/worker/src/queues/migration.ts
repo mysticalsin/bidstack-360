@@ -39,6 +39,7 @@ import {
   migrationChunkMatchesAttempt,
   migrationChunkMayRun,
   migrationFrom,
+  migrationProgressAt,
   migrationStaleDue,
 } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
@@ -711,6 +712,26 @@ async function chunkCreatedIds(payload: MigrationJobPayload): Promise<string[]> 
   });
 }
 
+/**
+ * The worker has the chunk. This is the stale clock. A job still sitting in
+ * the queue has no progressAt, so time spent queued is not a stall.
+ */
+async function noteChunkClaimed(id: string): Promise<void> {
+  const row = await prisma.migrationJob.findUnique({
+    where: { id },
+    select: { status: true, meta: true },
+  });
+  if (!row || row.status !== 'RUNNING') return;
+  const meta =
+    row.meta && typeof row.meta === 'object' && !Array.isArray(row.meta)
+      ? (row.meta as Record<string, unknown>)
+      : {};
+  await prisma.migrationJob.updateMany({
+    where: { id, status: 'RUNNING' },
+    data: { meta: { ...meta, progressAt: new Date().toISOString() } },
+  });
+}
+
 /** Import one chunk: acquire rows, write them, commit progress, queue enrichment, page on. */
 export async function processMigrationChunk(
   payload: MigrationJobPayload,
@@ -730,6 +751,7 @@ export async function processMigrationChunk(
     log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
     return;
   }
+  await noteChunkClaimed(payload.migrationJobId);
 
   const entity = normalizeEntity(payload.entityType);
   if (!entity) {
@@ -941,14 +963,14 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
       errorRows: 0,
       updatedAt: { lte: cutoff },
     },
-    select: { id: true, status: true, updatedAt: true, processedRows: true, errorRows: true },
+    select: { id: true, status: true, meta: true, updatedAt: true, processedRows: true, errorRows: true },
   });
   let claimed = 0;
   for (const job of candidates) {
     if (
       !migrationStaleDue({
         state: job.status,
-        progressAt: job.updatedAt,
+        progressAt: migrationProgressAt(job.meta),
         processedRows: job.processedRows,
         errorRows: job.errorRows,
         now,

@@ -25,7 +25,7 @@ const t = (name: string, fn: () => Promise<void>) =>
     await fn();
   });
 
-async function runningJob() {
+async function runningJob(progressAt?: string) {
   const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const org = await prisma.org.create({
     data: { clerkOrg: `org_mig_stale_${ns}`, name: `stale ${ns}` },
@@ -43,6 +43,7 @@ async function runningJob() {
       processedRows: 0,
       errorRows: 0,
       startedAt: new Date(),
+      ...(progressAt ? { meta: { progressAt } } : {}),
     },
   });
   const past = new Date(Date.now() - 16 * 60_000);
@@ -68,8 +69,20 @@ describe('migration stale scan', () => {
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
   });
 
-  t('a running import with no progress is failed with reason stale', async () => {
+  t('a job still waiting in the queue is not failed', async () => {
+    // WHY: stale is no progress since a worker claimed the chunk. Time spent
+    // queued, with no progress clock, is a healthy backlog.
     const { org, job } = await runningJob();
+    const claimed = await sweepStaleMigrations(new Date());
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(claimed).toBe(0);
+    expect(stored.status).toBe('RUNNING');
+    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
+
+  t('a running import with no progress is failed with reason stale', async () => {
+    const past = new Date(Date.now() - 16 * 60_000).toISOString();
+    const { org, job } = await runningJob(past);
     const claimed = await sweepStaleMigrations(new Date());
     expect(claimed).toBe(1);
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });

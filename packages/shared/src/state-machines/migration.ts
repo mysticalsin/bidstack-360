@@ -61,10 +61,10 @@ export function migrationRetryAllowed(processedRows: number, errorRows: number):
 }
 
 /**
- * A running job that has imported nothing, and whose last progress is at least
- * `MIGRATION_STALE_MS` old, may become failed. Callers pass `updatedAt`: a chunk
- * that commits progress moves that clock, so a stale claim that still holds the
- * old value loses the compare-and-set.
+ * A running job that has imported nothing, and whose worker-claim clock is at
+ * least `MIGRATION_STALE_MS` old, may become failed. `progressAt` is null while
+ * the chunks are still queued: time spent waiting is not a stall. A chunk that
+ * commits moves `updatedAt`, so a stale claim that still holds the old value loses.
  */
 export function migrationStaleDue(input: {
   state: MigrationState;
@@ -89,6 +89,17 @@ export function migrationChunkMatchesAttempt(
 ): boolean {
   if (!jobAttempt) return chunkAttempt == null;
   return chunkAttempt === jobAttempt;
+}
+
+/**
+ * When a worker claimed a chunk. Null means the job is still queued and is not stale.
+ */
+export function migrationProgressAt(meta: unknown): Date | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+  const value = (meta as { progressAt?: unknown }).progressAt;
+  if (typeof value !== 'string' || value.length === 0) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /** Read the attempt id stored on a migration job's meta. Missing means legacy. */

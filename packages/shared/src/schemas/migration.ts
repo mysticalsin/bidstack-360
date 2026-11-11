@@ -62,7 +62,7 @@ export const MigrationJobResponse = z.object({
   undoableUntil: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-  /** Derived on GET. Not a stored status. Absent on list and write responses. */
+  /** Derived on GET list and GET detail. Not a stored status. Absent on write responses. */
   stalled: z.boolean().optional(),
 });
 export type MigrationJobResponse = z.infer<typeof MigrationJobResponse>;

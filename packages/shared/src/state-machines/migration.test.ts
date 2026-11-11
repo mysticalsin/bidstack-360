@@ -7,6 +7,7 @@ import {
   MIGRATION_STATES,
   migrationAttemptId,
   migrationChunkMatchesAttempt,
+  migrationProgressAt,
   migrationChunkMayRun,
   migrationFrom,
   migrationRetryAllowed,
@@ -74,6 +75,12 @@ describe('migration transition table', () => {
     expect(
       migrationStaleDue({ state: 'FAILED', progressAt: stale, processedRows: 0, errorRows: 0, now }),
     ).toBe(false);
+    expect(
+      migrationStaleDue({ state: 'RUNNING', progressAt: null, processedRows: 0, errorRows: 0, now }),
+    ).toBe(false);
+    expect(migrationProgressAt({ progressAt: stale.toISOString() })?.toISOString()).toBe(stale.toISOString());
+    expect(migrationProgressAt({})).toBeNull();
+    expect(migrationProgressAt(null)).toBeNull();
   });
 
   it('accepts a chunk only from the attempt stored on the job', () => {

@@ -32,6 +32,7 @@ import {
   MIGRATION,
   migrationAttemptId,
   migrationFrom,
+  migrationProgressAt,
   migrationRetryAllowed,
   migrationStaleDue,
 } from '@bidstack/shared';
@@ -44,6 +45,22 @@ const ENQUEUE_FAILURE = 'Failed to enqueue import chunks';
 
 /** Empty on purpose. Retry takes the id from the path and no fields. */
 const RetryBody = z.object({}).strict().nullish();
+
+function stalledFlag(job: {
+  status: string;
+  meta: unknown;
+  processedRows: number;
+  errorRows: number;
+}): boolean {
+  const state = job.status as 'PENDING' | 'RUNNING' | 'COMPLETE' | 'FAILED' | 'CANCELLED';
+  return migrationStaleDue({
+    state,
+    progressAt: migrationProgressAt(job.meta),
+    processedRows: job.processedRows,
+    errorRows: job.errorRows,
+    now: new Date(),
+  });
+}
 
 async function markMigrationEnqueueFailed(
   id: string,
@@ -129,7 +146,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: { createdAt: 'desc' },
         take: limit,
       });
-      return { items: jobs.map(serializeJob) };
+      return { items: jobs.map((job) => ({ ...serializeJob(job), stalled: stalledFlag(job) })) };
     },
   );
 
@@ -152,14 +169,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!job) throw server.httpErrors.notFound('Migration job not found');
       // Read-only. The worker persists RUNNING → FAILED. This flag is derived
       // so a poll can show the stall before that write lands.
-      const stalled = migrationStaleDue({
-        state: job.status,
-        progressAt: job.updatedAt,
-        processedRows: job.processedRows,
-        errorRows: job.errorRows,
-        now: new Date(),
-      });
-      return { ...serializeJob(job), stalled };
+      return { ...serializeJob(job), stalled: stalledFlag(job) };
     },
   );
 

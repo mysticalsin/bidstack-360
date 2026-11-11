@@ -26,6 +26,16 @@ async function ageProgress(id: string): Promise<void> {
   `;
 }
 
+/** A worker claim stamps progress, then the clock ages. The claim write must not refresh updatedAt. */
+async function markWorkerClaim(id: string): Promise<void> {
+  const past = new Date(Date.now() - 16 * 60_000).toISOString();
+  await prisma.migrationJob.update({
+    where: { id },
+    data: { meta: { progressAt: past } },
+  });
+  await ageProgress(id);
+}
+
 let server: FastifyInstance;
 let org: IsolatedOrg;
 let restoreAuth: () => void;
@@ -169,6 +179,36 @@ describe('migration status races', () => {
     }
   });
 
+  t('list and detail agree, and a queued job is not stale', async () => {
+    // WHY: stale is no progress since a worker claimed the chunk. A job that
+    // was only marked running, and is still waiting in the queue, stays running.
+    // The list and the detail poll must report that same derived flag.
+    const backlog = await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        startedAt: new Date(),
+      },
+    });
+    await ageProgress(backlog.id);
+    const detail = await server.inject({ method: 'GET', url: `/api/v1/migrations/${backlog.id}` });
+    const list = await server.inject({ method: 'GET', url: '/api/v1/migrations' });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json<{ status: string; stalled?: boolean }>().stalled).toBe(false);
+    const listed = list.json<{ items: Array<{ id: string; stalled?: boolean; status: string }> }>().items.find(
+      (item) => item.id === backlog.id,
+    );
+    expect(listed?.status).toBe('RUNNING');
+    expect(listed?.stalled).toBe(false);
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: backlog.id } });
+    expect(stored.status).toBe('RUNNING');
+  });
+
   t('GET reports a stale import without writing it', async () => {
     // WHY: a progress poll must not be the writer. A read-only or cross-site
     // GET used to fail the row, which is a state change from a safe method.
@@ -184,7 +224,7 @@ describe('migration status races', () => {
         startedAt: new Date(),
       },
     });
-    await ageProgress(job.id);
+    await markWorkerClaim(job.id);
     const before = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
 
     const res = await server.inject({
@@ -213,7 +253,7 @@ describe('migration status races', () => {
         startedAt: new Date(),
       },
     });
-    await ageProgress(job.id);
+    await markWorkerClaim(job.id);
     const previousRole = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
     process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
     try {
