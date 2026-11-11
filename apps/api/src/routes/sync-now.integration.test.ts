@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
+import { Queue } from 'bullmq';
 import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type IORedis from 'ioredis';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -121,5 +123,29 @@ describe('sync now', () => {
   it('rejects an unknown source', async () => {
     const res = await server.inject({ method: 'POST', url: '/api/v1/sync-now/ftp', payload: {} });
     expect(res.statusCode).toBe(400);
+  });
+
+  // WHY: Sync now opens its own HubSpot migration queue and the dust-poll
+  // queue on first use, and nothing closed them, so their Redis connections
+  // outlived the server.
+  it('closes the queues it opened, and their Redis connections, when the server closes', async () => {
+    const own = await buildServer();
+    await own.ready();
+    await startSyncRun('dust', { orgId, userId, idempotencyKey: `sync-${randomUUID()}` });
+    // Not connected to HubSpot, so this refuses, after opening the migration queue.
+    await startSyncRun('hubspot', { orgId, userId, idempotencyKey: `sync-${randomUUID()}` }).catch(() => undefined);
+    const close = vi.spyOn(Queue.prototype, 'close');
+
+    await own.close();
+
+    const closed = close.mock.contexts as Queue[];
+    expect(closed.map((q) => q.name).sort()).toEqual(['dust-poll', 'migration']);
+    for (const queue of closed) {
+      const connection = queue.opts.connection as IORedis;
+      // quit() resolves on Redis's OK; the client reaches 'end' when the socket closes just after.
+      for (let i = 0; i < 40 && connection.status !== 'end'; i++) await new Promise((r) => setTimeout(r, 50));
+      expect(connection.status).toBe('end');
+    }
+    close.mockRestore();
   });
 });

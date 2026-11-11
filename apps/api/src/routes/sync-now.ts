@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { SyncOverview, SyncRun, SyncSource } from '@bidstack/shared';
 
 import { SyncNotFoundError, SyncUnavailableError } from '../services/sync-now/errors.js';
-import { getSyncOverview, getSyncRun, startSyncRun } from '../services/sync-now/index.js';
+import { closeSyncNowQueues, getSyncOverview, getSyncRun, startSyncRun } from '../services/sync-now/index.js';
 
 const SourceParams = z.object({ source: SyncSource });
 
@@ -26,6 +26,9 @@ export const syncNowRoutes: FastifyPluginAsyncZod = async (server) => {
     if (err instanceof SyncUnavailableError) throw server.httpErrors.badRequest(err.message);
     throw err;
   };
+  server.addHook('onClose', async () => {
+    await closeSyncNowQueues();
+  });
 
   server.get(
     '/sync-now/:source',

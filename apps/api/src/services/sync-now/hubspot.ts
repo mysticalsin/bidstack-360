@@ -16,6 +16,7 @@ import { hubspotRunFromJobs, syncRunId } from './runs.js';
 const log = pino({ name: 'sync-now:hubspot', level: process.env.LOG_LEVEL ?? 'info' });
 
 let queueSingleton: Queue | null = null;
+let connectionSingleton: IORedis | null = null;
 
 function migrationQueue(): Queue {
   if (queueSingleton) return queueSingleton;
@@ -23,11 +24,23 @@ function migrationQueue(): Queue {
     maxRetriesPerRequest: null,
   });
   connection.on('error', (err) => log.error({ err }, 'Redis connection error in sync-now queue'));
+  connectionSingleton = connection;
   queueSingleton = new Queue(MIGRATION.name, {
     connection,
     defaultJobOptions: MIGRATION.defaultJobOptions as never,
   });
   return queueSingleton;
+}
+
+/** Closes the queue and its connection; the next start opens them again.
+ *  BullMQ leaves a connection it was given open, so it is quit here too. */
+export async function closeHubspotSyncQueue(): Promise<void> {
+  const queue = queueSingleton;
+  const connection = connectionSingleton;
+  queueSingleton = null;
+  connectionSingleton = null;
+  await queue?.close();
+  await connection?.quit();
 }
 
 const runJobsWhere = (orgId: string, runId: string) => ({

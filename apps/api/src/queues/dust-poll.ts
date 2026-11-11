@@ -102,6 +102,17 @@ export async function enqueueDustSyncRun(orgId: string, runId: string): Promise<
   return queued.id ?? runId;
 }
 
+/** Closes the queue and its connection; the next use opens them again.
+ *  BullMQ leaves a connection it was given open, so it is quit here too. */
+export async function closeDustPollQueue(): Promise<void> {
+  const queue = queueSingleton;
+  const connection = connectionSingleton;
+  queueSingleton = null;
+  connectionSingleton = null;
+  await queue?.close();
+  await connection?.quit();
+}
+
 /** Read a dust-poll job for status polling; null when unknown or expired. */
 export async function getDustPollJob(jobId: string) {
   return (await getQueue().getJob(jobId)) ?? null;
