@@ -21,7 +21,7 @@ Status values: `FIX` (in the cleared order), `LATER`, `NOT A MACHINE`, `pending 
 | 3 | Migration job | `migration_jobs.status` | fixed | H | Start claims `RUNNING` before enqueue. Enqueue failure, cancel, undo, complete, and the worker's fail path compare-and-set. Chunks run only while `RUNNING`. |
 | 4 | Tenant export | `tenant_exports.status` | FIX | M | Claim and finish already compare-and-set. Finish the ordering; a wrong export is recoverable. |
 | 5 | Data subject request | `data_subject_requests.status` | fixed on main; pending reconciliation | H | On main, later writes carry the claim's `startedAt` and `orgId`. On bca5 there is no status column (risk n/a). |
-| 6 | Signature request | `signature_requests.status` | FIX | H | Void reads a terminal status, then updates by id. |
+| 6 | Signature request | `signature_requests.status` | fixed | H | Void compare-and-sets from `DRAFT`, `SENT`, or `VIEWED`. A signature that lands during the void is left signed. |
 | 7 | RFP orchestration | `rfp_orchestration_runs.state` | FIX | M | Approve-drafting can write `running` with no from-state. |
 | 8 | Proposal approval | `proposals.status` | FIX | H | Two writers can approve. The approval route already compare-and-sets; the other writer must share that rule. |
 | 9 | SERUM approval | `serum` approval fields | FIX | H | Characterization only. No behavior change in that commit. |
@@ -30,7 +30,7 @@ Status values: `FIX` (in the cleared order), `LATER`, `NOT A MACHINE`, `pending 
 | 12 | Onboarding tour | browser storage | LATER | L | Local wizard. No server record. |
 | 13 | Public sign steps | React state on `PublicSignPage` | folded | L | Guard on the signature request. Not a second writer of `signature_requests.status`. |
 
-Landed on this branch: migration (including HubSpot enqueue failure), SMS callback (forward-only and org-scoped), data-subject request (claim token), integration token (refresh from `active` or `error`). Signature void and proposal approval are next and were not changed in the inventory commit. Then SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
+Landed on this branch: migration (including HubSpot enqueue failure), SMS callback (forward-only and org-scoped), data-subject request (claim token), integration token (refresh from `active` or `error`), and signature void. Proposal approval's second writer is next. Then SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
 
 ## 1. Integration token
 
@@ -132,7 +132,7 @@ On bca5 the erasure route has no status column. Risk there is n/a. It is not a m
 
 Purpose: one request reaches signed, declined, voided, or expired. The public page is a guard, not a writer of this column.
 
-Code: `voidSignatureRequest` reads terminal statuses at `apps/api/src/services/documents/signature.service.ts:427` and updates by id to `VOIDED` at 454. A request that becomes `SIGNED` after the read can still be voided. DocuSign webhook claim and internal sign already exclude terminal statuses.
+Code: `voidSignatureRequest` still reads terminal statuses first. The write is `updateMany` where status is `DRAFT`, `SENT`, or `VIEWED` (the same compare-and-set shape as `proposals.approval.ts` around 59). A request that becomes `SIGNED` after the read matches nothing, and no void event is stored. DocuSign webhook claim and internal sign already exclude terminal statuses.
 
 Public page: `apps/web/src/pages/PublicSignPage.tsx` steps `welcome | sign | submit | confirm`. `goTo` at 51 sets the step. That state stays in the component. The page must not write `signature_requests.status`.
 
@@ -388,7 +388,7 @@ Each Prisma enum in `packages/db/prisma/schema.prisma`, named. Status machines t
 | RfpOrchestrationState | LATER | Row 7. `paused` and `rejected` have no writer. |
 | RfpResponsePhase | LATER | See RfpResponsePhase above. |
 | SignatureProvider | NOT A MACHINE | `DOCUSIGN` or `INTERNAL`. |
-| SignatureStatus | FIX | Row 6. Void still writes by id. Not changed in this pass. |
+| SignatureStatus | fixed | Row 6. Void matches `DRAFT`, `SENT`, or `VIEWED`. |
 | SignatureEventType | NOT A MACHINE | Event kind on the signature log. |
 | TemplateKind | NOT A MACHINE | Template kind. |
 | GovernanceStatus | NOT A MACHINE | `open`, `in_progress`, `done`. |

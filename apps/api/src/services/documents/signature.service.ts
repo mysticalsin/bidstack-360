@@ -451,10 +451,20 @@ export async function voidSignatureRequest(params: {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.signatureRequest.update({
-      where: { id: requestId },
+    // Same shape as proposal approval: the write matches the legal from-states.
+    // A signature that landed after the read above matches nothing.
+    const changed = await tx.signatureRequest.updateMany({
+      where: {
+        id: requestId,
+        orgId,
+        deletedAt: null,
+        status: { in: ['DRAFT', 'SENT', 'VIEWED'] },
+      },
       data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
     });
+    if (changed.count !== 1) {
+      badRequest(`Cannot void a request with status ${request.status}`);
+    }
     await tx.signatureEvent.create({
       data: {
         signatureRequestId: requestId,
