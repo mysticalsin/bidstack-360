@@ -235,6 +235,94 @@ describe('POST /api/v1/migrations/start-csv — retried upload', () => {
   });
 });
 
+const fresh: Array<Awaited<ReturnType<typeof buildServer>>> = [];
+/** A server of its own, past the start-csv rate limit the other tests use up. */
+async function freshServer() {
+  const server = await buildServer();
+  await server.ready();
+  fresh.push(server);
+  return server;
+}
+afterAll(async () => {
+  for (const server of fresh) await server.close();
+});
+
+/** Holds each call until `n` calls have arrived or `ms` has passed, then lets them all through. */
+function barrier(n: number, ms: number) {
+  let arrived = 0;
+  let release!: () => void;
+  const open = new Promise<void>((resolve) => (release = resolve));
+  const timer = setTimeout(release, ms);
+  return async () => {
+    if (++arrived >= n) {
+      clearTimeout(timer);
+      release();
+    }
+    await open;
+  };
+}
+
+// WHY: a client that times out retries while its first request is still
+// running. Both requests found no earlier start, both created a job, and the
+// rows were imported twice.
+describe('POST /api/v1/migrations/start-csv — concurrent retries', () => {
+  skipIfNoDb('two parallel requests with the same uploadId start one import', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const server = await freshServer();
+    // Both requests reach the job insert together unless one is made to wait for the other.
+    const create = prisma.migrationJob.create;
+    const wait = barrier(2, 500);
+    vi.spyOn(prisma.migrationJob, 'create').mockImplementation((async (args: unknown) => {
+      await wait();
+      return create.call(prisma.migrationJob, args as never);
+    }) as never);
+
+    const [a, b] = await Promise.all([
+      startCsv(entityType, 150, { uploadId }, server),
+      startCsv(entityType, 150, { uploadId }, server),
+    ]);
+
+    expect([a.statusCode, b.statusCode]).toEqual([201, 201]);
+    const jobs = await jobRows(entityType);
+    expect(jobs.map((j) => j.id)).toEqual([a.json<{ id: string }>().id]);
+    expect(b.json<{ id: string }>().id).toBe(jobs[0]!.id);
+    const chunks = await queuedChunks(entityType);
+    expect(chunks.map((c) => c.id).sort()).toEqual([0, 1].map((i) => `${jobs[0]!.id}-${entityType}-chunk-${i}`));
+    expect(await prisma.auditLog.count({ where: { action: 'migration.start', targetId: jobs[0]!.id } })).toBe(1);
+    await redis.del(`migration:${jobs[0]!.id}:${entityType}:rows`);
+  });
+
+  skipIfNoDb('a duplicate that misses the earlier start is refused by the unique index', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const server = await freshServer();
+
+    const first = await startCsv(entityType, 3, { uploadId }, server);
+    vi.spyOn(prisma.migrationJob, 'findFirst').mockResolvedValueOnce(null);
+    const dup = await startCsv(entityType, 3, { uploadId }, server);
+
+    expect([first.statusCode, dup.statusCode]).toEqual([201, 409]);
+    expect(dup.json<{ message: string }>().message).toBe('A start with this uploadId already exists; retry to resume it');
+    expect(await jobRows(entityType)).toHaveLength(1);
+    expect(await queuedChunks(entityType)).toHaveLength(1);
+    await redis.del(`migration:${first.json<{ id: string }>().id}:${entityType}:rows`);
+  });
+
+  skipIfNoDb('an uploadId used by another source is refused', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const server = await freshServer();
+
+    const csv = await startCsv(entityType, 3, { uploadId }, server);
+    const salesforce = await startCsv(entityType, 3, { uploadId, source: 'SALESFORCE_CSV' }, server);
+
+    expect([csv.statusCode, salesforce.statusCode]).toEqual([201, 409]);
+    expect(await jobRows(entityType)).toHaveLength(1);
+    await redis.del(`migration:${csv.json<{ id: string }>().id}:${entityType}:rows`);
+  });
+});
+
 // WHY: the cleanup of a failed start ran unguarded; when it threw, its error
 // replaced the start's own, so a retryable 503 became a 500 and the stored
 // rows were never removed.

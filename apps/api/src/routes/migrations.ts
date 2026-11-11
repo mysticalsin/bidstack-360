@@ -35,7 +35,9 @@ import { previewImportRows } from '../lib/import-preview.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 import { discardFailedStart } from '../lib/failed-start-cleanup.js';
 import { addWithinDeadline, QUEUE_ENQUEUE_TIMEOUT_MS, QueueUnavailableError } from '../lib/queue-enqueue.js';
+import { withUploadLock } from '../lib/upload-start.js';
 import { redis } from '../redis.js';
+import { isUniqueViolation } from './opportunities.helpers.js';
 
 const ImportPreviewResponse = z.object({
   entityType: z.string(),
@@ -237,49 +239,60 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         return prisma.migrationJob.findUniqueOrThrow({ where: { id: jobId } });
       };
 
-      if (uploadId) {
-        const earlier = await prisma.migrationJob.findFirst({
-          where: { orgId, source, meta: { path: ['uploadId'], equals: uploadId } },
-        });
-        if (earlier) {
-          const earlierEntity = (earlier.meta as { entityType?: unknown } | null)?.entityType;
-          if (earlierEntity !== entityType || earlier.totalRows !== rows.length) {
-            throw server.httpErrors.conflict('uploadId was already used for a different upload');
+      const start = async () => {
+        if (uploadId) {
+          const earlier = await prisma.migrationJob.findFirst({ where: { orgId, uploadId } });
+          if (earlier) {
+            const earlierEntity = (earlier.meta as { entityType?: unknown } | null)?.entityType;
+            if (earlier.source !== source || earlierEntity !== entityType || earlier.totalRows !== rows.length) {
+              throw server.httpErrors.conflict('uploadId was already used for a different upload');
+            }
+            // Still PENDING: the first attempt may have failed before or after
+            // queueing; queueing again only adds the chunks that are missing.
+            // The job row is kept on failure here, since its chunks may be queued.
+            if (earlier.status === 'PENDING') await queueImport(earlier.id);
+            return finishStart(earlier.id);
           }
-          // Still PENDING: the first attempt may have failed before or after
-          // queueing; queueing again only adds the chunks that are missing.
-          // The job row is kept on failure here, since its chunks may be queued.
-          if (earlier.status === 'PENDING') await queueImport(earlier.id);
-          return reply.code(201).send(serializeJob(await finishStart(earlier.id)));
         }
-      }
 
-      // The job row exists first because its id keys the rows and the chunks.
-      // If queueing fails, the job row and the rows key are removed so the
-      // failed start leaves nothing behind; a chunk that lands after the
-      // deadline finds no job row and the worker skips it. The audit log is
-      // append-only, so it is written only once the import is queued.
-      const job = await prisma.migrationJob.create({
-        data: {
-          orgId,
-          userId,
-          source,
-          status: 'PENDING',
-          totalRows: rows.length,
-          meta: uploadId ? { entityType, uploadId } : { entityType },
-        },
-      });
-      try {
-        await queueImport(job.id);
-      } catch (err) {
-        await discardFailedStart(err, req.log, [
-          ['delete job row', () => prisma.migrationJob.delete({ where: { id: job.id } })],
-          ['remove stored rows', () => redis.del(rowsKey(job.id))],
-        ]);
-        throw err;
-      }
+        // The job row exists first because its id keys the rows and the chunks.
+        // If queueing fails, the job row and the rows key are removed so the
+        // failed start leaves nothing behind; a chunk that lands after the
+        // deadline finds no job row and the worker skips it. The audit log is
+        // append-only, so it is written only once the import is queued.
+        let job;
+        try {
+          job = await prisma.migrationJob.create({
+            data: {
+              orgId,
+              userId,
+              source,
+              status: 'PENDING',
+              totalRows: rows.length,
+              uploadId,
+              meta: uploadId ? { entityType, uploadId } : { entityType },
+            },
+          });
+        } catch (err) {
+          if (uploadId && isUniqueViolation(err)) {
+            throw server.httpErrors.conflict('A start with this uploadId already exists; retry to resume it');
+          }
+          throw err;
+        }
+        try {
+          await queueImport(job.id);
+        } catch (err) {
+          await discardFailedStart(err, req.log, [
+            ['delete job row', () => prisma.migrationJob.delete({ where: { id: job.id } })],
+            ['remove stored rows', () => redis.del(rowsKey(job.id))],
+          ]);
+          throw err;
+        }
+        return finishStart(job.id);
+      };
 
-      return reply.code(201).send(serializeJob(await finishStart(job.id)));
+      const job = uploadId ? await withUploadLock(orgId, uploadId, start) : await start();
+      return reply.code(201).send(serializeJob(job));
     },
   );
 
