@@ -191,6 +191,8 @@ const STUB_ROLE_OVERRIDES: Record<
   },
 };
 
+const STUB_ROLE_OVERRIDE_EMAILS = [...new Set(Object.values(STUB_ROLE_OVERRIDES).map((o) => o.email))];
+
 function readStubRoleOverride(req: FastifyRequest): (typeof STUB_ROLE_OVERRIDES)[string] | null {
   const raw = req.headers[STUB_ROLE_HEADER];
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -341,8 +343,10 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
     return resolveStubRoleOverride(req, org.id, roleOverride);
   }
 
+  // Role-header users move between orgs and keep their createdAt, so they may
+  // be older than the org's own first user; they are never the default.
   const user = await prisma.user.findFirst({
-    where: { orgId: org.id },
+    where: { orgId: org.id, email: { notIn: STUB_ROLE_OVERRIDE_EMAILS } },
     orderBy: { createdAt: 'asc' },
   });
   if (!user) {
