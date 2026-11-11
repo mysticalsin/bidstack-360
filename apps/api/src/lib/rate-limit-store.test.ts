@@ -123,6 +123,10 @@ describe('rate limiter when its Redis store fails and the limiter does not fail 
     fake = await startFrozenRedis(answering(1));
     const port = fake.port;
     const client = await sharedClientAt(`redis://127.0.0.1:${port}`, true);
+    const { redisLog } = await import('../redis.js');
+    const warn = vi.spyOn(redisLog, 'warn').mockImplementation(() => undefined);
+    let reconnects = 0;
+    client.on('reconnecting', () => reconnects++);
     const { app } = await appWith(client, false);
     const ping = () => app.inject({ method: 'GET', url: '/ping' });
     expect((await ping()).statusCode).toBe(200);
@@ -140,6 +144,12 @@ describe('rate limiter when its Redis store fails and the limiter does not fail 
     }
     expect(status).toBe(200);
     expect(client.status).toBe('ready');
+    // WHY: the outage itself was silent in the logs (the 'error' handler
+    // swallows it), but one warning per reconnect attempt would flood them.
+    expect(reconnects).toBeGreaterThan(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[1]).toMatch(/reconnecting/);
+    warn.mockRestore();
     await app.close();
   }, 20_000);
 

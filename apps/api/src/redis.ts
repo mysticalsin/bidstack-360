@@ -1,5 +1,7 @@
 import Redis from 'ioredis';
 
+import { createLogger } from './lib/logger.js';
+
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
 
 // Reconnect forever with a backoff capped at 2 s. Giving up after a few tries
@@ -99,4 +101,18 @@ export function waitForRedisReady(timeoutMs = 5_000): Promise<boolean> {
 
 redis.on('error', () => {
   // Prevent unhandled 'error' events; callers such as /health surface status.
+});
+
+export const redisLog = createLogger({ name: 'redis' });
+
+// Reconnect attempts come every <= 2 s during an outage; warn on the first
+// one and then at most once per interval so the log shows it without flooding.
+const RECONNECT_WARN_INTERVAL_MS = 30_000;
+let lastReconnectWarnAt: number | null = null;
+
+redis.on('reconnecting', (nextAttemptInMs: number) => {
+  const now = Date.now();
+  if (lastReconnectWarnAt !== null && now - lastReconnectWarnAt < RECONNECT_WARN_INTERVAL_MS) return;
+  lastReconnectWarnAt = now;
+  redisLog.warn({ nextAttemptInMs }, 'shared Redis client is reconnecting; Redis-backed calls fail until it is back');
 });
