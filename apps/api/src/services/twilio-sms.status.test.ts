@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const rows = new Map<string, { id: string; twilioSid: string; status: string }>();
+const rows = new Map<string, { id: string; twilioSid: string; orgId: string; status: string }>();
 
 const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
@@ -36,9 +36,9 @@ import { handleStatusCallback } from './twilio-sms.service.js';
 
 const log = { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() };
 
-function seed(status: string) {
+function seed(status: string, orgId = 'org-1') {
   rows.clear();
-  rows.set('SM1', { id: 'msg-1', twilioSid: 'SM1', status });
+  rows.set('SM1', { id: 'msg-1', twilioSid: 'SM1', orgId, status });
 }
 
 beforeEach(() => {
@@ -46,19 +46,31 @@ beforeEach(() => {
   mocks.updateMany.mockImplementation(async ({ where, data }) => {
     const row = rows.get(where.twilioSid);
     if (!row) return { count: 0 };
+    if (where.orgId && row.orgId !== where.orgId) return { count: 0 };
     const allowed: string[] | undefined = where.status?.in ?? (typeof where.status === 'string' ? [where.status] : undefined);
     if (allowed && !allowed.includes(row.status)) return { count: 0 };
     row.status = data.status;
     return { count: 1 };
   });
-  mocks.findFirst.mockImplementation(async ({ where }) => rows.get(where.twilioSid) ?? null);
+  mocks.findFirst.mockImplementation(async ({ where }) => {
+    const row = rows.get(where.twilioSid);
+    if (!row) return null;
+    if (where.orgId && row.orgId !== where.orgId) return null;
+    return row;
+  });
 });
 
-async function callback(status: string) {
-  await handleStatusCallback({ MessageSid: 'SM1', MessageStatus: status }, log);
+async function callback(status: string, orgId = 'org-1') {
+  await handleStatusCallback({ MessageSid: 'SM1', MessageStatus: status }, orgId, log);
 }
 
 describe('Twilio status only moves forward', () => {
+  it('does not apply a status callback to another org', async () => {
+    seed('QUEUED', 'org-b');
+    await callback('sent', 'org-a');
+    expect(rows.get('SM1')?.status).toBe('QUEUED');
+  });
+
   it('does not let an older sent callback overwrite DELIVERED', async () => {
     seed('DELIVERED');
     await callback('sent');

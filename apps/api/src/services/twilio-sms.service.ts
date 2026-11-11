@@ -309,6 +309,7 @@ export async function testTwilioConnection(
  */
 export async function handleStatusCallback(
   payload: TwilioStatusCallbackPayload,
+  orgId: string,
   log: ServiceLogger,
 ): Promise<void> {
   const { MessageSid, MessageStatus, ErrorCode, Price, NumSegments } = payload;
@@ -343,7 +344,7 @@ export async function handleStatusCallback(
   // written when the message is created, so a queued callback never moves a row.
   if (from[mapped].length === 0) {
     const current = await prisma.smsMessage.findFirst({
-      where: { twilioSid: MessageSid },
+      where: { twilioSid: MessageSid, orgId },
       select: { id: true, status: true },
     });
     if (current && current.status !== mapped) {
@@ -353,7 +354,7 @@ export async function handleStatusCallback(
   }
 
   const moved = await prisma.smsMessage.updateMany({
-    where: { twilioSid: MessageSid, status: { in: from[mapped] } },
+    where: { twilioSid: MessageSid, orgId, status: { in: from[mapped] } },
     data: {
       status: mapped,
       errorCode: ErrorCode ? parseInt(ErrorCode, 10) : null,
@@ -364,7 +365,7 @@ export async function handleStatusCallback(
   });
   if (moved.count === 0) {
     const current = await prisma.smsMessage.findFirst({
-      where: { twilioSid: MessageSid },
+      where: { twilioSid: MessageSid, orgId },
       select: { id: true, status: true },
     });
     if (current && current.status !== mapped) {
