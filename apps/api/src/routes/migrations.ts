@@ -19,7 +19,7 @@ import { Queue } from 'bullmq';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import {
   MigrationJobResponse,
   MigrationMappingResponse,
@@ -381,7 +381,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             startedAt: new Date(),
             completedAt: null,
             errorSummary: [],
-            meta: fresh,
+            meta: fresh as Prisma.InputJsonValue,
           },
         });
         if (moved.count !== 1) return 0;
