@@ -187,6 +187,26 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       ).redis;
       await redisConn.set(redisKey, JSON.stringify(rows), 'EX', 3600);
 
+      // Claim RUNNING before any chunk exists. A by-id write after enqueue
+      // overwrites a cancel that landed while the chunks were being queued,
+      // and a chunk that dies while the row is still PENDING is invisible to
+      // the exhausted-retry handler (it only fails a RUNNING job).
+      const claimed = await prisma.migrationJob.updateMany({
+        where: { id: job.id, orgId, status: 'PENDING' },
+        data: { status: 'RUNNING', startedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        const current = await prisma.migrationJob.findFirst({
+          where: { id: job.id, orgId },
+          select: { status: true },
+        });
+        req.log.warn(
+          { migrationJobId: job.id, from: current?.status ?? null, to: 'RUNNING' },
+          'illegal migration transition',
+        );
+        throw server.httpErrors.conflict('Migration job is no longer pending');
+      }
+
       const CHUNK_SIZE = 100;
       const chunks = Math.ceil(rows.length / CHUNK_SIZE);
       const queue = getQueue();
@@ -211,9 +231,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         });
       }
 
-      const updated = await prisma.migrationJob.update({
-        where: { id: job.id },
-        data: { status: 'RUNNING', startedAt: new Date() },
+      const updated = await prisma.migrationJob.findFirstOrThrow({
+        where: { id: job.id, orgId },
       });
       return reply.code(201).send(serializeJob(updated));
     },
@@ -325,12 +344,26 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      if (job.status === 'COMPLETE' || job.status === 'CANCELLED' || job.status === 'FAILED') {
-        throw server.httpErrors.conflict(`Cannot cancel a job with status ${job.status}`);
-      }
-      const updated = await prisma.migrationJob.update({
-        where: { id: req.params.id },
+      // The read above can be stale. Only PENDING or RUNNING may become CANCELLED.
+      const moved = await prisma.migrationJob.updateMany({
+        where: { id: job.id, orgId, status: { in: ['PENDING', 'RUNNING'] } },
         data: { status: 'CANCELLED', completedAt: new Date() },
+      });
+      if (moved.count !== 1) {
+        const current = await prisma.migrationJob.findFirst({
+          where: { id: job.id, orgId },
+          select: { status: true },
+        });
+        req.log.warn(
+          { migrationJobId: job.id, from: current?.status ?? null, to: 'CANCELLED' },
+          'illegal migration transition',
+        );
+        throw server.httpErrors.conflict(
+          `Cannot cancel a job with status ${current?.status ?? job.status}`,
+        );
+      }
+      const updated = await prisma.migrationJob.findFirstOrThrow({
+        where: { id: job.id, orgId },
       });
       await prisma.auditLog.create({
         data: {
@@ -405,6 +438,32 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // Deletes run sequentially (not Promise.all) — interactive transactions
       // hold a single connection, and the order preserves FK safety.
       const deletedCount = await prisma.$transaction(async (tx) => {
+        // Claim the undo before deleting anything. A stale COMPLETE read must
+        // not wipe rows when the job is no longer COMPLETE.
+        const moved = await tx.migrationJob.updateMany({
+          where: {
+            id: job.id,
+            orgId,
+            status: 'COMPLETE',
+            undoableUntil: { gt: new Date() },
+          },
+          data: {
+            status: 'FAILED',
+            meta: { ...(job.meta as object), undone: true, undoneAt: new Date().toISOString() },
+          },
+        });
+        if (moved.count !== 1) {
+          const current = await tx.migrationJob.findUnique({
+            where: { id: job.id },
+            select: { status: true },
+          });
+          req.log.warn(
+            { migrationJobId: job.id, from: current?.status ?? null, to: 'FAILED' },
+            'illegal migration transition',
+          );
+          throw server.httpErrors.conflict('Only completed jobs can be undone');
+        }
+
         const opportunities = oppIds.length
           ? await tx.opportunity.deleteMany({ where: { orgId, id: { in: oppIds } } })
           : { count: 0 };
@@ -435,13 +494,6 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         const deleted =
           companies.count + leads.count + contacts.count + opportunities.count + financials.count;
 
-        await tx.migrationJob.update({
-          where: { id: req.params.id },
-          data: {
-            status: 'FAILED',
-            meta: { ...(job.meta as object), undone: true, undoneAt: new Date().toISOString() },
-          },
-        });
         await tx.auditLog.create({
           data: {
             orgId,

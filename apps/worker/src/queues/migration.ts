@@ -639,21 +639,36 @@ export async function resolveChunkResumeCursor(
   return consumed >= 0 ? consumed : 0;
 }
 
-async function maybeComplete(migrationJobId: string, forceTotal?: number): Promise<void> {
+export async function maybeComplete(
+  migrationJobId: string,
+  forceTotal?: number,
+  log?: ChunkLog,
+): Promise<void> {
   const job = await prisma.migrationJob.findUnique({ where: { id: migrationJobId } });
   if (!job || job.status !== 'RUNNING') return;
   const done = job.processedRows + job.errorRows;
   const total = forceTotal ?? job.totalRows;
-  if (done >= total) {
-    await prisma.migrationJob.update({
+  if (done < total) return;
+  // A cancel can land after the read above. Only a row that is still RUNNING
+  // becomes COMPLETE.
+  const moved = await prisma.migrationJob.updateMany({
+    where: { id: migrationJobId, status: 'RUNNING' },
+    data: {
+      status: 'COMPLETE',
+      completedAt: new Date(),
+      totalRows: forceTotal ?? job.totalRows,
+      undoableUntil: new Date(Date.now() + 24 * 3600 * 1000),
+    },
+  });
+  if (moved.count === 0) {
+    const current = await prisma.migrationJob.findUnique({
       where: { id: migrationJobId },
-      data: {
-        status: 'COMPLETE',
-        completedAt: new Date(),
-        totalRows: forceTotal ?? job.totalRows,
-        undoableUntil: new Date(Date.now() + 24 * 3600 * 1000),
-      },
+      select: { status: true },
     });
+    log?.warn(
+      { migrationJobId, from: current?.status ?? null, to: 'COMPLETE' },
+      'illegal migration transition',
+    );
   }
 }
 
@@ -843,9 +858,10 @@ export async function processMigrationChunk(
     await maybeComplete(
       payload.migrationJobId,
       (jobNow?.processedRows ?? 0) + (jobNow?.errorRows ?? 0),
+      log,
     );
   } else {
-    await maybeComplete(payload.migrationJobId);
+    await maybeComplete(payload.migrationJobId, undefined, log);
   }
 
   log.info(
