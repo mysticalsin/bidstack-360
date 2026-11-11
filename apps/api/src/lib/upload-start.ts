@@ -1,5 +1,7 @@
 // Starts that carry a client uploadId (start-csv, start-hubspot).
 
+import { createHash } from 'node:crypto';
+
 import type { Queue } from 'bullmq';
 
 import { prisma } from '@bidstack/db';
@@ -10,21 +12,38 @@ import { addWithinDeadline } from './queue-enqueue.js';
 // Covers the wait for a start in flight plus that start's enqueue and writes.
 const UPLOAD_LOCK_TIMEOUT_MS = 30_000;
 
+/** A start key belongs to one user's starts of one source in one org. */
+export type UploadScope = { orgId: string; userId: string; source: string; uploadId: string };
+
 /**
- * Runs the starts that carry the same uploadId one after another, across API
+ * Runs the starts that carry the same key one after another, across API
  * instances: a retry sent while the first attempt is still running waits for
  * it, then finds its job instead of starting a second import. The lock is
  * transaction-scoped and `run` writes on autocommit, so the next holder sees
- * those writes. The unique (org, uploadId) index backs this up.
+ * those writes. The unique (org, user, source, uploadId) index backs this up.
  */
-export function withUploadLock<T>(orgId: string, uploadId: string, run: () => Promise<T>): Promise<T> {
+export function withUploadLock<T>(scope: UploadScope, run: () => Promise<T>): Promise<T> {
+  const key = `migration-start:${scope.orgId}:${scope.userId}:${scope.source}:${scope.uploadId}`;
   return prisma.$transaction(
     async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`migration-start:${orgId}:${uploadId}`}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
       return run();
     },
     { maxWait: UPLOAD_LOCK_TIMEOUT_MS, timeout: UPLOAD_LOCK_TIMEOUT_MS },
   );
+}
+
+/**
+ * Digest of a start request as sent. A client retry resends the same body,
+ * so only a different request under the same key changes it.
+ */
+export function uploadDigest(request: unknown): string {
+  return createHash('sha256').update(JSON.stringify(request)).digest('hex');
+}
+
+/** The digest recorded on a start's job, if any. */
+export function recordedDigest(meta: unknown): unknown {
+  return (meta as { uploadDigest?: unknown } | null)?.uploadDigest;
 }
 
 type WarnLog = { warn(obj: object, msg: string): void };

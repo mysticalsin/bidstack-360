@@ -2550,8 +2550,8 @@ model MigrationJob {
   undoableUntil DateTime?       @map("undoable_until") @db.Timestamptz(6)
   // The client's key for one start request, set on the first job of the start
   // only (a HubSpot start creates one job per entity; each records the key in
-  // meta.uploadId). The unique index lets one start per key exist per org.
-  // NULL for starts without a key; NULLs never collide.
+  // meta.uploadId). The unique index lets one start per key exist per org,
+  // user and source. NULL for starts without a key; NULLs never collide.
   uploadId      String?         @map("upload_id")
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -2559,7 +2559,7 @@ model MigrationJob {
   org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([orgId, uploadId], map: "migration_jobs_org_upload_key")
+  @@unique([orgId, userId, source, uploadId], map: "migration_jobs_org_user_source_upload_key")
   @@index([orgId, status])
   @@index([orgId, createdAt(sort: Desc)])
   @@map("migration_jobs")

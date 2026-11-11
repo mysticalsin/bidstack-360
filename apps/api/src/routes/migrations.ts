@@ -35,7 +35,7 @@ import { previewImportRows } from '../lib/import-preview.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 import { discardFailedStart } from '../lib/failed-start-cleanup.js';
 import { addWithinDeadline, QUEUE_ENQUEUE_TIMEOUT_MS, QueueUnavailableError } from '../lib/queue-enqueue.js';
-import { warnIfPastRetryWindow, withUploadLock } from '../lib/upload-start.js';
+import { recordedDigest, uploadDigest, warnIfPastRetryWindow, withUploadLock } from '../lib/upload-start.js';
 import { redis } from '../redis.js';
 import { isUniqueViolation } from './opportunities.helpers.js';
 
@@ -241,12 +241,16 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         return prisma.migrationJob.findUniqueOrThrow({ where: { id: jobId } });
       };
 
+      const digest = uploadId
+        ? uploadDigest({ source, entityType, rows, mappings, dedupStrategy, externalIdColumn })
+        : undefined;
       const start = async () => {
         if (uploadId) {
-          const earlier = await prisma.migrationJob.findFirst({ where: { orgId, uploadId } });
+          const earlier = await prisma.migrationJob.findFirst({ where: { orgId, userId, source, uploadId } });
           if (earlier) {
-            const earlierEntity = (earlier.meta as { entityType?: unknown } | null)?.entityType;
-            if (earlier.source !== source || earlierEntity !== entityType || earlier.totalRows !== rows.length) {
+            // Same key, other content: never resume, or the new rows would be
+            // stored under the earlier job and imported in its name.
+            if (recordedDigest(earlier.meta) !== digest) {
               throw server.httpErrors.conflict('uploadId was already used for a different upload');
             }
             // Still PENDING: the first attempt may have failed before or after
@@ -275,7 +279,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
               status: 'PENDING',
               totalRows: rows.length,
               uploadId,
-              meta: uploadId ? { entityType, uploadId } : { entityType },
+              meta: uploadId ? { entityType, uploadId, uploadDigest: digest } : { entityType },
             },
           });
         } catch (err) {
@@ -296,7 +300,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         return finishStart(job.id);
       };
 
-      const job = uploadId ? await withUploadLock(orgId, uploadId, start) : await start();
+      const job = uploadId ? await withUploadLock({ orgId, userId, source, uploadId }, start) : await start();
       return reply.code(201).send(serializeJob(job));
     },
   );

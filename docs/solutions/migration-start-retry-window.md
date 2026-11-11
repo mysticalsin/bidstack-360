@@ -5,12 +5,17 @@
 and the status. If one of those writes fails, the start answers 500 but the
 import is already queued, so a client retry used to import every row again.
 
-**Fix:** The client sends one `uploadId` per start and reuses it on retry. The
-API serialises starts with the same key on a Postgres advisory lock, and the
-unique `(org_id, upload_id)` index on `migration_jobs` refuses a duplicate with
-409. A retry finds the earlier start. If its start writes never finished, the
-retry queues its chunks again under the same deterministic BullMQ job ids and
-finishes those writes. A start that finished is returned as is.
+**Fix:** The client sends one `uploadId` per start and reuses it on retry. A
+key belongs to one user's starts of one source in one org. The API serialises
+starts with the same key on a Postgres advisory lock, and the unique
+`(org_id, user_id, source, upload_id)` index on `migration_jobs` refuses a
+duplicate with 409. A retry finds the earlier start and compares the digest of
+its request (`meta.uploadDigest`, SHA-256 of the body as sent). A different
+request under the same key gets 409 and never resumes the start: resuming it
+would store the new rows under the earlier job. If the earlier start's writes
+never finished, the retry queues its chunks again under the same deterministic
+BullMQ job ids and finishes those writes. A start that finished is returned as
+is.
 
 **Window:** Re-adding a chunk is a no-op only while BullMQ still holds a job
 with that id. The `MIGRATION` queue keeps a completed chunk for **7 days**, and

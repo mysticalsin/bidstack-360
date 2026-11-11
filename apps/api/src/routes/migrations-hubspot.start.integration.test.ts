@@ -63,6 +63,7 @@ beforeAll(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 afterAll(async () => {
@@ -87,10 +88,16 @@ afterAll(async () => {
   }
 });
 
-function startHubspot(entities: string[], server = ctx.server, extra: Record<string, unknown> = {}) {
+function startHubspot(
+  entities: string[],
+  server = ctx.server,
+  extra: Record<string, unknown> = {},
+  headers: Record<string, string> = {},
+) {
   return server.inject({
     method: 'POST',
     url: '/api/v1/migrations/start-hubspot',
+    headers,
     payload: { entities, dedupStrategy: 'update', ...extra },
   });
 }
@@ -316,6 +323,44 @@ describe('POST /api/v1/migrations/start-hubspot — retried start', () => {
     const ids = jobIdsOf(first);
     expect((await startRows(uploadId)).map((r) => r.id)).toEqual(ids);
     expect(await chunksOf(ids)).toHaveLength(1);
+  });
+});
+
+// WHY: the key was looked up across the org, so a second user who reused a
+// pending uploadId resumed and finished the first user's start. A reused key
+// with another request must never resume a start.
+describe('POST /api/v1/migrations/start-hubspot — uploadId scope and content', () => {
+  skipIfNoDb('another user in the org cannot take over a pending start by reusing its uploadId', async () => {
+    vi.stubEnv('BIDSTACK_ALLOW_STUB_ROLE_HEADER', 'true');
+    const uploadId = randomUUID();
+    const server = await freshServer();
+    vi.spyOn(prisma.auditLog, 'create').mockRejectedValueOnce(new Error('synthetic database failure'));
+    expect((await startHubspot(['deals'], server, { uploadId })).statusCode).toBe(500);
+    vi.restoreAllMocks();
+    const [mine] = await startRows(uploadId);
+
+    const theirs = await startHubspot(['deals'], server, { uploadId }, { 'x-bidstack-e2e-role': 'admin' });
+
+    expect(theirs.statusCode).toBe(201);
+    const theirIds = jobIdsOf(theirs);
+    expect(theirIds).not.toContain(mine!.id);
+    expect(await prisma.auditLog.count({ where: { action: 'migration.start', targetId: mine!.id } })).toBe(0);
+    const theirRows = await prisma.migrationJob.findMany({ where: { id: { in: theirIds } } });
+    expect(theirRows.map((r) => r.userId)).not.toContain(mine!.userId);
+    await chunksOf([mine!.id, ...theirIds]);
+  });
+
+  skipIfNoDb('the same user reusing an uploadId with another request is refused', async () => {
+    const uploadId = randomUUID();
+    const server = await freshServer();
+
+    const first = await startHubspot(['deals'], server, { uploadId });
+    const other = await startHubspot(['deals'], server, { uploadId, dedupStrategy: 'skip' });
+
+    expect([first.statusCode, other.statusCode]).toEqual([201, 409]);
+    expect(other.json<{ message: string }>().message).toBe('uploadId was already used for a different upload');
+    jobIdsOf(first);
+    expect(await startRows(uploadId)).toHaveLength(1);
   });
 });
 

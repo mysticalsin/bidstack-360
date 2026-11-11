@@ -34,6 +34,7 @@ const queuedJobIds: string[] = [];
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 afterAll(async () => {
@@ -44,10 +45,17 @@ afterAll(async () => {
   }
 });
 
-function startCsv(entityType: string, rowCount = 3, extra: Record<string, unknown> = {}, server = ctx.server) {
+function startCsv(
+  entityType: string,
+  rowCount = 3,
+  extra: Record<string, unknown> = {},
+  server = ctx.server,
+  headers: Record<string, string> = {},
+) {
   return server.inject({
     method: 'POST',
     url: '/api/v1/migrations/start-csv',
+    headers,
     payload: {
       source: 'CSV',
       entityType,
@@ -309,7 +317,7 @@ describe('POST /api/v1/migrations/start-csv — concurrent retries', () => {
     await redis.del(`migration:${first.json<{ id: string }>().id}:${entityType}:rows`);
   });
 
-  skipIfNoDb('an uploadId used by another source is refused', async () => {
+  skipIfNoDb('an uploadId used with another source is a separate start', async () => {
     const entityType = `synthetic-${randomUUID()}`;
     const uploadId = randomUUID();
     const server = await freshServer();
@@ -317,9 +325,65 @@ describe('POST /api/v1/migrations/start-csv — concurrent retries', () => {
     const csv = await startCsv(entityType, 3, { uploadId }, server);
     const salesforce = await startCsv(entityType, 3, { uploadId, source: 'SALESFORCE_CSV' }, server);
 
-    expect([csv.statusCode, salesforce.statusCode]).toEqual([201, 409]);
+    expect([csv.statusCode, salesforce.statusCode]).toEqual([201, 201]);
+    expect(await jobRows(entityType)).toHaveLength(2);
+    for (const res of [csv, salesforce]) await redis.del(`migration:${res.json<{ id: string }>().id}:${entityType}:rows`);
+  });
+});
+
+/** Stub auth's second admin in the seed org (synthetic dev auth, not SSO). */
+const OTHER_USER = { 'x-bidstack-e2e-role': 'admin' };
+const otherRows = (n: number) => Array.from({ length: n }, (_, i) => ({ Name: `Synthetic Replacement Co ${i}` }));
+
+// WHY: the key was looked up across the org, so a second user who reused a
+// pending uploadId resumed the first user's start and stored their own rows
+// under its rows key: the first user's job imported the second user's rows.
+// A reused key with other rows must never resume a start.
+describe('POST /api/v1/migrations/start-csv — uploadId scope and content', () => {
+  skipIfNoDb('another user in the org cannot take over a pending start by reusing its uploadId', async () => {
+    vi.stubEnv('BIDSTACK_ALLOW_STUB_ROLE_HEADER', 'true');
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const server = await freshServer();
+    vi.spyOn(prisma.auditLog, 'create').mockRejectedValueOnce(new Error('synthetic database failure'));
+    expect((await startCsv(entityType, 150, { uploadId }, server)).statusCode).toBe(500);
+    vi.restoreAllMocks();
+    const [mine] = await jobRows(entityType);
+    const myRowsKey = `migration:${mine!.id}:${entityType}:rows`;
+    const myRows = await redis.get(myRowsKey);
+
+    const theirs = await startCsv(entityType, 150, { uploadId, rows: otherRows(150) }, server, OTHER_USER);
+
+    expect(theirs.statusCode).toBe(201);
+    const theirId = theirs.json<{ id: string }>().id;
+    expect(theirId).not.toBe(mine!.id);
+    expect((await prisma.migrationJob.findUniqueOrThrow({ where: { id: mine!.id } })).status).toBe('PENDING');
+    expect(await redis.get(myRowsKey)).toBe(myRows);
+    const jobs = await jobRows(entityType);
+    expect(new Set(jobs.map((j) => j.userId)).size).toBe(2);
+    const chunks = await queuedChunks(entityType);
+    expect(chunks.filter((c) => c.data.migrationJobId === mine!.id).map((c) => c.data.userId)).toEqual([
+      mine!.userId,
+      mine!.userId,
+    ]);
+    for (const id of [mine!.id, theirId]) await redis.del(`migration:${id}:${entityType}:rows`);
+  });
+
+  skipIfNoDb('the same user reusing an uploadId with other rows is refused', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const server = await freshServer();
+
+    const first = await startCsv(entityType, 3, { uploadId }, server);
+    const firstKey = `migration:${first.json<{ id: string }>().id}:${entityType}:rows`;
+    const stored = await redis.get(firstKey);
+    const other = await startCsv(entityType, 3, { uploadId, rows: otherRows(3) }, server);
+
+    expect([first.statusCode, other.statusCode]).toEqual([201, 409]);
+    expect(other.json<{ message: string }>().message).toBe('uploadId was already used for a different upload');
     expect(await jobRows(entityType)).toHaveLength(1);
-    await redis.del(`migration:${csv.json<{ id: string }>().id}:${entityType}:rows`);
+    expect(await redis.get(firstKey)).toBe(stored);
+    await redis.del(firstKey);
   });
 });
 

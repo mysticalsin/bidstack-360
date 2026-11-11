@@ -19,7 +19,7 @@ import {
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 import { discardFailedStart } from '../lib/failed-start-cleanup.js';
 import { addWithinDeadline } from '../lib/queue-enqueue.js';
-import { warnIfPastRetryWindow, withUploadLock } from '../lib/upload-start.js';
+import { recordedDigest, uploadDigest, warnIfPastRetryWindow, withUploadLock } from '../lib/upload-start.js';
 import { isUniqueViolation } from '../routes/opportunities.helpers.js';
 
 export const HUBSPOT_IMPORT_ENTITIES = ['companies', 'contacts', 'deals', 'tasks'] as const;
@@ -102,6 +102,9 @@ export async function startHubspotImport(input: {
 }) {
   const { orgId, userId, uploadId } = input;
   const log = input.log ?? { error: () => {}, warn: () => {} };
+  const digest = uploadId
+    ? uploadDigest({ entities: [...input.entities].sort(), dedupStrategy: input.dedupStrategy })
+    : undefined;
 
   // Workers resolve encrypted tokens just in time so raw OAuth tokens are
   // never persisted in BullMQ payloads.
@@ -150,15 +153,15 @@ export async function startHubspotImport(input: {
     );
 
   const resume = async (earlier: MigrationJobRow[]) => {
+    // Same key, another request: never resume it.
+    if (earlier.some((job) => recordedDigest(job.meta) !== digest)) {
+      throw new UploadIdConflictError('uploadId was already used for a different upload');
+    }
     const planned = earlier.map((job) => ({
       entity: (job.meta as { entityType?: unknown } | null)?.entityType as HubspotImportEntity,
       totalRows: job.totalRows,
       job,
     }));
-    const sameEntities = [...planned.map((p) => p.entity)].sort().join() === [...input.entities].sort().join();
-    if (earlier.some((job) => job.source !== 'HUBSPOT_OAUTH') || !sameEntities) {
-      throw new UploadIdConflictError('uploadId was already used for a different upload');
-    }
     // The audit row is a job's last start write, so a job without one is a
     // start that failed after queueing. Its first chunk is queued again unless
     // the worker already finished or failed the job.
@@ -183,7 +186,7 @@ export async function startHubspotImport(input: {
   const start = async () => {
     if (uploadId) {
       const earlier = await prisma.migrationJob.findMany({
-        where: { orgId, meta: { path: ['uploadId'], equals: uploadId } },
+        where: { orgId, userId, source: 'HUBSPOT_OAUTH', meta: { path: ['uploadId'], equals: uploadId } },
         orderBy: { createdAt: 'asc' },
         // One row more than this request would create is enough to tell another start apart.
         take: input.entities.length + 1,
@@ -210,7 +213,7 @@ export async function startHubspotImport(input: {
           meta: {
             entityType: entity,
             ...(input.syncRunId ? { syncRunId: input.syncRunId } : {}),
-            ...(uploadId ? { uploadId } : {}),
+            ...(uploadId ? { uploadId, uploadDigest: digest } : {}),
           },
         })),
       });
@@ -273,5 +276,5 @@ export async function startHubspotImport(input: {
     }
   }
 
-  return uploadId ? withUploadLock(orgId, uploadId, start) : start();
+  return uploadId ? withUploadLock({ orgId, userId, source: 'HUBSPOT_OAUTH', uploadId }, start) : start();
 }
