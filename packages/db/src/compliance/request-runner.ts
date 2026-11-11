@@ -12,6 +12,7 @@
  * `running` and the outcome is `busy`: the worker retries after the claim goes
  * stale, and that run only retries the deletes.
  */
+import { DSR_STALE_RUNNING_MS, dsrClaimWhere, dsrOwnedWhere, dsrStateFromStored } from '@bidstack/shared';
 import type { Prisma, PrismaClient } from '../../generated/client/index.js';
 
 import {
@@ -42,16 +43,15 @@ export interface RunDataSubjectRequestOptions {
   log?: { warn: (obj: object, msg?: string) => void };
 }
 
-const KNOWN_STATUSES = ['queued', 'running', 'done', 'failed'] as const;
-type KnownStatus = (typeof KNOWN_STATUSES)[number];
+type KnownStatus = 'queued' | 'running' | 'done' | 'failed';
 
 /** Unknown stored text is `failed` for the caller. The row is not rewritten. */
 export function storedDataSubjectState(stored: string): KnownStatus {
-  return (KNOWN_STATUSES as readonly string[]).includes(stored) ? (stored as KnownStatus) : 'failed';
+  return dsrStateFromStored(stored).state;
 }
 
 /** A `running` row older than this is treated as abandoned and may be claimed again. */
-const STALE_RUNNING_MS = 15 * 60_000;
+const STALE_RUNNING_MS = DSR_STALE_RUNNING_MS;
 
 /** Stored on the row and shown to admins; never the raw database message. */
 function publicError(err: unknown): string {
@@ -75,21 +75,14 @@ export async function runDataSubjectRequest(
   // this run's later updates no longer match.
   const claimedAt = new Date();
   const claimed = await db.dataSubjectRequest.updateMany({
-    where: {
-      id: requestId,
-      orgId,
-      OR: [
-        { status: 'queued' },
-        { status: 'running', startedAt: { lt: new Date(Date.now() - STALE_RUNNING_MS) } },
-      ],
-    },
+    where: dsrClaimWhere(requestId, orgId, claimedAt),
     data: { status: 'running', startedAt: claimedAt },
   });
   const row = await db.dataSubjectRequest.findFirst({ where: { id: requestId, orgId } });
   if (!row) throw new Error(`data-subject-request ${requestId} not found`);
   const outcome = { id: row.id, kind: row.kind, dryRun: row.dryRun };
   const retryAt = () => new Date((row.startedAt?.getTime() ?? Date.now()) + STALE_RUNNING_MS + 1_000);
-  if (!(KNOWN_STATUSES as readonly string[]).includes(row.status)) {
+  if (!dsrStateFromStored(row.status).known) {
     // Safe state is failed: queued would run another erasure, done would hide one.
     opts.log?.warn(
       { requestId: row.id, from: row.status, to: 'failed' },
@@ -103,8 +96,6 @@ export async function runDataSubjectRequest(
     if (row.status === 'running') return { ...outcome, status: 'busy', retryAt: retryAt() };
     return { ...outcome, status: 'skipped' };
   }
-
-  const claimWhere = { id: row.id, orgId: row.orgId, startedAt: claimedAt };
 
   /** Someone else holds the row. Report what is stored. Do not write. */
   const lostClaim = async (to: 'done' | 'failed'): Promise<DataSubjectRequestOutcome> => {
@@ -129,7 +120,7 @@ export async function runDataSubjectRequest(
     data: Prisma.DataSubjectRequestUpdateManyMutationInput,
   ): Promise<DataSubjectRequestOutcome | null> => {
     const moved = await db.dataSubjectRequest.updateMany({
-      where: { ...claimWhere, status: 'running' },
+      where: dsrOwnedWhere(row.id, row.orgId, claimedAt, 'running'),
       data: { ...data, status },
     });
     if (moved.count === 1) return null;
@@ -168,7 +159,7 @@ export async function runDataSubjectRequest(
         extra = { residueError: publicError(err) };
       }
       await db.dataSubjectRequest.updateMany({
-        where: { ...claimWhere, status: 'done' },
+        where: dsrOwnedWhere(row.id, row.orgId, claimedAt, 'done'),
         data: { report: { ...base, ...extra } },
       });
     }
@@ -200,7 +191,7 @@ export async function runDataSubjectRequest(
       const base = erased as unknown as Prisma.InputJsonObject;
       if (storageKeys.length) {
         const noted = await db.dataSubjectRequest.updateMany({
-          where: { ...claimWhere, status: 'running' },
+          where: dsrOwnedWhere(row.id, row.orgId, claimedAt, 'running'),
           data: { report: { ...base, pendingStorageKeys: storageKeys } },
         });
         if (noted.count !== 1) return lostClaim('done');
