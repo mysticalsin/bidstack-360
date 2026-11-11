@@ -71,6 +71,9 @@ export async function runDataSubjectRequest(
   orgId: string,
   opts: RunDataSubjectRequestOptions = {},
 ): Promise<DataSubjectRequestOutcome> {
+  // startedAt is this run's claim token. A stale reclaim writes a new one, so
+  // this run's later updates no longer match.
+  const claimedAt = new Date();
   const claimed = await db.dataSubjectRequest.updateMany({
     where: {
       id: requestId,
@@ -80,7 +83,7 @@ export async function runDataSubjectRequest(
         { status: 'running', startedAt: { lt: new Date(Date.now() - STALE_RUNNING_MS) } },
       ],
     },
-    data: { status: 'running', startedAt: new Date() },
+    data: { status: 'running', startedAt: claimedAt },
   });
   const row = await db.dataSubjectRequest.findFirst({ where: { id: requestId, orgId } });
   if (!row) throw new Error(`data-subject-request ${requestId} not found`);
@@ -101,29 +104,36 @@ export async function runDataSubjectRequest(
     return { ...outcome, status: 'skipped' };
   }
 
-  /** `done` and `failed` are written only from `running`. Null means this run won. */
-  const writeFromRunning = async (
-    status: 'done' | 'failed',
-    data: Prisma.DataSubjectRequestUpdateManyMutationInput,
-  ): Promise<DataSubjectRequestOutcome | null> => {
-    const moved = await db.dataSubjectRequest.updateMany({
-      where: { id: row.id, orgId: row.orgId, status: 'running' },
-      data: { ...data, status },
-    });
-    if (moved.count === 1) return null;
+  const claimWhere = { id: row.id, orgId: row.orgId, startedAt: claimedAt };
+
+  /** Someone else holds the row. Report what is stored. Do not write. */
+  const lostClaim = async (to: 'done' | 'failed'): Promise<DataSubjectRequestOutcome> => {
     const current = await db.dataSubjectRequest.findFirst({
       where: { id: row.id, orgId: row.orgId },
       select: { status: true },
     });
     const state = storedDataSubjectState(current?.status ?? '');
     opts.log?.warn(
-      { requestId: row.id, from: current?.status ?? null, to: status },
+      { requestId: row.id, from: current?.status ?? null, to },
       'illegal data subject transition',
     );
     if (state === 'running') return { ...outcome, status: 'busy', retryAt: retryAt() };
     if (state === 'done') return { ...outcome, status: 'done' };
     if (state === 'queued') return { ...outcome, status: 'skipped' };
     return { ...outcome, status: 'failed' };
+  };
+
+  /** `done` and `failed` are written only from this run's claim. Null means this run won. */
+  const writeFromRunning = async (
+    status: 'done' | 'failed',
+    data: Prisma.DataSubjectRequestUpdateManyMutationInput,
+  ): Promise<DataSubjectRequestOutcome | null> => {
+    const moved = await db.dataSubjectRequest.updateMany({
+      where: { ...claimWhere, status: 'running' },
+      data: { ...data, status },
+    });
+    if (moved.count === 1) return null;
+    return lostClaim(status);
   };
 
   /** Delete stored objects, then mark the erasure done. `busy` when a delete failed. */
@@ -157,8 +167,8 @@ export async function runDataSubjectRequest(
       } catch (err) {
         extra = { residueError: publicError(err) };
       }
-      await db.dataSubjectRequest.update({
-        where: { id: row.id },
+      await db.dataSubjectRequest.updateMany({
+        where: { ...claimWhere, status: 'done' },
         data: { report: { ...base, ...extra } },
       });
     }
@@ -189,10 +199,11 @@ export async function runDataSubjectRequest(
       });
       const base = erased as unknown as Prisma.InputJsonObject;
       if (storageKeys.length) {
-        await db.dataSubjectRequest.update({
-          where: { id: row.id },
+        const noted = await db.dataSubjectRequest.updateMany({
+          where: { ...claimWhere, status: 'running' },
           data: { report: { ...base, pendingStorageKeys: storageKeys } },
         });
+        if (noted.count !== 1) return lostClaim('done');
       }
       return await completeErase(base, storageKeys, subject);
     }

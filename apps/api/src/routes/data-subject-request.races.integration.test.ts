@@ -83,4 +83,35 @@ describe('data subject request terminal writes', () => {
       await client.$disconnect();
     }
   });
+
+  t('a stale reclaim is not finished by the run that lost the claim', async () => {
+    const row = await file('queued');
+    const client = new PrismaClient();
+    client.$use(async (params, next) => {
+      const result = await next(params);
+      if (
+        params.model === 'DataSubjectRequest' &&
+        params.action === 'updateMany' &&
+        params.args?.data?.status === 'running' &&
+        params.args?.data?.startedAt
+      ) {
+        // The claim went stale and a second run took it, with its own timestamp and report.
+        await prisma.dataSubjectRequest.update({
+          where: { id: row.id },
+          data: { startedAt: new Date(Date.now() + 60_000), report: { owner: 'reclaim' } },
+        });
+      }
+      return result;
+    });
+    try {
+      const out = await runDataSubjectRequest(client, row.id, orgId);
+      const stored = await prisma.dataSubjectRequest.findFirst({ where: { id: row.id, orgId } });
+      expect(stored?.status).toBe('running');
+      expect((stored?.report as { owner?: string } | null)?.owner).toBe('reclaim');
+      expect(stored?.error).toBeNull();
+      expect(out.status).toBe('busy');
+    } finally {
+      await client.$disconnect();
+    }
+  });
 });
