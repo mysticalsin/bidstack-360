@@ -24,7 +24,7 @@ import {
   type HubSpotTokens,
 } from '../lib/hubspot-client.js';
 import { recordSerumConnectorTestSuccess } from '../lib/serum-connector-policy.js';
-import { HubspotNotConnectedError, startHubspotImport } from '../services/hubspot-import.js';
+import { HubspotNotConnectedError, startHubspotImport, UploadIdConflictError } from '../services/hubspot-import.js';
 import { serializeJob } from './migrations.helpers.js';
 
 export const HUBSPOT_INTEGRATION_TYPE = 'hubspot' as const;
@@ -251,6 +251,9 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
           // Which entity types to import (user toggled these on discovery page).
           entities: z.array(z.enum(['companies', 'contacts', 'deals', 'tasks'])).min(1),
           dedupStrategy: DedupStrategyEnum.default('update'),
+          // One per start, reused by the client's retry, so a retried start
+          // resumes the first attempt instead of importing again.
+          uploadId: z.string().min(8).max(128).optional(),
         }),
         response: { 201: z.object({ jobs: z.array(MigrationJobResponse) }) },
       },
@@ -264,12 +267,14 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
           entities: req.body.entities,
           dedupStrategy: req.body.dedupStrategy,
           queue: getQueue(),
+          uploadId: req.body.uploadId,
           log: req.log,
         });
         return reply.code(201).send({ jobs: jobs.map(serializeJob) });
       } catch (err) {
         if (err instanceof HubspotNotConnectedError)
           throw server.httpErrors.badRequest(err.message);
+        if (err instanceof UploadIdConflictError) throw server.httpErrors.conflict(err.message);
         throw err;
       }
     },

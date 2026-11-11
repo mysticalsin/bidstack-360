@@ -7,6 +7,8 @@
 // half-start: the client retries a 5xx once, and a partly queued start would
 // import the first entities twice.
 
+import { randomUUID } from 'node:crypto';
+
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, vi } from 'vitest';
@@ -85,11 +87,11 @@ afterAll(async () => {
   }
 });
 
-function startHubspot(entities: string[], server = ctx.server) {
+function startHubspot(entities: string[], server = ctx.server, extra: Record<string, unknown> = {}) {
   return server.inject({
     method: 'POST',
     url: '/api/v1/migrations/start-hubspot',
-    payload: { entities, dedupStrategy: 'update' },
+    payload: { entities, dedupStrategy: 'update', ...extra },
   });
 }
 
@@ -169,6 +171,151 @@ describe('POST /api/v1/migrations/start-hubspot', () => {
     expect(addBulk).toHaveBeenCalledOnce();
     expect(addBulk.mock.calls[0]![0].map((j) => j.data.entityType)).toEqual(['companies', 'contacts']);
     expect(await hubspotRowsSince(since)).toEqual({ jobs: 0, audits: 0 });
+  });
+});
+
+const fresh: Array<Awaited<ReturnType<typeof buildServer>>> = [];
+/** start-hubspot allows 5 starts a minute per server; each of these tests gets its own. */
+async function freshServer() {
+  const server = await buildServer();
+  await server.ready();
+  fresh.push(server);
+  return server;
+}
+afterAll(async () => {
+  for (const server of fresh) await server.close();
+});
+
+/** Holds each call until `n` calls have arrived or `ms` has passed, then lets them all through. */
+function barrier(n: number, ms: number) {
+  let arrived = 0;
+  let release!: () => void;
+  const open = new Promise<void>((resolve) => (release = resolve));
+  const timer = setTimeout(release, ms);
+  return async () => {
+    if (++arrived >= n) {
+      clearTimeout(timer);
+      release();
+    }
+    await open;
+  };
+}
+
+/** The job rows of the start made with this uploadId; registered for cleanup. */
+async function startRows(uploadId: string) {
+  const rows = await prisma.migrationJob.findMany({
+    where: { orgId: ctx.seedOrgId!, meta: { path: ['uploadId'], equals: uploadId } },
+    orderBy: { createdAt: 'asc' },
+  });
+  ctx.cleanup.jobIds.push(...rows.map((r) => r.id));
+  return rows;
+}
+
+/** Queued chunks, in any state, of these job rows; registered for cleanup. */
+async function chunksOf(jobIds: string[]) {
+  const all = await inspectQueue().getJobs(['waiting', 'delayed', 'paused', 'prioritized', 'active', 'completed', 'failed']);
+  const mine = all.filter((j) => jobIds.includes(j.data.migrationJobId));
+  queuedJobIds.push(...mine.map((j) => j.id!));
+  return mine.map((j) => j.id).sort();
+}
+
+function jobIdsOf(res: { json: <T>() => T }) {
+  const ids = res.json<{ jobs: Array<{ id: string }> }>().jobs.map((j) => j.id);
+  ctx.cleanup.jobIds.push(...ids);
+  return ids;
+}
+
+// WHY: once the first chunks are queued the import runs. If a database write
+// after the enqueue failed, the start answered 500 and the client's retry
+// created new jobs and imported every entity again. The retry carries the
+// same uploadId and must resume the first start instead.
+describe('POST /api/v1/migrations/start-hubspot — retried start', () => {
+  skipIfNoDb('a retry after a database failure past the enqueue resumes the first start, imported once', async () => {
+    const uploadId = randomUUID();
+    const server = await freshServer();
+    vi.spyOn(prisma.auditLog, 'create').mockRejectedValueOnce(new Error('synthetic database failure'));
+
+    const first = await startHubspot(['companies', 'contacts'], server, { uploadId });
+    const retry = await startHubspot(['companies', 'contacts'], server, { uploadId });
+
+    expect([first.statusCode, retry.statusCode]).toEqual([500, 201]);
+    const ids = jobIdsOf(retry);
+    const rows = await startRows(uploadId);
+    expect(rows.map((r) => r.id)).toEqual(ids);
+    expect(await chunksOf(ids)).toEqual([`${ids[0]}-companies-chunk-0`, `${ids[1]}-contacts-chunk-0`].sort());
+    expect(await prisma.auditLog.count({ where: { action: 'migration.start', targetId: { in: ids } } })).toBe(2);
+  });
+
+  skipIfNoDb('a retry of a start that already succeeded returns that start and queues nothing new', async () => {
+    const uploadId = randomUUID();
+    const server = await freshServer();
+
+    const first = await startHubspot(['deals'], server, { uploadId });
+    const again = await startHubspot(['deals'], server, { uploadId });
+
+    expect([first.statusCode, again.statusCode]).toEqual([201, 201]);
+    const ids = jobIdsOf(first);
+    expect(jobIdsOf(again)).toEqual(ids);
+    expect((await startRows(uploadId)).map((r) => r.id)).toEqual(ids);
+    expect(await chunksOf(ids)).toEqual([`${ids[0]}-deals-chunk-0`]);
+    expect(await prisma.auditLog.count({ where: { action: 'migration.start', targetId: { in: ids } } })).toBe(1);
+  });
+
+  skipIfNoDb('an uploadId reused for other entities is refused', async () => {
+    const uploadId = randomUUID();
+    const server = await freshServer();
+
+    const first = await startHubspot(['deals'], server, { uploadId });
+    const other = await startHubspot(['companies'], server, { uploadId });
+
+    expect([first.statusCode, other.statusCode]).toEqual([201, 409]);
+    jobIdsOf(first);
+    expect(await startRows(uploadId)).toHaveLength(1);
+  });
+
+  // WHY: a client that times out retries while its first request is still
+  // running; both requests found no earlier start and both imported.
+  skipIfNoDb('two parallel requests with the same uploadId start one import', async () => {
+    const uploadId = randomUUID();
+    const server = await freshServer();
+    // Both requests reach the job insert together unless one is made to wait for the other.
+    const wait = barrier(2, 500);
+    const { create, createMany } = prisma.migrationJob;
+    vi.spyOn(prisma.migrationJob, 'create').mockImplementation((async (args: unknown) => {
+      await wait();
+      return create.call(prisma.migrationJob, args as never);
+    }) as never);
+    vi.spyOn(prisma.migrationJob, 'createMany').mockImplementation((async (args: unknown) => {
+      await wait();
+      return createMany.call(prisma.migrationJob, args as never);
+    }) as never);
+
+    const [a, b] = await Promise.all([
+      startHubspot(['deals'], server, { uploadId }),
+      startHubspot(['deals'], server, { uploadId }),
+    ]);
+
+    expect([a.statusCode, b.statusCode]).toEqual([201, 201]);
+    const ids = jobIdsOf(a);
+    expect(jobIdsOf(b)).toEqual(ids);
+    expect((await startRows(uploadId)).map((r) => r.id)).toEqual(ids);
+    expect(await chunksOf(ids)).toEqual([`${ids[0]}-deals-chunk-0`]);
+    expect(await prisma.auditLog.count({ where: { action: 'migration.start', targetId: { in: ids } } })).toBe(1);
+  });
+
+  skipIfNoDb('a duplicate that misses the earlier start is refused by the unique index', async () => {
+    const uploadId = randomUUID();
+    const server = await freshServer();
+
+    const first = await startHubspot(['deals'], server, { uploadId });
+    vi.spyOn(prisma.migrationJob, 'findMany').mockResolvedValueOnce([]);
+    const dup = await startHubspot(['deals'], server, { uploadId });
+
+    expect([first.statusCode, dup.statusCode]).toEqual([201, 409]);
+    expect(dup.json<{ message: string }>().message).toBe('A start with this uploadId already exists; retry to resume it');
+    const ids = jobIdsOf(first);
+    expect((await startRows(uploadId)).map((r) => r.id)).toEqual(ids);
+    expect(await chunksOf(ids)).toHaveLength(1);
   });
 });
 
