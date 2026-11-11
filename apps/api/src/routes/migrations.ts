@@ -367,35 +367,39 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const attemptId = randomUUID();
+      const previousAttempt = migrationAttemptId(job.meta);
       // A copied progressAt is the previous attempt's claim clock. The new
       // attempt has not been claimed, so it must not look stalled.
       const fresh = { ...(job.meta as object) } as Record<string, unknown>;
       delete fresh.progressAt;
       fresh.attemptId = attemptId;
-      const claimed = await prisma.migrationJob.updateMany({
-        where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
-        data: {
-          status: 'RUNNING',
-          startedAt: new Date(),
-          completedAt: null,
-          errorSummary: [],
-          meta: fresh,
-        },
+      const claimed = await prisma.$transaction(async (tx) => {
+        const moved = await tx.migrationJob.updateMany({
+          where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
+          data: {
+            status: 'RUNNING',
+            startedAt: new Date(),
+            completedAt: null,
+            errorSummary: [],
+            meta: fresh,
+          },
+        });
+        if (moved.count !== 1) return 0;
+        await tx.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'migration.retry',
+            targetType: 'MigrationJob',
+            targetId: job.id,
+            diff: { previousAttempt, attemptId },
+          },
+        });
+        return moved.count;
       });
-      if (claimed.count !== 1) {
+      if (claimed !== 1) {
         throw server.httpErrors.conflict('Migration job is no longer failed');
       }
-      const previousAttempt = migrationAttemptId(job.meta);
-      await prisma.auditLog.create({
-        data: {
-          orgId,
-          userId,
-          action: 'migration.retry',
-          targetType: 'MigrationJob',
-          targetId: job.id,
-          diff: { previousAttempt, attemptId },
-        },
-      });
 
       const queue = getQueue();
       try {

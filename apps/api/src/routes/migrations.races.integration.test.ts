@@ -193,6 +193,55 @@ describe('migration status races', () => {
     }
   });
 
+  t('a failed retry audit does not leave the new attempt running', async () => {
+    // WHY: the audit names who retried which attempt. If that row is written
+    // after the status commits, a failed insert leaves a running import with
+    // no record of the retry.
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValueOnce(new Error('queue down'));
+    await prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE FUNCTION fail_retry_audit() RETURNS trigger
+      LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.action = 'migration.retry' THEN
+          RAISE EXCEPTION 'audit down';
+        END IF;
+        RETURN NEW;
+      END;
+      $$
+    `);
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER fail_retry_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION fail_retry_audit()`,
+    );
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'name' },
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string }>();
+      add.mockResolvedValue({ id: 'chunk' } as never);
+      const retry = await server.inject({
+        method: 'POST',
+        url: `/api/v1/migrations/${body.id}/retry`,
+      });
+      expect(retry.statusCode).toBeGreaterThanOrEqual(500);
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      expect(stored.status).toBe('FAILED');
+    } finally {
+      await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS fail_retry_audit ON audit_log`);
+      await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS fail_retry_audit()`);
+      add.mockRestore();
+    }
+  });
+
   t('cancel does not trust a stale RUNNING read over a finished job', async () => {
     const job = await prisma.migrationJob.create({
       data: {
