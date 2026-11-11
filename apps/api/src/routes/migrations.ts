@@ -29,6 +29,10 @@ import {
   DedupStrategyEnum,
   type MigrationJobError,
   MIGRATION,
+  MIGRATION_INITIAL_STATUS,
+  migrationFromStatuses,
+  migrationStatusAfter,
+  migrationTransition,
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
@@ -238,8 +242,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           update: { mappings },
         });
         await prisma.migrationJob.updateMany({
-          where: { id: jobId, status: 'PENDING' },
-          data: { status: 'RUNNING', startedAt: new Date() },
+          where: { id: jobId, status: { in: [...migrationFromStatuses('start')] } },
+          data: { status: migrationStatusAfter('PENDING', 'start'), startedAt: new Date() },
         });
         return prisma.migrationJob.findUniqueOrThrow({ where: { id: jobId } });
       };
@@ -259,7 +263,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             // Still PENDING: the first attempt may have failed before or after
             // queueing; queueing again only adds the chunks that are missing.
             // The job row is kept on failure here, since its chunks may be queued.
-            if (earlier.status === 'PENDING') {
+            if (earlier.status === MIGRATION_INITIAL_STATUS.csv) {
               await warnIfPastRetryWindow(getQueue(), req.log, earlier.id, earlier.createdAt, chunkJobIds(earlier.id));
               await queueImport(earlier.id);
             }
@@ -279,7 +283,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
               orgId,
               userId,
               source,
-              status: 'PENDING',
+              status: MIGRATION_INITIAL_STATUS.csv,
               totalRows: rows.length,
               uploadId,
               meta: uploadId ? { entityType, uploadId, uploadDigest: digest } : { entityType },
@@ -414,12 +418,13 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      if (job.status === 'COMPLETE' || job.status === 'CANCELLED' || job.status === 'FAILED') {
+      const cancelled = migrationTransition(job.status, 'cancel');
+      if (!cancelled.ok) {
         throw server.httpErrors.conflict(`Cannot cancel a job with status ${job.status}`);
       }
       const updated = await prisma.migrationJob.update({
         where: { id: req.params.id },
-        data: { status: 'CANCELLED', completedAt: new Date() },
+        data: { status: cancelled.to, completedAt: new Date() },
       });
       await prisma.auditLog.create({
         data: {
@@ -450,7 +455,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      if (job.status !== 'COMPLETE') {
+      const undone = migrationTransition(job.status, 'undo');
+      if (!undone.ok) {
         throw server.httpErrors.conflict('Only completed jobs can be undone');
       }
       if (!job.undoableUntil || job.undoableUntil < new Date()) {
@@ -527,7 +533,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         await tx.migrationJob.update({
           where: { id: req.params.id },
           data: {
-            status: 'FAILED',
+            status: undone.to,
             meta: { ...(job.meta as object), undone: true, undoneAt: new Date().toISOString() },
           },
         });

@@ -32,6 +32,8 @@ import {
   ACCOUNT_INTEL,
   MIGRATION,
   MigrationJobPayload,
+  migrationFromStatuses,
+  migrationStatusAfter,
   type MigrationJobError,
 } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
@@ -641,14 +643,14 @@ export async function resolveChunkResumeCursor(
 
 async function maybeComplete(migrationJobId: string, forceTotal?: number): Promise<void> {
   const job = await prisma.migrationJob.findUnique({ where: { id: migrationJobId } });
-  if (!job || job.status !== 'RUNNING') return;
+  if (!job || !migrationFromStatuses('complete').includes(job.status)) return;
   const done = job.processedRows + job.errorRows;
   const total = forceTotal ?? job.totalRows;
   if (done >= total) {
     await prisma.migrationJob.update({
       where: { id: migrationJobId },
       data: {
-        status: 'COMPLETE',
+        status: migrationStatusAfter(job.status, 'complete'),
         completedAt: new Date(),
         totalRows: forceTotal ?? job.totalRows,
         undoableUntil: new Date(Date.now() + 24 * 3600 * 1000),
@@ -700,7 +702,7 @@ export async function processMigrationChunk(
     where: { id: payload.migrationJobId },
     select: { status: true },
   });
-  if (!jobRow || jobRow.status === 'CANCELLED' || jobRow.status === 'FAILED') {
+  if (!jobRow || !migrationFromStatuses('fail').includes(jobRow.status)) {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
     return;
   }
@@ -708,10 +710,11 @@ export async function processMigrationChunk(
   const entity = normalizeEntity(payload.entityType);
   if (!entity) {
     // e.g. HubSpot "tasks" — fail the job loudly instead of hanging RUNNING.
-    await prisma.migrationJob.update({
-      where: { id: payload.migrationJobId },
+    // Only from PENDING or RUNNING: a late chunk must not rewrite COMPLETE or CANCELLED.
+    const failed = await prisma.migrationJob.updateMany({
+      where: { id: payload.migrationJobId, status: { in: [...migrationFromStatuses('fail')] } },
       data: {
-        status: 'FAILED',
+        status: migrationStatusAfter(jobRow.status, 'fail'),
         completedAt: new Date(),
         errorSummary: [
           {
@@ -722,6 +725,10 @@ export async function processMigrationChunk(
         ],
       },
     });
+    if (failed.count === 0) {
+      log.info({ migrationJobId: payload.migrationJobId }, 'migration job moved before it could be failed');
+      return;
+    }
     log.warn('unsupported entity type — job failed honestly');
     return;
   }
@@ -922,8 +929,8 @@ export async function startMigrationWorker(
       if (migrationJobId) {
         await prisma.migrationJob
           .updateMany({
-            where: { id: migrationJobId, status: 'RUNNING' },
-            data: { status: 'FAILED', completedAt: new Date() },
+            where: { id: migrationJobId, status: { in: [...migrationFromStatuses('fail')] } },
+            data: { status: migrationStatusAfter('RUNNING', 'fail'), completedAt: new Date() },
           })
           .catch((updateErr) =>
             log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED'),

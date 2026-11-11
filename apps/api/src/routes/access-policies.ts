@@ -17,7 +17,14 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { Prisma, prisma, type AccessPolicyVersion } from '@bidstack/db';
-import { ACCESS_POLICY_LIMITS, AccessPolicyRulesSchema } from '@bidstack/shared';
+import {
+  ACCESS_POLICY_LIMITS,
+  ACCESS_POLICY_STATUSES,
+  AccessPolicyRulesSchema,
+  accessPolicyFromStatuses,
+  accessPolicyStatusAfter,
+  accessPolicyTransition,
+} from '@bidstack/shared';
 
 import {
   accessPolicyEnforcementEnabled,
@@ -26,7 +33,7 @@ import {
 } from '../lib/access-policy-enforcement.js';
 import { simulateAccessPolicy } from '../lib/access-policy-simulation.js';
 
-const STATUSES = ['draft', 'pending', 'approved', 'rejected', 'published', 'superseded'] as const;
+const STATUSES = ACCESS_POLICY_STATUSES;
 const LIST_CAP = 100;
 
 const PolicyDto = z.object({
@@ -292,12 +299,12 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const row = await owned(req, req.params.id);
       assertAuthor(req, row, 'submit');
-      if (row.status !== 'draft' && row.status !== 'rejected') {
+      if (!accessPolicyTransition(row.status, 'submit').ok) {
         throw server.httpErrors.conflict(`Only a draft can be submitted (this one is ${row.status})`);
       }
       const updated = await prisma.$transaction(async (tx) => {
-        const next = await transition(tx, row, ['draft', 'rejected'], {
-          status: 'pending',
+        const next = await transition(tx, row, accessPolicyFromStatuses('submit'), {
+          status: accessPolicyStatusAfter(row.status, 'submit'),
           submittedById: req.auth.userId,
           submittedAt: new Date(),
           decisionNote: null,
@@ -320,11 +327,15 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
       if (row.createdById !== req.auth.userId && row.submittedById !== req.auth.userId) {
         throw server.httpErrors.forbidden('Only the author or submitter can withdraw this policy.');
       }
-      if (row.status !== 'pending') {
+      if (!accessPolicyTransition(row.status, 'withdraw').ok) {
         throw server.httpErrors.conflict(`Only a pending policy can be withdrawn (this one is ${row.status})`);
       }
       const updated = await prisma.$transaction(async (tx) => {
-        const next = await transition(tx, row, ['pending'], { status: 'draft', submittedById: null, submittedAt: null });
+        const next = await transition(tx, row, accessPolicyFromStatuses('withdraw'), {
+          status: accessPolicyStatusAfter(row.status, 'withdraw'),
+          submittedById: null,
+          submittedAt: null,
+        });
         await audit(tx, req, 'withdraw', row.id, { name: row.name });
         return next;
       });
@@ -344,7 +355,8 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
         if (row.createdById === req.auth.userId || row.submittedById === req.auth.userId) {
           throw server.httpErrors.forbidden('A second admin must review this policy. You wrote or submitted it.');
         }
-        if (row.status !== 'pending') {
+        const review = decision === 'approve' ? 'approve' : 'reject';
+        if (!accessPolicyTransition(row.status, review).ok) {
           throw server.httpErrors.conflict(`Only a pending policy can be reviewed (this one is ${row.status})`);
         }
         if (row.updatedAt.toISOString() !== req.body.expectedUpdatedAt) {
@@ -355,10 +367,10 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
           const next = await transition(
             tx,
             row,
-            ['pending'],
+            accessPolicyFromStatuses(review),
             decision === 'approve'
-              ? { status: 'approved', approvedById: req.auth.userId, approvedAt: new Date(), decisionNote: note }
-              : { status: 'rejected', approvedById: null, approvedAt: null, decisionNote: note },
+              ? { status: accessPolicyStatusAfter(row.status, 'approve'), approvedById: req.auth.userId, approvedAt: new Date(), decisionNote: note }
+              : { status: accessPolicyStatusAfter(row.status, 'reject'), approvedById: null, approvedAt: null, decisionNote: note },
           );
           await audit(tx, req, decision, row.id, { name: row.name, note });
           return next;
@@ -376,7 +388,7 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const row = await owned(req, req.params.id);
-      if (row.status !== 'approved') {
+      if (!accessPolicyTransition(row.status, 'publish').ok) {
         throw server.httpErrors.conflict(`Only an approved policy can be published (this one is ${row.status})`);
       }
       assertValidRules(row);
@@ -390,11 +402,11 @@ export const accessPoliciesRoutes: FastifyPluginAsyncZod = async (server) => {
           if (previous) {
             await tx.accessPolicyVersion.updateMany({
               where: { id: previous.id, orgId: req.auth.orgId, status: 'published' },
-              data: { status: 'superseded' },
+              data: { status: accessPolicyStatusAfter('published', 'supersede') },
             });
           }
-          const next = await transition(tx, row, ['approved'], {
-            status: 'published',
+          const next = await transition(tx, row, accessPolicyFromStatuses('publish'), {
+            status: accessPolicyStatusAfter(row.status, 'publish'),
             version,
             publishedAt: new Date(),
             publishedById: req.auth.userId,

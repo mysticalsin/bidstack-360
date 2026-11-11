@@ -14,6 +14,7 @@ import {
   HUBSPOT_CONTACT_DEFAULTS,
   HUBSPOT_DEAL_DEFAULTS,
   MigrationJobPayload,
+  MIGRATION_INITIAL_STATUS,
 } from '@bidstack/shared';
 
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
@@ -206,7 +207,7 @@ export async function startHubspotImport(input: {
           orgId,
           userId,
           source: 'HUBSPOT_OAUTH' as const,
-          status: 'RUNNING' as const,
+          status: MIGRATION_INITIAL_STATUS.hubspot,
           startedAt,
           totalRows,
           uploadId: i === 0 ? uploadId : undefined,

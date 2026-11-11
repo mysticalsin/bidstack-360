@@ -84,6 +84,28 @@ export interface HubspotJobSnapshot {
   errorSummary: unknown;
 }
 
+/**
+ * Roll the per-entity job statuses up into one run state.
+ *
+ * A FAILED or CANCELLED entity fails the run only once nothing is still
+ * PENDING or RUNNING, so one slow entity does not hide behind another's
+ * failure. CANCELLED is reported as failed: the Sync now control has no
+ * cancelled state. A RUNNING row with no startedAt is reported queued —
+ * status and startedAt can disagree, and the timestamp wins.
+ */
+export function hubspotAggregateState(
+  jobs: ReadonlyArray<Pick<HubspotJobSnapshot, 'status' | 'startedAt'>>,
+): SyncRun['state'] {
+  const pending = jobs.some((j) => j.status === 'PENDING' || j.status === 'RUNNING');
+  let state: SyncRun['state'];
+  if (!pending && jobs.some((j) => j.status === 'FAILED' || j.status === 'CANCELLED')) state = 'failed';
+  else if (jobs.length > 0 && jobs.every((j) => j.status === 'COMPLETE')) state = 'completed';
+  else if (jobs.some((j) => j.startedAt || j.status === 'RUNNING')) state = 'running';
+  else state = 'queued';
+  if (state === 'running' && jobs.every((j) => !j.startedAt)) state = 'queued';
+  return state;
+}
+
 /** One HubSpot run spans one MigrationJob per entity type. */
 export function hubspotRunFromJobs(
   runId: string,
@@ -95,15 +117,7 @@ export function hubspotRunFromJobs(
   const processed = jobs.reduce((n, j) => n + j.processedRows, 0);
   const failedRows = jobs.reduce((n, j) => n + j.errorRows, 0);
 
-  let state: SyncRun['state'];
-  const pending = jobs.some((j) => j.status === 'PENDING' || j.status === 'RUNNING');
-  // A failed entity only fails the run once the other entities have settled.
-  if (!pending && jobs.some((j) => j.status === 'FAILED' || j.status === 'CANCELLED'))
-    state = 'failed';
-  else if (jobs.length > 0 && jobs.every((j) => j.status === 'COMPLETE')) state = 'completed';
-  else if (jobs.some((j) => j.startedAt || j.status === 'RUNNING')) state = 'running';
-  else state = 'queued';
-  if (state === 'running' && jobs.every((j) => !j.startedAt)) state = 'queued';
+  const state = hubspotAggregateState(jobs);
 
   const finished = state === 'completed' || state === 'failed';
   const progress = finished ? 100 : total > 0 ? Math.min(99, Math.round((done / total) * 100)) : 0;

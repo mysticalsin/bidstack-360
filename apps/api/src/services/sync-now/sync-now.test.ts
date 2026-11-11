@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dustRunFromJob, hubspotRunFromJobs, syncRunId } from './runs.js';
+import { dustRunFromJob, hubspotAggregateState, hubspotRunFromJobs, syncRunId } from './runs.js';
 
 const ORG = '00000000-0000-4000-8000-000000000001';
 
@@ -134,6 +134,30 @@ describe('hubspotRunFromJobs', () => {
   it('fails when any entity job failed', () => {
     const run = hubspotRunFromJobs('hubspot-1', [{ ...base, status: 'FAILED' }], 0);
     expect(run.state).toBe('failed');
+  });
+
+  it('keeps the run running while one entity is still going, even if another failed', () => {
+    // WHY: failing the run early would let the UI stop polling a job that is still importing.
+    expect(
+      hubspotAggregateState([
+        { status: 'FAILED', startedAt: new Date(1) },
+        { status: 'RUNNING', startedAt: new Date(1) },
+      ]),
+    ).toBe('running');
+  });
+
+  it('reports a cancelled entity as failed once the others have settled', () => {
+    expect(
+      hubspotAggregateState([
+        { status: 'CANCELLED', startedAt: new Date(1) },
+        { status: 'COMPLETE', startedAt: new Date(1) },
+      ]),
+    ).toBe('failed');
+  });
+
+  it('reports a RUNNING job with no startedAt as queued', () => {
+    // The two fields can disagree; the missing timestamp wins. Documented, not changed.
+    expect(hubspotAggregateState([{ status: 'RUNNING', startedAt: null }])).toBe('queued');
   });
 
   it('is queued before the worker starts', () => {
