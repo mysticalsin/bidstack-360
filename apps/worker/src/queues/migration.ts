@@ -720,6 +720,8 @@ async function chunkCreatedIds(payload: MigrationJobPayload): Promise<string[]> 
  */
 async function noteChunkClaimed(id: string): Promise<void> {
   const progressAt = new Date().toISOString();
+  // Milliseconds, not NOW(). Prisma reads this clock back at millisecond
+  // resolution, and the stale compare-and-set requires an equal value.
   await prisma.$executeRaw`
     UPDATE migration_jobs
     SET meta = jsonb_set(
@@ -728,7 +730,7 @@ async function noteChunkClaimed(id: string): Promise<void> {
           to_jsonb(${progressAt}::text),
           true
         ),
-        updated_at = NOW()
+        updated_at = date_trunc('milliseconds', NOW())
     WHERE id = ${id}::uuid
       AND status = 'RUNNING'
   `;

@@ -3,10 +3,16 @@
 // A chunk that just committed moves that clock and keeps the job running.
 
 import { prisma } from '@bidstack/db';
+import { migrationProgressAt } from '@bidstack/shared';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { claimStaleMigration, sweepStaleMigrations } from './migration.js';
+import {
+  claimStaleMigration,
+  processMigrationChunk,
+  sweepStaleMigrations,
+  type MigrationChunkDeps,
+} from './migration.js';
 
 let dbReachable = false;
 
@@ -85,6 +91,50 @@ describe('migration stale scan', () => {
     const { org, job } = await runningJob(past);
     const claimed = await sweepStaleMigrations(new Date());
     expect(claimed).toBe(1);
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(stored.status).toBe('FAILED');
+    const summary = stored.errorSummary as Array<{ message?: string }>;
+    expect(summary[0]?.message).toBe('stale');
+    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
+
+  t('a real claim is swept after the worker dies', async () => {
+    // WHY: the claim SQL is the clock the sweep compares. Prisma reads
+    // updated_at back at millisecond resolution. A microsecond NOW() never
+    // equals that value, so the compare-and-set misses and the import stays
+    // RUNNING after the worker is gone.
+    const { org, job } = await runningJob();
+    const deps: MigrationChunkDeps = {
+      readRows: async () => {
+        throw new Error('worker died');
+      },
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    };
+    await expect(
+      processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: job.userId,
+          source: 'CSV',
+          entityType: 'companies',
+          chunkOffset: 0,
+          chunkSize: 100,
+          totalRows: 2,
+          redisKey: 'rows',
+          mappings: { Name: 'company.name' },
+          dedupStrategy: 'skip',
+        },
+        deps,
+        { info: () => undefined, warn: () => undefined },
+      ),
+    ).rejects.toThrow(/worker died/);
+    const claimed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(migrationProgressAt(claimed.meta)).not.toBeNull();
+    // Do not rewrite updated_at here. A JS date would hide the microsecond mismatch.
+    await sweepStaleMigrations(new Date(Date.now() + 16 * 60_000));
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(stored.status).toBe('FAILED');
     const summary = stored.errorSummary as Array<{ message?: string }>;
