@@ -42,6 +42,9 @@ import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
 const ENQUEUE_FAILURE = 'Failed to enqueue import chunks';
 
+/** Empty on purpose. Retry takes the id from the path and no fields. */
+const RetryBody = z.object({}).strict().nullish();
+
 async function markMigrationEnqueueFailed(
   id: string,
   orgId: string,
@@ -298,6 +301,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
+        body: RetryBody,
         response: { 200: MigrationJobResponse },
       },
     },
