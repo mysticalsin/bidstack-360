@@ -715,21 +715,23 @@ async function chunkCreatedIds(payload: MigrationJobPayload): Promise<string[]> 
 /**
  * The worker has the chunk. This is the stale clock. A job still sitting in
  * the queue has no progressAt, so time spent queued is not a stall.
+ * Only progressAt is written. Rewriting meta from a snapshot would put back
+ * an attempt id a retry had already replaced.
  */
 async function noteChunkClaimed(id: string): Promise<void> {
-  const row = await prisma.migrationJob.findUnique({
-    where: { id },
-    select: { status: true, meta: true },
-  });
-  if (!row || row.status !== 'RUNNING') return;
-  const meta =
-    row.meta && typeof row.meta === 'object' && !Array.isArray(row.meta)
-      ? (row.meta as Record<string, unknown>)
-      : {};
-  await prisma.migrationJob.updateMany({
-    where: { id, status: 'RUNNING' },
-    data: { meta: { ...meta, progressAt: new Date().toISOString() } },
-  });
+  const progressAt = new Date().toISOString();
+  await prisma.$executeRaw`
+    UPDATE migration_jobs
+    SET meta = jsonb_set(
+          COALESCE(meta, '{}'::jsonb),
+          '{progressAt}',
+          to_jsonb(${progressAt}::text),
+          true
+        ),
+        updated_at = NOW()
+    WHERE id = ${id}::uuid
+      AND status = 'RUNNING'
+  `;
 }
 
 /** Import one chunk: acquire rows, write them, commit progress, queue enrichment, page on. */

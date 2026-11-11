@@ -4,7 +4,7 @@
 
 import { prisma } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { processMigrationChunk, type MigrationChunkDeps } from './migration.js';
 
@@ -142,6 +142,87 @@ describe('migration attempt fence', () => {
     expect(reads).toBe(1);
     expect(companies).toBe(1);
     expect(stored.processedRows).toBe(1);
+    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
+
+  t('a claim does not put back an attempt a retry already replaced', async () => {
+    // WHY: the claim used to write the whole meta from a snapshot. A retry
+    // that minted a new attempt between that read and the write lost its id,
+    // and the old chunk could keep running as the current attempt.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_claim_${ns}`, name: `claim ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'Claim' },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        startedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: PREVIOUS },
+      },
+    });
+    const original = prisma.migrationJob.findUnique.bind(prisma.migrationJob);
+    let reads = 0;
+    let stale: unknown;
+    const read = vi.spyOn(prisma.migrationJob, 'findUnique').mockImplementation(async (args) => {
+      const row = await original(args as never);
+      const id = args && typeof args === 'object' ? (args as { where?: { id?: string } }).where?.id : undefined;
+      const wantsMeta = Boolean(
+        args && typeof args === 'object' && (args as { select?: { meta?: boolean } }).select?.meta,
+      );
+      if (id === job.id && wantsMeta) {
+        reads += 1;
+        if (reads === 1) {
+          stale = row;
+          await prisma.migrationJob.update({
+            where: { id: job.id },
+            data: { meta: { entityType: 'companies', attemptId: CURRENT } },
+          });
+          return row;
+        }
+        if (reads === 2 && stale) return stale;
+      }
+      return row;
+    });
+    const deps: MigrationChunkDeps = {
+      readRows: async () => '[]',
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    };
+    try {
+      await processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: user.id,
+          source: 'CSV',
+          entityType: 'tasks',
+          chunkOffset: 0,
+          chunkSize: 100,
+          totalRows: 1,
+          redisKey: 'rows',
+          mappings: {},
+          dedupStrategy: 'skip',
+          attemptId: PREVIOUS,
+        },
+        deps,
+        { info: () => undefined, warn: () => undefined },
+      );
+    } finally {
+      read.mockRestore();
+    }
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    const meta = stored.meta as { attemptId?: string; progressAt?: string };
+    expect(meta.attemptId).toBe(CURRENT);
+    expect(meta.progressAt).toEqual(expect.any(String));
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
   });
 });
