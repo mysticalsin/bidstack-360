@@ -13,6 +13,11 @@ import type { SignatureStatus } from '@bidstack/shared';
 import { buildServer } from '../server.js';
 import { htmlToPdf } from '../services/documents/document.service.js';
 import { SIGN_LINK_TTL_DAYS } from '../services/documents/signature.service.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 vi.mock('../services/documents/document.service.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/documents/document.service.js')>()),
@@ -26,13 +31,16 @@ describe('public sign routes', () => {
   let server: Awaited<ReturnType<typeof buildServer>>;
   let orgId: string;
   let documentId: string;
+  let restoreAuth: (() => void) | undefined;
   const requestIds: string[] = [];
 
   beforeAll(async () => {
+    // Own tenant. The link is public, but the rows must not live in the shared seed org.
+    const iso = await createIsolatedOrg('public-sign');
+    orgId = iso.orgId;
+    restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
     server = await buildServer();
     await server.ready();
-    const org = await prisma.org.findFirstOrThrow({ where: { clerkOrg: 'org_seed_mantu' } });
-    orgId = org.id;
     const doc = await prisma.document.create({
       data: { orgId, name: `Sign test ${randomUUID().slice(0, 8)}`, kind: 'proposal', storageUrl: 'local://sign-test.pdf' },
     });
@@ -42,8 +50,10 @@ describe('public sign routes', () => {
   afterAll(async () => {
     await prisma.signatureEvent.deleteMany({ where: { signatureRequestId: { in: requestIds } } });
     await prisma.signatureRequest.deleteMany({ where: { id: { in: requestIds } } });
-    await prisma.document.deleteMany({ where: { id: documentId } });
+    if (documentId) await prisma.document.deleteMany({ where: { id: documentId } });
+    restoreAuth?.();
     await server.close();
+    if (orgId) await dropIsolatedOrg(orgId);
   });
 
   async function makeRequest(

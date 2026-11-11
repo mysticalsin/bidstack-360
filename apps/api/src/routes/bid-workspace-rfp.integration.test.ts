@@ -9,19 +9,27 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 
 describe('bid workspace draft section PATCH', () => {
   let server: Awaited<ReturnType<typeof buildServer>>;
   let orgId: string;
   let opportunityId: string;
+  let restoreAuth: (() => void) | undefined;
   const proposalIds: string[] = [];
   const foreignOrgIds: string[] = [];
 
   beforeAll(async () => {
+    // Own tenant. The shared seed org is what made this file fail hermeticity.
+    const iso = await createIsolatedOrg('bid-workspace-rfp');
+    orgId = iso.orgId;
+    restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
     server = await buildServer();
     await server.ready();
-    const org = await prisma.org.findFirstOrThrow({ where: { clerkOrg: 'org_seed_mantu' } });
-    orgId = org.id;
     const opp = await prisma.opportunity.findFirstOrThrow({
       where: { orgId, deletedAt: null },
       select: { id: true },
@@ -33,7 +41,9 @@ describe('bid workspace draft section PATCH', () => {
     await prisma.proposalSection.deleteMany({ where: { proposalId: { in: proposalIds } } });
     await prisma.proposal.deleteMany({ where: { id: { in: proposalIds } } });
     await prisma.org.deleteMany({ where: { id: { in: foreignOrgIds } } });
+    restoreAuth?.();
     await server.close();
+    if (orgId) await dropIsolatedOrg(orgId);
   });
 
   async function makeProposal(status: 'draft' | 'approved' | 'submitted' | 'won' | 'lost') {
