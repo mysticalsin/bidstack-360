@@ -1,129 +1,180 @@
-# State machines
+# State machines in bidstack-360
+Last reviewed: 2026-11-11 at parent 82c88c24. Standard: Devin v1, sha256 c62dff48dc032e70df170c3161709ae7bfb79f1e25db473b730a300cedb82f0c.
 
-Inventory of the lifecycles that used to live as status strings, flag
-combinations, or ordered side effects. Three of them now have one transition
-table and tests that refuse every move not in the table. The others are
-recorded here with their states and the race or encoding each one still has.
-They were not rewritten in this change: each is already a Prisma enum or an
-existing pure function, and folding every writer into a new reducer in one
-pass would mix unrelated behavior.
+Risk: H means a wrong move changes a persisted job, approval, signature, export, or auth record. M means a wizard whose side effects stay in the caller. L means local UI with no CRM write. A candidate with two states and no ordering rule is NOT A MACHINE.
 
-## Migration job — explicit
+High-risk rows are not edited in this pass. The two H machines marked FIXED were coded in 82c88c24, before this inventory. They are recorded here for review and are not being extended.
 
-States: `PENDING`, `RUNNING`, `COMPLETE`, `FAILED`, `CANCELLED`.
-Table: `packages/shared/src/migration-status.ts`. Writers: start-csv,
-start-hubspot, cancel, undo, and the migration worker.
+## Inventory
+| # | Machine | Location | Status | Risk | Notes |
+|---|---|---|---|---|---|
+| 1 | Migration job | apps/api/src/routes/migrations.ts:240, apps/worker/src/queues/migration.ts:705 | FIXED | H | Table in 82c88c24, before this inventory. Late chunk could overwrite a finished job. No further edit. |
+| 2 | Access policy version | apps/api/src/routes/access-policies.ts:295 | FIXED | H | Table in 82c88c24, before this inventory. Compare-and-swap kept. No further edit. |
+| 3 | HubSpot sync rollup | apps/api/src/services/sync-now/runs.ts:96 | FIXED | M | Pure rollup of the migration jobs. Behaviour unchanged. Quirks pinned by tests. |
+| 4 | Onboarding tour | apps/web/src/stores/onboarding.ts:97 | FIX now | L | Six steps plus tourActive/dismissed/tourSeen. localStorage v1. Corrupt stored arrays were accepted. |
+| 5 | Intake stepper | apps/web/src/pages/IntakePage.tsx:31 | FIX now | M | receive → extract → review → publish. Jump rule and body next/back are separate. Extraction stays in the page. |
+| 6 | Upload start | apps/api/src/routes/migrations.ts:247 | LATER | H | Lock, digest, and unique index already guard it. A reducer would sit on the import write path. |
+| 7 | Agreement ingest item | apps/api/src/services/agreement-ingest/process.ts:443 | LATER | H | queued ↔ processing, retry. Persisted pipeline. |
+| 8 | Agreement source sync | apps/api/src/services/agreement-sources/sync.ts:163 | LATER | H | processing / failed / retry. Persisted pipeline. |
+| 9 | OAuth refresh lock | apps/api/src/lib/oauth-refresh-lock.ts:69 | LATER | H | Acquire, refresh, wait, timeout. Auth lifecycle. |
+| 10 | Public signature | apps/web/src/pages/PublicSignPage.tsx:51 | LATER | H | welcome → sign → submit → confirm. goTo() accepts any step. Signature submit. |
+| 11 | Send for signature | apps/web/src/components/signatures/SendForSignatureModal.tsx:193 | LATER | H | Steps 0, 1, 2. Signature request. |
+| 12 | Proposal approval | apps/api/src/routes/proposals.approval.ts:67 | LATER | H | draft / approved writes. Approval. |
+| 13 | KAM draft review | apps/api/src/routes/kam-drafts.ts:205 | LATER | H | pending → approved or rejected. Approval. |
+| 14 | Tenant export | apps/api/src/routes/tenant-export.ts:51 | LATER | H | pending / running gate, ready required to download. Export of tenant data. |
+| 15 | Redis shared client | apps/api/src/redis.ts:17 | LATER | H | ioredis status plus reconnect warning. Connection lifecycle for every caller. |
+| 16 | Opportunity stage | packages/shared/src/stage-transitions/index.ts:29 | FIXED | M | Already a pure table before this sweep. Not reopened. |
+| 17 | Dust sync mapping | apps/api/src/services/sync-now/runs.ts:32 | NOT A MACHINE | L | Pure map from a BullMQ state string. No ordering rule of its own. |
+| 18 | Template picker | apps/web/src/stores/onboarding.ts:90 | NOT A MACHINE | L | One boolean, open or closed, no ordering. |
+| 19 | Quickstart checklist | apps/web/src/stores/onboarding.ts:170 | NOT A MACHINE | L | A set of independent items. No order between them. |
 
-| event | from | to |
+## Migration job
+- Purpose: One CSV or HubSpot import, from the row being created through cancel, complete, fail, or undo.
+- Code: packages/shared/src/migration-status.ts, tests: packages/shared/src/migration-status.test.ts
+- Persisted: yes, migration_jobs.status (Prisma enum). No version column. Unknown values are not remapped. Undo stores FAILED and meta.undone; that encoding was not changed.
+
+### States
+| State | Data carried | Meaning |
 |---|---|---|
-| (born, CSV) | — | PENDING |
-| (born, HubSpot) | — | RUNNING |
-| start | PENDING | RUNNING |
-| cancel | PENDING, RUNNING | CANCELLED |
-| complete | RUNNING | COMPLETE |
-| fail | PENDING, RUNNING | FAILED |
-| undo | COMPLETE | FAILED |
+| PENDING | upload id, digest | CSV row exists, chunks may already be queued |
+| RUNNING | startedAt | Worker may import |
+| COMPLETE | completedAt, undoableUntil | Import finished |
+| FAILED | error summary, or meta.undone | Failed, or undone |
+| CANCELLED | completedAt | Cancelled before finish |
 
-Illegal: anything else, including `COMPLETE -fail-> FAILED` and
-`CANCELLED -fail-> FAILED`. A late chunk used to write FAILED with no status
-check, so it could overwrite a finished job. The worker now updates with
-`status in (PENDING, RUNNING)` and ignores a row that moved. The same filter
-covers a chunk that uses up its retries while the row is still PENDING
-(start-csv queues the chunk before it marks the row RUNNING). Previously that
-left the row PENDING, and `finishStart` could then mark it RUNNING over a
-chunk that had already died.
+Birth is not an event. CSV creates PENDING. HubSpot creates RUNNING.
 
-Still an encoding, not a state: undo stores FAILED and sets `meta.undone`.
-There is no UNDONE status. A reader that treats every FAILED job as an error
-is wrong about an undone import. Left as-is so stored rows and the undo
-response do not change.
+### Events
+| Event | Source |
+|---|---|
+| start | API finishStart |
+| cancel | DELETE /migrations/:id/cancel |
+| complete | Worker, when processed + error rows cover the total |
+| fail | Worker, unknown entity or retries exhausted |
+| undo | DELETE /migrations/:id/undo |
 
-## Access policy version — explicit
+### Transitions
+| From | Event | Guard | To | Side effects |
+|---|---|---|---|---|
+| PENDING | start | row still PENDING | RUNNING | set startedAt |
+| PENDING, RUNNING | cancel | none | CANCELLED | set completedAt, audit |
+| RUNNING | complete | counts cover total | COMPLETE | set completedAt, undoableUntil |
+| PENDING, RUNNING | fail | compare-and-swap on those two | FAILED | set completedAt, error summary |
+| COMPLETE | undo | inside the undo window | FAILED | set meta.undone |
 
-States: `draft`, `pending`, `approved`, `rejected`, `published`, `superseded`.
-Table: `packages/shared/src/access-policy-status.ts`. The route still applies
-each move with a compare-and-swap on status and `updatedAt`, so two concurrent
-reviews cannot both win.
+Anything not in this table is illegal and is rejected and logged.
 
-| event | from | to |
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: csv create
+  [*] --> RUNNING: hubspot create
+  PENDING --> RUNNING: start
+  PENDING --> CANCELLED: cancel
+  PENDING --> FAILED: fail
+  RUNNING --> CANCELLED: cancel
+  RUNNING --> COMPLETE: complete
+  RUNNING --> FAILED: fail
+  COMPLETE --> FAILED: undo
+```
+
+### Platform / flag differences
+none
+
+## Access policy version
+- Purpose: A policy moves from draft to published only with a second admin, and publishing supersedes the live row.
+- Code: packages/shared/src/access-policy-status.ts, tests: packages/shared/src/access-policy-status.test.ts. The route still does the compare-and-swap.
+- Persisted: yes, access_policy_versions.status. No version column on the status. A rollback creates a new pending row; it does not move the superseded one.
+
+### States
+| State | Data carried | Meaning |
 |---|---|---|
-| (born) | — | draft |
-| submit | draft, rejected | pending |
-| withdraw | pending | draft |
-| approve | pending | approved |
-| reject | pending | rejected |
-| publish | approved | published |
-| supersede | published | superseded |
+| draft | rules, author | Editable by the author |
+| pending | submittedBy, submittedAt | Waiting for a second admin |
+| approved | approvedBy, note | May be published |
+| rejected | note | Author may submit again |
+| published | version, publishedAt | The live policy |
+| superseded | version | A previous live policy |
 
-A rollback does not move the superseded row. It creates a new row already
-`pending`, which then needs the same second-admin approve before publish.
-Publishing a draft, approving a published row, and publishing a superseded
-row are refused.
+### Events
+| Event | Source |
+|---|---|
+| submit | POST .../submit |
+| withdraw | POST .../withdraw |
+| approve | POST .../approve |
+| reject | POST .../reject |
+| publish | POST .../publish |
+| supersede | Same publish, on the previous live row |
 
-## HubSpot sync run — explicit rollup
+### Transitions
+| From | Event | Guard | To | Side effects |
+|---|---|---|---|---|
+| draft, rejected | submit | author, rules still valid on later publish | pending | audit submit |
+| pending | withdraw | author or submitter | draft | clear submittedBy |
+| pending | approve | not the author or submitter, expectedUpdatedAt | approved | audit |
+| pending | reject | same | rejected | audit |
+| approved | publish | rules valid | published | version number, audit |
+| published | supersede | a newer publish is committing | superseded | none on its own |
 
-Per-entity jobs use the migration table. The Sync now control shows one state
-for all of them: `queued`, `running`, `completed`, `failed`
-(`hubspotAggregateState` in `apps/api/src/services/sync-now/runs.ts`).
+Anything not in this table is illegal and is rejected and logged. The route returns 409, which is the documented contract.
 
-- `FAILED` or `CANCELLED` fails the run only once nothing is still PENDING or
-  RUNNING. One slow entity does not get hidden behind another's failure.
-- `CANCELLED` is reported as `failed`. The control has no cancelled state.
-- A `RUNNING` row with no `startedAt` is reported `queued`. The status and the
-  timestamp can disagree, and the timestamp wins. Left as-is; the test pins it.
+```mermaid
+stateDiagram-v2
+  [*] --> draft
+  draft --> pending: submit
+  rejected --> pending: submit
+  pending --> draft: withdraw
+  pending --> approved: approve
+  pending --> rejected: reject
+  approved --> published: publish
+  published --> superseded: supersede
+```
 
-Dust jobs map BullMQ `completed` / `failed` / `active` / anything else onto
-`completed` / `failed` / `running` / `queued`.
+### Platform / flag differences
+Enforcement of the published rules is off unless ACCESS_POLICIES_ENFORCE=true. The transition table does not read that flag.
 
-## Upload start — protocol, already guarded
+## HubSpot sync rollup
+- Purpose: Show one Sync now state for every entity job in a HubSpot run.
+- Code: hubspotAggregateState in apps/api/src/services/sync-now/runs.ts, tests: apps/api/src/services/sync-now/sync-now.test.ts
+- Persisted: no. Derived from migration_jobs rows.
 
-One start is `(org, user, source, uploadId)` plus a SHA-256 of the request.
+### States
+| State | Data carried | Meaning |
+|---|---|---|
+| queued | none | Nothing has startedAt, or a RUNNING row has no startedAt |
+| running | progress | Some entity still going |
+| completed | counts | Every entity COMPLETE |
+| failed | reasons | An entity FAILED or CANCELLED, and nothing is still PENDING or RUNNING |
 
-1. Take the advisory lock for that key.
-2. No row: create it. A unique-index conflict is 409.
-3. Row with the same digest: resume (re-queue missing chunks, finish the
-   start writes).
-4. Row with a different digest: 409, including the same user with different
-   rows.
-5. A second user in the org is a different key, so it cannot resume the first
-   user's job.
+### Events
+| Event | Source |
+|---|---|
+| (none) | The function is a pure fold of the current rows, not a stored machine |
 
-The lock is held on a second connection for the request. A wait over 30s
-surfaces as a 500 (P2028). Two parallel requests with one key produce one
-import.
+### Transitions
+Not a stored machine. The fold is the whole rule. CANCELLED is reported as failed. A RUNNING row with no startedAt is reported queued. Both are pinned by tests and were not changed.
 
-## Opportunity stage — already explicit
+### Platform / flag differences
+none
 
-`packages/shared/src/stage-transitions`. Legal moves are stay, one step
-forward or back among active stages, close to won/lost, or reopen.
-Skipping a stage is illegal. Unknown stages fail open.
+## Onboarding tour
+- Purpose: A six-step product tour, plus whether it was dismissed or finished.
+- Code: still inline in apps/web/src/stores/onboarding.ts (the reducer is the L fix that follows this inventory).
+- Persisted: yes, localStorage key bidstack-onboarding.v1:&lt;userId&gt;. Step index and tourActive are not stored. A non-array completedSteps was passed through; the fix maps that to [].
 
-## Redis client
+Current flags that can combine: tourActive, dismissed, tourSeen, currentStepIndex, completedSteps. startTour after dismiss leaves tourActive and dismissed both true. skipToStep accepts any number.
 
-ioredis statuses. Commands run only in `ready` or `connect`. `wait`, `close`,
-and `end` can be reconnected. `reconnecting` is not asked to connect again;
-the client warns at most once per 30s while it is in that state. Callers that
-do not go through `ensureRedisReady` (the rate-limit store) fail the request
-instead of queueing it.
+### Platform / flag differences
+none. No auto-start. Tour starts only from startTour.
 
-## Other Prisma enums
+## Intake stepper
+- Purpose: Receive documents, extract, review, publish. The stepper may return to a step already reached, and a finished extraction on the account unlocks review after reload.
+- Code: still inline in apps/web/src/pages/IntakePage.tsx (the table is the M fix that follows this inventory).
+- Persisted: the step itself is not stored. Account extractions are. reached is session state.
 
-These are typed states. Their transitions are still decided at each writer.
-Recorded so the next pass does not start from a search.
+Body next/back, the stepper jump, the settle-to-review effect, and onDone each call setStep with a different rule.
 
-`LeadStatus`, `ContactFactStatus`, `CustomerCommitmentStatus`, `TaskStatus`,
-`SyncEventStatus`, `WebhookMessageStatus`, `WebhookOutboxStatus`,
-`TenantExportStatus`, `ProposalStatus`, `RfpDocumentStatus`, `RfpJobStatus`,
-`RequirementStatus`, `ComplianceRowStatus`, `AssessmentStatus`,
-`BidFactStatus`, `ReviewIssueStatus`, `CompetitorInsightStatus`,
-`ApprovalGateStatus`, `SubmissionPackageStatus`, `ActivityStatus`,
-`RfpAgentAssignmentStatus`, `CaseStatus`, `IntegrationTokenStatus`,
-`SyncState`, `BookingStatus`, `SmsStatus`, `SubscriptionStatus`,
-`RenewalOpportunityStatus`, `ExpansionStatus`, `RfpOrchestrationState`,
-`SignatureStatus`, `GovernanceStatus`, `ProjectReferenceStatus`,
-`ContractStatus`, `KamAccountStatus`, `KamDraftStatus`, `KamHandoffStatus`,
-`WatchdogEventStatus`, `MeetingIngestStatus`.
+### Platform / flag differences
+none
 
-UI loading, error, and empty for the import wizard come from the React Query
-result (`isLoading`, `isError`, and no job yet), not from a hand-rolled trio
-of booleans.
+## Left for later
+Rows 6–15 stay as they are. Each is H: a wrong move changes a persisted job, an approval, a signature, an export, or a connection. They are not edited in this pass. Opportunity stage (row 16) is already a pure table and was not reopened. Rows 17–19 are not machines.
