@@ -193,6 +193,49 @@ describe('migration status races', () => {
     }
   });
 
+  t('a retry is not failed stale before a new claim', async () => {
+    // WHY: the stale scan fails a running import 15 minutes after the last
+    // claim. A retry that kept that clock would be failed without a worker
+    // ever claiming the new attempt.
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValueOnce(new Error('queue down'));
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'name' },
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string }>();
+      const failed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const past = new Date(Date.now() - 16 * 60_000).toISOString();
+      await prisma.migrationJob.update({
+        where: { id: body.id },
+        data: { meta: { ...(failed.meta as object), progressAt: past } },
+      });
+      add.mockResolvedValue({ id: 'chunk' } as never);
+      const retry = await server.inject({
+        method: 'POST',
+        url: `/api/v1/migrations/${body.id}/retry`,
+      });
+      expect(retry.statusCode).toBe(200);
+      await ageProgress(body.id);
+      const { sweepStaleMigrations } = await import('../../../worker/src/queues/migration.js');
+      await sweepStaleMigrations(new Date());
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      expect(stored.status).toBe('RUNNING');
+      expect(stored.errorSummary).toEqual([]);
+    } finally {
+      add.mockRestore();
+    }
+  });
+
   t('a failed retry audit does not leave the new attempt running', async () => {
     // WHY: the audit names who retried which attempt. If that row is written
     // after the status commits, a failed insert leaves a running import with

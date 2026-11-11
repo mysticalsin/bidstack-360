@@ -368,8 +368,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const attemptId = randomUUID();
       const previousAttempt = migrationAttemptId(job.meta);
-      // A copied progressAt is the previous attempt's claim clock. The new
-      // attempt has not been claimed, so it must not look stalled.
+      // Clear the previous claim clock in this same compare-and-set. A second
+      // write would leave the old progressAt in place for the stale scan.
       const fresh = { ...(job.meta as object) } as Record<string, unknown>;
       delete fresh.progressAt;
       fresh.attemptId = attemptId;
