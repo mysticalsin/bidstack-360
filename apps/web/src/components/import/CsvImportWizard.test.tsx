@@ -15,8 +15,12 @@ vi.mock('react-i18next', () => ({
 
 const hookMocks = vi.hoisted(() => ({
   mutate: vi.fn(),
+  cancelMutate: vi.fn(),
+  retryMutate: vi.fn(),
   previewMutate: vi.fn(),
   useStartCsvImport: vi.fn(),
+  useCancelMigration: vi.fn(),
+  useRetryMigration: vi.fn(),
   usePreviewCsvImport: vi.fn(),
   useParseSpreadsheet: vi.fn(),
   useMigrationJob: vi.fn(),
@@ -25,6 +29,8 @@ const hookMocks = vi.hoisted(() => ({
 
 vi.mock('@/hooks/useMigrations', () => ({
   useStartCsvImport: hookMocks.useStartCsvImport,
+  useCancelMigration: hookMocks.useCancelMigration,
+  useRetryMigration: hookMocks.useRetryMigration,
   usePreviewCsvImport: hookMocks.usePreviewCsvImport,
   useParseSpreadsheet: hookMocks.useParseSpreadsheet,
   useMigrationJob: hookMocks.useMigrationJob,
@@ -57,6 +63,14 @@ describe('CsvImportWizard', () => {
       mutate: hookMocks.mutate,
       isPending: false,
       isError: false,
+    });
+    hookMocks.useCancelMigration.mockReturnValue({
+      mutate: hookMocks.cancelMutate,
+      isPending: false,
+    });
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
     });
     hookMocks.usePreviewCsvImport.mockReturnValue({
       mutate: hookMocks.previewMutate,
@@ -180,5 +194,60 @@ describe('CsvImportWizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Download error report (CSV)' }));
     expect(hookMocks.downloadMigrationErrors).toHaveBeenCalledWith('job-1');
+  });
+
+  async function reachRun(job: Record<string, unknown>) {
+    hookMocks.useMigrationJob.mockReturnValue({ data: job, isLoading: false });
+    render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const [, opts] = hookMocks.mutate.mock.calls[0]!;
+    opts.onSuccess({ id: 'job-1' });
+  }
+
+  it('offers cancel while an import is running', async () => {
+    // WHY: a job stuck on Importing… had no control. Cancel is the recovery
+    // for a run the user no longer wants.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'RUNNING',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
+    expect(hookMocks.cancelMutate).toHaveBeenCalledWith('job-1');
+  });
+
+  it('offers retry only after a failure that imported nothing', async () => {
+    // WHY: an enqueue failure must be visible and retryable. A failure that
+    // already wrote rows must not offer a replay of the same file.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+    });
+    await waitFor(() => expect(screen.getByText('Failed to enqueue import chunks')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Retry import' }));
+    expect(hookMocks.retryMutate).toHaveBeenCalledWith('job-1');
+    expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
   });
 });

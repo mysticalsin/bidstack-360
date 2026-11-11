@@ -857,11 +857,23 @@ export async function processMigrationChunk(
   // ── HubSpot pagination: enqueue the next page while there is one. ──
   if (payload.source === 'HUBSPOT_OAUTH' && nextAfter) {
     const nextOffset = payload.chunkOffset + rows.length;
-    await deps.enqueueChunk(
-      `${payload.migrationJobId}-chunk-${nextOffset}`,
-      { ...payload, chunkOffset: nextOffset, hubspotAfter: nextAfter },
-      { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
-    );
+    try {
+      await deps.enqueueChunk(
+        `${payload.migrationJobId}-chunk-${nextOffset}`,
+        { ...payload, chunkOffset: nextOffset, hubspotAfter: nextAfter },
+        { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
+      );
+    } catch (err) {
+      await prisma.migrationJob.updateMany({
+        where: { id: payload.migrationJobId, status: { in: [...migrationFrom('fail')] } },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+        },
+      });
+      throw err;
+    }
   } else if (payload.source === 'HUBSPOT_OAUTH') {
     // Last page — HubSpot discovery counts are approximate, so completion
     // is "no more pages", not "processed == discovered total".

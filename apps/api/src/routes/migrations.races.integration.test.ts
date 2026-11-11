@@ -96,7 +96,6 @@ describe('migration status races', () => {
     const { redis } = await import('../redis.js');
     (server as unknown as { redis: typeof redis }).redis = redis;
     const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
-    const started = new Date();
     try {
       const res = await server.inject({
         method: 'POST',
@@ -108,12 +107,16 @@ describe('migration status races', () => {
           mappings: { name: 'name' },
         },
       });
-      expect(res.statusCode).toBeGreaterThanOrEqual(500);
-      const job = await prisma.migrationJob.findFirst({
-        where: { orgId: org.orgId, createdAt: { gte: new Date(started.getTime() - 1000) } },
-        orderBy: { createdAt: 'desc' },
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string; status: string }>();
+      expect(body.status).toBe('FAILED');
+      add.mockResolvedValue({ id: 'chunk' } as never);
+      const retry = await server.inject({
+        method: 'POST',
+        url: `/api/v1/migrations/${body.id}/retry`,
       });
-      expect(job?.status).toBe('FAILED');
+      expect(retry.statusCode).toBe(200);
+      expect(retry.json<{ status: string }>().status).toBe('RUNNING');
     } finally {
       add.mockRestore();
     }
@@ -147,6 +150,29 @@ describe('migration status races', () => {
     } finally {
       read.mockRestore();
     }
+  });
+
+  t('a running import with no progress is failed when it has stalled', async () => {
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        startedAt: new Date(Date.now() - 16 * 60_000),
+      },
+    });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/migrations/${job.id}`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ status: string }>().status).toBe('FAILED');
+    const row = await prisma.migrationJob.findUnique({ where: { id: job.id } });
+    expect(row?.status).toBe('FAILED');
   });
 
   t('undo does not trust a stale COMPLETE read over a job that is still running', async () => {

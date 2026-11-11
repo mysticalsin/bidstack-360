@@ -5,7 +5,7 @@ import { prisma, seedOrgData } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { maybeComplete } from './migration.js';
+import { processMigrationChunk, type MigrationChunkDeps } from './migration.js';
 
 let dbReachable = false;
 
@@ -54,18 +54,44 @@ describe('migration complete compare-and-set', () => {
     const original = prisma.migrationJob.findUnique.bind(prisma.migrationJob);
     const read = vi.spyOn(prisma.migrationJob, 'findUnique').mockImplementation(async (args) => {
       const row = await original(args as never);
-      if (row && row.id === job.id) {
+      const id = args && typeof args === 'object' ? (args as { where?: { id?: string } }).where?.id : undefined;
+      if (id === job.id) {
         await prisma.migrationJob.update({
           where: { id: job.id },
           data: { status: 'CANCELLED', completedAt: new Date() },
         });
-        return { ...row, status: 'RUNNING' };
+        return row ? { ...row, status: 'RUNNING' as const } : row;
       }
       return row;
     });
+    const deps: MigrationChunkDeps = {
+      readRows: async () => '[]',
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    };
 
     try {
-      await maybeComplete(job.id);
+      // processMigrationChunk is the export that exists on the parent. The
+      // assertion is the stored status, so a by-id complete fails the test
+      // even when the helper is exported.
+      await processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: user.id,
+          source: 'CSV',
+          entityType: 'companies',
+          chunkOffset: 0,
+          chunkSize: 100,
+          totalRows: 1,
+          redisKey: 'rows',
+          mappings: {},
+          dedupStrategy: 'skip',
+        },
+        deps,
+        { info: () => undefined, warn: () => undefined },
+      );
     } finally {
       read.mockRestore();
     }

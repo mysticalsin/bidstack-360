@@ -11,9 +11,11 @@ import {
 } from '@/lib/import-fields';
 import {
   downloadMigrationErrors,
+  useCancelMigration,
   useMigrationJob,
   useParseSpreadsheet,
   usePreviewCsvImport,
+  useRetryMigration,
   useStartCsvImport,
   type ImportPreviewResult,
   type MigrationJob,
@@ -38,6 +40,8 @@ export function CsvImportWizard() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const start = useStartCsvImport();
+  const cancel = useCancelMigration();
+  const retry = useRetryMigration();
   const preview = usePreviewCsvImport();
   const parseSheet = useParseSpreadsheet();
   const job = useMigrationJob(jobId);
@@ -362,6 +366,14 @@ export function CsvImportWizard() {
           job={job.data ?? null}
           isLoading={job.isLoading}
           onDone={reset}
+          onCancel={() => {
+            if (jobId) cancel.mutate(jobId);
+          }}
+          onRetry={() => {
+            if (jobId) retry.mutate(jobId);
+          }}
+          cancelPending={cancel.isPending}
+          retryPending={retry.isPending}
         />
       )}
     </div>
@@ -414,10 +426,18 @@ function ImportProgress({
   job,
   isLoading,
   onDone,
+  onCancel,
+  onRetry,
+  cancelPending,
+  retryPending,
 }: {
   job: MigrationJob | null;
   isLoading: boolean;
   onDone: () => void;
+  onCancel: () => void;
+  onRetry: () => void;
+  cancelPending: boolean;
+  retryPending: boolean;
 }) {
   const { t } = useTranslation('crm');
   if (isLoading || !job) {
@@ -460,6 +480,31 @@ function ImportProgress({
           />
         </div>
       </div>
+
+      {job.status === 'FAILED' && job.errorSummary?.[0]?.message ? (
+        <p className="text-sm text-[var(--danger)]">{job.errorSummary[0].message}</p>
+      ) : null}
+
+      {(job.status === 'RUNNING' || job.status === 'PENDING') && (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={cancelPending}
+          onClick={onCancel}
+        >
+          {cancelPending
+            ? t('csvImport.progress.cancelling', 'Cancelling…')
+            : t('csvImport.progress.cancel', 'Cancel import')}
+        </button>
+      )}
+
+      {job.status === 'FAILED' && job.processedRows === 0 && job.errorRows === 0 ? (
+        <button type="button" className="btn btn-primary" disabled={retryPending} onClick={onRetry}>
+          {retryPending
+            ? t('csvImport.progress.retrying', 'Retrying…')
+            : t('csvImport.progress.retry', 'Retry import')}
+        </button>
+      ) : null}
 
       {job.errorRows > 0 && (
         <div className="rounded-md bg-[var(--surface-sunken)] p-3 text-sm">

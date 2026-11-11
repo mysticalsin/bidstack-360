@@ -29,10 +29,34 @@ import {
   type MigrationJobError,
   MIGRATION,
   migrationFrom,
+  migrationRetryAllowed,
+  migrationStallDue,
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
+import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
+
+const ENQUEUE_FAILURE = 'Failed to enqueue import chunks';
+
+async function markMigrationEnqueueFailed(
+  id: string,
+  orgId: string,
+  log: { warn: (obj: object, msg?: string) => void },
+  message = ENQUEUE_FAILURE,
+): Promise<void> {
+  const failed = await prisma.migrationJob.updateMany({
+    where: { id, orgId, status: { in: [...migrationFrom('fail')] } },
+    data: {
+      status: 'FAILED',
+      completedAt: new Date(),
+      errorSummary: [{ row: 0, field: null, message }],
+    },
+  });
+  if (failed.count !== 1) {
+    log.warn({ migrationJobId: id, to: 'FAILED' }, 'illegal migration transition');
+  }
+}
 
 const ImportPreviewResponse = z.object({
   entityType: z.string(),
@@ -120,6 +144,28 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
+      if (
+        migrationStallDue({
+          state: job.status,
+          startedAt: job.startedAt,
+          processedRows: job.processedRows,
+          errorRows: job.errorRows,
+          now: new Date(),
+        })
+      ) {
+        await prisma.migrationJob.updateMany({
+          where: { id: job.id, orgId, status: { in: [...migrationFrom('stall')] } },
+          data: {
+            status: 'FAILED',
+            completedAt: new Date(),
+            errorSummary: [{ row: 0, field: null, message: 'Import stalled before any row was processed' }],
+          },
+        });
+        const stalled = await prisma.migrationJob.findFirstOrThrow({
+          where: { id: job.id, orgId },
+        });
+        return serializeJob(stalled);
+      }
       return serializeJob(job);
     },
   );
@@ -158,7 +204,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           source,
           status: 'PENDING',
           totalRows: rows.length,
-          meta: { entityType },
+          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null },
         },
       });
 
@@ -233,26 +279,124 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           });
         }
       } catch (err) {
-        // The claim already moved the row to RUNNING. A failed enqueue must not
-        // leave it there with no chunks. A cancel that won the race is left alone.
-        const failed = await prisma.migrationJob.updateMany({
-          where: { id: job.id, orgId, status: { in: [...migrationFrom('fail')] } },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
-          },
+        // The claim already moved the row to RUNNING. Leave it FAILED so the
+        // wizard can show the failure and offer retry. A cancel that won the
+        // race is left alone.
+        req.log.error({ err, migrationJobId: job.id }, 'failed to enqueue import chunks');
+        await markMigrationEnqueueFailed(job.id, orgId, req.log);
+        const failedJob = await prisma.migrationJob.findFirstOrThrow({
+          where: { id: job.id, orgId },
         });
-        if (failed.count !== 1) {
-          req.log.warn({ migrationJobId: job.id, to: 'FAILED' }, 'illegal migration transition');
-        }
-        throw err;
+        return reply.code(201).send(serializeJob(failedJob));
       }
 
       const updated = await prisma.migrationJob.findFirstOrThrow({
         where: { id: job.id, orgId },
       });
       return reply.code(201).send(serializeJob(updated));
+    },
+  );
+
+  server.post(
+    '/migrations/:id/retry',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: { 200: MigrationJobResponse },
+      },
+    },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      const job = await prisma.migrationJob.findFirst({
+        where: { id: req.params.id, orgId },
+      });
+      if (!job) throw server.httpErrors.notFound('Migration job not found');
+      const meta = (job.meta ?? {}) as {
+        entityType?: string;
+        dedupStrategy?: 'skip' | 'update' | 'duplicate';
+        externalIdColumn?: string | null;
+      };
+      if (
+        job.status !== 'FAILED' ||
+        !migrationRetryAllowed(job.processedRows, job.errorRows) ||
+        !meta.entityType
+      ) {
+        throw server.httpErrors.conflict('This import cannot be retried. Start it again from the file.');
+      }
+
+      const claimed = await prisma.migrationJob.updateMany({
+        where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
+        data: { status: 'RUNNING', startedAt: new Date(), completedAt: null, errorSummary: [] },
+      });
+      if (claimed.count !== 1) {
+        throw server.httpErrors.conflict('Migration job is no longer failed');
+      }
+
+      const queue = getQueue();
+      try {
+        if (job.source === 'HUBSPOT_OAUTH') {
+          await enqueueHubspotChunk({
+            jobId: job.id,
+            orgId,
+            userId,
+            entityType: meta.entityType,
+            totalRows: job.totalRows,
+            dedupStrategy: meta.dedupStrategy ?? 'update',
+            queue,
+          });
+        } else {
+          const redisKey = `migration:${job.id}:${meta.entityType}:rows`;
+          const redisConn = (
+            server as unknown as { redis: { get: (key: string) => Promise<string | null> } }
+          ).redis;
+          const raw = await redisConn.get(redisKey);
+          if (!raw) throw new Error('import rows expired');
+          const rows = JSON.parse(raw) as Record<string, string>[];
+          const mapping = await prisma.migrationMapping.findUnique({
+            where: {
+              orgId_source_sourceEntity: {
+                orgId,
+                source: job.source,
+                sourceEntity: meta.entityType,
+              },
+            },
+          });
+          const mappings = (mapping?.mappings ?? {}) as Record<string, string | null>;
+          const chunkSize = 100;
+          const chunks = Math.ceil(rows.length / chunkSize);
+          for (let i = 0; i < chunks; i++) {
+            const payload: MigrationJobPayload = {
+              migrationJobId: job.id,
+              orgId,
+              userId,
+              source: job.source,
+              entityType: meta.entityType,
+              chunkOffset: i * chunkSize,
+              chunkSize,
+              totalRows: rows.length,
+              redisKey,
+              mappings,
+              dedupStrategy: meta.dedupStrategy ?? 'update',
+              externalIdColumn: meta.externalIdColumn ?? undefined,
+            };
+            await queue.add(`${job.id}-retry-${i}`, payload, {
+              jobId: `${job.id}-${meta.entityType}-retry-${Date.now()}-${i}`,
+            });
+          }
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error && err.message === 'import rows expired'
+            ? 'Import rows expired. Upload the file again.'
+            : ENQUEUE_FAILURE;
+        req.log.error({ err, migrationJobId: job.id }, 'failed to retry import');
+        await markMigrationEnqueueFailed(job.id, orgId, req.log, message);
+      }
+
+      const updated = await prisma.migrationJob.findFirstOrThrow({
+        where: { id: job.id, orgId },
+      });
+      return serializeJob(updated);
     },
   );
 

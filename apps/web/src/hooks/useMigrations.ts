@@ -96,6 +96,29 @@ export function useStartCsvImport() {
   });
 }
 
+export function useCancelMigration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<MigrationJob>(`/api/migrations/${id}/cancel`, { method: 'DELETE' }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['migrations'] });
+      qc.invalidateQueries({ queryKey: ['migrations', id] });
+    },
+  });
+}
+
+export function useRetryMigration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<MigrationJob>(`/api/migrations/${id}/retry`, { method: 'POST' }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['migrations'] });
+      qc.invalidateQueries({ queryKey: ['migrations', id] });
+    },
+  });
+}
+
 export function downloadMigrationErrors(id: string): Promise<void> {
   return downloadFromApi(`/api/migrations/${id}/errors.csv`, `import-errors-${id}.csv`);
 }

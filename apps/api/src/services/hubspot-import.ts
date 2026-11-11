@@ -71,6 +71,40 @@ export async function findHubspotConnection(orgId: string) {
   });
 }
 
+const HUBSPOT_ENTITY_MAPPINGS: Record<string, Record<string, string | null>> = {
+  companies: HUBSPOT_COMPANY_DEFAULTS,
+  contacts: HUBSPOT_CONTACT_DEFAULTS,
+  deals: HUBSPOT_DEAL_DEFAULTS,
+  tasks: {},
+};
+
+/** Enqueue the first HubSpot chunk for a job that is already RUNNING. */
+export async function enqueueHubspotChunk(input: {
+  jobId: string;
+  orgId: string;
+  userId: string;
+  entityType: string;
+  totalRows: number;
+  dedupStrategy: z.infer<typeof DedupStrategyEnum>;
+  queue: Queue;
+}): Promise<void> {
+  const config = await findHubspotConnection(input.orgId);
+  if (!config) throw new HubspotNotConnectedError();
+  const payload = buildHubSpotMigrationPayload({
+    migrationJobId: input.jobId,
+    orgId: input.orgId,
+    userId: input.userId,
+    entityType: input.entityType,
+    totalRows: input.totalRows,
+    mappings: HUBSPOT_ENTITY_MAPPINGS[input.entityType] ?? {},
+    dedupStrategy: input.dedupStrategy,
+    hubspotIntegrationConfigId: config.id,
+  });
+  await input.queue.add(`${input.jobId}-chunk-0`, payload, {
+    jobId: `${input.jobId}-${input.entityType}-chunk-${Date.now()}`,
+  });
+}
+
 export async function startHubspotImport(input: {
   orgId: string;
   userId: string;
@@ -94,13 +128,6 @@ export async function startHubspotImport(input: {
     writeRequested: false,
   });
 
-  const entityMappings: Record<string, Record<string, string | null>> = {
-    companies: HUBSPOT_COMPANY_DEFAULTS,
-    contacts: HUBSPOT_CONTACT_DEFAULTS,
-    deals: HUBSPOT_DEAL_DEFAULTS,
-    tasks: {},
-  };
-
   const jobs: Awaited<ReturnType<typeof prisma.migrationJob.create>>[] = [];
 
   for (const entity of input.entities) {
@@ -119,8 +146,8 @@ export async function startHubspotImport(input: {
         startedAt: new Date(),
         totalRows,
         meta: input.syncRunId
-          ? { entityType: entity, syncRunId: input.syncRunId }
-          : { entityType: entity },
+          ? { entityType: entity, dedupStrategy: input.dedupStrategy, syncRunId: input.syncRunId }
+          : { entityType: entity, dedupStrategy: input.dedupStrategy },
       },
     });
 
@@ -132,30 +159,27 @@ export async function startHubspotImport(input: {
         orgId,
         source: 'HUBSPOT_OAUTH',
         sourceEntity: entity,
-        mappings: entityMappings[entity] ?? {},
+        mappings: HUBSPOT_ENTITY_MAPPINGS[entity] ?? {},
       },
-      update: { mappings: entityMappings[entity] ?? {} },
+      update: { mappings: HUBSPOT_ENTITY_MAPPINGS[entity] ?? {} },
     });
 
     // Enqueue first chunk; the worker paginates via the hubspotAfter cursor.
-    const payload = buildHubSpotMigrationPayload({
-      migrationJobId: job.id,
-      orgId,
-      userId,
-      entityType: entity,
-      totalRows,
-      mappings: entityMappings[entity] ?? {},
-      dedupStrategy: input.dedupStrategy,
-      hubspotIntegrationConfigId: config.id,
-    });
-
+    let enqueued = true;
     try {
-      await input.queue.add(`${job.id}-chunk-0`, payload, {
-        jobId: `${job.id}-${entity}-chunk-0`,
+      await enqueueHubspotChunk({
+        jobId: job.id,
+        orgId,
+        userId,
+        entityType: entity,
+        totalRows,
+        dedupStrategy: input.dedupStrategy,
+        queue: input.queue,
       });
-    } catch (err) {
-      // The job is already RUNNING. A failed enqueue must not leave it running
-      // with no chunks, and must not overwrite a cancel that won the race.
+    } catch {
+      enqueued = false;
+      // The job is already RUNNING. Leave it FAILED and return it, so the
+      // caller can show the failure instead of a 500 with a stranded row.
       await prisma.migrationJob.updateMany({
         where: { id: job.id, orgId, status: { in: [...migrationFrom('fail')] } },
         data: {
@@ -164,9 +188,9 @@ export async function startHubspotImport(input: {
           errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
         },
       });
-      throw err;
     }
 
+    if (enqueued) {
     await prisma.auditLog.create({
       data: {
         orgId,
@@ -180,7 +204,10 @@ export async function startHubspotImport(input: {
       },
     });
 
-    jobs.push(job);
+    }
+    jobs.push(
+      await prisma.migrationJob.findFirstOrThrow({ where: { id: job.id, orgId } }),
+    );
   }
 
   return jobs;

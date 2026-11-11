@@ -56,16 +56,15 @@ describe('HubSpot import enqueue', () => {
     });
     const queue = { add: vi.fn(async () => { throw new Error('queue down'); }) } as unknown as Queue;
 
-    await expect(
-      startHubspotImport({
-        orgId: org.id,
-        userId: user.id,
-        entities: ['companies'],
-        dedupStrategy: 'skip',
-        queue,
-      }),
-    ).rejects.toThrow(/queue down/);
+    const jobs = await startHubspotImport({
+      orgId: org.id,
+      userId: user.id,
+      entities: ['companies'],
+      dedupStrategy: 'skip',
+      queue,
+    });
 
+    expect(jobs[0]?.status).toBe('FAILED');
     const job = await prisma.migrationJob.findFirst({
       where: { orgId: org.id, source: 'HUBSPOT_OAUTH' },
       select: { status: true, errorSummary: true },

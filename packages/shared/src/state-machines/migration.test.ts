@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { isIllegalTransition } from './illegal-transition.js';
 import {
   MIGRATION_EVENTS,
+  MIGRATION_STALL_MS,
   MIGRATION_STATES,
   migrationChunkMayRun,
   migrationFrom,
+  migrationRetryAllowed,
+  migrationStallDue,
   migrationStateFromStored,
   migrationTransition,
   migrationUndoStillOpen,
@@ -20,6 +23,8 @@ const LEGAL: Array<[MigrationState, MigrationEvent, MigrationState]> = [
   ['RUNNING', 'complete', 'COMPLETE'],
   ['RUNNING', 'fail', 'FAILED'],
   ['COMPLETE', 'undo', 'FAILED'],
+  ['FAILED', 'retry', 'RUNNING'],
+  ['RUNNING', 'stall', 'FAILED'],
 ];
 
 describe('migration transition table', () => {
@@ -46,6 +51,27 @@ describe('migration transition table', () => {
     expect(migrationUndoStillOpen(new Date('2026-11-11T12:00:01.000Z'), now)).toBe(true);
     expect(migrationUndoStillOpen(new Date('2026-11-11T11:59:59.000Z'), now)).toBe(false);
     expect(migrationUndoStillOpen(null, now)).toBe(false);
+  });
+
+  it('retries only a failed job that imported nothing, and stalls only a running job with no progress', () => {
+    expect(migrationRetryAllowed(0, 0)).toBe(true);
+    expect(migrationRetryAllowed(1, 0)).toBe(false);
+    expect(migrationRetryAllowed(0, 1)).toBe(false);
+    const now = new Date('2026-11-11T12:00:00.000Z');
+    const stale = new Date(now.getTime() - MIGRATION_STALL_MS);
+    const fresh = new Date(now.getTime() - MIGRATION_STALL_MS + 1_000);
+    expect(
+      migrationStallDue({ state: 'RUNNING', startedAt: stale, processedRows: 0, errorRows: 0, now }),
+    ).toBe(true);
+    expect(
+      migrationStallDue({ state: 'RUNNING', startedAt: fresh, processedRows: 0, errorRows: 0, now }),
+    ).toBe(false);
+    expect(
+      migrationStallDue({ state: 'RUNNING', startedAt: stale, processedRows: 1, errorRows: 0, now }),
+    ).toBe(false);
+    expect(
+      migrationStallDue({ state: 'FAILED', startedAt: stale, processedRows: 0, errorRows: 0, now }),
+    ).toBe(false);
   });
 
   it('runs a chunk only while the job is running', () => {
