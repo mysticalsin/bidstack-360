@@ -126,6 +126,14 @@ describe('migration status races', () => {
       });
       expect(retry.statusCode).toBe(200);
       expect(retry.json<{ status: string }>().status).toBe('RUNNING');
+      const audit = await prisma.auditLog.findFirst({
+        where: { orgId: org.orgId, targetId: body.id, action: 'migration.retry' },
+      });
+      const diff = audit?.diff as { previousAttempt?: string | null; attemptId?: string } | null;
+      expect(audit?.userId).toBe(userId);
+      expect(diff?.previousAttempt).toEqual(expect.any(String));
+      expect(diff?.attemptId).toEqual(expect.any(String));
+      expect(diff?.attemptId).not.toBe(diff?.previousAttempt);
     } finally {
       add.mockRestore();
     }

@@ -30,6 +30,7 @@ import {
   DedupStrategyEnum,
   type MigrationJobError,
   MIGRATION,
+  migrationAttemptId,
   migrationFrom,
   migrationRetryAllowed,
   migrationStaleDue,
@@ -333,6 +334,17 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       if (claimed.count !== 1) {
         throw server.httpErrors.conflict('Migration job is no longer failed');
       }
+      const previousAttempt = migrationAttemptId(job.meta);
+      await prisma.auditLog.create({
+        data: {
+          orgId,
+          userId,
+          action: 'migration.retry',
+          targetType: 'MigrationJob',
+          targetId: job.id,
+          diff: { previousAttempt, attemptId },
+        },
+      });
 
       const queue = getQueue();
       try {
