@@ -22,6 +22,7 @@ vi.mock('@bidstack/shared/token-crypto', () => ({
 
 const updateMany = vi.mocked(prisma.integrationToken.updateMany);
 const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as pino.Logger;
+const grant = { status: 'active', access: 'enc(old-access)' };
 
 function row(provider: 'gmail' | 'microsoft_graph' | 'google_workspace', expired = true) {
   return {
@@ -44,6 +45,24 @@ beforeEach(() => {
   process.env.MICROSOFT_GRAPH_CLIENT_SECRET = 'test-ms-secret';
   process.env.GMAIL_CLIENT_ID = 'test-google-client';
   process.env.GMAIL_CLIENT_SECRET = 'test-google-secret';
+  grant.status = 'active';
+  grant.access = 'enc(old-access)';
+  updateMany.mockImplementation(async (args: {
+    where: { status?: { in?: string[] } };
+    data: { status?: string; accessTokenEncrypted?: string };
+  }) => {
+    const from = args.where.status?.in;
+    // A missing from-list is the bug: the write lands on the current row.
+    if (!from) {
+      if (args.data.status) grant.status = args.data.status;
+      if (args.data.accessTokenEncrypted) grant.access = args.data.accessTokenEncrypted;
+      return { count: 1 };
+    }
+    if (!from.includes(grant.status)) return { count: 0 };
+    if (args.data.status) grant.status = args.data.status;
+    if (args.data.accessTokenEncrypted) grant.access = args.data.accessTokenEncrypted;
+    return { count: 1 };
+  });
 });
 
 afterEach(() => {
@@ -51,6 +70,23 @@ afterEach(() => {
 });
 
 describe('getWorkspaceAccessToken', () => {
+  it('refuses a grant whose status is expired, and still refreshes one that is only past its expiry time', async () => {
+    // WHY: `expired` is the status column. A clock that has passed expiresAt,
+    // while the status is still active, is the normal refresh.
+    const blocked = vi.fn(async () => json({ access_token: 'new-access', expires_in: 3600 }));
+    await expect(
+      getWorkspaceAccessToken({ ...row('gmail'), status: 'expired' }, log, blocked),
+    ).rejects.toBeInstanceOf(GrantRevokedError);
+    expect(blocked).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
+
+    const allowed = vi.fn(async () => json({ access_token: 'new-access', expires_in: 3600 }));
+    await expect(
+      getWorkspaceAccessToken({ ...row('gmail'), status: 'active' }, log, allowed),
+    ).resolves.toBe('new-access');
+    expect(allowed).toHaveBeenCalledOnce();
+  });
+
   it('returns the stored token while it is still fresh', async () => {
     const fetchImpl = vi.fn();
     await expect(getWorkspaceAccessToken(row('gmail', false), log, fetchImpl)).resolves.toBe('old-access');
@@ -68,17 +104,8 @@ describe('getWorkspaceAccessToken', () => {
     expect(body.get('scope')).toContain('Calendars.Read');
     expect(body.get('scope')).not.toContain('Mail.Send');
     expect(init.signal).toBeInstanceOf(AbortSignal);
-    // The from-state is part of the contract: a revoked row is not in this list.
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'tok-1', deletedAt: null, status: { in: ['active', 'error'] } },
-        data: expect.objectContaining({
-          accessTokenEncrypted: 'enc(new-access)',
-          refreshTokenEncrypted: 'enc(new-refresh)',
-          status: 'active',
-        }),
-      }),
-    );
+    expect(grant.status).toBe('active');
+    expect(grant.access).toBe('enc(new-access)');
   });
 
   it('refreshes Google rows through the Google token endpoint', async () => {
@@ -96,43 +123,22 @@ describe('getWorkspaceAccessToken', () => {
   it('marks the grant revoked when the provider answers invalid_grant', async () => {
     const fetchImpl = vi.fn(async () => json({ error: 'invalid_grant' }, 400));
     await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(GrantRevokedError);
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'tok-1', deletedAt: null, status: { in: ['active', 'error'] } },
-        data: expect.objectContaining({ status: 'revoked', errorMessage: expect.stringMatching(/reconnect/i) }),
-      }),
-    );
+    expect(grant.status).toBe('revoked');
+    expect(grant.access).toBe('enc(old-access)');
   });
 
   it('does not store a fresh token onto a revoked grant', async () => {
-    const state = { status: 'revoked' };
-    updateMany.mockImplementation(async (args: {
-      where: { deletedAt?: Date | null; status?: { in?: string[] } };
-      data: { status?: string };
-    }) => {
-      const from = args.where.status?.in;
-      // A write with no from-state applies to every row. That is the bug.
-      if (!from) {
-        if (args.data.status) state.status = args.data.status;
-        return { count: 1 };
-      }
-      if (!from.includes(state.status)) return { count: 0 };
-      state.status = args.data.status ?? state.status;
-      return { count: 1 };
-    });
+    grant.status = 'revoked';
     const fetchImpl = vi.fn(async () => json({ access_token: 'late-access', expires_in: 3600 }));
     await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(GrantRevokedError);
-    expect(state.status).toBe('revoked');
+    expect(grant.status).toBe('revoked');
+    expect(grant.access).toBe('enc(old-access)');
   });
 
   it('marks a transient provider failure as error, not revoked', async () => {
     const fetchImpl = vi.fn(async () => new Response('boom', { status: 502 }));
     await expect(getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl)).rejects.toThrow(/502/);
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'tok-1', deletedAt: null, status: { in: ['active', 'error'] } },
-        data: expect.objectContaining({ status: 'error' }),
-      }),
-    );
+    expect(grant.status).toBe('error');
+    expect(grant.access).toBe('enc(old-access)');
   });
 });

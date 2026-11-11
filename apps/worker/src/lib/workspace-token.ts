@@ -12,17 +12,14 @@ import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
-import { microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
+import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
+
+export { GrantRevokedError };
 
 const EXPIRY_SKEW_MS = 60_000;
 const REFRESH_TIMEOUT_MS = 15_000;
 
 export const REVOKED_MESSAGE = 'Access was revoked at the provider. Reconnect to resume sync.';
-
-/** The provider no longer honours this grant; the user must reconnect. */
-export class GrantRevokedError extends Error {
-  override readonly name = 'GrantRevokedError';
-}
 
 /** Columns needed to use or refresh a grant. */
 export interface WorkspaceTokenRow {
@@ -33,6 +30,8 @@ export interface WorkspaceTokenRow {
   refreshTokenEncrypted: string | null;
   expiresAt: Date | null;
   scope: string[];
+  /** Omitted by callers that have not loaded the column. `expired` refuses a refresh. */
+  status?: string;
 }
 
 function isGoogle(provider: string): boolean {
@@ -111,6 +110,10 @@ export async function getWorkspaceAccessToken(
   log: pino.Logger,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
+  // `expired` is the status column. A past expiresAt with status active still refreshes.
+  if (row.status === 'expired') {
+    throw new GrantRevokedError('Grant status is expired');
+  }
   const fresh = row.expiresAt ? row.expiresAt.getTime() > Date.now() + EXPIRY_SKEW_MS : true;
   if (fresh) return decryptToken(row.accessTokenEncrypted);
   if (!row.refreshTokenEncrypted) {

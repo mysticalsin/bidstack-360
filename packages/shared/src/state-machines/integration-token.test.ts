@@ -40,6 +40,13 @@ describe('integration token transition table', () => {
     }
   });
 
+  it('refuses a refresh from expired, and expired has no writer', () => {
+    for (const event of TOKEN_EVENTS) {
+      expect(isIllegalTransition(tokenTransition('expired', event))).toBe(true);
+      expect(tokenFrom(event)).not.toContain('expired');
+    }
+  });
+
   it('allows a refresh only while the grant is not deleted', () => {
     expect(tokenRefreshAllowed(null)).toBe(true);
     expect(tokenRefreshAllowed(new Date('2026-11-11T12:00:00.000Z'))).toBe(false);

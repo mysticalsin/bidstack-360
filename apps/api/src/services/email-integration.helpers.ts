@@ -8,7 +8,7 @@
  */
 
 import { prisma } from '@bidstack/db';
-import { microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
+import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
@@ -138,7 +138,7 @@ async function refreshToken(
       { tokenId: token.id, from: current?.status ?? null, to: 'active' },
       'illegal integration token transition',
     );
-    throw new Error('Grant was disconnected during refresh');
+    throw new GrantRevokedError('Grant was disconnected during refresh');
   }
   return data.access_token;
 }
@@ -181,9 +181,14 @@ export async function getAccessToken(
     expiresAt: Date | null;
     provider: string;
     scope?: string[];
+    /** Omitted when the caller has not loaded the column. `expired` refuses a refresh. */
+    status?: string;
   },
   log: ServiceLogger,
 ): Promise<string> {
+  if (tokenRecord.status === 'expired') {
+    throw new GrantRevokedError('Grant status is expired');
+  }
   if (!tokenExpiresSoon(tokenRecord.expiresAt))
     return decryptToken(tokenRecord.accessTokenEncrypted);
 
@@ -193,7 +198,7 @@ export async function getAccessToken(
     getFreshValue: () => getFreshIntegrationAccessToken(tokenRecord.id, tokenRecord.orgId),
     refresh: async () => {
       if (!tokenRecord.refreshTokenEncrypted) {
-        throw new Error('Token expired and no refresh token available');
+        throw new GrantRevokedError('Token expired and no refresh token available');
       }
 
       const refresh = decryptToken(tokenRecord.refreshTokenEncrypted);

@@ -1,5 +1,10 @@
 import { illegalTransition, type IllegalTransition } from './illegal-transition.js';
 
+/** The provider no longer honours this grant, or its status refuses a refresh. */
+export class GrantRevokedError extends Error {
+  override readonly name = 'GrantRevokedError';
+}
+
 export const TOKEN_STATES = ['active', 'expired', 'revoked', 'error'] as const;
 export type TokenState = (typeof TOKEN_STATES)[number];
 
