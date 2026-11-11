@@ -148,4 +148,25 @@ describe('sync now', () => {
     }
     close.mockRestore();
   });
+
+  // WHY: each close quit its connection only after a successful queue close,
+  // so a failing close left the connection open.
+  it('quits both Redis connections even when closing the queues fails', async () => {
+    const own = await buildServer();
+    await own.ready();
+    await startSyncRun('dust', { orgId, userId, idempotencyKey: `sync-${randomUUID()}` });
+    await startSyncRun('hubspot', { orgId, userId, idempotencyKey: `sync-${randomUUID()}` }).catch(() => undefined);
+    const close = vi.spyOn(Queue.prototype, 'close').mockRejectedValue(new Error('synthetic close failure'));
+
+    await own.close().catch(() => undefined);
+
+    const closed = close.mock.contexts as Queue[];
+    close.mockRestore();
+    expect(closed.map((q) => q.name).sort()).toEqual(['dust-poll', 'migration']);
+    for (const queue of closed) {
+      const connection = queue.opts.connection as IORedis;
+      for (let i = 0; i < 40 && connection.status !== 'end'; i++) await new Promise((r) => setTimeout(r, 50));
+      expect(connection.status).toBe('end');
+    }
+  });
 });

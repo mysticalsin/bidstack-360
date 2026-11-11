@@ -435,4 +435,23 @@ describe('HubSpot migration routes on server close', () => {
     expect(closed).toHaveLength(1);
     await waitForEnd((closed[0] as Queue).opts.connection as IORedis);
   });
+
+  // WHY: the hook quit the connection only after a successful queue close, so
+  // a failing close left the connection open.
+  skipIfNoDb('quit the Redis connection even when closing the queue fails', async () => {
+    const server = await buildServer();
+    await server.ready();
+    const res = await startHubspot(['deals'], server);
+    expect(res.statusCode).toBe(201);
+    const { jobs } = res.json<{ jobs: Array<{ id: string }> }>();
+    ctx.cleanup.jobIds.push(...jobs.map((j) => j.id));
+    queuedJobIds.push(`${jobs[0]!.id}-deals-chunk-0`);
+    const close = vi.spyOn(Queue.prototype, 'close').mockRejectedValue(new Error('synthetic close failure'));
+
+    await server.close().catch(() => undefined);
+
+    const closed = close.mock.contexts.filter((q) => (q as Queue).name === MIGRATION.name && q !== inspector?.queue);
+    expect(closed).toHaveLength(1);
+    await waitForEnd((closed[0] as Queue).opts.connection as IORedis);
+  });
 });

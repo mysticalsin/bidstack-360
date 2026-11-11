@@ -77,8 +77,11 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
   };
   // BullMQ leaves a connection it was given open, so it is quit here too.
   server.addHook('onClose', async () => {
-    await migrationQueue?.close();
-    await connection?.quit();
+    try {
+      await migrationQueue?.close();
+    } finally {
+      await connection?.quit();
+    }
   });
 
   // ─── HubSpot OAuth: initiate ───────────────────────────────────────────

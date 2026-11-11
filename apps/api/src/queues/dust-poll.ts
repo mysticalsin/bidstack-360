@@ -109,8 +109,11 @@ export async function closeDustPollQueue(): Promise<void> {
   const connection = connectionSingleton;
   queueSingleton = null;
   connectionSingleton = null;
-  await queue?.close();
-  await connection?.quit();
+  try {
+    await queue?.close();
+  } finally {
+    await connection?.quit();
+  }
 }
 
 /** Read a dust-poll job for status polling; null when unknown or expired. */

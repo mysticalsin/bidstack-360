@@ -26,5 +26,8 @@ export function getSyncOverview(source: SyncSource, orgId: string): Promise<Sync
 
 /** Closes the queues Sync now opens on first use, and their Redis connections. */
 export async function closeSyncNowQueues(): Promise<void> {
-  await Promise.all([closeDustPollQueue(), closeHubspotSyncQueue()]);
+  // Waits for both to finish before reporting a failure.
+  const results = await Promise.allSettled([closeDustPollQueue(), closeHubspotSyncQueue()]);
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (failed) throw failed.reason;
 }
