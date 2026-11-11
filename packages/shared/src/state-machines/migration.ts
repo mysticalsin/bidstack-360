@@ -3,11 +3,14 @@ import { illegalTransition, type IllegalTransition } from './illegal-transition.
 export const MIGRATION_STATES = ['PENDING', 'RUNNING', 'COMPLETE', 'FAILED', 'CANCELLED'] as const;
 export type MigrationState = (typeof MIGRATION_STATES)[number];
 
-export const MIGRATION_EVENTS = ['start', 'cancel', 'complete', 'fail', 'undo', 'retry', 'stall'] as const;
+export const MIGRATION_EVENTS = ['start', 'cancel', 'complete', 'fail', 'undo', 'retry', 'stale'] as const;
 export type MigrationEvent = (typeof MIGRATION_EVENTS)[number];
 
-/** A running job that has processed nothing for this long is stalled. */
-export const MIGRATION_STALL_MS = 15 * 60_000;
+/** A running job with no row progress for this long is stale. */
+export const MIGRATION_STALE_MS = 15 * 60_000;
+
+/** Stored on the job when the worker applies the stale transition. */
+export const MIGRATION_STALE_REASON = 'stale';
 
 const FROM: Record<MigrationEvent, readonly MigrationState[]> = {
   start: ['PENDING'],
@@ -16,7 +19,7 @@ const FROM: Record<MigrationEvent, readonly MigrationState[]> = {
   fail: ['RUNNING'],
   undo: ['COMPLETE'],
   retry: ['FAILED'],
-  stall: ['RUNNING'],
+  stale: ['RUNNING'],
 };
 
 const TO: Record<MigrationEvent, MigrationState> = {
@@ -26,7 +29,7 @@ const TO: Record<MigrationEvent, MigrationState> = {
   fail: 'FAILED',
   undo: 'FAILED',
   retry: 'RUNNING',
-  stall: 'FAILED',
+  stale: 'FAILED',
 };
 
 /** Statuses a compare-and-set for this event may match. */
@@ -57,18 +60,23 @@ export function migrationRetryAllowed(processedRows: number, errorRows: number):
   return processedRows === 0 && errorRows === 0;
 }
 
-/** A running job with no row progress past the stall window becomes failed. */
-export function migrationStallDue(input: {
+/**
+ * A running job that has imported nothing, and whose last progress is at least
+ * `MIGRATION_STALE_MS` old, may become failed. Callers pass `updatedAt`: a chunk
+ * that commits progress moves that clock, so a stale claim that still holds the
+ * old value loses the compare-and-set.
+ */
+export function migrationStaleDue(input: {
   state: MigrationState;
-  startedAt: Date | null;
+  progressAt: Date | null;
   processedRows: number;
   errorRows: number;
   now: Date;
 }): boolean {
   if (input.state !== 'RUNNING') return false;
   if (!migrationRetryAllowed(input.processedRows, input.errorRows)) return false;
-  if (!input.startedAt) return false;
-  return input.now.getTime() - input.startedAt.getTime() >= MIGRATION_STALL_MS;
+  if (!input.progressAt) return false;
+  return input.now.getTime() - input.progressAt.getTime() >= MIGRATION_STALE_MS;
 }
 
 /**

@@ -33,8 +33,11 @@ import {
   MIGRATION,
   MigrationJobPayload,
   type MigrationJobError,
+  MIGRATION_STALE_MS,
+  MIGRATION_STALE_REASON,
   migrationChunkMayRun,
   migrationFrom,
+  migrationStaleDue,
 } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
@@ -896,6 +899,62 @@ export async function processMigrationChunk(
   );
 }
 
+// ─── Stale scan ────────────────────────────────────────────────────────────
+
+/** Repeatable job on the migration queue. No second queue. */
+export const MIGRATION_STALE_SCAN = 'migration-stale-scan';
+export const MIGRATION_STALE_SCAN_MS = 60_000;
+
+/**
+ * Compare-and-set RUNNING → FAILED for one observed progress time.
+ * A chunk that committed after this time moved `updatedAt`, so the write misses.
+ */
+export async function claimStaleMigration(id: string, observedProgressAt: Date): Promise<boolean> {
+  const moved = await prisma.migrationJob.updateMany({
+    where: {
+      id,
+      status: { in: [...migrationFrom('stale')] },
+      updatedAt: observedProgressAt,
+    },
+    data: {
+      status: 'FAILED',
+      completedAt: new Date(),
+      errorSummary: [{ row: 0, field: null, message: MIGRATION_STALE_REASON }],
+    },
+  });
+  return moved.count === 1;
+}
+
+/** Fail running imports whose last progress is older than the shared window. */
+export async function sweepStaleMigrations(now = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - MIGRATION_STALE_MS);
+  const candidates = await prisma.migrationJob.findMany({
+    where: {
+      status: 'RUNNING',
+      processedRows: 0,
+      errorRows: 0,
+      updatedAt: { lte: cutoff },
+    },
+    select: { id: true, status: true, updatedAt: true, processedRows: true, errorRows: true },
+  });
+  let claimed = 0;
+  for (const job of candidates) {
+    if (
+      !migrationStaleDue({
+        state: job.status,
+        progressAt: job.updatedAt,
+        processedRows: job.processedRows,
+        errorRows: job.errorRows,
+        now,
+      })
+    ) {
+      continue;
+    }
+    if (await claimStaleMigration(job.id, job.updatedAt)) claimed += 1;
+  }
+  return claimed;
+}
+
 // ─── Worker ────────────────────────────────────────────────────────────────
 
 let queueSingleton: Queue | null = null;
@@ -938,9 +997,19 @@ export async function startMigrationWorker(
     env: process.env,
   };
 
+  await queue.add(
+    MIGRATION_STALE_SCAN,
+    {},
+    { repeat: { every: MIGRATION_STALE_SCAN_MS }, jobId: MIGRATION_STALE_SCAN },
+  );
+
   const worker = new Worker(
     MIGRATION.name,
     async (job: Job) => {
+      if (job.name === MIGRATION_STALE_SCAN) {
+        await sweepStaleMigrations();
+        return;
+      }
       const payload = MigrationJobPayload.parse(job.data);
       const childLog = log.child({
         migrationJobId: payload.migrationJobId,

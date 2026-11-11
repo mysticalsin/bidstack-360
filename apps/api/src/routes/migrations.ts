@@ -30,7 +30,7 @@ import {
   MIGRATION,
   migrationFrom,
   migrationRetryAllowed,
-  migrationStallDue,
+  migrationStaleDue,
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
@@ -144,29 +144,16 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      if (
-        migrationStallDue({
-          state: job.status,
-          startedAt: job.startedAt,
-          processedRows: job.processedRows,
-          errorRows: job.errorRows,
-          now: new Date(),
-        })
-      ) {
-        await prisma.migrationJob.updateMany({
-          where: { id: job.id, orgId, status: { in: [...migrationFrom('stall')] } },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorSummary: [{ row: 0, field: null, message: 'Import stalled before any row was processed' }],
-          },
-        });
-        const stalled = await prisma.migrationJob.findFirstOrThrow({
-          where: { id: job.id, orgId },
-        });
-        return serializeJob(stalled);
-      }
-      return serializeJob(job);
+      // Read-only. The worker persists RUNNING → FAILED. This flag is derived
+      // so a poll can show the stall before that write lands.
+      const stalled = migrationStaleDue({
+        state: job.status,
+        progressAt: job.updatedAt,
+        processedRows: job.processedRows,
+        errorRows: job.errorRows,
+        now: new Date(),
+      });
+      return { ...serializeJob(job), stalled };
     },
   );
 

@@ -24,6 +24,8 @@ export interface MigrationJob {
   undoableUntil: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Derived by GET. The worker is what persists FAILED. */
+  stalled?: boolean;
 }
 
 export interface StartCsvImportInput {

@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { isIllegalTransition } from './illegal-transition.js';
 import {
   MIGRATION_EVENTS,
-  MIGRATION_STALL_MS,
+  MIGRATION_STALE_MS,
   MIGRATION_STATES,
   migrationChunkMayRun,
   migrationFrom,
   migrationRetryAllowed,
-  migrationStallDue,
+  migrationStaleDue,
   migrationStateFromStored,
   migrationTransition,
   migrationUndoStillOpen,
@@ -24,7 +24,7 @@ const LEGAL: Array<[MigrationState, MigrationEvent, MigrationState]> = [
   ['RUNNING', 'fail', 'FAILED'],
   ['COMPLETE', 'undo', 'FAILED'],
   ['FAILED', 'retry', 'RUNNING'],
-  ['RUNNING', 'stall', 'FAILED'],
+  ['RUNNING', 'stale', 'FAILED'],
 ];
 
 describe('migration transition table', () => {
@@ -53,24 +53,24 @@ describe('migration transition table', () => {
     expect(migrationUndoStillOpen(null, now)).toBe(false);
   });
 
-  it('retries only a failed job that imported nothing, and stalls only a running job with no progress', () => {
+  it('retries only a failed job that imported nothing, and marks stale only a running job with no recent progress', () => {
     expect(migrationRetryAllowed(0, 0)).toBe(true);
     expect(migrationRetryAllowed(1, 0)).toBe(false);
     expect(migrationRetryAllowed(0, 1)).toBe(false);
     const now = new Date('2026-11-11T12:00:00.000Z');
-    const stale = new Date(now.getTime() - MIGRATION_STALL_MS);
-    const fresh = new Date(now.getTime() - MIGRATION_STALL_MS + 1_000);
+    const stale = new Date(now.getTime() - MIGRATION_STALE_MS);
+    const fresh = new Date(now.getTime() - MIGRATION_STALE_MS + 1_000);
     expect(
-      migrationStallDue({ state: 'RUNNING', startedAt: stale, processedRows: 0, errorRows: 0, now }),
+      migrationStaleDue({ state: 'RUNNING', progressAt: stale, processedRows: 0, errorRows: 0, now }),
     ).toBe(true);
     expect(
-      migrationStallDue({ state: 'RUNNING', startedAt: fresh, processedRows: 0, errorRows: 0, now }),
+      migrationStaleDue({ state: 'RUNNING', progressAt: fresh, processedRows: 0, errorRows: 0, now }),
     ).toBe(false);
     expect(
-      migrationStallDue({ state: 'RUNNING', startedAt: stale, processedRows: 1, errorRows: 0, now }),
+      migrationStaleDue({ state: 'RUNNING', progressAt: stale, processedRows: 1, errorRows: 0, now }),
     ).toBe(false);
     expect(
-      migrationStallDue({ state: 'FAILED', startedAt: stale, processedRows: 0, errorRows: 0, now }),
+      migrationStaleDue({ state: 'FAILED', progressAt: stale, processedRows: 0, errorRows: 0, now }),
     ).toBe(false);
   });
 

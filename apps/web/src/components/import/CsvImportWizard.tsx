@@ -459,11 +459,13 @@ function ImportProgress({
           <span className="font-medium text-[var(--fg-primary)]">
             {job.status === 'COMPLETE'
               ? t('csvImport.progress.statusComplete', 'Import complete')
-              : job.status === 'RUNNING' || job.status === 'PENDING'
-                ? t('csvImport.progress.statusImporting', 'Importing…')
-                : job.status === 'CANCELLED'
-                  ? t('csvImport.progress.statusCancelled', 'Import cancelled')
-                  : t('csvImport.progress.statusFailed', 'Import failed')}
+              : job.stalled
+                ? t('csvImport.progress.statusStalled', 'Import stalled')
+                : job.status === 'RUNNING' || job.status === 'PENDING'
+                  ? t('csvImport.progress.statusImporting', 'Importing…')
+                  : job.status === 'CANCELLED'
+                    ? t('csvImport.progress.statusCancelled', 'Import cancelled')
+                    : t('csvImport.progress.statusFailed', 'Import failed')}
           </span>
           <span className="text-[var(--fg-tertiary)]">
             {job.processedRows.toLocaleString()} / {job.totalRows.toLocaleString()}

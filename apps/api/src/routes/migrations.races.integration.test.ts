@@ -17,6 +17,15 @@ import {
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
 
+async function ageProgress(id: string): Promise<void> {
+  const past = new Date(Date.now() - 16 * 60_000);
+  await prisma.$executeRaw`
+    UPDATE migration_jobs
+    SET started_at = ${past}, updated_at = ${past}
+    WHERE id = ${id}::uuid
+  `;
+}
+
 let server: FastifyInstance;
 let org: IsolatedOrg;
 let restoreAuth: () => void;
@@ -152,7 +161,9 @@ describe('migration status races', () => {
     }
   });
 
-  t('a running import with no progress is failed when it has stalled', async () => {
+  t('GET reports a stale import without writing it', async () => {
+    // WHY: a progress poll must not be the writer. A read-only or cross-site
+    // GET used to fail the row, which is a state change from a safe method.
     const job = await prisma.migrationJob.create({
       data: {
         orgId: org.orgId,
@@ -162,17 +173,68 @@ describe('migration status races', () => {
         totalRows: 1,
         processedRows: 0,
         errorRows: 0,
-        startedAt: new Date(Date.now() - 16 * 60_000),
+        startedAt: new Date(),
       },
     });
+    await ageProgress(job.id);
+    const before = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+
     const res = await server.inject({
       method: 'GET',
       url: `/api/v1/migrations/${job.id}`,
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json<{ status: string }>().status).toBe('FAILED');
-    const row = await prisma.migrationJob.findUnique({ where: { id: job.id } });
-    expect(row?.status).toBe('FAILED');
+    const body = res.json<{ status: string; stalled?: boolean }>();
+    expect(body.status).toBe('RUNNING');
+    expect(body.stalled).toBe(true);
+    const after = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(after.status).toBe('RUNNING');
+    expect(after.updatedAt.toISOString()).toBe(before.updatedAt.toISOString());
+  });
+
+  t('a read-only user and a cross-site GET cannot fail a stale import', async () => {
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        startedAt: new Date(),
+      },
+    });
+    await ageProgress(job.id);
+    const previousRole = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+    try {
+      const reader = await server.inject({
+        method: 'GET',
+        url: `/api/v1/migrations/${job.id}`,
+        headers: { 'x-bidstack-e2e-role': 'read-only' },
+      });
+      expect(reader.statusCode).toBe(200);
+      expect(reader.json<{ status: string }>().status).toBe('RUNNING');
+
+      const other = await createIsolatedOrg('migration-cross');
+      const restore = useIsolatedOrgAuth(other.clerkOrg);
+      try {
+        const foreign = await server.inject({
+          method: 'GET',
+          url: `/api/v1/migrations/${job.id}`,
+        });
+        expect(foreign.statusCode).toBe(404);
+      } finally {
+        restore();
+        await dropIsolatedOrg(other.orgId);
+      }
+    } finally {
+      if (previousRole === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousRole;
+    }
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(stored.status).toBe('RUNNING');
   });
 
   t('undo does not trust a stale COMPLETE read over a job that is still running', async () => {
