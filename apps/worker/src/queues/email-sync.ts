@@ -24,6 +24,7 @@ import {
   OUTLOOK_PULL_HISTORICAL,
   OUTLOOK_PULL_INCREMENTAL,
   OUTLOOK_SUBSCRIPTION_RENEW,
+  tokenFrom,
 } from '@bidstack/shared';
 
 import { PullJobData } from './email-sync.helpers.js';
@@ -66,7 +67,7 @@ export function startEmailSync(
           const tokens = await prisma.integrationToken.findMany({
             where: {
               provider: IntegrationProvider.microsoft_graph,
-              status: { in: ['active', 'error'] },
+              status: { in: [...tokenFrom('refresh_ok')] },
               deletedAt: null,
             },
             select: { id: true, orgId: true, userId: true },

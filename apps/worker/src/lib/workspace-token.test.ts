@@ -6,7 +6,13 @@ import { prisma } from '@bidstack/db';
 import { GrantRevokedError, getWorkspaceAccessToken } from './workspace-token.js';
 
 vi.mock('@bidstack/db', () => ({
-  prisma: { integrationToken: { update: vi.fn(), updateMany: vi.fn(async () => ({ count: 1 })) } },
+  prisma: {
+    integrationToken: {
+      update: vi.fn(),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+      findFirst: vi.fn(async () => ({ status: 'revoked' })),
+    },
+  },
 }));
 
 vi.mock('@bidstack/shared/token-crypto', () => ({

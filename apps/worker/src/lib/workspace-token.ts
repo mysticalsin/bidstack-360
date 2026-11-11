@@ -12,7 +12,7 @@ import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
-import { microsoftRefreshScopes } from '@bidstack/shared';
+import { microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
 
 const EXPIRY_SKEW_MS = 60_000;
 const REFRESH_TIMEOUT_MS = 15_000;
@@ -73,19 +73,36 @@ async function readError(res: Response): Promise<string | null> {
   }
 }
 
-/** Refresh may leave `active` or `error`. It must not rewrite `revoked` or a tombstone. */
+async function warnIllegalToken(
+  id: string,
+  to: 'active' | 'revoked' | 'error',
+  log: pino.Logger,
+): Promise<void> {
+  const current = await prisma.integrationToken.findFirst({
+    where: { id },
+    select: { status: true },
+  });
+  log.warn(
+    { tokenId: id, from: current?.status ?? null, to },
+    'illegal integration token transition',
+  );
+}
+
+/** A failed refresh may leave `revoked` or `error`. It must not rewrite a tombstone, and it does not set `active`. */
 async function markToken(
   id: string,
-  data: { status: 'active' | 'revoked' | 'error'; errorMessage: string },
+  data: { status: 'revoked' | 'error'; errorMessage: string },
   log: pino.Logger,
 ): Promise<void> {
   const moved = await prisma.integrationToken.updateMany({
-    where: { id, deletedAt: null, status: { in: ['active', 'error'] } },
+    where: {
+      id,
+      deletedAt: null,
+      status: { in: [...tokenFrom(data.status === 'revoked' ? 'revoke' : 'refresh_fail')] },
+    },
     data,
   });
-  if (moved.count === 0) {
-    log.warn({ tokenId: id, to: data.status }, 'illegal integration token transition');
-  }
+  if (moved.count === 0) await warnIllegalToken(id, data.status, log);
 }
 
 /** Return a usable access token, refreshing and persisting it when needed. */
@@ -128,7 +145,7 @@ export async function getWorkspaceAccessToken(
   const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
   // A disconnect can land while the refresh is in flight; never write fresh tokens onto the tombstone.
   const stored = await prisma.integrationToken.updateMany({
-    where: { id: row.id, deletedAt: null, status: { in: ['active', 'error'] } },
+    where: { id: row.id, deletedAt: null, status: { in: [...tokenFrom('refresh_ok')] } },
     data: {
       accessTokenEncrypted: encryptToken(data.access_token),
       ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
@@ -139,7 +156,7 @@ export async function getWorkspaceAccessToken(
     },
   });
   if (stored.count === 0) {
-    log.warn({ tokenId: row.id, to: 'active' }, 'illegal integration token transition');
+    await warnIllegalToken(row.id, 'active', log);
     throw new GrantRevokedError('Grant was disconnected during refresh');
   }
   return data.access_token;

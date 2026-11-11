@@ -8,7 +8,7 @@
  */
 
 import { prisma } from '@bidstack/db';
-import { microsoftRefreshScopes } from '@bidstack/shared';
+import { microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
@@ -119,7 +119,7 @@ async function refreshToken(
 
   const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
   const stored = await prisma.integrationToken.updateMany({
-    where: { id: token.id, deletedAt: null, status: { in: ['active', 'error'] } },
+    where: { id: token.id, deletedAt: null, status: { in: [...tokenFrom('refresh_ok')] } },
     data: {
       accessTokenEncrypted: encryptToken(data.access_token),
       ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
@@ -130,24 +130,42 @@ async function refreshToken(
     },
   });
   if (stored.count !== 1) {
-    log.warn({ tokenId: token.id, to: 'active' }, 'illegal integration token transition');
+    const current = await prisma.integrationToken.findFirst({
+      where: { id: token.id },
+      select: { status: true },
+    });
+    log.warn(
+      { tokenId: token.id, from: current?.status ?? null, to: 'active' },
+      'illegal integration token transition',
+    );
     throw new Error('Grant was disconnected during refresh');
   }
   return data.access_token;
 }
 
-/** A refresh may leave `active` or `error`. It must not rewrite `revoked` or a tombstone. */
+/** A failed refresh may leave `revoked` or `error`. It must not rewrite a tombstone. */
 async function markIntegrationToken(
   id: string,
   data: { status: 'revoked' | 'error'; errorMessage: string },
   log: ServiceLogger,
 ): Promise<void> {
   const moved = await prisma.integrationToken.updateMany({
-    where: { id, deletedAt: null, status: { in: ['active', 'error'] } },
+    where: {
+      id,
+      deletedAt: null,
+      status: { in: [...tokenFrom(data.status === 'revoked' ? 'revoke' : 'refresh_fail')] },
+    },
     data,
   });
   if (moved.count === 0) {
-    log.warn({ tokenId: id, to: data.status }, 'illegal integration token transition');
+    const current = await prisma.integrationToken.findFirst({
+      where: { id },
+      select: { status: true },
+    });
+    log.warn(
+      { tokenId: id, from: current?.status ?? null, to: data.status },
+      'illegal integration token transition',
+    );
   }
 }
 
