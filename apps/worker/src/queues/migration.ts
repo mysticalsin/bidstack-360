@@ -551,14 +551,26 @@ export async function fetchHubSpotPage(
 async function recordChunkOutcome(
   tx: Prisma.TransactionClient,
   migrationJobId: string,
+  attemptId: string | null,
   processed: number,
   errored: number,
   errors: MigrationJobError[],
-): Promise<void> {
-  await tx.migrationJob.update({
-    where: { id: migrationJobId },
-    data: { processedRows: { increment: processed }, errorRows: { increment: errored } },
-  });
+): Promise<number> {
+  // The opening check can be stale. Count the rows only while this attempt
+  // is still the one on the job, and the job is still RUNNING.
+  const moved = await tx.$executeRaw`
+    UPDATE migration_jobs
+    SET processed_rows = processed_rows + ${processed},
+        error_rows = error_rows + ${errored},
+        updated_at = date_trunc('milliseconds', NOW())
+    WHERE id = ${migrationJobId}::uuid
+      AND status = 'RUNNING'
+      AND (
+        (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
+        OR meta->>'attemptId' = ${attemptId}
+      )
+  `;
+  if (Number(moved) !== 1) return 0;
   if (errors.length > 0) {
     // Cap stored errors at 200 — the CSV download stays useful, the row stays small.
     await tx.$executeRaw`
@@ -570,6 +582,7 @@ async function recordChunkOutcome(
       END
       WHERE id = ${migrationJobId}::uuid`;
   }
+  return 1;
 }
 
 /**
@@ -591,9 +604,19 @@ export async function commitChunkProgress(chunk: {
   createdIds: string[];
   processed: number;
   errors: MigrationJobError[];
+  attemptId: string | null;
 }): Promise<void> {
   const { migrationJobId, processed, errors } = chunk;
   await prisma.$transaction(async (tx) => {
+    const moved = await recordChunkOutcome(
+      tx,
+      migrationJobId,
+      chunk.attemptId,
+      processed,
+      errors.length,
+      errors,
+    );
+    if (moved !== 1) return;
     if (chunk.createdIds.length > 0 || processed > 0 || errors.length > 0) {
       const rowsConsumed = chunk.resumeFrom + processed + errors.length;
       await tx.auditLog.create({
@@ -612,7 +635,6 @@ export async function commitChunkProgress(chunk: {
         },
       });
     }
-    await recordChunkOutcome(tx, migrationJobId, processed, errors.length, errors);
   });
 }
 
@@ -651,24 +673,33 @@ export async function maybeComplete(
   migrationJobId: string,
   forceTotal?: number,
   log?: ChunkLog,
+  attemptId: string | null = null,
 ): Promise<void> {
   const job = await prisma.migrationJob.findUnique({ where: { id: migrationJobId } });
   if (!job || !migrationChunkMayRun(job.status)) return;
+  if (!migrationChunkMatchesAttempt(migrationAttemptId(job.meta), attemptId)) return;
   const done = job.processedRows + job.errorRows;
   const total = forceTotal ?? job.totalRows;
   if (done < total) return;
-  // A cancel can land after the read above. Only a row that is still RUNNING
-  // becomes COMPLETE.
-  const moved = await prisma.migrationJob.updateMany({
-    where: { id: migrationJobId, status: { in: [...migrationFrom('complete')] } },
-    data: {
-      status: 'COMPLETE',
-      completedAt: new Date(),
-      totalRows: forceTotal ?? job.totalRows,
-      undoableUntil: new Date(Date.now() + 24 * 3600 * 1000),
-    },
-  });
-  if (moved.count === 0) {
+  // A cancel or a newer attempt can land after the read above. Only the
+  // attempt that is still current, and still RUNNING, becomes COMPLETE.
+  const completedAt = new Date();
+  const undoableUntil = new Date(Date.now() + 24 * 3600 * 1000);
+  const moved = await prisma.$executeRaw`
+    UPDATE migration_jobs
+    SET status = 'COMPLETE',
+        completed_at = ${completedAt},
+        total_rows = ${total},
+        undoable_until = ${undoableUntil},
+        updated_at = date_trunc('milliseconds', NOW())
+    WHERE id = ${migrationJobId}::uuid
+      AND status = 'RUNNING'
+      AND (
+        (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
+        OR meta->>'attemptId' = ${attemptId}
+      )
+  `;
+  if (Number(moved) !== 1) {
     const current = await prisma.migrationJob.findUnique({
       where: { id: migrationJobId },
       select: { status: true },
@@ -868,6 +899,7 @@ export async function processMigrationChunk(
     createdIds,
     processed,
     errors,
+    attemptId: payload.attemptId ?? null,
   });
 
   // ── Import enrichment: queue public intel and Apollo org data per new company.
@@ -920,9 +952,10 @@ export async function processMigrationChunk(
       payload.migrationJobId,
       (jobNow?.processedRows ?? 0) + (jobNow?.errorRows ?? 0),
       log,
+      payload.attemptId ?? null,
     );
   } else {
-    await maybeComplete(payload.migrationJobId, undefined, log);
+    await maybeComplete(payload.migrationJobId, undefined, log, payload.attemptId ?? null);
   }
 
   log.info(

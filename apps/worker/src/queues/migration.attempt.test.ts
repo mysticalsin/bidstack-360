@@ -6,7 +6,12 @@ import { prisma } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { processMigrationChunk, type MigrationChunkDeps } from './migration.js';
+import {
+  commitChunkProgress,
+  maybeComplete,
+  processMigrationChunk,
+  type MigrationChunkDeps,
+} from './migration.js';
 
 let dbReachable = false;
 
@@ -223,6 +228,59 @@ describe('migration attempt fence', () => {
     const meta = stored.meta as { attemptId?: string; progressAt?: string };
     expect(meta.attemptId).toBe(CURRENT);
     expect(meta.progressAt).toEqual(expect.any(String));
+    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
+
+  t('an old attempt cannot commit rows or complete the job', async () => {
+    // WHY: a chunk that already passed the opening check can still finish
+    // after retry has replaced the attempt. The commit and the complete
+    // write have to see the attempt that is current then.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_old_${ns}`, name: `old ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'Old' },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        startedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: CURRENT },
+      },
+    });
+    const log = { info: () => undefined, warn: () => undefined };
+    await commitChunkProgress({
+      orgId: org.id,
+      userId: user.id,
+      migrationJobId: job.id,
+      entity: 'company',
+      chunkOffset: 0,
+      resumeFrom: 0,
+      createdIds: [],
+      processed: 1,
+      errors: [],
+      attemptId: PREVIOUS,
+    });
+    const afterOld = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    const oldAudits = await prisma.auditLog.count({
+      where: { orgId: org.id, targetId: job.id, action: 'migration.chunk.imported' },
+    });
+    expect(afterOld.processedRows).toBe(0);
+    expect(afterOld.status).toBe('RUNNING');
+    expect(oldAudits).toBe(0);
+    await prisma.migrationJob.update({ where: { id: job.id }, data: { processedRows: 1 } });
+    await maybeComplete(job.id, undefined, log, PREVIOUS);
+    const afterComplete = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(afterComplete.status).toBe('RUNNING');
+    await maybeComplete(job.id, undefined, log, CURRENT);
+    const done = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(done.status).toBe('COMPLETE');
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
   });
 });
