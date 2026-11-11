@@ -4,7 +4,7 @@ Base: `0ba51f57f2889be9c8147508e0e65e17f7251187` (`origin/main`).
 Re-verified on that tree. Line numbers from `cursor/polo-integrated-bca5` are not used.
 This file is the inventory. It does not change behavior.
 
-Last reviewed: 2026-11-11, Devin addendum, on `cursor/sm-main-inventory-a111`. The addendum items that touch the four machines are in: a failed import is retryable, the API data-subject view maps unknown to failed, dropped SMS callbacks keep their facts, and an `expired` grant is refused.
+Last reviewed: 2026-11-11, on `cursor/sm-main-inventory-a111`. The addendum items that touch the four machines are in: a failed import is retryable, the API data-subject view maps unknown to failed, dropped SMS callbacks keep their facts, and an `expired` grant is refused. Stale imports are failed by the worker. Each import attempt has an id. Retry writes an audit row. The RFP gate stays `proposals:write`.
 
 Standard: one pure `transition(state, event)`, persisted rows versioned, unknown stored values map to a named safe state and are not rewritten on read. Illegal moves are rejected and logged with ids and states only. HTTP 409 stays the contract where a route already returns 409.
 
@@ -18,19 +18,19 @@ Status values: `FIX` (in the cleared order), `LATER`, `NOT A MACHINE`, `pending 
 | --- | --- | --- | --- | --- | --- |
 | 1 | Integration token | `integration_tokens.status` | fixed | H | Refresh is allowed from `active` or `error`. Status `expired` is refused before the provider is called. A past `expiresAt` with status `active` still refreshes. Connect writers are LATER. |
 | 2 | Access policy | `access_policy_versions.status` | pending reconciliation | H | On main the route already compare-and-sets. On bca5 the model is absent. Do not port a second legality check. |
-| 3 | Migration job | `migration_jobs.status` | fixed | H | Start claims `RUNNING` before enqueue. Enqueue failure returns the job `FAILED`. Retry is `FAILED → RUNNING` only when no row was imported. A running job with no progress for 15 minutes stalls to `FAILED` on the next read. |
+| 3 | Migration job | `migration_jobs.status` | fixed | H | Start claims `RUNNING` before enqueue. Enqueue failure returns the job `FAILED`. Retry is `FAILED → RUNNING` only when no row was imported, and it records both attempt ids. A running job with no progress for 15 minutes is failed by the worker, not by GET. |
 | 4 | Tenant export | `tenant_exports.status` | FIX | M | Claim and finish already compare-and-set. Finish the ordering; a wrong export is recoverable. |
 | 5 | Data subject request | `data_subject_requests.status` | fixed on main; pending reconciliation | H | On main, later writes carry the claim's `startedAt` and `orgId`. The API view and the worker both map an unknown stored value to `failed` and do not rewrite it. On bca5 there is no status column (risk n/a). |
 | 6 | Signature request | `signature_requests.status` | fixed | H | Void compare-and-sets from `DRAFT`, `SENT`, or `VIEWED`. A signature that lands during the void is left signed. |
 | 7 | RFP orchestration | `rfp_orchestration_runs.state` | FIX | M | Approve-drafting can write `running` with no from-state. |
-| 8 | Proposal approval | `proposals.status` | fixed | H | Both writers approve only from `draft` or `review`, from one from-list. |
+| 8 | Proposal approval | `proposals.status` | fixed | H | Both writers approve only from `draft` or `review`, from one from-list. The RFP gate permission is `proposals:write`. |
 | 9 | SERUM approval | `serum` approval fields | FIX | H | Characterization only. No behavior change in that commit. |
 | 10 | Opportunity stage | pipeline stage on the opportunity | NOT A MACHINE | n/a | Tony, 11 Nov 2026 17:03 BRT: keep Polo opportunity stages open. No guard. |
 | 11 | KAM draft | `kam_drafts.status` | LATER | M | Submit already compare-and-sets `pending` → `approved`. |
 | 12 | Onboarding tour | browser storage | LATER | L | Local wizard. No server record. |
 | 13 | Public sign steps | React state on `PublicSignPage` | folded | L | Guard on the signature request. Not a second writer of `signature_requests.status`. |
 
-Landed on this branch: migration (enqueue failure returns `FAILED`, retry, and stall), SMS callback (forward-only, org-scoped, facts kept on a dropped callback), data-subject request (claim token, and the API view maps unknown to `failed`), integration token (refresh from `active` or `error`, `expired` refused, one `GrantRevokedError`), signature void, and proposal approval. Next is SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
+Landed on this branch: migration (enqueue failure returns `FAILED`, retry, worker-owned stale, attempt ids, retry audit), SMS callback (forward-only, org-scoped, facts kept on a dropped callback), data-subject request (claim token, and the API view maps unknown to `failed`), integration token (refresh from `active` or `error`, `expired` refused, one `GrantRevokedError`), signature void, and proposal approval. Next is SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
 
 ## 1. Integration token
 
@@ -78,20 +78,20 @@ Purpose: one import. Chunks must not run while the row is still `PENDING`, and a
 
 Code: one table, `migrationFrom` in `packages/shared/src/state-machines/migration.ts`. Every compare-and-set uses it.
 
-- CSV start claims `PENDING → RUNNING` before `queue.add`. If enqueue throws, the claim is compare-and-set `RUNNING → FAILED` and the route returns 201 with that failed job (`migrations.ts` at 286). The wizard can cancel a `PENDING` or `RUNNING` job and can retry a `FAILED` job that imported nothing.
-- Retry is `POST /migrations/:id/retry`. It matches `FAILED` only when `processedRows` and `errorRows` are both 0 (`migrationRetryAllowed`). The CSV path re-reads the Redis rows. HubSpot uses `enqueueHubspotChunk`.
-- HubSpot start creates the job `RUNNING`, then enqueues. If that enqueue throws, `hubspot-import.ts` at 186 compare-and-sets `RUNNING → FAILED` and returns the reloaded row. It does not throw.
-- A `RUNNING` job with no row progress whose `startedAt` is at least 15 minutes ago (`MIGRATION_STALL_MS`) becomes `FAILED` on `GET /migrations/:id` (`migrationStallDue`, applied at `migrations.ts:148`). A job that has processed or errored a row is not stalled.
-- The worker's next-page enqueue (`migration.ts` at 860) compare-and-sets `RUNNING → FAILED` and then rethrows, so a mid-chunk enqueue failure is not left `RUNNING`.
+- CSV start claims `PENDING → RUNNING` before `queue.add` and stores a new `attemptId` on `meta`. If enqueue throws, `markMigrationEnqueueFailed` compare-and-sets `RUNNING → FAILED` (`migrations.ts` at 51) and the route returns 201 with that failed job (at 286). The wizard can cancel a `PENDING` or `RUNNING` job and can retry a `FAILED` job that imported nothing.
+- Retry is `POST /migrations/:id/retry`. It matches `FAILED` only when `processedRows` and `errorRows` are both 0 (`migrationRetryAllowed`), mints a new `attemptId`, and writes `audit_logs` action `migration.retry` with the actor, org, migration, previous attempt, and new attempt (`migrations.ts` at 338). The CSV path re-reads the Redis rows. HubSpot uses `enqueueHubspotChunk`.
+- HubSpot start creates the job `RUNNING` with an `attemptId`, then enqueues. If that enqueue throws, `hubspot-import.ts` at 192 compare-and-sets `RUNNING → FAILED` and returns the reloaded row. It does not throw.
+- A `RUNNING` job with no row progress whose `updatedAt` is at least 15 minutes ago (`MIGRATION_STALE_MS`) is failed by the worker. The repeatable job `migration-stale-scan` calls `sweepStaleMigrations`, and `claimStaleMigration` (`apps/worker/src/queues/migration.ts` at 918) compare-and-sets `RUNNING → FAILED` on that status and that `updatedAt`, with reason `stale`. A chunk that just committed progress moves `updatedAt`, so the claim misses. A job that has processed or errored a row is not failed this way. `GET /migrations/:id` does not write. It returns a derived `stalled` flag from `migrationStaleDue` (`migrations.ts` at 152).
+- The worker's next-page enqueue (`migration.ts` at 877) compare-and-sets `RUNNING → FAILED` and then rethrows, so a mid-chunk enqueue failure is not left `RUNNING`. The next page spreads the payload, so the attempt id travels with it.
 - Cancel matches `PENDING` or `RUNNING`. Undo matches `COMPLETE` and `undoableUntil` still in the future, and stores `FAILED` plus `meta.undone`.
 - Worker complete, unsupported entity, and exhausted retries match `RUNNING` only.
-- A chunk runs only while the status is `RUNNING`. `PENDING`, `COMPLETE`, `FAILED`, and `CANCELLED` are skipped.
+- A chunk runs only while the status is `RUNNING` and `migrationChunkMatchesAttempt` accepts it (`migration.ts` at 729). A job with an attempt id refuses a chunk from another attempt or a chunk with none, before any row is read and before complete. A legacy job with no attempt id still accepts a chunk with none. `PENDING`, `COMPLETE`, `FAILED`, and `CANCELLED` are skipped.
 
 States: `PENDING`, `RUNNING`, `COMPLETE`, `FAILED`, `CANCELLED`.
 
-Events: `start`, `cancel`, `complete`, `fail`, `undo`, `retry`, `stall`.
+Events: `start`, `cancel`, `complete`, `fail`, `undo`, `retry`, `stale`.
 
-Transitions: `start` is `PENDING → RUNNING` and must win before any chunk is enqueued. `cancel` from `PENDING|RUNNING → CANCELLED`. `complete` from `RUNNING → COMPLETE`. `fail` from `RUNNING → FAILED`. `undo` from `COMPLETE → FAILED` with `meta.undone` (there is no `UNDONE` status). `retry` from `FAILED → RUNNING` only when nothing was imported. `stall` from `RUNNING → FAILED` only for that same no-progress job after 15 minutes. `COMPLETE` and `CANCELLED` do not move again. A `FAILED` job that already imported rows does not retry.
+Transitions: `start` is `PENDING → RUNNING` and must win before any chunk is enqueued. `cancel` from `PENDING|RUNNING → CANCELLED`. `complete` from `RUNNING → COMPLETE`. `fail` from `RUNNING → FAILED`. `undo` from `COMPLETE → FAILED` with `meta.undone` (there is no `UNDONE` status). `retry` from `FAILED → RUNNING` only when nothing was imported. `stale` from `RUNNING → FAILED` only for that same no-progress job after 15 minutes, and only from the worker. `COMPLETE` and `CANCELLED` do not move again. A `FAILED` job that already imported rows does not retry.
 
 Legacy / unknown: the column is a Prisma enum, so an unknown value is rejected by the database. The pure loader views an unknown string as `FAILED` and does not write it back. `undo` is stored as `FAILED` plus `meta.undone`, not as its own status.
 
@@ -168,6 +168,8 @@ Legacy / unknown: Prisma enum. `paused` and `rejected` have no writer on this tr
 Purpose: a proposal becomes approved from draft or review, once.
 
 Code: one table, `proposalFrom` in `packages/shared/src/state-machines/proposal.ts`. `proposals.approval.ts` and the RFP gate in `rfp-pipeline.ts` both match `draft` or `review`. The RFP gate also requires `approvedAt` null. A submitted proposal is not approved.
+
+Permission: Tony, 11 Nov 2026: "No, proposals:write is enough for the RFP gate." `POST /proposals/:id/rfp-approve` stays `proposals:write` (`rfp-pipeline.ts` at 347). An Account Executive, who holds that permission, can approve. A user without it receives 403 and the proposal stays unapproved.
 
 States: the `ProposalStatus` enum. The approval edge is `draft|review → approved`.
 
@@ -462,7 +464,7 @@ Each Prisma enum in `packages/db/prisma/schema.prisma`, named. Status machines t
 - `IntegrationTokenStatus.expired` has no writer. Refresh from `expired` is illegal. A past `expiresAt` with status `active` still refreshes. Refresh is legal from `active` or `error`.
 - `TenantExportStatus.expired` has no writer.
 - RFP orchestration `paused` and `rejected` have no writer.
-- Migration `undo` is stored as `FAILED` plus `meta.undone`. Retry is `FAILED → RUNNING` only when no row was imported. Stall is `RUNNING → FAILED` after 15 minutes with no progress.
+- Migration `undo` is stored as `FAILED` plus `meta.undone`. Retry is `FAILED → RUNNING` only when no row was imported, and it writes `migration.retry` with both attempt ids. `stale` is `RUNNING → FAILED` after 15 minutes with no progress, applied by the worker. GET does not write it.
 - Data subject request maps unknown stored text to `failed` without rewriting it, in the worker and in the API view.
 - SMS ignores an unknown Twilio status and does not store its price. A recognized callback that cannot move the row keeps error, price, and segments.
 - The three OAuth connect writers (Gmail, Microsoft mail, Slack) still set `active` by the unique key. LATER.
