@@ -16,7 +16,8 @@ import { useAccountIntel, useExtractDocument } from '@/hooks/useAccountIntel';
 import { toast } from '@/components/ui/Toast';
 import { staggerParent, staggerChild } from '@/lib/motion';
 
-import { STEPS, type StepId } from './intake/intakeConfig';
+import { STEPS } from './intake/intakeConfig';
+import { intakeTransition, intakeUnlocked, type IntakeEvent, type IntakeState } from './intake/intake-step';
 import { ReceiveStep } from './intake/ReceiveStep';
 import { ExtractStep } from './intake/ExtractStep';
 import { ReviewStep } from './intake/ReviewStep';
@@ -25,13 +26,17 @@ import { PublishStep } from './intake/PublishStep';
 export function IntakePage() {
   const [params, setSearchParams] = useSearchParams();
   const accountId = params.get('account') ?? '';
-  const [step, setStepState] = useState<StepId>('receive');
-  // Furthest step reached; the stepper only jumps back to steps already done.
-  const [reached, setReached] = useState(0);
-  const setStep = useCallback((next: StepId) => {
-    setStepState(next);
-    const idx = STEPS.findIndex((s) => s.id === next);
-    setReached((prev) => Math.max(prev, idx));
+  const [machine, setMachine] = useState<IntakeState>({ step: 'receive', reached: 0 });
+  const { step, reached } = machine;
+  const move = useCallback((event: IntakeEvent, persistedReview = false) => {
+    setMachine((current) => {
+      const result = intakeTransition(current, event, persistedReview);
+      if (!result.ok) {
+        console.warn(`[intake] rejected: ${result.reason}`);
+        return current;
+      }
+      return result.state;
+    });
   }, []);
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [extractingDocIds, setExtractingDocIds] = useState<Set<string>>(new Set());
@@ -50,10 +55,7 @@ export function IntakePage() {
   // `reached` is session state; finished extractions on the account are
   // persisted, so a reload can still return to Review.
   const hasPersistedExtraction = (intel.data?.extractions ?? []).some((e) => e.status === 'done');
-  const unlocked = Math.max(
-    reached,
-    hasPersistedExtraction ? STEPS.findIndex((s) => s.id === 'review') : 0,
-  );
+  const unlocked = intakeUnlocked(reached, hasPersistedExtraction);
 
   // Auto-advance to review once the extractions WE triggered this session
   // settle. Scope to extractingDocIds so historical extractions on the account
@@ -91,9 +93,9 @@ export function IntakePage() {
       } else {
         toast.success(t('intake.toastExtractionComplete', 'Extraction complete'));
       }
-      setStep('review');
+      move({ type: 'settle' });
     }, 0);
-  }, [intel.data, hasPendingExtractions, extractingDocIds, t, setStep]);
+  }, [intel.data, hasPendingExtractions, extractingDocIds, t, move]);
 
   // Attaches the chosen account to the URL (?account=<id>) so the workflow
   // stays bookmarkable/shareable, matching the ?view= pattern on AccountsPage.
@@ -161,7 +163,7 @@ export function IntakePage() {
           <div key={s.id} className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setStep(s.id)}
+              onClick={() => move({ type: 'jump', to: s.id }, hasPersistedExtraction)}
               disabled={step === s.id || i > unlocked}
               aria-current={step === s.id ? 'step' : undefined}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-colors disabled:cursor-default ${
@@ -193,7 +195,7 @@ export function IntakePage() {
           files={files}
           selectedDocs={selectedDocs}
           onToggle={toggleDoc}
-          onNext={() => setStep('extract')}
+          onNext={() => move({ type: 'next' })}
           onSelectAccount={selectAccount}
         />
       )}
@@ -205,25 +207,24 @@ export function IntakePage() {
           extractions={intel.data?.extractions ?? []}
           onExtract={runExtraction}
           isExtracting={extract.isPending}
-          onBack={() => setStep('receive')}
+          onBack={() => move({ type: 'back' })}
         />
       )}
       {step === 'review' && (
         <ReviewStep
           accountId={accountId}
-          onNext={() => setStep('publish')}
-          onBack={() => setStep('extract')}
+          onNext={() => move({ type: 'next' })}
+          onBack={() => move({ type: 'back' })}
         />
       )}
       {step === 'publish' && (
         <PublishStep
           accountId={accountId}
-          onBack={() => setStep('review')}
+          onBack={() => move({ type: 'back' })}
           onDone={() => {
             setSelectedDocs(new Set());
             setExtractingDocIds(new Set());
-            setReached(0);
-            setStepState('receive');
+            move({ type: 'reset' });
           }}
         />
       )}

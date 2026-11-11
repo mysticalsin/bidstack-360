@@ -1,5 +1,5 @@
 # State machines in bidstack-360
-Last reviewed: 2026-11-11 at parent 82c88c24. Standard: Devin v1, sha256 c62dff48dc032e70df170c3161709ae7bfb79f1e25db473b730a300cedb82f0c.
+Last reviewed: 2026-11-11. Inventory commit 663aaeb2. Standard: Devin v1, sha256 c62dff48dc032e70df170c3161709ae7bfb79f1e25db473b730a300cedb82f0c. No High-risk edit after the inventory.
 
 Risk: H means a wrong move changes a persisted job, approval, signature, export, or auth record. M means a wizard whose side effects stay in the caller. L means local UI with no CRM write. A candidate with two states and no ordering rule is NOT A MACHINE.
 
@@ -11,8 +11,8 @@ High-risk rows are not edited in this pass. The two H machines marked FIXED were
 | 1 | Migration job | apps/api/src/routes/migrations.ts:240, apps/worker/src/queues/migration.ts:705 | FIXED | H | Table in 82c88c24, before this inventory. Late chunk could overwrite a finished job. No further edit. |
 | 2 | Access policy version | apps/api/src/routes/access-policies.ts:295 | FIXED | H | Table in 82c88c24, before this inventory. Compare-and-swap kept. No further edit. |
 | 3 | HubSpot sync rollup | apps/api/src/services/sync-now/runs.ts:96 | FIXED | M | Pure rollup of the migration jobs. Behaviour unchanged. Quirks pinned by tests. |
-| 4 | Onboarding tour | apps/web/src/stores/onboarding.ts:97 | FIX now | L | Six steps plus tourActive/dismissed/tourSeen. localStorage v1. Corrupt stored arrays were accepted. |
-| 5 | Intake stepper | apps/web/src/pages/IntakePage.tsx:31 | FIX now | M | receive → extract → review → publish. Jump rule and body next/back are separate. Extraction stays in the page. |
+| 4 | Onboarding tour | apps/web/src/stores/onboarding-tour.ts | FIXED | L | Reducer. Corrupt stored steps become []. Back from step 0 is rejected and logged. |
+| 5 | Intake stepper | apps/web/src/pages/intake/intake-step.ts | FIXED | M | Table for next, back, jump, settle, reset. Extraction and toasts stay in the page. |
 | 6 | Upload start | apps/api/src/routes/migrations.ts:247 | LATER | H | Lock, digest, and unique index already guard it. A reducer would sit on the import write path. |
 | 7 | Agreement ingest item | apps/api/src/services/agreement-ingest/process.ts:443 | LATER | H | queued ↔ processing, retry. Persisted pipeline. |
 | 8 | Agreement source sync | apps/api/src/services/agreement-sources/sync.ts:163 | LATER | H | processing / failed / retry. Persisted pipeline. |
@@ -158,20 +158,101 @@ none
 
 ## Onboarding tour
 - Purpose: A six-step product tour, plus whether it was dismissed or finished.
-- Code: still inline in apps/web/src/stores/onboarding.ts (the reducer is the L fix that follows this inventory).
-- Persisted: yes, localStorage key bidstack-onboarding.v1:&lt;userId&gt;. Step index and tourActive are not stored. A non-array completedSteps was passed through; the fix maps that to [].
+- Code: apps/web/src/stores/onboarding-tour.ts, tests: apps/web/src/stores/onboarding-tour.test.ts. The zustand store is the only writer.
+- Persisted: yes, localStorage key `bidstack-onboarding.v1:<userId>`, version 1 inside the JSON. Step index and whether the tour is open are not stored. A non-array or out-of-range completedSteps loads as the in-range unique steps. Unreadable JSON is left untouched.
 
-Current flags that can combine: tourActive, dismissed, tourSeen, currentStepIndex, completedSteps. startTour after dismiss leaves tourActive and dismissed both true. skipToStep accepts any number.
+### States
+| State | Data carried | Meaning |
+|---|---|---|
+| inactive | step, completed, dismissed, seen | Tour closed |
+| active | step 0–5, completed, dismissed, seen | Tour open at that step |
+
+start after dismiss keeps dismissed true. Finishing the last step clears dismissed and sets seen.
+
+### Events
+| Event | Source |
+|---|---|
+| start | Topbar |
+| advance | Product tour next |
+| back | Product tour back |
+| skip | skipToStep |
+| dismiss | Product tour dismiss |
+| complete | completeTourStep |
+
+### Transitions
+| From | Event | Guard | To | Side effects |
+|---|---|---|---|---|
+| either, any step | start | none | active at 0 | none |
+| either, step 0–4 | advance | none | same phase, step+1, step marked completed | persist |
+| either, step 5 | advance | none | inactive, seen, dismissed false, step marked completed | persist |
+| either, step 1–5 | back | not step 0 | same phase, step−1 | none |
+| either | skip | step in 0–5 | active at that step | none |
+| either | dismiss | none | inactive, dismissed, seen | persist |
+| either | complete | step in 0–5 | same phase, step added once | none |
+
+Anything not in this table is illegal and is rejected and logged. Back from 0, and skip or complete outside 0–5, are the illegal pairs.
+
+```mermaid
+stateDiagram-v2
+  [*] --> inactive
+  inactive --> active: start
+  active --> active: advance / back / skip
+  active --> inactive: dismiss
+  active --> inactive: advance from last step
+```
 
 ### Platform / flag differences
-none. No auto-start. Tour starts only from startTour.
+none. The tour does not auto-start.
 
 ## Intake stepper
 - Purpose: Receive documents, extract, review, publish. The stepper may return to a step already reached, and a finished extraction on the account unlocks review after reload.
-- Code: still inline in apps/web/src/pages/IntakePage.tsx (the table is the M fix that follows this inventory).
-- Persisted: the step itself is not stored. Account extractions are. reached is session state.
+- Code: apps/web/src/pages/intake/intake-step.ts, tests: apps/web/src/pages/intake/intake-step.test.ts. IntakePage is the only writer.
+- Persisted: the step is not stored. Account extractions are. reached is session state. No version.
 
-Body next/back, the stepper jump, the settle-to-review effect, and onDone each call setStep with a different rule.
+### States
+| State | Data carried | Meaning |
+|---|---|---|
+| receive | reached | Choosing documents |
+| extract | reached | Running extraction |
+| review | reached | Checking the extraction |
+| publish | reached | Committing it |
+
+### Events
+| Event | Source |
+|---|---|
+| next | Step body |
+| back | Step body |
+| jump | Stepper button |
+| settle | Extraction effect, when at least one document succeeded |
+| reset | Publish done |
+
+### Transitions
+| From | Event | Guard | To | Side effects |
+|---|---|---|---|---|
+| receive | next | none | extract | none in the reducer |
+| extract | next | none | review | none in the reducer |
+| review | next | none | publish | none in the reducer |
+| extract | back | none | receive | none |
+| review | back | none | extract | none |
+| publish | back | none | review | none |
+| any | jump | target index ≤ unlocked | that step | none |
+| any | settle | none | review | toasts stay in the page |
+| any | reset | none | receive, reached 0 | page clears the selection |
+
+unlocked is max(reached, 2) when the account has a finished extraction, otherwise reached. Anything not in this table is illegal and is rejected and logged. Next from publish, back from receive, and a jump past unlocked are the illegal pairs.
+
+```mermaid
+stateDiagram-v2
+  [*] --> receive
+  receive --> extract: next
+  extract --> review: next
+  review --> publish: next
+  extract --> receive: back
+  review --> extract: back
+  publish --> review: back
+  extract --> review: settle
+  publish --> receive: reset
+```
 
 ### Platform / flag differences
 none
