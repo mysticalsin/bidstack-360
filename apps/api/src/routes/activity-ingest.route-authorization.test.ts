@@ -62,6 +62,7 @@ vi.mock('../services/sync-now/index.js', () => ({
   startSyncRun: vi.fn(),
   getSyncRun: vi.fn(),
   getSyncOverview: vi.fn(),
+  closeSyncNowQueues: vi.fn(async () => {}),
 }));
 
 import { getCompanyActivitySummary, ingestActivities, listAccountConversations, prisma } from '@bidstack/db';
