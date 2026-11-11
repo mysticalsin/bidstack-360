@@ -86,4 +86,62 @@ describe('migration attempt fence', () => {
     expect(afterCurrent.status).toBe('COMPLETE');
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
   });
+
+  t('both copies of chunk 0 are consumed and only the new attempt is processed', async () => {
+    // WHY: retry enqueues chunk 0 again while the original is still queued.
+    // The attempt on the job is the one retry just minted. The older copy
+    // must be a no-op, so the row is imported once.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_both_${ns}`, name: `both ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'Both' },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        startedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: CURRENT },
+      },
+    });
+    let reads = 0;
+    const deps: MigrationChunkDeps = {
+      readRows: async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      },
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    };
+    const log = { info: () => undefined, warn: () => undefined };
+    const payload = {
+      migrationJobId: job.id,
+      orgId: org.id,
+      userId: user.id,
+      source: 'CSV' as const,
+      entityType: 'companies',
+      chunkOffset: 0,
+      chunkSize: 100,
+      totalRows: 1,
+      redisKey: 'rows',
+      mappings: { Name: 'company.name' },
+      dedupStrategy: 'duplicate' as const,
+      attemptId: PREVIOUS,
+    };
+    await processMigrationChunk(payload, deps, log);
+    await processMigrationChunk({ ...payload, attemptId: CURRENT }, deps, log);
+    const companies = await prisma.company.count({ where: { orgId: org.id } });
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(reads).toBe(1);
+    expect(companies).toBe(1);
+    expect(stored.processedRows).toBe(1);
+    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
 });

@@ -42,6 +42,7 @@ import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
 const ENQUEUE_FAILURE = 'Failed to enqueue import chunks';
+const CHUNK_SIZE = 100;
 
 /** Empty on purpose. Retry takes the id from the path and no fields. */
 const RetryBody = z.object({}).strict().nullish();
@@ -60,6 +61,43 @@ function stalledFlag(job: {
     errorRows: job.errorRows,
     now: new Date(),
   });
+}
+
+async function enqueueCsvChunks(input: {
+  jobId: string;
+  orgId: string;
+  userId: string;
+  source: MigrationJobPayload['source'];
+  entityType: string;
+  rows: Record<string, string>[];
+  redisKey: string;
+  mappings: Record<string, string | null>;
+  dedupStrategy: 'skip' | 'update' | 'duplicate';
+  externalIdColumn?: string;
+  attemptId: string;
+  queue: Queue;
+  nameFor: (index: number) => string;
+  idFor: (index: number) => string;
+}): Promise<void> {
+  const chunks = Math.ceil(input.rows.length / CHUNK_SIZE);
+  for (let i = 0; i < chunks; i++) {
+    const payload: MigrationJobPayload = {
+      migrationJobId: input.jobId,
+      orgId: input.orgId,
+      userId: input.userId,
+      source: input.source,
+      entityType: input.entityType,
+      chunkOffset: i * CHUNK_SIZE,
+      chunkSize: CHUNK_SIZE,
+      totalRows: input.rows.length,
+      redisKey: input.redisKey,
+      mappings: input.mappings,
+      dedupStrategy: input.dedupStrategy,
+      externalIdColumn: input.externalIdColumn,
+      attemptId: input.attemptId,
+    };
+    await input.queue.add(input.nameFor(i), payload, { jobId: input.idFor(i) });
+  }
 }
 
 async function markMigrationEnqueueFailed(
@@ -262,31 +300,25 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('Migration job is no longer pending');
       }
 
-      const CHUNK_SIZE = 100;
-      const chunks = Math.ceil(rows.length / CHUNK_SIZE);
       const queue = getQueue();
 
       try {
-        for (let i = 0; i < chunks; i++) {
-          const payload: MigrationJobPayload = {
-            migrationJobId: job.id,
-            orgId,
-            userId,
-            source,
-            entityType,
-            chunkOffset: i * CHUNK_SIZE,
-            chunkSize: CHUNK_SIZE,
-            totalRows: rows.length,
-            redisKey,
-            mappings,
-            dedupStrategy,
-            externalIdColumn,
-            attemptId,
-          };
-          await queue.add(`${job.id}-chunk-${i}`, payload, {
-            jobId: `${job.id}-${entityType}-chunk-${i}`,
-          });
-        }
+        await enqueueCsvChunks({
+          jobId: job.id,
+          orgId,
+          userId,
+          source,
+          entityType,
+          rows,
+          redisKey,
+          mappings,
+          dedupStrategy,
+          externalIdColumn,
+          attemptId,
+          queue,
+          nameFor: (i) => `${job.id}-chunk-${i}`,
+          idFor: (i) => `${job.id}-${entityType}-chunk-${i}`,
+        });
       } catch (err) {
         // The claim already moved the row to RUNNING. Leave it FAILED so the
         // wizard can show the failure and offer retry. A cancel that won the
@@ -391,28 +423,23 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             },
           });
           const mappings = (mapping?.mappings ?? {}) as Record<string, string | null>;
-          const chunkSize = 100;
-          const chunks = Math.ceil(rows.length / chunkSize);
-          for (let i = 0; i < chunks; i++) {
-            const payload: MigrationJobPayload = {
-              migrationJobId: job.id,
-              orgId,
-              userId,
-              source: job.source,
-              entityType: meta.entityType,
-              chunkOffset: i * chunkSize,
-              chunkSize,
-              totalRows: rows.length,
-              redisKey,
-              mappings,
-              dedupStrategy: meta.dedupStrategy ?? 'update',
-              externalIdColumn: meta.externalIdColumn ?? undefined,
-              attemptId,
-            };
-            await queue.add(`${job.id}-retry-${i}`, payload, {
-              jobId: `${job.id}-${meta.entityType}-retry-${Date.now()}-${i}`,
-            });
-          }
+          const stamp = Date.now();
+          await enqueueCsvChunks({
+            jobId: job.id,
+            orgId,
+            userId,
+            source: job.source,
+            entityType: meta.entityType,
+            rows,
+            redisKey,
+            mappings,
+            dedupStrategy: meta.dedupStrategy ?? 'update',
+            externalIdColumn: meta.externalIdColumn ?? undefined,
+            attemptId,
+            queue,
+            nameFor: (i) => `${job.id}-retry-${i}`,
+            idFor: (i) => `${job.id}-${meta.entityType}-retry-${stamp}-${i}`,
+          });
         }
       } catch (err) {
         const message =
