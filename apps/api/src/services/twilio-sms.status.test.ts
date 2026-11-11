@@ -4,7 +4,18 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const rows = new Map<string, { id: string; twilioSid: string; orgId: string; status: string }>();
+const rows = new Map<
+  string,
+  {
+    id: string;
+    twilioSid: string;
+    orgId: string;
+    status: string;
+    errorCode?: number;
+    costMicros?: bigint;
+    segments?: number;
+  }
+>();
 
 const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
@@ -49,7 +60,10 @@ beforeEach(() => {
     if (where.orgId && row.orgId !== where.orgId) return { count: 0 };
     const allowed: string[] | undefined = where.status?.in ?? (typeof where.status === 'string' ? [where.status] : undefined);
     if (allowed && !allowed.includes(row.status)) return { count: 0 };
-    row.status = data.status;
+    if (typeof data.status === 'string') row.status = data.status;
+    if (data.errorCode !== undefined) row.errorCode = data.errorCode;
+    if (data.costMicros !== undefined) row.costMicros = data.costMicros;
+    if (data.segments !== undefined) row.segments = data.segments;
     return { count: 1 };
   });
   mocks.findFirst.mockImplementation(async ({ where }) => {
@@ -81,6 +95,38 @@ describe('Twilio status only moves forward', () => {
     seed('DELIVERED');
     await callback('failed');
     expect(rows.get('SM1')?.status).toBe('DELIVERED');
+  });
+
+  it('keeps error, price, and segments when a failed callback cannot move DELIVERED', async () => {
+    // WHY: a late failure callback is dropped as a status, but the carrier's
+    // error and price are the only record of that attempt. An unknown status
+    // is not a callback we understand, so its price is not stored.
+    seed('DELIVERED');
+    await handleStatusCallback(
+      {
+        MessageSid: 'SM1',
+        MessageStatus: 'failed',
+        ErrorCode: '30008',
+        Price: '0.01',
+        NumSegments: '2',
+      },
+      'org-1',
+      log,
+    );
+    const row = rows.get('SM1');
+    expect(row?.status).toBe('DELIVERED');
+    expect(row?.errorCode).toBe(30008);
+    expect(row?.costMicros).toBe(10_000n);
+    expect(row?.segments).toBe(2);
+
+    seed('DELIVERED');
+    await handleStatusCallback(
+      { MessageSid: 'SM1', MessageStatus: 'mystery', ErrorCode: '1', Price: '0.01', NumSegments: '2' },
+      'org-1',
+      log,
+    );
+    expect(rows.get('SM1')?.errorCode).toBeUndefined();
+    expect(rows.get('SM1')?.costMicros).toBeUndefined();
   });
 
   it('moves queued to sent, then to delivered', async () => {

@@ -317,6 +317,8 @@ export async function handleStatusCallback(
 
   const event = smsEventFromProvider(MessageStatus ?? '');
   if (!event) {
+    // An unrecognized provider status is ignored entirely, including price
+    // and error fields. We do not store facts we cannot attribute to a known event.
     log.debug({ MessageSid, MessageStatus }, 'Ignoring unknown Twilio status');
     return;
   }
@@ -326,6 +328,22 @@ export async function handleStatusCallback(
   const from = smsFrom(event);
 
   const costMicros = Price ? BigInt(Math.round(parseFloat(Price) * 1_000_000)) : undefined;
+  const facts = {
+    ...(ErrorCode ? { errorCode: parseInt(ErrorCode, 10) } : {}),
+    ...(costMicros !== undefined ? { costMicros } : {}),
+    ...(NumSegments ? { segments: parseInt(NumSegments, 10) } : {}),
+  };
+
+  // A recognized callback that cannot move the row still keeps error, price,
+  // and segment facts. The where-clause matches the status just read, so a
+  // concurrent forward move is not overwritten.
+  const keepFacts = async (status: string) => {
+    if (Object.keys(facts).length === 0) return;
+    await prisma.smsMessage.updateMany({
+      where: { twilioSid: MessageSid, orgId, status },
+      data: facts,
+    });
+  };
 
   // Prisma rejects an empty `in` list. `queued` is only the starting status,
   // written when the message is created, so a queued callback never moves a row.
@@ -337,6 +355,7 @@ export async function handleStatusCallback(
     if (current && current.status !== mapped) {
       log.warn({ smsMessageId: current.id, from: current.status, to: mapped }, 'illegal sms transition');
     }
+    if (current) await keepFacts(current.status);
     return;
   }
 
@@ -358,6 +377,7 @@ export async function handleStatusCallback(
     if (current && current.status !== mapped) {
       log.warn({ smsMessageId: current.id, from: current.status, to: mapped }, 'illegal sms transition');
     }
+    if (current) await keepFacts(current.status);
     return;
   }
 
