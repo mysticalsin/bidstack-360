@@ -1,4 +1,18 @@
 {
+  "csvImport": {
+    "progress": {
+      "statusStalled": "توقف الاستيراد",
+      "reasonStalled": "توقف الاستيراد قبل حفظ أي صف.",
+      "reasonEnqueue": "لم يبدأ الاستيراد. حاول مرة أخرى.",
+      "reasonRowsExpired": "انتهت صلاحية هذه الصفوف. أعد رفع الملف.",
+      "reasonUnknown": "تعذر إكمال الاستيراد.",
+      "actionFailed": "لم ينجح ذلك. حاول مرة أخرى.",
+      "cancelling": "جارٍ الإلغاء…",
+      "cancel": "إلغاء الاستيراد",
+      "retrying": "جارٍ إعادة المحاولة…",
+      "retry": "إعادة محاولة الاستيراد"
+    }
+  },
   "references": {
     "column": {
       "reference": "المرجع",
