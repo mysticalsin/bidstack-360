@@ -303,6 +303,23 @@ After the dump/snapshot, write the proof artifact described in
 > Closing Gate 12 requires both (a) confirming automated backups exist in the
 > live env and (b) executing a restore (§9).
 
+### 5d. Per-migration rollback notes
+
+**`20261109070000_migration_job_upload_id`** (additive). Adds the nullable
+`migration_jobs.upload_id` and the unique index `migration_jobs_org_upload_key`
+on `(org_id, upload_id)`. Existing rows get NULL, and NULLs never collide, so it
+applies to any existing data without a backfill.
+
+- App-only rollback: safe. Older images do not read or write the column.
+- Removing it (only after rolling back to an image older than this migration):
+  write a new forward migration containing
+  ```sql
+  DROP INDEX IF EXISTS "migration_jobs_org_upload_key";
+  ALTER TABLE "migration_jobs" DROP COLUMN IF EXISTS "upload_id";
+  ```
+  This drops only the start keys. Duplicate start protection is lost; no job
+  row is removed.
+
 ---
 
 ## 6. DATABASE restore — the real DB rollback (break-glass)
