@@ -327,10 +327,33 @@ export async function handleStatusCallback(
     return;
   }
 
+  // Forward only: queued, then sent, then a terminal delivery or failure.
+  // A later callback must not move backwards, and a terminal status stays.
+  const from: Record<typeof mapped, Array<'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'UNDELIVERED'>> = {
+    QUEUED: [],
+    SENT: ['QUEUED'],
+    DELIVERED: ['QUEUED', 'SENT'],
+    FAILED: ['QUEUED', 'SENT'],
+    UNDELIVERED: ['QUEUED', 'SENT'],
+  };
+
   const costMicros = Price ? BigInt(Math.round(parseFloat(Price) * 1_000_000)) : undefined;
 
-  await prisma.smsMessage.updateMany({
-    where: { twilioSid: MessageSid },
+  // Prisma rejects an empty `in` list. `queued` is only the starting status,
+  // written when the message is created, so a queued callback never moves a row.
+  if (from[mapped].length === 0) {
+    const current = await prisma.smsMessage.findFirst({
+      where: { twilioSid: MessageSid },
+      select: { id: true, status: true },
+    });
+    if (current && current.status !== mapped) {
+      log.warn({ smsMessageId: current.id, from: current.status, to: mapped }, 'illegal sms transition');
+    }
+    return;
+  }
+
+  const moved = await prisma.smsMessage.updateMany({
+    where: { twilioSid: MessageSid, status: { in: from[mapped] } },
     data: {
       status: mapped,
       errorCode: ErrorCode ? parseInt(ErrorCode, 10) : null,
@@ -339,6 +362,16 @@ export async function handleStatusCallback(
       deliveredAt: mapped === 'DELIVERED' ? new Date() : undefined,
     },
   });
+  if (moved.count === 0) {
+    const current = await prisma.smsMessage.findFirst({
+      where: { twilioSid: MessageSid },
+      select: { id: true, status: true },
+    });
+    if (current && current.status !== mapped) {
+      log.warn({ smsMessageId: current.id, from: current.status, to: mapped }, 'illegal sms transition');
+    }
+    return;
+  }
 
   log.info({ MessageSid, status: mapped }, 'SmsMessage status updated');
 }

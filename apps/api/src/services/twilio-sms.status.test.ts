@@ -1,0 +1,89 @@
+// WHY: Twilio retries status callbacks out of order. An older "sent" must not
+// overwrite a message that has already been delivered, and a failure must not
+// replace a delivery either. The status only moves forward.
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const rows = new Map<string, { id: string; twilioSid: string; status: string }>();
+
+const mocks = vi.hoisted(() => ({
+  updateMany: vi.fn(),
+  findFirst: vi.fn(),
+}));
+
+vi.mock('@bidstack/db', () => ({
+  Prisma: { PrismaClientKnownRequestError: class extends Error {} },
+  prisma: {
+    smsMessage: {
+      updateMany: mocks.updateMany,
+      findFirst: mocks.findFirst,
+    },
+  },
+}));
+
+vi.mock('@bidstack/shared/token-crypto', () => ({ decryptToken: vi.fn() }));
+vi.mock('../lib/serum-connector-policy.js', () => ({
+  assertSerumConnectorAllowed: vi.fn(),
+  recordSerumConnectorTestSuccess: vi.fn(),
+}));
+vi.mock('../lib/outbound-communication-guard.js', () => ({
+  estimateSmsSegments: () => 1,
+  outboundCommunicationCapConfig: () => ({ smsEstimatedSegmentCostMicros: 8_000n }),
+  reserveOutboundCommunication: vi.fn(),
+}));
+
+import { handleStatusCallback } from './twilio-sms.service.js';
+
+const log = { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() };
+
+function seed(status: string) {
+  rows.clear();
+  rows.set('SM1', { id: 'msg-1', twilioSid: 'SM1', status });
+}
+
+beforeEach(() => {
+  rows.clear();
+  mocks.updateMany.mockImplementation(async ({ where, data }) => {
+    const row = rows.get(where.twilioSid);
+    if (!row) return { count: 0 };
+    const allowed: string[] | undefined = where.status?.in ?? (typeof where.status === 'string' ? [where.status] : undefined);
+    if (allowed && !allowed.includes(row.status)) return { count: 0 };
+    row.status = data.status;
+    return { count: 1 };
+  });
+  mocks.findFirst.mockImplementation(async ({ where }) => rows.get(where.twilioSid) ?? null);
+});
+
+async function callback(status: string) {
+  await handleStatusCallback({ MessageSid: 'SM1', MessageStatus: status }, log);
+}
+
+describe('Twilio status only moves forward', () => {
+  it('does not let an older sent callback overwrite DELIVERED', async () => {
+    seed('DELIVERED');
+    await callback('sent');
+    expect(rows.get('SM1')?.status).toBe('DELIVERED');
+  });
+
+  it('does not let failed overwrite DELIVERED', async () => {
+    seed('DELIVERED');
+    await callback('failed');
+    expect(rows.get('SM1')?.status).toBe('DELIVERED');
+  });
+
+  it('moves queued to sent, then to delivered', async () => {
+    seed('QUEUED');
+    await callback('sent');
+    expect(rows.get('SM1')?.status).toBe('SENT');
+    await callback('delivered');
+    expect(rows.get('SM1')?.status).toBe('DELIVERED');
+  });
+
+  it('moves sent to failed and does not move back to queued', async () => {
+    seed('SENT');
+    await callback('failed');
+    expect(rows.get('SM1')?.status).toBe('FAILED');
+    await callback('queued');
+    expect(rows.get('SM1')?.status).toBe('FAILED');
+  });
+});
