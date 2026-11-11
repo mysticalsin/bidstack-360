@@ -19,7 +19,7 @@ import {
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 import { discardFailedStart } from '../lib/failed-start-cleanup.js';
 import { addWithinDeadline } from '../lib/queue-enqueue.js';
-import { withUploadLock } from '../lib/upload-start.js';
+import { warnIfPastRetryWindow, withUploadLock } from '../lib/upload-start.js';
 import { isUniqueViolation } from '../routes/opportunities.helpers.js';
 
 export const HUBSPOT_IMPORT_ENTITIES = ['companies', 'contacts', 'deals', 'tasks'] as const;
@@ -96,10 +96,12 @@ export async function startHubspotImport(input: {
   /** The client's key for this start: a retry with the same key resumes or
    *  returns the start it made instead of importing again. */
   uploadId?: string;
-  /** Receives cleanup failures of a start that could not be queued. */
-  log?: { error(obj: object, msg: string): void };
+  /** Receives cleanup failures of a start that could not be queued, and
+   *  resumes past the queue's retry window. */
+  log?: { error(obj: object, msg: string): void; warn(obj: object, msg: string): void };
 }) {
   const { orgId, userId, uploadId } = input;
+  const log = input.log ?? { error: () => {}, warn: () => {} };
 
   // Workers resolve encrypted tokens just in time so raw OAuth tokens are
   // never persisted in BullMQ payloads.
@@ -168,7 +170,12 @@ export async function startHubspotImport(input: {
     const done = new Set(audited.map((a) => a.targetId));
     const unfinished = planned.filter((p) => !done.has(p.job.id));
     const requeue = unfinished.filter((p) => p.job.status === 'RUNNING');
-    if (requeue.length > 0) await queueFirstChunks(requeue);
+    if (requeue.length > 0) {
+      for (const { entity, job } of requeue) {
+        await warnIfPastRetryWindow(input.queue, log, job.id, job.createdAt, [`${job.id}-${entity}-chunk-0`]);
+      }
+      await queueFirstChunks(requeue);
+    }
     await finishStart(unfinished);
     return earlier;
   };
@@ -227,7 +234,7 @@ export async function startHubspotImport(input: {
     try {
       await queueFirstChunks(planned);
     } catch (err) {
-      await discardFailedStart(err, input.log ?? { error: () => {} }, [
+      await discardFailedStart(err, log, [
         ['delete job rows', () => prisma.migrationJob.deleteMany({ where: { id: { in: planned.map((p) => p.job.id) } } })],
       ]);
       throw err;

@@ -319,6 +319,38 @@ describe('POST /api/v1/migrations/start-hubspot — retried start', () => {
   });
 });
 
+// WHY: a resume re-adds nothing only while BullMQ still holds the first
+// chunk (7 days, last 500 completed). Past that it imports the entity again
+// from its first page, so it must at least say so.
+describe('POST /api/v1/migrations/start-hubspot — resume past the queue retry window', () => {
+  skipIfNoDb('warns when the first chunks are no longer in the queue, and still resumes', async () => {
+    const uploadId = randomUUID();
+    const server = await buildServer();
+    const warnings: Array<{ obj: Record<string, unknown>; msg: string }> = [];
+    server.addHook('onRequest', async (req) => {
+      const warn = req.log.warn.bind(req.log);
+      req.log.warn = ((obj: Record<string, unknown>, msg: string) => {
+        warnings.push({ obj, msg });
+        return warn(obj, msg);
+      }) as typeof req.log.warn;
+    });
+    await server.ready();
+    fresh.push(server);
+    vi.spyOn(prisma.auditLog, 'create').mockRejectedValueOnce(new Error('synthetic database failure'));
+    expect((await startHubspot(['companies', 'contacts'], server, { uploadId })).statusCode).toBe(500);
+    const rows = await startRows(uploadId);
+    const chunkIds = [`${rows[0]?.id}-companies-chunk-0`, `${rows[1]?.id}-contacts-chunk-0`];
+    for (const id of chunkIds) await inspectQueue().remove(id);
+
+    const retry = await startHubspot(['companies', 'contacts'], server, { uploadId });
+
+    expect(retry.statusCode).toBe(201);
+    const past = warnings.filter((w) => /past the queue retry window/.test(w.msg));
+    expect(past.map((w) => w.obj.missingChunks)).toEqual(chunkIds.map((id) => [id]));
+    expect(await chunksOf(jobIdsOf(retry))).toEqual([...chunkIds].sort());
+  });
+});
+
 describe('POST /api/v1/migrations/start-hubspot — failed cleanup', () => {
   // WHY: a throwing cleanup replaced the start's own error, turning a
   // retryable 503 into a 500.

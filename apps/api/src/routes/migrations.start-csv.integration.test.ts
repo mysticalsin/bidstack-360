@@ -323,6 +323,78 @@ describe('POST /api/v1/migrations/start-csv — concurrent retries', () => {
   });
 });
 
+type Warning = { obj: Record<string, unknown>; msg: string };
+/** A server of its own whose request loggers record every warning. */
+async function watchedServer() {
+  const server = await buildServer();
+  const warnings: Warning[] = [];
+  server.addHook('onRequest', async (req) => {
+    const warn = req.log.warn.bind(req.log);
+    req.log.warn = ((obj: Record<string, unknown>, msg: string) => {
+      warnings.push({ obj, msg });
+      return warn(obj, msg);
+    }) as typeof req.log.warn;
+  });
+  await server.ready();
+  fresh.push(server);
+  return { server, pastWindow: () => warnings.filter((w) => /past the queue retry window/.test(w.msg)) };
+}
+
+// WHY: a resume re-adds nothing only while BullMQ still holds the chunks
+// (7 days, last 500 completed). Past that it imports rows a second time, so
+// it must at least say so.
+describe('POST /api/v1/migrations/start-csv — resume past the queue retry window', () => {
+  async function failedStart(server: Awaited<ReturnType<typeof buildServer>>, entityType: string, uploadId: string) {
+    vi.spyOn(prisma.auditLog, 'create').mockRejectedValueOnce(new Error('synthetic database failure'));
+    expect((await startCsv(entityType, 150, { uploadId }, server)).statusCode).toBe(500);
+    const [job] = await jobRows(entityType);
+    const chunkIds = [0, 1].map((i) => `${job!.id}-${entityType}-chunk-${i}`);
+    queuedJobIds.push(...chunkIds);
+    return { job: job!, chunkIds };
+  }
+
+  skipIfNoDb('a resume inside the window logs no warning', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const { server, pastWindow } = await watchedServer();
+    const { job } = await failedStart(server, entityType, uploadId);
+
+    expect((await startCsv(entityType, 150, { uploadId }, server)).statusCode).toBe(201);
+    expect(pastWindow()).toEqual([]);
+    await redis.del(`migration:${job.id}:${entityType}:rows`);
+  });
+
+  skipIfNoDb('warns when the chunks of the start are no longer in the queue, and still resumes', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const { server, pastWindow } = await watchedServer();
+    const { job, chunkIds } = await failedStart(server, entityType, uploadId);
+    for (const id of chunkIds) await inspectQueue().remove(id);
+
+    const retry = await startCsv(entityType, 150, { uploadId }, server);
+
+    expect(retry.statusCode).toBe(201);
+    expect(pastWindow()).toHaveLength(1);
+    expect(pastWindow()[0]!.obj).toMatchObject({ migrationJobId: job.id, missingChunks: chunkIds });
+    expect((await queuedChunks(entityType)).map((c) => c.id).sort()).toEqual(chunkIds);
+    await redis.del(`migration:${job.id}:${entityType}:rows`);
+  });
+
+  skipIfNoDb('warns when the start is older than the 7-day window', async () => {
+    const entityType = `synthetic-${randomUUID()}`;
+    const uploadId = randomUUID();
+    const { server, pastWindow } = await watchedServer();
+    const { job } = await failedStart(server, entityType, uploadId);
+    await prisma.migrationJob.update({ where: { id: job.id }, data: { createdAt: new Date(Date.now() - 8 * 86_400_000) } });
+
+    expect((await startCsv(entityType, 150, { uploadId }, server)).statusCode).toBe(201);
+    expect(pastWindow()).toHaveLength(1);
+    expect(pastWindow()[0]!.obj).toMatchObject({ migrationJobId: job.id, missingChunks: [] });
+    expect(pastWindow()[0]!.obj.ageMs).toBeGreaterThan(7 * 86_400_000);
+    await redis.del(`migration:${job.id}:${entityType}:rows`);
+  });
+});
+
 // WHY: the cleanup of a failed start ran unguarded; when it threw, its error
 // replaced the start's own, so a retryable 503 became a 500 and the stored
 // rows were never removed.

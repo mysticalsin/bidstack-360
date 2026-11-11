@@ -356,7 +356,9 @@ export const MIGRATION: QueueConfig = {
   defaultJobOptions: {
     attempts: 5,
     backoff: { type: 'exponential', delay: 10_000 },
-    removeOnComplete: { age: 86_400 * 7, count: 500 }, // keep 7d for audit
+    // keep 7d for audit; also the window in which a resumed start re-adds
+    // nothing (docs/solutions/migration-start-retry-window.md)
+    removeOnComplete: { age: 86_400 * 7, count: 500 },
     removeOnFail: { age: 86_400 * 30, count: 5000 },
   },
 };

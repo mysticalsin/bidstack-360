@@ -35,7 +35,7 @@ import { previewImportRows } from '../lib/import-preview.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 import { discardFailedStart } from '../lib/failed-start-cleanup.js';
 import { addWithinDeadline, QUEUE_ENQUEUE_TIMEOUT_MS, QueueUnavailableError } from '../lib/queue-enqueue.js';
-import { withUploadLock } from '../lib/upload-start.js';
+import { warnIfPastRetryWindow, withUploadLock } from '../lib/upload-start.js';
 import { redis } from '../redis.js';
 import { isUniqueViolation } from './opportunities.helpers.js';
 
@@ -171,6 +171,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const { source, entityType, rows, mappings, dedupStrategy, externalIdColumn, uploadId } = req.body;
       const CHUNK_SIZE = 100;
       const rowsKey = (jobId: string) => `migration:${jobId}:${entityType}:rows`;
+      const chunkJobIds = (jobId: string) =>
+        Array.from({ length: Math.ceil(rows.length / CHUNK_SIZE) }, (_, i) => `${jobId}-${entityType}-chunk-${i}`);
 
       // Stores the rows (1h TTL) for the worker to read in chunks, then queues
       // every chunk in one bounded addBulk (one MULTI: all or none). Chunk ids
@@ -184,7 +186,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           const reason = err instanceof Error && /timed out/i.test(err.message) ? 'timed-out' : 'not-ready';
           throw new QueueUnavailableError(MIGRATION.name, reason, QUEUE_ENQUEUE_TIMEOUT_MS);
         }
-        const chunkJobs = Array.from({ length: Math.ceil(rows.length / CHUNK_SIZE) }, (_, i) => {
+        const chunkJobs = chunkJobIds(jobId).map((chunkJobId, i) => {
           const payload: MigrationJobPayload = {
             migrationJobId: jobId,
             orgId,
@@ -202,7 +204,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           return {
             name: `${jobId}-chunk-${i}`,
             data: payload,
-            opts: { jobId: `${jobId}-${entityType}-chunk-${i}` },
+            opts: { jobId: chunkJobId },
           };
         });
         await addWithinDeadline(getQueue(), (q) => q.addBulk(chunkJobs));
@@ -250,7 +252,10 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             // Still PENDING: the first attempt may have failed before or after
             // queueing; queueing again only adds the chunks that are missing.
             // The job row is kept on failure here, since its chunks may be queued.
-            if (earlier.status === 'PENDING') await queueImport(earlier.id);
+            if (earlier.status === 'PENDING') {
+              await warnIfPastRetryWindow(getQueue(), req.log, earlier.id, earlier.createdAt, chunkJobIds(earlier.id));
+              await queueImport(earlier.id);
+            }
             return finishStart(earlier.id);
           }
         }
