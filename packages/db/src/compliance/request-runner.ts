@@ -38,6 +38,16 @@ export interface DataSubjectRequestOutcome {
 export interface RunDataSubjectRequestOptions {
   /** Delete stored objects by key. A missing object is not an error; throw on any other failure. */
   deleteObjects?: (keys: string[]) => Promise<void>;
+  /** Illegal moves are logged with the request id and the states only. */
+  log?: { warn: (obj: object, msg?: string) => void };
+}
+
+const KNOWN_STATUSES = ['queued', 'running', 'done', 'failed'] as const;
+type KnownStatus = (typeof KNOWN_STATUSES)[number];
+
+/** Unknown stored text is `failed` for the caller. The row is not rewritten. */
+export function storedDataSubjectState(stored: string): KnownStatus {
+  return (KNOWN_STATUSES as readonly string[]).includes(stored) ? (stored as KnownStatus) : 'failed';
 }
 
 /** A `running` row older than this is treated as abandoned and may be claimed again. */
@@ -76,12 +86,45 @@ export async function runDataSubjectRequest(
   if (!row) throw new Error(`data-subject-request ${requestId} not found`);
   const outcome = { id: row.id, kind: row.kind, dryRun: row.dryRun };
   const retryAt = () => new Date((row.startedAt?.getTime() ?? Date.now()) + STALE_RUNNING_MS + 1_000);
+  if (!(KNOWN_STATUSES as readonly string[]).includes(row.status)) {
+    // Safe state is failed: queued would run another erasure, done would hide one.
+    opts.log?.warn(
+      { requestId: row.id, from: row.status, to: 'failed' },
+      'illegal data subject transition',
+    );
+    return { ...outcome, status: 'failed' };
+  }
   if (claimed.count === 0) {
     // A recent run still holds the claim; acknowledging the job here would
     // strand the row if that run died.
     if (row.status === 'running') return { ...outcome, status: 'busy', retryAt: retryAt() };
     return { ...outcome, status: 'skipped' };
   }
+
+  /** `done` and `failed` are written only from `running`. Null means this run won. */
+  const writeFromRunning = async (
+    status: 'done' | 'failed',
+    data: Prisma.DataSubjectRequestUpdateManyMutationInput,
+  ): Promise<DataSubjectRequestOutcome | null> => {
+    const moved = await db.dataSubjectRequest.updateMany({
+      where: { id: row.id, orgId: row.orgId, status: 'running' },
+      data: { ...data, status },
+    });
+    if (moved.count === 1) return null;
+    const current = await db.dataSubjectRequest.findFirst({
+      where: { id: row.id, orgId: row.orgId },
+      select: { status: true },
+    });
+    const state = storedDataSubjectState(current?.status ?? '');
+    opts.log?.warn(
+      { requestId: row.id, from: current?.status ?? null, to: status },
+      'illegal data subject transition',
+    );
+    if (state === 'running') return { ...outcome, status: 'busy', retryAt: retryAt() };
+    if (state === 'done') return { ...outcome, status: 'done' };
+    if (state === 'queued') return { ...outcome, status: 'skipped' };
+    return { ...outcome, status: 'failed' };
+  };
 
   /** Delete stored objects, then mark the erasure done. `busy` when a delete failed. */
   const completeErase = async (
@@ -104,10 +147,9 @@ export async function runDataSubjectRequest(
     }
     // The erasure has committed: record it as done before the residue scan,
     // so a scan failure can never make a completed erasure look failed.
-    await db.dataSubjectRequest.update({
-      where: { id: row.id },
-      data: { status: 'done', report: base, error: null, completedAt: new Date() },
-    });
+    // Only a row that is still running may become done.
+    const lost = await writeFromRunning('done', { report: base, error: null, completedAt: new Date() });
+    if (lost) return lost;
     if (!row.dryRun && subject) {
       let extra: Prisma.InputJsonObject;
       try {
@@ -182,16 +224,12 @@ export async function runDataSubjectRequest(
         diff: { requestId: row.id, dryRun: row.dryRun, stores: Object.keys(stores) },
       },
     });
-    await db.dataSubjectRequest.update({
-      where: { id: row.id },
-      data: { status: 'done', report, error: null, completedAt: new Date() },
-    });
+    const lost = await writeFromRunning('done', { report, error: null, completedAt: new Date() });
+    if (lost) return lost;
     return { ...outcome, status: 'done' };
   } catch (err) {
-    await db.dataSubjectRequest.update({
-      where: { id: row.id },
-      data: { status: 'failed', error: publicError(err), completedAt: new Date() },
-    });
+    const lost = await writeFromRunning('failed', { error: publicError(err), completedAt: new Date() });
+    if (lost) return lost;
     return {
       ...outcome,
       status: 'failed',
