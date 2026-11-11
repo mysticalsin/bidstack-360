@@ -294,4 +294,43 @@ describe('POST /api/v1/proposals/:proposalId/rfp-approve', () => {
     // id is BigInt — cast is sound because the type is bigint in the Prisma model.
     if (auditEntry) ctx.cleanup.auditLogs.push(auditEntry.id as bigint);
   });
+
+  skipIfNoDb(
+    'proposals:write can approve at the RFP gate and a user without it gets 403',
+    async () => {
+      // WHY: Tony's decision is that proposals:write is the RFP gate. An Account
+      // Executive holds that permission. Read-Only does not, and must not approve.
+      const { proposal: allowed } = await createApprovableProposal();
+      const { proposal: denied } = await createApprovableProposal();
+      const previousRole = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const approved = await ctx.server.inject({
+          method: 'POST',
+          url: `/api/v1/proposals/${allowed.id}/rfp-approve`,
+          headers: { 'x-bidstack-e2e-role': 'account-executive' },
+          payload: {},
+        });
+        expect(approved.statusCode).toBe(200);
+        expect(approved.json<{ orchestrationState: string }>().orchestrationState).toBe('approved');
+
+        const forbidden = await ctx.server.inject({
+          method: 'POST',
+          url: `/api/v1/proposals/${denied.id}/rfp-approve`,
+          headers: { 'x-bidstack-e2e-role': 'read-only' },
+          payload: {},
+        });
+        expect(forbidden.statusCode).toBe(403);
+      } finally {
+        if (previousRole === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousRole;
+      }
+      const granted = await prisma.proposal.findUniqueOrThrow({ where: { id: allowed.id } });
+      expect(granted.status).toBe('approved');
+      expect(granted.approvedAt).not.toBeNull();
+      const stored = await prisma.proposal.findUniqueOrThrow({ where: { id: denied.id } });
+      expect(stored.status).toBe('review');
+      expect(stored.approvedAt).toBeNull();
+    },
+  );
 });
