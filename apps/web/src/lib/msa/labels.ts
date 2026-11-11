@@ -1,5 +1,8 @@
 // Plain-language labels and tones for the Agreements screens.
 import type { BadgeTone } from '@/components/ui/Badge';
+import { formatConvertedMicros } from '@/lib/format';
+
+import { formatMicrosAmount } from '@bidstack/shared';
 
 import type { MsaKind, MsaStatus } from './types';
 
@@ -35,7 +38,11 @@ export function fmtBytes(n: number): string {
 }
 
 export function fmtMoneyMicros(amountMicros: number, currency: string): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(amountMicros / 1e6);
+  if (!Number.isSafeInteger(amountMicros) || amountMicros < 0) return 'amount not readable';
+  if (!/^[A-Za-z]{3}$/.test(currency)) {
+    return `${formatMicrosAmount(BigInt(amountMicros))} unspecified`;
+  }
+  return formatConvertedMicros(BigInt(amountMicros), currency.toUpperCase());
 }
 
 /** Deadline urgency for the expiring-soon strip and the list. */
