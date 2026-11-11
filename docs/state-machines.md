@@ -23,12 +23,12 @@ Status values: `FIX` (in the cleared order), `LATER`, `NOT A MACHINE`, `pending 
 | 7 | RFP orchestration | `rfp_orchestration_runs.state` | FIX | M | Approve-drafting can write `running` with no from-state. |
 | 8 | Proposal approval | `proposals.status` | FIX | H | Two writers can approve. The approval route already compare-and-sets; the other writer must share that rule. |
 | 9 | SERUM approval | `serum` approval fields | FIX | H | Characterization only. No behavior change in that commit. |
-| 10 | Opportunity stage | pipeline stage on the opportunity | LATER | M | Product rule. Unknown nodes fail open. Do not change it until a product decision. |
+| 10 | Opportunity stage | pipeline stage on the opportunity | NOT A MACHINE | n/a | Tony, 11 Nov 2026 17:03 BRT: keep Polo opportunity stages open. No guard. |
 | 11 | KAM draft | `kam_drafts.status` | LATER | M | Submit already compare-and-sets `pending` → `approved`. |
 | 12 | Onboarding tour | browser storage | LATER | L | Local wizard. No server record. |
 | 13 | Public sign steps | React state on `PublicSignPage` | folded | L | Guard on the signature request. Not a second writer of `signature_requests.status`. |
 
-Cleared order after this commit: migration start window, SMS callback, data-subject request, then integration token, signature void, proposal approval, SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage stops for a product decision. SMS is the second cleared fix, so it is not repeated as a later M row.
+Cleared order after this commit: migration start window, SMS callback, data-subject request, then integration token, signature void, proposal approval, SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order. SMS is the second cleared fix, so it is not repeated as a later M row.
 
 ## 1. Integration token
 
@@ -188,19 +188,11 @@ Legacy / unknown: to be recorded from the column type in that commit. No rewrite
 
 ## 10. Opportunity stage
 
-Purpose: whether a deal may move from one pipeline stage to another. This is a product rule.
+NOT A MACHINE, by decision. Tony, 11 Nov 2026 17:03 BRT: "Keep Polo opportunity stages open." No guard is added. The function stays fail-open, and the route gate stays `off` unless an operator turns it on.
 
-Code: `packages/shared/src/stage-transitions/index.ts:29`. A null `from` returns true at 34. An unknown node returns true at 42 (`if (fi === -1 || ti === -1) return true`). The route `apps/api/src/routes/opportunities.transitions.ts` compare-and-sets the previous stage and also calls this gate. Gate mode is `off | warn | enforce`, and `off` is the default.
+Code, unchanged: `packages/shared/src/stage-transitions/index.ts:29`. A null `from` returns true at 34. An unknown node returns true at 42 (`if (fi === -1 || ti === -1) return true`). The route `apps/api/src/routes/opportunities.transitions.ts` compare-and-sets the previous stage and also calls this function. Gate mode is `off | warn | enforce`, and `off` is the default.
 
-States: the org's pipeline stages, plus won and lost.
-
-Events: `advance`, `retreat`, `close`, `reopen`.
-
-Transitions today: stay, one step among active stages, close to won or lost, reopen. Unknown nodes and a null `from` are allowed.
-
-Legacy / unknown: fail-open, as written at line 42. That is the behavior a product decision would change.
-
-Stop: do not fail closed, and do not change the default mode, until the product owner says unknown nodes should 409 and whether `enforce` becomes the default. Jumps that succeed today would start failing.
+What the code allows today: stay, one step among active stages, close to won or lost, reopen, and any move whose node is not in the pipeline. That openness is the product behavior, not a defect to close.
 
 ## 11. KAM draft
 
