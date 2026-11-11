@@ -2,6 +2,8 @@
 // type. Shared by POST /api/v1/migrations/start-hubspot and the HubSpot
 // "Sync now" control, so both paths create identical jobs and audit rows.
 
+import { randomUUID } from 'node:crypto';
+
 import type { Queue } from 'bullmq';
 import type { z } from 'zod';
 
@@ -42,6 +44,7 @@ export function buildHubSpotMigrationPayload(input: {
   mappings: Record<string, string | null>;
   dedupStrategy: z.infer<typeof DedupStrategyEnum>;
   hubspotIntegrationConfigId: string;
+  attemptId?: string;
 }): MigrationJobPayload {
   return MigrationJobPayload.parse({
     migrationJobId: input.migrationJobId,
@@ -55,6 +58,7 @@ export function buildHubSpotMigrationPayload(input: {
     mappings: input.mappings,
     dedupStrategy: input.dedupStrategy,
     externalIdColumn: 'hs_object_id',
+    ...(input.attemptId ? { attemptId: input.attemptId } : {}),
     meta: { hubspotIntegrationConfigId: input.hubspotIntegrationConfigId },
   });
 }
@@ -86,6 +90,7 @@ export async function enqueueHubspotChunk(input: {
   entityType: string;
   totalRows: number;
   dedupStrategy: z.infer<typeof DedupStrategyEnum>;
+  attemptId: string;
   queue: Queue;
 }): Promise<void> {
   const config = await findHubspotConnection(input.orgId);
@@ -99,6 +104,7 @@ export async function enqueueHubspotChunk(input: {
     mappings: HUBSPOT_ENTITY_MAPPINGS[input.entityType] ?? {},
     dedupStrategy: input.dedupStrategy,
     hubspotIntegrationConfigId: config.id,
+    attemptId: input.attemptId,
   });
   await input.queue.add(`${input.jobId}-chunk-0`, payload, {
     jobId: `${input.jobId}-${input.entityType}-chunk-${Date.now()}`,
@@ -137,6 +143,7 @@ export async function startHubspotImport(input: {
     >;
     const totalRows = discovery?.[entity] ?? 0;
 
+    const attemptId = randomUUID();
     const job = await prisma.migrationJob.create({
       data: {
         orgId,
@@ -146,8 +153,8 @@ export async function startHubspotImport(input: {
         startedAt: new Date(),
         totalRows,
         meta: input.syncRunId
-          ? { entityType: entity, dedupStrategy: input.dedupStrategy, syncRunId: input.syncRunId }
-          : { entityType: entity, dedupStrategy: input.dedupStrategy },
+          ? { entityType: entity, dedupStrategy: input.dedupStrategy, syncRunId: input.syncRunId, attemptId }
+          : { entityType: entity, dedupStrategy: input.dedupStrategy, attemptId },
       },
     });
 
@@ -174,6 +181,7 @@ export async function startHubspotImport(input: {
         entityType: entity,
         totalRows,
         dedupStrategy: input.dedupStrategy,
+        attemptId,
         queue: input.queue,
       });
     } catch {

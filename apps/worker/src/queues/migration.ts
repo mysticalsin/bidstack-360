@@ -35,6 +35,8 @@ import {
   type MigrationJobError,
   MIGRATION_STALE_MS,
   MIGRATION_STALE_REASON,
+  migrationAttemptId,
+  migrationChunkMatchesAttempt,
   migrationChunkMayRun,
   migrationFrom,
   migrationStaleDue,
@@ -718,10 +720,14 @@ export async function processMigrationChunk(
   // Respect cancellation between chunks.
   const jobRow = await prisma.migrationJob.findUnique({
     where: { id: payload.migrationJobId },
-    select: { status: true },
+    select: { status: true, meta: true },
   });
   if (!jobRow || !migrationChunkMayRun(jobRow.status)) {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
+    return;
+  }
+  if (!migrationChunkMatchesAttempt(migrationAttemptId(jobRow.meta), payload.attemptId ?? null)) {
+    log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
     return;
   }
 

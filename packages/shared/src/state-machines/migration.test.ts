@@ -5,6 +5,8 @@ import {
   MIGRATION_EVENTS,
   MIGRATION_STALE_MS,
   MIGRATION_STATES,
+  migrationAttemptId,
+  migrationChunkMatchesAttempt,
   migrationChunkMayRun,
   migrationFrom,
   migrationRetryAllowed,
@@ -72,6 +74,17 @@ describe('migration transition table', () => {
     expect(
       migrationStaleDue({ state: 'FAILED', progressAt: stale, processedRows: 0, errorRows: 0, now }),
     ).toBe(false);
+  });
+
+  it('accepts a chunk only from the attempt stored on the job', () => {
+    expect(migrationChunkMatchesAttempt(null, null)).toBe(true);
+    expect(migrationChunkMatchesAttempt(null, 'attempt-a')).toBe(false);
+    expect(migrationChunkMatchesAttempt('attempt-b', 'attempt-a')).toBe(false);
+    expect(migrationChunkMatchesAttempt('attempt-b', null)).toBe(false);
+    expect(migrationChunkMatchesAttempt('attempt-b', 'attempt-b')).toBe(true);
+    expect(migrationAttemptId({ attemptId: 'attempt-b' })).toBe('attempt-b');
+    expect(migrationAttemptId({})).toBeNull();
+    expect(migrationAttemptId(null)).toBeNull();
   });
 
   it('runs a chunk only while the job is running', () => {

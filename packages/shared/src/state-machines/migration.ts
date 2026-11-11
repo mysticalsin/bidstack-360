@@ -80,6 +80,25 @@ export function migrationStaleDue(input: {
 }
 
 /**
+ * A chunk belongs to the attempt currently stored on the job.
+ * A legacy row with no attempt id only accepts a chunk that also has none.
+ */
+export function migrationChunkMatchesAttempt(
+  jobAttempt: string | null,
+  chunkAttempt: string | null,
+): boolean {
+  if (!jobAttempt) return chunkAttempt == null;
+  return chunkAttempt === jobAttempt;
+}
+
+/** Read the attempt id stored on a migration job's meta. Missing means legacy. */
+export function migrationAttemptId(meta: unknown): string | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+  const value = (meta as { attemptId?: unknown }).attemptId;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
  * An unknown stored value is viewed as failed and is not a known state.
  * Callers do not write that view back.
  */

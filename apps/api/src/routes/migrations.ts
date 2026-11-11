@@ -12,6 +12,8 @@
 //
 // HubSpot OAuth + import → migrations-hubspot.routes.ts
 
+import { randomUUID } from 'node:crypto';
+
 import * as XLSX from '@e965/xlsx';
 import { Queue } from 'bullmq';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -225,9 +227,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // overwrites a cancel that landed while the chunks were being queued,
       // and a chunk that dies while the row is still PENDING is invisible to
       // the exhausted-retry handler (it only fails a RUNNING job).
+      const attemptId = randomUUID();
       const claimed = await prisma.migrationJob.updateMany({
         where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
-        data: { status: 'RUNNING', startedAt: new Date() },
+        data: {
+          status: 'RUNNING',
+          startedAt: new Date(),
+          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, attemptId },
+        },
       });
       if (claimed.count !== 1) {
         const current = await prisma.migrationJob.findFirst({
@@ -260,6 +267,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             mappings,
             dedupStrategy,
             externalIdColumn,
+            attemptId,
           };
           await queue.add(`${job.id}-chunk-${i}`, payload, {
             jobId: `${job.id}-${entityType}-chunk-${i}`,
@@ -311,9 +319,16 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('This import cannot be retried. Start it again from the file.');
       }
 
+      const attemptId = randomUUID();
       const claimed = await prisma.migrationJob.updateMany({
         where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
-        data: { status: 'RUNNING', startedAt: new Date(), completedAt: null, errorSummary: [] },
+        data: {
+          status: 'RUNNING',
+          startedAt: new Date(),
+          completedAt: null,
+          errorSummary: [],
+          meta: { ...meta, attemptId },
+        },
       });
       if (claimed.count !== 1) {
         throw server.httpErrors.conflict('Migration job is no longer failed');
@@ -329,6 +344,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             entityType: meta.entityType,
             totalRows: job.totalRows,
             dedupStrategy: meta.dedupStrategy ?? 'update',
+            attemptId,
             queue,
           });
         } else {
@@ -365,6 +381,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
               mappings,
               dedupStrategy: meta.dedupStrategy ?? 'update',
               externalIdColumn: meta.externalIdColumn ?? undefined,
+              attemptId,
             };
             await queue.add(`${job.id}-retry-${i}`, payload, {
               jobId: `${job.id}-${meta.entityType}-retry-${Date.now()}-${i}`,
