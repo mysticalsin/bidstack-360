@@ -115,9 +115,18 @@ describe('getWorkspaceAccessToken', () => {
   });
 
   it('does not revive a grant disconnected while the refresh was in flight', async () => {
-    updateMany.mockResolvedValueOnce({ count: 0 });
-    const fetchImpl = vi.fn(async () => json({ access_token: 'late-access', expires_in: 3600 }));
-    await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(GrantRevokedError);
+    // WHY: the provider answers after the grant is revoked. The mock applies a
+    // write that has no from-list, so this fails if refresh stores the new
+    // access token onto whatever row is there.
+    const fetchImpl = vi.fn(async () => {
+      grant.status = 'revoked';
+      return json({ access_token: 'late-access', expires_in: 3600 });
+    });
+    await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(
+      GrantRevokedError,
+    );
+    expect(grant.status).toBe('revoked');
+    expect(grant.access).toBe('enc(old-access)');
   });
 
   it('marks the grant revoked when the provider answers invalid_grant', async () => {
