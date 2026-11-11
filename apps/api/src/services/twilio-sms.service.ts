@@ -16,6 +16,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Prisma, prisma } from '@bidstack/db';
+import { smsEventFromProvider, smsFrom, smsTarget } from '@bidstack/shared';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import {
@@ -314,35 +315,21 @@ export async function handleStatusCallback(
 ): Promise<void> {
   const { MessageSid, MessageStatus, ErrorCode, Price, NumSegments } = payload;
 
-  const statusMap: Record<string, 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'UNDELIVERED'> = {
-    queued: 'QUEUED',
-    sent: 'SENT',
-    delivered: 'DELIVERED',
-    failed: 'FAILED',
-    undelivered: 'UNDELIVERED',
-  };
-
-  const mapped = statusMap[MessageStatus?.toLowerCase() ?? ''];
-  if (!mapped) {
+  const event = smsEventFromProvider(MessageStatus ?? '');
+  if (!event) {
     log.debug({ MessageSid, MessageStatus }, 'Ignoring unknown Twilio status');
     return;
   }
-
+  const mapped = smsTarget(event);
   // Forward only: queued, then sent, then a terminal delivery or failure.
   // A later callback must not move backwards, and a terminal status stays.
-  const from: Record<typeof mapped, Array<'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'UNDELIVERED'>> = {
-    QUEUED: [],
-    SENT: ['QUEUED'],
-    DELIVERED: ['QUEUED', 'SENT'],
-    FAILED: ['QUEUED', 'SENT'],
-    UNDELIVERED: ['QUEUED', 'SENT'],
-  };
+  const from = smsFrom(event);
 
   const costMicros = Price ? BigInt(Math.round(parseFloat(Price) * 1_000_000)) : undefined;
 
   // Prisma rejects an empty `in` list. `queued` is only the starting status,
   // written when the message is created, so a queued callback never moves a row.
-  if (from[mapped].length === 0) {
+  if (from.length === 0) {
     const current = await prisma.smsMessage.findFirst({
       where: { twilioSid: MessageSid, orgId },
       select: { id: true, status: true },
@@ -354,7 +341,7 @@ export async function handleStatusCallback(
   }
 
   const moved = await prisma.smsMessage.updateMany({
-    where: { twilioSid: MessageSid, orgId, status: { in: from[mapped] } },
+    where: { twilioSid: MessageSid, orgId, status: { in: [...from] } },
     data: {
       status: mapped,
       errorCode: ErrorCode ? parseInt(ErrorCode, 10) : null,
