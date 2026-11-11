@@ -4,7 +4,7 @@ Base: `0ba51f57f2889be9c8147508e0e65e17f7251187` (`origin/main`).
 Re-verified on that tree. Line numbers from `cursor/polo-integrated-bca5` are not used.
 This file is the inventory. It does not change behavior.
 
-Last reviewed: 2026-11-11, Devin R7, on `cursor/sm-main-inventory-a111`.
+Last reviewed: 2026-11-11, Devin addendum, on `cursor/sm-main-inventory-a111`. The addendum items that touch the four machines are in: a failed import is retryable, the API data-subject view maps unknown to failed, dropped SMS callbacks keep their facts, and an `expired` grant is refused.
 
 Standard: one pure `transition(state, event)`, persisted rows versioned, unknown stored values map to a named safe state and are not rewritten on read. Illegal moves are rejected and logged with ids and states only. HTTP 409 stays the contract where a route already returns 409.
 
@@ -16,11 +16,11 @@ Status values: `FIX` (in the cleared order), `LATER`, `NOT A MACHINE`, `pending 
 
 | # | Subject | Persisted | Status | Risk | Why |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Integration token | `integration_tokens.status` | fixed | H | Refresh is allowed from `active` or `error`. A revoke during refresh is not revived. Connect writers are LATER. |
+| 1 | Integration token | `integration_tokens.status` | fixed | H | Refresh is allowed from `active` or `error`. Status `expired` is refused before the provider is called. A past `expiresAt` with status `active` still refreshes. Connect writers are LATER. |
 | 2 | Access policy | `access_policy_versions.status` | pending reconciliation | H | On main the route already compare-and-sets. On bca5 the model is absent. Do not port a second legality check. |
-| 3 | Migration job | `migration_jobs.status` | fixed | H | Start claims `RUNNING` before enqueue. Enqueue failure, cancel, undo, complete, and the worker's fail path compare-and-set. Chunks run only while `RUNNING`. |
+| 3 | Migration job | `migration_jobs.status` | fixed | H | Start claims `RUNNING` before enqueue. Enqueue failure returns the job `FAILED`. Retry is `FAILED → RUNNING` only when no row was imported. A running job with no progress for 15 minutes stalls to `FAILED` on the next read. |
 | 4 | Tenant export | `tenant_exports.status` | FIX | M | Claim and finish already compare-and-set. Finish the ordering; a wrong export is recoverable. |
-| 5 | Data subject request | `data_subject_requests.status` | fixed on main; pending reconciliation | H | On main, later writes carry the claim's `startedAt` and `orgId`. On bca5 there is no status column (risk n/a). |
+| 5 | Data subject request | `data_subject_requests.status` | fixed on main; pending reconciliation | H | On main, later writes carry the claim's `startedAt` and `orgId`. The API view and the worker both map an unknown stored value to `failed` and do not rewrite it. On bca5 there is no status column (risk n/a). |
 | 6 | Signature request | `signature_requests.status` | fixed | H | Void compare-and-sets from `DRAFT`, `SENT`, or `VIEWED`. A signature that lands during the void is left signed. |
 | 7 | RFP orchestration | `rfp_orchestration_runs.state` | FIX | M | Approve-drafting can write `running` with no from-state. |
 | 8 | Proposal approval | `proposals.status` | fixed | H | Both writers approve only from `draft` or `review`, from one from-list. |
@@ -30,13 +30,13 @@ Status values: `FIX` (in the cleared order), `LATER`, `NOT A MACHINE`, `pending 
 | 12 | Onboarding tour | browser storage | LATER | L | Local wizard. No server record. |
 | 13 | Public sign steps | React state on `PublicSignPage` | folded | L | Guard on the signature request. Not a second writer of `signature_requests.status`. |
 
-Landed on this branch: migration (including HubSpot enqueue failure), SMS callback (forward-only and org-scoped), data-subject request (claim token), integration token (refresh from `active` or `error`), signature void, and proposal approval. Next is SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
+Landed on this branch: migration (enqueue failure returns `FAILED`, retry, and stall), SMS callback (forward-only, org-scoped, facts kept on a dropped callback), data-subject request (claim token, and the API view maps unknown to `failed`), integration token (refresh from `active` or `error`, `expired` refused, one `GrantRevokedError`), signature void, and proposal approval. Next is SERUM characterization, then the M rows (RFP extraction, RFP orchestration, tenant export). Opportunity stage is not in that order.
 
 ## 1. Integration token
 
 Purpose: one grant per org and provider. Refresh may continue an `active` or `error` grant. It must not write onto a row that was revoked or deleted while the refresh was in flight.
 
-Code: one table, `tokenFrom` in `packages/shared/src/state-machines/integration-token.ts`. The API helper and the worker both use it. `refresh_ok`, `refresh_fail`, and `revoke` match `active` or `error`, and `deletedAt` null. Worker success is `workspace-token.ts` around 148. The failure helper `markToken` accepts only `revoked` or `error` (around 94). A lost compare-and-set logs `tokenId`, `from`, and `to` (`warnIllegalToken` around 76). Disconnect still writes `revoked` and `deletedAt` by id at `apps/api/src/services/workspace-connect.service.ts:221`. Slack disconnect is the same shape at `apps/api/src/routes/integrations/slack.ts:395`.
+Code: one table, `tokenFrom` in `packages/shared/src/state-machines/integration-token.ts`. `GrantRevokedError` is that module's class. The API helper and the worker both throw it (the worker re-exports it). `refresh_ok`, `refresh_fail`, and `revoke` match `active` or `error`, and `deletedAt` null. `expired` is not in any from-list and has no writer. Worker success is `workspace-token.ts` at 150. The failure helper `markToken` accepts only `revoked` or `error` (at 91). A lost compare-and-set logs `tokenId`, `from`, and `to` (`warnIllegalToken` at 75). A row whose status is `expired` throws at 114 before any fetch or write. The API does the same at `email-integration.helpers.ts:189`. A past `expiresAt` with status `active`, or with the column omitted, still refreshes. Disconnect still writes `revoked` and `deletedAt` by id at `apps/api/src/services/workspace-connect.service.ts:221`. Slack disconnect is the same shape at `apps/api/src/routes/integrations/slack.ts:395`.
 
 Connect writers, LATER. Each sets `active` by the `(org, user, provider)` key and is not the refresh race:
 
@@ -52,7 +52,7 @@ Events: `connect`, `refresh_ok`, `refresh_fail`, `revoke`, `expire`.
 
 Transitions: `connect → active` (the three writers above, LATER). `refresh_ok` from `active` or `error` → `active`. `refresh_fail` from `active` or `error` → `error`. `revoke` from `active` or `error` → `revoked` when the provider rejects the grant. `expire` is in the enum and has no writer on this tree. `revoked` and a tombstone are not rewritten by refresh.
 
-Legacy / unknown: a value outside the Prisma enum is rejected by the database. `expired` is never written. The pure loader views an unknown string as `revoked` and does not write it back. A row with `deletedAt` set is not refreshed.
+Legacy / unknown: a value outside the Prisma enum is rejected by the database. `expired` is never written. A stored `expired` refuses refresh and is not rewritten. The pure loader views an unknown string as `revoked` and does not write it back. A row with `deletedAt` set is not refreshed.
 
 ## 2. Access policy
 
@@ -78,17 +78,20 @@ Purpose: one import. Chunks must not run while the row is still `PENDING`, and a
 
 Code: one table, `migrationFrom` in `packages/shared/src/state-machines/migration.ts`. Every compare-and-set uses it.
 
-- CSV start claims `PENDING → RUNNING` before `queue.add`. If enqueue throws, the claim is compare-and-set `RUNNING → FAILED` with a fixed error summary.
-- HubSpot start creates the job `RUNNING`, then enqueues. If that enqueue throws, `apps/api/src/services/hubspot-import.ts` around 160 compare-and-sets `RUNNING → FAILED` the same way.
+- CSV start claims `PENDING → RUNNING` before `queue.add`. If enqueue throws, the claim is compare-and-set `RUNNING → FAILED` and the route returns 201 with that failed job (`migrations.ts` at 286). The wizard can cancel a `PENDING` or `RUNNING` job and can retry a `FAILED` job that imported nothing.
+- Retry is `POST /migrations/:id/retry`. It matches `FAILED` only when `processedRows` and `errorRows` are both 0 (`migrationRetryAllowed`). The CSV path re-reads the Redis rows. HubSpot uses `enqueueHubspotChunk`.
+- HubSpot start creates the job `RUNNING`, then enqueues. If that enqueue throws, `hubspot-import.ts` at 186 compare-and-sets `RUNNING → FAILED` and returns the reloaded row. It does not throw.
+- A `RUNNING` job with no row progress whose `startedAt` is at least 15 minutes ago (`MIGRATION_STALL_MS`) becomes `FAILED` on `GET /migrations/:id` (`migrationStallDue`, applied at `migrations.ts:148`). A job that has processed or errored a row is not stalled.
+- The worker's next-page enqueue (`migration.ts` at 860) compare-and-sets `RUNNING → FAILED` and then rethrows, so a mid-chunk enqueue failure is not left `RUNNING`.
 - Cancel matches `PENDING` or `RUNNING`. Undo matches `COMPLETE` and `undoableUntil` still in the future, and stores `FAILED` plus `meta.undone`.
 - Worker complete, unsupported entity, and exhausted retries match `RUNNING` only.
 - A chunk runs only while the status is `RUNNING`. `PENDING`, `COMPLETE`, `FAILED`, and `CANCELLED` are skipped.
 
 States: `PENDING`, `RUNNING`, `COMPLETE`, `FAILED`, `CANCELLED`.
 
-Events: `start`, `cancel`, `complete`, `fail`, `undo`.
+Events: `start`, `cancel`, `complete`, `fail`, `undo`, `retry`, `stall`.
 
-Transitions: `start` is `PENDING → RUNNING` and must win before any chunk is enqueued. `cancel` from `PENDING|RUNNING → CANCELLED`. `complete` from `RUNNING → COMPLETE`. `fail` from `RUNNING → FAILED`. `undo` from `COMPLETE → FAILED` with `meta.undone` (there is no `UNDONE` status). `COMPLETE`, `FAILED`, and `CANCELLED` do not move again.
+Transitions: `start` is `PENDING → RUNNING` and must win before any chunk is enqueued. `cancel` from `PENDING|RUNNING → CANCELLED`. `complete` from `RUNNING → COMPLETE`. `fail` from `RUNNING → FAILED`. `undo` from `COMPLETE → FAILED` with `meta.undone` (there is no `UNDONE` status). `retry` from `FAILED → RUNNING` only when nothing was imported. `stall` from `RUNNING → FAILED` only for that same no-progress job after 15 minutes. `COMPLETE` and `CANCELLED` do not move again. A `FAILED` job that already imported rows does not retry.
 
 Legacy / unknown: the column is a Prisma enum, so an unknown value is rejected by the database. The pure loader views an unknown string as `FAILED` and does not write it back. `undo` is stored as `FAILED` plus `meta.undone`, not as its own status.
 
@@ -114,7 +117,7 @@ Risk is M: a wrong export can be re-requested. It does not approve a bid.
 
 Purpose: one export or erasure. Owner of reconciliation: Tony. The main-side bug is in the cleared order. Whether bca5 grows this table is a separate decision.
 
-Code: one table, `dsrClaimWhere` and `dsrOwnedWhere` in `packages/shared/src/state-machines/data-subject.ts`. The runner uses them. The claim matches `queued`, or `running` older than 15 minutes, and writes `startedAt` as the claim token (`request-runner.ts` around 77). Finish, the residue report, and pending storage keys (around 122, 161, and 193) match that `startedAt`, the org, and the expected status. A stale reclaim writes a new `startedAt`, so the old run's update matches nothing and does not overwrite the new run.
+Code: one table, `dsrClaimWhere` and `dsrOwnedWhere` in `packages/shared/src/state-machines/data-subject.ts`. The runner uses them. The claim matches `queued`, or `running` older than 15 minutes, and writes `startedAt` as the claim token (`request-runner.ts` at 78). Finish, the residue report, and pending storage keys (at 123, 162, and 194) match that `startedAt`, the org, and the expected status. A stale reclaim writes a new `startedAt`, so the old run's update matches nothing and does not overwrite the new run. The runner views an unknown stored status as `failed` at 85 and does not write it. The API view does the same through `dsrStateFromStored` at `data-subject-requests.ts:53`. The worker calls the runner and does not map the runner's `skipped` or `busy` outcome through that function.
 
 Persisted: `status` is `VarChar(16)`, default `queued`. Comment says `queued | running | done | failed`. Any other 16-character string can be stored.
 
@@ -234,7 +237,7 @@ See row 6. The component steps are a guard on the way to submit. They are not a 
 
 Purpose: a Twilio callback only moves a message forward, and only the message that belongs to the org the route resolved.
 
-Code: one table, `smsFrom` in `packages/shared/src/state-machines/sms.ts`. `handleStatusCallback` in `apps/api/src/services/twilio-sms.service.ts` takes `orgId`. The update (around 343) and both read-backs (around 334 and 354) include `twilioSid` and `orgId`. A `queued` callback has an empty from-list and does not write. Unknown `MessageStatus` is ignored and is not stored.
+Code: one table, `smsFrom` in `packages/shared/src/state-machines/sms.ts`. `handleStatusCallback` in `apps/api/src/services/twilio-sms.service.ts` takes `orgId`. The status update (at 362) and the read-backs (at 351 and 373) include `twilioSid` and `orgId`. A recognized callback that cannot move the row still stores `errorCode`, `costMicros`, and `segments` (at 340), matched on the status just read. A `queued` callback has an empty from-list and does not change status. Unknown `MessageStatus` is ignored at 319, including its price and error fields.
 
 States: `QUEUED`, `SENT`, `DELIVERED`, `FAILED`, `UNDELIVERED`.
 
@@ -242,7 +245,7 @@ Events: Twilio `queued`, `sent`, `delivered`, `failed`, `undelivered`.
 
 Transitions: `QUEUED → SENT → DELIVERED`. `FAILED` and `UNDELIVERED` are forward moves from `QUEUED` or `SENT`. Nothing moves out of `DELIVERED`, `FAILED`, or `UNDELIVERED`. A same-rank callback does not replace a terminal status.
 
-Legacy / unknown: an unrecognized Twilio status is ignored and the row is not rewritten. The column is a Prisma enum. The pure loader views an unknown stored string as `FAILED` and does not write it back.
+Legacy / unknown: an unrecognized Twilio status is ignored, and its price and error are not stored. A recognized status that loses the compare-and-set keeps those facts and does not change status. The column is a Prisma enum. The pure loader views an unknown stored string as `FAILED` and does not write it back.
 
 The forward-only guard and the org scope are in. Risk for the callback race is closed.
 
@@ -456,10 +459,14 @@ Each Prisma enum in `packages/db/prisma/schema.prisma`, named. Status machines t
 
 ## Mapping notes
 
-- `IntegrationTokenStatus.expired` has no writer. Refresh is legal from `active` or `error`.
+- `IntegrationTokenStatus.expired` has no writer. Refresh from `expired` is illegal. A past `expiresAt` with status `active` still refreshes. Refresh is legal from `active` or `error`.
 - `TenantExportStatus.expired` has no writer.
 - RFP orchestration `paused` and `rejected` have no writer.
-- Migration `undo` is stored as `FAILED` plus `meta.undone`.
-- Data subject request maps unknown stored text to `failed` without rewriting it.
-- SMS ignores an unknown Twilio status and does not store it.
+- Migration `undo` is stored as `FAILED` plus `meta.undone`. Retry is `FAILED → RUNNING` only when no row was imported. Stall is `RUNNING → FAILED` after 15 minutes with no progress.
+- Data subject request maps unknown stored text to `failed` without rewriting it, in the worker and in the API view.
+- SMS ignores an unknown Twilio status and does not store its price. A recognized callback that cannot move the row keeps error, price, and segments.
 - The three OAuth connect writers (Gmail, Microsoft mail, Slack) still set `active` by the unique key. LATER.
+- RFP extraction writers are unchanged. Rating stays FIX, risk H.
+- `SyncState` and `RfpResponsePhase` stay LATER.
+- Opportunity stage stays NOT A MACHINE.
+- Free-text status columns other than the data-subject request leave an unknown value in place.
