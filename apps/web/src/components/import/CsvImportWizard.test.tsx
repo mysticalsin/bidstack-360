@@ -245,9 +245,33 @@ describe('CsvImportWizard', () => {
       errorRows: 0,
       errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
     });
-    await waitFor(() => expect(screen.getByText('Failed to enqueue import chunks')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('The import did not start. Try again.')).toBeTruthy());
+    expect(screen.queryByText('Failed to enqueue import chunks')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry import' }));
     expect(hookMocks.retryMutate).toHaveBeenCalledWith('job-1');
     expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
+  });
+
+  it('shows an error when cancel or retry fails, without the raw server text', async () => {
+    // WHY: a failed cancel or retry must leave the wizard in an error state.
+    // The server's English is not the copy the user reads.
+    stubHooks();
+    hookMocks.useCancelMigration.mockReturnValue({
+      mutate: hookMocks.cancelMutate,
+      isPending: false,
+      isError: true,
+      error: new Error('Migration job is no longer running'),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'RUNNING',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [],
+    });
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(screen.getByRole('alert').textContent).toBe('That did not work. Try again.');
+    expect(screen.queryByText('Migration job is no longer running')).toBeNull();
   });
 });

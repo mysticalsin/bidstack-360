@@ -25,6 +25,25 @@ type Step = 'upload' | 'map' | 'preview' | 'run';
 type Dedup = 'skip' | 'update' | 'duplicate';
 const MAX_ROWS = 10_000;
 
+const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
+  stale: ['csvImport.progress.reasonStalled', 'The import stalled before any rows were saved.'],
+  'Failed to enqueue import chunks': ['csvImport.progress.reasonEnqueue', 'The import did not start. Try again.'],
+  'Import rows expired. Upload the file again.': [
+    'csvImport.progress.reasonRowsExpired',
+    'Those rows expired. Upload the file again.',
+  ],
+};
+
+function importErrorCopy(
+  t: (key: string, fallback: string) => string,
+  message: string | undefined,
+): string | null {
+  if (!message) return null;
+  const known = IMPORT_ERROR_KEYS[message];
+  if (!known) return t('csvImport.progress.reasonUnknown', 'The import could not be completed.');
+  return t(known[0], known[1]);
+}
+
 export function CsvImportWizard() {
   const { t } = useTranslation('crm');
   const entityId = useId();
@@ -374,6 +393,7 @@ export function CsvImportWizard() {
           }}
           cancelPending={cancel.isPending}
           retryPending={retry.isPending}
+          actionFailed={cancel.isError || retry.isError}
         />
       )}
     </div>
@@ -430,6 +450,7 @@ function ImportProgress({
   onRetry,
   cancelPending,
   retryPending,
+  actionFailed,
 }: {
   job: MigrationJob | null;
   isLoading: boolean;
@@ -438,6 +459,7 @@ function ImportProgress({
   onRetry: () => void;
   cancelPending: boolean;
   retryPending: boolean;
+  actionFailed: boolean;
 }) {
   const { t } = useTranslation('crm');
   if (isLoading || !job) {
@@ -449,6 +471,10 @@ function ImportProgress({
   }
 
   const done = job.status === 'COMPLETE' || job.status === 'FAILED' || job.status === 'CANCELLED';
+  const failure = importErrorCopy(
+    t,
+    job.status === 'FAILED' ? job.errorSummary?.[0]?.message : undefined,
+  );
   const pct =
     job.totalRows > 0 ? Math.round((job.processedRows / job.totalRows) * 100) : done ? 100 : 0;
 
@@ -483,9 +509,13 @@ function ImportProgress({
         </div>
       </div>
 
-      {job.status === 'FAILED' && job.errorSummary?.[0]?.message ? (
-        <p className="text-sm text-[var(--danger)]">{job.errorSummary[0].message}</p>
+      {actionFailed ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {t('csvImport.progress.actionFailed', 'That did not work. Try again.')}
+        </p>
       ) : null}
+
+      {failure ? <p className="text-sm text-[var(--danger)]">{failure}</p> : null}
 
       {(job.status === 'RUNNING' || job.status === 'PENDING') && (
         <button
