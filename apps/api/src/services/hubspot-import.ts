@@ -12,6 +12,7 @@ import {
   HUBSPOT_CONTACT_DEFAULTS,
   HUBSPOT_DEAL_DEFAULTS,
   MigrationJobPayload,
+  migrationFrom,
 } from '@bidstack/shared';
 
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
@@ -148,9 +149,23 @@ export async function startHubspotImport(input: {
       hubspotIntegrationConfigId: config.id,
     });
 
-    await input.queue.add(`${job.id}-chunk-0`, payload, {
-      jobId: `${job.id}-${entity}-chunk-0`,
-    });
+    try {
+      await input.queue.add(`${job.id}-chunk-0`, payload, {
+        jobId: `${job.id}-${entity}-chunk-0`,
+      });
+    } catch (err) {
+      // The job is already RUNNING. A failed enqueue must not leave it running
+      // with no chunks, and must not overwrite a cancel that won the race.
+      await prisma.migrationJob.updateMany({
+        where: { id: job.id, orgId, status: { in: [...migrationFrom('fail')] } },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+        },
+      });
+      throw err;
+    }
 
     await prisma.auditLog.create({
       data: {

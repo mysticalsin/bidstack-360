@@ -33,6 +33,8 @@ import {
   MIGRATION,
   MigrationJobPayload,
   type MigrationJobError,
+  migrationChunkMayRun,
+  migrationFrom,
 } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
@@ -645,14 +647,14 @@ export async function maybeComplete(
   log?: ChunkLog,
 ): Promise<void> {
   const job = await prisma.migrationJob.findUnique({ where: { id: migrationJobId } });
-  if (!job || job.status !== 'RUNNING') return;
+  if (!job || !migrationChunkMayRun(job.status)) return;
   const done = job.processedRows + job.errorRows;
   const total = forceTotal ?? job.totalRows;
   if (done < total) return;
   // A cancel can land after the read above. Only a row that is still RUNNING
   // becomes COMPLETE.
   const moved = await prisma.migrationJob.updateMany({
-    where: { id: migrationJobId, status: 'RUNNING' },
+    where: { id: migrationJobId, status: { in: [...migrationFrom('complete')] } },
     data: {
       status: 'COMPLETE',
       completedAt: new Date(),
@@ -715,7 +717,7 @@ export async function processMigrationChunk(
     where: { id: payload.migrationJobId },
     select: { status: true },
   });
-  if (!jobRow || jobRow.status !== 'RUNNING') {
+  if (!jobRow || !migrationChunkMayRun(jobRow.status)) {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
     return;
   }
@@ -725,7 +727,7 @@ export async function processMigrationChunk(
     // e.g. HubSpot "tasks" — fail the job loudly instead of hanging RUNNING.
     // Only from RUNNING: a cancel after the read above must stick.
     const moved = await prisma.migrationJob.updateMany({
-      where: { id: payload.migrationJobId, status: 'RUNNING' },
+      where: { id: payload.migrationJobId, status: { in: [...migrationFrom('fail')] } },
       data: {
         status: 'FAILED',
         completedAt: new Date(),
@@ -950,7 +952,7 @@ export async function startMigrationWorker(
       if (migrationJobId) {
         const moved = await prisma.migrationJob
           .updateMany({
-            where: { id: migrationJobId, status: 'RUNNING' },
+            where: { id: migrationJobId, status: { in: [...migrationFrom('fail')] } },
             data: { status: 'FAILED', completedAt: new Date() },
           })
           .catch((updateErr) => {

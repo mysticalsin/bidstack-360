@@ -28,6 +28,7 @@ import {
   DedupStrategyEnum,
   type MigrationJobError,
   MIGRATION,
+  migrationFrom,
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
@@ -192,7 +193,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // and a chunk that dies while the row is still PENDING is invisible to
       // the exhausted-retry handler (it only fails a RUNNING job).
       const claimed = await prisma.migrationJob.updateMany({
-        where: { id: job.id, orgId, status: 'PENDING' },
+        where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
         data: { status: 'RUNNING', startedAt: new Date() },
       });
       if (claimed.count !== 1) {
@@ -235,7 +236,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         // The claim already moved the row to RUNNING. A failed enqueue must not
         // leave it there with no chunks. A cancel that won the race is left alone.
         const failed = await prisma.migrationJob.updateMany({
-          where: { id: job.id, orgId, status: 'RUNNING' },
+          where: { id: job.id, orgId, status: { in: [...migrationFrom('fail')] } },
           data: {
             status: 'FAILED',
             completedAt: new Date(),
@@ -363,7 +364,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!job) throw server.httpErrors.notFound('Migration job not found');
       // The read above can be stale. Only PENDING or RUNNING may become CANCELLED.
       const moved = await prisma.migrationJob.updateMany({
-        where: { id: job.id, orgId, status: { in: ['PENDING', 'RUNNING'] } },
+        where: { id: job.id, orgId, status: { in: [...migrationFrom('cancel')] } },
         data: { status: 'CANCELLED', completedAt: new Date() },
       });
       if (moved.count !== 1) {
@@ -461,7 +462,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           where: {
             id: job.id,
             orgId,
-            status: 'COMPLETE',
+            status: { in: [...migrationFrom('undo')] },
             undoableUntil: { gt: new Date() },
           },
           data: {
