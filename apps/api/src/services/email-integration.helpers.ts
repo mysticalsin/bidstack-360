@@ -107,18 +107,19 @@ async function refreshToken(
     }
     const revoked = code === 'invalid_grant' || code === 'unauthorized_client';
     log.error({ tokenId: token.id, status: res.status, code }, 'OAuth token refresh failed');
-    await prisma.integrationToken.update({
-      where: { id: token.id },
-      data: revoked
+    await markIntegrationToken(
+      token.id,
+      revoked
         ? { status: 'revoked', errorMessage: REVOKED_MESSAGE }
         : { status: 'error', errorMessage: `Token refresh failed (${res.status}). Polo will retry.` },
-    });
+      log,
+    );
     throw new Error(`${google ? 'Gmail' : 'MS Graph'} refresh failed: ${res.status}`);
   }
 
   const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
-  await prisma.integrationToken.update({
-    where: { id: token.id },
+  const stored = await prisma.integrationToken.updateMany({
+    where: { id: token.id, deletedAt: null, status: { in: ['active', 'error'] } },
     data: {
       accessTokenEncrypted: encryptToken(data.access_token),
       ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
@@ -128,7 +129,26 @@ async function refreshToken(
       errorMessage: null,
     },
   });
+  if (stored.count !== 1) {
+    log.warn({ tokenId: token.id, to: 'active' }, 'illegal integration token transition');
+    throw new Error('Grant was disconnected during refresh');
+  }
   return data.access_token;
+}
+
+/** A refresh may leave `active` or `error`. It must not rewrite `revoked` or a tombstone. */
+async function markIntegrationToken(
+  id: string,
+  data: { status: 'revoked' | 'error'; errorMessage: string },
+  log: ServiceLogger,
+): Promise<void> {
+  const moved = await prisma.integrationToken.updateMany({
+    where: { id, deletedAt: null, status: { in: ['active', 'error'] } },
+    data,
+  });
+  if (moved.count === 0) {
+    log.warn({ tokenId: id, to: data.status }, 'illegal integration token transition');
+  }
 }
 
 /**

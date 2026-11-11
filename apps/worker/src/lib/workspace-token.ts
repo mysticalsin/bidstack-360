@@ -73,6 +73,21 @@ async function readError(res: Response): Promise<string | null> {
   }
 }
 
+/** Refresh may leave `active` or `error`. It must not rewrite `revoked` or a tombstone. */
+async function markToken(
+  id: string,
+  data: { status: 'active' | 'revoked' | 'error'; errorMessage: string },
+  log: pino.Logger,
+): Promise<void> {
+  const moved = await prisma.integrationToken.updateMany({
+    where: { id, deletedAt: null, status: { in: ['active', 'error'] } },
+    data,
+  });
+  if (moved.count === 0) {
+    log.warn({ tokenId: id, to: data.status }, 'illegal integration token transition');
+  }
+}
+
 /** Return a usable access token, refreshing and persisting it when needed. */
 export async function getWorkspaceAccessToken(
   row: WorkspaceTokenRow,
@@ -82,10 +97,7 @@ export async function getWorkspaceAccessToken(
   const fresh = row.expiresAt ? row.expiresAt.getTime() > Date.now() + EXPIRY_SKEW_MS : true;
   if (fresh) return decryptToken(row.accessTokenEncrypted);
   if (!row.refreshTokenEncrypted) {
-    await prisma.integrationToken.update({
-      where: { id: row.id },
-      data: { status: 'revoked', errorMessage: REVOKED_MESSAGE },
-    });
+    await markToken(row.id, { status: 'revoked', errorMessage: REVOKED_MESSAGE }, log);
     throw new GrantRevokedError('Access token expired and no refresh token is stored');
   }
 
@@ -101,24 +113,22 @@ export async function getWorkspaceAccessToken(
     const code = res.status === 400 || res.status === 401 ? await readError(res) : null;
     if (code === 'invalid_grant' || code === 'unauthorized_client') {
       log.warn({ tokenId: row.id, provider: row.provider }, 'workspace grant revoked at provider');
-      await prisma.integrationToken.update({
-        where: { id: row.id },
-        data: { status: 'revoked', errorMessage: REVOKED_MESSAGE },
-      });
+      await markToken(row.id, { status: 'revoked', errorMessage: REVOKED_MESSAGE }, log);
       throw new GrantRevokedError(`${row.provider} refresh rejected: ${code}`);
     }
     log.error({ tokenId: row.id, provider: row.provider, status: res.status }, 'workspace token refresh failed');
-    await prisma.integrationToken.update({
-      where: { id: row.id },
-      data: { status: 'error', errorMessage: `Token refresh failed (${res.status}). Polo will retry.` },
-    });
+    await markToken(
+      row.id,
+      { status: 'error', errorMessage: `Token refresh failed (${res.status}). Polo will retry.` },
+      log,
+    );
     throw new Error(`${row.provider} token refresh failed: ${res.status}`);
   }
 
   const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
   // A disconnect can land while the refresh is in flight; never write fresh tokens onto the tombstone.
   const stored = await prisma.integrationToken.updateMany({
-    where: { id: row.id, deletedAt: null },
+    where: { id: row.id, deletedAt: null, status: { in: ['active', 'error'] } },
     data: {
       accessTokenEncrypted: encryptToken(data.access_token),
       ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
@@ -128,6 +138,9 @@ export async function getWorkspaceAccessToken(
       errorMessage: null,
     },
   });
-  if (stored.count === 0) throw new GrantRevokedError('Grant was disconnected during refresh');
+  if (stored.count === 0) {
+    log.warn({ tokenId: row.id, to: 'active' }, 'illegal integration token transition');
+    throw new GrantRevokedError('Grant was disconnected during refresh');
+  }
   return data.access_token;
 }

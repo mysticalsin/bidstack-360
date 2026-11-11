@@ -14,7 +14,6 @@ vi.mock('@bidstack/shared/token-crypto', () => ({
   decryptToken: (v: string) => v.replace(/^enc\((.*)\)$/, '$1'),
 }));
 
-const update = vi.mocked(prisma.integrationToken.update);
 const updateMany = vi.mocked(prisma.integrationToken.updateMany);
 const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as pino.Logger;
 
@@ -63,9 +62,10 @@ describe('getWorkspaceAccessToken', () => {
     expect(body.get('scope')).toContain('Calendars.Read');
     expect(body.get('scope')).not.toContain('Mail.Send');
     expect(init.signal).toBeInstanceOf(AbortSignal);
+    // The from-state is part of the contract: a revoked row is not in this list.
     expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'tok-1', deletedAt: null },
+        where: { id: 'tok-1', deletedAt: null, status: { in: ['active', 'error'] } },
         data: expect.objectContaining({
           accessTokenEncrypted: 'enc(new-access)',
           refreshTokenEncrypted: 'enc(new-refresh)',
@@ -90,18 +90,43 @@ describe('getWorkspaceAccessToken', () => {
   it('marks the grant revoked when the provider answers invalid_grant', async () => {
     const fetchImpl = vi.fn(async () => json({ error: 'invalid_grant' }, 400));
     await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(GrantRevokedError);
-    expect(update).toHaveBeenCalledWith(
+    expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: { id: 'tok-1', deletedAt: null, status: { in: ['active', 'error'] } },
         data: expect.objectContaining({ status: 'revoked', errorMessage: expect.stringMatching(/reconnect/i) }),
       }),
     );
   });
 
+  it('does not store a fresh token onto a revoked grant', async () => {
+    const state = { status: 'revoked' };
+    updateMany.mockImplementation(async (args: {
+      where: { deletedAt?: Date | null; status?: { in?: string[] } };
+      data: { status?: string };
+    }) => {
+      const from = args.where.status?.in;
+      // A write with no from-state applies to every row. That is the bug.
+      if (!from) {
+        if (args.data.status) state.status = args.data.status;
+        return { count: 1 };
+      }
+      if (!from.includes(state.status)) return { count: 0 };
+      state.status = args.data.status ?? state.status;
+      return { count: 1 };
+    });
+    const fetchImpl = vi.fn(async () => json({ access_token: 'late-access', expires_in: 3600 }));
+    await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(GrantRevokedError);
+    expect(state.status).toBe('revoked');
+  });
+
   it('marks a transient provider failure as error, not revoked', async () => {
     const fetchImpl = vi.fn(async () => new Response('boom', { status: 502 }));
     await expect(getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl)).rejects.toThrow(/502/);
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'error' }) }),
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'tok-1', deletedAt: null, status: { in: ['active', 'error'] } },
+        data: expect.objectContaining({ status: 'error' }),
+      }),
     );
   });
 });
