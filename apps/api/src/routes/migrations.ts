@@ -367,6 +367,11 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const attemptId = randomUUID();
+      // A copied progressAt is the previous attempt's claim clock. The new
+      // attempt has not been claimed, so it must not look stalled.
+      const fresh = { ...(job.meta as object) } as Record<string, unknown>;
+      delete fresh.progressAt;
+      fresh.attemptId = attemptId;
       const claimed = await prisma.migrationJob.updateMany({
         where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
         data: {
@@ -374,7 +379,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           startedAt: new Date(),
           completedAt: null,
           errorSummary: [],
-          meta: { ...meta, attemptId },
+          meta: fresh,
         },
       });
       if (claimed.count !== 1) {

@@ -149,6 +149,50 @@ describe('migration status races', () => {
     }
   });
 
+  t('a retry does not keep the previous attempt clock', async () => {
+    // WHY: copying progressAt makes the wizard say the new attempt is stalled,
+    // and the worker fails it after 15 minutes without a new claim.
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValueOnce(new Error('queue down'));
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'name' },
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string }>();
+      const failed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const past = new Date(Date.now() - 16 * 60_000).toISOString();
+      await prisma.migrationJob.update({
+        where: { id: body.id },
+        data: { meta: { ...(failed.meta as object), progressAt: past } },
+      });
+      add.mockResolvedValue({ id: 'chunk' } as never);
+      const retry = await server.inject({
+        method: 'POST',
+        url: `/api/v1/migrations/${body.id}/retry`,
+      });
+      expect(retry.statusCode).toBe(200);
+      const detail = await server.inject({
+        method: 'GET',
+        url: `/api/v1/migrations/${body.id}`,
+      });
+      expect(detail.json<{ status: string }>().status).toBe('RUNNING');
+      expect(detail.json<{ stalled?: boolean }>().stalled).toBe(false);
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      expect((stored.meta as { progressAt?: unknown }).progressAt).toBeUndefined();
+    } finally {
+      add.mockRestore();
+    }
+  });
+
   t('cancel does not trust a stale RUNNING read over a finished job', async () => {
     const job = await prisma.migrationJob.create({
       data: {
