@@ -1,6 +1,11 @@
 {
   "csvImport": {
     "progress": {
+      "starting": "جارٍ بدء الاستيراد…",
+      "statusComplete": "اكتمل الاستيراد",
+      "statusImporting": "جارٍ الاستيراد…",
+      "statusCancelled": "أُلغي الاستيراد",
+      "statusFailed": "فشل الاستيراد",
       "statusStalled": "توقف الاستيراد",
       "reasonStalled": "توقف الاستيراد قبل حفظ أي صف.",
       "reasonEnqueue": "لم يبدأ الاستيراد. حاول مرة أخرى.",
@@ -10,7 +15,10 @@
       "cancelling": "جارٍ الإلغاء…",
       "cancel": "إلغاء الاستيراد",
       "retrying": "جارٍ إعادة المحاولة…",
-      "retry": "إعادة محاولة الاستيراد"
+      "retry": "إعادة محاولة الاستيراد",
+      "errorRows": "تعذر استيراد {{formattedCount}} صف.",
+      "downloadErrors": "تنزيل تقرير الأخطاء (CSV)",
+      "importAnother": "استيراد ملف آخر"
     }
   },
   "references": {
