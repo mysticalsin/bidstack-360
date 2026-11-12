@@ -188,6 +188,41 @@ describe('migration chunk guards', () => {
     await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
   });
 
+  t('a running job accepts a chunk that passes a null attempt id', async () => {
+    // WHY: a legacy row and a legacy chunk both have no attempt id. Null is
+    // that missing id, and the chunk still has to import.
+    const running = await fixture('RUNNING');
+    await prisma.migrationJob.update({
+      where: { id: running.job.id },
+      data: { startedAt: new Date(), meta: { entityType: 'companies' } },
+    });
+    let reads = 0;
+    await processMigrationChunk(
+      {
+        migrationJobId: running.job.id,
+        orgId: running.org.id,
+        userId: running.job.userId,
+        source: 'CSV',
+        entityType: 'companies',
+        chunkOffset: 0,
+        chunkSize: 100,
+        totalRows: 1,
+        redisKey: 'rows',
+        mappings: { Name: 'company.name' },
+        dedupStrategy: 'skip',
+        attemptId: null,
+      },
+      deps(async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      }),
+      log,
+    );
+    expect(reads).toBe(1);
+    expect(await prisma.company.count({ where: { orgId: running.org.id, deletedAt: null } })).toBe(1);
+    await prisma.org.delete({ where: { id: running.org.id } }).catch(() => undefined);
+  });
+
   t('a chunk for an attempt the reaper already ended is not retried', async () => {
     // WHY: the reaper marks that attempt FAILED. BullMQ then retries the
     // chunk five times and logs a misleading error. The chunk has to finish

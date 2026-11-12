@@ -242,6 +242,19 @@ describe('migration stale scan', () => {
     }
   });
 
+  t('an old pending import that already has queued chunks releases the slot', async () => {
+    // WHY: the sweep used to leave a PENDING row alone when a chunk was
+    // queued. That row holds the same-import slot until someone deletes it.
+    const queued = await pendingJob(16 * 60_000);
+    const released = await sweepAbandonedPending(new Date(), {
+      hasQueueEntry: async () => true,
+    });
+    expect(released).toBe(1);
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: queued.job.id } });
+    expect(stored.status).toBe('FAILED');
+    await prisma.org.delete({ where: { id: queued.org.id } }).catch(() => undefined);
+  });
+
   t('a delete that does not land does not record a reap', async () => {
     // WHY: the reap audit used to commit before the delete. A delete that
     // removes nothing, or is rejected, left a "reaped" row, and the next

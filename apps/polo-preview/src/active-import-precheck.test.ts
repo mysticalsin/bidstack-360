@@ -9,7 +9,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { decideBootMigration, DUPLICATE_PRECHECK_SQL } from './active-import-precheck.js';
+import {
+  ACTIVE_IMPORT_MIGRATION,
+  decideBootMigration,
+  DUPLICATE_PRECHECK_SQL,
+  planBootMigration,
+} from './active-import-precheck.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -47,7 +52,7 @@ describe('active import boot guard', () => {
 
   it('uses the current index predicate', () => {
     const migration = readFileSync(
-      join(here, '../../../packages/db/prisma/migrations/20261112170000_migration_jobs_one_active_per_org_source/migration.sql'),
+      join(here, '../../../packages/db/prisma/migrations/20261112170100_migration_jobs_one_active_per_file/migration.sql'),
       'utf8',
     );
     expect(wherePredicate(DUPLICATE_PRECHECK_SQL)).toBe(wherePredicate(migration));
@@ -57,5 +62,34 @@ describe('active import boot guard', () => {
     expect(guard).toBeGreaterThan(-1);
     expect(deploy).toBeGreaterThan(guard);
     expect(entry).not.toMatch(/DELETE\s+FROM\s+migration_jobs/i);
+  });
+
+  it('skips only the index migration when duplicates exist', () => {
+    // WHY: the column and the app role can still apply. Refusing the whole
+    // deploy leaves the container on the previous schema. Deleting the rows
+    // is Tony's decision, so the plan must not modify them.
+    const decision = decideBootMigration([{ org_id: 'org-1', active: 2 }]);
+    expect(planBootMigration(decision)).toEqual({
+      deploy: true,
+      skipIndexMigration: true,
+      servePreviousSchema: false,
+      modifyRows: false,
+    });
+    expect(planBootMigration(decideBootMigration([]))).toEqual({
+      deploy: true,
+      skipIndexMigration: false,
+      servePreviousSchema: false,
+      modifyRows: false,
+    });
+    expect(ACTIVE_IMPORT_MIGRATION).toBe('20261112170100_migration_jobs_one_active_per_file');
+    const entry = readFileSync(join(here, '../container/entrypoint.mjs'), 'utf8');
+    expect(entry).toContain('skipIndexMigration');
+    expect(entry).toContain('ACTIVE_IMPORT_MIGRATION');
+    const skip = entry.indexOf('skipIndexMigration');
+    const giveUp = entry.indexOf('serving the restored schema');
+    const deploy = entry.indexOf("['migrate', 'deploy'");
+    expect(skip).toBeGreaterThan(-1);
+    expect(giveUp).toBeGreaterThan(skip);
+    expect(deploy).toBeGreaterThan(giveUp);
   });
 });
