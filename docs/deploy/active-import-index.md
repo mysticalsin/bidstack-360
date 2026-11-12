@@ -62,18 +62,22 @@ This is the failed-index recovery above, not a down migration. `20261112170000` 
 
 `20261112170000_migration_jobs_one_active_per_org_source` on this branch only adds `file_hash`. It is not on `origin/main` or `origin/demo`, and the container image is built from main. Prisma 5.22 does not halt on a checksum mismatch. Do not add a repair migration for an older copy of that file.
 
-A row in `_prisma_migrations` is not itself a stop. A healthy deploy of the current file records a row. Compare `checksum`. Jarvis decides whether to run this read-only check. This change does not run it.
+Jarvis decides whether to run this read-only check. This change does not run it.
 
 ```sql
-SELECT migration_name, checksum, finished_at, rolled_back_at
+SELECT migration_name, checksum, finished_at, rolled_back_at, COUNT(*) OVER () AS row_count
 FROM _prisma_migrations
-WHERE migration_name = '20261112170000_migration_jobs_one_active_per_org_source';
+WHERE migration_name LIKE '20261112170000%';
 ```
 
-- No row, or checksum `d7e69f0c4edfd74990c47dde52dc8797225eb6314abcd415b7f44a227eaf9ee8`: proceed. That is the sha256 of the current `migration.sql`, which only adds `file_hash`.
-- Checksum `b4630ad8e436a1c4b945bf383a781c5864686387c18109fcc54958ee9b829833`: STOP. That database applied the earlier SQL. This head does not repair it. `20261112170100` would fail with `42703` and the next deploy is P3009. It needs Tony's decision and a forward add-column migration before deploy. Do not drop an index and do not edit the checksum from this repo.
+PROCEED only if (a) no row exists for `20261112170000` (never recorded), or (b) a row with checksum `d7e69f0c4edfd74990c47dde52dc8797225eb6314abcd415b7f44a227eaf9ee8` AND `finished_at` IS NOT NULL AND `rolled_back_at` IS NULL.
 
-Any other checksum is not a proceed.
+STOP and escalate to Tony in every other case, including:
+
+- checksum `b4630ad8e436a1c4b945bf383a781c5864686387c18109fcc54958ee9b829833` (old index SQL). That database is not repaired by this head: `20261112170100` would fail with `42703` and then P3009. It needs a forward add-column migration before deploy. Do not drop an index and do not edit the checksum from this repo.
+- current checksum with `finished_at` NULL (a failed attempt: recover per the P3009 notes)
+- any other checksum
+- more than one row
 
 ## Recovery when deploy already failed with P3018 / 23505
 
