@@ -35,7 +35,6 @@ import {
   type MigrationJobError,
   MIGRATION_STALE_MS,
   MIGRATION_CONFLICT,
-  migrationEnqueueFailureCode,
   MIGRATION_STALE_REASON,
   migrationAttemptId,
   migrationChunkMatchesAttempt,
@@ -1058,24 +1057,10 @@ export async function processMigrationChunk(
         { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
       );
     } catch (err) {
-      const jobNow = await prisma.migrationJob.findUnique({
-        where: { id: payload.migrationJobId },
-        select: { processedRows: true, errorRows: true },
-      });
-      await prisma.migrationJob.updateMany({
-        where: { id: payload.migrationJobId, status: { in: [...migrationFrom('fail')] } },
-        data: {
-          status: 'FAILED',
-          completedAt: new Date(),
-          errorSummary: [
-            {
-              row: 0,
-              field: null,
-              message: migrationEnqueueFailureCode(jobNow?.processedRows ?? 0, jobNow?.errorRows ?? 0),
-            },
-          ],
-        },
-      });
+      // The page is already committed. Leave the job RUNNING and rethrow so
+      // BullMQ runs this chunk again. Failing it here makes that retry return
+      // at the running-status guard, with the next page never fetched.
+      log.warn({ err, migrationJobId: payload.migrationJobId }, 'migration next page was not queued');
       throw err;
     }
   } else if (payload.source === 'HUBSPOT_OAUTH') {
