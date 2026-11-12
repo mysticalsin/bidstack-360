@@ -134,4 +134,54 @@ describe('migration chunk guards', () => {
     expect(stored?.status).toBe('COMPLETE');
     await prisma.org.delete({ where: { id: done.org.id } }).catch(() => undefined);
   });
+
+  t('a retry chunk waits while the job is still failed, then imports once it is running', async () => {
+    // WHY: retry enqueues the chunk while the row is still FAILED, then
+    // claims RUNNING and clears the stall clock. Acking the chunk in that
+    // window leaves the job running with nothing left to process.
+    const previous = 'attempt-previous';
+    const next = 'attempt-next';
+    const failed = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: failed.job.id },
+      data: { meta: { entityType: 'companies', attemptId: previous } },
+    });
+    let reads = 0;
+    const readRows = async () => {
+      reads += 1;
+      return JSON.stringify([{ Name: 'Acme' }]);
+    };
+    const csv = {
+      migrationJobId: failed.job.id,
+      orgId: failed.org.id,
+      userId: failed.job.userId,
+      source: 'CSV' as const,
+      entityType: 'companies',
+      chunkOffset: 0,
+      chunkSize: 100,
+      totalRows: 1,
+      redisKey: 'rows',
+      mappings: { Name: 'company.name' },
+      dedupStrategy: 'skip' as const,
+      attemptId: next,
+    };
+    await expect(processMigrationChunk(csv, deps(readRows), log)).rejects.toThrow(/not running yet/);
+    const hubspot = { ...csv, source: 'HUBSPOT_OAUTH' as const };
+    await expect(processMigrationChunk(hubspot, deps(readRows), log)).rejects.toThrow(/not running yet/);
+    expect(reads).toBe(0);
+    expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(0);
+
+    await prisma.migrationJob.update({
+      where: { id: failed.job.id },
+      data: {
+        status: 'RUNNING',
+        startedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: next },
+      },
+    });
+    await processMigrationChunk(csv, deps(readRows), log);
+    expect(reads).toBe(1);
+    expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(1);
+    await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
+  });
 });

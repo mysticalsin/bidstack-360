@@ -848,9 +848,10 @@ export async function processMigrationChunk(
     where: { id: payload.migrationJobId },
     select: { status: true, meta: true, orgId: true },
   });
-  // Start and retry enqueue before the RUNNING claim. A chunk that arrives in
-  // that window must be retried, not completed, or the rows are dropped.
-  if (jobRow?.status === 'PENDING') {
+  // Start and retry enqueue before the RUNNING claim. A chunk that arrives
+  // while the row is still PENDING or FAILED must be retried, not completed,
+  // or the claim that follows has nothing left to process.
+  if (jobRow?.status === 'PENDING' || jobRow?.status === 'FAILED') {
     throw new Error('migration job is not running yet');
   }
   if (!jobRow || !migrationChunkMayRun(jobRow.status)) {
