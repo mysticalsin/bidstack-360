@@ -26,6 +26,7 @@ import {
   grantsCalendarRead,
   grantsMailRead,
   mayWriteCalendar,
+  tokenFrom,
 } from '@bidstack/shared';
 
 import { CalendarConflictError, PushJobData, PullJobData } from './calendar-sync-types.js';
@@ -289,7 +290,7 @@ export async function fanoutIncrementalPulls(queue: Queue, log: pino.Logger): Pr
   while (true) {
     const batch = await prisma.integrationToken.findMany({
       // A failed refresh marks the row 'error'; keep pulling so the next refresh can recover it.
-      where: { status: { in: ['active', 'error'] }, deletedAt: null, provider: { in: [...CALENDAR_TOKEN_PROVIDERS] } },
+      where: { status: { in: [...tokenFrom('refresh_ok')] }, deletedAt: null, provider: { in: [...CALENDAR_TOKEN_PROVIDERS] } },
       select: { id: true, orgId: true, userId: true },
       take: FANOUT_BATCH_SIZE,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),

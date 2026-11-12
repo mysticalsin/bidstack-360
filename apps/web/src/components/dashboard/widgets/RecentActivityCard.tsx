@@ -53,7 +53,6 @@ type ActivityItem = {
 export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
   const { t } = useTranslation('crm');
   const visible = activity.slice(0, 8);
-  const hasMore = activity.length > 8;
 
   return (
     <GlassCard padding="none" hoverable={false}>
@@ -123,16 +122,6 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
           ))
         )}
       </div>
-      {hasMore && (
-        <div className="px-5 py-3 border-t border-[var(--border-subtle)]">
-          <Link
-            to="/activities"
-            className="text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
-          >
-            {t('recentActivity.viewAll', 'View all {{count}} activities →', { count: activity.length })}
-          </Link>
-        </div>
-      )}
     </GlassCard>
   );
 }

@@ -18,6 +18,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -67,7 +68,7 @@ afterAll(async () => {
   if (!dbReachable) return;
   // Best-effort cleanup. We only delete rows we ourselves inserted.
   if (seededIds.length > 0) {
-    await prisma.auditLog.deleteMany({ where: { id: { in: seededIds } } });
+    await purgeAuditRows({ where: { id: { in: seededIds } } });
   }
   if (foreignOrgId) await prisma.org.delete({ where: { id: foreignOrgId } }).catch(() => undefined);
   if (server) await server.close();
@@ -78,7 +79,7 @@ afterAll(async () => {
 
 afterEach(async () => {
   if (!dbReachable || seededIds.length === 0) return;
-  await prisma.auditLog.deleteMany({ where: { id: { in: seededIds } } });
+  await purgeAuditRows({ where: { id: { in: seededIds } } });
   seededIds.length = 0;
 });
 

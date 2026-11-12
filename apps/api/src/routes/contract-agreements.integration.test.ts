@@ -16,6 +16,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -41,7 +42,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (orgId) {
     await prisma.contractAgreement.deleteMany({ where: { orgId, accountKey: ACCOUNT } });
-    await prisma.auditLog.deleteMany({
+    await purgeAuditRows({
       where: { orgId, action: { startsWith: 'contract_agreement.' } },
     });
   }

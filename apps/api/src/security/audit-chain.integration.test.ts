@@ -96,15 +96,21 @@ describe('audit log hash chain', () => {
 
   it('rejects content updates but allows soft delete', async () => {
     const [row] = await write(orgId, 1, 'immutable');
+    // The Prisma guard runs first. The trigger is what a raw writer hits.
     await expect(
       prisma.auditLog.update({ where: { id: row!.id }, data: { diff: { rewritten: true } } }),
+    ).rejects.toThrow(/insert-only/);
+    await expect(
+      prisma.$executeRaw`UPDATE audit_log SET diff = '{"rewritten":true}'::jsonb WHERE id = ${row!.id}`,
     ).rejects.toThrow(/append-only/);
     await expect(
-      prisma.auditLog.update({ where: { id: row!.id }, data: { action: 'test.chain.renamed' } }),
+      prisma.$executeRaw`UPDATE audit_log SET action = 'test.chain.renamed' WHERE id = ${row!.id}`,
     ).rejects.toThrow(/append-only/);
-    await expect(
-      prisma.auditLog.update({ where: { id: row!.id }, data: { deletedAt: new Date() } }),
-    ).resolves.toBeTruthy();
+    await prisma.$executeRaw`UPDATE audit_log SET deleted_at = NOW() WHERE id = ${row!.id}`;
+    const stored = await prisma.$queryRaw<Array<{ deleted_at: Date | null }>>`
+      SELECT deleted_at FROM audit_log WHERE id = ${row!.id}
+    `;
+    expect(stored[0]?.deleted_at).toBeTruthy();
   });
 
   it('rejects TRUNCATE', async () => {
@@ -129,7 +135,8 @@ describe('audit log hash chain', () => {
       prisma.$executeRaw`UPDATE audit_log SET diff = '{"forged":true}'::jsonb WHERE id = ${rows[0]!.id}`,
       prisma.$executeRawUnsafe('ALTER TABLE audit_log ENABLE TRIGGER audit_log_append_only'),
     ]);
-    await prisma.auditLog.delete({ where: { id: rows[1]!.id } });
+    await expect(prisma.auditLog.delete({ where: { id: rows[1]!.id } })).rejects.toThrow(/insert-only/);
+    await prisma.$executeRaw`DELETE FROM audit_log WHERE id = ${rows[1]!.id}`;
 
     const report = await verifyAuditChain(otherOrgId);
     expect(report.ok).toBe(false);

@@ -28,6 +28,9 @@ export default defineConfig({
     isolate: true,
     env: {
       NODE_ENV: 'test',
+      // In-process refreshes. The opt-out is honored only because NODE_ENV is
+      // test. Production and a missing NODE_ENV still require Redis.
+      OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
     },
   },
 });

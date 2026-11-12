@@ -92,7 +92,7 @@ describeDb('MCP tools', () => {
   });
 
   afterAll(async () => {
-    await prisma.auditLog.deleteMany({ where: { orgId } });
+    await prisma.$executeRaw`DELETE FROM audit_log WHERE org_id::text = ${orgId}`;
     await prisma.note.deleteMany({ where: { orgId } });
     await prisma.task.deleteMany({ where: { orgId } });
     await prisma.lead.deleteMany({ where: { orgId } });

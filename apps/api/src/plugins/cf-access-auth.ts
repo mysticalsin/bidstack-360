@@ -76,7 +76,15 @@ export async function verifyCfAccessJwt(
     throw new Error('malformed_cf_access_jwt');
   }
   let header: { alg?: string; kid?: string };
-  let payload: { email?: string; common_name?: string; name?: string; aud?: string | string[]; iss?: string; exp?: number };
+  let payload: {
+    email?: string;
+    common_name?: string;
+    name?: string;
+    aud?: string | string[];
+    iss?: string;
+    exp?: number;
+    nbf?: number;
+  };
   try {
     header = JSON.parse(b64urlToBuffer(parts[0]).toString('utf8')) as typeof header;
     payload = JSON.parse(b64urlToBuffer(parts[1]).toString('utf8')) as typeof payload;
@@ -113,6 +121,7 @@ export async function verifyCfAccessJwt(
   if (!aud.includes(opts.audience)) throw new Error('cf_access_aud_mismatch');
   if (payload.iss !== issuer) throw new Error('cf_access_iss_mismatch');
   if (!payload.exp || payload.exp <= now) throw new Error('cf_access_expired');
+  if (payload.nbf != null && payload.nbf > now) throw new Error('cf_access_nbf');
 
   const email = (payload.email ?? payload.common_name ?? '').trim().toLowerCase();
   if (!email.includes('@')) throw new Error('cf_access_email_missing');
@@ -123,17 +132,30 @@ function jwkToPem(jwk: JsonWebKey): string {
   return createPublicKey({ key: jwk, format: 'jwk' }).export({ type: 'spki', format: 'pem' }).toString();
 }
 
+function loopbackEmailBypassAllowed(): boolean {
+  const nodeEnv = process.env.NODE_ENV ?? '';
+  if (nodeEnv !== 'development' && nodeEnv !== 'test') return false;
+  return process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL === 'true';
+}
+
 export async function resolveCfAccessIdentity(req: FastifyRequest): Promise<CfAccessIdentity> {
   const jwt = headerValue(req, CF_ACCESS_JWT_HEADER);
-  const team = process.env.CF_ACCESS_TEAM_DOMAIN?.trim() ?? '';
-  const audience = process.env.CF_ACCESS_AUD?.trim() ?? '';
-  if (jwt && team && audience) {
-    return verifyCfAccessJwt(jwt, { teamDomain: team, audience });
+  if (jwt) {
+    const team = process.env.CF_ACCESS_TEAM_DOMAIN?.trim() ?? '';
+    const audience = process.env.CF_ACCESS_AUD?.trim() ?? '';
+    if (!team || !audience) {
+      throw req.server.httpErrors.unauthorized('Cloudflare Access identity required');
+    }
+    try {
+      return await verifyCfAccessJwt(jwt, { teamDomain: team, audience });
+    } catch (err) {
+      req.log.warn({ err }, 'cf-access jwt rejected');
+      throw req.server.httpErrors.unauthorized('Cloudflare Access identity required');
+    }
   }
 
   const email = headerValue(req, CF_ACCESS_EMAIL_HEADER)?.toLowerCase();
-  const trustLoopback = process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL !== 'false';
-  if (email && trustLoopback && isLoopback(req.ip)) {
+  if (email && loopbackEmailBypassAllowed() && isLoopback(req.ip)) {
     return { email };
   }
 

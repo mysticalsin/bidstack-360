@@ -86,7 +86,24 @@ const { state, prismaMock } = vi.hoisted(() => {
           return {};
         },
       },
-      $executeRaw: async () => 0,
+      $executeRaw: async (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const sql = Array.isArray(strings) ? strings.join(' ') : '';
+        if (!sql.includes('processed_rows = processed_rows')) return 0;
+        if (state.failNextCounterUpdate) {
+          state.failNextCounterUpdate = false;
+          throw new Error('simulated crash on counter update');
+        }
+        const processed = Number(values[0] ?? 0);
+        const errored = Number(values[1] ?? 0);
+        if (buffer) {
+          buffer.processedDelta += processed;
+          buffer.errorDelta += errored;
+        } else {
+          state.processedRows += processed;
+          state.errorRows += errored;
+        }
+        return 1;
+      },
     };
   }
 
@@ -162,6 +179,7 @@ async function runAttempt(): Promise<number> {
     createdIds: [],
     processed,
     errors: [],
+    attemptId: null,
   });
   return resumeFrom;
 }

@@ -119,6 +119,9 @@ function shouldPersistQueryKey(key: unknown[]): boolean {
   if (key[0] === 'crm-dashboard' && typeof key[1] === 'string' && key[1] !== 'default') {
     return false;
   }
+  // The nav badge is a live count. Restoring it after reload shows the
+  // previous overdue total while the task list has already moved on.
+  if (key[0] === 'tasks' && key[1] === 'summary') return false;
   return true;
 }
 

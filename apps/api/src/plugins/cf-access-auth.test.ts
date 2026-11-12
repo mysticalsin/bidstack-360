@@ -1,12 +1,17 @@
+import { createSign, generateKeyPairSync } from 'node:crypto';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import {
   CF_ACCESS_EMAIL_HEADER,
+  CF_ACCESS_JWT_HEADER,
   CF_ACCESS_NOT_ALLOWLISTED,
+  __clearCfAccessJwksCacheForTests,
   __setCfAccessVerifierForTests,
   verifyCfAccessAuth,
+  verifyCfAccessJwt,
 } from './cf-access-auth.js';
 
 vi.mock('@bidstack/db', () => ({
@@ -122,5 +127,98 @@ describe('Cloudflare Access identity mapping', () => {
     await expect(
       verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' }, '203.0.113.9')),
     ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it('refuses the loopback email in production even when the flag is set', async () => {
+    // WHY: a production process that can be reached on 127.0.0.1 (a sidecar,
+    // a mis-set proxy, a container health probe) must not treat the email
+    // header as identity. The flag cannot turn that back on.
+    process.env.NODE_ENV = 'production';
+    process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
+    await expect(
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    process.env.NODE_ENV = 'test';
+  });
+
+  it('refuses the loopback email when NODE_ENV is missing', async () => {
+    const previous = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
+    await expect(
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    process.env.NODE_ENV = previous;
+  });
+
+  it('refuses the loopback email when the trust flag is missing', async () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL;
+    await expect(
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    process.env.NODE_ENV = 'test';
+    process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
+  });
+
+  it('does not fall back to the email header when the Access JWT cannot be verified', async () => {
+    // WHY: aud and issuer are checked inside JWT verification. A client that
+    // also sends the email header must not be admitted when that check fails
+    // or the team and audience are unset.
+    process.env.CF_ACCESS_TEAM_DOMAIN = 'team.cloudflareaccess.com';
+    process.env.CF_ACCESS_AUD = 'aud-1';
+    __setCfAccessVerifierForTests(async () => {
+      throw new Error('cf_access_aud_mismatch');
+    });
+    await expect(
+      verifyCfAccessAuth(
+        fakeReq({
+          [CF_ACCESS_JWT_HEADER]: 'header.payload.sig',
+          [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com',
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    delete process.env.CF_ACCESS_TEAM_DOMAIN;
+    delete process.env.CF_ACCESS_AUD;
+  });
+
+  it('rejects an Access JWT that is not valid yet', async () => {
+    // WHY: exp is checked, and nbf was not. A token whose not-before is in
+    // the future would be accepted and become the request identity.
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const jwk = publicKey.export({ format: 'jwk' }) as JsonWebKey & { kid?: string };
+    jwk.kid = 'nbf-key';
+    jwk.alg = 'RS256';
+    const now = Math.floor(Date.now() / 1000);
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'nbf-key' })).toString('base64url');
+    const body = Buffer.from(
+      JSON.stringify({
+        email: 'ada@mantu.com',
+        aud: 'aud-1',
+        iss: 'https://team.cloudflareaccess.com',
+        exp: now + 600,
+        nbf: now + 600,
+      }),
+    ).toString('base64url');
+    const sign = createSign('RSA-SHA256');
+    sign.update(`${header}.${body}`);
+    sign.end();
+    const token = `${header}.${body}.${sign.sign(privateKey).toString('base64url')}`;
+    __clearCfAccessJwksCacheForTests();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ keys: [jwk] }) })),
+    );
+    try {
+      await expect(
+        verifyCfAccessJwt(token, { teamDomain: 'team.cloudflareaccess.com', audience: 'aud-1' }),
+      ).rejects.toThrow(/cf_access_nbf/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -1,4 +1,28 @@
 {
+  "csvImport": {
+    "progress": {
+      "starting": "جارٍ بدء الاستيراد…",
+      "statusComplete": "اكتمل الاستيراد",
+      "statusImporting": "جارٍ الاستيراد…",
+      "statusCancelled": "أُلغي الاستيراد",
+      "statusFailed": "فشل الاستيراد",
+      "statusStalled": "توقف الاستيراد",
+      "reasonStalled": "توقف الاستيراد قبل حفظ أي صف.",
+      "reasonEnqueue": "لم يبدأ الاستيراد. حاول مرة أخرى.",
+      "reasonRowsExpired": "انتهت صلاحية هذه الصفوف. أعد رفع الملف.",
+      "reasonConflict": "تعارض الاستيراد مع كتابة أخرى.",
+      "reasonEnqueueStopped": "توقف الاستيراد قبل حفظ الصفوف المتبقية.",
+      "reasonUnknown": "تعذر إكمال الاستيراد.",
+      "actionFailed": "لم ينجح ذلك. حاول مرة أخرى.",
+      "cancelling": "جارٍ الإلغاء…",
+      "cancel": "إلغاء الاستيراد",
+      "retrying": "جارٍ إعادة المحاولة…",
+      "retry": "إعادة محاولة الاستيراد",
+      "errorRows": "تعذر استيراد {{formattedCount}} صف.",
+      "downloadErrors": "تنزيل تقرير الأخطاء (CSV)",
+      "importAnother": "استيراد ملف آخر"
+    }
+  },
   "references": {
     "column": {
       "reference": "المرجع",

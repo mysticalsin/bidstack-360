@@ -10,6 +10,7 @@ export const PUBLIC_PREVIEW_ORIGIN = 'https://polo-preview.tony-walteur.workers.
 export const DROP_REQUEST = [
   'host',
   'cf-access-jwt-assertion',
+  'cf-access-authenticated-user-email',
   'cf-connecting-ip',
   'cf-ipcountry',
   'cf-ray',
@@ -18,8 +19,16 @@ export const DROP_REQUEST = [
   'x-forwarded-proto',
   'x-forwarded-host',
   'x-real-ip',
+  'forwarded',
+  'true-client-ip',
   'x-bidstack-e2e-role',
   'x-bidstack-e2e-org',
+  'x-polo-internal-key',
+  'x-relay-key',
+  'cf-access-client-id',
+  'cf-access-client-secret',
+  'x-bidstack-sentry-smoke-token',
+  'x-azure-fdid',
   'connection',
   'upgrade',
   'content-length',
@@ -78,6 +87,13 @@ export function filterCookieHeader(cookie) {
       return name.length > 0 && !name.startsWith('cf_') && name !== 'polo_session';
     });
   return kept.length > 0 ? kept.join('; ') : null;
+}
+
+// The Worker reattaches the assertion only after verifyAccess checks aud
+// and issuer. A code-login session has no JWT, so it gets no identity header.
+export function identityHeaders(who, jwt) {
+  if (who?.via === 'access' && jwt) return [['cf-access-jwt-assertion', jwt]];
+  return [];
 }
 
 export function filterRequestHeaders(headers) {

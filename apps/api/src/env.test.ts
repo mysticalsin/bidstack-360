@@ -151,6 +151,32 @@ describe('boot environment validation', () => {
     expect(env.STORAGE_DRIVER).toBe('local');
   });
 
+  it('refuses a refresh-lock wait that is not shorter than the ttl', async () => {
+    await expect(
+      loadEnvWith({
+        NODE_ENV: 'development',
+        OAUTH_REFRESH_LOCK_TTL_MS: '30000',
+        OAUTH_REFRESH_LOCK_WAIT_MS: '30000',
+      }),
+    ).rejects.toThrow('OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_REFRESH_LOCK_WAIT_MS');
+  });
+
+  it('refuses to start in production when the refresh lock opts out of Redis', async () => {
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).rejects.toThrow(
+      'OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false is refused when NODE_ENV=production',
+    );
+    const env = await loadEnvWith({
+      NODE_ENV: 'development',
+      OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+    });
+    expect(env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED).toBe('false');
+  });
+
   it('requires an explicit non-loopback Redis URL in production', async () => {
     await expect(loadEnvWith({ ...COMPLETE_PRODUCTION_ENV, REDIS_URL: undefined })).rejects.toThrow(
       'REDIS_URL is required in production',
@@ -246,5 +272,18 @@ describe('boot environment validation', () => {
     });
     expect(env.CF_ACCESS_AUTH).toBe('true');
     expect(env.POLO_ALLOWED_USERS).toBe('ada@mantu.com:Admin');
+  });
+
+  it('refuses the Access loopback email trust in production and defaults it off', async () => {
+    // WHY: a missing flag must not mean "trust the email header". Production
+    // must refuse to boot if an operator turns the dev bypass on.
+    const dev = await loadEnvWith({ NODE_ENV: 'development' });
+    expect(dev.CF_ACCESS_TRUST_LOOPBACK_EMAIL).toBe('false');
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'true',
+      }),
+    ).rejects.toThrow('CF_ACCESS_TRUST_LOOPBACK_EMAIL=true is not allowed in production');
   });
 });

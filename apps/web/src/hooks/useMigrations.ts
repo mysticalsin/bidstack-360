@@ -24,6 +24,8 @@ export interface MigrationJob {
   undoableUntil: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Derived by GET. The worker is what persists FAILED. */
+  stalled?: boolean;
 }
 
 export interface StartCsvImportInput {
@@ -92,7 +94,39 @@ export function useStartCsvImport() {
   return useMutation({
     mutationFn: (input: StartCsvImportInput) =>
       api<MigrationJob>('/api/migrations/start-csv', { method: 'POST', body: input }),
+    // The app retries other mutations once on 500. A start creates a job, so a
+    // retry would be a second request from the same click.
+    retry: false,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['migrations'] }),
+  });
+}
+
+export function useCancelMigration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<MigrationJob>(`/api/migrations/${id}/cancel`, { method: 'DELETE' }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['migrations'] });
+      qc.invalidateQueries({ queryKey: ['migrations', id] });
+    },
+  });
+}
+
+export function useRetryMigration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<MigrationJob>(`/api/migrations/${id}/retry`, { method: 'POST' }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['migrations'] });
+      qc.invalidateQueries({ queryKey: ['migrations', id] });
+    },
+    // A 409 stores the real reason on the job (the rows expired). The list the
+    // wizard is showing is the one from before that write.
+    onError: (_err, id) => {
+      qc.invalidateQueries({ queryKey: ['migrations'] });
+      qc.invalidateQueries({ queryKey: ['migrations', id] });
+    },
   });
 }
 

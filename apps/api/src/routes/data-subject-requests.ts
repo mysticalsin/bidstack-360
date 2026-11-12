@@ -24,6 +24,7 @@ import {
   DataSubjectRequestIdParams,
   DataSubjectRequestParams,
   DataSubjectRequestView,
+  dsrStateFromStored,
   type DataSubjectType,
 } from '@bidstack/shared';
 
@@ -49,7 +50,7 @@ function toView(row: DataSubjectRequest): DataSubjectRequestView {
     subjectType: row.subjectType as DataSubjectType,
     subjectId: row.subjectId,
     dryRun: row.dryRun,
-    status: row.status as DataSubjectRequestView['status'],
+    status: dsrStateFromStored(row.status).state,
     report: report.success ? report.data : null,
     error: row.error,
     createdAt: row.createdAt.toISOString(),

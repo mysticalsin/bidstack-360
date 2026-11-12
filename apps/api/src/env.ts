@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
+
 import { parseAllowedUsers } from './lib/allowed-users.js';
 
 /**
@@ -39,7 +41,7 @@ export const envSchema = z.object({
   CF_ACCESS_AUTH: z.enum(['true', 'false']).default('false'),
   CF_ACCESS_TEAM_DOMAIN: z.string().optional().or(z.literal('')),
   CF_ACCESS_AUD: z.string().optional().or(z.literal('')),
-  CF_ACCESS_TRUST_LOOPBACK_EMAIL: z.enum(['true', 'false']).default('true'),
+  CF_ACCESS_TRUST_LOOPBACK_EMAIL: z.enum(['true', 'false']).default('false'),
   // Account-file document intelligence (LLM/Dust). Off in real mode unless
   // the operator explicitly enables it. MSA library extract stays local.
   DOCUMENT_LLM_EXTRACT_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -194,8 +196,9 @@ export const envSchema = z.object({
   TWILIO_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   TWILIO_RECORDING_DOWNLOAD_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
 
-  // OAuth refresh single-flight. Redis is required in production so concurrent
-  // refreshes across API replicas do not race a rotating provider refresh token.
+  // OAuth refresh single-flight. Redis is required in every mode until
+  // OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false. Production refuses to start
+  // when that opt-out is set. The API and the worker share the same check.
   OAUTH_REFRESH_LOCK_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
   OAUTH_REFRESH_LOCK_TTL_MS: z.coerce.number().int().positive().default(30_000),
   OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(10_000),
@@ -384,6 +387,14 @@ export function getEnv(): Env {
   }
   const env = parsed.data;
   const semanticErrors: string[] = [];
+  const lockStartup = oauthRefreshLockStartupError(env);
+  if (lockStartup) semanticErrors.push(lockStartup);
+  const lockTiming = oauthRefreshLockTimingError({
+    OAUTH_REFRESH_LOCK_TTL_MS: env.OAUTH_REFRESH_LOCK_TTL_MS,
+    OAUTH_REFRESH_LOCK_WAIT_MS: env.OAUTH_REFRESH_LOCK_WAIT_MS,
+    OAUTH_HTTP_TIMEOUT_MS: env.OAUTH_HTTP_TIMEOUT_MS,
+  });
+  if (lockTiming) semanticErrors.push(lockTiming);
 
   if (env.NODE_ENV === 'production') {
     const publicBaseUrl = new URL(env.PUBLIC_BASE_URL);
@@ -531,6 +542,9 @@ export function getEnv(): Env {
     if (env.NODE_ENV === 'production' && !env.CF_ACCESS_AUD?.trim()) {
       semanticErrors.push('CF_ACCESS_AUD is required when CF_ACCESS_AUTH=true in production');
     }
+  }
+  if (env.NODE_ENV === 'production' && env.CF_ACCESS_TRUST_LOOPBACK_EMAIL === 'true') {
+    semanticErrors.push('CF_ACCESS_TRUST_LOOPBACK_EMAIL=true is not allowed in production');
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);

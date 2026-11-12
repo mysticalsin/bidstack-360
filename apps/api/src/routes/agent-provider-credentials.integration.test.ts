@@ -16,6 +16,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -30,7 +31,7 @@ async function cleanupAgentProviderRows(id: string): Promise<void> {
     DELETE FROM integration_configs
     WHERE org_id = ${id}::uuid AND name LIKE 'agent-provider:%'
   `;
-  await prisma.auditLog.deleteMany({
+  await purgeAuditRows({
     where: { orgId: id, action: { startsWith: 'agent_provider.' } },
   });
 }

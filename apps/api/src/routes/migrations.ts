@@ -12,12 +12,14 @@
 //
 // HubSpot OAuth + import → migrations-hubspot.routes.ts
 
+import { randomUUID } from 'node:crypto';
+
 import * as XLSX from '@e965/xlsx';
 import { Queue } from 'bullmq';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import {
   MigrationJobResponse,
   MigrationMappingResponse,
@@ -28,10 +30,113 @@ import {
   DedupStrategyEnum,
   type MigrationJobError,
   MIGRATION,
+  migrationAttemptId,
+  migrationFrom,
+  migrationProgressAt,
+  MIGRATION_ROWS_EXPIRED,
+  migrationErrorsCsv,
+  migrationRetryOffered,
+  migrationStaleDue,
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
+import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
+
+const CHUNK_SIZE = 100;
+
+/** Empty on purpose. Retry takes the id from the path and no fields. */
+const RetryBody = z.object({}).strict().nullish();
+
+function stalledFlag(job: {
+  status: string;
+  meta: unknown;
+  processedRows: number;
+  errorRows: number;
+}): boolean {
+  const state = job.status as 'PENDING' | 'RUNNING' | 'COMPLETE' | 'FAILED' | 'CANCELLED';
+  return migrationStaleDue({
+    state,
+    progressAt: migrationProgressAt(job.meta),
+    processedRows: job.processedRows,
+    errorRows: job.errorRows,
+    now: new Date(),
+  });
+}
+
+/**
+ * A start that never queued is not a job. The audit log is insert-only, so the
+ * failure is a new row. That row is written first, then the pending job, then
+ * the Redis key. A throw before the key is deleted leaves the pending job with
+ * its rows. A throw from the key delete cannot leave a pending job.
+ */
+async function abandonUnqueuedStart(input: {
+  jobId: string;
+  orgId: string;
+  userId: string;
+  redisKey: string;
+  redis: { del: (key: string) => Promise<unknown> };
+  reason: string;
+}): Promise<void> {
+  await prisma.auditLog.create({
+    data: {
+      orgId: input.orgId,
+      userId: input.userId,
+      action: 'migration.start_failed',
+      targetType: 'MigrationJob',
+      targetId: input.jobId,
+      diff: { reason: input.reason },
+    },
+  });
+  const removed = await prisma.migrationJob.deleteMany({
+    where: { id: input.jobId, orgId: input.orgId, status: 'PENDING' },
+  });
+  // A cancel that already won is not pending, so its key stays.
+  if (removed.count > 0) {
+    await input.redis.del(input.redisKey);
+  }
+}
+
+async function enqueueCsvChunks(input: {
+  jobId: string;
+  orgId: string;
+  userId: string;
+  source: MigrationJobPayload['source'];
+  entityType: string;
+  rows: Record<string, string>[];
+  redisKey: string;
+  mappings: Record<string, string | null>;
+  dedupStrategy: 'skip' | 'update' | 'duplicate';
+  externalIdColumn?: string;
+  attemptId: string;
+  queue: Queue;
+  nameFor: (index: number) => string;
+  idFor: (index: number) => string;
+}): Promise<void> {
+  const chunks = Math.ceil(input.rows.length / CHUNK_SIZE);
+  const jobs: Array<{ name: string; data: MigrationJobPayload; opts: { jobId: string } }> = [];
+  for (let i = 0; i < chunks; i++) {
+    const payload: MigrationJobPayload = {
+      migrationJobId: input.jobId,
+      orgId: input.orgId,
+      userId: input.userId,
+      source: input.source,
+      entityType: input.entityType,
+      chunkOffset: i * CHUNK_SIZE,
+      chunkSize: CHUNK_SIZE,
+      totalRows: input.rows.length,
+      redisKey: input.redisKey,
+      mappings: input.mappings,
+      dedupStrategy: input.dedupStrategy,
+      externalIdColumn: input.externalIdColumn,
+      attemptId: input.attemptId,
+    };
+    jobs.push({ name: input.nameFor(i), data: payload, opts: { jobId: input.idFor(i) } });
+  }
+  // One pipeline. A per-chunk add lets a live worker lock chunk 0 before
+  // chunk 1 is sent, and remove then fails because the job is locked.
+  await input.queue.addBulk(jobs);
+}
 
 const ImportPreviewResponse = z.object({
   entityType: z.string(),
@@ -65,11 +170,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   let migrationQueue: Queue | null = null;
   const getQueue = () => {
     if (!migrationQueue) {
-      const { redis } = server as unknown as {
-        redis: { status: string; duplicate: () => unknown };
-      };
       migrationQueue = new Queue(MIGRATION.name, {
-        connection: (redis as unknown as { duplicate: () => unknown }).duplicate() as never,
+        connection: server.redis.duplicate() as never,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,
       });
     }
@@ -98,7 +200,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: { createdAt: 'desc' },
         take: limit,
       });
-      return { items: jobs.map(serializeJob) };
+      return { items: jobs.map((job) => ({ ...serializeJob(job), stalled: stalledFlag(job) })) };
     },
   );
 
@@ -119,7 +221,9 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      return serializeJob(job);
+      // Read-only. The worker persists RUNNING → FAILED. This flag is derived
+      // so a poll can show the stall before that write lands.
+      return { ...serializeJob(job), stalled: stalledFlag(job) };
     },
   );
 
@@ -157,10 +261,71 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           source,
           status: 'PENDING',
           totalRows: rows.length,
-          meta: { entityType },
+          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings },
         },
       });
 
+      await prisma.migrationMapping.upsert({
+        where: { orgId_source_sourceEntity: { orgId, source, sourceEntity: entityType } },
+        create: { orgId, source, sourceEntity: entityType, mappings },
+        update: { mappings },
+      });
+
+      // Store rows in Redis with 1h TTL so the worker can read them in chunks.
+      // The start audit is written only after the queue accepts the job.
+      const redisKey = `migration:${job.id}:${entityType}:rows`;
+      try {
+        await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+      } catch (err) {
+        req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
+        await abandonUnqueuedStart({
+          jobId: job.id,
+          orgId,
+          userId,
+          redisKey,
+          redis: server.redis,
+          reason: 'rows',
+        });
+        throw server.httpErrors.conflict('The import could not be queued. Try again.');
+      }
+
+      // Enqueue while the row is still PENDING. A queue that cannot be opened
+      // removes that row. The RUNNING claim is the write that follows a
+      // successful enqueue, so a cancel in between is not overwritten.
+      const attemptId = randomUUID();
+      try {
+        const queue = getQueue();
+        await enqueueCsvChunks({
+          jobId: job.id,
+          orgId,
+          userId,
+          source,
+          entityType,
+          rows,
+          redisKey,
+          mappings,
+          dedupStrategy,
+          externalIdColumn,
+          attemptId,
+          queue,
+          nameFor: (i) => `${job.id}-chunk-${i}`,
+          idFor: (i) => `${job.id}-${entityType}-chunk-${i}`,
+        });
+      } catch (err) {
+        req.log.error({ err, migrationJobId: job.id }, 'failed to enqueue import chunks');
+        await abandonUnqueuedStart({
+          jobId: job.id,
+          orgId,
+          userId,
+          redisKey,
+          redis: server.redis,
+          reason: 'queue',
+        });
+        throw server.httpErrors.conflict('The import could not be queued. Try again.');
+      }
+
+      // The queue accepted the job. A cancel that landed during enqueue must
+      // still have this record; the RUNNING claim below may already have lost.
       await prisma.auditLog.create({
         data: {
           orgId,
@@ -172,50 +337,185 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
 
-      await prisma.migrationMapping.upsert({
-        where: { orgId_source_sourceEntity: { orgId, source, sourceEntity: entityType } },
-        create: { orgId, source, sourceEntity: entityType, mappings },
-        update: { mappings },
+      const claimed = await prisma.migrationJob.updateMany({
+        where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
+        data: {
+          status: 'RUNNING',
+          startedAt: new Date(),
+          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings, attemptId },
+        },
       });
-
-      // Store rows in Redis with 1h TTL so the worker can read them in chunks.
-      const redisKey = `migration:${job.id}:${entityType}:rows`;
-      const redisConn = (
-        server as unknown as {
-          redis: { set: (k: string, v: string, ex: string, ttl: number) => Promise<void> };
-        }
-      ).redis;
-      await redisConn.set(redisKey, JSON.stringify(rows), 'EX', 3600);
-
-      const CHUNK_SIZE = 100;
-      const chunks = Math.ceil(rows.length / CHUNK_SIZE);
-      const queue = getQueue();
-
-      for (let i = 0; i < chunks; i++) {
-        const payload: MigrationJobPayload = {
-          migrationJobId: job.id,
-          orgId,
-          userId,
-          source,
-          entityType,
-          chunkOffset: i * CHUNK_SIZE,
-          chunkSize: CHUNK_SIZE,
-          totalRows: rows.length,
-          redisKey,
-          mappings,
-          dedupStrategy,
-          externalIdColumn,
-        };
-        await queue.add(`${job.id}-chunk-${i}`, payload, {
-          jobId: `${job.id}-${entityType}-chunk-${i}`,
+      if (claimed.count !== 1) {
+        const current = await prisma.migrationJob.findFirst({
+          where: { id: job.id, orgId },
+          select: { status: true },
         });
+        req.log.warn(
+          { migrationJobId: job.id, from: current?.status ?? null, to: 'RUNNING' },
+          'illegal migration transition',
+        );
+        throw server.httpErrors.conflict('Migration job is no longer pending');
       }
 
-      const updated = await prisma.migrationJob.update({
-        where: { id: job.id },
-        data: { status: 'RUNNING', startedAt: new Date() },
+      const updated = await prisma.migrationJob.findFirstOrThrow({
+        where: { id: job.id, orgId },
       });
       return reply.code(201).send(serializeJob(updated));
+    },
+  );
+
+  server.post(
+    '/migrations/:id/retry',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: RetryBody,
+        response: { 200: MigrationJobResponse },
+      },
+    },
+    async (req) => {
+      const { orgId, userId } = req.auth;
+      const job = await prisma.migrationJob.findFirst({
+        where: { id: req.params.id, orgId },
+      });
+      if (!job) throw server.httpErrors.notFound('Migration job not found');
+      const meta = (job.meta ?? {}) as {
+        entityType?: string;
+        dedupStrategy?: 'skip' | 'update' | 'duplicate';
+        externalIdColumn?: string | null;
+        mappings?: Record<string, string | null>;
+      };
+      if (
+        job.status !== 'FAILED' ||
+        !migrationRetryOffered(
+          job.processedRows,
+          job.errorRows,
+          (Array.isArray(job.errorSummary) ? job.errorSummary : []).flatMap((row) =>
+            row && typeof row === 'object' && typeof (row as { message?: unknown }).message === 'string'
+              ? [(row as { message: string }).message]
+              : [],
+          ),
+        ) ||
+        !meta.entityType
+      ) {
+        throw server.httpErrors.conflict('This import cannot be retried. Start it again from the file.');
+      }
+
+      const attemptId = randomUUID();
+      const previousAttempt = migrationAttemptId(job.meta);
+      try {
+        const queue = getQueue();
+        if (job.source === 'HUBSPOT_OAUTH') {
+          await enqueueHubspotChunk({
+            jobId: job.id,
+            orgId,
+            userId,
+            entityType: meta.entityType,
+            totalRows: job.totalRows,
+            dedupStrategy: meta.dedupStrategy ?? 'update',
+            attemptId,
+            queue,
+          });
+        } else {
+          const redisKey = `migration:${job.id}:${meta.entityType}:rows`;
+          const raw = await server.redis.get(redisKey);
+          if (!raw) {
+            await prisma.migrationJob.updateMany({
+              where: { id: job.id, orgId, status: 'FAILED' },
+              data: {
+                errorSummary: [{ row: 0, field: null, message: MIGRATION_ROWS_EXPIRED }],
+              },
+            });
+            throw server.httpErrors.conflict('Those rows expired. Upload the file again.');
+          }
+          const rows = JSON.parse(raw) as Record<string, string>[];
+          const stored = meta.mappings;
+          let mappings: Record<string, string | null>;
+          if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+            mappings = stored;
+          } else {
+            const mapping = await prisma.migrationMapping.findUnique({
+              where: {
+                orgId_source_sourceEntity: {
+                  orgId,
+                  source: job.source,
+                  sourceEntity: meta.entityType,
+                },
+              },
+            });
+            mappings = (mapping?.mappings ?? {}) as Record<string, string | null>;
+          }
+          const stamp = Date.now();
+          await enqueueCsvChunks({
+            jobId: job.id,
+            orgId,
+            userId,
+            source: job.source,
+            entityType: meta.entityType,
+            rows,
+            redisKey,
+            mappings,
+            dedupStrategy: meta.dedupStrategy ?? 'update',
+            externalIdColumn: meta.externalIdColumn ?? undefined,
+            attemptId,
+            queue,
+            nameFor: (i) => `${job.id}-retry-${i}`,
+            idFor: (i) => `${job.id}-${meta.entityType}-retry-${stamp}-${i}`,
+          });
+        }
+      } catch (err) {
+        if (typeof err === 'object' && err !== null && 'statusCode' in err) throw err;
+        req.log.error({ err, migrationJobId: job.id }, 'failed to retry import');
+        throw server.httpErrors.conflict('The import could not be queued. Try again.');
+      }
+
+      // Clear the previous claim clock in this same compare-and-set. A second
+      // write would leave the old progressAt in place for the stale scan.
+      const fresh = { ...(job.meta as object) } as Record<string, unknown>;
+      delete fresh.progressAt;
+      delete fresh.undone;
+      delete fresh.undoneAt;
+      fresh.attemptId = attemptId;
+      const claimed = await prisma.$transaction(async (tx) => {
+        const moved = await tx.migrationJob.updateMany({
+          where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
+          data: {
+            status: 'RUNNING',
+            startedAt: new Date(),
+            completedAt: null,
+            errorSummary: [],
+            meta: fresh as Prisma.InputJsonValue,
+          },
+        });
+        if (moved.count !== 1) return 0;
+        await tx.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'migration.retry',
+            targetType: 'MigrationJob',
+            targetId: job.id,
+            diff: { previousAttempt, attemptId },
+          },
+        });
+        return moved.count;
+      });
+      if (claimed !== 1) {
+        const current = await prisma.migrationJob.findFirst({
+          where: { id: job.id, orgId },
+          select: { status: true },
+        });
+        req.log.warn(
+          { migrationJobId: job.id, from: current?.status ?? null, to: 'RUNNING' },
+          'illegal migration transition',
+        );
+        throw server.httpErrors.conflict('Migration job is no longer failed');
+      }
+
+      const updated = await prisma.migrationJob.findFirstOrThrow({
+        where: { id: job.id, orgId },
+      });
+      return serializeJob(updated);
     },
   );
 
@@ -325,12 +625,26 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      if (job.status === 'COMPLETE' || job.status === 'CANCELLED' || job.status === 'FAILED') {
-        throw server.httpErrors.conflict(`Cannot cancel a job with status ${job.status}`);
-      }
-      const updated = await prisma.migrationJob.update({
-        where: { id: req.params.id },
+      // The read above can be stale. Only PENDING or RUNNING may become CANCELLED.
+      const moved = await prisma.migrationJob.updateMany({
+        where: { id: job.id, orgId, status: { in: [...migrationFrom('cancel')] } },
         data: { status: 'CANCELLED', completedAt: new Date() },
+      });
+      if (moved.count !== 1) {
+        const current = await prisma.migrationJob.findFirst({
+          where: { id: job.id, orgId },
+          select: { status: true },
+        });
+        req.log.warn(
+          { migrationJobId: job.id, from: current?.status ?? null, to: 'CANCELLED' },
+          'illegal migration transition',
+        );
+        throw server.httpErrors.conflict(
+          `Cannot cancel a job with status ${current?.status ?? job.status}`,
+        );
+      }
+      const updated = await prisma.migrationJob.findFirstOrThrow({
+        where: { id: job.id, orgId },
       });
       await prisma.auditLog.create({
         data: {
@@ -361,7 +675,10 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      if (job.status !== 'COMPLETE') {
+      if (
+        job.status !== 'COMPLETE' &&
+        !(job.status === 'FAILED' && job.undoableUntil)
+      ) {
         throw server.httpErrors.conflict('Only completed jobs can be undone');
       }
       if (!job.undoableUntil || job.undoableUntil < new Date()) {
@@ -374,15 +691,24 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       //    ('migration.chunk.imported'), which is the only way to find
       //    imported Contacts/Opportunities (no source column on those models).
       const sourceTag = `migration:${job.id}`;
-      // Bounded: one import fans out to many chunks, but the cap keeps the
-      // query within the query-guard's unbounded-findMany limit. A 10k-row
-      // import is 100 chunks at chunkSize 100, well under this.
-      const chunkLogs = await prisma.auditLog.findMany({
-        where: { orgId, action: 'migration.chunk.imported', targetId: job.id },
-        select: { diff: true },
-        take: 1000,
-      });
+      // Page every chunk audit. A capped read drops ids and must not report success.
       const idsByEntity: Record<string, string[]> = {};
+      const chunkLogs: Array<{ diff: unknown }> = [];
+      let auditCursor: bigint | undefined;
+      for (;;) {
+        const page = await prisma.auditLog.findMany({
+          where: { orgId, action: 'migration.chunk.imported', targetId: job.id },
+          select: { id: true, diff: true },
+          orderBy: { id: 'asc' },
+          take: 500,
+          ...(auditCursor ? { cursor: { id: auditCursor }, skip: 1 } : {}),
+        });
+        chunkLogs.push(...page);
+        if (page.length < 500) break;
+        const last = page[page.length - 1];
+        if (!last) break;
+        auditCursor = last.id;
+      }
       for (const log of chunkLogs) {
         const diff = log.diff as { entity?: string; createdIds?: string[] } | null;
         if (!diff?.entity || !Array.isArray(diff.createdIds)) continue;
@@ -405,6 +731,32 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // Deletes run sequentially (not Promise.all) — interactive transactions
       // hold a single connection, and the order preserves FK safety.
       const deletedCount = await prisma.$transaction(async (tx) => {
+        // Claim the undo before deleting anything. A stale COMPLETE read must
+        // not wipe rows when the job is no longer COMPLETE.
+        const moved = await tx.migrationJob.updateMany({
+          where: {
+            id: job.id,
+            orgId,
+            status: { in: [...migrationFrom('undo')] },
+            undoableUntil: { gt: new Date() },
+          },
+          data: {
+            status: 'FAILED',
+            meta: { ...(job.meta as object), undone: true, undoneAt: new Date().toISOString() },
+          },
+        });
+        if (moved.count !== 1) {
+          const current = await tx.migrationJob.findUnique({
+            where: { id: job.id },
+            select: { status: true },
+          });
+          req.log.warn(
+            { migrationJobId: job.id, from: current?.status ?? null, to: 'FAILED' },
+            'illegal migration transition',
+          );
+          throw server.httpErrors.conflict('Only completed jobs can be undone');
+        }
+
         const opportunities = oppIds.length
           ? await tx.opportunity.deleteMany({ where: { orgId, id: { in: oppIds } } })
           : { count: 0 };
@@ -435,13 +787,6 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         const deleted =
           companies.count + leads.count + contacts.count + opportunities.count + financials.count;
 
-        await tx.migrationJob.update({
-          where: { id: req.params.id },
-          data: {
-            status: 'FAILED',
-            meta: { ...(job.meta as object), undone: true, undoneAt: new Date().toISOString() },
-          },
-        });
         await tx.auditLog.create({
           data: {
             orgId,
@@ -471,19 +816,10 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!job) throw server.httpErrors.notFound('Migration job not found');
 
       const errors = (job.errorSummary as MigrationJobError[]) ?? [];
-      if (errors.length === 0) {
-        return reply.header('Content-Type', 'text/csv; charset=utf-8').send('row,field,message\n');
-      }
-
-      const header = 'row,field,message\n';
-      const rows = errors
-        .map((e) => `${e.row},${JSON.stringify(e.field ?? '')},${JSON.stringify(e.message)}`)
-        .join('\n');
-
       return reply
         .header('Content-Type', 'text/csv; charset=utf-8')
         .header('Content-Disposition', `attachment; filename="migration-errors-${job.id}.csv"`)
-        .send(header + rows);
+        .send(migrationErrorsCsv(errors));
     },
   );
 };

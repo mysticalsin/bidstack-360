@@ -9,17 +9,6 @@ import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
-type TaskSummaryCacheEntry = {
-  expiresAt: number;
-  promise: Promise<TaskSummaryPayload>;
-};
-
-const TASK_SUMMARY_CACHE_TTL_MS = 15_000;
-const taskSummaryCache = new Map<string, TaskSummaryCacheEntry>();
-
-function clearTaskSummaryCache(orgId: string): void {
-  taskSummaryCache.delete(orgId);
-}
 
 async function buildTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
   const today = new Date().toISOString().slice(0, 10);
@@ -39,21 +28,6 @@ async function buildTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
       AND deleted_at IS NULL
   `;
   return rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 };
-}
-
-async function cachedTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
-  const now = Date.now();
-  const cached = taskSummaryCache.get(orgId);
-  if (cached && cached.expiresAt > now) return cached.promise;
-
-  const promise = buildTaskSummary(orgId);
-  taskSummaryCache.set(orgId, { expiresAt: now + TASK_SUMMARY_CACHE_TTL_MS, promise });
-  try {
-    return await promise;
-  } catch (err) {
-    taskSummaryCache.delete(orgId);
-    throw err;
-  }
 }
 
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -107,10 +81,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      return req.cache(() => cachedTaskSummary(req.auth.orgId), {
-        ttlSeconds: 30,
-        tags: ['task-summary'],
-      });
+      // Tasks are also created by kam, opportunity transitions, and the
+      // worker. A process cache or a tagged response cache kept the badge
+      // behind the uncached list. The count is one query.
+      return buildTaskSummary(req.auth.orgId);
     },
   );
 
@@ -187,7 +161,6 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { assignee: true },
       });
       // Fan-out webhook event — fire-and-forget (fail-open).
-      clearTaskSummaryCache(req.auth.orgId);
       void fanOutWebhookEvent(req.auth.orgId, 'task.created', {
         id: created.id,
         title: created.title,
@@ -286,7 +259,6 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         include: { assignee: true },
       });
-      clearTaskSummaryCache(req.auth.orgId);
       if (existing.status !== 'done' && updated.status === 'done') {
         emitTaskAccountEventSafe({
           orgId: req.auth.orgId,
@@ -405,7 +377,6 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
-      clearTaskSummaryCache(req.auth.orgId);
       return reply.code(204).send(null);
     },
   );

@@ -1,7 +1,21 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  MIGRATION_CONFLICT,
+  MIGRATION_ENQUEUE_FAILED,
+  MIGRATION_ENQUEUE_STOPPED,
+  MIGRATION_LEGACY_CONFLICT,
+  MIGRATION_LEGACY_ENQUEUE_FAILED,
+  MIGRATION_LEGACY_ROWS_EXPIRED,
+  MIGRATION_ROWS_EXPIRED,
+  MIGRATION_STALE_REASON,
+  migrationFailureText,
+  migrationRetryAllowed,
+  migrationRetryOffered,
+} from '@bidstack/shared';
 
 import { Icon } from '@/components/ui/Icon';
+import { ApiError } from '@/lib/api';
 import { parseCsv, type ParsedCsv } from '@/lib/csv-parse';
 import {
   autoMap,
@@ -11,9 +25,11 @@ import {
 } from '@/lib/import-fields';
 import {
   downloadMigrationErrors,
+  useCancelMigration,
   useMigrationJob,
   useParseSpreadsheet,
   usePreviewCsvImport,
+  useRetryMigration,
   useStartCsvImport,
   type ImportPreviewResult,
   type MigrationJob,
@@ -23,8 +39,92 @@ type Step = 'upload' | 'map' | 'preview' | 'run';
 type Dedup = 'skip' | 'update' | 'duplicate';
 const MAX_ROWS = 10_000;
 
+const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
+  [MIGRATION_STALE_REASON]: [
+    'csvImport.progress.reasonStalled',
+    'The import stalled before any rows were saved.',
+  ],
+  [MIGRATION_ENQUEUE_FAILED]: [
+    'csvImport.progress.reasonEnqueue',
+    'The import did not start. Try again.',
+  ],
+  [MIGRATION_ENQUEUE_STOPPED]: [
+    'csvImport.progress.reasonEnqueueStopped',
+    'The import stopped before the remaining rows were saved.',
+  ],
+  [MIGRATION_ROWS_EXPIRED]: [
+    'csvImport.progress.reasonRowsExpired',
+    'Those rows expired. Upload the file again.',
+  ],
+  [MIGRATION_LEGACY_ENQUEUE_FAILED]: [
+    'csvImport.progress.reasonEnqueue',
+    'The import did not start. Try again.',
+  ],
+  [MIGRATION_LEGACY_ROWS_EXPIRED]: [
+    'csvImport.progress.reasonRowsExpired',
+    'Those rows expired. Upload the file again.',
+  ],
+  [MIGRATION_CONFLICT]: [
+    'csvImport.progress.reasonConflict',
+    'The import conflicted with another write.',
+  ],
+  [MIGRATION_LEGACY_CONFLICT]: [
+    'csvImport.progress.reasonConflict',
+    'The import conflicted with another write.',
+  ],
+};
+
+function wizardReasonMessage(
+  messages: readonly string[],
+  processedRows: number,
+  errorRows: number,
+): string | undefined {
+  const stopped = messages.find(
+    (message) =>
+      message === MIGRATION_ENQUEUE_STOPPED ||
+      ((message === MIGRATION_ENQUEUE_FAILED || message === MIGRATION_LEGACY_ENQUEUE_FAILED) &&
+        !migrationRetryAllowed(processedRows, errorRows)),
+  );
+  return stopped ?? messages[0];
+}
+
+function importErrorCopy(
+  t: (key: string, fallback: string) => string,
+  message: string | undefined,
+  processedRows: number,
+  errorRows: number,
+): string | null {
+  if (!message) return null;
+  if (
+    (message === MIGRATION_ENQUEUE_FAILED || message === MIGRATION_LEGACY_ENQUEUE_FAILED) &&
+    !migrationRetryAllowed(processedRows, errorRows)
+  ) {
+    return t(
+      'csvImport.progress.reasonEnqueueStopped',
+      'The import stopped before the remaining rows were saved.',
+    );
+  }
+  const known = IMPORT_ERROR_KEYS[message];
+  if (known) return t(known[0], known[1]);
+  const shown = migrationFailureText(message);
+  if (shown === message) return message;
+  return t('csvImport.progress.reasonUnknown', 'The import could not be completed.');
+}
+
 export function CsvImportWizard() {
   const { t } = useTranslation('crm');
+  const startFailureCopy = (error: unknown): string => {
+    if (error instanceof ApiError && error.status === 409 && error.message.length > 0) {
+      return error.message;
+    }
+    if (error instanceof ApiError && error.status >= 500) {
+      return t('csvImport.map.startServerError', 'The import could not be started. Try again.');
+    }
+    return t(
+      'csvImport.map.startError',
+      'Could not start the import. Check your mappings and try again.',
+    );
+  };
   const entityId = useId();
   const dedupId = useId();
   const [step, setStep] = useState<Step>('upload');
@@ -36,8 +136,11 @@ export function CsvImportWizard() {
   const [dedup, setDedup] = useState<Dedup>('update');
   const [jobId, setJobId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const starting = useRef(false);
 
   const start = useStartCsvImport();
+  const cancel = useCancelMigration();
+  const retry = useRetryMigration();
   const preview = usePreviewCsvImport();
   const parseSheet = useParseSpreadsheet();
   const job = useMigrationJob(jobId);
@@ -106,7 +209,8 @@ export function CsvImportWizard() {
   }
 
   function runImport() {
-    if (!parsed) return;
+    if (!parsed || starting.current || start.isPending) return;
+    starting.current = true;
     start.mutate(
       {
         source: 'CSV',
@@ -119,6 +223,9 @@ export function CsvImportWizard() {
         onSuccess: (created) => {
           setJobId(created.id);
           setStep('run');
+        },
+        onSettled: () => {
+          starting.current = false;
         },
       },
     );
@@ -195,11 +302,17 @@ export function CsvImportWizard() {
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
             <span className="font-medium text-[var(--fg-primary)]">{fileName}</span> —{' '}
-            {t(
-              'csvImport.map.summary',
-              '{{rows}} rows. Match each column to a field, or leave it as Don’t import.',
-              { rows: parsed.rows.length.toLocaleString() },
-            )}
+            {parsed.rows.length === 1
+              ? t(
+                  'csvImport.map.summaryOne',
+                  '{{rows}} row. Match each column to a field, or leave it as Don’t import.',
+                  { rows: parsed.rows.length.toLocaleString() },
+                )
+              : t(
+                  'csvImport.map.summary',
+                  '{{rows}} rows. Match each column to a field, or leave it as Don’t import.',
+                  { rows: parsed.rows.length.toLocaleString() },
+                )}
           </p>
 
           <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)]">
@@ -281,11 +394,8 @@ export function CsvImportWizard() {
             </p>
           )}
           {start.isError && (
-            <p className="text-sm text-[var(--danger)]">
-              {t(
-                'csvImport.map.startError',
-                'Could not start the import. Check your mappings and try again.',
-              )}
+            <p className="text-sm text-[var(--danger)]" role="alert">
+              {startFailureCopy(start.error)}
             </p>
           )}
 
@@ -301,9 +411,13 @@ export function CsvImportWizard() {
             >
               {preview.isPending
                 ? t('csvImport.map.previewing', 'Validating…')
-                : t('csvImport.map.previewRows', 'Preview {{rows}} rows', {
-                    rows: parsed.rows.length.toLocaleString(),
-                  })}
+                : parsed.rows.length === 1
+                  ? t('csvImport.map.previewRow', 'Preview {{rows}} row', {
+                      rows: parsed.rows.length.toLocaleString(),
+                    })
+                  : t('csvImport.map.previewRows', 'Preview {{rows}} rows', {
+                      rows: parsed.rows.length.toLocaleString(),
+                    })}
             </button>
           </div>
         </div>
@@ -312,18 +426,28 @@ export function CsvImportWizard() {
       {step === 'preview' && previewResult && (
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
-            {t(
-              'csvImport.preview.summary',
-              '{{valid}} of {{total}} rows look valid. Confirm to write them. Nothing has been saved yet.',
-              { valid: previewResult.validCount, total: previewResult.rowCount },
-            )}
+            {previewResult.rowCount === 1
+              ? t(
+                  'csvImport.preview.summaryOne',
+                  '{{valid}} of {{total}} row looks valid. Confirm to write it. Nothing has been saved yet.',
+                  { valid: previewResult.validCount, total: previewResult.rowCount },
+                )
+              : t(
+                  'csvImport.preview.summary',
+                  '{{valid}} of {{total}} rows look valid. Confirm to write them. Nothing has been saved yet.',
+                  { valid: previewResult.validCount, total: previewResult.rowCount },
+                )}
           </p>
           {previewResult.invalidCount > 0 ? (
             <div className="rounded-lg border border-[var(--danger)]/40 bg-[var(--danger)]/5 p-3 text-sm">
               <p className="font-medium text-[var(--danger)]">
-                {t('csvImport.preview.issuesTitle', '{{count}} rows have problems', {
-                  count: previewResult.invalidCount,
-                })}
+                {previewResult.invalidCount === 1
+                  ? t('csvImport.preview.issueTitle', '{{count}} row has problems', {
+                      count: previewResult.invalidCount,
+                    })
+                  : t('csvImport.preview.issuesTitle', '{{count}} rows have problems', {
+                      count: previewResult.invalidCount,
+                    })}
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--fg-secondary)]">
                 {previewResult.issues.slice(0, 8).map((issue) => (
@@ -337,6 +461,11 @@ export function CsvImportWizard() {
           ) : (
             <p className="text-sm text-[var(--fg-primary)]">
               {t('csvImport.preview.allValid', 'Money, dates, and required fields passed validation.')}
+            </p>
+          )}
+          {start.isError && (
+            <p className="text-sm text-[var(--danger)]" role="alert">
+              {startFailureCopy(start.error)}
             </p>
           )}
           <div className="flex items-center gap-2">
@@ -362,6 +491,16 @@ export function CsvImportWizard() {
           job={job.data ?? null}
           isLoading={job.isLoading}
           onDone={reset}
+          onCancel={() => {
+            if (jobId) cancel.mutate(jobId);
+          }}
+          onRetry={() => {
+            if (jobId) retry.mutate(jobId);
+          }}
+          cancelPending={cancel.isPending}
+          retryPending={retry.isPending}
+          actionFailed={cancel.isError || retry.isError}
+          retryError={retry.error}
         />
       )}
     </div>
@@ -414,10 +553,22 @@ function ImportProgress({
   job,
   isLoading,
   onDone,
+  onCancel,
+  onRetry,
+  cancelPending,
+  retryPending,
+  actionFailed,
+  retryError,
 }: {
   job: MigrationJob | null;
   isLoading: boolean;
   onDone: () => void;
+  onCancel: () => void;
+  onRetry: () => void;
+  cancelPending: boolean;
+  retryPending: boolean;
+  actionFailed: boolean;
+  retryError: unknown;
 }) {
   const { t } = useTranslation('crm');
   if (isLoading || !job) {
@@ -429,6 +580,22 @@ function ImportProgress({
   }
 
   const done = job.status === 'COMPLETE' || job.status === 'FAILED' || job.status === 'CANCELLED';
+  const failure = importErrorCopy(
+    t,
+    job.status === 'FAILED'
+      ? wizardReasonMessage(
+          (job.errorSummary ?? []).map((row) => row.message),
+          job.processedRows,
+          job.errorRows,
+        )
+      : undefined,
+    job.processedRows,
+    job.errorRows,
+  );
+  // A 409 is the request's own reason. A stalled job already has a sentence,
+  // so the generic alert would stay hidden and this refusal would vanish.
+  const refusal =
+    retryError instanceof ApiError && retryError.status === 409 ? retryError.message : null;
   const pct =
     job.totalRows > 0 ? Math.round((job.processedRows / job.totalRows) * 100) : done ? 100 : 0;
 
@@ -439,11 +606,13 @@ function ImportProgress({
           <span className="font-medium text-[var(--fg-primary)]">
             {job.status === 'COMPLETE'
               ? t('csvImport.progress.statusComplete', 'Import complete')
-              : job.status === 'RUNNING' || job.status === 'PENDING'
-                ? t('csvImport.progress.statusImporting', 'Importing…')
-                : job.status === 'CANCELLED'
-                  ? t('csvImport.progress.statusCancelled', 'Import cancelled')
-                  : t('csvImport.progress.statusFailed', 'Import failed')}
+              : job.stalled
+                ? t('csvImport.progress.statusStalled', 'Import stalled')
+                : job.status === 'RUNNING' || job.status === 'PENDING'
+                  ? t('csvImport.progress.statusImporting', 'Importing…')
+                  : job.status === 'CANCELLED'
+                    ? t('csvImport.progress.statusCancelled', 'Import cancelled')
+                    : t('csvImport.progress.statusFailed', 'Import failed')}
           </span>
           <span className="text-[var(--fg-tertiary)]">
             {job.processedRows.toLocaleString()} / {job.totalRows.toLocaleString()}
@@ -461,13 +630,66 @@ function ImportProgress({
         </div>
       </div>
 
-      {job.errorRows > 0 && (
+      {refusal && refusal !== failure ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {refusal}
+        </p>
+      ) : null}
+
+      {actionFailed && !failure && !refusal ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {t('csvImport.progress.actionFailed', 'That did not work. Try again.')}
+        </p>
+      ) : null}
+
+      {failure ? <p className="text-sm text-[var(--danger)]">{failure}</p> : null}
+
+      {(job.status === 'RUNNING' || job.status === 'PENDING') && (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={cancelPending}
+          onClick={onCancel}
+        >
+          {cancelPending
+            ? t('csvImport.progress.cancelling', 'Cancelling…')
+            : t('csvImport.progress.cancel', 'Cancel import')}
+        </button>
+      )}
+
+      {job.status === 'FAILED' &&
+      migrationRetryOffered(
+        job.processedRows,
+        job.errorRows,
+        (job.errorSummary ?? []).map((row) => row.message),
+      ) ? (
+        <button type="button" className="btn btn-primary" disabled={retryPending} onClick={onRetry}>
+          {retryPending
+            ? t('csvImport.progress.retrying', 'Retrying…')
+            : t('csvImport.progress.retry', 'Retry import')}
+        </button>
+      ) : null}
+
+      {job.errorRows > 0 ? (
         <div className="rounded-md bg-[var(--surface-sunken)] p-3 text-sm">
           <p className="text-[var(--fg-primary)]">
-            {t('csvImport.progress.errorRows', '{{formattedCount}} rows could not be imported.', {
-              count: job.errorRows,
-              formattedCount: job.errorRows.toLocaleString(),
-            })}
+            {job.errorRows === 1
+              ? t(
+                  'csvImport.progress.errorRow',
+                  '{{formattedCount}} row could not be imported.',
+                  {
+                    count: job.errorRows,
+                    formattedCount: job.errorRows.toLocaleString(),
+                  },
+                )
+              : t(
+                  'csvImport.progress.errorRows',
+                  '{{formattedCount}} rows could not be imported.',
+                  {
+                    count: job.errorRows,
+                    formattedCount: job.errorRows.toLocaleString(),
+                  },
+                )}
           </p>
           <button
             type="button"
@@ -477,7 +699,7 @@ function ImportProgress({
             {t('csvImport.progress.downloadErrors', 'Download error report (CSV)')}
           </button>
         </div>
-      )}
+      ) : null}
 
       {done && (
         <button type="button" className="btn btn-secondary" onClick={onDone}>

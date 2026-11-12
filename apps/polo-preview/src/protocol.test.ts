@@ -7,6 +7,7 @@ import {
   PUBLIC_PREVIEW_ORIGIN,
   filterCookieHeader,
   filterRequestHeaders,
+  identityHeaders,
   filterResponseHeaders,
   isApiPath,
   rewriteLocalUrl,
@@ -87,13 +88,39 @@ describe('polo-preview header contract', () => {
     expect(headers).toContainEqual(['cookie', 'session=abc']);
   });
 
-  it('forwards the verified Access email so Polo can map a per-user identity', () => {
+  it('drops client identity, relay, and front-door headers and keeps Authorization', () => {
+    // WHY: the preview relay used to forward headers the API treats as
+    // identity or admission. Authorization stays: the demo bearer uses it.
+    const headers = filterRequestHeaders([
+      ['Forwarded', 'for=203.0.113.9'],
+      ['True-Client-IP', '203.0.113.9'],
+      ['x-polo-internal-key', 'secret'],
+      ['x-relay-key', 'secret'],
+      ['cf-access-client-id', 'id'],
+      ['cf-access-client-secret', 'secret'],
+      ['x-bidstack-sentry-smoke-token', 'token'],
+      ['x-azure-fdid', 'front-door'],
+      ['authorization', 'Bearer demo'],
+    ]);
+    const names = headers.map(([name]) => name.toLowerCase());
+    expect(names).toEqual(['authorization']);
+  });
+
+  it('drops the Access email header and reattaches only a verified JWT', () => {
+    // WHY: the API used to trust this header from loopback. The client copy
+    // must not survive, and a code-login session must not invent a JWT.
     const headers = filterRequestHeaders([
       ['cf-access-authenticated-user-email', 'ada@mantu.com'],
-      ['cf-access-jwt-assertion', 'jwt'],
+      ['cf-access-jwt-assertion', 'client-jwt'],
     ]);
-    expect(headers).toContainEqual(['cf-access-authenticated-user-email', 'ada@mantu.com']);
-    expect(headers.map(([name]) => name.toLowerCase())).not.toContain('cf-access-jwt-assertion');
+    const names = headers.map(([name]) => name.toLowerCase());
+    expect(names).not.toContain('cf-access-authenticated-user-email');
+    expect(names).not.toContain('cf-access-jwt-assertion');
+    expect(identityHeaders({ via: 'access', email: 'ada@mantu.com' }, 'verified-jwt')).toEqual([
+      ['cf-access-jwt-assertion', 'verified-jwt'],
+    ]);
+    expect(identityHeaders({ via: 'code', email: 'ada@mantu.com' }, 'client-jwt')).toEqual([]);
+    expect(identityHeaders({ via: 'access', email: 'ada@mantu.com' }, '')).toEqual([]);
   });
 
   it('strips hop-by-hop and content-encoding from reconstructed responses', () => {

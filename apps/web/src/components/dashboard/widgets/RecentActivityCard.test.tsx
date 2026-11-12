@@ -34,4 +34,23 @@ describe('RecentActivityCard', () => {
     expect(screen.getByText('In Progress')).toBeTruthy();
     expect(screen.queryByText('s4_negotiation')).toBeNull();
   });
+
+  it('does not link to a page that does not exist', () => {
+    // WHY: /activities is not a route. A "view all" link lands on Page not found.
+    const activity = Array.from({ length: 9 }, (_, index) => ({
+      type: 'opportunity',
+      title: `Deal ${index}`,
+      subtitle: null,
+      date: new Date(Date.UTC(2026, 10, 12, index)).toISOString(),
+      url: `/opportunities/opp-${index}`,
+    }));
+    render(
+      <MemoryRouter>
+        <RecentActivityCard activity={activity} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: /view all/i })).toBeNull();
+    expect(document.querySelector('a[href="/activities"]')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Deal 0' })).toBeTruthy();
+  });
 });

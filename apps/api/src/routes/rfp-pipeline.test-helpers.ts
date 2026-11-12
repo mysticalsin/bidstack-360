@@ -23,6 +23,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ export function makeRfpTestContext() {
     if (ctx.dbReachable && ctx.rfpTablesReady) {
       // Delete in FK-dependency order (children before parents).
       if (ctx.cleanup.auditLogs.length > 0) {
-        await prisma.auditLog.deleteMany({ where: { id: { in: ctx.cleanup.auditLogs } } });
+        await purgeAuditRows({ where: { id: { in: ctx.cleanup.auditLogs } } });
       }
       if (ctx.cleanup.rfpOrchestrations.length > 0) {
         await prisma.rfpOrchestration.deleteMany({

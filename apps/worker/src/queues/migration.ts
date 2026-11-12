@@ -33,6 +33,16 @@ import {
   MIGRATION,
   MigrationJobPayload,
   type MigrationJobError,
+  MIGRATION_STALE_MS,
+  MIGRATION_CONFLICT,
+  MIGRATION_STALE_REASON,
+  migrationAttemptId,
+  migrationChunkMatchesAttempt,
+  migrationChunkMayRun,
+  migrationActiveStatus,
+  migrationFrom,
+  migrationProgressAt,
+  migrationStaleDue,
 } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
@@ -161,6 +171,65 @@ interface WriteCtx {
   orgId: string;
   sourceTag: string;
   dedupStrategy: 'skip' | 'update' | 'duplicate';
+  tx: Prisma.TransactionClient;
+}
+
+/** Shown to users and written on the error CSV. No process ids, transaction ids, or SQL. */
+export const MIGRATION_DEADLOCK_PUBLIC =
+  'The import conflicted with another write and will be tried again.';
+
+/**
+ * A deadlock or serialization failure, including the shapes Prisma actually
+ * raises. Company inserts arrive as PrismaClientUnknownRequestError with no
+ * `code`: the driver text is `PostgresError { code: "40P01" }`. Raw queries
+ * use P2010 and `meta.code`. A transaction conflict is P2034. A digit sequence
+ * anywhere else in the message is not a match.
+ */
+const DRIVER_CONFLICT_CODE = /PostgresError \{\s*code:\s*"(40P01|40001)"/;
+
+function migrationConflictCode(value: unknown): boolean {
+  return value === '40P01' || value === '40001' || value === 'P2034';
+}
+
+export function isMigrationDeadlock(err: unknown, seen?: Set<unknown>): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const visited = seen ?? new Set<unknown>();
+  if (visited.has(err)) return false;
+  visited.add(err);
+  const row = err as {
+    code?: unknown;
+    meta?: { code?: unknown };
+    cause?: unknown;
+    message?: unknown;
+  };
+  if (migrationConflictCode(row.code) || migrationConflictCode(row.meta?.code)) return true;
+  if (typeof row.message === 'string' && DRIVER_CONFLICT_CODE.test(row.message)) return true;
+  return row.cause !== undefined && isMigrationDeadlock(row.cause, visited);
+}
+
+/** A deadlock aborts the transaction. The chunk fails so BullMQ retries the whole chunk. */
+export class MigrationChunkConflict extends Error {
+  readonly code = '40P01';
+  constructor() {
+    super(MIGRATION_DEADLOCK_PUBLIC);
+    this.name = 'MigrationChunkConflict';
+  }
+}
+
+/** A failed statement aborts the chunk transaction. A savepoint lets one row fail. */
+async function withSavepoint<T>(tx: Prisma.TransactionClient, name: string, fn: () => Promise<T>): Promise<T> {
+  await tx.$executeRawUnsafe(`SAVEPOINT ${name}`);
+  try {
+    const result = await fn();
+    await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${name}`);
+    return result;
+  } catch (err) {
+    // Rethrow a deadlock so the chunk fails and BullMQ retries it, instead of
+    // storing the database error on the row.
+    if (isMigrationDeadlock(err)) throw err;
+    await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${name}`);
+    throw err;
+  }
 }
 
 async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<string | null> {
@@ -175,21 +244,20 @@ async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     countryCode: asTrimmed(t['company.countryCode'])?.slice(0, 2).toUpperCase() ?? null,
   };
   if (ctx.dedupStrategy !== 'duplicate') {
-    const existing = await prisma.company.findFirst({
+    const existing = await ctx.tx.company.findFirst({
       where: { orgId: ctx.orgId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
       select: { id: true },
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.company.update({ where: { id: existing.id }, data });
+      await ctx.tx.company.update({ where: { id: existing.id }, data });
       return null; // updated, not created — undo must not delete pre-existing rows
     }
   }
-  const created = await prisma.company.create({
+  const created = await ctx.tx.company.create({
     data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag, confidence: 1 },
     select: { id: true },
   });
-  queueTechDetectAfterImport(ctx.orgId, created.id);
   return created.id;
 }
 
@@ -201,7 +269,7 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
   const customer = asTrimmed(t['contact.companyName']) ?? '';
   const email = asTrimmed(t['contact.email']);
   const company = customer
-    ? await prisma.company.findFirst({
+    ? await ctx.tx.company.findFirst({
         where: {
           orgId: ctx.orgId,
           name: { equals: customer, mode: 'insensitive' },
@@ -219,17 +287,17 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     role: asTrimmed(t['contact.title']),
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const existing = await prisma.contact.findFirst({
+    const existing = await ctx.tx.contact.findFirst({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.contact.update({ where: { id: existing.id }, data });
+      await ctx.tx.contact.update({ where: { id: existing.id }, data });
       return null;
     }
   }
-  const created = await prisma.contact.create({
+  const created = await ctx.tx.contact.create({
     data: { ...data, orgId: ctx.orgId },
     select: { id: true },
   });
@@ -255,19 +323,19 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
     status: (statusRaw && LEAD_STATUSES.has(statusRaw) ? statusRaw : 'new') as never,
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const existing = await prisma.lead.findFirst({
+    const existing = await ctx.tx.lead.findFirst({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.lead.update({ where: { id: existing.id }, data });
+      await ctx.tx.lead.update({ where: { id: existing.id }, data });
       return null;
     }
   }
   // `source` doubles as the undo tag — same mechanism the undo route already
   // queries for (source: 'migration:<jobId>').
-  const created = await prisma.lead.create({
+  const created = await ctx.tx.lead.create({
     data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag },
     select: { id: true },
   });
@@ -297,7 +365,7 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
   const customer =
     asTrimmed(t['opportunity.companyName']) ?? asTrimmed(t['opportunity.customer']) ?? 'Unknown';
   if (ctx.dedupStrategy !== 'duplicate') {
-    const existing = await prisma.opportunity.findFirst({
+    const existing = await ctx.tx.opportunity.findFirst({
       where: {
         orgId: ctx.orgId,
         name: { equals: name, mode: 'insensitive' },
@@ -308,7 +376,7 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.opportunity.update({
+      await ctx.tx.opportunity.update({
         where: { id: existing.id },
         data: {
           valueMicros: asMicros(t['opportunity.valueMicros']) ?? undefined,
@@ -320,12 +388,13 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
     }
   }
   // Bounded retry on (orgId, code) unique collisions — same pattern as the
-  // API's create route.
+  // API's create route. The savepoint keeps one collision from aborting the
+  // chunk transaction these writes share with the attempt check.
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const created = await prisma.$transaction(async (tx) => {
-        const code = await mintNextCode(tx, ctx.orgId);
-        return tx.opportunity.create({
+      const created = await withSavepoint(ctx.tx, `opp_code_${attempt}`, async () => {
+        const code = await mintNextCode(ctx.tx, ctx.orgId);
+        return ctx.tx.opportunity.create({
           data: {
             orgId: ctx.orgId,
             code,
@@ -359,7 +428,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   if (periodType !== 'FY' && periodType !== 'Q')
     throw new Error('financial.periodType must be FY or Q');
   const fiscalYear = asInt(t['financial.fiscalYear']) ?? periodEnd.getUTCFullYear();
-  const company = await prisma.company.findFirst({
+  const company = await ctx.tx.company.findFirst({
     where: {
       orgId: ctx.orgId,
       name: { equals: companyName, mode: 'insensitive' },
@@ -383,7 +452,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   if (netIncome) metrics.netIncome = netIncome;
   if (!metrics.revenue) throw new Error('financial.revenue is required');
 
-  const existing = await prisma.accountFinancialPeriod.findFirst({
+  const existing = await ctx.tx.accountFinancialPeriod.findFirst({
     where: {
       orgId: ctx.orgId,
       companyId: company.id,
@@ -395,7 +464,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   });
   if (existing) {
     if (ctx.dedupStrategy === 'skip') return null;
-    await prisma.accountFinancialPeriod.update({
+    await ctx.tx.accountFinancialPeriod.update({
       where: { id: existing.id },
       data: {
         currency,
@@ -408,7 +477,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
     return ctx.dedupStrategy === 'duplicate' ? existing.id : null;
   }
 
-  const created = await prisma.accountFinancialPeriod.create({
+  const created = await ctx.tx.accountFinancialPeriod.create({
     data: {
       orgId: ctx.orgId,
       companyId: company.id,
@@ -543,14 +612,26 @@ export async function fetchHubSpotPage(
 async function recordChunkOutcome(
   tx: Prisma.TransactionClient,
   migrationJobId: string,
+  attemptId: string | null,
   processed: number,
   errored: number,
   errors: MigrationJobError[],
-): Promise<void> {
-  await tx.migrationJob.update({
-    where: { id: migrationJobId },
-    data: { processedRows: { increment: processed }, errorRows: { increment: errored } },
-  });
+): Promise<number> {
+  // The opening check can be stale. Count the rows only while this attempt
+  // is still the one on the job, and the job is still RUNNING.
+  const moved = await tx.$executeRaw`
+    UPDATE migration_jobs
+    SET processed_rows = processed_rows + ${processed},
+        error_rows = error_rows + ${errored},
+        updated_at = date_trunc('milliseconds', NOW())
+    WHERE id = ${migrationJobId}::uuid
+      AND status::text = ${migrationActiveStatus()}
+      AND (
+        (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
+        OR meta->>'attemptId' = ${attemptId}
+      )
+  `;
+  if (Number(moved) !== 1) return 0;
   if (errors.length > 0) {
     // Cap stored errors at 200 — the CSV download stays useful, the row stays small.
     await tx.$executeRaw`
@@ -562,6 +643,7 @@ async function recordChunkOutcome(
       END
       WHERE id = ${migrationJobId}::uuid`;
   }
+  return 1;
 }
 
 /**
@@ -573,7 +655,7 @@ async function recordChunkOutcome(
  * zero to the counters — permanently undercounting processedRows, which
  * maybeComplete compares to totalRows, stranding the job in RUNNING forever.
  */
-export async function commitChunkProgress(chunk: {
+type ChunkBookkeeping = {
   orgId: string;
   userId: string;
   migrationJobId: string;
@@ -583,28 +665,45 @@ export async function commitChunkProgress(chunk: {
   createdIds: string[];
   processed: number;
   errors: MigrationJobError[];
-}): Promise<void> {
+  attemptId: string | null;
+};
+
+/** Counters and the undo-trail row. Returns 0 when this attempt no longer owns the job. */
+async function persistChunkBookkeeping(tx: Prisma.TransactionClient, chunk: ChunkBookkeeping): Promise<number> {
   const { migrationJobId, processed, errors } = chunk;
-  await prisma.$transaction(async (tx) => {
-    if (chunk.createdIds.length > 0 || processed > 0 || errors.length > 0) {
-      const rowsConsumed = chunk.resumeFrom + processed + errors.length;
-      await tx.auditLog.create({
-        data: {
-          orgId: chunk.orgId,
-          userId: chunk.userId,
-          action: 'migration.chunk.imported',
-          targetType: 'MigrationJob',
-          targetId: migrationJobId,
-          diff: {
-            entity: chunk.entity,
-            createdIds: chunk.createdIds,
-            chunkOffset: chunk.chunkOffset,
-            rowsConsumed,
-          },
+  const moved = await recordChunkOutcome(
+    tx,
+    migrationJobId,
+    chunk.attemptId,
+    processed,
+    errors.length,
+    errors,
+  );
+  if (moved !== 1) return 0;
+  if (chunk.createdIds.length > 0 || processed > 0 || errors.length > 0) {
+    const rowsConsumed = chunk.resumeFrom + processed + errors.length;
+    await tx.auditLog.create({
+      data: {
+        orgId: chunk.orgId,
+        userId: chunk.userId,
+        action: 'migration.chunk.imported',
+        targetType: 'MigrationJob',
+        targetId: migrationJobId,
+        diff: {
+          entity: chunk.entity,
+          createdIds: chunk.createdIds,
+          chunkOffset: chunk.chunkOffset,
+          rowsConsumed,
         },
-      });
-    }
-    await recordChunkOutcome(tx, migrationJobId, processed, errors.length, errors);
+      },
+    });
+  }
+  return 1;
+}
+
+export async function commitChunkProgress(chunk: ChunkBookkeeping): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await persistChunkBookkeeping(tx, chunk);
   });
 }
 
@@ -639,21 +738,45 @@ export async function resolveChunkResumeCursor(
   return consumed >= 0 ? consumed : 0;
 }
 
-async function maybeComplete(migrationJobId: string, forceTotal?: number): Promise<void> {
+export async function maybeComplete(
+  migrationJobId: string,
+  forceTotal?: number,
+  log?: ChunkLog,
+  attemptId: string | null = null,
+): Promise<void> {
   const job = await prisma.migrationJob.findUnique({ where: { id: migrationJobId } });
-  if (!job || job.status !== 'RUNNING') return;
+  if (!job || !migrationChunkMayRun(job.status)) return;
+  if (!migrationChunkMatchesAttempt(migrationAttemptId(job.meta), attemptId)) return;
   const done = job.processedRows + job.errorRows;
   const total = forceTotal ?? job.totalRows;
-  if (done >= total) {
-    await prisma.migrationJob.update({
+  if (done < total) return;
+  // A cancel or a newer attempt can land after the read above. Only the
+  // attempt that is still current, and still RUNNING, becomes COMPLETE.
+  const completedAt = new Date();
+  const undoableUntil = new Date(Date.now() + 24 * 3600 * 1000);
+  const moved = await prisma.$executeRaw`
+    UPDATE migration_jobs
+    SET status = 'COMPLETE',
+        completed_at = ${completedAt},
+        total_rows = ${total},
+        undoable_until = ${undoableUntil},
+        updated_at = date_trunc('milliseconds', NOW())
+    WHERE id = ${migrationJobId}::uuid
+      AND status::text = ${migrationActiveStatus()}
+      AND (
+        (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
+        OR meta->>'attemptId' = ${attemptId}
+      )
+  `;
+  if (Number(moved) !== 1) {
+    const current = await prisma.migrationJob.findUnique({
       where: { id: migrationJobId },
-      data: {
-        status: 'COMPLETE',
-        completedAt: new Date(),
-        totalRows: forceTotal ?? job.totalRows,
-        undoableUntil: new Date(Date.now() + 24 * 3600 * 1000),
-      },
+      select: { status: true },
     });
+    log?.warn(
+      { migrationJobId, from: current?.status ?? null, to: 'COMPLETE' },
+      'illegal migration transition',
+    );
   }
 }
 
@@ -689,6 +812,31 @@ async function chunkCreatedIds(payload: MigrationJobPayload): Promise<string[]> 
   });
 }
 
+/**
+ * The worker has the chunk. This is the stale clock. A job still sitting in
+ * the queue has no progressAt, so time spent queued is not a stall.
+ * Only progressAt is written. Rewriting meta from a snapshot would put back
+ * an attempt id a retry had already replaced.
+ */
+async function noteChunkClaimed(id: string): Promise<number> {
+  const progressAt = new Date().toISOString();
+  // Milliseconds, not NOW(). Prisma reads this clock back at millisecond
+  // resolution, and the stale compare-and-set requires an equal value.
+  const moved = await prisma.$executeRaw`
+    UPDATE migration_jobs
+    SET meta = jsonb_set(
+          COALESCE(meta, '{}'::jsonb),
+          '{progressAt}',
+          to_jsonb(${progressAt}::text),
+          true
+        ),
+        updated_at = date_trunc('milliseconds', NOW())
+    WHERE id = ${id}::uuid
+      AND status::text = ${migrationActiveStatus()}
+  `;
+  return Number(moved);
+}
+
 /** Import one chunk: acquire rows, write them, commit progress, queue enrichment, page on. */
 export async function processMigrationChunk(
   payload: MigrationJobPayload,
@@ -698,18 +846,44 @@ export async function processMigrationChunk(
   // Respect cancellation between chunks.
   const jobRow = await prisma.migrationJob.findUnique({
     where: { id: payload.migrationJobId },
-    select: { status: true },
+    select: { status: true, meta: true, orgId: true },
   });
-  if (!jobRow || jobRow.status === 'CANCELLED' || jobRow.status === 'FAILED') {
+  // Start and retry enqueue before the RUNNING claim. A chunk that arrives
+  // while the row is still PENDING or FAILED must be retried, not completed,
+  // or the claim that follows has nothing left to process.
+  if (jobRow?.status === 'PENDING' || jobRow?.status === 'FAILED') {
+    throw new Error('migration job is not running yet');
+  }
+  if (!jobRow || !migrationChunkMayRun(jobRow.status)) {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
     return;
+  }
+  if (jobRow.orgId !== payload.orgId) {
+    log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — org mismatch');
+    return;
+  }
+  if (!migrationChunkMatchesAttempt(migrationAttemptId(jobRow.meta), payload.attemptId ?? null)) {
+    log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
+    return;
+  }
+  const claimed = await noteChunkClaimed(payload.migrationJobId);
+  if (claimed !== 1) {
+    const current = await prisma.migrationJob.findUnique({
+      where: { id: payload.migrationJobId },
+      select: { status: true },
+    });
+    log.warn(
+      { migrationJobId: payload.migrationJobId, from: current?.status ?? null, to: migrationActiveStatus() },
+      'illegal migration transition',
+    );
   }
 
   const entity = normalizeEntity(payload.entityType);
   if (!entity) {
     // e.g. HubSpot "tasks" — fail the job loudly instead of hanging RUNNING.
-    await prisma.migrationJob.update({
-      where: { id: payload.migrationJobId },
+    // Only from RUNNING: a cancel after the read above must stick.
+    const moved = await prisma.migrationJob.updateMany({
+      where: { id: payload.migrationJobId, status: { in: [...migrationFrom('fail')] } },
       data: {
         status: 'FAILED',
         completedAt: new Date(),
@@ -722,6 +896,17 @@ export async function processMigrationChunk(
         ],
       },
     });
+    if (moved.count === 0) {
+      const current = await prisma.migrationJob.findUnique({
+        where: { id: payload.migrationJobId },
+        select: { status: true },
+      });
+      log.warn(
+        { migrationJobId: payload.migrationJobId, from: current?.status ?? null, to: 'FAILED' },
+        'illegal migration transition',
+      );
+      return;
+    }
     log.warn('unsupported entity type — job failed honestly');
     return;
   }
@@ -751,13 +936,6 @@ export async function processMigrationChunk(
     rows = all.slice(payload.chunkOffset, payload.chunkOffset + payload.chunkSize);
   }
 
-  // ── Import rows ──
-  const ctx: WriteCtx = {
-    orgId: payload.orgId,
-    sourceTag: `migration:${payload.migrationJobId}`,
-    dedupStrategy: payload.dedupStrategy,
-  };
-
   // Retry idempotency: a BullMQ retry re-runs the WHOLE chunk from the start.
   // For the 'skip'/'update' strategies the per-row dedup check makes that safe,
   // but 'duplicate' re-inserts every row unconditionally — so a retry after a
@@ -770,45 +948,95 @@ export async function processMigrationChunk(
     payload.chunkOffset,
   );
 
-  const createdIds: string[] = [];
-  const errors: MigrationJobError[] = [];
-  let processed = 0;
-
-  for (let i = resumeFrom; i < rows.length; i++) {
-    const absoluteRow = payload.chunkOffset + i;
-    try {
-      const mapped = applyMappings(rows[i]!, payload.mappings);
-      const createdId = await WRITERS[entity](ctx, mapped);
-      if (createdId) createdIds.push(createdId);
-      processed += 1;
-    } catch (err) {
-      errors.push({
-        row: absoluteRow,
-        field: null,
-        message: err instanceof Error ? err.message : String(err),
+  // The attempt is checked again under a row lock, before any entity insert.
+  // The inserts, the counters, and the undo trail commit together. A retry
+  // that already replaced the attempt writes nothing.
+  let written: { createdIds: string[]; processed: number; errors: MigrationJobError[] } | null;
+  let skipReason: 'org' | 'attempt' | 'status' | null = null;
+  try {
+    written = await prisma.$transaction(
+    async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ status: string; org_id: string; meta: unknown }>>`
+        SELECT status::text AS status, org_id::text AS org_id, meta
+        FROM migration_jobs
+        WHERE id = ${payload.migrationJobId}::uuid
+        FOR UPDATE
+      `;
+      const holder = locked[0];
+      if (!holder || holder.status !== migrationActiveStatus()) {
+        skipReason = 'status';
+        return null;
+      }
+      if (holder.org_id !== payload.orgId) {
+        skipReason = 'org';
+        return null;
+      }
+      if (!migrationChunkMatchesAttempt(migrationAttemptId(holder.meta), payload.attemptId ?? null)) {
+        skipReason = 'attempt';
+        return null;
+      }
+      const ctx: WriteCtx = {
+        orgId: holder.org_id,
+        sourceTag: `migration:${payload.migrationJobId}`,
+        dedupStrategy: payload.dedupStrategy,
+        tx,
+      };
+      const createdIds: string[] = [];
+      const errors: MigrationJobError[] = [];
+      let processed = 0;
+      for (let i = resumeFrom; i < rows.length; i++) {
+        const absoluteRow = payload.chunkOffset + i + 1;
+        try {
+          const mapped = applyMappings(rows[i]!, payload.mappings);
+          const createdId = await withSavepoint(tx, `chunk_row_${i}`, () => WRITERS[entity](ctx, mapped));
+          if (createdId) createdIds.push(createdId);
+          processed += 1;
+        } catch (err) {
+          if (isMigrationDeadlock(err)) throw new MigrationChunkConflict();
+          errors.push({
+            row: absoluteRow,
+            field: null,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      const booked = await persistChunkBookkeeping(tx, {
+        orgId: holder.org_id,
+        userId: payload.userId,
+        migrationJobId: payload.migrationJobId,
+        entity,
+        chunkOffset: payload.chunkOffset,
+        resumeFrom,
+        createdIds,
+        processed,
+        errors,
+        attemptId: payload.attemptId ?? null,
       });
-    }
+      // The lock makes this miss unreachable. Throw so a miss cannot commit the inserts.
+      if (booked !== 1) throw new Error('migration attempt lost during chunk');
+      return { createdIds, processed, errors };
+    },
+    { maxWait: 10_000, timeout: 120_000 },
+    );
+  } catch (err) {
+    if (err instanceof MigrationChunkConflict) throw err;
+    if (isMigrationDeadlock(err)) throw new MigrationChunkConflict();
+    throw err;
   }
-
-  // ── Undo trail: contacts/opportunities have no `source` column, so the
-  // undo route reads these audit rows to find what this job created. The
-  // `rowsConsumed` field doubles as the resume cursor for retry idempotency,
-  // so it commits atomically with the counters (see commitChunkProgress). ──
-  await commitChunkProgress({
-    orgId: payload.orgId,
-    userId: payload.userId,
-    migrationJobId: payload.migrationJobId,
-    entity,
-    chunkOffset: payload.chunkOffset,
-    resumeFrom,
-    createdIds,
-    processed,
-    errors,
-  });
+  if (!written) {
+    if (skipReason === 'org') {
+      log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — org mismatch');
+    } else if (skipReason === 'attempt') {
+      log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
+    }
+    return;
+  }
+  const { createdIds, processed, errors } = written;
 
   // ── Import enrichment: queue public intel and Apollo org data per new company.
   // Prior passes of this chunk are included so a retry after a crash still queues them. ──
   if (entity === 'company') {
+    for (const companyId of createdIds) queueTechDetectAfterImport(payload.orgId, companyId);
     const companyIds =
       resumeFrom > 0 ? [...(await chunkCreatedIds(payload)), ...createdIds] : createdIds;
     await queueImportEnrichment(
@@ -828,11 +1056,19 @@ export async function processMigrationChunk(
   // ── HubSpot pagination: enqueue the next page while there is one. ──
   if (payload.source === 'HUBSPOT_OAUTH' && nextAfter) {
     const nextOffset = payload.chunkOffset + rows.length;
-    await deps.enqueueChunk(
-      `${payload.migrationJobId}-chunk-${nextOffset}`,
-      { ...payload, chunkOffset: nextOffset, hubspotAfter: nextAfter },
-      { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
-    );
+    try {
+      await deps.enqueueChunk(
+        `${payload.migrationJobId}-chunk-${nextOffset}`,
+        { ...payload, chunkOffset: nextOffset, hubspotAfter: nextAfter },
+        { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
+      );
+    } catch (err) {
+      // The page is already committed. Leave the job RUNNING and rethrow so
+      // BullMQ runs this chunk again. Failing it here makes that retry return
+      // at the running-status guard, with the next page never fetched.
+      log.warn({ err, migrationJobId: payload.migrationJobId }, 'migration next page was not queued');
+      throw err;
+    }
   } else if (payload.source === 'HUBSPOT_OAUTH') {
     // Last page — HubSpot discovery counts are approximate, so completion
     // is "no more pages", not "processed == discovered total".
@@ -843,15 +1079,210 @@ export async function processMigrationChunk(
     await maybeComplete(
       payload.migrationJobId,
       (jobNow?.processedRows ?? 0) + (jobNow?.errorRows ?? 0),
+      log,
+      payload.attemptId ?? null,
     );
   } else {
-    await maybeComplete(payload.migrationJobId);
+    await maybeComplete(payload.migrationJobId, undefined, log, payload.attemptId ?? null);
   }
 
   log.info(
     { processed, errored: errors.length, created: createdIds.length },
     'migration chunk done',
   );
+}
+
+// ─── Stale scan ────────────────────────────────────────────────────────────
+
+/** Repeatable job on the migration queue. No second queue. */
+export const MIGRATION_STALE_SCAN = 'migration-stale-scan';
+export const MIGRATION_STALE_SCAN_MS = 60_000;
+
+/**
+ * A PENDING job this old was not an in-flight start. The same window as a
+ * stalled running import: a request still inside the handler is shorter.
+ */
+export const MIGRATION_ABANDONED_PENDING_MS = MIGRATION_STALE_MS;
+
+/**
+ * Compare-and-set RUNNING → FAILED for one observed progress time.
+ * A chunk that committed after this time moved `updatedAt`, so the write misses.
+ */
+export async function claimStaleMigration(id: string, observedProgressAt: Date): Promise<boolean> {
+  const moved = await prisma.migrationJob.updateMany({
+    where: {
+      id,
+      status: { in: [...migrationFrom('stale')] },
+      updatedAt: observedProgressAt,
+    },
+    data: {
+      status: 'FAILED',
+      completedAt: new Date(),
+      errorSummary: [{ row: 0, field: null, message: MIGRATION_STALE_REASON }],
+    },
+  });
+  return moved.count === 1;
+}
+
+/** Fail running imports whose last progress is older than the shared window. */
+export async function sweepStaleMigrations(now = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - MIGRATION_STALE_MS);
+  const candidates = await prisma.migrationJob.findMany({
+    where: {
+      status: migrationActiveStatus(),
+      processedRows: 0,
+      errorRows: 0,
+      updatedAt: { lte: cutoff },
+    },
+    select: { id: true, status: true, meta: true, updatedAt: true, processedRows: true, errorRows: true },
+  });
+  let claimed = 0;
+  for (const job of candidates) {
+    if (
+      !migrationStaleDue({
+        state: job.status,
+        progressAt: migrationProgressAt(job.meta),
+        processedRows: job.processedRows,
+        errorRows: job.errorRows,
+        now,
+      })
+    ) {
+      continue;
+    }
+    if (await claimStaleMigration(job.id, job.updatedAt)) claimed += 1;
+  }
+  return claimed;
+}
+
+function migrationEntityType(meta: unknown): string | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+  const value = (meta as { entityType?: unknown }).entityType;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Remove a PENDING start the handler did not finish. A start_failed row means
+ * the queue already refused it. No queue entry means the chunks were never
+ * accepted. A job that still has a chunk waiting is left for the worker.
+ */
+export async function sweepAbandonedPending(
+  now = new Date(),
+  deps: {
+    hasQueueEntry?: (migrationJobId: string) => Promise<boolean>;
+    deleteRows?: (key: string) => Promise<unknown>;
+    log?: { info: (obj: object, msg?: string) => void };
+  } = {},
+): Promise<number> {
+  const cutoff = new Date(now.getTime() - MIGRATION_ABANDONED_PENDING_MS);
+  const candidates = await prisma.migrationJob.findMany({
+    where: { status: 'PENDING', createdAt: { lte: cutoff } },
+    select: { id: true, orgId: true, meta: true },
+  });
+  let reaped = 0;
+  for (const job of candidates) {
+    const failedStart = await prisma.auditLog.findFirst({
+      where: { orgId: job.orgId, targetId: job.id, action: 'migration.start_failed' },
+      select: { id: true },
+    });
+    if (!failedStart) {
+      if (!deps.hasQueueEntry) continue;
+      let queued: boolean;
+      try {
+        queued = await deps.hasQueueEntry(job.id);
+      } catch {
+        continue;
+      }
+      if (queued) continue;
+    }
+    const reason = failedStart ? 'start_failed' : 'no_queue_entry';
+    // The audit and the delete commit together. A delete that removes
+    // nothing, or is rejected, must not leave a reap row for the next scan.
+    const removed = await prisma.$transaction(async (tx) => {
+      const deleted = await tx.migrationJob.deleteMany({
+        where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+      });
+      if (deleted.count !== 1) return 0;
+      await tx.auditLog.create({
+        data: {
+          orgId: job.orgId,
+          action: 'migration.reaped',
+          targetType: 'MigrationJob',
+          targetId: job.id,
+          diff: { reason },
+        },
+      });
+      return 1;
+    });
+    if (removed !== 1) continue;
+    deps.log?.info(
+      { migrationJobId: job.id, orgId: job.orgId, reason },
+      'reaped an abandoned pending import',
+    );
+    const entityType = migrationEntityType(job.meta);
+    if (entityType && deps.deleteRows) {
+      await deps.deleteRows(`migration:${job.id}:${entityType}:rows`).catch(() => undefined);
+    }
+    reaped += 1;
+  }
+  return reaped;
+}
+
+type FailLog = {
+  error: (obj: object, msg?: string) => void;
+  warn: (obj: object, msg?: string) => void;
+};
+
+/** The last BullMQ attempt failed. The attempt id is in the write, so a stale chunk cannot fail a newer one. */
+export async function failExhaustedMigrationChunk(
+  data: { migrationJobId?: string; attemptId?: string | null },
+  err: { message: string },
+  log: FailLog,
+): Promise<void> {
+  const migrationJobId = data.migrationJobId;
+  if (!migrationJobId) return;
+  const attemptId = data.attemptId ?? null;
+  const message = isMigrationDeadlock(err)
+    ? MIGRATION_CONFLICT
+    : `chunk failed permanently: ${err.message}`;
+  const payload = JSON.stringify([{ row: 0, field: null, message }]);
+  let moved: number;
+  try {
+    moved = Number(
+      await prisma.$executeRaw`
+        UPDATE migration_jobs
+        SET status = 'FAILED',
+            completed_at = date_trunc('milliseconds', NOW()),
+            error_summary = CASE
+              WHEN jsonb_array_length(error_summary) < 200
+              THEN error_summary || ${payload}::jsonb
+              ELSE error_summary
+            END
+        WHERE id = ${migrationJobId}::uuid
+          AND status::text = ${migrationActiveStatus()}
+          AND (
+            (${attemptId}::text IS NULL AND COALESCE(meta->>'attemptId', '') = '')
+            OR meta->>'attemptId' = ${attemptId}
+          )
+      `,
+    );
+  } catch (updateErr) {
+    log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED');
+    return;
+  }
+  if (moved !== 1) {
+    const current = await prisma.migrationJob.findUnique({
+      where: { id: migrationJobId },
+      select: { status: true, meta: true },
+    });
+    if (!migrationChunkMatchesAttempt(migrationAttemptId(current?.meta), attemptId)) {
+      log.warn({ migrationJobId }, 'exhausted chunk belongs to an older attempt');
+      return;
+    }
+    log.warn(
+      { migrationJobId, from: current?.status ?? null, to: 'FAILED' },
+      'illegal migration transition',
+    );
+  }
 }
 
 // ─── Worker ────────────────────────────────────────────────────────────────
@@ -896,9 +1327,36 @@ export async function startMigrationWorker(
     env: process.env,
   };
 
+  await queue.add(
+    MIGRATION_STALE_SCAN,
+    {},
+    { repeat: { every: MIGRATION_STALE_SCAN_MS }, jobId: MIGRATION_STALE_SCAN },
+  );
+
   const worker = new Worker(
     MIGRATION.name,
     async (job: Job) => {
+      if (job.name === MIGRATION_STALE_SCAN) {
+        await sweepStaleMigrations();
+        let hasQueueEntry: ((migrationJobId: string) => Promise<boolean>) | undefined;
+        try {
+          const waiting = await queue.getJobs(['waiting', 'active', 'delayed', 'paused', 'prioritized']);
+          const queued = new Set<string>();
+          for (const entry of waiting) {
+            const id = (entry?.data as { migrationJobId?: unknown } | undefined)?.migrationJobId;
+            if (typeof id === 'string') queued.add(id);
+          }
+          hasQueueEntry = async (migrationJobId) => queued.has(migrationJobId);
+        } catch (err) {
+          log.warn({ err }, 'migration sweep could not read the queue');
+        }
+        await sweepAbandonedPending(new Date(), {
+          hasQueueEntry,
+          deleteRows: (key) => connection.del(key),
+          log,
+        });
+        return;
+      }
       const payload = MigrationJobPayload.parse(job.data);
       const childLog = log.child({
         migrationJobId: payload.migrationJobId,
@@ -918,29 +1376,11 @@ export async function startMigrationWorker(
     // After BullMQ exhausts retries (attempts: 5), fail the parent job row so
     // the UI never shows RUNNING forever on a dead chunk.
     if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
-      const migrationJobId = (job.data as { migrationJobId?: string }).migrationJobId;
-      if (migrationJobId) {
-        await prisma.migrationJob
-          .updateMany({
-            where: { id: migrationJobId, status: 'RUNNING' },
-            data: { status: 'FAILED', completedAt: new Date() },
-          })
-          .catch((updateErr) =>
-            log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED'),
-          );
-        await prisma.$executeRaw`
-          UPDATE migration_jobs
-          SET error_summary = CASE
-            WHEN jsonb_array_length(error_summary) < 200
-            THEN error_summary || ${JSON.stringify([
-              { row: 0, field: null, message: `chunk failed permanently: ${err.message}` },
-            ])}::jsonb
-            ELSE error_summary
-          END
-          WHERE id = ${migrationJobId}::uuid`.catch((rawErr) =>
-          log.warn({ err: rawErr, migrationJobId }, 'best-effort error_summary append failed'),
-        );
-      }
+      await failExhaustedMigrationChunk(
+        job.data as { migrationJobId?: string; attemptId?: string | null },
+        err,
+        log,
+      );
     }
   });
 

@@ -20,10 +20,19 @@
 
 import { createHmac, createSign, randomBytes } from 'node:crypto';
 import type { FastifyError } from 'fastify';
+import pino from 'pino';
 import { prisma, type Prisma } from '@bidstack/db';
-import type { SignatureStatus } from '@bidstack/shared';
+import {
+  isIllegalTransition,
+  signatureFrom,
+  signatureTransition,
+  type SignatureState,
+  type SignatureStatus,
+} from '@bidstack/shared';
 import { htmlToPdf } from './document.service.js';
 import { getEnv } from '../../env.js';
+
+const log = pino({ name: 'signature', level: process.env.LOG_LEVEL ?? 'info' });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -380,9 +389,38 @@ export async function handleDocuSignWebhook(
       },
     });
     if (claim.count === 0) {
-      // Already processed / already terminal — duplicate or stale delivery.
-      // No event written; the transaction commits as a no-op and the caller
-      // returns 200 so DocuSign stops retrying.
+      // A void claim holds the row at VOIDED until DocuSign answers. The
+      // completion cannot change that row yet (the claim has to stay first),
+      // but it has to be remembered: if DocuSign then rejects the void, the
+      // completion is the outcome. A void that already wrote its event is
+      // finished, and a late completion stays ignored.
+      if (newStatus === 'SIGNED' || newStatus === 'DECLINED') {
+        const current = await tx.signatureRequest.findFirst({
+          where: { id: request.id },
+          select: { status: true, voidReason: true },
+        });
+        if (current?.status === 'VOIDED' && current.voidReason) {
+          const voided = await tx.signatureEvent.count({
+            where: { signatureRequestId: request.id, type: 'VOIDED' },
+          });
+          const already = await tx.signatureEvent.count({
+            where: { signatureRequestId: request.id, type: eventType },
+          });
+          if (voided === 0 && already === 0) {
+            await tx.signatureEvent.create({
+              data: {
+                signatureRequestId: request.id,
+                type: eventType,
+                recipientEmail: payload.recipients?.signers?.[0]?.email ?? null,
+                occurredAt: new Date(),
+                ipAddress: null,
+                userAgent: null,
+                payload: { ...(payload as object), heldDuringVoid: true },
+              },
+            });
+          }
+        }
+      }
       return;
     }
 
@@ -424,49 +462,128 @@ export async function voidSignatureRequest(params: {
   if (!request) notFound(`Signature request ${requestId} not found`);
   if (request.orgId !== orgId) forbidden('Cannot void a signature request from another org');
 
-  const terminalStatuses: SignatureStatus[] = ['SIGNED', 'DECLINED', 'VOIDED', 'EXPIRED'];
-  if (terminalStatuses.includes(request.status as SignatureStatus)) {
+  if (isIllegalTransition(signatureTransition(request.status as SignatureState, 'void'))) {
+    log.warn(
+      { signatureRequestId: requestId, from: request.status, to: 'VOIDED' },
+      'illegal signature transition',
+    );
     badRequest(`Cannot void a request with status ${request.status}`);
   }
 
-  if (request.provider === 'DOCUSIGN' && request.providerRequestId) {
-    const env = getEnv();
-    const baseUrl = env.DOCUSIGN_BASE_URL || 'https://demo.docusign.net/restapi';
-    const accountId = env.DOCUSIGN_ACCOUNT_ID;
-    if (accountId) {
-      const token = await getDocuSignAccessToken();
-      const res = await fetch(
-        `${baseUrl}/v2.1/accounts/${accountId}/envelopes/${request.providerRequestId}`,
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'voided', voidedReason: reason }),
-        },
-      );
-      if (!res.ok) {
-        const body = await res.text();
-        throw credentialError(`DocuSign void failed: ${res.status} ${body}`);
-      }
-    }
+  // Claim the void before DocuSign. A signature that lands after the read
+  // matches nothing, so the envelope is never voided for a row we do not own.
+  const previousStatus = request.status;
+  const claimed = await prisma.signatureRequest.updateMany({
+    where: {
+      id: requestId,
+      orgId,
+      deletedAt: null,
+      status: { in: [...signatureFrom('void')] },
+    },
+    data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
+  });
+  if (claimed.count !== 1) {
+    const current = await prisma.signatureRequest.findFirst({
+      where: { id: requestId, orgId },
+      select: { status: true },
+    });
+    log.warn(
+      { signatureRequestId: requestId, from: current?.status ?? null, to: 'VOIDED' },
+      'illegal signature transition',
+    );
+    badRequest(`Cannot void a request with status ${current?.status ?? request.status}`);
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.signatureRequest.update({
-      where: { id: requestId },
-      data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
-    });
-    await tx.signatureEvent.create({
+  try {
+    if (request.provider === 'DOCUSIGN' && request.providerRequestId) {
+      const env = getEnv();
+      const baseUrl = env.DOCUSIGN_BASE_URL || 'https://demo.docusign.net/restapi';
+      const accountId = env.DOCUSIGN_ACCOUNT_ID;
+      if (accountId) {
+        const token = await getDocuSignAccessToken();
+        const res = await fetch(
+          `${baseUrl}/v2.1/accounts/${accountId}/envelopes/${request.providerRequestId}`,
+          {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'voided', voidedReason: reason }),
+          },
+        );
+        if (!res.ok) {
+          const body = await res.text();
+          throw credentialError(`DocuSign void failed: ${res.status} ${body}`);
+        }
+      }
+    }
+  } catch (err) {
+    const held = await heldSignatureDuringVoid(requestId);
+    const nextStatus = held?.type === 'SIGNED' || held?.type === 'DECLINED' ? held.type : previousStatus;
+    const restored = await prisma.signatureRequest.updateMany({
+      where: { id: requestId, orgId, deletedAt: null, status: 'VOIDED', voidReason: reason },
       data: {
-        signatureRequestId: requestId,
-        type: 'VOIDED',
-        recipientEmail: null,
-        occurredAt: new Date(),
-        ipAddress: null,
-        userAgent: null,
-        payload: { reason } as object,
+        status: nextStatus,
+        voidedAt: null,
+        voidReason: null,
+        ...(nextStatus === 'SIGNED' ? { completedAt: new Date() } : {}),
       },
     });
+    if (restored.count !== 1) {
+      log.warn(
+        { signatureRequestId: requestId, from: 'VOIDED', to: nextStatus },
+        'illegal signature transition',
+      );
+    }
+    throw err;
+  }
+
+  // The void event is the audit fact. A completion remembered while the
+  // claim was held is removed only after that event exists, so a successful
+  // void does not also stay signed. A rejected void leaves the completion.
+  await prisma.signatureEvent.create({
+    data: {
+      signatureRequestId: requestId,
+      type: 'VOIDED',
+      recipientEmail: null,
+      occurredAt: new Date(),
+      ipAddress: null,
+      userAgent: null,
+      payload: { reason } as object,
+    },
   });
+  const heldIds = (await prisma.signatureEvent.findMany({
+    where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
+    orderBy: { occurredAt: 'desc' },
+    select: { id: true, payload: true },
+    take: 10,
+  }))
+    .filter((event) => isHeldDuringVoid(event.payload))
+    .map((event) => event.id);
+  if (heldIds.length > 0) {
+    await prisma.signatureEvent.deleteMany({ where: { id: { in: heldIds } } });
+  }
+}
+
+function isHeldDuringVoid(payload: unknown): boolean {
+  return (
+    !!payload &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    (payload as { heldDuringVoid?: unknown }).heldDuringVoid === true
+  );
+}
+
+async function heldSignatureDuringVoid(
+  requestId: string,
+): Promise<{ type: 'SIGNED' | 'DECLINED' } | null> {
+  const events = await prisma.signatureEvent.findMany({
+    where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
+    orderBy: { occurredAt: 'desc' },
+    select: { type: true, payload: true },
+    take: 10,
+  });
+  const held = events.find((event) => isHeldDuringVoid(event.payload));
+  if (held?.type === 'SIGNED' || held?.type === 'DECLINED') return { type: held.type };
+  return null;
 }
 
 // ─── handleInternalSign ───────────────────────────────────────────────────────

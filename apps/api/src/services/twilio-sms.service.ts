@@ -16,6 +16,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Prisma, prisma } from '@bidstack/db';
+import { smsEventFromProvider, smsFrom, smsTarget } from '@bidstack/shared';
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import {
@@ -309,28 +310,59 @@ export async function testTwilioConnection(
  */
 export async function handleStatusCallback(
   payload: TwilioStatusCallbackPayload,
+  orgId: string,
   log: ServiceLogger,
 ): Promise<void> {
   const { MessageSid, MessageStatus, ErrorCode, Price, NumSegments } = payload;
 
-  const statusMap: Record<string, 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'UNDELIVERED'> = {
-    queued: 'QUEUED',
-    sent: 'SENT',
-    delivered: 'DELIVERED',
-    failed: 'FAILED',
-    undelivered: 'UNDELIVERED',
-  };
-
-  const mapped = statusMap[MessageStatus?.toLowerCase() ?? ''];
-  if (!mapped) {
+  const event = smsEventFromProvider(MessageStatus ?? '');
+  if (!event) {
+    // An unrecognized provider status is ignored entirely, including price
+    // and error fields. We do not store facts we cannot attribute to a known event.
     log.debug({ MessageSid, MessageStatus }, 'Ignoring unknown Twilio status');
     return;
   }
+  const mapped = smsTarget(event);
+  // Forward only: queued, then sent, then a terminal delivery or failure.
+  // A later callback must not move backwards, and a terminal status stays.
+  const from = smsFrom(event);
 
   const costMicros = Price ? BigInt(Math.round(parseFloat(Price) * 1_000_000)) : undefined;
+  const facts = {
+    ...(ErrorCode ? { errorCode: parseInt(ErrorCode, 10) } : {}),
+    ...(costMicros !== undefined ? { costMicros } : {}),
+    ...(NumSegments ? { segments: parseInt(NumSegments, 10) } : {}),
+  };
 
-  await prisma.smsMessage.updateMany({
-    where: { twilioSid: MessageSid },
+  // A recognized callback that cannot move the row still keeps error, price,
+  // and segment facts. The where-clause matches the status just read, so a
+  // concurrent forward move is not overwritten.
+  const keepFacts = async (
+    status: 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'UNDELIVERED',
+  ) => {
+    if (Object.keys(facts).length === 0) return;
+    await prisma.smsMessage.updateMany({
+      where: { twilioSid: MessageSid, orgId, status },
+      data: facts,
+    });
+  };
+
+  // Prisma rejects an empty `in` list. `queued` is only the starting status,
+  // written when the message is created, so a queued callback never moves a row.
+  if (from.length === 0) {
+    const current = await prisma.smsMessage.findFirst({
+      where: { twilioSid: MessageSid, orgId },
+      select: { id: true, status: true },
+    });
+    if (current && current.status !== mapped) {
+      log.warn({ smsMessageId: current.id, from: current.status, to: mapped }, 'illegal sms transition');
+    }
+    if (current) await keepFacts(current.status);
+    return;
+  }
+
+  const moved = await prisma.smsMessage.updateMany({
+    where: { twilioSid: MessageSid, orgId, status: { in: [...from] } },
     data: {
       status: mapped,
       errorCode: ErrorCode ? parseInt(ErrorCode, 10) : null,
@@ -339,6 +371,17 @@ export async function handleStatusCallback(
       deliveredAt: mapped === 'DELIVERED' ? new Date() : undefined,
     },
   });
+  if (moved.count === 0) {
+    const current = await prisma.smsMessage.findFirst({
+      where: { twilioSid: MessageSid, orgId },
+      select: { id: true, status: true },
+    });
+    if (current && current.status !== mapped) {
+      log.warn({ smsMessageId: current.id, from: current.status, to: mapped }, 'illegal sms transition');
+    }
+    if (current) await keepFacts(current.status);
+    return;
+  }
 
   log.info({ MessageSid, status: mapped }, 'SmsMessage status updated');
 }

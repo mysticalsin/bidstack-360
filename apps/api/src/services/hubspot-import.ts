@@ -2,6 +2,8 @@
 // type. Shared by POST /api/v1/migrations/start-hubspot and the HubSpot
 // "Sync now" control, so both paths create identical jobs and audit rows.
 
+import { randomUUID } from 'node:crypto';
+
 import type { Queue } from 'bullmq';
 import type { z } from 'zod';
 
@@ -12,6 +14,8 @@ import {
   HUBSPOT_CONTACT_DEFAULTS,
   HUBSPOT_DEAL_DEFAULTS,
   MigrationJobPayload,
+  MIGRATION_ENQUEUE_FAILED,
+  migrationFrom,
 } from '@bidstack/shared';
 
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
@@ -41,6 +45,7 @@ export function buildHubSpotMigrationPayload(input: {
   mappings: Record<string, string | null>;
   dedupStrategy: z.infer<typeof DedupStrategyEnum>;
   hubspotIntegrationConfigId: string;
+  attemptId?: string;
 }): MigrationJobPayload {
   return MigrationJobPayload.parse({
     migrationJobId: input.migrationJobId,
@@ -54,6 +59,7 @@ export function buildHubSpotMigrationPayload(input: {
     mappings: input.mappings,
     dedupStrategy: input.dedupStrategy,
     externalIdColumn: 'hs_object_id',
+    ...(input.attemptId ? { attemptId: input.attemptId } : {}),
     meta: { hubspotIntegrationConfigId: input.hubspotIntegrationConfigId },
   });
 }
@@ -67,6 +73,42 @@ export async function findHubspotConnection(orgId: string) {
       isActive: true,
     },
     select: { id: true, config: true },
+  });
+}
+
+const HUBSPOT_ENTITY_MAPPINGS: Record<string, Record<string, string | null>> = {
+  companies: HUBSPOT_COMPANY_DEFAULTS,
+  contacts: HUBSPOT_CONTACT_DEFAULTS,
+  deals: HUBSPOT_DEAL_DEFAULTS,
+  tasks: {},
+};
+
+/** Enqueue the first HubSpot chunk for a job that is already RUNNING. */
+export async function enqueueHubspotChunk(input: {
+  jobId: string;
+  orgId: string;
+  userId: string;
+  entityType: string;
+  totalRows: number;
+  dedupStrategy: z.infer<typeof DedupStrategyEnum>;
+  attemptId: string;
+  queue: Queue;
+}): Promise<void> {
+  const config = await findHubspotConnection(input.orgId);
+  if (!config) throw new HubspotNotConnectedError();
+  const payload = buildHubSpotMigrationPayload({
+    migrationJobId: input.jobId,
+    orgId: input.orgId,
+    userId: input.userId,
+    entityType: input.entityType,
+    totalRows: input.totalRows,
+    mappings: HUBSPOT_ENTITY_MAPPINGS[input.entityType] ?? {},
+    dedupStrategy: input.dedupStrategy,
+    hubspotIntegrationConfigId: config.id,
+    attemptId: input.attemptId,
+  });
+  await input.queue.add(`${input.jobId}-chunk-0`, payload, {
+    jobId: `${input.jobId}-${input.entityType}-chunk-${Date.now()}`,
   });
 }
 
@@ -93,13 +135,6 @@ export async function startHubspotImport(input: {
     writeRequested: false,
   });
 
-  const entityMappings: Record<string, Record<string, string | null>> = {
-    companies: HUBSPOT_COMPANY_DEFAULTS,
-    contacts: HUBSPOT_CONTACT_DEFAULTS,
-    deals: HUBSPOT_DEAL_DEFAULTS,
-    tasks: {},
-  };
-
   const jobs: Awaited<ReturnType<typeof prisma.migrationJob.create>>[] = [];
 
   for (const entity of input.entities) {
@@ -109,6 +144,7 @@ export async function startHubspotImport(input: {
     >;
     const totalRows = discovery?.[entity] ?? 0;
 
+    const attemptId = randomUUID();
     const job = await prisma.migrationJob.create({
       data: {
         orgId,
@@ -118,8 +154,8 @@ export async function startHubspotImport(input: {
         startedAt: new Date(),
         totalRows,
         meta: input.syncRunId
-          ? { entityType: entity, syncRunId: input.syncRunId }
-          : { entityType: entity },
+          ? { entityType: entity, dedupStrategy: input.dedupStrategy, syncRunId: input.syncRunId, attemptId }
+          : { entityType: entity, dedupStrategy: input.dedupStrategy, attemptId },
       },
     });
 
@@ -131,27 +167,39 @@ export async function startHubspotImport(input: {
         orgId,
         source: 'HUBSPOT_OAUTH',
         sourceEntity: entity,
-        mappings: entityMappings[entity] ?? {},
+        mappings: HUBSPOT_ENTITY_MAPPINGS[entity] ?? {},
       },
-      update: { mappings: entityMappings[entity] ?? {} },
+      update: { mappings: HUBSPOT_ENTITY_MAPPINGS[entity] ?? {} },
     });
 
     // Enqueue first chunk; the worker paginates via the hubspotAfter cursor.
-    const payload = buildHubSpotMigrationPayload({
-      migrationJobId: job.id,
-      orgId,
-      userId,
-      entityType: entity,
-      totalRows,
-      mappings: entityMappings[entity] ?? {},
-      dedupStrategy: input.dedupStrategy,
-      hubspotIntegrationConfigId: config.id,
-    });
+    let enqueued = true;
+    try {
+      await enqueueHubspotChunk({
+        jobId: job.id,
+        orgId,
+        userId,
+        entityType: entity,
+        totalRows,
+        dedupStrategy: input.dedupStrategy,
+        attemptId,
+        queue: input.queue,
+      });
+    } catch {
+      enqueued = false;
+      // The job is already RUNNING. Leave it FAILED and return it, so the
+      // caller can show the failure instead of a 500 with a stranded row.
+      await prisma.migrationJob.updateMany({
+        where: { id: job.id, orgId, status: { in: [...migrationFrom('fail')] } },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          errorSummary: [{ row: 0, field: null, message: MIGRATION_ENQUEUE_FAILED }],
+        },
+      });
+    }
 
-    await input.queue.add(`${job.id}-chunk-0`, payload, {
-      jobId: `${job.id}-${entity}-chunk-0`,
-    });
-
+    if (enqueued) {
     await prisma.auditLog.create({
       data: {
         orgId,
@@ -165,7 +213,10 @@ export async function startHubspotImport(input: {
       },
     });
 
-    jobs.push(job);
+    }
+    jobs.push(
+      await prisma.migrationJob.findFirstOrThrow({ where: { id: job.id, orgId } }),
+    );
   }
 
   return jobs;

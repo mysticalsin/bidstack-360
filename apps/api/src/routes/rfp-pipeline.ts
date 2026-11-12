@@ -24,6 +24,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
+import { proposalFrom } from '@bidstack/shared';
 import { logAiInvocation } from '../lib/ai-audit.js';
 import {
   RfpOrchestrateLoopPolicyError,
@@ -438,7 +439,13 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         // concurrent double-approval loses the race (the second write sees
         // count 0) without a separate row lock.
         const approved = await tx.proposal.updateMany({
-          where: { id: proposal.id, orgId, approvedAt: null },
+          where: {
+            id: proposal.id,
+            orgId,
+            status: { in: [...proposalFrom('approve')] },
+            deletedAt: null,
+            approvedAt: null,
+          },
           data: {
             approvedAt,
             approvedByUserId: userId,

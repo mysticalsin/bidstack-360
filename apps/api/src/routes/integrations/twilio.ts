@@ -100,7 +100,7 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         );
         if (!valid) return reply.code(403).send({ ok: false } as never);
 
-        await handleStatusCallback(req.body, req.log);
+        await handleStatusCallback(req.body, msg.orgId, req.log);
         return reply.send({ ok: true });
       }
 
@@ -116,7 +116,7 @@ export const twilioWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(403).send({ ok: false } as never);
       }
 
-      await handleStatusCallback(req.body, req.log);
+      await handleStatusCallback(req.body, token.orgId, req.log);
       return reply.send({ ok: true });
     },
   );

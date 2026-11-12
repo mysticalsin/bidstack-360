@@ -65,6 +65,25 @@ describe('POST /api/v1/proposals/:proposalId/rfp-approve', () => {
     expect(res.statusCode).toBe(409);
   });
 
+  skipIfNoDb('409 if the proposal is no longer a draft or in review', async () => {
+    // WHY: the RFP gate approved any row with approvedAt null, including one
+    // that had already been submitted. Approval is only from draft or review.
+    const { proposal } = await createApprovableProposal();
+    await prisma.proposal.update({ where: { id: proposal.id }, data: { status: 'submitted' } });
+
+    const res = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/proposals/${proposal.id}/rfp-approve`,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(409);
+    const stored = await prisma.proposal.findUnique({
+      where: { id: proposal.id },
+      select: { status: true, approvedAt: true },
+    });
+    expect(stored).toMatchObject({ status: 'submitted', approvedAt: null });
+  });
+
   skipIfNoDb('409 if proposal has already been approved', async () => {
     const { proposal } = await createProposal({ approvedAt: new Date() });
 
@@ -275,4 +294,43 @@ describe('POST /api/v1/proposals/:proposalId/rfp-approve', () => {
     // id is BigInt — cast is sound because the type is bigint in the Prisma model.
     if (auditEntry) ctx.cleanup.auditLogs.push(auditEntry.id as bigint);
   });
+
+  skipIfNoDb(
+    'proposals:write can approve at the RFP gate and a user without it gets 403',
+    async () => {
+      // WHY: Tony's decision is that proposals:write is the RFP gate. An Account
+      // Executive holds that permission. Read-Only does not, and must not approve.
+      const { proposal: allowed } = await createApprovableProposal();
+      const { proposal: denied } = await createApprovableProposal();
+      const previousRole = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const approved = await ctx.server.inject({
+          method: 'POST',
+          url: `/api/v1/proposals/${allowed.id}/rfp-approve`,
+          headers: { 'x-bidstack-e2e-role': 'account-executive' },
+          payload: {},
+        });
+        expect(approved.statusCode).toBe(200);
+        expect(approved.json<{ orchestrationState: string }>().orchestrationState).toBe('approved');
+
+        const forbidden = await ctx.server.inject({
+          method: 'POST',
+          url: `/api/v1/proposals/${denied.id}/rfp-approve`,
+          headers: { 'x-bidstack-e2e-role': 'read-only' },
+          payload: {},
+        });
+        expect(forbidden.statusCode).toBe(403);
+      } finally {
+        if (previousRole === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousRole;
+      }
+      const granted = await prisma.proposal.findUniqueOrThrow({ where: { id: allowed.id } });
+      expect(granted.status).toBe('approved');
+      expect(granted.approvedAt).not.toBeNull();
+      const stored = await prisma.proposal.findUniqueOrThrow({ where: { id: denied.id } });
+      expect(stored.status).toBe('review');
+      expect(stored.approvedAt).toBeNull();
+    },
+  );
 });

@@ -67,7 +67,7 @@ import IORedis from 'ioredis';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'node:crypto';
 
-const { prisma } = await import('@bidstack/db');
+const { Prisma, prisma } = await import('@bidstack/db');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -510,10 +510,12 @@ async function teardown() {
     const bidDocumentIds = unique(documentVersionRows.map((row) => row.bidDocumentId));
 
     if (orchestrationIds.length > 0) {
-      const auditRows = await prisma.auditLog.deleteMany({
-        where: { targetType: 'rfp_orchestration', targetId: { in: orchestrationIds } },
-      });
-      pass(`Deleted ${auditRows.count} RFP orchestration audit rows`);
+      const auditRows = await prisma.$executeRaw`
+        DELETE FROM audit_log
+        WHERE target_type = 'rfp_orchestration'
+          AND target_id IN (${Prisma.join(orchestrationIds)})
+      `;
+      pass(`Deleted ${auditRows} RFP orchestration audit rows`);
 
       const deleted = await prisma.rfpOrchestration.deleteMany({
         where: { id: { in: orchestrationIds } },

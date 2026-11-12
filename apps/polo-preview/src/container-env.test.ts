@@ -25,6 +25,7 @@ describe('container env', () => {
     expect(env).toMatchObject({
       PUBLIC_BASE_URL: 'https://polo.example',
       CF_ACCESS_AUD: 'aud',
+      CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'false',
       POLO_ALLOWED_USERS: 'a@x.com:Admin',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
       PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),

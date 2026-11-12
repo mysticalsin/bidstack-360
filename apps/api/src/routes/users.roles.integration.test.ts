@@ -17,6 +17,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -85,7 +86,7 @@ afterAll(async () => {
       await prisma.rolePermission.deleteMany({ where: { roleId } });
       await prisma.role.deleteMany({ where: { id: roleId } });
     }
-    await prisma.auditLog.deleteMany({
+    await purgeAuditRows({
       where: { orgId, action: { startsWith: 'user_role.' }, targetId: memberId ?? undefined },
     });
   }

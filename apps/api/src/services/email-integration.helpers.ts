@@ -8,7 +8,7 @@
  */
 
 import { prisma } from '@bidstack/db';
-import { microsoftRefreshScopes } from '@bidstack/shared';
+import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
@@ -107,18 +107,19 @@ async function refreshToken(
     }
     const revoked = code === 'invalid_grant' || code === 'unauthorized_client';
     log.error({ tokenId: token.id, status: res.status, code }, 'OAuth token refresh failed');
-    await prisma.integrationToken.update({
-      where: { id: token.id },
-      data: revoked
+    await markIntegrationToken(
+      token.id,
+      revoked
         ? { status: 'revoked', errorMessage: REVOKED_MESSAGE }
         : { status: 'error', errorMessage: `Token refresh failed (${res.status}). Polo will retry.` },
-    });
+      log,
+    );
     throw new Error(`${google ? 'Gmail' : 'MS Graph'} refresh failed: ${res.status}`);
   }
 
   const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
-  await prisma.integrationToken.update({
-    where: { id: token.id },
+  const stored = await prisma.integrationToken.updateMany({
+    where: { id: token.id, deletedAt: null, status: { in: [...tokenFrom('refresh_ok')] } },
     data: {
       accessTokenEncrypted: encryptToken(data.access_token),
       ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
@@ -128,7 +129,44 @@ async function refreshToken(
       errorMessage: null,
     },
   });
+  if (stored.count !== 1) {
+    const current = await prisma.integrationToken.findFirst({
+      where: { id: token.id },
+      select: { status: true },
+    });
+    log.warn(
+      { tokenId: token.id, from: current?.status ?? null, to: 'active' },
+      'illegal integration token transition',
+    );
+    throw new GrantRevokedError('Grant was disconnected during refresh');
+  }
   return data.access_token;
+}
+
+/** A failed refresh may leave `revoked` or `error`. It must not rewrite a tombstone. */
+async function markIntegrationToken(
+  id: string,
+  data: { status: 'revoked' | 'error'; errorMessage: string },
+  log: ServiceLogger,
+): Promise<void> {
+  const moved = await prisma.integrationToken.updateMany({
+    where: {
+      id,
+      deletedAt: null,
+      status: { in: [...tokenFrom(data.status === 'revoked' ? 'revoke' : 'refresh_fail')] },
+    },
+    data,
+  });
+  if (moved.count === 0) {
+    const current = await prisma.integrationToken.findFirst({
+      where: { id },
+      select: { status: true },
+    });
+    log.warn(
+      { tokenId: id, from: current?.status ?? null, to: data.status },
+      'illegal integration token transition',
+    );
+  }
 }
 
 /**
@@ -143,9 +181,14 @@ export async function getAccessToken(
     expiresAt: Date | null;
     provider: string;
     scope?: string[];
+    /** Omitted when the caller has not loaded the column. `expired` refuses a refresh. */
+    status?: string;
   },
   log: ServiceLogger,
 ): Promise<string> {
+  if (tokenRecord.status === 'expired') {
+    throw new GrantRevokedError('Grant status is expired');
+  }
   if (!tokenExpiresSoon(tokenRecord.expiresAt))
     return decryptToken(tokenRecord.accessTokenEncrypted);
 
@@ -154,13 +197,23 @@ export async function getAccessToken(
     log,
     getFreshValue: () => getFreshIntegrationAccessToken(tokenRecord.id, tokenRecord.orgId),
     refresh: async () => {
-      if (!tokenRecord.refreshTokenEncrypted) {
-        throw new Error('Token expired and no refresh token available');
+      // The caller may still hold the refresh token from before the lock.
+      // The row is the one the previous refresh stored.
+      const fresh = await prisma.integrationToken.findFirst({
+        where: { id: tokenRecord.id, orgId: tokenRecord.orgId, deletedAt: null },
+        select: { refreshTokenEncrypted: true, provider: true, scope: true, status: true },
+      });
+      if (
+        !fresh?.refreshTokenEncrypted ||
+        fresh.status === 'expired' ||
+        fresh.status === 'revoked'
+      ) {
+        throw new GrantRevokedError('Token expired and no refresh token available');
       }
 
-      const refresh = decryptToken(tokenRecord.refreshTokenEncrypted);
+      const refresh = decryptToken(fresh.refreshTokenEncrypted);
       return refreshToken(
-        { id: tokenRecord.id, provider: tokenRecord.provider, scope: tokenRecord.scope ?? [] },
+        { id: tokenRecord.id, provider: fresh.provider, scope: fresh.scope ?? [] },
         refresh,
         log,
       );
