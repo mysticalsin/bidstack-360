@@ -1,7 +1,7 @@
 // WHY: BullMQ retries an old chunk after a newer attempt has started. When
 // those retries run out, the old chunk must not mark the new attempt failed.
 
-import { prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -92,6 +92,40 @@ describe('an exhausted chunk retry', () => {
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(stored.status).toBe('FAILED');
     expect(JSON.stringify(stored.errorSummary)).toContain('current chunk exhausted');
+    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
+
+  t('stores a conflict code and not a promise of another try', async () => {
+    // WHY: the last attempt is over. The error file must not say the import
+    // will be tried again, and it must not contain the database text.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_ex4_${ns}`, name: `ex4 ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'ex4' },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        startedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: CURRENT },
+      },
+    });
+    const err = new Prisma.PrismaClientUnknownRequestError(
+      'PostgresError { code: "40P01", message: "deadlock detected" }',
+      { clientVersion: '5.22.0' },
+    );
+    await failExhaustedMigrationChunk({ migrationJobId: job.id, attemptId: CURRENT }, err, log);
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    const text = JSON.stringify(stored.errorSummary);
+    expect(text).toContain('import_conflict');
+    expect(text).not.toMatch(/will be tried again|40P01|deadlock detected/);
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
   });
 

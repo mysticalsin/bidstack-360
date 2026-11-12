@@ -119,6 +119,11 @@ export function migrationRetryAllowed(processedRows: number, errorRows: number):
   return processedRows === 0 && errorRows === 0;
 }
 
+/** A later page that cannot be queued after rows were saved is not the same as a start that never ran. */
+export function migrationEnqueueFailureCode(processedRows: number, errorRows: number): string {
+  return processedRows + errorRows > 0 ? MIGRATION_ENQUEUE_STOPPED : MIGRATION_ENQUEUE_FAILED;
+}
+
 /** A retry button that would always fail, or that the API would reject, is not offered. */
 export function migrationRetryOffered(
   processedRows: number,

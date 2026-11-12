@@ -34,7 +34,8 @@ import {
   MigrationJobPayload,
   type MigrationJobError,
   MIGRATION_STALE_MS,
-  MIGRATION_ENQUEUE_FAILED,
+  MIGRATION_CONFLICT,
+  migrationEnqueueFailureCode,
   MIGRATION_STALE_REASON,
   migrationAttemptId,
   migrationChunkMatchesAttempt,
@@ -1057,12 +1058,22 @@ export async function processMigrationChunk(
         { jobId: `${payload.migrationJobId}-${payload.entityType}-chunk-${nextOffset}` },
       );
     } catch (err) {
+      const jobNow = await prisma.migrationJob.findUnique({
+        where: { id: payload.migrationJobId },
+        select: { processedRows: true, errorRows: true },
+      });
       await prisma.migrationJob.updateMany({
         where: { id: payload.migrationJobId, status: { in: [...migrationFrom('fail')] } },
         data: {
           status: 'FAILED',
           completedAt: new Date(),
-          errorSummary: [{ row: 0, field: null, message: MIGRATION_ENQUEUE_FAILED }],
+          errorSummary: [
+            {
+              row: 0,
+              field: null,
+              message: migrationEnqueueFailureCode(jobNow?.processedRows ?? 0, jobNow?.errorRows ?? 0),
+            },
+          ],
         },
       });
       throw err;
@@ -1161,7 +1172,7 @@ export async function failExhaustedMigrationChunk(
   if (!migrationJobId) return;
   const attemptId = data.attemptId ?? null;
   const message = isMigrationDeadlock(err)
-    ? MIGRATION_DEADLOCK_PUBLIC
+    ? MIGRATION_CONFLICT
     : `chunk failed permanently: ${err.message}`;
   const payload = JSON.stringify([{ row: 0, field: null, message }]);
   let moved: number;

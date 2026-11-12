@@ -11,6 +11,7 @@ import {
   migrationProgressAt,
   migrationChunkMayRun,
   migrationErrorsCsv,
+  migrationEnqueueFailureCode,
   migrationFailureText,
   migrationFrom,
   migrationRetryAllowed,
@@ -52,6 +53,8 @@ describe('migration transition table', () => {
     expect(migrationRetryOffered(0, 0, ['rows_expired'])).toBe(false);
     expect(migrationRetryOffered(0, 0, ['Import rows expired. Upload the file again.'])).toBe(false);
     expect(migrationRetryOffered(2, 0, ['enqueue_failed'])).toBe(false);
+    expect(migrationEnqueueFailureCode(0, 0)).toBe('enqueue_failed');
+    expect(migrationEnqueueFailureCode(2, 0)).toBe('enqueue_stopped');
     expect(migrationFailureText('enqueue_stopped')).toBe(
       'The import stopped before the remaining rows were saved.',
     );
