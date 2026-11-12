@@ -36,7 +36,7 @@ export const redis = new Redis(redisUrl, {
 let reconnectPromise: Promise<void> | null = null;
 
 export function redisStatusCanRunCommand(status = redis.status): boolean {
-  return status === 'ready' || status === 'connect';
+  return status === 'ready';
 }
 
 export function redisStatusCanReconnect(status = redis.status): boolean {
@@ -86,7 +86,7 @@ export function waitForRedisReady(timeoutMs = 5_000): Promise<boolean> {
  * already reconnecting is left to finish that attempt.
  */
 export function waitForRedisClient(client: Redis, timeoutMs = 5_000): Promise<boolean> {
-  const canRun = (): boolean => client.status === 'ready' || client.status === 'connect';
+  const canRun = (): boolean => redisStatusCanRunCommand(client.status);
   if (canRun()) return Promise.resolve(true);
   return new Promise((resolve) => {
     const onUp = (): void => {
@@ -100,10 +100,8 @@ export function waitForRedisClient(client: Redis, timeoutMs = 5_000): Promise<bo
     const cleanup = (): void => {
       clearTimeout(timer);
       client.off('ready', onUp);
-      client.off('connect', onUp);
     };
     client.once('ready', onUp);
-    client.once('connect', onUp);
     if (client.status === 'wait' || client.status === 'close' || client.status === 'end') {
       const connecting =
         client === redis

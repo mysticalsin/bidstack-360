@@ -66,18 +66,18 @@ function stalledFlag(job: {
   });
 }
 
-/**
- * A start that never queued is not a job. The audit log is insert-only, so the
- * failure is a new row. That row is written first, then the pending job, then
- * the Redis key. A throw before the key is deleted leaves the pending job with
- * its rows. A throw from the key delete cannot leave a pending job.
- */
 const ACTIVE_IMPORT_MESSAGE = 'An import from this source is already running.';
 
 function isActiveImportConflict(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
+/**
+ * A start that never queued is not a job. The audit log is insert-only, so the
+ * failure is a new row. That row is written first, then the pending job, then
+ * the Redis key. A throw before the key is deleted leaves the pending job with
+ * its rows. A throw from the key delete cannot leave a pending job.
+ */
 async function abandonUnqueuedStart(input: {
   jobId: string;
   orgId: string;
@@ -85,6 +85,7 @@ async function abandonUnqueuedStart(input: {
   redisKey: string;
   redis: { del: (key: string) => Promise<unknown> };
   reason: string;
+  log: { warn: (obj: object, msg?: string) => void };
 }): Promise<void> {
   await prisma.auditLog.create({
     data: {
@@ -99,9 +100,14 @@ async function abandonUnqueuedStart(input: {
   const removed = await prisma.migrationJob.deleteMany({
     where: { id: input.jobId, orgId: input.orgId, status: 'PENDING' },
   });
-  // A cancel that already won is not pending, so its key stays.
+  // A cancel that already won is not pending, so its key stays. A throw from
+  // the delete must not replace the 409 the caller is about to return.
   if (removed.count > 0) {
-    await input.redis.del(input.redisKey);
+    try {
+      await input.redis.del(input.redisKey);
+    } catch (err) {
+      input.log.warn({ err, migrationJobId: input.jobId }, 'import row delete failed');
+    }
   }
 }
 
@@ -179,18 +185,50 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   // next start opens another one with the same capped reconnect delay.
   let migrationQueue: Queue | null = null;
   let queueRedis: Redis | null = null;
-  const getQueue = async (): Promise<Queue> => {
-    if (!queueRedis || queueRedis.status === 'end') {
-      queueRedis = server.redis.duplicate({ retryStrategy: redisRetryDelay });
-      migrationQueue = new Queue(MIGRATION.name, {
-        connection: queueRedis as never,
-        defaultJobOptions: MIGRATION.defaultJobOptions as never,
+  let opening: Promise<Queue> | null = null;
+  const getQueue = (): Promise<Queue> => {
+    if (migrationQueue && queueRedis && queueRedis.status !== 'end') {
+      const current = migrationQueue;
+      const connection = queueRedis;
+      return waitForRedisClient(connection, 3_000).then((ready) => {
+        if (!ready) throw new Error('migration queue redis is not ready');
+        return current;
       });
     }
-    if (!(await waitForRedisClient(queueRedis, 3_000))) {
-      throw new Error('migration queue redis is not ready');
-    }
-    return migrationQueue!;
+    if (opening) return opening;
+    let resolveOpen: (queue: Queue) => void = () => undefined;
+    let rejectOpen: (err: unknown) => void = () => undefined;
+    const gate = new Promise<Queue>((resolve, reject) => {
+      resolveOpen = resolve;
+      rejectOpen = reject;
+    });
+    opening = gate;
+    void (async () => {
+      const previousQueue = migrationQueue;
+      const previousRedis = queueRedis;
+      try {
+        if (previousQueue) await previousQueue.close();
+        previousRedis?.disconnect();
+        const nextRedis = server.redis.duplicate({ retryStrategy: redisRetryDelay });
+        const nextQueue = new Queue(MIGRATION.name, {
+          connection: nextRedis as never,
+          defaultJobOptions: MIGRATION.defaultJobOptions as never,
+        });
+        queueRedis = nextRedis;
+        migrationQueue = nextQueue;
+        if (!(await waitForRedisClient(nextRedis, 3_000))) {
+          throw new Error('migration queue redis is not ready');
+        }
+        resolveOpen(nextQueue);
+      } catch (err) {
+        queueRedis = null;
+        migrationQueue = null;
+        rejectOpen(err);
+      } finally {
+        opening = null;
+      }
+    })();
+    return gate;
   };
 
   // ─── List jobs ─────────────────────────────────────────────────────────
@@ -312,6 +350,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             redisKey,
             redis: server.redis,
             reason: 'rows',
+            log: req.log,
           });
           throw server.httpErrors.conflict('The import could not be queued. Try again.');
         }
@@ -347,6 +386,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             redisKey,
             redis: server.redis,
             reason: 'queue',
+            log: req.log,
           });
           throw server.httpErrors.conflict('The import could not be queued. Try again.');
         }

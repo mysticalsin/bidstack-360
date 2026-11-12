@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
 
+import { redisOutagePort } from '../redis-outage.js';
 import { buildServer } from '../server.js';
 import {
   createIsolatedOrg,
@@ -84,19 +85,25 @@ describe('csv start after redis gives up', () => {
     expect(after.json()).toMatchObject({ status: 'RUNNING' });
   });
 
+  const outagePort = redisOutagePort(
+    process.env.REDIS_URL ?? '',
+    process.env.BIDSTACK_REDIS_OUTAGE === '1',
+  );
   const redisTools =
+    outagePort !== null &&
     spawnSync('redis-cli', ['--version']).status === 0 &&
     spawnSync('redis-server', ['--version']).status === 0;
 
-  // A real outage, not only a manual disconnect. CI's Redis is a service
-  // container without redis-server in the job, so this case runs where the
-  // binary can restart the port. The ended-client case above is the 500.
+  // A real outage, not only a manual disconnect. It runs only when
+  // BIDSTACK_REDIS_OUTAGE=1 and REDIS_URL is a loopback redis, so it cannot
+  // shut down a shared server. The ended-client case above is the 500.
   (redisTools ? it : it.skip)(
     'returns 201 after redis has been down for 6 seconds',
     async () => {
       if (!dbReachable) throw new Error('[skip] redis outage — DATABASE_URL not reachable');
+      if (outagePort === null) throw new Error('redis outage target is not a loopback');
       await retireActiveImports(org.orgId);
-      const port = Number(new URL(process.env.REDIS_URL ?? 'redis://127.0.0.1:6380').port || 6379);
+      const port = outagePort;
       const start = (name: string) =>
         server.inject({
           method: 'POST',

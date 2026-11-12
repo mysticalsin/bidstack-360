@@ -85,6 +85,34 @@ describe('migration queue reconnect', () => {
     expect(second.json()).toMatchObject({ status: 'RUNNING' });
   });
 
+  t('a row delete that throws does not turn cleanup into 500', async () => {
+    // WHY: abandon removes the pending job, then deletes the Redis key. A
+    // throw from that delete used to replace the 409 and the client saw 500.
+    // This file has its own server, so the assertion does not spend the
+    // start route's rate limit in the queue file.
+    await retireActiveImports(org.orgId);
+    const del = vi.spyOn(server.redis, 'del').mockRejectedValue(new Error('Connection is closed.'));
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Cleanup' }],
+          mappings: { name: 'company.name' },
+        },
+      });
+      expect(res.statusCode).not.toBe(500);
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({ message: 'The import could not be queued. Try again.' });
+    } finally {
+      del.mockRestore();
+      add.mockRestore();
+    }
+  });
+
   t('a closed queue is closed once and rebuilt once', async () => {
     // WHY: replacing the queue left the old one open, and two starts on an
     // ended connection each built another one.
