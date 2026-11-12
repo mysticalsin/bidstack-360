@@ -246,7 +246,7 @@ describe('migration status races', () => {
           source: 'CSV',
           entityType: 'company',
           rows: [{ name: 'Acme' }],
-          mappings: { name: 'company.name' },
+          mappings: { Name: 'company.name' },
         },
       });
       expect(res.statusCode).toBe(201);
@@ -255,14 +255,14 @@ describe('migration status races', () => {
         where: {
           orgId_source_sourceEntity: { orgId: org.orgId, source: 'CSV', sourceEntity: 'company' },
         },
-        data: { mappings: { name: 'company.domain' } },
+        data: { mappings: { Name: 'company.website' } },
       });
       const retry = await server.inject({
         method: 'POST',
         url: `/api/v1/migrations/${body.id}/retry`,
       });
       expect(retry.statusCode).toBe(200);
-      expect(added[1]?.mappings).toEqual({ name: 'company.name' });
+      expect(added[1]?.mappings).toEqual({ Name: 'company.name' });
     } finally {
       add.mockRestore();
     }
@@ -317,6 +317,73 @@ describe('migration status races', () => {
       expect(undo.statusCode).toBe(200);
       expect(await prisma.company.findUnique({ where: { id: company.id } })).toBeNull();
     } finally {
+      add.mockRestore();
+    }
+  });
+
+  t('a chunk that commits while the next enqueue is waiting can be undone', async () => {
+    // WHY: chunk 0 can land in the CRM before chunk 1's queue add throws.
+    // The job is then failed, so retry refuses it. Undo is the way back.
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    let calls = 0;
+    let rejectNext: (err: Error) => void = () => undefined;
+    const blocked = new Promise<never>((_resolve, reject) => {
+      rejectNext = reject;
+    });
+    let chunk0: { migrationJobId?: string } | null = null;
+    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (_name, data) => {
+      calls += 1;
+      if (calls === 1) {
+        chunk0 = data as { migrationJobId?: string };
+        return { id: 'chunk-0' } as never;
+      }
+      return blocked;
+    });
+    try {
+      const rows = Array.from({ length: 101 }, (_, i) => ({ name: `Co ${i}` }));
+      const pending = server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows,
+          mappings: { name: 'company.name' },
+        },
+      });
+      await vi.waitFor(() => expect(calls).toBe(2));
+      const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
+      await processMigrationChunk(
+        chunk0 as never,
+        {
+          readRows: (key) => redis.get(key),
+          enqueueChunk: async () => undefined,
+          enqueueIntel: async () => undefined,
+          env: { ACCOUNT_INTEL_IMPORT_ENRICH: 'false' },
+        },
+        { info: () => undefined, warn: () => undefined },
+      );
+      const source = `migration:${chunk0?.migrationJobId ?? ''}`;
+      expect(await prisma.company.count({ where: { orgId: org.orgId, source } })).toBeGreaterThan(0);
+      rejectNext(new Error('queue down'));
+      const res = await pending;
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string; status: string }>();
+      expect(body.status).toBe('FAILED');
+      const retry = await server.inject({
+        method: 'POST',
+        url: `/api/v1/migrations/${body.id}/retry`,
+      });
+      expect(retry.statusCode).toBe(409);
+      const undo = await server.inject({
+        method: 'DELETE',
+        url: `/api/v1/migrations/${body.id}/undo`,
+      });
+      expect(undo.statusCode).toBe(200);
+      expect(await prisma.company.count({ where: { orgId: org.orgId, source } })).toBe(0);
+    } finally {
+      rejectNext(new Error('queue down'));
       add.mockRestore();
     }
   });
