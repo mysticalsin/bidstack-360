@@ -89,6 +89,16 @@ jobs:
           --exclude src/queues/queues.test.ts
           --exclude src/queues/sms.test.ts
           --exclude src/queues/tenant-export.contract.test.ts
+          --exclude src/lib/workspace-token.revoke.integration.test.ts
+          --exclude src/queues/migration.attempt.test.ts
+          --exclude src/queues/migration.complete-race.test.ts
+          --exclude src/queues/migration.exhausted.test.ts
+          --exclude src/queues/migration.guard.test.ts
+          --exclude src/queues/migration.hubspot-page.test.ts
+          --exclude src/queues/migration.org-lock.test.ts
+          --exclude src/queues/migration.orphan-rows.test.ts
+          --exclude src/queues/migration.savepoint.test.ts
+          --exclude src/queues/migration.stale.test.ts
 
       # kam-tools.test.ts is fail-loud when Postgres is missing (intentional
       # "do not silently skip"). It belongs in the integration job below.
