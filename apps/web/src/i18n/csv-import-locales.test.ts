@@ -13,6 +13,10 @@ function progress(locale: string): Record<string, string> {
   return doc.csvImport?.progress ?? {};
 }
 
+function placeholders(value: string): string[] {
+  return [...value.matchAll(/\{\{[^}]+\}\}/g)].map((match) => match[0]).sort();
+}
+
 describe('csv import progress copy', () => {
   it('has every progress string in every locale', () => {
     const english = progress('en');
@@ -25,6 +29,7 @@ describe('csv import progress copy', () => {
         expect(block[key], `${locale}.${key}`).toEqual(expect.any(String));
         expect(block[key]!.length, `${locale}.${key}`).toBeGreaterThan(0);
         if (locale !== 'en') expect(block[key], `${locale}.${key}`).not.toBe(english[key]);
+        expect(placeholders(block[key]!), `${locale}.${key}`).toEqual(placeholders(english[key]!));
       }
     }
   });
