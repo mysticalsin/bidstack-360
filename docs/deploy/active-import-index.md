@@ -60,9 +60,9 @@ This is the failed-index recovery above, not a down migration. `20261112170000` 
 
 ## Live database check
 
-`20261112170000_migration_jobs_one_active_per_org_source` on this branch is unapplied SQL that only adds `file_hash`. It is not on `origin/main` or `origin/demo`, and the container image is built from main, so no database migrated from this repo has applied it. Prisma 5.22 does not halt on a checksum mismatch. Do not add a repair migration for an older copy of that file. A later drop would run, `20261112170100` would then fail with `42703` because `file_hash` was never added, and the next deploy is P3009.
+`20261112170000_migration_jobs_one_active_per_org_source` on this branch only adds `file_hash`. It is not on `origin/main` or `origin/demo`, and the container image is built from main. Prisma 5.22 does not halt on a checksum mismatch. Do not add a repair migration for an older copy of that file.
 
-Before anyone treats a live database as already migrated, this read-only check is the gate. Jarvis decides whether to run it. This change does not run it.
+A row in `_prisma_migrations` is not itself a stop. A healthy deploy of the current file records a row. Compare `checksum`. Jarvis decides whether to run this read-only check. This change does not run it.
 
 ```sql
 SELECT migration_name, checksum, finished_at, rolled_back_at
@@ -70,7 +70,10 @@ FROM _prisma_migrations
 WHERE migration_name = '20261112170000_migration_jobs_one_active_per_org_source';
 ```
 
-If that query returns a row, stop. Do not drop an index and do not edit the checksum from this repo.
+- No row, or checksum `d7e69f0c4edfd74990c47dde52dc8797225eb6314abcd415b7f44a227eaf9ee8`: proceed. That is the sha256 of the current `migration.sql`, which only adds `file_hash`.
+- Checksum `b4630ad8e436a1c4b945bf383a781c5864686387c18109fcc54958ee9b829833`: STOP. That database applied the earlier SQL. This head does not repair it. `20261112170100` would fail with `42703` and the next deploy is P3009. It needs Tony's decision and a forward add-column migration before deploy. Do not drop an index and do not edit the checksum from this repo.
+
+Any other checksum is not a proceed.
 
 ## Recovery when deploy already failed with P3018 / 23505
 
