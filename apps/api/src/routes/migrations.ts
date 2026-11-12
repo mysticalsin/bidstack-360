@@ -42,7 +42,6 @@ import {
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
-import { redis } from '../redis.js';
 import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
@@ -176,7 +175,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   const getQueue = () => {
     if (!migrationQueue) {
       migrationQueue = new Queue(MIGRATION.name, {
-        connection: redis.duplicate() as never,
+        connection: server.redis.duplicate() as never,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,
       });
     }
@@ -292,7 +291,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // is an orphan the wizard never shows.
       const redisKey = `migration:${job.id}:${entityType}:rows`;
       try {
-        await redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+        await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
       } catch (err) {
         req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
         await prisma.migrationJob.delete({ where: { id: job.id } });
@@ -458,7 +457,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           });
         } else {
           const redisKey = `migration:${job.id}:${meta.entityType}:rows`;
-          const raw = await redis.get(redisKey);
+          const raw = await server.redis.get(redisKey);
           if (!raw) throw new Error(MIGRATION_ROWS_EXPIRED);
           const rows = JSON.parse(raw) as Record<string, string>[];
           const stored = meta.mappings;

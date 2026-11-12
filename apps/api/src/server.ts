@@ -93,6 +93,10 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();
 
+  // One Redis client for the process. CSV import queues through this decorator
+  // so a request built by buildServer() does not depend on a test assigning it.
+  server.decorate('redis', redis);
+
   if (options.onRoute) server.addHook('onRoute', options.onRoute);
   installAccountActivityAlerts();
 

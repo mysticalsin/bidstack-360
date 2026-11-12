@@ -1,5 +1,12 @@
 import Redis from 'ioredis';
 
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** Process Redis client. Routes that queue work use this, not a second client. */
+    redis: Redis;
+  }
+}
+
 const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6380';
 
 // Bounded auto-reconnect: a transient blip should self-heal without waiting for

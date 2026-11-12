@@ -1,6 +1,5 @@
-// Start and retry read Redis off the server object. Production never sets that
-// property, so both calls 500. Retry claims RUNNING before getQueue(), and the
-// throw sits outside the catch that would mark the job failed.
+// buildServer() decorates server.redis. Start goes through that client and
+// returns 2xx. Retry still claims RUNNING before getQueue().
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -111,8 +110,9 @@ describe('migration queue acquisition', () => {
   });
 
   t('starts a csv import on the process Redis client', async () => {
-    // WHY: the route used server.redis, which only tests assign. A real
-    // request then 500s before any chunk is queued.
+    // WHY: buildServer() has to hand the route the same Redis the process
+    // already connected. A start that cannot see that client returns 500.
+    expect(server.redis).toBeTruthy();
     const res = await server.inject({
       method: 'POST',
       url: '/api/v1/migrations/start-csv',
