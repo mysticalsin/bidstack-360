@@ -87,4 +87,49 @@ describe('same import guard', () => {
     const winnerId = (first.statusCode === 201 ? first : second).json<{ id: string }>().id;
     expect(await prisma.migrationJob.count({ where: { orgId: org.orgId, id: winnerId } })).toBe(1);
   });
+
+  t('two users with different files both start, and the same file does not', async () => {
+    // WHY: the user id is not part of the import. Another person's different
+    // file runs beside the first. Their copy of the same file does not.
+    const users = await prisma.user.findMany({
+      where: { orgId: org.orgId, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      take: 2,
+    });
+    expect(users).toHaveLength(2);
+    const [firstUser, secondUser] = users;
+    if (!firstUser || !secondUser) throw new Error('expected two users');
+    await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId: firstUser.id,
+        source: 'CSV',
+        status: 'PENDING',
+        fileHash: 'a'.repeat(64),
+        totalRows: 1,
+      },
+    });
+    await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId: secondUser.id,
+        source: 'CSV',
+        status: 'PENDING',
+        fileHash: 'b'.repeat(64),
+        totalRows: 1,
+      },
+    });
+    await expect(
+      prisma.migrationJob.create({
+        data: {
+          orgId: org.orgId,
+          userId: secondUser.id,
+          source: 'CSV',
+          status: 'PENDING',
+          fileHash: 'a'.repeat(64),
+          totalRows: 1,
+        },
+      }),
+    ).rejects.toThrow(/Unique constraint/);
+  });
 });

@@ -346,7 +346,7 @@ Smoke flow after green health: log in (Clerk), load dashboard, open an account, 
 ## 10. Rollback (outline — drill REQUIRES ACCESS)
 
 - **App rollback:** redeploy the previous immutable image digest per service (Azure revision pin / Railway redeploy). Stateless apps roll back cleanly.
-- **Schema rollback:** Prisma `migrate deploy` is forward-only. A schema rollback needs a compensating migration or a point-in-time restore — not an automatic down-migration. Validate via a **rollback drill** in staging before relying on it. For `migration_jobs_one_active_per_org_source` (`20261112170000`), follow `docs/deploy/active-import-index.md`: drop that index, then `prisma migrate resolve --rolled-back`.
+- **Schema rollback:** Prisma `migrate deploy` is forward-only. A schema rollback needs a compensating migration or a point-in-time restore — not an automatic down-migration. Validate via a **rollback drill** in staging before relying on it. For `migration_jobs_one_active_per_file` (`20261112170000`), follow `docs/deploy/active-import-index.md`: drop that index, drop `file_hash`, then `prisma migrate resolve --rolled-back`.
 - The ops-readiness gate (§7) requires `rollback.runbookReviewed` + a `rollbackDrillAt` ISO timestamp and a restore drill within RTO/RPO thresholds. Those are real drills against real infra — **REQUIRES ACCESS**, and per the gate matrix are currently FAIL/UNKNOWN (Gate 12 CRITICAL).
 
 ---

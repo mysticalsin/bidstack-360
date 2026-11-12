@@ -2529,16 +2529,17 @@ enum MigrationStatus {
   @@map("migration_status")
 }
 
-/// One active CSV or Salesforce CSV import per tenant. Raw SQL in
-/// 20261112170000_migration_jobs_one_active_per_org_source adds the partial
-/// unique index Prisma cannot express. HubSpot writes one RUNNING row per
-/// entity under one source, so it is not in that index. Keep the index out
-/// of any drop.
+/// One active CSV or Salesforce CSV import per tenant, source, and uploaded
+/// file. Raw SQL in 20261112170000_migration_jobs_one_active_per_org_source
+/// adds file_hash and the partial unique index Prisma cannot express.
+/// HubSpot rows leave file_hash null, so they are not in that index.
 model MigrationJob {
   id            String          @id @default(uuid()) @db.Uuid
   orgId         String          @map("org_id") @db.Uuid
   userId        String          @map("user_id") @db.Uuid
   source        MigrationSource
+  /// sha256 of the uploaded rows. Null when the job is not a CSV file.
+  fileHash      String?         @map("file_hash")
   // Status drives the frontend progress bar.
   status        MigrationStatus @default(PENDING)
   // Totals are filled in at job start once we know the row count.

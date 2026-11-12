@@ -313,10 +313,9 @@ describe('migration queue acquisition', () => {
   });
 
   t('two concurrent starts without a key create one import', async () => {
-    // WHY: a missing Idempotency-Key inserts one migration_job per request
-    // unless the database allows only one active import for that tenant and
-    // source. The second start is refused. A finished import can be followed
-    // by another.
+    // WHY: a missing Idempotency-Key inserts one migration_job per request.
+    // The same uploaded rows are one import, so the second start is refused.
+    // A finished import can be followed by another.
     const payload = {
       source: 'CSV',
       entityType: 'company',
@@ -340,7 +339,7 @@ describe('migration queue acquisition', () => {
     expect(codes).toEqual([201, 409]);
     const refused = first.statusCode === 409 ? first : second;
     expect(refused.json()).toMatchObject({
-      message: 'An import from this source is already running.',
+      message: 'This import is already running.',
     });
     expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(before + 1);
 

@@ -40,6 +40,7 @@ import {
   migrationStaleDue,
 } from '@bidstack/shared';
 
+import { importFileHash } from '../lib/import-file-hash.js';
 import { previewImportRows } from '../lib/import-preview.js';
 import { redisRetryDelay, waitForRedisClient, waitForRedisReady } from '../redis.js';
 import { enqueueHubspotChunk } from '../services/hubspot-import.js';
@@ -66,9 +67,9 @@ function stalledFlag(job: {
   });
 }
 
-const ACTIVE_IMPORT_MESSAGE = 'An import from this source is already running.';
+const ACTIVE_IMPORT_MESSAGE = 'This import is already running.';
 
-const ACTIVE_IMPORT_INDEX = 'migration_jobs_one_active_per_org_source';
+const ACTIVE_IMPORT_INDEX = 'migration_jobs_one_active_per_file';
 
 function constraintNames(value: unknown): string[] {
   if (typeof value === 'string') return [value];
@@ -82,10 +83,15 @@ export function isActiveImportConflict(err: unknown): boolean {
   const names = [...constraintNames(meta?.target), ...constraintNames(meta?.constraint)];
   if (names.includes(ACTIVE_IMPORT_INDEX)) return true;
   // Prisma names the index columns when the index is not in the schema.
-  // This partial index is the only unique constraint on exactly that pair.
-  if (names.length !== 2) return false;
+  // Same import is org, source, and the uploaded file hash. A pair of org
+  // and source is a different file and is not this conflict.
+  if (names.length !== 3) return false;
   const columns = new Set(names);
-  return (columns.has('org_id') || columns.has('orgId')) && columns.has('source');
+  return (
+    (columns.has('org_id') || columns.has('orgId')) &&
+    columns.has('source') &&
+    (columns.has('file_hash') || columns.has('fileHash'))
+  );
 }
 
 /**
@@ -336,6 +342,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             source,
             status: 'PENDING',
             totalRows: rows.length,
+            fileHash: importFileHash(rows),
             meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings },
           },
         });

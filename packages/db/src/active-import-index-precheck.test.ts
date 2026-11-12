@@ -31,6 +31,6 @@ describe('active import index precheck', () => {
 
     expect(wherePredicate(precheck)).toBe(wherePredicate(migration));
     expect(precheck.toLowerCase()).toContain('group by org_id, source');
-    expect(migration).toContain('("org_id", "source")');
+    expect(migration).toContain('("org_id", "source", "file_hash")');
   });
 });
