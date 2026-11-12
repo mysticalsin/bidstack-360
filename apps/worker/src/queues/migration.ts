@@ -846,10 +846,14 @@ export async function processMigrationChunk(
   // Respect cancellation between chunks.
   const jobRow = await prisma.migrationJob.findUnique({
     where: { id: payload.migrationJobId },
-    select: { status: true, meta: true },
+    select: { status: true, meta: true, orgId: true },
   });
   if (!jobRow || !migrationChunkMayRun(jobRow.status)) {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
+    return;
+  }
+  if (jobRow.orgId !== payload.orgId) {
+    log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — org mismatch');
     return;
   }
   if (!migrationChunkMatchesAttempt(migrationAttemptId(jobRow.meta), payload.attemptId ?? null)) {

@@ -87,6 +87,7 @@ describe('a chunk uses the org on the locked job', () => {
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(stored.status).toBe('RUNNING');
     expect(stored.processedRows).toBe(0);
+    expect((stored.meta as { progressAt?: string }).progressAt).toBeUndefined();
     await prisma.org.delete({ where: { id: owner.org.id } }).catch(() => undefined);
     await prisma.org.delete({ where: { id: other.org.id } }).catch(() => undefined);
   });
