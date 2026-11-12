@@ -64,6 +64,23 @@ function stalledFlag(job: {
   });
 }
 
+/** A start that never queued is not a job. Drop the row, its Redis payload, and the start audit. */
+async function abandonUnqueuedStart(input: {
+  jobId: string;
+  orgId: string;
+  redisKey: string;
+  redis: { del: (key: string) => Promise<unknown> };
+}): Promise<void> {
+  // redis.set can be the thing that failed. A second error here must not keep the row.
+  await input.redis.del(input.redisKey).catch(() => undefined);
+  await prisma.auditLog.deleteMany({
+    where: { orgId: input.orgId, targetId: input.jobId, action: 'migration.start' },
+  });
+  await prisma.migrationJob.deleteMany({
+    where: { id: input.jobId, orgId: input.orgId, status: 'PENDING' },
+  });
+}
+
 async function enqueueCsvChunks(input: {
   jobId: string;
   orgId: string;
@@ -246,21 +263,19 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       });
 
       // Store rows in Redis with 1h TTL so the worker can read them in chunks.
-      // A failure here is still PENDING. Delete the row: a 500 that leaves it
-      // is an orphan the wizard never shows.
+      // A failure here must not leave the row, its start audit, or the key.
       const redisKey = `migration:${job.id}:${entityType}:rows`;
       try {
         await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
       } catch (err) {
         req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
-        await prisma.migrationJob.delete({ where: { id: job.id } });
+        await abandonUnqueuedStart({ jobId: job.id, orgId, redisKey, redis: server.redis });
         throw err;
       }
 
       // Enqueue while the row is still PENDING. A queue that cannot be opened
-      // leaves that status and tells the caller. The RUNNING claim is the
-      // write that follows a successful enqueue, so a cancel in between is not
-      // overwritten by a later by-id update.
+      // removes that row. The RUNNING claim is the write that follows a
+      // successful enqueue, so a cancel in between is not overwritten.
       const attemptId = randomUUID();
       try {
         const queue = getQueue();
@@ -282,6 +297,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         });
       } catch (err) {
         req.log.error({ err, migrationJobId: job.id }, 'failed to enqueue import chunks');
+        await abandonUnqueuedStart({ jobId: job.id, orgId, redisKey, redis: server.redis });
         throw server.httpErrors.conflict('The import could not be queued. Try again.');
       }
 

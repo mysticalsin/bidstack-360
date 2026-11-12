@@ -46,42 +46,40 @@ const t = (name: string, fn: () => Promise<void>) =>
     await fn();
   });
 
-async function newestJob() {
-  return prisma.migrationJob.findFirstOrThrow({
+async function failedCsvJob(options?: { undoableUntil?: Date }) {
+  const user = await prisma.user.findFirstOrThrow({
     where: { orgId: org.orgId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
   });
+  const job = await prisma.migrationJob.create({
+    data: {
+      orgId: org.orgId,
+      userId: user.id,
+      source: 'CSV',
+      status: 'FAILED',
+      totalRows: 1,
+      completedAt: new Date(),
+      undoableUntil: options?.undoableUntil,
+      meta: { entityType: 'company', mappings: { name: 'company.name' }, dedupStrategy: 'update' },
+    },
+  });
+  await server.redis.set(
+    `migration:${job.id}:company:rows`,
+    JSON.stringify([{ name: 'Acme' }]),
+    'EX',
+    3600,
+  );
+  return job;
 }
 
 describe('migration residual failures', () => {
   t('a retry after undo does not stay marked undone', async () => {
     // WHY: undo of a job that saved nothing sets meta.undone. Retry copies
     // that meta, so the new attempt still looks undone after it imports.
-    const { redis } = await import('../redis.js');
-    (server as unknown as { redis: typeof redis }).redis = redis;
-    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValueOnce(new Error('queue down'));
+    const created = await failedCsvJob({ undoableUntil: new Date(Date.now() + 60 * 60 * 1000) });
+    const add = vi.spyOn(Queue.prototype, 'add').mockResolvedValue({ id: 'chunk' } as never);
     try {
-      const res = await server.inject({
-        method: 'POST',
-        url: '/api/v1/migrations/start-csv',
-        payload: {
-          source: 'CSV',
-          entityType: 'company',
-          rows: [{ name: 'Acme' }],
-          mappings: { name: 'company.name' },
-        },
-      });
-      expect(res.statusCode).toBe(409);
-      const created = await newestJob();
-      expect(created.status).toBe('PENDING');
-      await prisma.migrationJob.update({
-        where: { id: created.id },
-        data: {
-          status: 'FAILED',
-          completedAt: new Date(),
-          undoableUntil: new Date(Date.now() + 60 * 60 * 1000),
-        },
-      });
       const undo = await server.inject({
         method: 'DELETE',
         url: `/api/v1/migrations/${created.id}/undo`,
@@ -104,24 +102,14 @@ describe('migration residual failures', () => {
     }
   });
 
-  t('a partial enqueue keeps the row error and the pending job', async () => {
-    // WHY: a later chunk that cannot be queued must not replace the row error
-    // or mark the job failed. The start never claimed it.
-    const { redis } = await import('../redis.js');
-    (server as unknown as { redis: typeof redis }).redis = redis;
+  t('a partial enqueue does not leave the pending job', async () => {
+    // WHY: a later chunk that cannot be queued used to leave a PENDING job
+    // the response never named. The start removes it and its stored rows.
+    let jobId = '';
     const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (name, data) => {
       const payload = data as { migrationJobId?: string; chunkOffset?: number };
-      if ((payload.chunkOffset ?? 0) > 0 && payload.migrationJobId) {
-        await prisma.migrationJob.update({
-          where: { id: payload.migrationJobId },
-          data: {
-            processedRows: 1,
-            errorRows: 1,
-            errorSummary: [{ row: 5, field: 'company.name', message: 'company.name is required' }],
-          },
-        });
-        throw new Error('queue down');
-      }
+      if (payload.migrationJobId) jobId = payload.migrationJobId;
+      if ((payload.chunkOffset ?? 0) > 0) throw new Error('queue down');
       return { id: String(name) } as never;
     });
     try {
@@ -137,15 +125,13 @@ describe('migration residual failures', () => {
         },
       });
       expect(res.statusCode).toBe(409);
-      const created = await newestJob();
-      expect(created.status).toBe('PENDING');
-      const csv = await server.inject({
-        method: 'GET',
-        url: `/api/v1/migrations/${created.id}/errors.csv`,
-      });
-      expect(csv.statusCode).toBe(200);
-      expect(csv.body).toContain('company.name is required');
-      expect(csv.body).not.toContain('The import did not start');
+      expect(await prisma.migrationJob.findUnique({ where: { id: jobId } })).toBeNull();
+      expect(await server.redis.get(`migration:${jobId}:company:rows`)).toBeNull();
+      expect(
+        await prisma.auditLog.count({
+          where: { orgId: org.orgId, targetId: jobId, action: 'migration.start' },
+        }),
+      ).toBe(0);
     } finally {
       add.mockRestore();
     }

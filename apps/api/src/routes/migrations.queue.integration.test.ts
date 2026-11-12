@@ -2,6 +2,7 @@
 // returns 2xx. Retry enqueues before the RUNNING claim, so a queue that
 // cannot be opened leaves the job failed and returns a clear error.
 
+import { Queue } from 'bullmq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
@@ -100,6 +101,9 @@ describe('migration queue acquisition', () => {
     const before = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
+    const audits = await prisma.auditLog.count({
+      where: { orgId: org.orgId, action: 'migration.start' },
+    });
     try {
       const res = await server.inject({
         method: 'POST',
@@ -119,6 +123,52 @@ describe('migration queue acquisition', () => {
       where: { orgId: org.orgId, status: 'PENDING' },
     });
     expect(pending).toBe(before);
+    // The start audit names a job that no longer exists.
+    expect(
+      await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start' } }),
+    ).toBe(audits);
+  });
+
+  t('repeated starts that cannot be queued leave no pending job', async () => {
+    // WHY: each click created a PENDING job, stored its rows, and wrote an
+    // audit, then returned 409 with no id. The next click added another.
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const beforeJobs = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
+    const beforePending = await prisma.migrationJob.count({
+      where: { orgId: org.orgId, status: 'PENDING' },
+    });
+    const beforeAudits = await prisma.auditLog.count({
+      where: { orgId: org.orgId, action: 'migration.start' },
+    });
+    const beforeKeys = (await server.redis.keys('migration:*')).sort();
+    try {
+      for (const name of ['Acme', 'Beta']) {
+        const res = await server.inject({
+          method: 'POST',
+          url: '/api/v1/migrations/start-csv',
+          payload: {
+            source: 'CSV',
+            entityType: 'company',
+            rows: [{ name }],
+            mappings: { name: 'company.name' },
+          },
+        });
+        expect(res.statusCode).toBe(409);
+        expect(res.json()).toMatchObject({
+          message: 'The import could not be queued. Try again.',
+        });
+      }
+    } finally {
+      add.mockRestore();
+    }
+    expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(beforeJobs);
+    expect(
+      await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
+    ).toBe(beforePending);
+    expect(
+      await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start' } }),
+    ).toBe(beforeAudits);
+    expect((await server.redis.keys('migration:*')).sort()).toEqual(beforeKeys);
   });
 
   t('starts a csv import on the process Redis client', async () => {
