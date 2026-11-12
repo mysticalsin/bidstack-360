@@ -4,11 +4,11 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The unit job is the required CI gate. A Vite build that lives only on the
- * e2e job does not run for a branch push, so a node built-in in the shared
- * root can blank every route without failing CI.
+ * The unit job is the required CI gate. It must run the same script the
+ * writer harness runs: the full workspace build, then the web vite build.
  */
 const ci = readFileSync(resolve(process.cwd(), '../../.github/workflows/ci.yml'), 'utf8');
+const gates = readFileSync(resolve(process.cwd(), '../../scripts/freeze-gates.sh'), 'utf8');
 
 function unitJob(): string {
   const start = ci.indexOf('  unit:');
@@ -16,8 +16,10 @@ function unitJob(): string {
   return ci.slice(start, end);
 }
 
-describe('CI web build gate', () => {
-  it('runs the web vite build in the unit job', () => {
-    expect(unitJob()).toContain('pnpm --filter @bidstack/web build');
+describe('CI build gates', () => {
+  it('runs the workspace build and the web vite build from the unit job', () => {
+    expect(unitJob()).toContain('bash scripts/freeze-gates.sh');
+    expect(gates).toContain('pnpm -r build');
+    expect(gates).toContain('pnpm --filter @bidstack/web build');
   });
 });
