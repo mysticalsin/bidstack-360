@@ -1,6 +1,6 @@
 // WHY: a chunk for an unsupported entity failed the job by id, so a cancel
-// that landed after the status read was overwritten. A chunk also kept going
-// while the job was still pending or already complete.
+// that landed after the status read was overwritten. A chunk that arrives
+// before the RUNNING claim must be retried, and a finished job is left alone.
 
 import { prisma } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
@@ -87,34 +87,51 @@ describe('migration chunk guards', () => {
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
   });
 
-  t('a chunk does not import while the job is pending or complete', async () => {
-    for (const status of ['PENDING', 'COMPLETE'] as const) {
-      const { org, job } = await fixture(status);
-      let reads = 0;
-      await processMigrationChunk(
-        {
-          migrationJobId: job.id,
-          orgId: org.id,
-          userId: job.userId,
-          source: 'CSV',
-          entityType: 'companies',
-          chunkOffset: 0,
-          chunkSize: 100,
-          totalRows: 1,
-          redisKey: 'rows',
-          mappings: { Name: 'company.name' },
-          dedupStrategy: 'skip',
-        },
+  t('a chunk waits while the job is still pending and skips a finished job', async () => {
+    const pending = await fixture('PENDING');
+    let reads = 0;
+    const payload = {
+      migrationJobId: pending.job.id,
+      orgId: pending.org.id,
+      userId: pending.job.userId,
+      source: 'CSV' as const,
+      entityType: 'companies',
+      chunkOffset: 0,
+      chunkSize: 100,
+      totalRows: 1,
+      redisKey: 'rows',
+      mappings: { Name: 'company.name' },
+      dedupStrategy: 'skip' as const,
+    };
+    // Start and retry enqueue before the RUNNING claim. Completing this chunk
+    // would drop the rows, so the worker throws and BullMQ retries.
+    await expect(
+      processMigrationChunk(
+        payload,
         deps(async () => {
           reads += 1;
           return JSON.stringify([{ Name: 'Acme' }]);
         }),
         log,
-      );
-      expect(reads).toBe(0);
-      const stored = await prisma.migrationJob.findUnique({ where: { id: job.id } });
-      expect(stored?.status).toBe(status);
-      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
-    }
+      ),
+    ).rejects.toThrow(/not running yet/);
+    expect(reads).toBe(0);
+    const stillPending = await prisma.migrationJob.findUnique({ where: { id: pending.job.id } });
+    expect(stillPending?.status).toBe('PENDING');
+    await prisma.org.delete({ where: { id: pending.org.id } }).catch(() => undefined);
+
+    const done = await fixture('COMPLETE');
+    await processMigrationChunk(
+      { ...payload, migrationJobId: done.job.id, orgId: done.org.id, userId: done.job.userId },
+      deps(async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      }),
+      log,
+    );
+    expect(reads).toBe(0);
+    const stored = await prisma.migrationJob.findUnique({ where: { id: done.job.id } });
+    expect(stored?.status).toBe('COMPLETE');
+    await prisma.org.delete({ where: { id: done.org.id } }).catch(() => undefined);
   });
 });

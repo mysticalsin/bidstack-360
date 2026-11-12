@@ -1,5 +1,6 @@
 // buildServer() decorates server.redis. Start goes through that client and
-// returns 2xx. Retry still claims RUNNING before getQueue().
+// returns 2xx. Retry enqueues before the RUNNING claim, so a queue that
+// cannot be opened leaves the job failed and returns a clear error.
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -46,9 +47,10 @@ const t = (name: string, fn: () => Promise<void>) =>
   });
 
 describe('migration queue acquisition', () => {
-  t('a retry whose queue cannot be opened does not stay running', async () => {
-    // WHY: getQueue() runs after the RUNNING claim and outside the catch, so a
-    // throw on duplicate leaves the job running and the HTTP call 500s.
+  t('a retry whose queue cannot be opened keeps the failed job and says so', async () => {
+    // WHY: the handler marked the job RUNNING and then getQueue() threw, so
+    // the row was stranded running. Enqueue has to happen first. A throw
+    // leaves the prior status and returns the reason.
     const user = await prisma.user.findFirstOrThrow({
       where: { orgId: org.orgId, deletedAt: null },
       orderBy: { createdAt: 'asc' },
@@ -63,6 +65,13 @@ describe('migration queue acquisition', () => {
         meta: { entityType: 'company', mappings: { name: 'company.name' }, dedupStrategy: 'update' },
       },
     });
+    const statuses: string[] = [];
+    const original = prisma.migrationJob.updateMany.bind(prisma.migrationJob);
+    const updateMany = vi.spyOn(prisma.migrationJob, 'updateMany').mockImplementation((args) => {
+      const status = (args.data as { status?: string } | undefined)?.status;
+      if (status) statuses.push(status);
+      return original(args);
+    });
     const { redis } = await import('../redis.js');
     const duplicate = vi.spyOn(redis, 'duplicate').mockImplementation(() => {
       throw new Error('duplicate down');
@@ -72,11 +81,14 @@ describe('migration queue acquisition', () => {
         method: 'POST',
         url: `/api/v1/migrations/${job.id}/retry`,
       });
-      expect(res.statusCode).toBe(200);
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({ message: 'The import could not be queued. Try again.' });
       const again = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
       expect(again.status).toBe('FAILED');
+      expect(statuses).not.toContain('RUNNING');
     } finally {
       duplicate.mockRestore();
+      updateMany.mockRestore();
     }
   });
 
