@@ -70,7 +70,7 @@ describe('HubSpot import enqueue', () => {
       select: { status: true, errorSummary: true },
     });
     expect(job?.status).toBe('FAILED');
-    expect(JSON.stringify(job?.errorSummary)).toContain('Failed to enqueue import chunks');
+    expect(JSON.stringify(job?.errorSummary)).toContain('enqueue_failed');
     await prisma.org.delete({ where: { id: org.id } });
   });
 });

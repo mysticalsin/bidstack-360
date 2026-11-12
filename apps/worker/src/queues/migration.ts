@@ -34,6 +34,7 @@ import {
   MigrationJobPayload,
   type MigrationJobError,
   MIGRATION_STALE_MS,
+  MIGRATION_ENQUEUE_FAILED,
   MIGRATION_STALE_REASON,
   migrationAttemptId,
   migrationChunkMatchesAttempt,
@@ -1036,7 +1037,7 @@ export async function processMigrationChunk(
         data: {
           status: 'FAILED',
           completedAt: new Date(),
-          errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+          errorSummary: [{ row: 0, field: null, message: MIGRATION_ENQUEUE_FAILED }],
         },
       });
       throw err;

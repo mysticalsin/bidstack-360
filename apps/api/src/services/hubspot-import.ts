@@ -14,6 +14,7 @@ import {
   HUBSPOT_CONTACT_DEFAULTS,
   HUBSPOT_DEAL_DEFAULTS,
   MigrationJobPayload,
+  MIGRATION_ENQUEUE_FAILED,
   migrationFrom,
 } from '@bidstack/shared';
 
@@ -193,7 +194,7 @@ export async function startHubspotImport(input: {
         data: {
           status: 'FAILED',
           completedAt: new Date(),
-          errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+          errorSummary: [{ row: 0, field: null, message: MIGRATION_ENQUEUE_FAILED }],
         },
       });
     }

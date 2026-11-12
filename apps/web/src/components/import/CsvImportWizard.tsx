@@ -1,5 +1,11 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  MIGRATION_ENQUEUE_FAILED,
+  MIGRATION_ROWS_EXPIRED,
+  MIGRATION_STALE_REASON,
+  migrationRetryAllowed,
+} from '@bidstack/shared';
 
 import { Icon } from '@/components/ui/Icon';
 import { parseCsv, type ParsedCsv } from '@/lib/csv-parse';
@@ -26,9 +32,15 @@ type Dedup = 'skip' | 'update' | 'duplicate';
 const MAX_ROWS = 10_000;
 
 const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
-  stale: ['csvImport.progress.reasonStalled', 'The import stalled before any rows were saved.'],
-  'Failed to enqueue import chunks': ['csvImport.progress.reasonEnqueue', 'The import did not start. Try again.'],
-  'Import rows expired. Upload the file again.': [
+  [MIGRATION_STALE_REASON]: [
+    'csvImport.progress.reasonStalled',
+    'The import stalled before any rows were saved.',
+  ],
+  [MIGRATION_ENQUEUE_FAILED]: [
+    'csvImport.progress.reasonEnqueue',
+    'The import did not start. Try again.',
+  ],
+  [MIGRATION_ROWS_EXPIRED]: [
     'csvImport.progress.reasonRowsExpired',
     'Those rows expired. Upload the file again.',
   ],
@@ -530,7 +542,7 @@ function ImportProgress({
         </button>
       )}
 
-      {job.status === 'FAILED' && job.processedRows === 0 && job.errorRows === 0 ? (
+      {job.status === 'FAILED' && migrationRetryAllowed(job.processedRows, job.errorRows) ? (
         <button type="button" className="btn btn-primary" disabled={retryPending} onClick={onRetry}>
           {retryPending
             ? t('csvImport.progress.retrying', 'Retrying…')

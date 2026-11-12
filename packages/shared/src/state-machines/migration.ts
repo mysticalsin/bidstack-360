@@ -12,6 +12,23 @@ export const MIGRATION_STALE_MS = 15 * 60_000;
 /** Stored on the job when the worker applies the stale transition. */
 export const MIGRATION_STALE_REASON = 'stale';
 
+/** Stored on the job when the chunks could not be queued. The wizard keys on this, not on English. */
+export const MIGRATION_ENQUEUE_FAILED = 'enqueue_failed';
+
+/** Stored on the job when the uploaded rows are gone from Redis. */
+export const MIGRATION_ROWS_EXPIRED = 'rows_expired';
+
+const MIGRATION_FAILURE_TEXT: Record<string, string> = {
+  [MIGRATION_STALE_REASON]: 'The import stalled before any rows were saved.',
+  [MIGRATION_ENQUEUE_FAILED]: 'The import did not start. Try again.',
+  [MIGRATION_ROWS_EXPIRED]: 'Those rows expired. Upload the file again.',
+};
+
+/** The sentence a downloaded error CSV shows for a stored failure code. Other messages pass through. */
+export function migrationFailureText(message: string): string {
+  return MIGRATION_FAILURE_TEXT[message] ?? message;
+}
+
 const FROM: Record<MigrationEvent, readonly MigrationState[]> = {
   start: ['PENDING'],
   cancel: ['PENDING', 'RUNNING'],

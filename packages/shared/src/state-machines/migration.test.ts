@@ -10,6 +10,7 @@ import {
   migrationChunkMatchesAttempt,
   migrationProgressAt,
   migrationChunkMayRun,
+  migrationFailureText,
   migrationFrom,
   migrationRetryAllowed,
   migrationStaleDue,
@@ -32,6 +33,12 @@ const LEGAL: Array<[MigrationState, MigrationEvent, MigrationState]> = [
 ];
 
 describe('migration transition table', () => {
+  it('turns a stored failure code into the sentence the error file shows', () => {
+    expect(migrationFailureText('enqueue_failed')).toBe('The import did not start. Try again.');
+    expect(migrationFailureText('rows_expired')).toBe('Those rows expired. Upload the file again.');
+    expect(migrationFailureText('company.name is required')).toBe('company.name is required');
+  });
+
   it('takes the status a chunk may write from the fail transition', () => {
     expect(migrationActiveStatus()).toBe(migrationFrom('fail')[0]);
   });

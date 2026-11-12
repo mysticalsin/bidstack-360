@@ -33,6 +33,9 @@ import {
   migrationAttemptId,
   migrationFrom,
   migrationProgressAt,
+  MIGRATION_ENQUEUE_FAILED,
+  MIGRATION_ROWS_EXPIRED,
+  migrationFailureText,
   migrationRetryAllowed,
   migrationStaleDue,
 } from '@bidstack/shared';
@@ -41,7 +44,7 @@ import { previewImportRows } from '../lib/import-preview.js';
 import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
-const ENQUEUE_FAILURE = 'Failed to enqueue import chunks';
+const ENQUEUE_FAILURE = MIGRATION_ENQUEUE_FAILED;
 const CHUNK_SIZE = 100;
 
 /** Empty on purpose. Retry takes the id from the path and no fields. */
@@ -435,7 +438,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             server as unknown as { redis: { get: (key: string) => Promise<string | null> } }
           ).redis;
           const raw = await redisConn.get(redisKey);
-          if (!raw) throw new Error('import rows expired');
+          if (!raw) throw new Error(MIGRATION_ROWS_EXPIRED);
           const rows = JSON.parse(raw) as Record<string, string>[];
           const mapping = await prisma.migrationMapping.findUnique({
             where: {
@@ -467,8 +470,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       } catch (err) {
         const message =
-          err instanceof Error && err.message === 'import rows expired'
-            ? 'Import rows expired. Upload the file again.'
+          err instanceof Error && err.message === MIGRATION_ROWS_EXPIRED
+            ? MIGRATION_ROWS_EXPIRED
             : ENQUEUE_FAILURE;
         req.log.error({ err, migrationJobId: job.id }, 'failed to retry import');
         await markMigrationEnqueueFailed(job.id, orgId, req.log, message);
@@ -772,7 +775,10 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const header = 'row,field,message\n';
       const rows = errors
-        .map((e) => `${e.row},${JSON.stringify(e.field ?? '')},${JSON.stringify(e.message)}`)
+        .map(
+          (e) =>
+            `${e.row},${JSON.stringify(e.field ?? '')},${JSON.stringify(migrationFailureText(e.message))}`,
+        )
         .join('\n');
 
       return reply

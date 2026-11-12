@@ -243,10 +243,10 @@ describe('CsvImportWizard', () => {
       totalRows: 1,
       processedRows: 0,
       errorRows: 0,
-      errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+      errorSummary: [{ row: 0, field: null, message: 'enqueue_failed' }],
     });
     await waitFor(() => expect(screen.getByText('The import did not start. Try again.')).toBeTruthy());
-    expect(screen.queryByText('Failed to enqueue import chunks')).toBeNull();
+    expect(screen.queryByText('enqueue_failed')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry import' }));
     expect(hookMocks.retryMutate).toHaveBeenCalledWith('job-1');
     expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
