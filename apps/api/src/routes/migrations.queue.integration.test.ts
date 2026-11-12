@@ -146,7 +146,7 @@ describe('migration queue acquisition', () => {
     await expect(prisma.auditLog.deleteMany({ where: { orgId: org.orgId } })).rejects.toThrow(
       /insert-only/,
     );
-    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
     const beforeJobs = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
     const beforePending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
@@ -195,7 +195,7 @@ describe('migration queue acquisition', () => {
     // WHY: the failure row is written first. If that insert throws, deleting
     // the Redis key would leave a PENDING job whose rows are already gone.
     const create = vi.spyOn(prisma.auditLog, 'create').mockRejectedValue(new Error('audit down'));
-    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
     const beforePending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
@@ -230,7 +230,7 @@ describe('migration queue acquisition', () => {
       if (where?.status === 'PENDING' && where.id) throw new Error('job delete down');
       return original(args);
     });
-    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
     const beforePending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
@@ -263,21 +263,14 @@ describe('migration queue acquisition', () => {
     expect((await server.redis.keys('migration:*')).length).toBe(beforeKeys.length + 1);
   });
 
-  t('a later chunk that fails to queue removes the chunks already accepted', async () => {
-    // WHY: chunk 0 is already in BullMQ when chunk 1 throws. Deleting the
-    // job row leaves that chunk to run against a job that no longer exists.
+  t('a multi-chunk start queues every chunk in one bulk add', async () => {
+    // WHY: a live worker locks a chunk about 1ms after queue.add returns.
+    // Removing the earlier chunks then fails, and those jobs stay in Redis.
+    // One addBulk is a single pipeline, so a later chunk is not added after
+    // an earlier one has already been taken.
     const rows = Array.from({ length: 101 }, (_, index) => ({ name: `Acme ${index}` }));
-    let added = 0;
-    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async () => {
-      added += 1;
-      if (added > 1) throw new Error('queue down');
-      return { id: 'chunk-0' } as never;
-    });
-    const removed: string[] = [];
-    const remove = vi.spyOn(Queue.prototype, 'remove').mockImplementation(async (id: string) => {
-      removed.push(id);
-      return 1;
-    });
+    const add = vi.spyOn(Queue.prototype, 'add');
+    const addBulk = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
     const beforePending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
@@ -293,12 +286,17 @@ describe('migration queue acquisition', () => {
         },
       });
       expect(res.statusCode).toBe(409);
-      expect(added).toBe(2);
-      expect(removed).toHaveLength(1);
-      expect(removed[0]).toMatch(/-company-chunk-0$/);
+      expect(add).not.toHaveBeenCalled();
+      expect(addBulk).toHaveBeenCalledTimes(1);
+      const bulk = addBulk.mock.calls[0]?.[0] as Array<{ opts?: { jobId?: string } }>;
+      expect(bulk).toHaveLength(2);
+      expect(bulk.map((job) => job.opts?.jobId)).toEqual([
+        expect.stringMatching(/-company-chunk-0$/),
+        expect.stringMatching(/-company-chunk-1$/),
+      ]);
     } finally {
       add.mockRestore();
-      remove.mockRestore();
+      addBulk.mockRestore();
     }
     expect(
       await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),

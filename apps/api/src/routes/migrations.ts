@@ -114,6 +114,7 @@ async function enqueueCsvChunks(input: {
   idFor: (index: number) => string;
 }): Promise<void> {
   const chunks = Math.ceil(input.rows.length / CHUNK_SIZE);
+  const jobs: Array<{ name: string; data: MigrationJobPayload; opts: { jobId: string } }> = [];
   for (let i = 0; i < chunks; i++) {
     const payload: MigrationJobPayload = {
       migrationJobId: input.jobId,
@@ -130,16 +131,11 @@ async function enqueueCsvChunks(input: {
       externalIdColumn: input.externalIdColumn,
       attemptId: input.attemptId,
     };
-    const jobId = input.idFor(i);
-    try {
-      await input.queue.add(input.nameFor(i), payload, { jobId });
-    } catch (err) {
-      for (let prior = 0; prior < i; prior += 1) {
-        await input.queue.remove(input.idFor(prior)).catch(() => undefined);
-      }
-      throw err;
-    }
+    jobs.push({ name: input.nameFor(i), data: payload, opts: { jobId: input.idFor(i) } });
   }
+  // One pipeline. A per-chunk add lets a live worker lock chunk 0 before
+  // chunk 1 is sent, and remove then fails because the job is locked.
+  await input.queue.addBulk(jobs);
 }
 
 const ImportPreviewResponse = z.object({
