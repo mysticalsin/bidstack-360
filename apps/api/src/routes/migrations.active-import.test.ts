@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { isActiveImportConflict } from './migrations.js';
 
-const INDEX = 'migration_jobs_one_active_per_org_source';
+const INDEX = 'migration_jobs_one_active_per_file';
 
 function unique(target: string | string[]): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -18,8 +18,10 @@ describe('active import conflict', () => {
     // WHY: any P2002 was treated as "an import is already running", including
     // a mapping upsert that collided on a different constraint.
     expect(isActiveImportConflict(unique(INDEX))).toBe(true);
-    expect(isActiveImportConflict(unique(['org_id', 'source']))).toBe(true);
-    expect(isActiveImportConflict(unique(['orgId', 'source']))).toBe(true);
+    expect(isActiveImportConflict(unique(['org_id', 'source', 'file_hash']))).toBe(true);
+    expect(isActiveImportConflict(unique(['orgId', 'source', 'fileHash']))).toBe(true);
+    // A pair of org and source is a different file. That start is not this conflict.
+    expect(isActiveImportConflict(unique(['org_id', 'source']))).toBe(false);
     expect(isActiveImportConflict(unique(['org_id', 'source', 'source_entity']))).toBe(false);
     expect(isActiveImportConflict(unique('migration_mappings_org_source_entity_key'))).toBe(false);
     expect(isActiveImportConflict(new Error('P2002'))).toBe(false);
