@@ -169,6 +169,20 @@ interface WriteCtx {
   orgId: string;
   sourceTag: string;
   dedupStrategy: 'skip' | 'update' | 'duplicate';
+  tx: Prisma.TransactionClient;
+}
+
+/** A failed statement aborts the chunk transaction. A savepoint lets one row fail. */
+async function withSavepoint<T>(tx: Prisma.TransactionClient, name: string, fn: () => Promise<T>): Promise<T> {
+  await tx.$executeRawUnsafe(`SAVEPOINT ${name}`);
+  try {
+    const result = await fn();
+    await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${name}`);
+    return result;
+  } catch (err) {
+    await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${name}`);
+    throw err;
+  }
 }
 
 async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<string | null> {
@@ -183,21 +197,20 @@ async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     countryCode: asTrimmed(t['company.countryCode'])?.slice(0, 2).toUpperCase() ?? null,
   };
   if (ctx.dedupStrategy !== 'duplicate') {
-    const existing = await prisma.company.findFirst({
+    const existing = await ctx.tx.company.findFirst({
       where: { orgId: ctx.orgId, name: { equals: name, mode: 'insensitive' }, deletedAt: null },
       select: { id: true },
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.company.update({ where: { id: existing.id }, data });
+      await ctx.tx.company.update({ where: { id: existing.id }, data });
       return null; // updated, not created — undo must not delete pre-existing rows
     }
   }
-  const created = await prisma.company.create({
+  const created = await ctx.tx.company.create({
     data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag, confidence: 1 },
     select: { id: true },
   });
-  queueTechDetectAfterImport(ctx.orgId, created.id);
   return created.id;
 }
 
@@ -209,7 +222,7 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
   const customer = asTrimmed(t['contact.companyName']) ?? '';
   const email = asTrimmed(t['contact.email']);
   const company = customer
-    ? await prisma.company.findFirst({
+    ? await ctx.tx.company.findFirst({
         where: {
           orgId: ctx.orgId,
           name: { equals: customer, mode: 'insensitive' },
@@ -227,17 +240,17 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     role: asTrimmed(t['contact.title']),
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const existing = await prisma.contact.findFirst({
+    const existing = await ctx.tx.contact.findFirst({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.contact.update({ where: { id: existing.id }, data });
+      await ctx.tx.contact.update({ where: { id: existing.id }, data });
       return null;
     }
   }
-  const created = await prisma.contact.create({
+  const created = await ctx.tx.contact.create({
     data: { ...data, orgId: ctx.orgId },
     select: { id: true },
   });
@@ -263,19 +276,19 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
     status: (statusRaw && LEAD_STATUSES.has(statusRaw) ? statusRaw : 'new') as never,
   };
   if (ctx.dedupStrategy !== 'duplicate' && email) {
-    const existing = await prisma.lead.findFirst({
+    const existing = await ctx.tx.lead.findFirst({
       where: { orgId: ctx.orgId, email, deletedAt: null },
       select: { id: true },
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.lead.update({ where: { id: existing.id }, data });
+      await ctx.tx.lead.update({ where: { id: existing.id }, data });
       return null;
     }
   }
   // `source` doubles as the undo tag — same mechanism the undo route already
   // queries for (source: 'migration:<jobId>').
-  const created = await prisma.lead.create({
+  const created = await ctx.tx.lead.create({
     data: { ...data, orgId: ctx.orgId, source: ctx.sourceTag },
     select: { id: true },
   });
@@ -305,7 +318,7 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
   const customer =
     asTrimmed(t['opportunity.companyName']) ?? asTrimmed(t['opportunity.customer']) ?? 'Unknown';
   if (ctx.dedupStrategy !== 'duplicate') {
-    const existing = await prisma.opportunity.findFirst({
+    const existing = await ctx.tx.opportunity.findFirst({
       where: {
         orgId: ctx.orgId,
         name: { equals: name, mode: 'insensitive' },
@@ -316,7 +329,7 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
     });
     if (existing) {
       if (ctx.dedupStrategy === 'skip') return null;
-      await prisma.opportunity.update({
+      await ctx.tx.opportunity.update({
         where: { id: existing.id },
         data: {
           valueMicros: asMicros(t['opportunity.valueMicros']) ?? undefined,
@@ -328,12 +341,13 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
     }
   }
   // Bounded retry on (orgId, code) unique collisions — same pattern as the
-  // API's create route.
+  // API's create route. The savepoint keeps one collision from aborting the
+  // chunk transaction these writes share with the attempt check.
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const created = await prisma.$transaction(async (tx) => {
-        const code = await mintNextCode(tx, ctx.orgId);
-        return tx.opportunity.create({
+      const created = await withSavepoint(ctx.tx, `opp_code_${attempt}`, async () => {
+        const code = await mintNextCode(ctx.tx, ctx.orgId);
+        return ctx.tx.opportunity.create({
           data: {
             orgId: ctx.orgId,
             code,
@@ -367,7 +381,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   if (periodType !== 'FY' && periodType !== 'Q')
     throw new Error('financial.periodType must be FY or Q');
   const fiscalYear = asInt(t['financial.fiscalYear']) ?? periodEnd.getUTCFullYear();
-  const company = await prisma.company.findFirst({
+  const company = await ctx.tx.company.findFirst({
     where: {
       orgId: ctx.orgId,
       name: { equals: companyName, mode: 'insensitive' },
@@ -391,7 +405,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   if (netIncome) metrics.netIncome = netIncome;
   if (!metrics.revenue) throw new Error('financial.revenue is required');
 
-  const existing = await prisma.accountFinancialPeriod.findFirst({
+  const existing = await ctx.tx.accountFinancialPeriod.findFirst({
     where: {
       orgId: ctx.orgId,
       companyId: company.id,
@@ -403,7 +417,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   });
   if (existing) {
     if (ctx.dedupStrategy === 'skip') return null;
-    await prisma.accountFinancialPeriod.update({
+    await ctx.tx.accountFinancialPeriod.update({
       where: { id: existing.id },
       data: {
         currency,
@@ -416,7 +430,7 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
     return ctx.dedupStrategy === 'duplicate' ? existing.id : null;
   }
 
-  const created = await prisma.accountFinancialPeriod.create({
+  const created = await ctx.tx.accountFinancialPeriod.create({
     data: {
       orgId: ctx.orgId,
       companyId: company.id,
@@ -594,7 +608,7 @@ async function recordChunkOutcome(
  * zero to the counters — permanently undercounting processedRows, which
  * maybeComplete compares to totalRows, stranding the job in RUNNING forever.
  */
-export async function commitChunkProgress(chunk: {
+type ChunkBookkeeping = {
   orgId: string;
   userId: string;
   migrationJobId: string;
@@ -605,36 +619,44 @@ export async function commitChunkProgress(chunk: {
   processed: number;
   errors: MigrationJobError[];
   attemptId: string | null;
-}): Promise<void> {
+};
+
+/** Counters and the undo-trail row. Returns 0 when this attempt no longer owns the job. */
+async function persistChunkBookkeeping(tx: Prisma.TransactionClient, chunk: ChunkBookkeeping): Promise<number> {
   const { migrationJobId, processed, errors } = chunk;
-  await prisma.$transaction(async (tx) => {
-    const moved = await recordChunkOutcome(
-      tx,
-      migrationJobId,
-      chunk.attemptId,
-      processed,
-      errors.length,
-      errors,
-    );
-    if (moved !== 1) return;
-    if (chunk.createdIds.length > 0 || processed > 0 || errors.length > 0) {
-      const rowsConsumed = chunk.resumeFrom + processed + errors.length;
-      await tx.auditLog.create({
-        data: {
-          orgId: chunk.orgId,
-          userId: chunk.userId,
-          action: 'migration.chunk.imported',
-          targetType: 'MigrationJob',
-          targetId: migrationJobId,
-          diff: {
-            entity: chunk.entity,
-            createdIds: chunk.createdIds,
-            chunkOffset: chunk.chunkOffset,
-            rowsConsumed,
-          },
+  const moved = await recordChunkOutcome(
+    tx,
+    migrationJobId,
+    chunk.attemptId,
+    processed,
+    errors.length,
+    errors,
+  );
+  if (moved !== 1) return 0;
+  if (chunk.createdIds.length > 0 || processed > 0 || errors.length > 0) {
+    const rowsConsumed = chunk.resumeFrom + processed + errors.length;
+    await tx.auditLog.create({
+      data: {
+        orgId: chunk.orgId,
+        userId: chunk.userId,
+        action: 'migration.chunk.imported',
+        targetType: 'MigrationJob',
+        targetId: migrationJobId,
+        diff: {
+          entity: chunk.entity,
+          createdIds: chunk.createdIds,
+          chunkOffset: chunk.chunkOffset,
+          rowsConsumed,
         },
-      });
-    }
+      },
+    });
+  }
+  return 1;
+}
+
+export async function commitChunkProgress(chunk: ChunkBookkeeping): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await persistChunkBookkeeping(tx, chunk);
   });
 }
 
@@ -846,13 +868,6 @@ export async function processMigrationChunk(
     rows = all.slice(payload.chunkOffset, payload.chunkOffset + payload.chunkSize);
   }
 
-  // ── Import rows ──
-  const ctx: WriteCtx = {
-    orgId: payload.orgId,
-    sourceTag: `migration:${payload.migrationJobId}`,
-    dedupStrategy: payload.dedupStrategy,
-  };
-
   // Retry idempotency: a BullMQ retry re-runs the WHOLE chunk from the start.
   // For the 'skip'/'update' strategies the per-row dedup check makes that safe,
   // but 'duplicate' re-inserts every row unconditionally — so a retry after a
@@ -865,46 +880,74 @@ export async function processMigrationChunk(
     payload.chunkOffset,
   );
 
-  const createdIds: string[] = [];
-  const errors: MigrationJobError[] = [];
-  let processed = 0;
-
-  for (let i = resumeFrom; i < rows.length; i++) {
-    const absoluteRow = payload.chunkOffset + i;
-    try {
-      const mapped = applyMappings(rows[i]!, payload.mappings);
-      const createdId = await WRITERS[entity](ctx, mapped);
-      if (createdId) createdIds.push(createdId);
-      processed += 1;
-    } catch (err) {
-      errors.push({
-        row: absoluteRow,
-        field: null,
-        message: err instanceof Error ? err.message : String(err),
+  // The attempt is checked again under a row lock, before any entity insert.
+  // The inserts, the counters, and the undo trail commit together. A retry
+  // that already replaced the attempt writes nothing.
+  const written = await prisma.$transaction(
+    async (tx) => {
+      const locked = await tx.$queryRaw<Array<{ status: string; meta: unknown }>>`
+        SELECT status::text AS status, meta
+        FROM migration_jobs
+        WHERE id = ${payload.migrationJobId}::uuid
+        FOR UPDATE
+      `;
+      const holder = locked[0];
+      if (!holder || holder.status !== 'RUNNING') return null;
+      if (!migrationChunkMatchesAttempt(migrationAttemptId(holder.meta), payload.attemptId ?? null)) {
+        return null;
+      }
+      const ctx: WriteCtx = {
+        orgId: payload.orgId,
+        sourceTag: `migration:${payload.migrationJobId}`,
+        dedupStrategy: payload.dedupStrategy,
+        tx,
+      };
+      const createdIds: string[] = [];
+      const errors: MigrationJobError[] = [];
+      let processed = 0;
+      for (let i = resumeFrom; i < rows.length; i++) {
+        const absoluteRow = payload.chunkOffset + i;
+        try {
+          const mapped = applyMappings(rows[i]!, payload.mappings);
+          const createdId = await withSavepoint(tx, `chunk_row_${i}`, () => WRITERS[entity](ctx, mapped));
+          if (createdId) createdIds.push(createdId);
+          processed += 1;
+        } catch (err) {
+          errors.push({
+            row: absoluteRow,
+            field: null,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      const booked = await persistChunkBookkeeping(tx, {
+        orgId: payload.orgId,
+        userId: payload.userId,
+        migrationJobId: payload.migrationJobId,
+        entity,
+        chunkOffset: payload.chunkOffset,
+        resumeFrom,
+        createdIds,
+        processed,
+        errors,
+        attemptId: payload.attemptId ?? null,
       });
-    }
+      // The lock makes this miss unreachable. Throw so a miss cannot commit the inserts.
+      if (booked !== 1) throw new Error('migration attempt lost during chunk');
+      return { createdIds, processed, errors };
+    },
+    { maxWait: 10_000, timeout: 120_000 },
+  );
+  if (!written) {
+    log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
+    return;
   }
-
-  // ── Undo trail: contacts/opportunities have no `source` column, so the
-  // undo route reads these audit rows to find what this job created. The
-  // `rowsConsumed` field doubles as the resume cursor for retry idempotency,
-  // so it commits atomically with the counters (see commitChunkProgress). ──
-  await commitChunkProgress({
-    orgId: payload.orgId,
-    userId: payload.userId,
-    migrationJobId: payload.migrationJobId,
-    entity,
-    chunkOffset: payload.chunkOffset,
-    resumeFrom,
-    createdIds,
-    processed,
-    errors,
-    attemptId: payload.attemptId ?? null,
-  });
+  const { createdIds, processed, errors } = written;
 
   // ── Import enrichment: queue public intel and Apollo org data per new company.
   // Prior passes of this chunk are included so a retry after a crash still queues them. ──
   if (entity === 'company') {
+    for (const companyId of createdIds) queueTechDetectAfterImport(payload.orgId, companyId);
     const companyIds =
       resumeFrom > 0 ? [...(await chunkCreatedIds(payload)), ...createdIds] : createdIds;
     await queueImportEnrichment(
