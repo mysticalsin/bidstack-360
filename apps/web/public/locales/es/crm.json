@@ -1210,6 +1210,7 @@
       "dedupDuplicate": "Crear siempre un nuevo registro",
       "requiredMissing": "Asigna una columna a: {{fields}}.",
       "startError": "No se pudo iniciar la importación. Revisa tus asignaciones e inténtalo de nuevo.",
+      "startServerError": "No se pudo iniciar la importación. Inténtalo de nuevo.",
       "startOver": "Empezar de nuevo",
       "starting": "Iniciando…",
       "importRows": "Importar {{rows}} filas"

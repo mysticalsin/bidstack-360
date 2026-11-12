@@ -1232,6 +1232,7 @@
       "dedupDuplicate": "Toujours créer un nouvel enregistrement",
       "requiredMissing": "Associez une colonne à : {{fields}}.",
       "startError": "Impossible de démarrer l'importation. Vérifiez vos correspondances et réessayez.",
+      "startServerError": "L'importation n'a pas pu démarrer. Réessayez.",
       "startOver": "Recommencer",
       "starting": "Démarrage…",
       "importRows": "Importer {{rows}} lignes"

@@ -1147,6 +1147,7 @@
       "dedupDuplicate": "始终创建新记录",
       "requiredMissing": "请将列映射到：{{fields}}。",
       "startError": "无法开始导入。请检查映射后重试。",
+      "startServerError": "无法开始导入。请重试。",
       "startOver": "重新开始",
       "starting": "正在开始…",
       "importRows": "导入 {{rows}} 行"

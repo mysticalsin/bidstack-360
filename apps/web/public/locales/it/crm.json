@@ -1147,6 +1147,7 @@
       "dedupDuplicate": "Crea sempre un nuovo record",
       "requiredMissing": "Associa una colonna a: {{fields}}.",
       "startError": "Impossibile avviare l'importazione. Controlla le associazioni e riprova.",
+      "startServerError": "Impossibile avviare l'importazione. Riprova.",
       "startOver": "Ricomincia",
       "starting": "Avvio…",
       "importRows": "Importa {{rows}} righe"

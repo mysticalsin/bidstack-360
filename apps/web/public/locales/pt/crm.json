@@ -1147,6 +1147,7 @@
       "dedupDuplicate": "Sempre criar um novo registro",
       "requiredMissing": "Mapeie uma coluna para: {{fields}}.",
       "startError": "Não foi possível iniciar a importação. Verifique seus mapeamentos e tente novamente.",
+      "startServerError": "Não foi possível iniciar a importação. Tente novamente.",
       "startOver": "Recomeçar",
       "starting": "Iniciando…",
       "importRows": "Importar {{rows}} linhas"

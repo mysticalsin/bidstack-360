@@ -597,6 +597,34 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByText('Could not start the import. Check your mappings and try again.')).toBeNull();
   });
 
+  it('says something generic when the start fails with a server error', async () => {
+    // WHY: a 500 is not a mapping problem, and its body can be a driver
+    // sentence. The confirm step must not tell the user to check mappings.
+    stubHooks();
+    hookMocks.useStartCsvImport.mockReturnValue({
+      mutate: hookMocks.mutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('Check your mappings and the column types', 500, null),
+    });
+    render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    expect(screen.getByText('The import could not be started. Try again.')).toBeTruthy();
+    expect(screen.queryByText('Could not start the import. Check your mappings and try again.')).toBeNull();
+    expect(screen.queryByText('Check your mappings and the column types')).toBeNull();
+  });
+
   it('shows a failed start on the confirm step and sends it once', async () => {
     // WHY: Confirm lives on the preview step. The error was only rendered on
     // the mapping step, so a 500 left the screen unchanged, and a second click

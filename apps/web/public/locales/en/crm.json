@@ -1148,6 +1148,7 @@
       "dedupDuplicate": "Always create a new record",
       "requiredMissing": "Map a column to: {{fields}}.",
       "startError": "Could not start the import. Check your mappings and try again.",
+      "startServerError": "The import could not be started. Try again.",
       "startOver": "Start over",
       "starting": "Starting…",
       "importRows": "Import {{rows}} rows"

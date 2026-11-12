@@ -113,13 +113,18 @@ function importErrorCopy(
 
 export function CsvImportWizard() {
   const { t } = useTranslation('crm');
-  const startFailureCopy = (error: unknown): string =>
-    error instanceof ApiError && error.status === 409 && error.message.length > 0
-      ? error.message
-      : t(
-          'csvImport.map.startError',
-          'Could not start the import. Check your mappings and try again.',
-        );
+  const startFailureCopy = (error: unknown): string => {
+    if (error instanceof ApiError && error.status === 409 && error.message.length > 0) {
+      return error.message;
+    }
+    if (error instanceof ApiError && error.status >= 500) {
+      return t('csvImport.map.startServerError', 'The import could not be started. Try again.');
+    }
+    return t(
+      'csvImport.map.startError',
+      'Could not start the import. Check your mappings and try again.',
+    );
+  };
   const entityId = useId();
   const dedupId = useId();
   const [step, setStep] = useState<Step>('upload');
