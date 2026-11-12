@@ -541,6 +541,12 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
+function importRowsExpired(messages: readonly string[]): boolean {
+  return messages.some(
+    (message) => message === MIGRATION_ROWS_EXPIRED || message === MIGRATION_LEGACY_ROWS_EXPIRED,
+  );
+}
+
 function ImportProgress({
   job,
   isLoading,
@@ -650,7 +656,10 @@ function ImportProgress({
         </button>
       ) : null}
 
-      {(job.errorRows > 0 || (job.status === 'FAILED' && (job.errorSummary?.length ?? 0) > 0)) && (
+      {(job.errorRows > 0 ||
+        (job.status === 'FAILED' &&
+          (job.errorSummary?.length ?? 0) > 0 &&
+          !importRowsExpired((job.errorSummary ?? []).map((row) => row.message)))) && (
         <div className="rounded-md bg-[var(--surface-sunken)] p-3 text-sm">
           {job.errorRows > 0 ? (
             <p className="text-[var(--fg-primary)]">

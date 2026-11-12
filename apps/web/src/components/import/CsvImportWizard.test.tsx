@@ -334,6 +334,7 @@ describe('CsvImportWizard', () => {
     );
     expect(screen.queryByText('The import could not be completed.')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Download error report (CSV)' })).toBeNull();
   });
 
   it('does not offer retry when the rows are gone', async () => {
@@ -352,6 +353,7 @@ describe('CsvImportWizard', () => {
       expect(screen.getByText('Those rows expired. Upload the file again.')).toBeTruthy(),
     );
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Download error report (CSV)' })).toBeNull();
     expect(screen.queryByText('Try again.')).toBeNull();
   });
 
