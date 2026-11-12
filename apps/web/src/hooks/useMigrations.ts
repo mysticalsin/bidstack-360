@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef } from 'react';
 
 import { api, downloadFromApi } from '@/lib/api';
 
@@ -89,15 +90,36 @@ export function useParseSpreadsheet() {
   });
 }
 
+function newCsvStartKey(): string {
+  const random =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `import-csv-${random}`;
+}
+
 export function useStartCsvImport() {
   const qc = useQueryClient();
+  // One key for the action that is still unsettled, including a retry of that
+  // action. Cleared when the action settles so the next start is a new import.
+  const keyRef = useRef<string | null>(null);
   return useMutation({
-    mutationFn: (input: StartCsvImportInput) =>
-      api<MigrationJob>('/api/migrations/start-csv', { method: 'POST', body: input }),
+    mutationFn: (input: StartCsvImportInput) => {
+      keyRef.current ??= newCsvStartKey();
+      return api<MigrationJob>('/api/migrations/start-csv', {
+        method: 'POST',
+        body: input,
+        headers: { 'Idempotency-Key': keyRef.current },
+      });
+    },
     // The app retries other mutations once on 500. A start creates a job, so a
-    // retry would be a second request from the same click.
+    // retry would be a second request from the same click. The key above is
+    // still stable if that retry is turned back on.
     retry: false,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['migrations'] }),
+    onSettled: () => {
+      keyRef.current = null;
+    },
   });
 }
 
