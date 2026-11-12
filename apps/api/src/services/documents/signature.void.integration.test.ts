@@ -97,6 +97,69 @@ describe('void signature request', () => {
     await prisma.org.delete({ where: { id: org.id } });
   });
 
+  t('a held completion past ten older events is still removed', async () => {
+    // WHY: the cleanup reads ten signature events. Without an order, the index
+    // returns the oldest ten and a completion that arrived during the void
+    // stays on a voided request.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_sigord_${ns}`, name: `sig ${ns}` },
+    });
+    const document = await prisma.document.create({
+      data: { orgId: org.id, name: 'proposal.pdf', kind: 'proposal', storageUrl: `s3://test/${ns}` },
+    });
+    const request = await prisma.signatureRequest.create({
+      data: {
+        orgId: org.id,
+        documentId: document.id,
+        provider: 'INTERNAL',
+        status: 'SENT',
+        recipients: [],
+      },
+    });
+    const oldest = new Date('2020-01-01T00:00:00.000Z');
+    for (let i = 0; i < 10; i += 1) {
+      await prisma.signatureEvent.create({
+        data: {
+          signatureRequestId: request.id,
+          type: 'SIGNED',
+          occurredAt: new Date(oldest.getTime() + i * 1000),
+          payload: {},
+        },
+      });
+    }
+    await prisma.signatureEvent.create({
+      data: {
+        signatureRequestId: request.id,
+        type: 'SIGNED',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        payload: { heldDuringVoid: true },
+      },
+    });
+    const findMany = vi.spyOn(prisma.signatureEvent, 'findMany');
+    await voidSignatureRequest({ orgId: org.id, requestId: request.id, reason: 'withdrawn' });
+    const cleanup = findMany.mock.calls
+      .map((call) => call[0] as { take?: number; select?: { id?: boolean }; orderBy?: unknown })
+      .find((args) => args?.take === 10 && args.select?.id === true);
+    expect(cleanup?.orderBy).toEqual({ occurredAt: 'desc' });
+    findMany.mockRestore();
+    const signed = await prisma.signatureEvent.findMany({
+      where: { signatureRequestId: request.id, type: 'SIGNED' },
+      select: { payload: true },
+      take: 20,
+    });
+    const held = signed.filter(
+      (event) =>
+        !!event.payload &&
+        typeof event.payload === 'object' &&
+        !Array.isArray(event.payload) &&
+        (event.payload as { heldDuringVoid?: unknown }).heldDuringVoid === true,
+    );
+    expect(held).toEqual([]);
+    expect(signed).toHaveLength(10);
+    await prisma.org.delete({ where: { id: org.id } });
+  });
+
   t('a signature that lands during void is not overwritten', async () => {
     const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const org = await prisma.org.create({

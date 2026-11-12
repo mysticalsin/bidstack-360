@@ -552,6 +552,7 @@ export async function voidSignatureRequest(params: {
   });
   const heldIds = (await prisma.signatureEvent.findMany({
     where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
+    orderBy: { occurredAt: 'desc' },
     select: { id: true, payload: true },
     take: 10,
   }))
