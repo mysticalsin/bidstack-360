@@ -41,7 +41,7 @@ export const envSchema = z.object({
   CF_ACCESS_AUTH: z.enum(['true', 'false']).default('false'),
   CF_ACCESS_TEAM_DOMAIN: z.string().optional().or(z.literal('')),
   CF_ACCESS_AUD: z.string().optional().or(z.literal('')),
-  CF_ACCESS_TRUST_LOOPBACK_EMAIL: z.enum(['true', 'false']).default('true'),
+  CF_ACCESS_TRUST_LOOPBACK_EMAIL: z.enum(['true', 'false']).default('false'),
   // Account-file document intelligence (LLM/Dust). Off in real mode unless
   // the operator explicitly enables it. MSA library extract stays local.
   DOCUMENT_LLM_EXTRACT_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -542,6 +542,9 @@ export function getEnv(): Env {
     if (env.NODE_ENV === 'production' && !env.CF_ACCESS_AUD?.trim()) {
       semanticErrors.push('CF_ACCESS_AUD is required when CF_ACCESS_AUTH=true in production');
     }
+  }
+  if (env.NODE_ENV === 'production' && env.CF_ACCESS_TRUST_LOOPBACK_EMAIL === 'true') {
+    semanticErrors.push('CF_ACCESS_TRUST_LOOPBACK_EMAIL=true is not allowed in production');
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);

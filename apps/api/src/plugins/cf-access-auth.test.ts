@@ -4,6 +4,7 @@ import { prisma } from '@bidstack/db';
 
 import {
   CF_ACCESS_EMAIL_HEADER,
+  CF_ACCESS_JWT_HEADER,
   CF_ACCESS_NOT_ALLOWLISTED,
   __setCfAccessVerifierForTests,
   verifyCfAccessAuth,
@@ -122,5 +123,62 @@ describe('Cloudflare Access identity mapping', () => {
     await expect(
       verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' }, '203.0.113.9')),
     ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it('refuses the loopback email in production even when the flag is set', async () => {
+    // WHY: a production process that can be reached on 127.0.0.1 (a sidecar,
+    // a mis-set proxy, a container health probe) must not treat the email
+    // header as identity. The flag cannot turn that back on.
+    process.env.NODE_ENV = 'production';
+    process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
+    await expect(
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    process.env.NODE_ENV = 'test';
+  });
+
+  it('refuses the loopback email when NODE_ENV is missing', async () => {
+    const previous = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
+    await expect(
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    process.env.NODE_ENV = previous;
+  });
+
+  it('refuses the loopback email when the trust flag is missing', async () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL;
+    await expect(
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    process.env.NODE_ENV = 'test';
+    process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
+  });
+
+  it('does not fall back to the email header when the Access JWT cannot be verified', async () => {
+    // WHY: aud and issuer are checked inside JWT verification. A client that
+    // also sends the email header must not be admitted when that check fails
+    // or the team and audience are unset.
+    process.env.CF_ACCESS_TEAM_DOMAIN = 'team.cloudflareaccess.com';
+    process.env.CF_ACCESS_AUD = 'aud-1';
+    __setCfAccessVerifierForTests(async () => {
+      throw new Error('cf_access_aud_mismatch');
+    });
+    await expect(
+      verifyCfAccessAuth(
+        fakeReq({
+          [CF_ACCESS_JWT_HEADER]: 'header.payload.sig',
+          [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com',
+        }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(userUpsert).not.toHaveBeenCalled();
+    delete process.env.CF_ACCESS_TEAM_DOMAIN;
+    delete process.env.CF_ACCESS_AUD;
   });
 });

@@ -273,4 +273,17 @@ describe('boot environment validation', () => {
     expect(env.CF_ACCESS_AUTH).toBe('true');
     expect(env.POLO_ALLOWED_USERS).toBe('ada@mantu.com:Admin');
   });
+
+  it('refuses the Access loopback email trust in production and defaults it off', async () => {
+    // WHY: a missing flag must not mean "trust the email header". Production
+    // must refuse to boot if an operator turns the dev bypass on.
+    const dev = await loadEnvWith({ NODE_ENV: 'development' });
+    expect(dev.CF_ACCESS_TRUST_LOOPBACK_EMAIL).toBe('false');
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'true',
+      }),
+    ).rejects.toThrow('CF_ACCESS_TRUST_LOOPBACK_EMAIL=true is not allowed in production');
+  });
 });

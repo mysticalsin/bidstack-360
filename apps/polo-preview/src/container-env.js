@@ -24,6 +24,7 @@ export function containerEnv(env) {
     PUBLIC_BASE_URL: origin,
     PUBLIC_API_URL: origin,
     CF_ACCESS_AUD: env.ACCESS_AUD || '',
+    CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'false',
     POLO_ALLOWED_USERS: allowedUsersFromEmails(env.ALLOWED_EMAILS, String(env.POLO_ADMIN_EMAILS || '').split(',')),
     INTEGRATION_TOKEN_KEY: env.POLO_INTEGRATION_TOKEN_KEY,
     PII_ENCRYPTION_MASTER_KEY: env.POLO_PII_ENCRYPTION_MASTER_KEY,

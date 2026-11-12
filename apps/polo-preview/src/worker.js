@@ -33,6 +33,7 @@ import {
   bytesToBase64,
   filterCookieHeader,
   filterRequestHeaders,
+  identityHeaders,
   isApiPath,
   rewriteResponseHeaders,
   targetUrl,
@@ -212,7 +213,9 @@ function requestHeadersForBox(req, publicOrigin) {
   const headers = [];
   for (const [key, value] of req.headers) {
     const name = key.toLowerCase();
-    if (DROP_REQUEST.includes(name)) continue;
+    // The Worker already dropped the client assertion and put back the one
+    // verifyAccess accepted. Keep that copy. Still drop the email header.
+    if (name !== 'cf-access-jwt-assertion' && DROP_REQUEST.includes(name)) continue;
     if (name === 'cookie') {
       const cookie = filterCookieHeader(value);
       if (cookie) headers.push(['cookie', cookie]);
@@ -273,9 +276,8 @@ async function proxyUpstream(req, env, url) {
   });
 }
 
-// Container mode (v29). Identity is checked before this call. The container
-// API trusts the verified email only from loopback, so any client copy of the
-// identity or forwarding headers is dropped here.
+// Container mode (v29). Identity is checked before this call. The API verifies
+// the Access JWT itself (audience and issuer). The email header is not identity.
 const CONTAINER_NAME = 'main';
 
 async function toContainer(req, env, url, who) {
@@ -284,7 +286,9 @@ async function toContainer(req, env, url, who) {
     if (key.toLowerCase().startsWith('cf-')) continue;
     headers.append(key, value);
   }
-  if (who?.email) headers.set('cf-access-authenticated-user-email', String(who.email));
+  for (const [key, value] of identityHeaders(who, req.headers.get('cf-access-jwt-assertion'))) {
+    headers.set(key, value);
+  }
   headers.set('x-forwarded-host', url.host);
   headers.set('x-forwarded-proto', 'https');
   const init = { method: req.method, headers, redirect: 'manual' };
@@ -314,8 +318,10 @@ async function containerHealth(env) {
 }
 
 function relayToBox(req, env, who) {
-  const headers = new Headers(req.headers);
-  if (who?.email) headers.set('cf-access-authenticated-user-email', String(who.email));
+  const headers = new Headers(filterRequestHeaders(req.headers));
+  for (const [key, value] of identityHeaders(who, req.headers.get('cf-access-jwt-assertion'))) {
+    headers.set(key, value);
+  }
   return env.RELAY.get(env.RELAY.idFromName('box')).fetch(new Request(req, { headers }));
 }
 
