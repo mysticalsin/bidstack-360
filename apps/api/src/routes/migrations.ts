@@ -17,6 +17,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as XLSX from '@e965/xlsx';
 import { Queue } from 'bullmq';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type Redis from 'ioredis';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
@@ -40,6 +41,7 @@ import {
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
+import { redisRetryDelay, waitForRedisClient, waitForRedisReady } from '../redis.js';
 import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
@@ -195,15 +197,22 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
   // BullMQ queue handle (producer side only — worker consumes).
   // Lazily initialised so the test environment doesn't need Redis configured.
+  // The queue connection is not the process client. When it has stopped, the
+  // next start opens another one with the same capped reconnect delay.
   let migrationQueue: Queue | null = null;
-  const getQueue = () => {
-    if (!migrationQueue) {
+  let queueRedis: Redis | null = null;
+  const getQueue = async (): Promise<Queue> => {
+    if (!queueRedis || queueRedis.status === 'end') {
+      queueRedis = server.redis.duplicate({ retryStrategy: redisRetryDelay });
       migrationQueue = new Queue(MIGRATION.name, {
-        connection: server.redis.duplicate() as never,
+        connection: queueRedis as never,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,
       });
     }
-    return migrationQueue;
+    if (!(await waitForRedisClient(queueRedis, 3_000))) {
+      throw new Error('migration queue redis is not ready');
+    }
+    return migrationQueue!;
   };
 
   // ─── List jobs ─────────────────────────────────────────────────────────
@@ -282,6 +291,10 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const { source, entityType, rows, mappings, dedupStrategy, externalIdColumn } = req.body;
 
+      if (!(await waitForRedisReady(3_000))) {
+        throw server.httpErrors.conflict('The import could not be queued. Try again.');
+      }
+
       // No Idempotency-Key: hold the body only while this request is in flight.
       // A later start of the same file is a new import. A Redis miss does not
       // block the start; storing the rows still fails closed.
@@ -350,7 +363,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         // successful enqueue, so a cancel in between is not overwritten.
         const attemptId = randomUUID();
         try {
-          const queue = getQueue();
+          const queue = await getQueue();
           await enqueueCsvChunks({
             jobId: job.id,
             orgId,
@@ -467,7 +480,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const attemptId = randomUUID();
       const previousAttempt = migrationAttemptId(job.meta);
       try {
-        const queue = getQueue();
+        const queue = await getQueue();
         if (job.source === 'HUBSPOT_OAUTH') {
           await enqueueHubspotChunk({
             jobId: job.id,
