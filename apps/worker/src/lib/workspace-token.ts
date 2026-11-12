@@ -137,26 +137,51 @@ export function workerRefreshLockReady(client: {
   };
 }
 
-/** The worker's Redis, so this process takes the same lock as the API. Tests use the in-process fallback. */
-function refreshLockRedis(): OAuthRefreshLockRedis | null {
-  if (process.env.NODE_ENV === 'test' || !process.env.REDIS_URL) return null;
-  if (!refreshClient) {
-    refreshClient = new IORedis(process.env.REDIS_URL, {
-      maxRetriesPerRequest: 1,
-      lazyConnect: true,
-      enableOfflineQueue: false,
-    });
+type RefreshLockClient = {
+  readonly status: string;
+  connect: () => Promise<unknown>;
+};
+
+let refreshReady: { client: RefreshLockClient; ready: () => Promise<boolean> } | null = null;
+
+/** One readiness promise per Redis client, shared by every caller in this process. */
+function sharedRefreshReady(client: RefreshLockClient): () => Promise<boolean> {
+  if (!refreshReady || refreshReady.client !== client) {
+    refreshReady = { client, ready: workerRefreshLockReady(client) };
   }
-  const client = refreshClient;
+  return refreshReady.ready;
+}
+
+/**
+ * The worker's Redis, so this process takes the same lock as the API.
+ * Tests pass a client. Without one, the test process uses the in-process lock.
+ */
+export function refreshLockRedis(injected?: RefreshLockClient): OAuthRefreshLockRedis | null {
+  if (!injected) {
+    const redisUrl = process.env.REDIS_URL;
+    if (process.env.NODE_ENV === 'test' || !redisUrl) return null;
+    if (!refreshClient) {
+      refreshClient = new IORedis(redisUrl, {
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+        enableOfflineQueue: false,
+      });
+    }
+  }
+  const client = injected ?? (refreshClient as RefreshLockClient);
+  const ready = sharedRefreshReady(client);
+  if (!refreshClient || injected) {
+    return {
+      ready,
+      set: async () => null,
+      eval: async () => null,
+    };
+  }
   return {
-    ready: workerRefreshLockReady({
-      get status() {
-        return client.status as string;
-      },
-      connect: () => client.connect(),
-    }),
-    set: (key, value, expiryMode, ttlMs, condition) => client.set(key, value, expiryMode, ttlMs, condition),
-    eval: (script, numKeys, key, owner) => client.eval(script, numKeys, key, owner),
+    ready,
+    set: (key, value, expiryMode, ttlMs, condition) =>
+      refreshClient!.set(key, value, expiryMode, ttlMs, condition),
+    eval: (script, numKeys, key, owner) => refreshClient!.eval(script, numKeys, key, owner),
   };
 }
 

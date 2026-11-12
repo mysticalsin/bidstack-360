@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
-import { GrantRevokedError, getWorkspaceAccessToken, workerRefreshLockReady } from './workspace-token.js';
+import {
+  GrantRevokedError,
+  getWorkspaceAccessToken,
+  refreshLockRedis,
+  workerRefreshLockReady,
+} from './workspace-token.js';
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
@@ -247,6 +252,29 @@ describe('getWorkspaceAccessToken', () => {
       },
     });
     await expect(Promise.all([ready(), ready(), ready()])).resolves.toEqual([true, true, true]);
+    expect(connects).toBe(1);
+  });
+
+  it('shares one cold connect when each caller opens the lock itself', async () => {
+    // WHY: refreshLockRedis() used to build a new readiness closure on every
+    // call. Four cold callers then each called connect(), and the ones that
+    // lost the race refreshed without the Redis lock.
+    let connects = 0;
+    let status = 'wait';
+    const client = {
+      get status() {
+        return status;
+      },
+      async connect() {
+        connects += 1;
+        if (status === 'connecting') throw new Error('Redis is already connecting');
+        status = 'connecting';
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        status = 'ready';
+      },
+    };
+    const ready = [0, 1, 2, 3].map(() => refreshLockRedis(client)!.ready);
+    await expect(Promise.all(ready.map((run) => run()))).resolves.toEqual([true, true, true, true]);
     expect(connects).toBe(1);
   });
 
