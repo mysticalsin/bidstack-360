@@ -89,8 +89,18 @@ function importErrorCopy(
     );
   }
   const known = IMPORT_ERROR_KEYS[message];
-  if (!known) return message;
-  return t(known[0], known[1]);
+  if (known) return t(known[0], known[1]);
+  // A driver failure is stored with its thrown text. The existing sentence
+  // covers that. A short row sentence, such as a missing field, stays.
+  if (
+    message.startsWith('chunk failed permanently:') ||
+    /PostgresError|\b40P01\b|\b40001\b|\bP2034\b|Unique constraint|\/apps\/|\.ts:\d+|Process \d+/.test(
+      message,
+    )
+  ) {
+    return t('csvImport.progress.reasonUnknown', 'The import could not be completed.');
+  }
+  return message;
 }
 
 export function CsvImportWizard() {

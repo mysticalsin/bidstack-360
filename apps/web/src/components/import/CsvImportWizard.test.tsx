@@ -386,6 +386,30 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
   });
 
+  it('maps a stored driver failure to the existing sentence', async () => {
+    // WHY: the worker prefixes the thrown driver text. That text can contain
+    // a path, a process id, or a database code, and the wizard already has a
+    // sentence for a failure it cannot explain.
+    stubHooks();
+    const message =
+      'chunk failed permanently: PrismaClientKnownRequestError Invalid `ctx.tx.company.create()` Unique constraint failed at /apps/worker/src/queues/migration.ts:236:40 Process 4242 40P01';
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 1,
+      errorSummary: [{ row: 0, field: null, message }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import could not be completed.')).toBeTruthy(),
+    );
+    expect(screen.queryByText(/migration\.ts/)).toBeNull();
+    expect(screen.queryByText(/40P01/)).toBeNull();
+    expect(screen.queryByText(/Unique constraint/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download error report (CSV)' })).toBeTruthy();
+  });
+
   it('does not say an exhausted conflict will be tried again', async () => {
     // WHY: the last attempt is over. The error file and the wizard must not
     // promise another try.
