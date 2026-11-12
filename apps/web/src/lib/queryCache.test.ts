@@ -71,6 +71,19 @@ describe('queryCache', () => {
     expect(query?.state.dataUpdatedAt).toBe(cachedAt.getTime());
   });
 
+  it('does not persist the tasks badge across reload', () => {
+    // WHY: the nav badge is overdue count. A reload that restores 7 while the
+    // list is already 8 keeps the discrepancy until the stale window ends.
+    const queryClient = new QueryClient();
+    persistCache(queryClient);
+    queryClient.setQueryData(['tasks', 'summary'], { total: 8, open: 8, overdue: 7, dueSoon: 0 });
+
+    const hydratedClient = new QueryClient();
+    hydrateCache(hydratedClient);
+
+    expect(hydratedClient.getQueryData(['tasks', 'summary'])).toBeUndefined();
+  });
+
   it('does not hydrate live control-plane status snapshots', () => {
     const queryClient = new QueryClient();
     persistCache(queryClient);

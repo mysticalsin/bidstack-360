@@ -29,7 +29,9 @@ export function useTaskSummary() {
   return useQuery({
     queryKey: ['tasks', 'summary'],
     queryFn: ({ signal }) => api<TaskSummaryPayload>('/api/tasks/summary', { signal }),
-    staleTime: 30_000,
+    // The list has no stale window. The badge must not keep an older overdue
+    // count across a navigation that remounts this query.
+    staleTime: 0,
   });
 }
 
