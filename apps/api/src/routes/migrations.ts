@@ -68,7 +68,7 @@ function stalledFlag(job: {
 
 const ACTIVE_IMPORT_MESSAGE = 'An import from this source is already running.';
 
-function isActiveImportConflict(err: unknown): boolean {
+export function isActiveImportConflict(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
