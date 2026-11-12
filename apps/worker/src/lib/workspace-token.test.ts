@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
+import { OAuthRefreshLockUnavailableError } from '@bidstack/shared/server';
+
 import {
   GrantRevokedError,
   getWorkspaceAccessToken,
@@ -108,6 +110,31 @@ afterEach(() => {
 });
 
 describe('getWorkspaceAccessToken', () => {
+  it('does not call the provider when NODE_ENV is missing and Redis is down', async () => {
+    // WHY: the worker treated a missing NODE_ENV as "Redis optional", so each
+    // process refreshed with the same token. Redis is required unless this
+    // process is development or test and opts out.
+    const previousEnv = process.env.NODE_ENV;
+    const previousUrl = process.env.REDIS_URL;
+    const previousFlag = process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED;
+    delete process.env.NODE_ENV;
+    delete process.env.REDIS_URL;
+    delete process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED;
+    const fetchImpl = vi.fn();
+    try {
+      await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(
+        OAuthRefreshLockUnavailableError,
+      );
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = previousEnv;
+      if (previousUrl === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = previousUrl;
+      if (previousFlag === undefined) delete process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED;
+      else process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED = previousFlag;
+    }
+  });
+
   it('refuses a grant whose status is expired, and still refreshes one that is only past its expiry time', async () => {
     // WHY: `expired` is the status column. A clock that has passed expiresAt,
     // while the status is still active, is the normal refresh.

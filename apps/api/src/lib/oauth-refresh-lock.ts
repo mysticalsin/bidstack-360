@@ -4,6 +4,7 @@ import {
   OAuthRefreshLockTimeoutError,
   OAuthRefreshLockUnavailableError,
   isOAuthRefreshLockError,
+  oauthRefreshLockRedisRequired,
   runWithOAuthRefreshLock as runSharedLock,
   type OAuthRefreshLockRedis,
 } from '@bidstack/shared/server';
@@ -45,8 +46,6 @@ export async function runWithOAuthRefreshLock<T>({
     getFreshValue,
     refresh,
     redis: store,
-    redisRequired:
-      process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED !== 'false' &&
-      process.env.NODE_ENV === 'production',
+    redisRequired: oauthRefreshLockRedisRequired(),
   });
 }

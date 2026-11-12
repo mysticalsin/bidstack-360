@@ -14,7 +14,11 @@ import type pino from 'pino';
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
-import { runWithOAuthRefreshLock, type OAuthRefreshLockRedis } from '@bidstack/shared/server';
+import {
+  oauthRefreshLockRedisRequired,
+  runWithOAuthRefreshLock,
+  type OAuthRefreshLockRedis,
+} from '@bidstack/shared/server';
 
 export { GrantRevokedError };
 
@@ -220,9 +224,7 @@ export async function getWorkspaceAccessToken(
     tokenId: row.id,
     log,
     redis: refreshLockRedis(),
-    redisRequired:
-      process.env.NODE_ENV === 'production' &&
-      process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED !== 'false',
+    redisRequired: oauthRefreshLockRedisRequired(),
     getFreshValue: async () => {
       const current = await readGrant(row.id, row.orgId);
       if (!current || current.status !== 'active' || !current.accessTokenEncrypted) return null;

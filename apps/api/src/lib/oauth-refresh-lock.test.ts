@@ -120,4 +120,90 @@ describe('runWithOAuthRefreshLock', () => {
       }),
     ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
   });
+
+  it('fails closed when NODE_ENV is missing and Redis is down', async () => {
+    // WHY: a missing NODE_ENV used to look like "not production" and four
+    // processes refreshed the same token. Redis is required unless local
+    // development or the test runner opts out.
+    delete process.env.NODE_ENV;
+    delete process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED;
+    mocks.ensureRedisReady.mockResolvedValue(false);
+    const refresh = vi.fn();
+
+    await expect(
+      runWithOAuthRefreshLock({
+        tokenId: 'token-unset',
+        log,
+        getFreshValue: vi.fn().mockResolvedValue(null),
+        refresh,
+      }),
+    ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('fails closed in development until the memory lock is opted out', async () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED;
+    mocks.ensureRedisReady.mockResolvedValue(false);
+    const refresh = vi.fn();
+
+    await expect(
+      runWithOAuthRefreshLock({
+        tokenId: 'token-dev',
+        log,
+        getFreshValue: vi.fn().mockResolvedValue(null),
+        refresh,
+      }),
+    ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('ignores the memory opt-out when NODE_ENV is missing', async () => {
+    delete process.env.NODE_ENV;
+    process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED = 'false';
+    mocks.ensureRedisReady.mockResolvedValue(false);
+    const refresh = vi.fn();
+
+    await expect(
+      runWithOAuthRefreshLock({
+        tokenId: 'token-optout-unset',
+        log,
+        getFreshValue: vi.fn().mockResolvedValue(null),
+        refresh,
+      }),
+    ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('keeps Redis required in production when the memory opt-out is set', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED = 'false';
+    mocks.ensureRedisReady.mockResolvedValue(false);
+
+    await expect(
+      runWithOAuthRefreshLock({
+        tokenId: 'token-prod-optout',
+        log,
+        getFreshValue: vi.fn().mockResolvedValue(null),
+        refresh: vi.fn(),
+      }),
+    ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
+  });
+
+  it('uses the in-memory lock in development only after an explicit opt-out', async () => {
+    process.env.NODE_ENV = 'development';
+    process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED = 'false';
+    mocks.ensureRedisReady.mockResolvedValue(false);
+    const refresh = vi.fn().mockResolvedValue('local-token');
+
+    await expect(
+      runWithOAuthRefreshLock({
+        tokenId: 'token-dev-optout',
+        log,
+        getFreshValue: vi.fn().mockResolvedValue(null),
+        refresh,
+      }),
+    ).resolves.toBe('local-token');
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
 });

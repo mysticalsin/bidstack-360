@@ -24,7 +24,9 @@ peer and break the connection.
   newer owner's lock.
 - Waiters poll the database and reuse the fresh access token after the owner
   writes it.
-- Production fails closed when Redis locking is required but unavailable.
+- Redis is required unless the process is development or test and
+  OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false. A missing NODE_ENV does not opt out.
+  The API and the worker share oauthRefreshLockRedisRequired.
 
 ## Prevention
 

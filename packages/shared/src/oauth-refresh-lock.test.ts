@@ -1,8 +1,39 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runWithOAuthRefreshLock } from './oauth-refresh-lock.js';
+import { oauthRefreshLockRedisRequired, runWithOAuthRefreshLock } from './oauth-refresh-lock.js';
 
 const FALLBACK = 'OAuth refresh Redis lock unavailable; using process-local fallback';
+
+describe('oauthRefreshLockRedisRequired', () => {
+  it('requires Redis when NODE_ENV is missing, even if the opt-out is set', () => {
+    expect(oauthRefreshLockRedisRequired({})).toBe(true);
+    expect(oauthRefreshLockRedisRequired({ OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false' })).toBe(true);
+    expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'production' })).toBe(true);
+    expect(
+      oauthRefreshLockRedisRequired({
+        NODE_ENV: 'production',
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toBe(true);
+    expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'development' })).toBe(true);
+    expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'test' })).toBe(true);
+  });
+
+  it('allows the in-memory lock only for development or test with an explicit opt-out', () => {
+    expect(
+      oauthRefreshLockRedisRequired({
+        NODE_ENV: 'development',
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toBe(false);
+    expect(
+      oauthRefreshLockRedisRequired({
+        NODE_ENV: 'test',
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toBe(false);
+  });
+});
 
 describe('runWithOAuthRefreshLock', () => {
   it('logs the process-local fallback when Redis ready() is false', async () => {

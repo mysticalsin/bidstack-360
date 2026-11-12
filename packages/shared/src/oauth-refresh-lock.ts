@@ -63,6 +63,19 @@ export interface OAuthRefreshLockRedis {
   eval: (script: string, numKeys: number, key: string, owner: string) => Promise<unknown>;
 }
 
+/**
+ * Redis is required unless this process is local development or the test
+ * runner and it opts out with OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false.
+ * A missing NODE_ENV is not local development, and production ignores the opt-out.
+ */
+export function oauthRefreshLockRedisRequired(
+  env: { NODE_ENV?: string; OAUTH_REFRESH_LOCK_REDIS_REQUIRED?: string } = process.env,
+): boolean {
+  const optedOut = env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED === 'false';
+  const local = env.NODE_ENV === 'development' || env.NODE_ENV === 'test';
+  return !(optedOut && local);
+}
+
 interface OAuthRefreshLockOptions<T> {
   tokenId: string;
   log: RefreshLockLogger;

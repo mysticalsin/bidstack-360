@@ -194,8 +194,9 @@ export const envSchema = z.object({
   TWILIO_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   TWILIO_RECORDING_DOWNLOAD_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
 
-  // OAuth refresh single-flight. Redis is required in production so concurrent
-  // refreshes across API replicas do not race a rotating provider refresh token.
+  // OAuth refresh single-flight. Redis is required unless NODE_ENV is
+  // development or test and this flag is false. A missing NODE_ENV does not
+  // opt out. The API and the worker share oauthRefreshLockRedisRequired.
   OAUTH_REFRESH_LOCK_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
   OAUTH_REFRESH_LOCK_TTL_MS: z.coerce.number().int().positive().default(30_000),
   OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(10_000),
