@@ -984,7 +984,7 @@ export async function processMigrationChunk(
       const errors: MigrationJobError[] = [];
       let processed = 0;
       for (let i = resumeFrom; i < rows.length; i++) {
-        const absoluteRow = payload.chunkOffset + i;
+        const absoluteRow = payload.chunkOffset + i + 1;
         try {
           const mapped = applyMappings(rows[i]!, payload.mappings);
           const createdId = await withSavepoint(tx, `chunk_row_${i}`, () => WRITERS[entity](ctx, mapped));

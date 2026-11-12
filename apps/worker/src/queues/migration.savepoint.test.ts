@@ -102,6 +102,8 @@ describe('a duplicate company name stays inside its row', () => {
     const summary = JSON.stringify(stored.errorSummary);
     expect(summary).not.toMatch(/25P02/);
     expect(summary).not.toMatch(/current transaction is aborted/);
+    // The preview numbers the first data row 1. The error report must match.
+    expect(summary).toContain('"row":1');
     } finally {
       await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
     }
