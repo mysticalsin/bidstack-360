@@ -594,14 +594,16 @@ function ImportProgress({
         </button>
       ) : null}
 
-      {job.errorRows > 0 && (
+      {(job.errorRows > 0 || (job.status === 'FAILED' && (job.errorSummary?.length ?? 0) > 0)) && (
         <div className="rounded-md bg-[var(--surface-sunken)] p-3 text-sm">
-          <p className="text-[var(--fg-primary)]">
-            {t('csvImport.progress.errorRows', '{{formattedCount}} rows could not be imported.', {
-              count: job.errorRows,
-              formattedCount: job.errorRows.toLocaleString(),
-            })}
-          </p>
+          {job.errorRows > 0 ? (
+            <p className="text-[var(--fg-primary)]">
+              {t('csvImport.progress.errorRows', '{{formattedCount}} rows could not be imported.', {
+                count: job.errorRows,
+                formattedCount: job.errorRows.toLocaleString(),
+              })}
+            </p>
+          ) : null}
           <button
             type="button"
             className="mt-1 text-[var(--brand-primary)] hover:underline"

@@ -350,6 +350,25 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
   });
 
+  it('shows an unsupported-entity failure when no rows were saved', async () => {
+    // WHY: the worker stores the sentence on the job and leaves both counters
+    // at zero. The generic failure and a hidden error file would leave the
+    // operator with nothing to read.
+    stubHooks();
+    const message = 'Entity type "tasks" is not supported by the import worker yet';
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 0,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message }],
+    });
+    await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
+    expect(screen.queryByText('The import could not be completed.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download error report (CSV)' })).toBeTruthy();
+  });
+
   it('shows a stored failure sentence that has no code', async () => {
     // WHY: a row error is already the sentence the operator needs. Replacing
     // it with the generic failure hides which row was rejected.
