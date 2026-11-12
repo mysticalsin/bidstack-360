@@ -27,6 +27,9 @@ const t = (name: string, fn: () => Promise<void>) =>
 
 const log = { info: () => undefined, warn: () => undefined };
 
+const ENDED = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const FRESH = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
 async function fixture(status: 'PENDING' | 'RUNNING' | 'COMPLETE' | 'CANCELLED' | 'FAILED') {
   const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const org = await prisma.org.create({
@@ -183,5 +186,73 @@ describe('migration chunk guards', () => {
     expect(reads).toBe(1);
     expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(1);
     await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
+  });
+
+  t('a chunk for an attempt the reaper already ended is not retried', async () => {
+    // WHY: the reaper marks that attempt FAILED. BullMQ then retries the
+    // chunk five times and logs a misleading error. The chunk has to finish
+    // without writing rows. A newer attempt, and a job still pending, still wait.
+    const ended = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: ended.job.id },
+      data: { meta: { attemptId: ENDED } },
+    });
+    let reads = 0;
+    const info = vi.fn();
+    const payload = {
+      migrationJobId: ended.job.id,
+      orgId: ended.org.id,
+      userId: ended.job.userId,
+      source: 'CSV' as const,
+      entityType: 'companies',
+      chunkOffset: 0,
+      chunkSize: 100,
+      totalRows: 1,
+      redisKey: 'rows',
+      mappings: { Name: 'company.name' },
+      dedupStrategy: 'skip' as const,
+      attemptId: ENDED,
+    };
+    await processMigrationChunk(
+      payload,
+      deps(async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      }),
+      { info, warn: () => undefined },
+    );
+    expect(reads).toBe(0);
+    expect(await prisma.company.count({ where: { orgId: ended.org.id, deletedAt: null } })).toBe(0);
+    expect(info).toHaveBeenCalledWith(
+      { migrationJobId: ended.job.id, attemptId: ENDED, status: 'FAILED' },
+      'migration chunk skipped — attempt already ended',
+    );
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: ended.job.id } });
+    expect(stored.status).toBe('FAILED');
+    await prisma.org.delete({ where: { id: ended.org.id } }).catch(() => undefined);
+
+    const fresh = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: fresh.job.id },
+      data: { meta: { attemptId: ENDED } },
+    });
+    await expect(
+      processMigrationChunk(
+        { ...payload, migrationJobId: fresh.job.id, orgId: fresh.org.id, userId: fresh.job.userId, attemptId: FRESH },
+        deps(async () => '[]'),
+        log,
+      ),
+    ).rejects.toThrow(/not running yet/);
+    await prisma.org.delete({ where: { id: fresh.org.id } }).catch(() => undefined);
+
+    const pending = await fixture('PENDING');
+    await expect(
+      processMigrationChunk(
+        { ...payload, migrationJobId: pending.job.id, orgId: pending.org.id, userId: pending.job.userId, attemptId: ENDED },
+        deps(async () => '[]'),
+        log,
+      ),
+    ).rejects.toThrow(/not running yet/);
+    await prisma.org.delete({ where: { id: pending.org.id } }).catch(() => undefined);
   });
 });
