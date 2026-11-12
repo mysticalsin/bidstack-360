@@ -20,10 +20,19 @@
 
 import { createHmac, createSign, randomBytes } from 'node:crypto';
 import type { FastifyError } from 'fastify';
+import pino from 'pino';
 import { prisma, type Prisma } from '@bidstack/db';
-import type { SignatureStatus } from '@bidstack/shared';
+import {
+  isIllegalTransition,
+  signatureFrom,
+  signatureTransition,
+  type SignatureState,
+  type SignatureStatus,
+} from '@bidstack/shared';
 import { htmlToPdf } from './document.service.js';
 import { getEnv } from '../../env.js';
+
+const log = pino({ name: 'signature', level: process.env.LOG_LEVEL ?? 'info' });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -424,8 +433,11 @@ export async function voidSignatureRequest(params: {
   if (!request) notFound(`Signature request ${requestId} not found`);
   if (request.orgId !== orgId) forbidden('Cannot void a signature request from another org');
 
-  const terminalStatuses: SignatureStatus[] = ['SIGNED', 'DECLINED', 'VOIDED', 'EXPIRED'];
-  if (terminalStatuses.includes(request.status as SignatureStatus)) {
+  if (isIllegalTransition(signatureTransition(request.status as SignatureState, 'void'))) {
+    log.warn(
+      { signatureRequestId: requestId, from: request.status, to: 'VOIDED' },
+      'illegal signature transition',
+    );
     badRequest(`Cannot void a request with status ${request.status}`);
   }
 
@@ -458,12 +470,20 @@ export async function voidSignatureRequest(params: {
         id: requestId,
         orgId,
         deletedAt: null,
-        status: { in: ['DRAFT', 'SENT', 'VIEWED'] },
+        status: { in: [...signatureFrom('void')] },
       },
       data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
     });
     if (changed.count !== 1) {
-      badRequest(`Cannot void a request with status ${request.status}`);
+      const current = await tx.signatureRequest.findFirst({
+        where: { id: requestId, orgId },
+        select: { status: true },
+      });
+      log.warn(
+        { signatureRequestId: requestId, from: current?.status ?? null, to: 'VOIDED' },
+        'illegal signature transition',
+      );
+      badRequest(`Cannot void a request with status ${current?.status ?? request.status}`);
     }
     await tx.signatureEvent.create({
       data: {
