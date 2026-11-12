@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   OAuthRefreshLockTimeoutError,
+  OAuthRefreshLockUnavailableError,
   oauthRefreshLockRedisRequired,
   oauthRefreshLockStartupError,
   runWithOAuthRefreshLock,
@@ -78,6 +79,7 @@ describe('runWithOAuthRefreshLock', () => {
       redisRequired: false,
     });
     expect(value).toBe('fresh');
+    expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls.some((call) => call.includes(FALLBACK))).toBe(true);
   });
 
@@ -123,9 +125,11 @@ describe('runWithOAuthRefreshLock', () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(280);
   });
 
-  it('does not warn when no Redis client was configured', async () => {
+  it('warns when the memory lock is used because no Redis client was configured', async () => {
+    // WHY: a missing client is a fallback, the same as a client that is not
+    // ready. A silent fallback hides an outage.
     const warn = vi.fn();
-    await runWithOAuthRefreshLock({
+    const value = await runWithOAuthRefreshLock({
       tokenId: 'no-redis',
       log: { debug: vi.fn(), warn },
       getFreshValue: async () => 'already',
@@ -133,6 +137,23 @@ describe('runWithOAuthRefreshLock', () => {
       redis: null,
       redisRequired: false,
     });
+    expect(value).toBe('already');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls.some((call) => call.includes(FALLBACK))).toBe(true);
+  });
+
+  it('does not warn when Redis is required and unavailable', async () => {
+    const warn = vi.fn();
+    await expect(
+      runWithOAuthRefreshLock({
+        tokenId: 'required-down',
+        log: { debug: vi.fn(), warn },
+        getFreshValue: async () => null,
+        refresh: async () => 'fresh',
+        redis: null,
+        redisRequired: true,
+      }),
+    ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
     expect(warn).not.toHaveBeenCalled();
   });
 });

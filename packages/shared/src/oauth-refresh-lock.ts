@@ -147,21 +147,20 @@ async function acquireRefreshLock(
   redisRequired: boolean,
   log: RefreshLockLogger,
 ): Promise<boolean> {
+  const fallback = 'OAuth refresh Redis lock unavailable; using process-local fallback';
   try {
     if (redis && (await redis.ready())) {
       const result = await redis.set(key, owner, 'PX', ttlMs, 'NX');
       return result === 'OK';
     }
-    if (redisRequired) throw new OAuthRefreshLockUnavailableError();
-    if (redis) {
-      log.warn({ ready: false }, 'OAuth refresh Redis lock unavailable; using process-local fallback');
-    }
   } catch (err) {
-    if (err instanceof OAuthRefreshLockUnavailableError) throw err;
     if (redisRequired) throw new OAuthRefreshLockUnavailableError();
-    log.warn({ err }, 'OAuth refresh Redis lock unavailable; using process-local fallback');
+    log.warn({ err }, fallback);
+    return acquireMemoryLock(key, owner, ttlMs);
   }
 
+  if (redisRequired) throw new OAuthRefreshLockUnavailableError();
+  log.warn(redis ? { ready: false } : { redis: null }, fallback);
   return acquireMemoryLock(key, owner, ttlMs);
 }
 
