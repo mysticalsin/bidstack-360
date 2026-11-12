@@ -89,7 +89,7 @@ function importErrorCopy(
     );
   }
   const known = IMPORT_ERROR_KEYS[message];
-  if (!known) return t('csvImport.progress.reasonUnknown', 'The import could not be completed.');
+  if (!known) return message;
   return t(known[0], known[1]);
 }
 

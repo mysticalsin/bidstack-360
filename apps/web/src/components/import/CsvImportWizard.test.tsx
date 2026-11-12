@@ -350,6 +350,23 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
   });
 
+  it('shows a stored failure sentence that has no code', async () => {
+    // WHY: a row error is already the sentence the operator needs. Replacing
+    // it with the generic failure hides which row was rejected.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 1,
+      errorRows: 1,
+      errorSummary: [{ row: 2, field: 'company.name', message: 'company.name is required' }],
+    });
+    await waitFor(() => expect(screen.getByText('company.name is required')).toBeTruthy());
+    expect(screen.queryByText('The import could not be completed.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+  });
+
   it('does not say an exhausted conflict will be tried again', async () => {
     // WHY: the last attempt is over. The error file and the wizard must not
     // promise another try.
