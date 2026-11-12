@@ -17,6 +17,7 @@ export function containerEnv(env) {
     'POLO_INTEGRATION_TOKEN_KEY',
     'POLO_PII_ENCRYPTION_MASTER_KEY',
     'POLO_JOB_SIGNING_SECRET',
+    'POLO_APP_DB_PASSWORD',
   ].filter((name) => !env[name]);
   if (missing.length) throw new Error(`polo-preview is missing Worker secrets: ${missing.join(', ')}`);
   return {
@@ -29,6 +30,7 @@ export function containerEnv(env) {
     INTEGRATION_TOKEN_KEY: env.POLO_INTEGRATION_TOKEN_KEY,
     PII_ENCRYPTION_MASTER_KEY: env.POLO_PII_ENCRYPTION_MASTER_KEY,
     BIDSTACK_JOB_SIGNING_SECRET: env.POLO_JOB_SIGNING_SECRET,
+    POLO_APP_DB_PASSWORD: env.POLO_APP_DB_PASSWORD,
     ...(env.POLO_INTEL_USER_AGENT ? { POLO_INTEL_USER_AGENT: env.POLO_INTEL_USER_AGENT } : {}),
     ...(env.COMPANIES_HOUSE_API_KEY ? { COMPANIES_HOUSE_API_KEY: env.COMPANIES_HOUSE_API_KEY } : {}),
   };

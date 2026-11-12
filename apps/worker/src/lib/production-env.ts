@@ -1,3 +1,4 @@
+import { databaseLogin } from '@bidstack/db';
 import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
 
 type Env = Record<string, string | undefined>;
@@ -52,6 +53,20 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
   for (const key of REQUIRED_PRODUCTION_KEYS) {
     if (!trimmed(env, key)) {
       errors.push(`${key} is required in production`);
+    }
+  }
+
+  const appUrl = trimmed(env, 'DATABASE_URL_APP');
+  const ownerUrl = trimmed(env, 'DATABASE_URL_OWNER');
+  if (!appUrl) errors.push('DATABASE_URL_APP is required in production');
+  if (!ownerUrl) errors.push('DATABASE_URL_OWNER is required in production');
+  if (appUrl && ownerUrl) {
+    const appLogin = databaseLogin(appUrl);
+    const ownerLogin = databaseLogin(ownerUrl);
+    if (!appLogin) errors.push('DATABASE_URL_APP must be a postgres URL with a login');
+    if (!ownerLogin) errors.push('DATABASE_URL_OWNER must be a postgres URL with a login');
+    if (appLogin && ownerLogin && appLogin === ownerLogin) {
+      errors.push('DATABASE_URL_APP must not use the owner login');
     }
   }
 

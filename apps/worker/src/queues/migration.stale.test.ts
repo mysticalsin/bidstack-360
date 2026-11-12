@@ -171,7 +171,8 @@ describe('migration stale scan', () => {
   t('an old pending start that never queued is removed', async () => {
     // WHY: a crash after migration.start_failed, or before the chunks were
     // queued, leaves a PENDING job the wizard never received. The sweep has
-    // to remove it. A job that still has a queue entry, and a young one, stay.
+    // to remove it. An old job that still has a queue entry is marked failed
+    // so it does not keep the slot. A young one stays.
     const abandoned = await pendingJob(16 * 60_000);
     await prisma.auditLog.create({
       data: {
@@ -203,11 +204,11 @@ describe('migration stale scan', () => {
         deleted.push(key);
       },
     });
-    expect(reaped).toBe(2);
+    expect(reaped).toBe(3);
     expect(await prisma.migrationJob.findUnique({ where: { id: abandoned.job.id } })).toBeNull();
     expect(await prisma.migrationJob.findUnique({ where: { id: unqueued.job.id } })).toBeNull();
     expect((await prisma.migrationJob.findUnique({ where: { id: queued.job.id } }))?.status).toBe(
-      'PENDING',
+      'FAILED',
     );
     expect((await prisma.migrationJob.findUnique({ where: { id: young.job.id } }))?.status).toBe(
       'PENDING',
@@ -242,6 +243,19 @@ describe('migration stale scan', () => {
     }
   });
 
+  t('an old pending import that already has queued chunks releases the slot', async () => {
+    // WHY: the sweep used to leave a PENDING row alone when a chunk was
+    // queued. That row holds the same-import slot until someone deletes it.
+    const queued = await pendingJob(16 * 60_000);
+    const released = await sweepAbandonedPending(new Date(), {
+      hasQueueEntry: async () => true,
+    });
+    expect(released).toBe(1);
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: queued.job.id } });
+    expect(stored.status).toBe('FAILED');
+    await prisma.org.delete({ where: { id: queued.org.id } }).catch(() => undefined);
+  });
+
   t('a delete that does not land does not record a reap', async () => {
     // WHY: the reap audit used to commit before the delete. A delete that
     // removes nothing, or is rejected, left a "reaped" row, and the next
@@ -272,8 +286,8 @@ describe('migration stale scan', () => {
       `CREATE TRIGGER block_reap BEFORE DELETE ON migration_jobs FOR EACH ROW EXECUTE FUNCTION block_reap_delete()`,
     );
     try {
-      await expect(sweepAbandonedPending(new Date())).rejects.toThrow(/delete blocked/);
-      await expect(sweepAbandonedPending(new Date())).rejects.toThrow(/delete blocked/);
+      await expect(sweepAbandonedPending(new Date())).resolves.toBe(0);
+      await expect(sweepAbandonedPending(new Date())).resolves.toBe(0);
       expect(
         await prisma.auditLog.count({
           where: { targetId: abandoned.job.id, action: 'migration.reaped' },
@@ -286,6 +300,67 @@ describe('migration stale scan', () => {
       await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS block_reap ON migration_jobs`);
       await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS block_reap_delete()`);
       await prisma.org.delete({ where: { id: abandoned.org.id } }).catch(() => undefined);
+    }
+  });
+
+  t('a delete that raises still reaps the next abandoned job', async () => {
+    // WHY: the sweep used to throw out of the loop. One rejected delete
+    // left every later abandoned import pending until the next process.
+    const first = await pendingJob(16 * 60_000);
+    const second = await pendingJob(16 * 60_000);
+    for (const row of [first, second]) {
+      await prisma.auditLog.create({
+        data: {
+          orgId: row.org.id,
+          userId: row.user.id,
+          action: 'migration.start_failed',
+          targetType: 'MigrationJob',
+          targetId: row.job.id,
+          diff: { reason: 'queue' },
+        },
+      });
+    }
+    await prisma.$executeRawUnsafe(`CREATE SEQUENCE IF NOT EXISTS reap_block_seq`);
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE reap_block_seq RESTART WITH 1`);
+    await prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE FUNCTION block_first_reap() RETURNS trigger
+      LANGUAGE plpgsql AS $fn$
+      BEGIN
+        IF nextval('reap_block_seq') = 1 THEN
+          RAISE EXCEPTION 'delete blocked';
+        END IF;
+        RETURN OLD;
+      END;
+      $fn$;
+    `);
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER block_first_reap BEFORE DELETE ON migration_jobs FOR EACH ROW EXECUTE FUNCTION block_first_reap()`,
+    );
+    try {
+      await expect(sweepAbandonedPending(new Date())).resolves.toBe(1);
+      const still = [];
+      for (const row of [first, second]) {
+        const stored = await prisma.migrationJob.findUnique({ where: { id: row.job.id } });
+        if (stored) still.push(row);
+      }
+      expect(still).toHaveLength(1);
+      expect(
+        await prisma.auditLog.count({
+          where: { targetId: still[0]!.job.id, action: 'migration.reaped' },
+        }),
+      ).toBe(0);
+      const gone = first.job.id === still[0]!.job.id ? second : first;
+      expect(
+        await prisma.auditLog.count({
+          where: { targetId: gone.job.id, action: 'migration.reaped' },
+        }),
+      ).toBe(1);
+    } finally {
+      await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS block_first_reap ON migration_jobs`);
+      await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS block_first_reap()`);
+      await prisma.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS reap_block_seq`);
+      await prisma.org.delete({ where: { id: first.org.id } }).catch(() => undefined);
+      await prisma.org.delete({ where: { id: second.org.id } }).catch(() => undefined);
     }
   });
 });

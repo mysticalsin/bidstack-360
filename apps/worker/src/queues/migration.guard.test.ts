@@ -27,6 +27,9 @@ const t = (name: string, fn: () => Promise<void>) =>
 
 const log = { info: () => undefined, warn: () => undefined };
 
+const ENDED = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const FRESH = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
 async function fixture(status: 'PENDING' | 'RUNNING' | 'COMPLETE' | 'CANCELLED' | 'FAILED') {
   const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const org = await prisma.org.create({
@@ -183,5 +186,150 @@ describe('migration chunk guards', () => {
     expect(reads).toBe(1);
     expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(1);
     await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
+  });
+
+  t('a failed chunk with two null attempt ids is not retried', async () => {
+    // WHY: a legacy failed row and its chunk both have no attempt id. Treating
+    // that pair as a mismatch makes BullMQ retry the chunk five times.
+    const failed = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: failed.job.id },
+      data: { meta: { attemptId: null } },
+    });
+    let reads = 0;
+    const info = vi.fn();
+    await processMigrationChunk(
+      {
+        migrationJobId: failed.job.id,
+        orgId: failed.org.id,
+        userId: failed.job.userId,
+        source: 'CSV',
+        entityType: 'companies',
+        chunkOffset: 0,
+        chunkSize: 100,
+        totalRows: 1,
+        redisKey: 'rows',
+        mappings: { Name: 'company.name' },
+        dedupStrategy: 'skip',
+        attemptId: null,
+      },
+      deps(async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      }),
+      { info, warn: () => undefined },
+    );
+    expect(reads).toBe(0);
+    expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(0);
+    expect(info).toHaveBeenCalledWith(
+      { migrationJobId: failed.job.id, attemptId: null, status: 'FAILED' },
+      'migration chunk skipped — attempt already ended',
+    );
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: failed.job.id } });
+    expect(stored.status).toBe('FAILED');
+    await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
+  });
+
+  t('a running job accepts a chunk that passes a null attempt id', async () => {
+    // WHY: a legacy row and a legacy chunk both have no attempt id. Null is
+    // that missing id, and the chunk still has to import.
+    const running = await fixture('RUNNING');
+    await prisma.migrationJob.update({
+      where: { id: running.job.id },
+      data: { startedAt: new Date(), meta: { entityType: 'companies' } },
+    });
+    let reads = 0;
+    await processMigrationChunk(
+      {
+        migrationJobId: running.job.id,
+        orgId: running.org.id,
+        userId: running.job.userId,
+        source: 'CSV',
+        entityType: 'companies',
+        chunkOffset: 0,
+        chunkSize: 100,
+        totalRows: 1,
+        redisKey: 'rows',
+        mappings: { Name: 'company.name' },
+        dedupStrategy: 'skip',
+        attemptId: null,
+      },
+      deps(async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      }),
+      log,
+    );
+    expect(reads).toBe(1);
+    expect(await prisma.company.count({ where: { orgId: running.org.id, deletedAt: null } })).toBe(1);
+    await prisma.org.delete({ where: { id: running.org.id } }).catch(() => undefined);
+  });
+
+  t('a chunk for an attempt the reaper already ended is not retried', async () => {
+    // WHY: the reaper marks that attempt FAILED. BullMQ then retries the
+    // chunk five times and logs a misleading error. The chunk has to finish
+    // without writing rows. A newer attempt, and a job still pending, still wait.
+    const ended = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: ended.job.id },
+      data: { meta: { attemptId: ENDED } },
+    });
+    let reads = 0;
+    const info = vi.fn();
+    const payload = {
+      migrationJobId: ended.job.id,
+      orgId: ended.org.id,
+      userId: ended.job.userId,
+      source: 'CSV' as const,
+      entityType: 'companies',
+      chunkOffset: 0,
+      chunkSize: 100,
+      totalRows: 1,
+      redisKey: 'rows',
+      mappings: { Name: 'company.name' },
+      dedupStrategy: 'skip' as const,
+      attemptId: ENDED,
+    };
+    await processMigrationChunk(
+      payload,
+      deps(async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      }),
+      { info, warn: () => undefined },
+    );
+    expect(reads).toBe(0);
+    expect(await prisma.company.count({ where: { orgId: ended.org.id, deletedAt: null } })).toBe(0);
+    expect(info).toHaveBeenCalledWith(
+      { migrationJobId: ended.job.id, attemptId: ENDED, status: 'FAILED' },
+      'migration chunk skipped — attempt already ended',
+    );
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: ended.job.id } });
+    expect(stored.status).toBe('FAILED');
+    await prisma.org.delete({ where: { id: ended.org.id } }).catch(() => undefined);
+
+    const fresh = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: fresh.job.id },
+      data: { meta: { attemptId: ENDED } },
+    });
+    await expect(
+      processMigrationChunk(
+        { ...payload, migrationJobId: fresh.job.id, orgId: fresh.org.id, userId: fresh.job.userId, attemptId: FRESH },
+        deps(async () => '[]'),
+        log,
+      ),
+    ).rejects.toThrow(/not running yet/);
+    await prisma.org.delete({ where: { id: fresh.org.id } }).catch(() => undefined);
+
+    const pending = await fixture('PENDING');
+    await expect(
+      processMigrationChunk(
+        { ...payload, migrationJobId: pending.job.id, orgId: pending.org.id, userId: pending.job.userId, attemptId: ENDED },
+        deps(async () => '[]'),
+        log,
+      ),
+    ).rejects.toThrow(/not running yet/);
+    await prisma.org.delete({ where: { id: pending.org.id } }).catch(() => undefined);
   });
 });

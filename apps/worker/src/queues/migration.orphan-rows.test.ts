@@ -240,6 +240,10 @@ describe('migration rows stay with the attempt that owns them', () => {
         read.mockRestore();
       }
       expect(await item.count(), item.entityType).toBe(0);
+      await prisma.migrationJob.update({
+        where: { id: job.id },
+        data: { status: 'COMPLETE', completedAt: new Date() },
+      });
     }
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
   });

@@ -1,10 +1,9 @@
-// WHY these races matter: a CSV start enqueues while the job is still pending,
-// then claims RUNNING only if that status is unchanged. A cancel during
-// enqueue must stay cancelled. A queue that throws removes the pending job.
-// A chunk must not import in that window.
+// WHY these races matter: a CSV start claims RUNNING before it enqueues. A
+// cancel during enqueue must stay cancelled. A queue that throws removes the
+// job. A claim that does not land must not enqueue.
 
 import { Queue } from 'bullmq';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
@@ -16,6 +15,7 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
+import { retireActiveImports } from './migrations.test-helpers.js';
 
 async function ageProgress(id: string): Promise<void> {
   const past = new Date(Date.now() - 16 * 60_000);
@@ -67,6 +67,10 @@ afterAll(async () => {
   if (server) await server.close();
   restoreAuth?.();
   if (org) await dropIsolatedOrg(org.orgId);
+});
+
+beforeEach(async () => {
+  if (org) await retireActiveImports(org.orgId);
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
@@ -274,20 +278,18 @@ describe('migration status races', () => {
     }
   });
 
-  t('a chunk does not import while the next enqueue is still waiting', async () => {
-    // WHY: the bulk add has not returned, so the job is still pending.
-    // Importing a chunk now would save rows the start never claimed.
-    const { redis } = await import('../redis.js');
-    (server as unknown as { redis: typeof redis }).redis = redis;
+  t('the attempt is claimed before the enqueue returns', async () => {
+    // WHY: the chunks are handed to the queue only after the row is RUNNING.
+    // A throw from that hand-off still removes the job.
     let calls = 0;
     let rejectNext: (err: Error) => void = () => undefined;
     const blocked = new Promise<never>((_resolve, reject) => {
       rejectNext = reject;
     });
-    let chunk0: { migrationJobId?: string } | null = null;
+    let jobId = '';
     const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
       calls += 1;
-      chunk0 = (jobs[0]?.data ?? null) as { migrationJobId?: string } | null;
+      jobId = (jobs[0]?.data as { migrationJobId?: string } | undefined)?.migrationJobId ?? '';
       return blocked;
     });
     try {
@@ -303,27 +305,13 @@ describe('migration status races', () => {
         },
       });
       await vi.waitFor(() => expect(calls).toBe(1));
-      const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
-      await expect(
-        processMigrationChunk(
-          chunk0 as never,
-          {
-            readRows: (key) => redis.get(key),
-            enqueueChunk: async () => undefined,
-            enqueueIntel: async () => undefined,
-            env: { ACCOUNT_INTEL_IMPORT_ENRICH: 'false' },
-          },
-          { info: () => undefined, warn: () => undefined },
-        ),
-      ).rejects.toThrow(/not running yet/);
-      const source = `migration:${chunk0?.migrationJobId ?? ''}`;
-      expect(await prisma.company.count({ where: { orgId: org.orgId, source } })).toBe(0);
+      const claimed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: jobId } });
+      expect(claimed.status).toBe('RUNNING');
+      expect((claimed.meta as { attemptId?: string }).attemptId).toEqual(expect.any(String));
       rejectNext(new Error('queue down'));
       const res = await pending;
       expect(res.statusCode).toBe(409);
-      expect(
-        await prisma.migrationJob.findUnique({ where: { id: chunk0?.migrationJobId ?? '' } }),
-      ).toBeNull();
+      expect(await prisma.migrationJob.findUnique({ where: { id: jobId } })).toBeNull();
     } finally {
       rejectNext(new Error('queue down'));
       add.mockRestore();

@@ -114,6 +114,8 @@ CI build verification (`.github/workflows/ci.yml`, `unit` job, no DB): `pnpm ins
 
 Migrations run as a **dedicated one-shot** that must complete (exit 0) **before any app revision serves traffic**. This ordering prevents new app code from hitting an old schema.
 
+Before `prisma migrate deploy`, run the read-only precheck in `docs/deploy/active-import-index.md`. If it returns any row, do not apply `20261112170100_migration_jobs_one_active_per_file`. That file is only `CREATE UNIQUE INDEX CONCURRENTLY`. A failed attempt can leave an invalid index; the note has `DROP INDEX CONCURRENTLY` and the resolve command. It does not delete duplicate rows. `20261112170000` only adds `file_hash`. Polo's live migrate is the same command inside the Cloudflare container, which skips the index migration when the precheck returns rows.
+
 The `migrate` target (root `Dockerfile`):
 
 - Minimal image: installs only `@bidstack/db` deps, copies `packages/db/prisma`, strips pnpm/npm/corepack, **runs as non-root `bidstack`**.
@@ -344,7 +346,7 @@ Smoke flow after green health: log in (Clerk), load dashboard, open an account, 
 ## 10. Rollback (outline — drill REQUIRES ACCESS)
 
 - **App rollback:** redeploy the previous immutable image digest per service (Azure revision pin / Railway redeploy). Stateless apps roll back cleanly.
-- **Schema rollback:** Prisma `migrate deploy` is forward-only. A schema rollback needs a compensating migration or a point-in-time restore — not an automatic down-migration. Validate via a **rollback drill** in staging before relying on it.
+- **Schema rollback:** Prisma `migrate deploy` is forward-only. A schema rollback needs a compensating migration or a point-in-time restore — not an automatic down-migration. Validate via a **rollback drill** in staging before relying on it. For `migration_jobs_one_active_per_file` (`20261112170100`), follow `docs/deploy/active-import-index.md`. A failed `CREATE INDEX CONCURRENTLY` leaves `indisvalid = false`, and the next deploy is P3009 until `DROP INDEX CONCURRENTLY` and `prisma migrate resolve --rolled-back` for that failed migration. `resolve --rolled-back` on a migration that succeeded returns P3012. There is no repair migration for an older `20261112170000`. Jarvis decides whether to run the read-only check; this change does not run it. The query is `SELECT migration_name, checksum, finished_at, rolled_back_at, COUNT(*) OVER () AS row_count FROM _prisma_migrations WHERE migration_name LIKE '20261112170000%'`. PROCEED only if (a) no row exists for `20261112170000` (never recorded), or (b) a row with checksum `d7e69f0c4edfd74990c47dde52dc8797225eb6314abcd415b7f44a227eaf9ee8` AND `finished_at` IS NOT NULL AND `rolled_back_at` IS NULL. STOP and escalate to Tony in every other case, including checksum `b4630ad8e436a1c4b945bf383a781c5864686387c18109fcc54958ee9b829833` (old index SQL; `20261112170100` would fail with 42703 and then P3009, and it needs a forward add-column migration before deploy), the current checksum with `finished_at` NULL (a failed attempt: recover per the P3009 notes), any other checksum, and more than one row. On Polo, a failed boot restores the same R2 snapshot and tries again; that note has the image rollback and where the snapshot fits.
 - The ops-readiness gate (§7) requires `rollback.runbookReviewed` + a `rollbackDrillAt` ISO timestamp and a restore drill within RTO/RPO thresholds. Those are real drills against real infra — **REQUIRES ACCESS**, and per the gate matrix are currently FAIL/UNKNOWN (Gate 12 CRITICAL).
 
 ---

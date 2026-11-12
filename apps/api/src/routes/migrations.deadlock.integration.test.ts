@@ -134,7 +134,18 @@ describe('a real import deadlock', () => {
           });
         }
         const forward = await job(attemptA);
-        const backward = await job(attemptB);
+        const backward = await prisma.migrationJob.create({
+          data: {
+            orgId: org.orgId,
+            userId,
+            source: 'SALESFORCE_CSV',
+            status: 'RUNNING',
+            totalRows: names.length,
+            processedRows: 0,
+            startedAt: new Date(),
+            meta: { entityType: 'companies', attemptId: attemptB },
+          },
+        });
         await redis.set(`migration:${forward.id}:rows`, JSON.stringify(names.map((name) => ({ Name: name }))));
         await redis.set(
           `migration:${backward.id}:rows`,

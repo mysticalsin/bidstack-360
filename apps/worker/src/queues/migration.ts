@@ -848,9 +848,25 @@ export async function processMigrationChunk(
     where: { id: payload.migrationJobId },
     select: { status: true, meta: true, orgId: true },
   });
-  // Start and retry enqueue before the RUNNING claim. A chunk that arrives
-  // while the row is still PENDING or FAILED must be retried, not completed,
-  // or the claim that follows has nothing left to process.
+  // The reaper already ended this attempt. Retrying the chunk does no work
+  // and logs a misleading error. A newer attempt id is the retry route, which
+  // still has to wait for the RUNNING claim.
+  if (
+    jobRow?.status === 'FAILED' &&
+    migrationChunkMatchesAttempt(migrationAttemptId(jobRow.meta), payload.attemptId ?? null)
+  ) {
+    log.info(
+      {
+        migrationJobId: payload.migrationJobId,
+        attemptId: payload.attemptId ?? null,
+        status: jobRow.status,
+      },
+      'migration chunk skipped — attempt already ended',
+    );
+    return;
+  }
+  // A chunk that arrives before the RUNNING claim, or for a different
+  // attempt, waits. Null attempt ids are the legacy pair and match each other.
   if (jobRow?.status === 'PENDING' || jobRow?.status === 'FAILED') {
     throw new Error('migration job is not running yet');
   }
@@ -1163,14 +1179,19 @@ function migrationEntityType(meta: unknown): string | null {
 /**
  * Remove a PENDING start the handler did not finish. A start_failed row means
  * the queue already refused it. No queue entry means the chunks were never
- * accepted. A job that still has a chunk waiting is left for the worker.
+ * accepted. A job that still has a chunk waiting is marked FAILED so it does
+ * not keep the same-import slot.
  */
 export async function sweepAbandonedPending(
   now = new Date(),
   deps: {
     hasQueueEntry?: (migrationJobId: string) => Promise<boolean>;
+    dropQueuedChunks?: (migrationJobId: string) => Promise<void>;
     deleteRows?: (key: string) => Promise<unknown>;
-    log?: { info: (obj: object, msg?: string) => void };
+    log?: {
+      info: (obj: object, msg?: string) => void;
+      warn?: (obj: object, msg?: string) => void;
+    };
   } = {},
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - MIGRATION_ABANDONED_PENDING_MS);
@@ -1180,49 +1201,74 @@ export async function sweepAbandonedPending(
   });
   let reaped = 0;
   for (const job of candidates) {
-    const failedStart = await prisma.auditLog.findFirst({
-      where: { orgId: job.orgId, targetId: job.id, action: 'migration.start_failed' },
-      select: { id: true },
-    });
-    if (!failedStart) {
-      if (!deps.hasQueueEntry) continue;
-      let queued: boolean;
-      try {
-        queued = await deps.hasQueueEntry(job.id);
-      } catch {
-        continue;
+    // One rejected delete must not skip the imports after it.
+    try {
+      const failedStart = await prisma.auditLog.findFirst({
+        where: { orgId: job.orgId, targetId: job.id, action: 'migration.start_failed' },
+        select: { id: true },
+      });
+      if (!failedStart) {
+        if (!deps.hasQueueEntry) continue;
+        let queued: boolean;
+        try {
+          queued = await deps.hasQueueEntry(job.id);
+        } catch {
+          continue;
+        }
+        if (queued) {
+          const released = await prisma.migrationJob.updateMany({
+            where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+            data: {
+              status: 'FAILED',
+              completedAt: new Date(),
+              errorSummary: [{ row: 0, field: null, message: 'pending import released' }],
+            },
+          });
+          if (released.count !== 1) continue;
+          deps.log?.info(
+            { migrationJobId: job.id, orgId: job.orgId },
+            'released a pending import that still had queued chunks',
+          );
+          await deps.dropQueuedChunks?.(job.id).catch(() => undefined);
+          reaped += 1;
+          continue;
+        }
       }
-      if (queued) continue;
-    }
-    const reason = failedStart ? 'start_failed' : 'no_queue_entry';
-    // The audit and the delete commit together. A delete that removes
-    // nothing, or is rejected, must not leave a reap row for the next scan.
-    const removed = await prisma.$transaction(async (tx) => {
-      const deleted = await tx.migrationJob.deleteMany({
-        where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+      const reason = failedStart ? 'start_failed' : 'no_queue_entry';
+      // The audit and the delete commit together. A delete that removes
+      // nothing, or is rejected, must not leave a reap row for the next scan.
+      const removed = await prisma.$transaction(async (tx) => {
+        const deleted = await tx.migrationJob.deleteMany({
+          where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+        });
+        if (deleted.count !== 1) return 0;
+        await tx.auditLog.create({
+          data: {
+            orgId: job.orgId,
+            action: 'migration.reaped',
+            targetType: 'MigrationJob',
+            targetId: job.id,
+            diff: { reason },
+          },
+        });
+        return 1;
       });
-      if (deleted.count !== 1) return 0;
-      await tx.auditLog.create({
-        data: {
-          orgId: job.orgId,
-          action: 'migration.reaped',
-          targetType: 'MigrationJob',
-          targetId: job.id,
-          diff: { reason },
-        },
-      });
-      return 1;
-    });
-    if (removed !== 1) continue;
-    deps.log?.info(
-      { migrationJobId: job.id, orgId: job.orgId, reason },
-      'reaped an abandoned pending import',
-    );
-    const entityType = migrationEntityType(job.meta);
-    if (entityType && deps.deleteRows) {
-      await deps.deleteRows(`migration:${job.id}:${entityType}:rows`).catch(() => undefined);
+      if (removed !== 1) continue;
+      deps.log?.info(
+        { migrationJobId: job.id, orgId: job.orgId, reason },
+        'reaped an abandoned pending import',
+      );
+      const entityType = migrationEntityType(job.meta);
+      if (entityType && deps.deleteRows) {
+        await deps.deleteRows(`migration:${job.id}:${entityType}:rows`).catch(() => undefined);
+      }
+      reaped += 1;
+    } catch (err) {
+      deps.log?.warn?.(
+        { err, migrationJobId: job.id, orgId: job.orgId },
+        'abandoned import reap failed',
+      );
     }
-    reaped += 1;
   }
   return reaped;
 }
@@ -1339,8 +1385,9 @@ export async function startMigrationWorker(
       if (job.name === MIGRATION_STALE_SCAN) {
         await sweepStaleMigrations();
         let hasQueueEntry: ((migrationJobId: string) => Promise<boolean>) | undefined;
+        let waiting: Awaited<ReturnType<typeof queue.getJobs>> = [];
         try {
-          const waiting = await queue.getJobs(['waiting', 'active', 'delayed', 'paused', 'prioritized']);
+          waiting = await queue.getJobs(['waiting', 'active', 'delayed', 'paused', 'prioritized']);
           const queued = new Set<string>();
           for (const entry of waiting) {
             const id = (entry?.data as { migrationJobId?: unknown } | undefined)?.migrationJobId;
@@ -1352,6 +1399,13 @@ export async function startMigrationWorker(
         }
         await sweepAbandonedPending(new Date(), {
           hasQueueEntry,
+          dropQueuedChunks: async (migrationJobId) => {
+            await Promise.all(
+              waiting
+                .filter((entry) => (entry?.data as { migrationJobId?: unknown } | undefined)?.migrationJobId === migrationJobId)
+                .map((entry) => entry.remove()),
+            );
+          },
           deleteRows: (key) => connection.del(key),
           log,
         });

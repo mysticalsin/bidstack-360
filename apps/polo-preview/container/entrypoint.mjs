@@ -7,13 +7,15 @@
 // it seeds by itself so the app never stays dark.
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, createReadStream, createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
+import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
+import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
 const APP = '/app';
@@ -28,11 +30,12 @@ const BOOT_ID = randomUUID();
 const INTERNAL_KEY = process.env.POLO_INTERNAL_KEY || '';
 const PG_USER = 'bidstack';
 const DB = 'bidstack';
-const DATABASE_URL = `postgres://${PG_USER}:${PG_USER}@127.0.0.1:5432/${DB}`;
+const OWNER_URL = ownerDatabaseUrl();
 const REDIS_PASS = randomUUID().replaceAll('-', '');
 let redisHost = 'polo-redis';
 
 let phase = 'booting';
+let servePreviousSchema = false;
 let detail = '';
 let apiChild = null;
 let apiRestarts = 0;
@@ -79,15 +82,15 @@ function runSync(cmd, args, opts = {}) {
   }
 }
 
-function apiEnv() {
-  return {
+function runtimeEnv(databaseUrl) {
+  const env = {
     ...process.env,
     NODE_ENV: 'production',
     HOST: '127.0.0.1',
     PORT: String(API_PORT),
     PORT_API: String(API_PORT),
-    DATABASE_URL,
-    DATABASE_URL_UNPOOLED: DATABASE_URL,
+    DATABASE_URL: databaseUrl,
+    DATABASE_URL_UNPOOLED: databaseUrl,
     REDIS_URL: `redis://:${REDIS_PASS}@${redisHost}:6379`,
     CF_ACCESS_AUTH: 'true',
     CF_ACCESS_TEAM_DOMAIN: 'tony-walteur.cloudflareaccess.com',
@@ -113,6 +116,54 @@ function apiEnv() {
         }
       : {}),
   };
+  delete env.POLO_APP_DB_PASSWORD;
+  return env;
+}
+
+function migrateEnv() {
+  return { ...runtimeEnv(OWNER_URL), DATABASE_URL_OWNER: OWNER_URL };
+}
+
+function apiEnv() {
+  // The restored database is still the previous schema. Connect as the owner
+  // so the API can answer. The app role belongs to the migration we refused.
+  if (servePreviousSchema) {
+    const env = runtimeEnv(OWNER_URL);
+    env.DATABASE_URL_APP = OWNER_URL;
+    delete env.DATABASE_URL_OWNER;
+    return env;
+  }
+  const app = appDatabaseUrl(process.env.POLO_APP_DB_PASSWORD);
+  const env = runtimeEnv(app);
+  env.DATABASE_URL_APP = app;
+  delete env.DATABASE_URL_OWNER;
+  return env;
+}
+
+function workerEnv() {
+  const env = apiEnv();
+  env.DATABASE_URL_OWNER = OWNER_URL;
+  return env;
+}
+
+function quoteLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function setAppRolePassword() {
+  const password = process.env.POLO_APP_DB_PASSWORD || '';
+  if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
+  // psql must not echo the statement. A failure reports the role, not the secret.
+  const res = spawnSync(
+    'psql',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'],
+    {
+      encoding: 'utf8',
+      input: `ALTER ROLE app_role PASSWORD ${quoteLiteral(password)};\n`,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  );
+  if (res.status !== 0) throw new Error('could not set the app role password');
 }
 
 function startDatabase() {
@@ -163,18 +214,72 @@ function startDatabase() {
   if (exists.stdout.trim() !== '1') runSync('createdb', ['-h', '127.0.0.1', '-U', PG_USER, DB]);
 }
 
-function migrate() {
-  runSync(join(APP, 'packages/db/node_modules/.bin/prisma'), ['migrate', 'deploy', '--schema', 'packages/db/prisma/schema.prisma'], {
-    cwd: APP,
-    env: apiEnv(),
+function psqlText(sql) {
+  const res = spawnSync(
+    'psql',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-tAc', sql],
+    { encoding: 'utf8' },
+  );
+  if (res.status !== 0) {
+    if (/does not exist/i.test(`${res.stderr || ''}`)) return '';
+    throw new Error('active import precheck failed');
+  }
+  return (res.stdout || '').trim();
+}
+
+function activeImportDuplicates() {
+  const column = psqlText(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'migration_jobs' AND column_name = 'file_hash'",
+  );
+  // The current predicate excludes a null file hash. Until the column exists,
+  // no restored row can match it.
+  if (column !== '1') return [];
+  const raw = psqlText(DUPLICATE_PRECHECK_SQL);
+  if (!raw) return [];
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const [orgId, active] = line.split('|');
+    return { orgId: (orgId || '').trim(), active: Number((active || '').trim()) };
   });
+}
+
+function stageMigrationsWithoutIndex() {
+  const staging = '/tmp/polo-migrate';
+  rmSync(staging, { recursive: true, force: true });
+  cpSync(join(APP, 'packages/db/prisma'), staging, {
+    recursive: true,
+    filter: (src) => !src.includes(`/${ACTIVE_IMPORT_MIGRATION}`),
+  });
+  return join(staging, 'schema.prisma');
+}
+
+function migrate() {
+  const decision = decideBootMigration(activeImportDuplicates());
+  const plan = planBootMigration(decision);
+  for (const row of decision.log) log(`active import precheck org ${row.orgId} count ${row.active}`);
+  let schema = join(APP, 'packages/db/prisma/schema.prisma');
+  if (plan.skipIndexMigration) {
+    log(`skipping ${ACTIVE_IMPORT_MIGRATION}; duplicate rows are unchanged`);
+    try {
+      schema = stageMigrationsWithoutIndex();
+    } catch {
+      servePreviousSchema = true;
+      log('could not skip the index migration; serving the restored schema');
+      return;
+    }
+  }
+  runSync(join(APP, 'packages/db/node_modules/.bin/prisma'), ['migrate', 'deploy', '--schema', schema], {
+    cwd: APP,
+    env: migrateEnv(),
+  });
+  setAppRolePassword();
 }
 
 function seed() {
   // The preview is a demo instance: its database holds only the fixture org.
+  // Seed runs as the owner. The API and worker do not.
   runSync(join(APP, 'packages/db/node_modules/.bin/tsx'), ['src/seed.ts'], {
     cwd: join(APP, 'packages/db'),
-    env: { ...apiEnv(), BIDSTACK_ALLOW_FIXTURE_SEED: 'true' },
+    env: { ...migrateEnv(), BIDSTACK_ALLOW_FIXTURE_SEED: 'true' },
   });
 }
 
@@ -197,7 +302,11 @@ function startApi() {
 // Queued jobs (public registry and filings pulls, imports) run here. A crash
 // never takes the API down; the worker restarts on its own.
 function startWorker() {
-  workerChild = spawn(process.execPath, ['apps/worker/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  if (servePreviousSchema) {
+    log('worker not started; active import migration was refused');
+    return;
+  }
+  workerChild = spawn(process.execPath, ['apps/worker/dist/main.js'], { cwd: APP, env: workerEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
   workerChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   workerChild.stderr.on('data', (chunk) => {
     process.stderr.write(chunk);

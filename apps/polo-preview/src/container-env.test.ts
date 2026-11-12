@@ -7,6 +7,7 @@ const SECRETS = {
   POLO_INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
   POLO_PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
   POLO_JOB_SIGNING_SECRET: 's',
+  POLO_APP_DB_PASSWORD: 'fixture-password',
 };
 
 describe('container env', () => {
@@ -30,6 +31,7 @@ describe('container env', () => {
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
       PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
       BIDSTACK_JOB_SIGNING_SECRET: 's',
+      POLO_APP_DB_PASSWORD: 'fixture-password',
     });
   });
 
@@ -42,5 +44,11 @@ describe('container env', () => {
 
   it('refuses to start without the encryption secrets instead of booting with blank keys', () => {
     expect(() => containerEnv({ ALLOWED_EMAILS: 'a@x.com' })).toThrow(/POLO_PII_ENCRYPTION_MASTER_KEY/);
+  });
+
+  it('names the app database secret and does not repeat a password in the error', () => {
+    expect(() => containerEnv({ ...SECRETS, POLO_APP_DB_PASSWORD: '' })).toThrow(
+      /^polo-preview is missing Worker secrets: POLO_APP_DB_PASSWORD$/,
+    );
   });
 });

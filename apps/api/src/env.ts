@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { databaseLogin } from '@bidstack/db';
 import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
 
 import { parseAllowedUsers } from './lib/allowed-users.js';
@@ -17,6 +18,8 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
   DATABASE_URL: z.string().min(1),
+  DATABASE_URL_APP: z.string().min(1).optional().or(z.literal('')),
+  DATABASE_URL_OWNER: z.string().min(1).optional().or(z.literal('')),
   SHADOW_DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().min(1).default('redis://localhost:6380'),
 
@@ -407,6 +410,15 @@ export function getEnv(): Env {
       semanticErrors.push(
         'PUBLIC_BASE_URL must be set to the public web origin in production (cannot be loopback)',
       );
+    }
+
+    if (!env.DATABASE_URL_APP?.trim()) {
+      semanticErrors.push('DATABASE_URL_APP is required in production');
+    } else if (!databaseLogin(env.DATABASE_URL_APP)) {
+      semanticErrors.push('DATABASE_URL_APP must be a postgres URL with a login');
+    }
+    if (env.DATABASE_URL_OWNER?.trim()) {
+      semanticErrors.push('DATABASE_URL_OWNER must not be set on the API');
     }
 
     const rawRedisUrl = process.env.REDIS_URL?.trim() ?? '';

@@ -3,7 +3,7 @@
 // cannot be opened leaves the job failed and returns a clear error.
 
 import { Queue } from 'bullmq';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
@@ -15,6 +15,7 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
+import { retireActiveImports } from './migrations.test-helpers.js';
 
 let server: FastifyInstance;
 let org: IsolatedOrg;
@@ -39,6 +40,10 @@ afterAll(async () => {
   if (server) await server.close();
   restoreAuth?.();
   if (org) await dropIsolatedOrg(org.orgId);
+});
+
+beforeEach(async () => {
+  if (org) await retireActiveImports(org.orgId);
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
@@ -98,7 +103,11 @@ describe('migration queue acquisition', () => {
     // return 500 after the cleanup had already removed the job. The queue-down
     // path returns 409, and this one has to as well.
     const { redis } = await import('../redis.js');
-    const set = vi.spyOn(redis, 'set').mockRejectedValueOnce(new Error('redis down'));
+    const originalSet = redis.set.bind(redis);
+    const set = vi.spyOn(redis, 'set').mockImplementation((...args) => {
+      if (String(args[0]).includes(':rows')) return Promise.reject(new Error('redis down'));
+      return originalSet(...args);
+    });
     const before = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
@@ -139,10 +148,9 @@ describe('migration queue acquisition', () => {
   });
 
   t('repeated starts that cannot be queued leave no pending job', async () => {
-    // WHY: each click created a PENDING job, stored its rows, and wrote an
-    // audit, then returned 409 with no id. The next click added another.
-    // The failure is an extra audit row. The log is insert-only, so cleanup
-    // must not delete one.
+    // WHY: the start is recorded, then the queue refuses the chunks and the
+    // pending row is removed. The log is insert-only, so both the start and
+    // the failure row stay. The next click must not find a pending job.
     await expect(prisma.auditLog.deleteMany({ where: { orgId: org.orgId } })).rejects.toThrow(
       /insert-only/,
     );
@@ -184,7 +192,7 @@ describe('migration queue acquisition', () => {
     ).toBe(beforePending);
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start' } }),
-    ).toBe(beforeAudits);
+    ).toBe(beforeAudits + 2);
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start_failed' } }),
     ).toBe(beforeFailed + 2);
@@ -192,8 +200,8 @@ describe('migration queue acquisition', () => {
   });
 
   t('a failed start keeps the job and its rows when the failure audit cannot be written', async () => {
-    // WHY: the failure row is written first. If that insert throws, deleting
-    // the Redis key would leave a PENDING job whose rows are already gone.
+    // WHY: the start audit is rejected, so the handler cannot finish. The slot
+    // is released, and the stored rows stay with the failed job.
     const create = vi.spyOn(prisma.auditLog, 'create').mockRejectedValue(new Error('audit down'));
     const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
     const beforePending = await prisma.migrationJob.count({
@@ -217,17 +225,23 @@ describe('migration queue acquisition', () => {
     }
     expect(
       await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
-    ).toBe(beforePending + 1);
+    ).toBe(beforePending);
+    const kept = await prisma.migrationJob.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(kept.status).toBe('FAILED');
     expect((await server.redis.keys('migration:*')).length).toBe(beforeKeys.length + 1);
   });
 
   t('a failed start does not drop the rows when the job cannot be removed', async () => {
     // WHY: the Redis key is last. A throw from the job delete must leave the
-    // key in place, and the failure audit must already be stored.
+    // key in place, and the failure audit must already be stored. The slot is
+    // already released, so the row is failed rather than pending.
     const original = prisma.migrationJob.deleteMany.bind(prisma.migrationJob);
     const removeJob = vi.spyOn(prisma.migrationJob, 'deleteMany').mockImplementation((args) => {
       const where = args?.where as { id?: string; status?: string } | undefined;
-      if (where?.status === 'PENDING' && where.id) throw new Error('job delete down');
+      if (where?.id) throw new Error('job delete down');
       return original(args);
     });
     const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
@@ -256,7 +270,12 @@ describe('migration queue acquisition', () => {
     }
     expect(
       await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
-    ).toBe(beforePending + 1);
+    ).toBe(beforePending);
+    const kept = await prisma.migrationJob.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(kept.status).toBe('FAILED');
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start_failed' } }),
     ).toBe(beforeFailed + 1);
@@ -301,6 +320,51 @@ describe('migration queue acquisition', () => {
     expect(
       await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
     ).toBe(beforePending);
+  });
+
+  t('two concurrent starts without a key create one import', async () => {
+    // WHY: a missing Idempotency-Key inserts one migration_job per request.
+    // The same uploaded rows are one import, so the second start is refused.
+    // A finished import can be followed by another.
+    const payload = {
+      source: 'CSV',
+      entityType: 'company',
+      rows: [{ name: 'Hammer Concurrent' }],
+      mappings: { name: 'company.name' },
+    };
+    await prisma.migrationJob.updateMany({
+      where: {
+        orgId: org.orgId,
+        source: { in: ['CSV', 'SALESFORCE_CSV'] },
+        status: { in: ['PENDING', 'RUNNING'] },
+      },
+      data: { status: 'COMPLETE', completedAt: new Date() },
+    });
+    const before = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
+    const [first, second] = await Promise.all([
+      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+    ]);
+    const codes = [first.statusCode, second.statusCode].sort();
+    expect(codes).toEqual([201, 409]);
+    const refused = first.statusCode === 409 ? first : second;
+    expect(refused.json()).toMatchObject({
+      message: 'This import is already running.',
+    });
+    expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(before + 1);
+
+    const winnerId = (first.statusCode === 201 ? first : second).json<{ id: string }>().id;
+    await prisma.migrationJob.update({
+      where: { id: winnerId },
+      data: { status: 'COMPLETE', completedAt: new Date() },
+    });
+    const again = await server.inject({
+      method: 'POST',
+      url: '/api/v1/migrations/start-csv',
+      payload,
+    });
+    expect(again.statusCode).toBe(201);
+    expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(before + 2);
   });
 
   t('starts a csv import on the process Redis client', async () => {

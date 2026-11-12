@@ -1,3 +1,5 @@
+import { databaseLogin } from '@bidstack/db';
+
 type Env = Record<string, string | undefined>;
 
 const HEX_32_BYTE_KEY = /^[0-9a-fA-F]{64}$/;
@@ -42,6 +44,15 @@ export function validateMcpProductionEnv(env: Env = process.env): string[] {
   const errors: string[] = [];
   if (!trimmed(env, 'DATABASE_URL')) {
     errors.push('DATABASE_URL is required in production');
+  }
+  const appUrl = trimmed(env, 'DATABASE_URL_APP');
+  if (!appUrl) {
+    errors.push('DATABASE_URL_APP is required in production');
+  } else if (!databaseLogin(appUrl)) {
+    errors.push('DATABASE_URL_APP must be a postgres URL with a login');
+  }
+  if (trimmed(env, 'DATABASE_URL_OWNER')) {
+    errors.push('DATABASE_URL_OWNER must not be set on MCP');
   }
 
   const redisUrl = trimmed(env, 'REDIS_URL');

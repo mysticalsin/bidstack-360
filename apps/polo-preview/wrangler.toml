@@ -14,6 +14,11 @@
 #   POLO_INTEGRATION_TOKEN_KEY      API INTEGRATION_TOKEN_KEY (64 hex)
 #   POLO_PII_ENCRYPTION_MASTER_KEY  API PII_ENCRYPTION_MASTER_KEY (64 hex)
 #   POLO_JOB_SIGNING_SECRET         API BIDSTACK_JOB_SIGNING_SECRET
+#   POLO_APP_DB_PASSWORD            password for the app_role login. The API
+#                                   and worker connect as app_role. Migrations
+#                                   and retention stay on the owner login.
+#                                   wrangler secret put POLO_APP_DB_PASSWORD
+#                                   Never commit the value. Do not set it here.
 # The two encryption keys must never change: R2 snapshots hold data
 # encrypted with them.
 #

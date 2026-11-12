@@ -27,6 +27,13 @@ describe('MigrationJobPayload secret hygiene', () => {
     });
   });
 
+  it('accepts a null attempt id', () => {
+    // WHY: a legacy chunk stores JSON null, not an omitted field. Rejecting
+    // it at parse makes BullMQ retry the chunk instead of the attempt guard.
+    const parsed = MigrationJobPayload.parse({ ...basePayload, attemptId: null });
+    expect(parsed.attemptId).toBeNull();
+  });
+
   it('rejects raw provider tokens in queue metadata', () => {
     const result = MigrationJobPayload.safeParse({
       ...basePayload,

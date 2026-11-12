@@ -45,7 +45,7 @@ describe('GET /api/v1/migrations', () => {
   });
 
   skipIfNoDb('?status=RUNNING filters by status', async () => {
-    await createJob({ status: 'PENDING' });
+    await createJob({ status: 'COMPLETE' });
     const runningJob = await createJob({ status: 'RUNNING' });
 
     const res = await ctx.server.inject({
