@@ -68,8 +68,24 @@ function stalledFlag(job: {
 
 const ACTIVE_IMPORT_MESSAGE = 'An import from this source is already running.';
 
+const ACTIVE_IMPORT_INDEX = 'migration_jobs_one_active_per_org_source';
+
+function constraintNames(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
 export function isActiveImportConflict(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false;
+  const meta = err.meta as { target?: unknown; constraint?: unknown } | undefined;
+  const names = [...constraintNames(meta?.target), ...constraintNames(meta?.constraint)];
+  if (names.includes(ACTIVE_IMPORT_INDEX)) return true;
+  // Prisma names the index columns when the index is not in the schema.
+  // This partial index is the only unique constraint on exactly that pair.
+  if (names.length !== 2) return false;
+  const columns = new Set(names);
+  return (columns.has('org_id') || columns.has('orgId')) && columns.has('source');
 }
 
 /**
