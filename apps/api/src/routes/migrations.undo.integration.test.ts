@@ -69,6 +69,36 @@ describe('DELETE /api/v1/migrations/:id/undo', () => {
     ctx.cleanup.leadIds.splice(ctx.cleanup.leadIds.indexOf(lead.id), 1);
   });
 
+  skipIfNoDb('undo deletes every audited row, not a silent first page', async () => {
+    // WHY: take 1000 with no order drops an arbitrary chunk and still reports
+    // success. The caller believes the import is gone while a contact remains.
+    const undoableUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const job = await createJob({ status: 'COMPLETE', undoableUntil });
+    const ids = Array.from({ length: 1001 }, () => randomUUID());
+    await prisma.contact.createMany({
+      data: ids.map((id) => ({ id, orgId: ctx.seedOrgId!, customer: 'Undo', name: id })),
+    });
+    await prisma.auditLog.createMany({
+      data: ids.map((id) => ({
+        orgId: ctx.seedOrgId!,
+        action: 'migration.chunk.imported',
+        targetType: 'MigrationJob',
+        targetId: job.id,
+        diff: { entity: 'contact', createdIds: [id] },
+      })),
+    });
+    try {
+      const res = await ctx.server.inject({
+        method: 'DELETE',
+        url: `/api/v1/migrations/${job.id}/undo`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(await prisma.contact.count({ where: { id: { in: ids } } })).toBe(0);
+    } finally {
+      await prisma.contact.deleteMany({ where: { id: { in: ids } } });
+    }
+  });
+
   skipIfNoDb('returns 409 when job is not COMPLETE', async () => {
     const job = await createJob({ status: 'RUNNING' });
 

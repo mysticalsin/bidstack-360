@@ -661,15 +661,24 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       //    ('migration.chunk.imported'), which is the only way to find
       //    imported Contacts/Opportunities (no source column on those models).
       const sourceTag = `migration:${job.id}`;
-      // Bounded: one import fans out to many chunks, but the cap keeps the
-      // query within the query-guard's unbounded-findMany limit. A 10k-row
-      // import is 100 chunks at chunkSize 100, well under this.
-      const chunkLogs = await prisma.auditLog.findMany({
-        where: { orgId, action: 'migration.chunk.imported', targetId: job.id },
-        select: { diff: true },
-        take: 1000,
-      });
+      // Page every chunk audit. A capped read drops ids and must not report success.
       const idsByEntity: Record<string, string[]> = {};
+      const chunkLogs: Array<{ diff: unknown }> = [];
+      let auditCursor: bigint | undefined;
+      for (;;) {
+        const page = await prisma.auditLog.findMany({
+          where: { orgId, action: 'migration.chunk.imported', targetId: job.id },
+          select: { id: true, diff: true },
+          orderBy: { id: 'asc' },
+          take: 500,
+          ...(auditCursor ? { cursor: { id: auditCursor }, skip: 1 } : {}),
+        });
+        chunkLogs.push(...page);
+        if (page.length < 500) break;
+        const last = page[page.length - 1];
+        if (!last) break;
+        auditCursor = last.id;
+      }
       for (const log of chunkLogs) {
         const diff = log.diff as { entity?: string; createdIds?: string[] } | null;
         if (!diff?.entity || !Array.isArray(diff.createdIds)) continue;
