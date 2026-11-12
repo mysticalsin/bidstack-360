@@ -51,6 +51,31 @@ A chunk whose attempt is the one already stored on a failed import is done. The 
 1. **Given** a failed import and a chunk with the same attempt id, **When** the worker processes the chunk, **Then** it returns without reading rows and without throwing.
 2. **Given** a failed import and a chunk with a different attempt id, **When** the worker processes the chunk, **Then** it throws "not running yet" and does not read rows.
 
+### User Story 5 — One start action is one import (Priority: P1)
+
+A CSV start creates one import record for one action. The web client sends an `Idempotency-Key` that stays the same while that action is unsettled, including a second attempt of the same action, and is a new key after the action settles. Two processes that post the same body at the same time without a key also get one record: the second request is refused while the first is in flight and does not insert a row. When the first request finishes, a later start of the same file is a new import. A missing key is not stored for the 24-hour replay.
+
+**Independent Test**: The start hook sends one key for two overlapping calls and a different key after they settle. Two concurrent start requests with no key return 201 and 409 and leave one `migration_job`. A third request after those finish returns 201.
+
+**Acceptance Scenarios**:
+
+1. **Given** a start that has not settled, **When** the client sends that start again, **Then** both requests carry the same `Idempotency-Key` of at least 8 characters.
+2. **Given** that start has settled, **When** the client starts again, **Then** the new request carries a different key.
+3. **Given** two concurrent start requests with the same body and no key, **When** both are handled, **Then** one returns 201, the other returns 409, and one import row exists.
+4. **Given** the in-flight request has finished, **When** the same body is posted again with no key, **Then** that start returns 201 and creates a second import.
+
+### User Story 6 — Redis comes back without a process restart (Priority: P1)
+
+Redis can be unreachable for longer than the old five reconnect attempts. The API client and the migrations queue connection keep reconnecting, with the delay capped, and commands still fail immediately while the connection is down. When Redis accepts connections again, a CSV start on the same process succeeds. A connection that has already stopped is started again before the start uses it.
+
+**Independent Test**: A client and its duplicate, using the process retry delay, stay able to reconnect after the socket is down for longer than the old five-attempt budget, and both answer `PING` after the socket returns, without a manual `connect()`. A start whose queue connection was closed succeeds on the next request.
+
+**Acceptance Scenarios**:
+
+1. **Given** the retry delay, **When** the attempt count is past five, **Then** the delay is still a number and never asks the client to stop, and it never exceeds the cap.
+2. **Given** a client and the queue's duplicate connection lose the socket for longer than the old give-up, **When** the socket accepts connections again, **Then** both answer a command without the process being restarted.
+3. **Given** the queue connection is already closed, **When** a CSV start runs, **Then** it reconnects that connection and returns 201.
+
 ## Requirements
 
 ### Functional Requirements
@@ -61,6 +86,8 @@ A chunk whose attempt is the one already stored on a failed import is done. The 
 - **FR-004**: A migration creates the app role if it is missing and revokes `DELETE` on `audit_log` from that role. It does not revoke `DELETE` from the table owner.
 - **FR-005**: A chunk for a failed import is skipped when its attempt id is the attempt stored on the row, or when the row has no attempt id. A chunk with a different attempt id still throws while the row is `FAILED`. A chunk for a `PENDING` row still throws.
 - **FR-006**: Commit subjects name the change. No published commit is amended. Nothing in this slice rewrites `110a4fc8`.
+- **FR-007**: `useStartCsvImport` sends `Idempotency-Key`. The key is stable for one unsettled start and new after it settles. When the header is absent, `start-csv` holds an in-flight lock on the org and the request body, refuses the concurrent request with 409, and creates no second `migration_job`. The lock is released when the request ends. A missing key is not written to the 24-hour replay cache.
+- **FR-008**: The Redis retry delay never stops the client. The delay is capped. Commands stay fail-fast (`maxRetriesPerRequest` 1, no offline queue). The migrations queue connection uses that same delay. `start-csv` waits until the process client and the queue connection can run a command, and a connection that has already stopped is connected again before the start uses it.
 
 ## Success Criteria
 
@@ -68,9 +95,13 @@ A chunk whose attempt is the one already stored on a failed import is done. The 
 - **SC-002**: `npm ls` and `npm audit` in `deploy/cli` exit 0, and both pinned CLIs print a version.
 - **SC-003**: The app-role delete test fails before the migration and passes after.
 - **SC-004**: The same-attempt failed chunk test fails before the quiet skip and passes after, and the newer-attempt test still rejects.
+- **SC-005**: The start hook test fails before the key is sent, and passes after. The concurrent no-key start test fails with two import rows before the in-flight lock, and passes with one row after.
+- **SC-006**: The socket-drop test ends the client after the old five-attempt budget before the delay change, and both connections answer `PING` after the socket returns once the delay no longer stops. The closed queue connection test fails the next start before the readiness path, and that start returns 201 after.
 
 ## Out of Scope
 
 - Production deploy, `deploy.yml` changes, and changing which database user the API and worker connect as.
 - A `DELETE` trigger on `audit_log`, `REVOKE` from the table owner, and a scheduled chain verifier.
 - Rewriting commit subjects on `main`.
+- Replaying a start that omitted `Idempotency-Key` for 24 hours.
+- BullMQ attempt counts, stall intervals, and the abandoned-import reaper.
