@@ -132,6 +132,12 @@ jobs:
       - name: Build
         run: pnpm -r build
 
+      # The recursive build runs the web package script. This step is the
+      # named gate: a node built-in in @bidstack/shared's root entry fails here
+      # on every push and pull request, not only in the later e2e job.
+      - name: Build web
+        run: pnpm --filter @bidstack/web build
+
       - name: Route inventory ratchet (permission + schema)
         # Boots the API route table without a database and fails on any route
         # that lacks a permission gate or input schema and is not already in
