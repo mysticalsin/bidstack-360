@@ -319,10 +319,36 @@ describe('migration queue acquisition', () => {
       mappings: { name: 'company.name' },
     };
     const before = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
-    const [first, second] = await Promise.all([
-      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
-      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
-    ]);
+    // The winner stays inside the lock until the loser has been refused. Two
+    // inject() calls otherwise finish one after the other when the suite is busy.
+    const originalSet = server.redis.set.bind(server.redis);
+    let releaseWinner: (() => void) | undefined;
+    const winnerGate = new Promise<void>((resolve) => {
+      releaseWinner = resolve;
+    });
+    const releaseTimer = setTimeout(() => releaseWinner?.(), 8_000);
+    const set = vi.spyOn(server.redis, 'set').mockImplementation(async (...args) => {
+      const key = String(args[0]);
+      const result = await originalSet(...args);
+      if (key.startsWith('migration:start-lock:')) {
+        if (result === 'OK') await winnerGate;
+        else releaseWinner?.();
+      }
+      return result;
+    });
+    let first: Awaited<ReturnType<typeof server.inject>> | undefined;
+    let second: Awaited<ReturnType<typeof server.inject>> | undefined;
+    try {
+      [first, second] = await Promise.all([
+        server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+        server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+      ]);
+    } finally {
+      clearTimeout(releaseTimer);
+      releaseWinner?.();
+      set.mockRestore();
+    }
+    if (!first || !second) throw new Error('starts did not finish');
     const codes = [first.statusCode, second.statusCode].sort();
     expect(codes).toEqual([201, 409]);
     const refused = first.statusCode === 409 ? first : second;
