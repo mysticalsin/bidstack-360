@@ -113,6 +113,13 @@ function importErrorCopy(
 
 export function CsvImportWizard() {
   const { t } = useTranslation('crm');
+  const startFailureCopy = (error: unknown): string =>
+    error instanceof ApiError && error.status === 409 && error.message.length > 0
+      ? error.message
+      : t(
+          'csvImport.map.startError',
+          'Could not start the import. Check your mappings and try again.',
+        );
   const entityId = useId();
   const dedupId = useId();
   const [step, setStep] = useState<Step>('upload');
@@ -382,11 +389,8 @@ export function CsvImportWizard() {
             </p>
           )}
           {start.isError && (
-            <p className="text-sm text-[var(--danger)]">
-              {t(
-                'csvImport.map.startError',
-                'Could not start the import. Check your mappings and try again.',
-              )}
+            <p className="text-sm text-[var(--danger)]" role="alert">
+              {startFailureCopy(start.error)}
             </p>
           )}
 
@@ -455,11 +459,8 @@ export function CsvImportWizard() {
             </p>
           )}
           {start.isError && (
-            <p className="text-sm text-[var(--danger)]">
-              {t(
-                'csvImport.map.startError',
-                'Could not start the import. Check your mappings and try again.',
-              )}
+            <p className="text-sm text-[var(--danger)]" role="alert">
+              {startFailureCopy(start.error)}
             </p>
           )}
           <div className="flex items-center gap-2">

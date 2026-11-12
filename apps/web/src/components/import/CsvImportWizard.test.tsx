@@ -570,6 +570,33 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByText(/will be tried again/)).toBeNull();
   });
 
+  it('says the queue failed when the start was refused for that reason', async () => {
+    // WHY: a queue or Redis failure is not a mapping problem. The confirm
+    // step was still telling the user to check their mappings.
+    stubHooks();
+    hookMocks.useStartCsvImport.mockReturnValue({
+      mutate: hookMocks.mutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('The import could not be queued. Try again.', 409, null),
+    });
+    render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    expect(screen.getByText('The import could not be queued. Try again.')).toBeTruthy();
+    expect(screen.queryByText('Could not start the import. Check your mappings and try again.')).toBeNull();
+  });
+
   it('shows a failed start on the confirm step and sends it once', async () => {
     // WHY: Confirm lives on the preview step. The error was only rendered on
     // the mapping step, so a 500 left the screen unchanged, and a second click
