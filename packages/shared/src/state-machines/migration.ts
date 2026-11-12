@@ -30,6 +30,32 @@ export const MIGRATION_LEGACY_ROWS_EXPIRED = 'Import rows expired. Upload the fi
 export const MIGRATION_LEGACY_CONFLICT =
   'The import conflicted with another write and will be tried again.';
 
+/** Sentences the import worker writes for a rejected row. Anything else is driver text. */
+const MIGRATION_ROW_SENTENCES = new Set([
+  'company.name is required',
+  'contact first/last name is required',
+  'lead first or last name is required',
+  'lead company is required',
+  'opportunity.name is required',
+  'financial.companyName is required',
+  'financial.periodEnd must be an ISO date',
+  'financial.currency must be a 3-letter code',
+  'financial.periodType must be FY or Q',
+  'financial.revenue is required',
+]);
+
+const MIGRATION_ACCOUNT_FIRST = /^No account named ".+" — import accounts first$/;
+const MIGRATION_UNSUPPORTED_ENTITY =
+  /^Entity type ".+" is not supported by the import worker yet$/;
+
+function migrationKnownRowSentence(message: string): boolean {
+  return (
+    MIGRATION_ROW_SENTENCES.has(message) ||
+    MIGRATION_ACCOUNT_FIRST.test(message) ||
+    MIGRATION_UNSUPPORTED_ENTITY.test(message)
+  );
+}
+
 const MIGRATION_FAILURE_TEXT: Record<string, string> = {
   [MIGRATION_STALE_REASON]: 'The import stalled before any rows were saved.',
   [MIGRATION_ENQUEUE_FAILED]: 'The import did not start. Try again.',
@@ -41,20 +67,12 @@ const MIGRATION_FAILURE_TEXT: Record<string, string> = {
   [MIGRATION_LEGACY_ROWS_EXPIRED]: 'Those rows expired. Upload the file again.',
 };
 
-/** The sentence a downloaded error CSV shows for a stored failure code. A short row sentence passes through. */
+/** The sentence a downloaded error CSV shows. A known row sentence passes through; other text does not. */
 export function migrationFailureText(message: string): string {
   const known = MIGRATION_FAILURE_TEXT[message];
   if (known) return known;
-  // Same sentences the wizard uses. Driver text is not a row sentence.
-  if (
-    message.startsWith('chunk failed permanently:') ||
-    /PostgresError|\b40P01\b|\b40001\b|\bP2034\b|Unique constraint|\/apps\/|\.ts:\d+|Process \d+/.test(
-      message,
-    )
-  ) {
-    return 'The import could not be completed.';
-  }
-  return message;
+  if (migrationKnownRowSentence(message)) return message;
+  return 'The import could not be completed.';
 }
 
 /** A spreadsheet treats a cell starting with one of these as a formula. */
@@ -143,7 +161,11 @@ export function migrationRetryOffered(
 ): boolean {
   if (!migrationRetryAllowed(processedRows, errorRows)) return false;
   return !messages.some(
-    (message) => message === MIGRATION_ROWS_EXPIRED || message === MIGRATION_LEGACY_ROWS_EXPIRED,
+    (message) =>
+      message === MIGRATION_ROWS_EXPIRED ||
+      message === MIGRATION_LEGACY_ROWS_EXPIRED ||
+      message.startsWith('chunk failed permanently:') ||
+      MIGRATION_UNSUPPORTED_ENTITY.test(message),
   );
 }
 

@@ -366,6 +366,48 @@ describe('CsvImportWizard', () => {
     });
     await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
     expect(screen.queryByText('The import could not be completed.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download error report (CSV)' })).toBeTruthy();
+  });
+
+  it('maps pathless driver text to the existing sentence', async () => {
+    // WHY: a driver error can name a host, a pool, or a constraint without a
+    // file path. The operator still gets the sentence the wizard already has.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 1,
+      errorSummary: [
+        { row: 2, field: null, message: "Can't reach database server at `host:5432`" },
+      ],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import could not be completed.')).toBeTruthy(),
+    );
+    expect(screen.queryByText(/host:5432/)).toBeNull();
+    expect(screen.queryByText(/Connection is closed/)).toBeNull();
+  });
+
+  it('does not offer retry when a chunk failed before any row was saved', async () => {
+    // WHY: replaying a permanent chunk failure returns success and changes
+    // nothing. The button must not be there, and the driver sentence must not show.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'chunk failed permanently: Connection is closed.' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import could not be completed.')).toBeTruthy(),
+    );
+    expect(screen.queryByText(/Connection is closed/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Download error report (CSV)' })).toBeTruthy();
   });
 

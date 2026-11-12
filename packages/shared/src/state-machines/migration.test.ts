@@ -60,11 +60,38 @@ describe('migration transition table', () => {
       'The import stopped before the remaining rows were saved.',
     );
     expect(migrationFailureText('company.name is required')).toBe('company.name is required');
+    expect(migrationFailureText('financial.periodEnd must be an ISO date')).toBe(
+      'financial.periodEnd must be an ISO date',
+    );
+    expect(migrationFailureText('No account named "Acme" — import accounts first')).toBe(
+      'No account named "Acme" — import accounts first',
+    );
+    expect(migrationFailureText('Entity type "tasks" is not supported by the import worker yet')).toBe(
+      'Entity type "tasks" is not supported by the import worker yet',
+    );
     expect(
       migrationFailureText(
         'chunk failed permanently: Unique constraint failed at /apps/worker/src/queues/migration.ts:236 Process 4242 40P01',
       ),
     ).toBe('The import could not be completed.');
+    // WHY: a driver error can name a host, a pool, or a constraint without a path or a code.
+    // Anything outside the sentences the worker writes itself is not shown.
+    for (const message of [
+      "Can't reach database server at `host:5432`",
+      'Transaction API error: Transaction already closed. The timeout for this transaction was 120000 ms',
+      'Timed out fetching a new connection from the connection pool. Current timeout: 10s',
+      'Foreign key constraint failed on the field: `Company_orgId_fkey`',
+      'Null constraint violation on the fields: (`name`)',
+      'Connection is closed.',
+    ]) {
+      expect(migrationFailureText(message)).toBe('The import could not be completed.');
+    }
+    expect(
+      migrationRetryOffered(0, 0, ['Entity type "tasks" is not supported by the import worker yet']),
+    ).toBe(false);
+    expect(migrationRetryOffered(0, 0, ['chunk failed permanently: Connection is closed.'])).toBe(
+      false,
+    );
     const csv = migrationErrorsCsv([
       { row: 2, field: '=cmd', message: '+sum' },
       { row: 3, field: '-1', message: '@x' },
@@ -77,12 +104,12 @@ describe('migration transition table', () => {
       },
     ]);
     expect(csv).toContain(`"'=cmd"`);
-    expect(csv).toContain(`"'+sum"`);
     expect(csv).toContain(`"'-1"`);
-    expect(csv).toContain(`"'@x"`);
     expect(csv).toContain('"\'\\tcell"');
-    expect(csv).toContain('"\'\\rmsg"');
+    expect(csv).not.toContain('+sum');
+    expect(csv).not.toContain('@x');
     expect(csv).not.toContain('"=cmd"');
+    expect(csv).toContain('"The import could not be completed."');
     expect(csv).toContain('"company.name is required"');
     expect(csv).toContain('"The import conflicted with another write."');
     expect(csv).not.toMatch(/will be tried again/);
