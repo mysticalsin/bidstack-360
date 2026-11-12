@@ -44,6 +44,18 @@ describe('worker production env contract', () => {
     ).toEqual(['OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_REFRESH_LOCK_WAIT_MS']);
   });
 
+  it('refuses a NODE_ENV that is not exactly production, development, or test', () => {
+    // WHY: 'Production' used to skip the whole production contract, including
+    // the refusal of the refresh-lock opt-out.
+    const errors = validateWorkerProductionEnv({
+      ...validProductionEnv,
+      NODE_ENV: 'Production',
+      OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+    });
+    expect(errors).not.toEqual([]);
+    expect(errors).toContain("NODE_ENV must be exactly 'development', 'production', or 'test'");
+  });
+
   it('refuses the refresh-lock opt-out in production', () => {
     expect(
       validateWorkerProductionEnv({

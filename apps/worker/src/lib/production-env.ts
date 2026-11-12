@@ -32,10 +32,16 @@ function redisUrlError(value: string): string | null {
   }
 }
 
+const NODE_ENVS = new Set(['development', 'production', 'test']);
+
 export function validateWorkerProductionEnv(env: Env = process.env): string[] {
-  if (trimmed(env, 'NODE_ENV') !== 'production') {
-    return [];
+  const nodeEnv = env.NODE_ENV ?? '';
+  if (nodeEnv === '') return [];
+  // Anything else, including 'Production', used to skip this contract.
+  if (!NODE_ENVS.has(nodeEnv)) {
+    return ["NODE_ENV must be exactly 'development', 'production', or 'test'"];
   }
+  if (nodeEnv !== 'production') return [];
 
   const errors: string[] = [];
   const lockStartup = oauthRefreshLockStartupError(env);
