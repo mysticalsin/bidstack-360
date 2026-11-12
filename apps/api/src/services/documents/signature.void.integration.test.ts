@@ -12,7 +12,15 @@ import { voidSignatureRequest } from './signature.service.js';
 const docusign = vi.hoisted(() => ({ on: false, privateKey: '' }));
 
 vi.mock('../../env.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../env.js')>();
+  const actual = (await importOriginal()) as {
+    getEnv: () => {
+      DOCUSIGN_ACCOUNT_ID?: string;
+      DOCUSIGN_INTEGRATION_KEY?: string;
+      DOCUSIGN_USER_ID?: string;
+      DOCUSIGN_PRIVATE_KEY?: string;
+      DOCUSIGN_BASE_URL?: string;
+    };
+  };
   return {
     ...actual,
     getEnv: () => {
