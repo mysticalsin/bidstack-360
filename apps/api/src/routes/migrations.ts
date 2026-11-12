@@ -35,6 +35,7 @@ import {
   migrationProgressAt,
   MIGRATION_ENQUEUE_FAILED,
   MIGRATION_ROWS_EXPIRED,
+  migrationEnqueueFailureCode,
   migrationErrorsCsv,
   migrationRetryOffered,
   migrationStaleDue,
@@ -109,13 +110,24 @@ async function markMigrationEnqueueFailed(
   log: { warn: (obj: object, msg?: string) => void },
   message = ENQUEUE_FAILURE,
 ): Promise<void> {
+  const current = await prisma.migrationJob.findFirst({
+    where: { id, orgId },
+    select: { processedRows: true, errorRows: true, errorSummary: true },
+  });
+  const code =
+    message === ENQUEUE_FAILURE
+      ? migrationEnqueueFailureCode(current?.processedRows ?? 0, current?.errorRows ?? 0)
+      : message;
+  const prior = Array.isArray(current?.errorSummary)
+    ? (current.errorSummary as MigrationJobError[])
+    : [];
   const failed = await prisma.migrationJob.updateMany({
     where: { id, orgId, status: { in: [...migrationFrom('fail')] } },
     data: {
       status: 'FAILED',
       completedAt: new Date(),
       undoableUntil: new Date(Date.now() + 24 * 3600 * 1000),
-      errorSummary: [{ row: 0, field: null, message }],
+      errorSummary: [...prior, { row: 0, field: null, message: code }],
     },
   });
   if (failed.count !== 1) {
