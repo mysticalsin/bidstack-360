@@ -14,7 +14,7 @@ import { Worker, Queue, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { prisma, resolveRetentionConfig, runRetentionSweep } from '@bidstack/db';
+import { resolveRetentionConfig, retentionPrisma, runRetentionSweep } from '@bidstack/db';
 import { RETENTION_SWEEP } from '@bidstack/shared';
 
 const FIVE_FIELD_CRON = /^\S+(\s+\S+){4}$/;
@@ -26,7 +26,7 @@ export async function runRetentionJob(
   env: Record<string, string | undefined> = process.env,
 ): Promise<Awaited<ReturnType<typeof runRetentionSweep>>> {
   const { mode } = resolveRetentionConfig(env);
-  const out = await runRetentionSweep(prisma, { dryRun: mode !== 'enforce', env });
+  const out = await runRetentionSweep(retentionPrisma(), { dryRun: mode !== 'enforce', env });
   log.info(out, out.dryRun ? 'retention sweep report (dry run)' : 'retention sweep enforced');
   return out;
 }

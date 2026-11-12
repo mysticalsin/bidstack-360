@@ -28,12 +28,11 @@ import type { Prisma } from '../../generated/client/index.js';
  * that hash-chain every insert per org and reject content UPDATE and TRUNCATE
  * for every writer, raw SQL included. DELETE stays possible for the retention
  * purge and org cascade; chain verification reports the gap it leaves.
- * Migration 20261112160000 revokes DELETE from app_role. That step is
- * preparatory: app_role has no members, and the process still connects as
- * the table owner, who keeps DELETE for the retention purge and for teardown.
- * Remaining follow-up: REVOKE DELETE ON audit_log from the app role so only the
- * retention role may purge. R-2 stays open until the runtime connection is
- * that role.
+ * Migration 20261112180000 makes app_role the runtime login and revokes
+ * UPDATE, DELETE, and TRUNCATE on audit_log from that role. The API and worker
+ * connect with DATABASE_URL_APP. Migrations and retention connect with
+ * DATABASE_URL_OWNER, which can still delete. Left: this is not deployed until
+ * Tony's go, and deleting an org still cascades to its audit rows.
  */
 
 const AUDIT_MODEL = 'AuditLog';

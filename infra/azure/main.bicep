@@ -46,8 +46,12 @@ param managedIdentityPrincipalId string
 param pgAdminLogin string
 
 @secure()
-@description('Postgres administrator password (break-glass only).')
+@description('Postgres administrator password (break-glass only). Migrations and the retention job use this login.')
 param pgAdminPassword string
+
+@secure()
+@description('Password for the app_role login. API, worker, and MCP connect as that role. Generated at deploy. Not the admin password.')
+param pgAppPassword string
 
 @secure()
 @minLength(64)
@@ -399,6 +403,10 @@ var databaseUrlApi = 'postgresql://${dbBase}:6432/${pgDatabase}?sslmode=require&
 var databaseUrlWorker = 'postgresql://${dbBase}:6432/${pgDatabase}?sslmode=require&pgbouncer=true&connection_limit=40&pool_timeout=20'
 var databaseUrlMcp = 'postgresql://${dbBase}:6432/${pgDatabase}?sslmode=require&pgbouncer=true&connection_limit=5&pool_timeout=10'
 var databaseUrlDirect = 'postgresql://${dbBase}:5432/${pgDatabase}?sslmode=require'
+var appPassword = uriComponent(pgAppPassword)
+var databaseUrlAppApi = 'postgresql://app_role:${appPassword}@${pgHost}:6432/${pgDatabase}?sslmode=require&pgbouncer=true&connection_limit=10&pool_timeout=10'
+var databaseUrlAppWorker = 'postgresql://app_role:${appPassword}@${pgHost}:6432/${pgDatabase}?sslmode=require&pgbouncer=true&connection_limit=40&pool_timeout=20'
+var databaseUrlAppMcp = 'postgresql://app_role:${appPassword}@${pgHost}:6432/${pgDatabase}?sslmode=require&pgbouncer=true&connection_limit=5&pool_timeout=10'
 var redisUrl = 'rediss://:${redis.listKeys().primaryKey}@${redis.properties.hostName}:6380'
 
 var secretMap = {
@@ -406,6 +414,10 @@ var secretMap = {
   'database-url-worker': databaseUrlWorker
   'database-url-mcp': databaseUrlMcp
   'database-url-direct': databaseUrlDirect
+  'database-url-app-api': databaseUrlAppApi
+  'database-url-app-worker': databaseUrlAppWorker
+  'database-url-app-mcp': databaseUrlAppMcp
+  'app-db-password': pgAppPassword
   'redis-url': redisUrl
   'integration-token-key': integrationTokenKey
   'pii-encryption-master-key': piiEncryptionMasterKey
@@ -427,6 +439,10 @@ var secretNames = [
   'database-url-worker'
   'database-url-mcp'
   'database-url-direct'
+  'database-url-app-api'
+  'database-url-app-worker'
+  'database-url-app-mcp'
+  'app-db-password'
   'redis-url'
   'integration-token-key'
   'pii-encryption-master-key'
@@ -537,6 +553,7 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
       manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 }
       secrets: [
         kvSecret('database-url-direct', managedIdentityId, kvUri)
+        kvSecret('app-db-password', managedIdentityId, kvUri)
         kvSecret('migrate-backup-proof', managedIdentityId, kvUri)
       ]
       registries: registries
@@ -563,6 +580,8 @@ resource migrateJob 'Microsoft.App/jobs@2024-03-01' = {
             { name: 'NODE_ENV', value: 'production' }
             { name: 'BIDSTACK_DEPLOY_ENV', value: 'production' }
             { name: 'DATABASE_URL', secretRef: 'database-url-direct' } // direct :5432, no pooler
+            { name: 'DATABASE_URL_OWNER', secretRef: 'database-url-direct' }
+            { name: 'BIDSTACK_APP_DB_PASSWORD', secretRef: 'app-db-password' }
             // Fixed in-container path the secret volume below mounts the proof
             // file at — same value docker-compose.prod.yml uses.
             { name: 'BIDSTACK_MIGRATE_BACKUP_PROOF', value: '/run/bidstack/migrate-backup-proof.json' }
@@ -590,7 +609,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
         // Lock public ingress to Front Door (defense-in-depth; app also checks X-Azure-FDID).
         ipSecurityRestrictions: [] // VALIDATE: prefer Front Door Private Link origin; else AzureFrontDoor.Backend service tag
       }
-      secrets: concat(commonSecrets, [kvSecret('database-url-api', managedIdentityId, kvUri)])
+      secrets: concat(commonSecrets, [kvSecret('database-url-app-api', managedIdentityId, kvUri)])
       registries: registries
     }
     template: {
@@ -600,7 +619,8 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           image: '${acrLoginServer}/bidstack-api:${imageTag}'
           resources: { cpu: json('1.0'), memory: '2Gi' }
           env: concat(sharedEnv, [
-            { name: 'DATABASE_URL', secretRef: 'database-url-api' }
+            { name: 'DATABASE_URL', secretRef: 'database-url-app-api' }
+            { name: 'DATABASE_URL_APP', secretRef: 'database-url-app-api' }
             { name: 'PUBLIC_BASE_URL', value: publicBaseUrl }
             { name: 'PUBLIC_API_URL', value: publicApiUrl }
             { name: 'CLERK_SECRET_KEY', secretRef: 'clerk-secret-key' }
@@ -637,7 +657,8 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       secrets: concat(commonSecrets, [
-        kvSecret('database-url-worker', managedIdentityId, kvUri)
+        kvSecret('database-url-app-worker', managedIdentityId, kvUri)
+        kvSecret('database-url-direct', managedIdentityId, kvUri)
         // KEDA needs the Redis connection to read list depth.
         kvSecret('redis-url', managedIdentityId, kvUri)
       ])
@@ -650,7 +671,9 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
           image: '${acrLoginServer}/bidstack-worker:${imageTag}'
           resources: { cpu: json('1.0'), memory: '2Gi' } // OCR + python sidecar
           env: concat(sharedEnv, [
-            { name: 'DATABASE_URL', secretRef: 'database-url-worker' }
+            { name: 'DATABASE_URL', secretRef: 'database-url-app-worker' }
+            { name: 'DATABASE_URL_APP', secretRef: 'database-url-app-worker' }
+            { name: 'DATABASE_URL_OWNER', secretRef: 'database-url-direct' }
             { name: 'WORKER_SHUTDOWN_TIMEOUT_MS', value: '120000' }
             { name: 'OTEL_SERVICE_NAME', value: 'bidstack-worker' }
           ])
@@ -698,7 +721,7 @@ resource mcpApp 'Microsoft.App/containerApps@2024-03-01' = {
       activeRevisionsMode: 'Single'
       ingress: { external: false, targetPort: 4001, transport: 'auto' }
       secrets: [
-        kvSecret('database-url-mcp', managedIdentityId, kvUri)
+        kvSecret('database-url-app-mcp', managedIdentityId, kvUri)
         kvSecret('redis-url', managedIdentityId, kvUri)
         kvSecret('integration-token-key', managedIdentityId, kvUri)
         kvSecret('pii-encryption-master-key', managedIdentityId, kvUri)
@@ -713,7 +736,8 @@ resource mcpApp 'Microsoft.App/containerApps@2024-03-01' = {
           resources: { cpu: json('0.5'), memory: '1Gi' }
           env: [
             { name: 'NODE_ENV', value: 'production' }
-            { name: 'DATABASE_URL', secretRef: 'database-url-mcp' }
+            { name: 'DATABASE_URL', secretRef: 'database-url-app-mcp' }
+            { name: 'DATABASE_URL_APP', secretRef: 'database-url-app-mcp' }
             { name: 'REDIS_URL', secretRef: 'redis-url' }
             { name: 'INTEGRATION_TOKEN_KEY', secretRef: 'integration-token-key' }
             { name: 'PII_FIELD_ENCRYPTION', value: 'true' }

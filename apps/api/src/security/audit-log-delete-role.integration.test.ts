@@ -1,7 +1,6 @@
-// WHY: app_role is not the role the services connect as. This migration is
-// preparatory. It records the grants a future role should have. It does not
-// prove the process is unable to delete audit rows. The table owner still
-// can, and THREAT-MODEL R-2 stays open.
+// WHY: SET ROLE checks the privilege on app_role. The connection the API
+// uses is audit-log-app-role.integration.test.ts. The table owner can still
+// delete, which is the retention path.
 
 import { randomUUID } from 'node:crypto';
 

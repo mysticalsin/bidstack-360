@@ -14,6 +14,7 @@ const COMPLETE_PRODUCTION_ENV = {
   REDIS_URL: 'redis://:test@redis:6379',
   BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
   BIDSTACK_TENANT_SCOPE_GUARD: 'enforce',
+  DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
 };
 
 function restoreEnv(): void {
@@ -134,6 +135,7 @@ describe('boot environment validation', () => {
       REDIS_URL: 'redis://:test@redis:6379',
       DEMO_MODE: 'true',
       DEMO_SESSION_SECRET: 'demo-session-secret',
+      DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
       BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
       BIDSTACK_TENANT_SCOPE_GUARD: 'enforce',
     };

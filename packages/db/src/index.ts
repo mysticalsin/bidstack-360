@@ -9,7 +9,8 @@
 // Default is false for backward compatibility with existing plaintext rows.
 // Runbook: docs/security/pii-field-encryption.md
 
-import { PrismaClient } from '../generated/client/index.js';
+import { Prisma, PrismaClient } from '../generated/client/index.js';
+import { appDatabaseUrl, ownerDatabaseUrl } from './database-url.js';
 import { makeAuditImmutabilityMiddleware } from './middleware/audit-immutability.js';
 import { isPiiEncryptionEnabled, makePiiMiddleware } from './middleware/pii-encryption.js';
 import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
@@ -20,7 +21,7 @@ import {
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-function buildPrismaClient(): PrismaClient {
+function buildPrismaClient(databaseUrl?: string): PrismaClient {
   // Connection-pool sizing is NOT configured here on purpose. Prisma's canonical
   // knob is the connection string itself (`?connection_limit=N&pool_timeout=S`),
   // so the pool is owned by per-service env (DATABASE_URL) + the infra pooler,
@@ -34,6 +35,7 @@ function buildPrismaClient(): PrismaClient {
   //   sum(replicas * connection_limit) + worker < Postgres max_connections.
   // See DEPLOY.production.md §"Connection pool sizing" and .env.example.
   const client = new PrismaClient({
+    ...(databaseUrl ? { datasources: { db: { url: databaseUrl } } } : {}),
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 
@@ -97,7 +99,36 @@ const globalForPrisma2 = globalForPrisma as unknown as { prisma?: PrismaClient }
  * const leads = await prisma.lead.findMany({ where: { orgId, deletedAt: null } });
  * ```
  */
-export const prisma = globalForPrisma2.prisma ?? buildPrismaClient();
+const configuredAppUrl = appDatabaseUrl();
+export const prisma = globalForPrisma2.prisma ?? buildPrismaClient(configuredAppUrl || undefined);
+
+let retentionClient: PrismaClient | undefined;
+
+export function retentionPrisma(): PrismaClient {
+  if (!retentionClient) {
+    const url = ownerDatabaseUrl();
+    if (!url) throw new Error('DATABASE_URL is required');
+    retentionClient = buildPrismaClient(url);
+  }
+  return retentionClient;
+}
+
+export async function closeRetentionPrisma(): Promise<void> {
+  if (!retentionClient) return;
+  const client = retentionClient;
+  retentionClient = undefined;
+  await client.$disconnect();
+}
+
+export async function deleteAuditRowsAsRetention(ids: readonly bigint[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const removed = await retentionPrisma().$executeRaw`
+    DELETE FROM audit_log WHERE id IN (${Prisma.join(ids)})
+  `;
+  return removed;
+}
+
+export { appDatabaseUrl, assertDistinctDatabaseLogins, databaseLogin, ownerDatabaseUrl } from './database-url.js';
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma2.prisma = prisma;

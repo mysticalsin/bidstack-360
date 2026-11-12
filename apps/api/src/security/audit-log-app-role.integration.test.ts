@@ -75,12 +75,12 @@ describe('audit log app role', () => {
       const who = await app.$queryRaw<Array<{ user: string }>>`SELECT current_user AS user`;
       expect(who[0]?.user).toBe('app_role');
 
-      const priv = await app.$queryRaw<Array<{ delete: boolean; truncate: boolean }>>`
-        SELECT has_table_privilege('app_role', 'public.audit_log', 'DELETE') AS delete,
-               has_table_privilege('app_role', 'public.audit_log', 'TRUNCATE') AS truncate
+      const priv = await app.$queryRaw<Array<{ can_delete: boolean; can_truncate: boolean }>>`
+        SELECT has_table_privilege('app_role', 'public.audit_log', 'DELETE') AS can_delete,
+               has_table_privilege('app_role', 'public.audit_log', 'TRUNCATE') AS can_truncate
       `;
-      expect(priv[0]?.delete).toBe(false);
-      expect(priv[0]?.truncate).toBe(false);
+      expect(priv[0]?.can_delete).toBe(false);
+      expect(priv[0]?.can_truncate).toBe(false);
 
       await expect(
         app.$executeRaw`DELETE FROM audit_log WHERE id = ${row.id}`,
@@ -92,6 +92,8 @@ describe('audit log app role', () => {
       expect(await prisma.auditLog.findUnique({ where: { id: row.id } })).toBeNull();
     } finally {
       await app.$disconnect().catch(() => undefined);
+      const { closeRetentionPrisma } = await import('@bidstack/db');
+      await closeRetentionPrisma().catch(() => undefined);
       await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
     }
   });
