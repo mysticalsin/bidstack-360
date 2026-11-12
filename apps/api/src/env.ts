@@ -199,7 +199,7 @@ export const envSchema = z.object({
   // opt out. The API and the worker share oauthRefreshLockRedisRequired.
   OAUTH_REFRESH_LOCK_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
   OAUTH_REFRESH_LOCK_TTL_MS: z.coerce.number().int().positive().default(30_000),
-  OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(10_000),
+  OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(30_000),
   OAUTH_REFRESH_LOCK_POLL_MS: z.coerce.number().int().positive().default(250),
 
   // OCR

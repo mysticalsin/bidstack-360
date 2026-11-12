@@ -102,7 +102,12 @@ export async function runWithOAuthRefreshLock<T>({
 }: OAuthRefreshLockOptions<T>): Promise<T> {
   const key = `bidstack:oauth-refresh-lock:${tokenId}`;
   const ttlMs = timeoutMs('OAUTH_REFRESH_LOCK_TTL_MS', 30_000);
-  const waitMs = timeoutMs('OAUTH_REFRESH_LOCK_WAIT_MS', 10_000);
+  // A crashed holder leaves the key until its TTL, and Redis persistence keeps
+  // that key across a restart. The waiter waits at least that long so it can
+  // take the lock after the key expires. The TTL stays above a provider
+  // refresh; shortening it would drop the lock while a live refresh is still
+  // calling the provider.
+  const waitMs = Math.max(timeoutMs('OAUTH_REFRESH_LOCK_WAIT_MS', ttlMs), ttlMs);
   const pollMs = timeoutMs('OAUTH_REFRESH_LOCK_POLL_MS', 250);
   const deadline = Date.now() + waitMs;
 

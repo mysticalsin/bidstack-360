@@ -23,7 +23,9 @@ peer and break the connection.
 - Release with an owner-checked Lua script so a slow releaser cannot delete a
   newer owner's lock.
 - Waiters poll the database and reuse the fresh access token after the owner
-  writes it.
+  writes it. The wait is at least the lock TTL (both 30s by default) so a
+  persisted key from a dead holder cannot outlive the waiter. The TTL stays
+  longer than a provider refresh.
 - Redis is required unless the process is development or test and
   OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false. A missing NODE_ENV does not opt out.
   The API and the worker share oauthRefreshLockRedisRequired.

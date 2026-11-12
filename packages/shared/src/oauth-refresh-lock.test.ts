@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { oauthRefreshLockRedisRequired, runWithOAuthRefreshLock } from './oauth-refresh-lock.js';
+import {
+  OAuthRefreshLockTimeoutError,
+  oauthRefreshLockRedisRequired,
+  runWithOAuthRefreshLock,
+} from './oauth-refresh-lock.js';
 
 const FALLBACK = 'OAuth refresh Redis lock unavailable; using process-local fallback';
 
@@ -54,6 +58,48 @@ describe('runWithOAuthRefreshLock', () => {
     });
     expect(value).toBe('fresh');
     expect(warn.mock.calls.some((call) => call.includes(FALLBACK))).toBe(true);
+  });
+
+  it('waits at least as long as a persisted lock can live', async () => {
+    // WHY: the lock key lasts 30s and the waiter gave up at 10s. With Redis
+    // persistence that key outlives the process, so every later refresh in
+    // the gap also gives up. The waiter has to outlast the key. The TTL stays
+    // above a provider refresh; shortening it would let a live refresh lose
+    // the lock.
+    const previousTtl = process.env.OAUTH_REFRESH_LOCK_TTL_MS;
+    const previousWait = process.env.OAUTH_REFRESH_LOCK_WAIT_MS;
+    const previousPoll = process.env.OAUTH_REFRESH_LOCK_POLL_MS;
+    process.env.OAUTH_REFRESH_LOCK_TTL_MS = '300';
+    process.env.OAUTH_REFRESH_LOCK_WAIT_MS = '40';
+    process.env.OAUTH_REFRESH_LOCK_POLL_MS = '20';
+    const started = Date.now();
+    let caught: unknown;
+    try {
+      await runWithOAuthRefreshLock({
+        tokenId: 'stale-window',
+        log: { debug: vi.fn(), warn: vi.fn() },
+        getFreshValue: async () => null,
+        refresh: async () => 'not-used',
+        redis: {
+          ready: async () => true,
+          set: async () => null,
+          eval: async () => 0,
+        },
+        redisRequired: true,
+      });
+    } catch (err) {
+      caught = err;
+    } finally {
+      if (previousTtl === undefined) delete process.env.OAUTH_REFRESH_LOCK_TTL_MS;
+      else process.env.OAUTH_REFRESH_LOCK_TTL_MS = previousTtl;
+      if (previousWait === undefined) delete process.env.OAUTH_REFRESH_LOCK_WAIT_MS;
+      else process.env.OAUTH_REFRESH_LOCK_WAIT_MS = previousWait;
+      if (previousPoll === undefined) delete process.env.OAUTH_REFRESH_LOCK_POLL_MS;
+      else process.env.OAUTH_REFRESH_LOCK_POLL_MS = previousPoll;
+    }
+    expect(caught).toBeInstanceOf(OAuthRefreshLockTimeoutError);
+    expect((caught as OAuthRefreshLockTimeoutError).waitMs).toBeGreaterThanOrEqual(300);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(280);
   });
 
   it('does not warn when no Redis client was configured', async () => {
