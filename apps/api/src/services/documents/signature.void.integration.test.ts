@@ -1,12 +1,37 @@
 // WHY: void reads a non-terminal status and then updates by id. A signature
 // that lands after that read must stay signed, and no void event is stored.
 
-import { randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
+
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
 import { voidSignatureRequest } from './signature.service.js';
+
+const docusign = vi.hoisted(() => ({ on: false, privateKey: '' }));
+
+vi.mock('../../env.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../env.js')>();
+  return {
+    ...actual,
+    getEnv: () => {
+      const env = actual.getEnv();
+      if (!docusign.on) return env;
+      return {
+        ...env,
+        DOCUSIGN_ACCOUNT_ID: 'acct-void',
+        DOCUSIGN_INTEGRATION_KEY: 'ik-void',
+        DOCUSIGN_USER_ID: 'user-void',
+        DOCUSIGN_PRIVATE_KEY: docusign.privateKey,
+        DOCUSIGN_BASE_URL: 'https://demo.docusign.net/restapi',
+      };
+    },
+  };
+});
+
+const { privateKey: voidKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const VOID_KEY = voidKey.export({ type: 'pkcs8', format: 'pem' }).toString();
 
 let dbReachable = false;
 
@@ -24,6 +49,7 @@ afterAll(async () => {
 });
 
 afterEach(() => {
+  docusign.on = false;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -130,6 +156,8 @@ describe('void signature request', () => {
         },
       });
       const urls: string[] = [];
+      docusign.privateKey = Buffer.from(VOID_KEY).toString('base64');
+      docusign.on = true;
       vi.stubGlobal('fetch', async (url: string) => {
         urls.push(String(url));
         if (String(url).includes('oauth/token')) {
@@ -184,6 +212,8 @@ describe('void signature request', () => {
           recipients: [],
         },
       });
+      docusign.privateKey = Buffer.from(VOID_KEY).toString('base64');
+      docusign.on = true;
       vi.stubGlobal('fetch', async (url: string) => {
         if (String(url).includes('oauth/token')) {
           return new Response(JSON.stringify({ access_token: 'ds-tok', expires_in: 7200 }), { status: 200 });
