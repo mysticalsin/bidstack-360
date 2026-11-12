@@ -172,6 +172,27 @@ interface WriteCtx {
   tx: Prisma.TransactionClient;
 }
 
+/** Shown to users and written on the error CSV. No process ids, transaction ids, or SQL. */
+export const MIGRATION_DEADLOCK_PUBLIC =
+  'The import conflicted with another write and will be tried again.';
+
+/** Postgres 40P01, including when Prisma nests it on `meta.code`. */
+export function isMigrationDeadlock(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const row = err as { code?: unknown; meta?: { code?: unknown }; cause?: unknown };
+  if (row.code === '40P01' || row.meta?.code === '40P01') return true;
+  return row.cause !== undefined && row.cause !== err && isMigrationDeadlock(row.cause);
+}
+
+/** A deadlock aborts the transaction. The chunk fails so BullMQ retries the whole chunk. */
+export class MigrationChunkConflict extends Error {
+  readonly code = '40P01';
+  constructor() {
+    super(MIGRATION_DEADLOCK_PUBLIC);
+    this.name = 'MigrationChunkConflict';
+  }
+}
+
 /** A failed statement aborts the chunk transaction. A savepoint lets one row fail. */
 async function withSavepoint<T>(tx: Prisma.TransactionClient, name: string, fn: () => Promise<T>): Promise<T> {
   await tx.$executeRawUnsafe(`SAVEPOINT ${name}`);
@@ -180,6 +201,9 @@ async function withSavepoint<T>(tx: Prisma.TransactionClient, name: string, fn: 
     await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${name}`);
     return result;
   } catch (err) {
+    // 40P01 already aborted the transaction. Rolling back to the savepoint
+    // would raise 25P02 and hide the deadlock in a later row error.
+    if (isMigrationDeadlock(err)) throw err;
     await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${name}`);
     throw err;
   }
@@ -883,7 +907,9 @@ export async function processMigrationChunk(
   // The attempt is checked again under a row lock, before any entity insert.
   // The inserts, the counters, and the undo trail commit together. A retry
   // that already replaced the attempt writes nothing.
-  const written = await prisma.$transaction(
+  let written: { createdIds: string[]; processed: number; errors: MigrationJobError[] } | null;
+  try {
+    written = await prisma.$transaction(
     async (tx) => {
       const locked = await tx.$queryRaw<Array<{ status: string; meta: unknown }>>`
         SELECT status::text AS status, meta
@@ -913,6 +939,7 @@ export async function processMigrationChunk(
           if (createdId) createdIds.push(createdId);
           processed += 1;
         } catch (err) {
+          if (isMigrationDeadlock(err)) throw new MigrationChunkConflict();
           errors.push({
             row: absoluteRow,
             field: null,
@@ -937,7 +964,12 @@ export async function processMigrationChunk(
       return { createdIds, processed, errors };
     },
     { maxWait: 10_000, timeout: 120_000 },
-  );
+    );
+  } catch (err) {
+    if (err instanceof MigrationChunkConflict) throw err;
+    if (isMigrationDeadlock(err)) throw new MigrationChunkConflict();
+    throw err;
+  }
   if (!written) {
     log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
     return;
@@ -1156,7 +1188,13 @@ export async function startMigrationWorker(
             SET error_summary = CASE
               WHEN jsonb_array_length(error_summary) < 200
               THEN error_summary || ${JSON.stringify([
-                { row: 0, field: null, message: `chunk failed permanently: ${err.message}` },
+                {
+                  row: 0,
+                  field: null,
+                  message: isMigrationDeadlock(err)
+                    ? MIGRATION_DEADLOCK_PUBLIC
+                    : `chunk failed permanently: ${err.message}`,
+                },
               ])}::jsonb
               ELSE error_summary
             END
