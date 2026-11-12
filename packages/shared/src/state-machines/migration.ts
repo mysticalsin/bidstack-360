@@ -41,9 +41,20 @@ const MIGRATION_FAILURE_TEXT: Record<string, string> = {
   [MIGRATION_LEGACY_ROWS_EXPIRED]: 'Those rows expired. Upload the file again.',
 };
 
-/** The sentence a downloaded error CSV shows for a stored failure code. Other messages pass through. */
+/** The sentence a downloaded error CSV shows for a stored failure code. A short row sentence passes through. */
 export function migrationFailureText(message: string): string {
-  return MIGRATION_FAILURE_TEXT[message] ?? message;
+  const known = MIGRATION_FAILURE_TEXT[message];
+  if (known) return known;
+  // Same sentences the wizard uses. Driver text is not a row sentence.
+  if (
+    message.startsWith('chunk failed permanently:') ||
+    /PostgresError|\b40P01\b|\b40001\b|\bP2034\b|Unique constraint|\/apps\/|\.ts:\d+|Process \d+/.test(
+      message,
+    )
+  ) {
+    return 'The import could not be completed.';
+  }
+  return message;
 }
 
 /** A spreadsheet treats a cell starting with one of these as a formula. */

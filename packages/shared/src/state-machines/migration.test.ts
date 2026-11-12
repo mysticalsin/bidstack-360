@@ -60,6 +60,11 @@ describe('migration transition table', () => {
       'The import stopped before the remaining rows were saved.',
     );
     expect(migrationFailureText('company.name is required')).toBe('company.name is required');
+    expect(
+      migrationFailureText(
+        'chunk failed permanently: Unique constraint failed at /apps/worker/src/queues/migration.ts:236 Process 4242 40P01',
+      ),
+    ).toBe('The import could not be completed.');
     const csv = migrationErrorsCsv([
       { row: 2, field: '=cmd', message: '+sum' },
       { row: 3, field: '-1', message: '@x' },
