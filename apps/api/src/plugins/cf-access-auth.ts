@@ -76,7 +76,15 @@ export async function verifyCfAccessJwt(
     throw new Error('malformed_cf_access_jwt');
   }
   let header: { alg?: string; kid?: string };
-  let payload: { email?: string; common_name?: string; name?: string; aud?: string | string[]; iss?: string; exp?: number };
+  let payload: {
+    email?: string;
+    common_name?: string;
+    name?: string;
+    aud?: string | string[];
+    iss?: string;
+    exp?: number;
+    nbf?: number;
+  };
   try {
     header = JSON.parse(b64urlToBuffer(parts[0]).toString('utf8')) as typeof header;
     payload = JSON.parse(b64urlToBuffer(parts[1]).toString('utf8')) as typeof payload;
@@ -113,6 +121,7 @@ export async function verifyCfAccessJwt(
   if (!aud.includes(opts.audience)) throw new Error('cf_access_aud_mismatch');
   if (payload.iss !== issuer) throw new Error('cf_access_iss_mismatch');
   if (!payload.exp || payload.exp <= now) throw new Error('cf_access_expired');
+  if (payload.nbf != null && payload.nbf > now) throw new Error('cf_access_nbf');
 
   const email = (payload.email ?? payload.common_name ?? '').trim().toLowerCase();
   if (!email.includes('@')) throw new Error('cf_access_email_missing');
