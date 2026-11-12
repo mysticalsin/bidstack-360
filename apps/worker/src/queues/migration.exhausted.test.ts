@@ -91,6 +91,59 @@ describe('an exhausted chunk retry', () => {
     );
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(stored.status).toBe('FAILED');
+    expect(JSON.stringify(stored.errorSummary)).toContain('current chunk exhausted');
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
+
+  t('a retry that lands during exhaustion cannot fail the new attempt', async () => {
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_ex3_${ns}`, name: `ex3 ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'ex3' },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        startedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: PREVIOUS },
+      },
+    });
+    try {
+      let release: () => void = () => undefined;
+      const locked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const flip = prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM migration_jobs WHERE id = ${job.id}::uuid FOR UPDATE`;
+        release();
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        await tx.$executeRaw`
+          UPDATE migration_jobs
+          SET meta = jsonb_set(meta, '{attemptId}', to_jsonb(${CURRENT}::text))
+          WHERE id = ${job.id}::uuid
+        `;
+      });
+      await locked;
+      const exhaustion = failExhaustedMigrationChunk(
+        { migrationJobId: job.id, attemptId: PREVIOUS },
+        new Error('old attempt exhausted'),
+        log,
+      );
+      await flip;
+      await exhaustion;
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.status).toBe('RUNNING');
+      expect((stored.meta as { attemptId?: string }).attemptId).toBe(CURRENT);
+      expect(JSON.stringify(stored.errorSummary)).not.toMatch(/old attempt exhausted/);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
   });
 });

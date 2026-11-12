@@ -1147,7 +1147,7 @@ type FailLog = {
   warn: (obj: object, msg?: string) => void;
 };
 
-/** The last BullMQ attempt failed. Only the attempt that still owns the job may mark it failed. */
+/** The last BullMQ attempt failed. The attempt id is in the write, so a stale chunk cannot fail a newer one. */
 export async function failExhaustedMigrationChunk(
   data: { migrationJobId?: string; attemptId?: string | null },
   err: { message: string },
@@ -1155,50 +1155,47 @@ export async function failExhaustedMigrationChunk(
 ): Promise<void> {
   const migrationJobId = data.migrationJobId;
   if (!migrationJobId) return;
-  const holder = await prisma.migrationJob.findUnique({
-    where: { id: migrationJobId },
-    select: { meta: true },
-  });
-  if (!migrationChunkMatchesAttempt(migrationAttemptId(holder?.meta), data.attemptId ?? null)) {
-    log.warn({ migrationJobId }, 'exhausted chunk belongs to an older attempt');
+  const attemptId = data.attemptId ?? null;
+  const message = isMigrationDeadlock(err)
+    ? MIGRATION_DEADLOCK_PUBLIC
+    : `chunk failed permanently: ${err.message}`;
+  const payload = JSON.stringify([{ row: 0, field: null, message }]);
+  let moved: number;
+  try {
+    moved = Number(
+      await prisma.$executeRaw`
+        UPDATE migration_jobs
+        SET status = 'FAILED',
+            completed_at = date_trunc('milliseconds', NOW()),
+            error_summary = CASE
+              WHEN jsonb_array_length(error_summary) < 200
+              THEN error_summary || ${payload}::jsonb
+              ELSE error_summary
+            END
+        WHERE id = ${migrationJobId}::uuid
+          AND status::text = ${migrationActiveStatus()}
+          AND (
+            (${attemptId}::text IS NULL AND COALESCE(meta->>'attemptId', '') = '')
+            OR meta->>'attemptId' = ${attemptId}
+          )
+      `,
+    );
+  } catch (updateErr) {
+    log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED');
     return;
   }
-  const moved = await prisma.migrationJob
-    .updateMany({
-      where: { id: migrationJobId, status: { in: [...migrationFrom('fail')] } },
-      data: { status: 'FAILED', completedAt: new Date() },
-    })
-    .catch((updateErr) => {
-      log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED');
-      return { count: 0 };
-    });
-  if (moved.count !== 1) {
+  if (moved !== 1) {
     const current = await prisma.migrationJob.findUnique({
       where: { id: migrationJobId },
-      select: { status: true },
+      select: { status: true, meta: true },
     });
+    if (!migrationChunkMatchesAttempt(migrationAttemptId(current?.meta), attemptId)) {
+      log.warn({ migrationJobId }, 'exhausted chunk belongs to an older attempt');
+      return;
+    }
     log.warn(
       { migrationJobId, from: current?.status ?? null, to: 'FAILED' },
       'illegal migration transition',
-    );
-  } else {
-    await prisma.$executeRaw`
-      UPDATE migration_jobs
-      SET error_summary = CASE
-        WHEN jsonb_array_length(error_summary) < 200
-        THEN error_summary || ${JSON.stringify([
-          {
-            row: 0,
-            field: null,
-            message: isMigrationDeadlock(err)
-              ? MIGRATION_DEADLOCK_PUBLIC
-              : `chunk failed permanently: ${err.message}`,
-          },
-        ])}::jsonb
-        ELSE error_summary
-      END
-      WHERE id = ${migrationJobId}::uuid AND status = 'FAILED'`.catch((rawErr) =>
-      log.warn({ err: rawErr, migrationJobId }, 'best-effort error_summary append failed'),
     );
   }
 }
