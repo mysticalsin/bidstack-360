@@ -46,6 +46,13 @@ const t = (name: string, fn: () => Promise<void>) =>
     await fn();
   });
 
+async function newestJob() {
+  return prisma.migrationJob.findFirstOrThrow({
+    where: { orgId: org.orgId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 describe('migration residual failures', () => {
   t('a retry after undo does not stay marked undone', async () => {
     // WHY: undo of a job that saved nothing sets meta.undone. Retry copies
@@ -64,22 +71,31 @@ describe('migration residual failures', () => {
           mappings: { name: 'company.name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
+      expect(res.statusCode).toBe(409);
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
+      await prisma.migrationJob.update({
+        where: { id: created.id },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          undoableUntil: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
       const undo = await server.inject({
         method: 'DELETE',
-        url: `/api/v1/migrations/${body.id}/undo`,
+        url: `/api/v1/migrations/${created.id}/undo`,
       });
       expect(undo.statusCode).toBe(200);
-      const undone = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const undone = await prisma.migrationJob.findUniqueOrThrow({ where: { id: created.id } });
       expect((undone.meta as { undone?: boolean }).undone).toBe(true);
       add.mockResolvedValue({ id: 'chunk' } as never);
       const retry = await server.inject({
         method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
+        url: `/api/v1/migrations/${created.id}/retry`,
       });
       expect(retry.statusCode).toBe(200);
-      const again = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const again = await prisma.migrationJob.findUniqueOrThrow({ where: { id: created.id } });
       expect(again.status).toBe('RUNNING');
       expect((again.meta as { undone?: boolean }).undone).not.toBe(true);
       expect((again.meta as { undoneAt?: string }).undoneAt).toBeUndefined();
@@ -88,9 +104,9 @@ describe('migration residual failures', () => {
     }
   });
 
-  t('a partial enqueue keeps the row error and the stopped sentence', async () => {
-    // WHY: the fail write replaced the summary with enqueue_failed. The error
-    // file then said the import did not start, and the row that failed was gone.
+  t('a partial enqueue keeps the row error and the pending job', async () => {
+    // WHY: a later chunk that cannot be queued must not replace the row error
+    // or mark the job failed. The start never claimed it.
     const { redis } = await import('../redis.js');
     (server as unknown as { redis: typeof redis }).redis = redis;
     const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (name, data) => {
@@ -120,15 +136,15 @@ describe('migration residual failures', () => {
           mappings: { name: 'company.name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
+      expect(res.statusCode).toBe(409);
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
       const csv = await server.inject({
         method: 'GET',
-        url: `/api/v1/migrations/${body.id}/errors.csv`,
+        url: `/api/v1/migrations/${created.id}/errors.csv`,
       });
       expect(csv.statusCode).toBe(200);
       expect(csv.body).toContain('company.name is required');
-      expect(csv.body).toContain('The import stopped before the remaining rows were saved.');
       expect(csv.body).not.toContain('The import did not start');
     } finally {
       add.mockRestore();

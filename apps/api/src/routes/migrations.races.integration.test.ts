@@ -1,7 +1,7 @@
-// WHY these races matter: a CSV start enqueues chunks and only then writes
-// RUNNING by id, so a cancel that lands during enqueue is overwritten and the
-// job looks running with dead chunks. Cancel and undo make the same mistake:
-// they trust a status they read earlier, then update by id.
+// WHY these races matter: a CSV start enqueues while the job is still pending,
+// then claims RUNNING only if that status is unchanged. A cancel during
+// enqueue must stay cancelled. A queue that throws leaves the pending job
+// and tells the caller. A chunk must not import in that window.
 
 import { Queue } from 'bullmq';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -75,6 +75,13 @@ const t = (name: string, fn: () => Promise<void>) =>
     await fn();
   });
 
+async function newestJob() {
+  return prisma.migrationJob.findFirstOrThrow({
+    where: { orgId: org.orgId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 describe('migration status races', () => {
   t('a cancel during enqueue is not overwritten by the start write', async () => {
     const { redis } = await import('../redis.js');
@@ -101,11 +108,10 @@ describe('migration status races', () => {
           mappings: { name: 'name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
-      const row = await prisma.migrationJob.findUnique({ where: { id: body.id } });
-      // The cancel won. A later by-id RUNNING write must not revive the job.
-      expect(row?.status).toBe('CANCELLED');
+      expect(res.statusCode).toBe(409);
+      const row = await newestJob();
+      // The cancel won. The RUNNING claim is conditional, so it does not revive the job.
+      expect(row.status).toBe('CANCELLED');
     } finally {
       add.mockRestore();
     }
@@ -126,18 +132,29 @@ describe('migration status races', () => {
           mappings: { name: 'name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string; status: string }>();
-      expect(body.status).toBe('FAILED');
+      expect(res.statusCode).toBe(409);
+      expect(res.json<{ message: string }>().message).toBe(
+        'The import could not be queued. Try again.',
+      );
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
+      await prisma.migrationJob.update({
+        where: { id: created.id },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          meta: { ...(created.meta as object), attemptId: 'attempt-that-failed' },
+        },
+      });
       add.mockResolvedValue({ id: 'chunk' } as never);
       const retry = await server.inject({
         method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
+        url: `/api/v1/migrations/${created.id}/retry`,
       });
       expect(retry.statusCode).toBe(200);
       expect(retry.json<{ status: string }>().status).toBe('RUNNING');
       const audit = await prisma.auditLog.findFirst({
-        where: { orgId: org.orgId, targetId: body.id, action: 'migration.retry' },
+        where: { orgId: org.orgId, targetId: created.id, action: 'migration.retry' },
       });
       const diff = audit?.diff as { previousAttempt?: string | null; attemptId?: string } | null;
       expect(audit?.userId).toBe(userId);
@@ -166,27 +183,31 @@ describe('migration status races', () => {
           mappings: { name: 'name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
-      const failed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      expect(res.statusCode).toBe(409);
+      const failed = await newestJob();
+      expect(failed.status).toBe('PENDING');
       const past = new Date(Date.now() - 16 * 60_000).toISOString();
       await prisma.migrationJob.update({
-        where: { id: body.id },
-        data: { meta: { ...(failed.meta as object), progressAt: past } },
+        where: { id: failed.id },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          meta: { ...(failed.meta as object), progressAt: past },
+        },
       });
       add.mockResolvedValue({ id: 'chunk' } as never);
       const retry = await server.inject({
         method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
+        url: `/api/v1/migrations/${failed.id}/retry`,
       });
       expect(retry.statusCode).toBe(200);
       const detail = await server.inject({
         method: 'GET',
-        url: `/api/v1/migrations/${body.id}`,
+        url: `/api/v1/migrations/${failed.id}`,
       });
       expect(detail.json<{ status: string }>().status).toBe('RUNNING');
       expect(detail.json<{ stalled?: boolean }>().stalled).toBe(false);
-      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: failed.id } });
       expect((stored.meta as { progressAt?: unknown }).progressAt).toBeUndefined();
     } finally {
       add.mockRestore();
@@ -209,18 +230,23 @@ describe('migration status races', () => {
           mappings: { name: 'name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
+      expect(res.statusCode).toBe(409);
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
       await prisma.migrationJob.update({
-        where: { id: body.id },
-        data: { errorSummary: [{ row: 0, field: null, message: 'rows_expired' }] },
+        where: { id: created.id },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          errorSummary: [{ row: 0, field: null, message: 'rows_expired' }],
+        },
       });
       const retry = await server.inject({
         method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
+        url: `/api/v1/migrations/${created.id}/retry`,
       });
       expect(retry.statusCode).toBe(409);
-      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: created.id } });
       expect(stored.status).toBe('FAILED');
     } finally {
       add.mockRestore();
@@ -249,8 +275,13 @@ describe('migration status races', () => {
           mappings: { Name: 'company.name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
+      expect(res.statusCode).toBe(409);
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
+      await prisma.migrationJob.update({
+        where: { id: created.id },
+        data: { status: 'FAILED', completedAt: new Date() },
+      });
       await prisma.migrationMapping.update({
         where: {
           orgId_source_sourceEntity: { orgId: org.orgId, source: 'CSV', sourceEntity: 'company' },
@@ -259,7 +290,7 @@ describe('migration status races', () => {
       });
       const retry = await server.inject({
         method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
+        url: `/api/v1/migrations/${created.id}/retry`,
       });
       expect(retry.statusCode).toBe(200);
       expect(added[1]?.mappings).toEqual({ Name: 'company.name' });
@@ -268,9 +299,10 @@ describe('migration status races', () => {
     }
   });
 
-  t('a committed chunk can still be undone when a later enqueue fails', async () => {
-    // WHY: the first chunk can commit before the next queue add throws.
-    // The job is then failed, retry refuses it, and undo refuses it too.
+  t('a later enqueue failure leaves the job pending', async () => {
+    // WHY: the first chunk is queued before the next add throws. The job is
+    // still pending, so the worker must not import it, and the start does not
+    // mark it failed.
     const { redis } = await import('../redis.js');
     (server as unknown as { redis: typeof redis }).redis = redis;
     let calls = 0;
@@ -291,39 +323,21 @@ describe('migration status races', () => {
           mappings: { name: 'company.name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string; status: string }>();
-      expect(body.status).toBe('FAILED');
-      const company = await prisma.company.create({
-        data: { orgId: org.orgId, name: `Kept ${body.id}`, source: `migration:${body.id}` },
-      });
-      await prisma.migrationJob.update({
-        where: { id: body.id },
-        data: { processedRows: 1 },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: org.orgId,
-          action: 'migration.chunk.imported',
-          targetType: 'MigrationJob',
-          targetId: body.id,
-          diff: { entity: 'company', createdIds: [company.id] },
-        },
-      });
-      const undo = await server.inject({
-        method: 'DELETE',
-        url: `/api/v1/migrations/${body.id}/undo`,
-      });
-      expect(undo.statusCode).toBe(200);
-      expect(await prisma.company.findUnique({ where: { id: company.id } })).toBeNull();
+      expect(res.statusCode).toBe(409);
+      expect(res.json<{ message: string }>().message).toBe(
+        'The import could not be queued. Try again.',
+      );
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
+      expect(calls).toBe(2);
     } finally {
       add.mockRestore();
     }
   });
 
-  t('a chunk that commits while the next enqueue is waiting can be undone', async () => {
-    // WHY: chunk 0 can land in the CRM before chunk 1's queue add throws.
-    // The job is then failed, so retry refuses it. Undo is the way back.
+  t('a chunk does not import while the next enqueue is still waiting', async () => {
+    // WHY: chunk 0 is queued before chunk 1's add returns. The job is still
+    // pending, so importing now would save rows the start never claimed.
     const { redis } = await import('../redis.js');
     (server as unknown as { redis: typeof redis }).redis = redis;
     let calls = 0;
@@ -354,34 +368,25 @@ describe('migration status races', () => {
       });
       await vi.waitFor(() => expect(calls).toBe(2));
       const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
-      await processMigrationChunk(
-        chunk0 as never,
-        {
-          readRows: (key) => redis.get(key),
-          enqueueChunk: async () => undefined,
-          enqueueIntel: async () => undefined,
-          env: { ACCOUNT_INTEL_IMPORT_ENRICH: 'false' },
-        },
-        { info: () => undefined, warn: () => undefined },
-      );
+      await expect(
+        processMigrationChunk(
+          chunk0 as never,
+          {
+            readRows: (key) => redis.get(key),
+            enqueueChunk: async () => undefined,
+            enqueueIntel: async () => undefined,
+            env: { ACCOUNT_INTEL_IMPORT_ENRICH: 'false' },
+          },
+          { info: () => undefined, warn: () => undefined },
+        ),
+      ).rejects.toThrow(/not running yet/);
       const source = `migration:${chunk0?.migrationJobId ?? ''}`;
-      expect(await prisma.company.count({ where: { orgId: org.orgId, source } })).toBeGreaterThan(0);
+      expect(await prisma.company.count({ where: { orgId: org.orgId, source } })).toBe(0);
       rejectNext(new Error('queue down'));
       const res = await pending;
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string; status: string }>();
-      expect(body.status).toBe('FAILED');
-      const retry = await server.inject({
-        method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
-      });
-      expect(retry.statusCode).toBe(409);
-      const undo = await server.inject({
-        method: 'DELETE',
-        url: `/api/v1/migrations/${body.id}/undo`,
-      });
-      expect(undo.statusCode).toBe(200);
-      expect(await prisma.company.count({ where: { orgId: org.orgId, source } })).toBe(0);
+      expect(res.statusCode).toBe(409);
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
     } finally {
       rejectNext(new Error('queue down'));
       add.mockRestore();
@@ -406,24 +411,28 @@ describe('migration status races', () => {
           mappings: { name: 'name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
-      const failed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      expect(res.statusCode).toBe(409);
+      const failed = await newestJob();
+      expect(failed.status).toBe('PENDING');
       const past = new Date(Date.now() - 16 * 60_000).toISOString();
       await prisma.migrationJob.update({
-        where: { id: body.id },
-        data: { meta: { ...(failed.meta as object), progressAt: past } },
+        where: { id: failed.id },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          meta: { ...(failed.meta as object), progressAt: past },
+        },
       });
       add.mockResolvedValue({ id: 'chunk' } as never);
       const retry = await server.inject({
         method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
+        url: `/api/v1/migrations/${failed.id}/retry`,
       });
       expect(retry.statusCode).toBe(200);
-      await ageProgress(body.id);
+      await ageProgress(failed.id);
       const { sweepStaleMigrations } = await import('../../../worker/src/queues/migration.js');
       await sweepStaleMigrations(new Date());
-      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: failed.id } });
       expect(stored.status).toBe('RUNNING');
       expect(stored.errorSummary).toEqual([]);
     } finally {
@@ -463,15 +472,20 @@ describe('migration status races', () => {
           mappings: { name: 'name' },
         },
       });
-      expect(res.statusCode).toBe(201);
-      const body = res.json<{ id: string }>();
+      expect(res.statusCode).toBe(409);
+      const created = await newestJob();
+      expect(created.status).toBe('PENDING');
+      await prisma.migrationJob.update({
+        where: { id: created.id },
+        data: { status: 'FAILED', completedAt: new Date() },
+      });
       add.mockResolvedValue({ id: 'chunk' } as never);
       const retry = await server.inject({
         method: 'POST',
-        url: `/api/v1/migrations/${body.id}/retry`,
+        url: `/api/v1/migrations/${created.id}/retry`,
       });
       expect(retry.statusCode).toBeGreaterThanOrEqual(500);
-      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: created.id } });
       expect(stored.status).toBe('FAILED');
     } finally {
       await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS fail_retry_audit ON audit_log`);
