@@ -241,4 +241,51 @@ describe('migration stale scan', () => {
       await prisma.org.delete({ where: { id: row.org.id } }).catch(() => undefined);
     }
   });
+
+  t('a delete that does not land does not record a reap', async () => {
+    // WHY: the reap audit used to commit before the delete. A delete that
+    // removes nothing, or is rejected, left a "reaped" row, and the next
+    // scan wrote another one for the same still-pending job.
+    const abandoned = await pendingJob(16 * 60_000);
+    await prisma.auditLog.create({
+      data: {
+        orgId: abandoned.org.id,
+        userId: abandoned.user.id,
+        action: 'migration.start_failed',
+        targetType: 'MigrationJob',
+        targetId: abandoned.job.id,
+        diff: { reason: 'queue' },
+      },
+    });
+    await prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE FUNCTION block_reap_delete() RETURNS trigger
+      LANGUAGE plpgsql AS $fn$
+      BEGIN
+        IF OLD.id = '${abandoned.job.id}'::uuid THEN
+          RAISE EXCEPTION 'delete blocked';
+        END IF;
+        RETURN OLD;
+      END;
+      $fn$;
+    `);
+    await prisma.$executeRawUnsafe(
+      `CREATE TRIGGER block_reap BEFORE DELETE ON migration_jobs FOR EACH ROW EXECUTE FUNCTION block_reap_delete()`,
+    );
+    try {
+      await expect(sweepAbandonedPending(new Date())).rejects.toThrow(/delete blocked/);
+      await expect(sweepAbandonedPending(new Date())).rejects.toThrow(/delete blocked/);
+      expect(
+        await prisma.auditLog.count({
+          where: { targetId: abandoned.job.id, action: 'migration.reaped' },
+        }),
+      ).toBe(0);
+      expect(
+        (await prisma.migrationJob.findUnique({ where: { id: abandoned.job.id } }))?.status,
+      ).toBe('PENDING');
+    } finally {
+      await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS block_reap ON migration_jobs`);
+      await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS block_reap_delete()`);
+      await prisma.org.delete({ where: { id: abandoned.org.id } }).catch(() => undefined);
+    }
+  });
 });

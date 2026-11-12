@@ -1195,23 +1195,29 @@ export async function sweepAbandonedPending(
       if (queued) continue;
     }
     const reason = failedStart ? 'start_failed' : 'no_queue_entry';
-    await prisma.auditLog.create({
-      data: {
-        orgId: job.orgId,
-        action: 'migration.reaped',
-        targetType: 'MigrationJob',
-        targetId: job.id,
-        diff: { reason },
-      },
+    // The audit and the delete commit together. A delete that removes
+    // nothing, or is rejected, must not leave a reap row for the next scan.
+    const removed = await prisma.$transaction(async (tx) => {
+      const deleted = await tx.migrationJob.deleteMany({
+        where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+      });
+      if (deleted.count !== 1) return 0;
+      await tx.auditLog.create({
+        data: {
+          orgId: job.orgId,
+          action: 'migration.reaped',
+          targetType: 'MigrationJob',
+          targetId: job.id,
+          diff: { reason },
+        },
+      });
+      return 1;
     });
+    if (removed !== 1) continue;
     deps.log?.info(
       { migrationJobId: job.id, orgId: job.orgId, reason },
       'reaped an abandoned pending import',
     );
-    const removed = await prisma.migrationJob.deleteMany({
-      where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
-    });
-    if (removed.count !== 1) continue;
     const entityType = migrationEntityType(job.meta);
     if (entityType && deps.deleteRows) {
       await deps.deleteRows(`migration:${job.id}:${entityType}:rows`).catch(() => undefined);
