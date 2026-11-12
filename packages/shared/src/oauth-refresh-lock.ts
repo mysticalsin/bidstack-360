@@ -130,6 +130,9 @@ async function acquireRefreshLock(
       return result === 'OK';
     }
     if (redisRequired) throw new OAuthRefreshLockUnavailableError();
+    if (redis) {
+      log.warn({ ready: false }, 'OAuth refresh Redis lock unavailable; using process-local fallback');
+    }
   } catch (err) {
     if (err instanceof OAuthRefreshLockUnavailableError) throw err;
     if (redisRequired) throw new OAuthRefreshLockUnavailableError();
