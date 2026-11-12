@@ -81,6 +81,35 @@ describe('migration queue acquisition', () => {
     }
   });
 
+  t('a start that cannot store its rows does not leave a pending job', async () => {
+    // WHY: the handler creates the job before redis.set. A throw there returns
+    // 500 and leaves the row PENDING, which the wizard never shows.
+    const { redis } = await import('../redis.js');
+    const set = vi.spyOn(redis, 'set').mockRejectedValueOnce(new Error('redis down'));
+    const before = await prisma.migrationJob.count({
+      where: { orgId: org.orgId, status: 'PENDING' },
+    });
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'company.name' },
+        },
+      });
+      expect(res.statusCode).toBe(500);
+    } finally {
+      set.mockRestore();
+    }
+    const pending = await prisma.migrationJob.count({
+      where: { orgId: org.orgId, status: 'PENDING' },
+    });
+    expect(pending).toBe(before);
+  });
+
   t('starts a csv import on the process Redis client', async () => {
     // WHY: the route used server.redis, which only tests assign. A real
     // request then 500s before any chunk is queued.

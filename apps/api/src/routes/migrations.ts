@@ -288,8 +288,16 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       });
 
       // Store rows in Redis with 1h TTL so the worker can read them in chunks.
+      // A failure here is still PENDING. Delete the row: a 500 that leaves it
+      // is an orphan the wizard never shows.
       const redisKey = `migration:${job.id}:${entityType}:rows`;
-      await redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+      try {
+        await redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+      } catch (err) {
+        req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
+        await prisma.migrationJob.delete({ where: { id: job.id } });
+        throw err;
+      }
 
       // Claim RUNNING before any chunk exists. A by-id write after enqueue
       // overwrites a cancel that landed while the chunks were being queued,

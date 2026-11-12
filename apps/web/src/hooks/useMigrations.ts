@@ -94,6 +94,9 @@ export function useStartCsvImport() {
   return useMutation({
     mutationFn: (input: StartCsvImportInput) =>
       api<MigrationJob>('/api/migrations/start-csv', { method: 'POST', body: input }),
+    // The app retries other mutations once on 500. A start creates a job, so a
+    // retry would be a second request from the same click.
+    retry: false,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['migrations'] }),
   });
 }
