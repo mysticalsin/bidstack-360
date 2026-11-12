@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
-import { GrantRevokedError, getWorkspaceAccessToken } from './workspace-token.js';
+import { GrantRevokedError, getWorkspaceAccessToken, workerRefreshLockReady } from './workspace-token.js';
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
@@ -226,6 +226,40 @@ describe('getWorkspaceAccessToken', () => {
     await expect(Promise.all([first, second])).resolves.toEqual(['new-access', 'new-access']);
     expect(fetchImpl).toHaveBeenCalledOnce();
     expect(grant.status).toBe('active');
+  });
+
+  it('shares one cold Redis connect across refresh callers', async () => {
+    // WHY: ioredis rejects a second connect() while the first is starting.
+    // Each rejection used to look like Redis being down, so those callers
+    // took the in-process lock beside the caller that held the Redis key.
+    let connects = 0;
+    let status = 'wait';
+    const ready = workerRefreshLockReady({
+      get status() {
+        return status;
+      },
+      async connect() {
+        connects += 1;
+        if (status === 'connecting') throw new Error('Redis is already connecting');
+        status = 'connecting';
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        status = 'ready';
+      },
+    });
+    await expect(Promise.all([ready(), ready(), ready()])).resolves.toEqual([true, true, true]);
+    expect(connects).toBe(1);
+  });
+
+  it('a refused Redis connect stays unready', async () => {
+    // WHY: production still requires Redis. A connect that fails must not
+    // report ready and refresh without the lock.
+    const ready = workerRefreshLockReady({
+      status: 'wait',
+      connect: async () => {
+        throw new Error('ECONNREFUSED');
+      },
+    });
+    expect(await ready()).toBe(false);
   });
 
   it('marks a transient provider failure as error, not revoked', async () => {

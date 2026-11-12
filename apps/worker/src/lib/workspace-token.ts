@@ -113,6 +113,30 @@ async function markToken(
 
 let refreshClient: IORedis | null = null;
 
+/**
+ * One cold client must not open a second connection while the first is still
+ * starting. A second `connect()` throws, and a false ready() would take the
+ * in-process lock beside a Redis holder. A refused connect stays unready.
+ */
+export function workerRefreshLockReady(client: {
+  readonly status: string;
+  connect: () => Promise<unknown>;
+}): () => Promise<boolean> {
+  let connecting: Promise<unknown> | null = null;
+  return async () => {
+    try {
+      if (client.status === 'ready' || client.status === 'connect') return true;
+      connecting ??= client.connect().finally(() => {
+        connecting = null;
+      });
+      await connecting;
+      return client.status === 'ready' || client.status === 'connect';
+    } catch {
+      return false;
+    }
+  };
+}
+
 /** The worker's Redis, so this process takes the same lock as the API. Tests use the in-process fallback. */
 function refreshLockRedis(): OAuthRefreshLockRedis | null {
   if (process.env.NODE_ENV === 'test' || !process.env.REDIS_URL) return null;
@@ -125,15 +149,12 @@ function refreshLockRedis(): OAuthRefreshLockRedis | null {
   }
   const client = refreshClient;
   return {
-    ready: async () => {
-      try {
-        if ((client.status as string) !== 'ready') await client.connect();
-        const status = client.status as string;
-        return status === 'ready' || status === 'connect';
-      } catch {
-        return false;
-      }
-    },
+    ready: workerRefreshLockReady({
+      get status() {
+        return client.status as string;
+      },
+      connect: () => client.connect(),
+    }),
     set: (key, value, expiryMode, ttlMs, condition) => client.set(key, value, expiryMode, ttlMs, condition),
     eval: (script, numKeys, key, owner) => client.eval(script, numKeys, key, owner),
   };
