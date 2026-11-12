@@ -282,7 +282,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           redis: server.redis,
           reason: 'rows',
         });
-        throw err;
+        throw server.httpErrors.conflict('The import could not be queued. Try again.');
       }
 
       // Enqueue while the row is still PENDING. A queue that cannot be opened

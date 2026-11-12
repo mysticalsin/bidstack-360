@@ -94,8 +94,9 @@ describe('migration queue acquisition', () => {
   });
 
   t('a start that cannot store its rows does not leave a pending job', async () => {
-    // WHY: the handler creates the job before redis.set. A throw there returns
-    // 500 and leaves the row PENDING, which the wizard never shows.
+    // WHY: the handler creates the job before redis.set. A throw there used to
+    // return 500 after the cleanup had already removed the job. The queue-down
+    // path returns 409, and this one has to as well.
     const { redis } = await import('../redis.js');
     const set = vi.spyOn(redis, 'set').mockRejectedValueOnce(new Error('redis down'));
     const before = await prisma.migrationJob.count({
@@ -118,7 +119,10 @@ describe('migration queue acquisition', () => {
           mappings: { name: 'company.name' },
         },
       });
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({
+        message: 'The import could not be queued. Try again.',
+      });
     } finally {
       set.mockRestore();
     }
