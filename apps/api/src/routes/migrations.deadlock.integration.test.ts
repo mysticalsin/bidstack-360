@@ -234,6 +234,11 @@ describe('a real import deadlock', () => {
         await queue.obliterate({ force: true }).catch(() => undefined);
         await queue.close();
         redis.disconnect();
+        if (org) {
+          const finished = org;
+          org = undefined as unknown as IsolatedOrg;
+          await dropIsolatedOrg(finished.orgId);
+        }
       }
     },
     60_000,

@@ -41,6 +41,7 @@ describe('an exhausted chunk retry', () => {
     const user = await prisma.user.create({
       data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'ex' },
     });
+    try {
     const job = await prisma.migrationJob.create({
       data: {
         orgId: org.id,
@@ -61,7 +62,9 @@ describe('an exhausted chunk retry', () => {
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(stored.status).toBe('RUNNING');
     expect(JSON.stringify(stored.errorSummary)).not.toMatch(/old chunk exhausted/);
-    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
   });
 
   t('fails the job when the exhausted chunk is still the current attempt', async () => {
@@ -72,6 +75,7 @@ describe('an exhausted chunk retry', () => {
     const user = await prisma.user.create({
       data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'ex2' },
     });
+    try {
     const job = await prisma.migrationJob.create({
       data: {
         orgId: org.id,
@@ -92,7 +96,9 @@ describe('an exhausted chunk retry', () => {
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
     expect(stored.status).toBe('FAILED');
     expect(JSON.stringify(stored.errorSummary)).toContain('current chunk exhausted');
-    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
   });
 
   t('stores a conflict code and not a promise of another try', async () => {
@@ -105,6 +111,7 @@ describe('an exhausted chunk retry', () => {
     const user = await prisma.user.create({
       data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'ex4' },
     });
+    try {
     const job = await prisma.migrationJob.create({
       data: {
         orgId: org.id,
@@ -126,7 +133,9 @@ describe('an exhausted chunk retry', () => {
     const text = JSON.stringify(stored.errorSummary);
     expect(text).toContain('import_conflict');
     expect(text).not.toMatch(/will be tried again|40P01|deadlock detected/);
-    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
   });
 
   t('a retry that lands during exhaustion cannot fail the new attempt', async () => {

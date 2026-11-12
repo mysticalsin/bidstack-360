@@ -53,6 +53,7 @@ function deps(rows: unknown[]): MigrationChunkDeps {
 describe('a duplicate company name stays inside its row', () => {
   t('duplicate strategy records the name collision and still imports the next company', async () => {
     const { org, user } = await orgUser();
+    try {
     await prisma.company.create({
       data: { orgId: org.id, name: 'Acme', source: 'manual', confidence: 1 },
     });
@@ -101,6 +102,8 @@ describe('a duplicate company name stays inside its row', () => {
     const summary = JSON.stringify(stored.errorSummary);
     expect(summary).not.toMatch(/25P02/);
     expect(summary).not.toMatch(/current transaction is aborted/);
-    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
   });
 });

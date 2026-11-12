@@ -52,6 +52,7 @@ describe('a chunk uses the org on the locked job', () => {
   t('a payload for another org inserts no companies', async () => {
     const owner = await orgUser('owner');
     const other = await orgUser('other');
+    try {
     const job = await prisma.migrationJob.create({
       data: {
         orgId: owner.org.id,
@@ -88,7 +89,9 @@ describe('a chunk uses the org on the locked job', () => {
     expect(stored.status).toBe('RUNNING');
     expect(stored.processedRows).toBe(0);
     expect((stored.meta as { progressAt?: string }).progressAt).toBeUndefined();
-    await prisma.org.delete({ where: { id: owner.org.id } }).catch(() => undefined);
-    await prisma.org.delete({ where: { id: other.org.id } }).catch(() => undefined);
+    } finally {
+      await prisma.org.delete({ where: { id: owner.org.id } }).catch(() => undefined);
+      await prisma.org.delete({ where: { id: other.org.id } }).catch(() => undefined);
+    }
   });
 });
