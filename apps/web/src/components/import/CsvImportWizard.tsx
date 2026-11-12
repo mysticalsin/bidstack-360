@@ -616,7 +616,7 @@ function ImportProgress({
         </div>
       </div>
 
-      {actionFailed ? (
+      {actionFailed && !failure ? (
         <p className="text-sm text-[var(--danger)]" role="alert">
           {t('csvImport.progress.actionFailed', 'That did not work. Try again.')}
         </p>

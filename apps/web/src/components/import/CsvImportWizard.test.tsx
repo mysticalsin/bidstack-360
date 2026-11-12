@@ -357,6 +357,30 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByText('Try again.')).toBeNull();
   });
 
+  it('drops the generic retry error once the job shows why it was refused', async () => {
+    // WHY: a refused retry stores the reason on the job. The generic
+    // "That did not work" line stayed on screen next to that reason.
+    stubHooks();
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: new Error('Those rows expired. Upload the file again.'),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'rows_expired' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('Those rows expired. Upload the file again.')).toBeTruthy(),
+    );
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+  });
+
   it('does not tell a partial import to try again', async () => {
     // WHY: a later page that could not be queued already saved rows. Retry is
     // not offered, so the sentence must not ask for it.
