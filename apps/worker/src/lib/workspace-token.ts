@@ -16,6 +16,7 @@ import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
 import {
   oauthRefreshLockRedisRequired,
+  oauthRefreshTimeoutMs,
   runWithOAuthRefreshLock,
   type OAuthRefreshLockRedis,
 } from '@bidstack/shared/server';
@@ -23,7 +24,6 @@ import {
 export { GrantRevokedError };
 
 const EXPIRY_SKEW_MS = 60_000;
-const REFRESH_TIMEOUT_MS = 15_000;
 
 export const REVOKED_MESSAGE = 'Access was revoked at the provider. Reconnect to resume sync.';
 
@@ -254,7 +254,7 @@ async function refreshGrant(
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
-    signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(oauthRefreshTimeoutMs()),
   });
 
   if (!res.ok) {

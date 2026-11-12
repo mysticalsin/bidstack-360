@@ -31,6 +31,7 @@ beforeEach(() => {
     OAUTH_REFRESH_LOCK_POLL_MS: '1',
     OAUTH_REFRESH_LOCK_WAIT_MS: '50',
     OAUTH_REFRESH_LOCK_TTL_MS: '500',
+    OAUTH_HTTP_TIMEOUT_MS: '100',
   };
   mocks.ensureRedisReady.mockResolvedValue(true);
   mocks.set.mockResolvedValue('OK');

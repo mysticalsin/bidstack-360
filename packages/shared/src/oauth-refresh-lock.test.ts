@@ -83,6 +83,40 @@ describe('runWithOAuthRefreshLock', () => {
     expect(warn.mock.calls.some((call) => call.includes(FALLBACK))).toBe(true);
   });
 
+  it('refuses a lock ttl that does not outlive the refresh', async () => {
+    // WHY: the holder can still be talking to the provider when the key
+    // expires. The waiter check does not cover that.
+    const previousTtl = process.env.OAUTH_REFRESH_LOCK_TTL_MS;
+    const previousWait = process.env.OAUTH_REFRESH_LOCK_WAIT_MS;
+    const previousTimeout = process.env.OAUTH_HTTP_TIMEOUT_MS;
+    process.env.OAUTH_REFRESH_LOCK_TTL_MS = '20000';
+    process.env.OAUTH_REFRESH_LOCK_WAIT_MS = '10000';
+    process.env.OAUTH_HTTP_TIMEOUT_MS = '20000';
+    try {
+      await expect(
+        runWithOAuthRefreshLock({
+          tokenId: 'ttl-not-longer-than-refresh',
+          log: { debug: vi.fn(), warn: vi.fn() },
+          getFreshValue: async () => null,
+          refresh: async () => 'fresh',
+          redis: {
+            ready: async () => true,
+            set: async () => 'OK',
+            eval: async () => 1,
+          },
+          redisRequired: true,
+        }),
+      ).rejects.toThrow('OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_HTTP_TIMEOUT_MS');
+    } finally {
+      if (previousTtl === undefined) delete process.env.OAUTH_REFRESH_LOCK_TTL_MS;
+      else process.env.OAUTH_REFRESH_LOCK_TTL_MS = previousTtl;
+      if (previousWait === undefined) delete process.env.OAUTH_REFRESH_LOCK_WAIT_MS;
+      else process.env.OAUTH_REFRESH_LOCK_WAIT_MS = previousWait;
+      if (previousTimeout === undefined) delete process.env.OAUTH_HTTP_TIMEOUT_MS;
+      else process.env.OAUTH_HTTP_TIMEOUT_MS = previousTimeout;
+    }
+  });
+
   it('refuses a waiter that is at least as long as the lock ttl', async () => {
     const previousTtl = process.env.OAUTH_REFRESH_LOCK_TTL_MS;
     const previousWait = process.env.OAUTH_REFRESH_LOCK_WAIT_MS;
@@ -118,9 +152,11 @@ describe('runWithOAuthRefreshLock', () => {
     const previousTtl = process.env.OAUTH_REFRESH_LOCK_TTL_MS;
     const previousWait = process.env.OAUTH_REFRESH_LOCK_WAIT_MS;
     const previousPoll = process.env.OAUTH_REFRESH_LOCK_POLL_MS;
+    const previousTimeout = process.env.OAUTH_HTTP_TIMEOUT_MS;
     process.env.OAUTH_REFRESH_LOCK_TTL_MS = '300';
     process.env.OAUTH_REFRESH_LOCK_WAIT_MS = '40';
     process.env.OAUTH_REFRESH_LOCK_POLL_MS = '20';
+    process.env.OAUTH_HTTP_TIMEOUT_MS = '50';
     const started = Date.now();
     let caught: unknown;
     try {
@@ -145,6 +181,8 @@ describe('runWithOAuthRefreshLock', () => {
       else process.env.OAUTH_REFRESH_LOCK_WAIT_MS = previousWait;
       if (previousPoll === undefined) delete process.env.OAUTH_REFRESH_LOCK_POLL_MS;
       else process.env.OAUTH_REFRESH_LOCK_POLL_MS = previousPoll;
+      if (previousTimeout === undefined) delete process.env.OAUTH_HTTP_TIMEOUT_MS;
+      else process.env.OAUTH_HTTP_TIMEOUT_MS = previousTimeout;
     }
     expect(caught).toBeInstanceOf(OAuthRefreshLockTimeoutError);
     expect((caught as OAuthRefreshLockTimeoutError).waitMs).toBe(40);

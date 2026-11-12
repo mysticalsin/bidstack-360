@@ -392,6 +392,7 @@ export function getEnv(): Env {
   const lockTiming = oauthRefreshLockTimingError({
     OAUTH_REFRESH_LOCK_TTL_MS: env.OAUTH_REFRESH_LOCK_TTL_MS,
     OAUTH_REFRESH_LOCK_WAIT_MS: env.OAUTH_REFRESH_LOCK_WAIT_MS,
+    OAUTH_HTTP_TIMEOUT_MS: env.OAUTH_HTTP_TIMEOUT_MS,
   });
   if (lockTiming) semanticErrors.push(lockTiming);
 

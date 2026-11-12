@@ -34,6 +34,17 @@ describe('worker production env contract', () => {
     ]);
   });
 
+  it('refuses a lock ttl that does not outlive the refresh', () => {
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        OAUTH_REFRESH_LOCK_TTL_MS: '20000',
+        OAUTH_REFRESH_LOCK_WAIT_MS: '10000',
+        OAUTH_HTTP_TIMEOUT_MS: '20000',
+      }),
+    ).toEqual(['OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_HTTP_TIMEOUT_MS']);
+  });
+
   it('refuses a refresh-lock wait that is not shorter than the ttl', () => {
     expect(
       validateWorkerProductionEnv({

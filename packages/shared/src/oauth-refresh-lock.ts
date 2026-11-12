@@ -98,20 +98,33 @@ function positiveMs(raw: string | number | undefined, fallback: number): number 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/** Default provider refresh budget. The worker and the API both use this. */
+export const OAUTH_REFRESH_TIMEOUT_DEFAULT_MS = 15_000;
+
+export function oauthRefreshTimeoutMs(env: TimingEnv = process.env): number {
+  return positiveMs(env.OAUTH_HTTP_TIMEOUT_MS, OAUTH_REFRESH_TIMEOUT_DEFAULT_MS);
+}
+
 export function oauthRefreshLockTiming(env: TimingEnv = process.env): {
   ttlMs: number;
   waitMs: number;
+  refreshTimeoutMs: number;
 } {
   return {
     ttlMs: positiveMs(env.OAUTH_REFRESH_LOCK_TTL_MS, 30_000),
     waitMs: positiveMs(env.OAUTH_REFRESH_LOCK_WAIT_MS, 10_000),
+    refreshTimeoutMs: oauthRefreshTimeoutMs(env),
   };
 }
 
 export function oauthRefreshLockTimingError(env: TimingEnv = process.env): string | null {
-  const { ttlMs, waitMs } = oauthRefreshLockTiming(env);
+  const { ttlMs, waitMs, refreshTimeoutMs } = oauthRefreshLockTiming(env);
   if (ttlMs <= waitMs) {
     return 'OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_REFRESH_LOCK_WAIT_MS';
+  }
+  // The key has to outlive the provider call, not only the waiter.
+  if (ttlMs <= refreshTimeoutMs) {
+    return 'OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_HTTP_TIMEOUT_MS';
   }
   return null;
 }
