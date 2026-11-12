@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { oauthRefreshLockStartupError } from '@bidstack/shared/server';
+import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
 
 import { parseAllowedUsers } from './lib/allowed-users.js';
 
@@ -201,7 +201,7 @@ export const envSchema = z.object({
   // when that opt-out is set. The API and the worker share the same check.
   OAUTH_REFRESH_LOCK_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
   OAUTH_REFRESH_LOCK_TTL_MS: z.coerce.number().int().positive().default(30_000),
-  OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(30_000),
+  OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(10_000),
   OAUTH_REFRESH_LOCK_POLL_MS: z.coerce.number().int().positive().default(250),
 
   // OCR
@@ -389,6 +389,11 @@ export function getEnv(): Env {
   const semanticErrors: string[] = [];
   const lockStartup = oauthRefreshLockStartupError(env);
   if (lockStartup) semanticErrors.push(lockStartup);
+  const lockTiming = oauthRefreshLockTimingError({
+    OAUTH_REFRESH_LOCK_TTL_MS: env.OAUTH_REFRESH_LOCK_TTL_MS,
+    OAUTH_REFRESH_LOCK_WAIT_MS: env.OAUTH_REFRESH_LOCK_WAIT_MS,
+  });
+  if (lockTiming) semanticErrors.push(lockTiming);
 
   if (env.NODE_ENV === 'production') {
     const publicBaseUrl = new URL(env.PUBLIC_BASE_URL);

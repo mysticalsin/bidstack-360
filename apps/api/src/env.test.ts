@@ -151,6 +151,16 @@ describe('boot environment validation', () => {
     expect(env.STORAGE_DRIVER).toBe('local');
   });
 
+  it('refuses a refresh-lock wait that is not shorter than the ttl', async () => {
+    await expect(
+      loadEnvWith({
+        NODE_ENV: 'development',
+        OAUTH_REFRESH_LOCK_TTL_MS: '30000',
+        OAUTH_REFRESH_LOCK_WAIT_MS: '30000',
+      }),
+    ).rejects.toThrow('OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_REFRESH_LOCK_WAIT_MS');
+  });
+
   it('refuses to start in production when the refresh lock opts out of Redis', async () => {
     await expect(
       loadEnvWith({

@@ -90,11 +90,30 @@ interface OAuthRefreshLockOptions<T> {
   redisRequired: boolean;
 }
 
-function timeoutMs(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
+type TimingEnv = Record<string, string | number | undefined>;
+
+function positiveMs(raw: string | number | undefined, fallback: number): number {
+  if (raw === undefined || raw === '') return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function oauthRefreshLockTiming(env: TimingEnv = process.env): {
+  ttlMs: number;
+  waitMs: number;
+} {
+  return {
+    ttlMs: positiveMs(env.OAUTH_REFRESH_LOCK_TTL_MS, 30_000),
+    waitMs: positiveMs(env.OAUTH_REFRESH_LOCK_WAIT_MS, 10_000),
+  };
+}
+
+export function oauthRefreshLockTimingError(env: TimingEnv = process.env): string | null {
+  const { ttlMs, waitMs } = oauthRefreshLockTiming(env);
+  if (ttlMs <= waitMs) {
+    return 'OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_REFRESH_LOCK_WAIT_MS';
+  }
+  return null;
 }
 
 export async function runWithOAuthRefreshLock<T>({
@@ -106,14 +125,12 @@ export async function runWithOAuthRefreshLock<T>({
   redisRequired,
 }: OAuthRefreshLockOptions<T>): Promise<T> {
   const key = `bidstack:oauth-refresh-lock:${tokenId}`;
-  const ttlMs = timeoutMs('OAUTH_REFRESH_LOCK_TTL_MS', 30_000);
-  // A crashed holder leaves the key until its TTL, and Redis persistence keeps
-  // that key across a restart. The waiter waits at least that long so it can
-  // take the lock after the key expires. The TTL stays above a provider
-  // refresh; shortening it would drop the lock while a live refresh is still
-  // calling the provider.
-  const waitMs = Math.max(timeoutMs('OAUTH_REFRESH_LOCK_WAIT_MS', ttlMs), ttlMs);
-  const pollMs = timeoutMs('OAUTH_REFRESH_LOCK_POLL_MS', 250);
+  const timingError = oauthRefreshLockTimingError();
+  if (timingError) throw new Error(timingError);
+  // The key has to outlive the waiter. A waiter that lasts at least as long
+  // as the TTL can take the lock while the previous holder still owns it.
+  const { ttlMs, waitMs } = oauthRefreshLockTiming();
+  const pollMs = positiveMs(process.env.OAUTH_REFRESH_LOCK_POLL_MS, 250);
   const deadline = Date.now() + waitMs;
 
   for (;;) {
