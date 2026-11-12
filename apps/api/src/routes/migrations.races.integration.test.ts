@@ -227,6 +227,47 @@ describe('migration status races', () => {
     }
   });
 
+  t('retry uses the mapping stored on the failed attempt', async () => {
+    // WHY: the shared mapping row is the latest import, not this attempt.
+    // Retrying with it would write the failed file through someone else's columns.
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    const added: Array<{ mappings?: Record<string, string | null> }> = [];
+    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (_name, data) => {
+      added.push(data as { mappings?: Record<string, string | null> });
+      if (added.length === 1) throw new Error('queue down');
+      return { id: 'chunk' } as never;
+    });
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'company.name' },
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string }>();
+      await prisma.migrationMapping.update({
+        where: {
+          orgId_source_sourceEntity: { orgId: org.orgId, source: 'CSV', sourceEntity: 'company' },
+        },
+        data: { mappings: { name: 'company.domain' } },
+      });
+      const retry = await server.inject({
+        method: 'POST',
+        url: `/api/v1/migrations/${body.id}/retry`,
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(added[1]?.mappings).toEqual({ name: 'company.name' });
+    } finally {
+      add.mockRestore();
+    }
+  });
+
   t('a retry is not failed stale before a new claim', async () => {
     // WHY: the stale scan fails a running import 15 minutes after the last
     // claim. A retry that kept that clock would be failed without a worker

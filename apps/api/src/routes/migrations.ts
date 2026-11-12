@@ -255,7 +255,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           source,
           status: 'PENDING',
           totalRows: rows.length,
-          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null },
+          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings },
         },
       });
 
@@ -295,7 +295,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         data: {
           status: 'RUNNING',
           startedAt: new Date(),
-          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, attemptId },
+          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings, attemptId },
         },
       });
       if (claimed.count !== 1) {
@@ -367,6 +367,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         entityType?: string;
         dedupStrategy?: 'skip' | 'update' | 'duplicate';
         externalIdColumn?: string | null;
+        mappings?: Record<string, string | null>;
       };
       if (
         job.status !== 'FAILED' ||
@@ -448,16 +449,22 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           const raw = await redisConn.get(redisKey);
           if (!raw) throw new Error(MIGRATION_ROWS_EXPIRED);
           const rows = JSON.parse(raw) as Record<string, string>[];
-          const mapping = await prisma.migrationMapping.findUnique({
-            where: {
-              orgId_source_sourceEntity: {
-                orgId,
-                source: job.source,
-                sourceEntity: meta.entityType,
+          const stored = meta.mappings;
+          let mappings: Record<string, string | null>;
+          if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+            mappings = stored;
+          } else {
+            const mapping = await prisma.migrationMapping.findUnique({
+              where: {
+                orgId_source_sourceEntity: {
+                  orgId,
+                  source: job.source,
+                  sourceEntity: meta.entityType,
+                },
               },
-            },
-          });
-          const mappings = (mapping?.mappings ?? {}) as Record<string, string | null>;
+            });
+            mappings = (mapping?.mappings ?? {}) as Record<string, string | null>;
+          }
           const stamp = Date.now();
           await enqueueCsvChunks({
             jobId: job.id,
