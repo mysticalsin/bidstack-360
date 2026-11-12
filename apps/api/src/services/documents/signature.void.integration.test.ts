@@ -309,4 +309,71 @@ describe('void signature request', () => {
       await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
     }
   });
+
+  t('a completion during a rejected void stays signed', async () => {
+    // WHY: DocuSign refuses a void of an envelope that just completed. The
+    // local claim still has to happen first, and the completion that arrived
+    // while the claim was held has to win once the provider rejects the void.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_dsrej_${ns}`, name: `dsrej ${ns}` },
+    });
+    try {
+      const document = await prisma.document.create({
+        data: { orgId: org.id, name: 'proposal.pdf', kind: 'proposal', storageUrl: `s3://test/${ns}` },
+      });
+      const request = await prisma.signatureRequest.create({
+        data: {
+          orgId: org.id,
+          documentId: document.id,
+          provider: 'DOCUSIGN',
+          providerRequestId: `env-${ns}`,
+          status: 'SENT',
+          recipients: [],
+        },
+      });
+      let release: () => void = () => undefined;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let sawPut = false;
+      docusign.privateKey = Buffer.from(VOID_KEY).toString('base64');
+      docusign.on = true;
+      vi.stubGlobal('fetch', async (url: string) => {
+        if (String(url).includes('oauth/token')) {
+          return new Response(JSON.stringify({ access_token: 'ds-tok', expires_in: 7200 }), { status: 200 });
+        }
+        sawPut = true;
+        await held;
+        return new Response('envelope completed', { status: 400 });
+      });
+      const pending = voidSignatureRequest({ orgId: org.id, requestId: request.id, reason: 'withdrawn' });
+      await vi.waitFor(() => expect(sawPut).toBe(true));
+      const raw = Buffer.from(JSON.stringify({ envelopeId: `env-${ns}`, event: 'envelope-completed' }));
+      const signature = createHmac('sha256', 'hook-secret').update(raw).digest('base64');
+      await handleDocuSignWebhook(raw, signature, {
+        envelopeId: `env-${ns}`,
+        event: 'envelope-completed',
+      });
+      release();
+      await expect(pending).rejects.toThrow(/DocuSign void failed/);
+      const stored = await prisma.signatureRequest.findUnique({
+        where: { id: request.id },
+        select: { status: true, voidReason: true },
+      });
+      expect(stored).toMatchObject({ status: 'SIGNED', voidReason: null });
+      expect(
+        await prisma.signatureEvent.count({
+          where: { signatureRequestId: request.id, type: 'SIGNED' },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.signatureEvent.count({
+          where: { signatureRequestId: request.id, type: 'VOIDED' },
+        }),
+      ).toBe(0);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
 });

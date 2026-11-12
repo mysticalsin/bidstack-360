@@ -389,9 +389,38 @@ export async function handleDocuSignWebhook(
       },
     });
     if (claim.count === 0) {
-      // Already processed / already terminal — duplicate or stale delivery.
-      // No event written; the transaction commits as a no-op and the caller
-      // returns 200 so DocuSign stops retrying.
+      // A void claim holds the row at VOIDED until DocuSign answers. The
+      // completion cannot change that row yet (the claim has to stay first),
+      // but it has to be remembered: if DocuSign then rejects the void, the
+      // completion is the outcome. A void that already wrote its event is
+      // finished, and a late completion stays ignored.
+      if (newStatus === 'SIGNED' || newStatus === 'DECLINED') {
+        const current = await tx.signatureRequest.findFirst({
+          where: { id: request.id },
+          select: { status: true, voidReason: true },
+        });
+        if (current?.status === 'VOIDED' && current.voidReason) {
+          const voided = await tx.signatureEvent.count({
+            where: { signatureRequestId: request.id, type: 'VOIDED' },
+          });
+          const already = await tx.signatureEvent.count({
+            where: { signatureRequestId: request.id, type: eventType },
+          });
+          if (voided === 0 && already === 0) {
+            await tx.signatureEvent.create({
+              data: {
+                signatureRequestId: request.id,
+                type: eventType,
+                recipientEmail: payload.recipients?.signers?.[0]?.email ?? null,
+                occurredAt: new Date(),
+                ipAddress: null,
+                userAgent: null,
+                payload: { ...(payload as object), heldDuringVoid: true },
+              },
+            });
+          }
+        }
+      }
       return;
     }
 
@@ -487,19 +516,29 @@ export async function voidSignatureRequest(params: {
       }
     }
   } catch (err) {
+    const held = await heldSignatureDuringVoid(requestId);
+    const nextStatus = held?.type === 'SIGNED' || held?.type === 'DECLINED' ? held.type : previousStatus;
     const restored = await prisma.signatureRequest.updateMany({
       where: { id: requestId, orgId, deletedAt: null, status: 'VOIDED', voidReason: reason },
-      data: { status: previousStatus, voidedAt: null, voidReason: null },
+      data: {
+        status: nextStatus,
+        voidedAt: null,
+        voidReason: null,
+        ...(nextStatus === 'SIGNED' ? { completedAt: new Date() } : {}),
+      },
     });
     if (restored.count !== 1) {
       log.warn(
-        { signatureRequestId: requestId, from: 'VOIDED', to: previousStatus },
+        { signatureRequestId: requestId, from: 'VOIDED', to: nextStatus },
         'illegal signature transition',
       );
     }
     throw err;
   }
 
+  // The void event is the audit fact. A completion remembered while the
+  // claim was held is removed only after that event exists, so a successful
+  // void does not also stay signed. A rejected void leaves the completion.
   await prisma.signatureEvent.create({
     data: {
       signatureRequestId: requestId,
@@ -511,6 +550,37 @@ export async function voidSignatureRequest(params: {
       payload: { reason } as object,
     },
   });
+  const heldIds = (await prisma.signatureEvent.findMany({
+    where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
+    select: { id: true, payload: true },
+  }))
+    .filter((event) => isHeldDuringVoid(event.payload))
+    .map((event) => event.id);
+  if (heldIds.length > 0) {
+    await prisma.signatureEvent.deleteMany({ where: { id: { in: heldIds } } });
+  }
+}
+
+function isHeldDuringVoid(payload: unknown): boolean {
+  return (
+    !!payload &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    (payload as { heldDuringVoid?: unknown }).heldDuringVoid === true
+  );
+}
+
+async function heldSignatureDuringVoid(
+  requestId: string,
+): Promise<{ type: 'SIGNED' | 'DECLINED' } | null> {
+  const events = await prisma.signatureEvent.findMany({
+    where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
+    orderBy: { occurredAt: 'desc' },
+    select: { type: true, payload: true },
+  });
+  const held = events.find((event) => isHeldDuringVoid(event.payload));
+  if (held?.type === 'SIGNED' || held?.type === 'DECLINED') return { type: held.type };
+  return null;
 }
 
 // ─── handleInternalSign ───────────────────────────────────────────────────────
