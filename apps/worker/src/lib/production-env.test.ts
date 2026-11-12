@@ -21,6 +21,16 @@ describe('worker production env contract', () => {
     expect(validateWorkerProductionEnv({ NODE_ENV: 'development' })).toEqual([]);
   });
 
+  it('refuses to boot when NODE_ENV is missing', () => {
+    // WHY: a missing NODE_ENV used to skip the production contract. Local dev
+    // sets NODE_ENV=development in .env, which dotenv loads before this check,
+    // so development still skips the production secret list.
+    expect(validateWorkerProductionEnv({})).not.toEqual([]);
+    expect(validateWorkerProductionEnv({})).toContain(
+      "NODE_ENV must be exactly 'development', 'production', or 'test'",
+    );
+  });
+
   it('requires the universal production dependencies before queues start', () => {
     expect(validateWorkerProductionEnv({ NODE_ENV: 'production' })).toEqual([
       'DATABASE_URL is required in production',

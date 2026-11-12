@@ -36,8 +36,9 @@ const NODE_ENVS = new Set(['development', 'production', 'test']);
 
 export function validateWorkerProductionEnv(env: Env = process.env): string[] {
   const nodeEnv = env.NODE_ENV ?? '';
-  if (nodeEnv === '') return [];
-  // Anything else, including 'Production', used to skip this contract.
+  // Missing is not development. Local dev sets NODE_ENV=development in .env,
+  // and dotenv loads that before this check, so a normal dev boot still skips
+  // the production secret list. An empty value must not.
   if (!NODE_ENVS.has(nodeEnv)) {
     return ["NODE_ENV must be exactly 'development', 'production', or 'test'"];
   }
