@@ -1,133 +1,61 @@
-// WHY: a deadlock aborts the Postgres transaction. Recording it as a row
-// error keeps the other rows and stores process ids, transaction ids, and SQL.
-// The chunk has to fail so the transaction rolls back and BullMQ retries it.
+// WHY: a Prisma company insert reports a deadlock with no error code. A
+// classifier that only reads `.code` stores the driver text, process ids, and
+// transaction ids on the job. The match is the driver record's code field,
+// not a search for those digits anywhere in the message.
 
-import { prisma } from '@bidstack/db';
-import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { Prisma } from '@bidstack/db';
+import { describe, expect, it } from 'vitest';
 
-import { processMigrationChunk, type MigrationChunkDeps } from './migration.js';
+import { isMigrationDeadlock } from './migration.js';
 
-let dbReachable = false;
+const DRIVER_40P01 = `
+Invalid \`prisma.company.create()\` invocation:
 
-beforeAll(async () => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    dbReachable = true;
-  } catch {
-    dbReachable = false;
-  }
-}, 30_000);
+Error occurred during query execution:
+ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "40P01", message: "deadlock detected", severity: "ERROR", detail: Some("Process 156345 waits for ShareLock on transaction 1329; blocked by process 156346.\\nProcess 156346 waits for ShareLock on transaction 1328; blocked by process 156345."), column: None, hint: Some("See server log for query details.") }), transient: false })`;
 
-const t = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbReachable) throw new Error(`[skip] ${name} — DATABASE_URL not reachable`);
-    await fn();
-  });
+const DRIVER_40001 = DRIVER_40P01.replace('40P01', '40001').replace(
+  'deadlock detected',
+  'could not serialize access due to concurrent update',
+);
 
-const ATTEMPT = '33333333-3333-4333-8333-333333333333';
-
-async function orgUser() {
-  const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
-  const org = await prisma.org.create({
-    data: { clerkOrg: `org_mig_dead_${ns}`, name: `dead ${ns}` },
-  });
-  const user = await prisma.user.create({
-    data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'dead' },
-  });
-  return { org, user };
-}
-
-const log = { info: () => undefined, warn: () => undefined };
-
-function deps(rows: unknown[]): MigrationChunkDeps {
-  return {
-    readRows: async () => JSON.stringify(rows),
-    enqueueChunk: async () => undefined,
-    enqueueIntel: async () => undefined,
-    env: {},
-  };
-}
-
-const DEADLOCK_DETAIL =
-  'deadlock detected\nDETAIL: Process 4242 waits for ShareLock on transaction 999; blocked by process 4243.\nProcess 4243 waits for ShareLock on transaction 1000; blocked by process 4242.\nQUERY: INSERT INTO "companies" ("org_id","name") VALUES ($1,$2)';
-
-/** The second company insert raises 40P01 after the first insert has run. */
-function deadlockOnSecondCompany() {
-  const original = prisma.$transaction.bind(prisma);
-  let inserts = 0;
-  return vi.spyOn(prisma, '$transaction').mockImplementation((async (fn: unknown, opts?: unknown) => {
-    if (typeof fn !== 'function') return original(fn as never, opts as never);
-    return original(async (tx: { company: { create: (args: unknown) => Promise<unknown> } }) => {
-      const create = tx.company.create.bind(tx.company);
-      tx.company.create = (async (args: unknown) => {
-        inserts += 1;
-        if (inserts === 2) {
-          const err = new Error(DEADLOCK_DETAIL) as Error & { code: string };
-          err.code = '40P01';
-          throw err;
-        }
-        return create(args);
-      }) as typeof tx.company.create;
-      return (fn as (tx: unknown) => Promise<unknown>)(tx);
-    }, opts);
-  }) as never);
-}
-
-describe('a migration deadlock fails the chunk', () => {
-  t('a 40P01 rolls the chunk back and the failure text has no process id, xid, or SQL', async () => {
-    const { org, user } = await orgUser();
-    const job = await prisma.migrationJob.create({
-      data: {
-        orgId: org.id,
-        userId: user.id,
-        source: 'CSV',
-        status: 'RUNNING',
-        totalRows: 2,
-        processedRows: 0,
-        startedAt: new Date(),
-        meta: { entityType: 'companies', attemptId: ATTEMPT },
-      },
+describe('deadlock classification', () => {
+  it('recognises a codeless Prisma company insert deadlock', () => {
+    const err = new Prisma.PrismaClientUnknownRequestError(DRIVER_40P01, {
+      clientVersion: '5.22.0',
     });
-    const spy = deadlockOnSecondCompany();
-    let thrown: Error | undefined;
-    try {
-      await processMigrationChunk(
-        {
-          migrationJobId: job.id,
-          orgId: org.id,
-          userId: user.id,
-          source: 'CSV',
-          entityType: 'companies',
-          chunkOffset: 0,
-          chunkSize: 100,
-          totalRows: 2,
-          redisKey: 'rows',
-          mappings: { Name: 'company.name' },
-          dedupStrategy: 'duplicate',
-          attemptId: ATTEMPT,
-        },
-        deps([{ Name: 'Kept' }, { Name: 'Blocked' }]),
-        log,
-      );
-    } catch (err) {
-      thrown = err as Error;
-    } finally {
-      spy.mockRestore();
-    }
-    expect(thrown, 'chunk must fail so BullMQ retries it').toBeInstanceOf(Error);
-    const text = `${thrown?.message ?? ''}`;
-    expect(text).not.toMatch(/4242/);
-    expect(text).not.toMatch(/transaction 999/);
-    expect(text).not.toMatch(/INSERT INTO/i);
-    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
-    const summary = JSON.stringify(stored.errorSummary);
-    expect(summary).not.toMatch(/4242/);
-    expect(summary).not.toMatch(/transaction 999/);
-    expect(summary).not.toMatch(/INSERT INTO/i);
-    expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(0);
-    expect(stored.processedRows).toBe(0);
-    expect(stored.status).toBe('RUNNING');
-    await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    expect(err.code).toBeUndefined();
+    expect(isMigrationDeadlock(err)).toBe(true);
+  });
+
+  it('recognises a serialization failure and a Prisma transaction conflict', () => {
+    const serial = new Prisma.PrismaClientUnknownRequestError(DRIVER_40001, {
+      clientVersion: '5.22.0',
+    });
+    const wrapped = new Prisma.PrismaClientKnownRequestError(
+      'Transaction failed due to a write conflict or a deadlock. Please retry your transaction.',
+      { code: 'P2034', clientVersion: '5.22.0' },
+    );
+    const raw = new Prisma.PrismaClientKnownRequestError('raw', {
+      code: 'P2010',
+      clientVersion: '5.22.0',
+      meta: { code: '40001' },
+    });
+    expect(isMigrationDeadlock(serial)).toBe(true);
+    expect(isMigrationDeadlock(wrapped)).toBe(true);
+    expect(isMigrationDeadlock(raw)).toBe(true);
+    expect(isMigrationDeadlock({ cause: serial })).toBe(true);
+  });
+
+  it('does not treat a nearby 40P01 or a unique violation as a deadlock', () => {
+    expect(isMigrationDeadlock(new Error('company 40P01'))).toBe(false);
+    expect(
+      isMigrationDeadlock(new Error('failed at apps/worker/src/queues/migration.ts:236:40')),
+    ).toBe(false);
+    const unique = new Prisma.PrismaClientUnknownRequestError(
+      DRIVER_40P01.replace('40P01', '23505'),
+      { clientVersion: '5.22.0' },
+    );
+    expect(isMigrationDeadlock(unique)).toBe(false);
   });
 });

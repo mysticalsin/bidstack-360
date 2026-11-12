@@ -178,12 +178,33 @@ interface WriteCtx {
 export const MIGRATION_DEADLOCK_PUBLIC =
   'The import conflicted with another write and will be tried again.';
 
-/** Postgres 40P01, including when Prisma nests it on `meta.code`. */
-export function isMigrationDeadlock(err: unknown): boolean {
+/**
+ * A deadlock or serialization failure, including the shapes Prisma actually
+ * raises. Company inserts arrive as PrismaClientUnknownRequestError with no
+ * `code`: the driver text is `PostgresError { code: "40P01" }`. Raw queries
+ * use P2010 and `meta.code`. A transaction conflict is P2034. A digit sequence
+ * anywhere else in the message is not a match.
+ */
+const DRIVER_CONFLICT_CODE = /PostgresError \{\s*code:\s*"(40P01|40001)"/;
+
+function migrationConflictCode(value: unknown): boolean {
+  return value === '40P01' || value === '40001' || value === 'P2034';
+}
+
+export function isMigrationDeadlock(err: unknown, seen?: Set<unknown>): boolean {
   if (!err || typeof err !== 'object') return false;
-  const row = err as { code?: unknown; meta?: { code?: unknown }; cause?: unknown };
-  if (row.code === '40P01' || row.meta?.code === '40P01') return true;
-  return row.cause !== undefined && row.cause !== err && isMigrationDeadlock(row.cause);
+  const visited = seen ?? new Set<unknown>();
+  if (visited.has(err)) return false;
+  visited.add(err);
+  const row = err as {
+    code?: unknown;
+    meta?: { code?: unknown };
+    cause?: unknown;
+    message?: unknown;
+  };
+  if (migrationConflictCode(row.code) || migrationConflictCode(row.meta?.code)) return true;
+  if (typeof row.message === 'string' && DRIVER_CONFLICT_CODE.test(row.message)) return true;
+  return row.cause !== undefined && isMigrationDeadlock(row.cause, visited);
 }
 
 /** A deadlock aborts the transaction. The chunk fails so BullMQ retries the whole chunk. */
