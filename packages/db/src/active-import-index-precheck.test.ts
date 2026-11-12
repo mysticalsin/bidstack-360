@@ -2,7 +2,7 @@
 // A precheck whose WHERE drifts from the partial index would either stop a
 // deploy that can succeed or let a deploy hit 23505.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -61,12 +61,19 @@ describe('active import index precheck', () => {
     expect(notes).not.toMatch(/DELETE\s+FROM\s+migration_jobs/i);
   });
 
-  it('points the schema at the concurrent index and drops the old one before the new checksum', () => {
-    // WHY: migrate dev diffs the database against schema.prisma. The partial
-    // index is not in that schema, so the next dev migration would drop it.
-    // A database that applied the first SQL of 20261112170000 still has
-    // migration_jobs_one_active_per_org_source. That index has to go before
-    // the recorded checksum changes, and the drop has to be a no-op elsewhere.
+  it('does not repair an old 170000 with a drop, and names the failed-index errors', () => {
+    // WHY: Prisma 5.22 applies later migrations even when a checksum differs.
+    // A DROP INDEX migration would run on a database that applied the earlier
+    // 170000 SQL, then 170100 fails with 42703 and the next boot is P3009.
+    expect(
+      existsSync(
+        resolve(
+          root,
+          'packages/db/prisma/migrations/20261112170050_drop_migration_jobs_one_active_per_org_source',
+        ),
+      ),
+    ).toBe(false);
+
     const schema = readFileSync(resolve(root, 'packages/db/prisma/schema.prisma'), 'utf8');
     const model = schema.slice(schema.indexOf('model MigrationJob') - 400, schema.indexOf('model MigrationJob'));
     expect(model).toContain('20261112170100_migration_jobs_one_active_per_file');
@@ -74,24 +81,15 @@ describe('active import index precheck', () => {
     expect(model.toLowerCase()).toMatch(/must not drop/);
 
     const notes = readFileSync(resolve(root, 'docs/deploy/active-import-index.md'), 'utf8');
-    expect(notes).toContain('DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_org_source');
-    expect(notes.toLowerCase()).toContain('checksum');
-
-    const drop = readFileSync(
-      resolve(
-        root,
-        'packages/db/prisma/migrations/20261112170050_drop_migration_jobs_one_active_per_org_source/migration.sql',
-      ),
-      'utf8',
-    );
-    const statements = drop
-      .replace(/--[^\n]*/g, '')
-      .split(';')
-      .map((statement) => statement.trim())
-      .filter(Boolean);
-    expect(statements).toEqual([
-      'DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_org_source',
-    ]);
-    expect(drop).not.toMatch(/\b(DELETE|UPDATE|INSERT|ALTER)\b/i);
+    expect(notes).toContain('Prisma 5.22 does not halt on a checksum mismatch');
+    expect(notes).not.toMatch(/deploy stops while/i);
+    expect(notes).toContain('SELECT migration_name, checksum, finished_at, rolled_back_at');
+    expect(notes).toContain('_prisma_migrations');
+    expect(notes).toContain('Jarvis decides');
+    expect(notes).not.toContain('DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_org_source');
+    expect(notes).toContain('indisvalid');
+    expect(notes).toContain('P3009');
+    expect(notes).toContain('P3012');
+    expect(notes).toContain('DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file');
   });
 });
