@@ -37,8 +37,8 @@ import {
   MIGRATION_STALE_REASON,
   migrationAttemptId,
   migrationChunkMatchesAttempt,
-  migrationActiveStatus,
   migrationChunkMayRun,
+  migrationActiveStatus,
   migrationFrom,
   migrationProgressAt,
   migrationStaleDue,
@@ -796,11 +796,11 @@ async function chunkCreatedIds(payload: MigrationJobPayload): Promise<string[]> 
  * Only progressAt is written. Rewriting meta from a snapshot would put back
  * an attempt id a retry had already replaced.
  */
-async function noteChunkClaimed(id: string): Promise<void> {
+async function noteChunkClaimed(id: string): Promise<number> {
   const progressAt = new Date().toISOString();
   // Milliseconds, not NOW(). Prisma reads this clock back at millisecond
   // resolution, and the stale compare-and-set requires an equal value.
-  await prisma.$executeRaw`
+  const moved = await prisma.$executeRaw`
     UPDATE migration_jobs
     SET meta = jsonb_set(
           COALESCE(meta, '{}'::jsonb),
@@ -812,6 +812,7 @@ async function noteChunkClaimed(id: string): Promise<void> {
     WHERE id = ${id}::uuid
       AND status::text = ${migrationActiveStatus()}
   `;
+  return Number(moved);
 }
 
 /** Import one chunk: acquire rows, write them, commit progress, queue enrichment, page on. */
@@ -833,7 +834,17 @@ export async function processMigrationChunk(
     log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
     return;
   }
-  await noteChunkClaimed(payload.migrationJobId);
+  const claimed = await noteChunkClaimed(payload.migrationJobId);
+  if (claimed !== 1) {
+    const current = await prisma.migrationJob.findUnique({
+      where: { id: payload.migrationJobId },
+      select: { status: true },
+    });
+    log.warn(
+      { migrationJobId: payload.migrationJobId, from: current?.status ?? null, to: migrationActiveStatus() },
+      'illegal migration transition',
+    );
+  }
 
   const entity = normalizeEntity(payload.entityType);
   if (!entity) {
@@ -1140,7 +1151,14 @@ export async function failExhaustedMigrationChunk(
       return { count: 0 };
     });
   if (moved.count !== 1) {
-    log.warn({ migrationJobId, to: 'FAILED' }, 'illegal migration transition');
+    const current = await prisma.migrationJob.findUnique({
+      where: { id: migrationJobId },
+      select: { status: true },
+    });
+    log.warn(
+      { migrationJobId, from: current?.status ?? null, to: 'FAILED' },
+      'illegal migration transition',
+    );
   } else {
     await prisma.$executeRaw`
       UPDATE migration_jobs

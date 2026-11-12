@@ -115,7 +115,14 @@ async function markMigrationEnqueueFailed(
     },
   });
   if (failed.count !== 1) {
-    log.warn({ migrationJobId: id, to: 'FAILED' }, 'illegal migration transition');
+    const current = await prisma.migrationJob.findFirst({
+      where: { id, orgId },
+      select: { status: true },
+    });
+    log.warn(
+      { migrationJobId: id, from: current?.status ?? null, to: 'FAILED' },
+      'illegal migration transition',
+    );
   }
 }
 
@@ -398,6 +405,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         return moved.count;
       });
       if (claimed !== 1) {
+        const current = await prisma.migrationJob.findFirst({
+          where: { id: job.id, orgId },
+          select: { status: true },
+        });
+        req.log.warn(
+          { migrationJobId: job.id, from: current?.status ?? null, to: 'RUNNING' },
+          'illegal migration transition',
+        );
         throw server.httpErrors.conflict('Migration job is no longer failed');
       }
 
