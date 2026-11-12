@@ -225,8 +225,8 @@ async function withSavepoint<T>(tx: Prisma.TransactionClient, name: string, fn: 
     await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${name}`);
     return result;
   } catch (err) {
-    // 40P01 already aborted the transaction. Rolling back to the savepoint
-    // would raise 25P02 and hide the deadlock in a later row error.
+    // Rethrow a deadlock so the chunk fails and BullMQ retries it, instead of
+    // storing the database error on the row.
     if (isMigrationDeadlock(err)) throw err;
     await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${name}`);
     throw err;
