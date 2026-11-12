@@ -90,19 +90,66 @@ describe('deploy CLIs are pinned', () => {
     expect(hits).toEqual([]);
   });
 
-  it('locks railway, vercel, and wrangler to exact versions with integrity hashes', () => {
+  it('locks railway and vercel to exact versions with integrity hashes', () => {
     const pkg = JSON.parse(readFileSync(join(repo, 'deploy/cli/package.json'), 'utf8')) as {
       dependencies: Record<string, string>;
     };
-    for (const name of ['@railway/cli', 'vercel', 'wrangler']) {
+    for (const name of ['@railway/cli', 'vercel']) {
       expect(pkg.dependencies[name]).toMatch(/^\d+\.\d+\.\d+$/);
     }
     const parsed = JSON.parse(
       readFileSync(join(repo, 'deploy/cli/package-lock.json'), 'utf8'),
     ) as { packages: Record<string, { version?: string; integrity?: string }> };
-    for (const name of ['node_modules/@railway/cli', 'node_modules/vercel', 'node_modules/wrangler']) {
+    for (const name of ['node_modules/@railway/cli', 'node_modules/vercel']) {
       expect(parsed.packages[name]?.version).toBe(pkg.dependencies[name.replace('node_modules/', '')]);
       expect(parsed.packages[name]?.integrity).toMatch(/^sha512-/);
+    }
+  });
+
+  it('does not install the versions Trivy flagged, or an unused wrangler', () => {
+    // WHY: the pin is a separate npm tree. Bumping the CLI versions does
+    // not move these transitives, and code scanning fails on the lockfile.
+    // wrangler is not invoked by any workflow or script, so it is not a
+    // dependency of this install.
+    const pkg = JSON.parse(readFileSync(join(repo, 'deploy/cli/package.json'), 'utf8')) as {
+      dependencies: Record<string, string>;
+      overrides?: Record<string, string>;
+    };
+    expect(pkg.dependencies.wrangler).toBeUndefined();
+    expect(pkg.overrides).toMatchObject({
+      'js-yaml': '4.3.2',
+      tar: '7.5.23',
+      'undici@5': '6.29.1',
+      minimatch: '11.0.1',
+      'path-to-regexp@6': '6.3.0',
+      'path-to-regexp@8': '8.4.0',
+      '@fastify/busboy': '3.2.2',
+      'smol-toml': '1.9.0',
+      glob: '14.0.2',
+      ajv: '8.18.0',
+      zod: '4.6.7',
+    });
+    const parsed = JSON.parse(readFileSync(join(repo, 'deploy/cli/package-lock.json'), 'utf8')) as {
+      packages: Record<string, { version?: string }>;
+    };
+    const banned = new Map<string, Set<string>>([
+      ['js-yaml', new Set(['4.1.1'])],
+      ['tar', new Set(['6.2.1', '7.5.11'])],
+      ['undici', new Set(['5.28.4', '5.29.0'])],
+      ['minimatch', new Set(['10.1.1', '10.2.6'])],
+      ['path-to-regexp', new Set(['6.1.0', '8.3.0'])],
+      ['@fastify/busboy', new Set(['2.1.1'])],
+      ['smol-toml', new Set(['1.5.2'])],
+      ['glob', new Set(['13.0.7'])],
+      ['ajv', new Set(['8.6.3'])],
+    ]);
+    for (const [path, entry] of Object.entries(parsed.packages)) {
+      const name = path.split('node_modules/').pop() ?? '';
+      expect(name).not.toBe('wrangler');
+      const versions = banned.get(name);
+      if (versions?.has(entry.version ?? '')) {
+        throw new Error(`${name}@${entry.version} is still in the deploy lockfile`);
+      }
     }
   });
 

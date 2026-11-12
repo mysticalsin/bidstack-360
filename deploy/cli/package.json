@@ -4,7 +4,19 @@
   "description": "Exact deploy CLIs. Workflows and scripts call these binaries after npm ci. Do not npx an unpinned release.",
   "dependencies": {
     "@railway/cli": "5.71.0",
-    "vercel": "65.14.0",
-    "wrangler": "4.161.0"
+    "vercel": "65.14.0"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2",
+    "tar": "7.5.23",
+    "undici@5": "6.29.1",
+    "minimatch": "11.0.1",
+    "path-to-regexp@6": "6.3.0",
+    "path-to-regexp@8": "8.4.0",
+    "@fastify/busboy": "3.2.2",
+    "smol-toml": "1.9.0",
+    "glob": "14.0.2",
+    "ajv": "8.18.0",
+    "zod": "4.6.7"
   }
 }

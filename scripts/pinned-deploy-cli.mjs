@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = new Set(['railway', 'vercel', 'wrangler']);
+const NAMES = new Set(['railway', 'vercel']);
 
 export function pinnedDeployCli(name) {
   if (!NAMES.has(name)) {
