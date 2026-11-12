@@ -15,6 +15,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { pinnedDeployCli } from './pinned-deploy-cli.mjs';
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENV_FILE = join(REPO, '.env.production.local');
 const PULL_FILE = join(REPO, '.vercel', '.env.provisioned.local');
@@ -26,7 +28,7 @@ const die = (m) => {
 };
 
 function vercel(args) {
-  const res = spawnSync('npx', ['vercel', ...args], {
+  const res = spawnSync(pinnedDeployCli('vercel'), args, {
     cwd: REPO, encoding: 'utf8', shell: process.platform === 'win32',
   });
   return { ok: res.status === 0, out: `${res.stdout ?? ''}${res.stderr ?? ''}` };

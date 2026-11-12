@@ -14,8 +14,18 @@ export function pinnedDeployCli(name) {
   const bin = join(REPO, 'deploy/cli/node_modules/.bin', name);
   if (!existsSync(bin)) {
     throw new Error(
-      `${name} is not installed from the pinned lockfile. Run npm ci in deploy/cli.`,
+      `${name} is not installed from the pinned lockfile. Run npm ci --ignore-scripts in deploy/cli.`,
     );
+  }
+  if (name === 'railway') {
+    const native = join(
+      REPO,
+      'deploy/cli/node_modules/@railway/cli/bin',
+      process.platform === 'win32' ? 'railway.exe' : 'railway',
+    );
+    if (!existsSync(native)) {
+      throw new Error('railway binary is missing. Run: node deploy/cli/install-railway.mjs');
+    }
   }
   return bin;
 }

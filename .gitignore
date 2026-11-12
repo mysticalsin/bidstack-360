@@ -114,6 +114,7 @@ apps/web/scripts/_i18n_*
 !scripts/*.mjs
 !apps/polo-preview/**/*.mjs
 !load/*.mjs
+!deploy/cli/*.mjs
 
 # Web app screenshot blobs at the package root (ad-hoc QA dumps)
 apps/web/*.png
