@@ -16,6 +16,7 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
+import { retireActiveImports } from './migrations.test-helpers.js';
 
 let server: FastifyInstance;
 let org: IsolatedOrg;
@@ -67,6 +68,7 @@ describe('csv start after redis gives up', () => {
 
     const before = await start('Before outage');
     expect(before.statusCode).toBe(201);
+    await retireActiveImports(org.orgId);
 
     server.redis.disconnect();
     if (server.redis.status !== 'end') {
@@ -93,6 +95,7 @@ describe('csv start after redis gives up', () => {
     'returns 201 after redis has been down for 6 seconds',
     async () => {
       if (!dbReachable) throw new Error('[skip] redis outage — DATABASE_URL not reachable');
+      await retireActiveImports(org.orgId);
       const port = Number(new URL(process.env.REDIS_URL ?? 'redis://127.0.0.1:6380').port || 6379);
       const start = (name: string) =>
         server.inject({

@@ -3,7 +3,7 @@
 // cannot be opened leaves the job failed and returns a clear error.
 
 import { Queue } from 'bullmq';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
@@ -15,6 +15,7 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
+import { retireActiveImports } from './migrations.test-helpers.js';
 
 let server: FastifyInstance;
 let org: IsolatedOrg;
@@ -39,6 +40,10 @@ afterAll(async () => {
   if (server) await server.close();
   restoreAuth?.();
   if (org) await dropIsolatedOrg(org.orgId);
+});
+
+beforeEach(async () => {
+  if (org) await retireActiveImports(org.orgId);
 });
 
 const t = (name: string, fn: () => Promise<void>) =>

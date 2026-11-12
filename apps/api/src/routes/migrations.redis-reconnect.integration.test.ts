@@ -15,6 +15,7 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
+import { retireActiveImports } from './migrations.test-helpers.js';
 
 let server: FastifyInstance;
 let org: IsolatedOrg;
@@ -75,6 +76,7 @@ describe('migration queue reconnect', () => {
     const first = await start('Before outage');
     expect(first.statusCode).toBe(201);
     expect(opened.length).toBeGreaterThan(0);
+    await retireActiveImports(org.orgId);
     for (const connection of opened) connection.disconnect();
 
     const second = await start('After outage');

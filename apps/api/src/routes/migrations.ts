@@ -20,7 +20,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type Redis from 'ioredis';
 import { z } from 'zod';
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { Prisma, prisma } from '@bidstack/db';
 import {
   MigrationJobResponse,
   MigrationMappingResponse,
@@ -72,6 +72,12 @@ function stalledFlag(job: {
  * the Redis key. A throw before the key is deleted leaves the pending job with
  * its rows. A throw from the key delete cannot leave a pending job.
  */
+const ACTIVE_IMPORT_MESSAGE = 'An import from this source is already running.';
+
+function isActiveImportConflict(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
+
 async function abandonUnqueuedStart(input: {
   jobId: string;
   orgId: string;
@@ -267,7 +273,9 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('The import could not be queued. Try again.');
       }
 
-      const job = await prisma.migrationJob.create({
+      let job: Awaited<ReturnType<typeof prisma.migrationJob.create>>;
+      try {
+        job = await prisma.migrationJob.create({
           data: {
             orgId,
             userId,
@@ -277,6 +285,12 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings },
           },
         });
+      } catch (err) {
+        if (isActiveImportConflict(err)) {
+          throw server.httpErrors.conflict(ACTIVE_IMPORT_MESSAGE);
+        }
+        throw err;
+      }
 
         await prisma.migrationMapping.upsert({
           where: { orgId_source_sourceEntity: { orgId, source, sourceEntity: entityType } },
@@ -489,30 +503,38 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       delete fresh.undone;
       delete fresh.undoneAt;
       fresh.attemptId = attemptId;
-      const claimed = await prisma.$transaction(async (tx) => {
-        const moved = await tx.migrationJob.updateMany({
-          where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
-          data: {
-            status: 'RUNNING',
-            startedAt: new Date(),
-            completedAt: null,
-            errorSummary: [],
-            meta: fresh as Prisma.InputJsonValue,
-          },
+      let claimed: number;
+      try {
+        claimed = await prisma.$transaction(async (tx) => {
+          const moved = await tx.migrationJob.updateMany({
+            where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
+            data: {
+              status: 'RUNNING',
+              startedAt: new Date(),
+              completedAt: null,
+              errorSummary: [],
+              meta: fresh as Prisma.InputJsonValue,
+            },
+          });
+          if (moved.count !== 1) return 0;
+          await tx.auditLog.create({
+            data: {
+              orgId,
+              userId,
+              action: 'migration.retry',
+              targetType: 'MigrationJob',
+              targetId: job.id,
+              diff: { previousAttempt, attemptId },
+            },
+          });
+          return moved.count;
         });
-        if (moved.count !== 1) return 0;
-        await tx.auditLog.create({
-          data: {
-            orgId,
-            userId,
-            action: 'migration.retry',
-            targetType: 'MigrationJob',
-            targetId: job.id,
-            diff: { previousAttempt, attemptId },
-          },
-        });
-        return moved.count;
-      });
+      } catch (err) {
+        if (isActiveImportConflict(err)) {
+          throw server.httpErrors.conflict(ACTIVE_IMPORT_MESSAGE);
+        }
+        throw err;
+      }
       if (claimed !== 1) {
         const current = await prisma.migrationJob.findFirst({
           where: { id: job.id, orgId },

@@ -2529,6 +2529,11 @@ enum MigrationStatus {
   @@map("migration_status")
 }
 
+/// One active CSV or Salesforce CSV import per tenant. Raw SQL in
+/// 20261112170000_migration_jobs_one_active_per_org_source adds the partial
+/// unique index Prisma cannot express. HubSpot writes one RUNNING row per
+/// entity under one source, so it is not in that index. Keep the index out
+/// of any drop.
 model MigrationJob {
   id            String          @id @default(uuid()) @db.Uuid
   orgId         String          @map("org_id") @db.Uuid

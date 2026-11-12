@@ -4,7 +4,7 @@
 // A chunk must not import in that window.
 
 import { Queue } from 'bullmq';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
@@ -16,6 +16,7 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
+import { retireActiveImports } from './migrations.test-helpers.js';
 
 async function ageProgress(id: string): Promise<void> {
   const past = new Date(Date.now() - 16 * 60_000);
@@ -67,6 +68,10 @@ afterAll(async () => {
   if (server) await server.close();
   restoreAuth?.();
   if (org) await dropIsolatedOrg(org.orgId);
+});
+
+beforeEach(async () => {
+  if (org) await retireActiveImports(org.orgId);
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
