@@ -137,6 +137,10 @@ describe('migration status races', () => {
       const row = await newestJob();
       // The cancel won. The RUNNING claim is conditional, so it does not revive the job.
       expect(row.status).toBe('CANCELLED');
+      const started = await prisma.auditLog.findFirst({
+        where: { orgId: org.orgId, targetId: row.id, action: 'migration.start' },
+      });
+      expect(started).toBeTruthy();
     } finally {
       add.mockRestore();
     }

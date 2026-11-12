@@ -98,6 +98,11 @@ describe('migration queue acquisition', () => {
     // 500 and leaves the row PENDING, which the wizard never shows.
     const { redis } = await import('../redis.js');
     const set = vi.spyOn(redis, 'set').mockRejectedValueOnce(new Error('redis down'));
+    // The audit log is insert-only outside tests. A cleanup that deletes the
+    // start row throws, and the pending job is what remains.
+    const removeAudit = vi.spyOn(prisma.auditLog, 'deleteMany').mockRejectedValue(
+      new Error("AuditLog is insert-only: 'deleteMany' is not permitted."),
+    );
     const before = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
@@ -118,6 +123,7 @@ describe('migration queue acquisition', () => {
       expect(res.statusCode).toBe(500);
     } finally {
       set.mockRestore();
+      removeAudit.mockRestore();
     }
     const pending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
@@ -133,6 +139,9 @@ describe('migration queue acquisition', () => {
     // WHY: each click created a PENDING job, stored its rows, and wrote an
     // audit, then returned 409 with no id. The next click added another.
     const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const removeAudit = vi.spyOn(prisma.auditLog, 'deleteMany').mockRejectedValue(
+      new Error("AuditLog is insert-only: 'deleteMany' is not permitted."),
+    );
     const beforeJobs = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
     const beforePending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
@@ -158,8 +167,10 @@ describe('migration queue acquisition', () => {
           message: 'The import could not be queued. Try again.',
         });
       }
+      expect(removeAudit).not.toHaveBeenCalled();
     } finally {
       add.mockRestore();
+      removeAudit.mockRestore();
     }
     expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(beforeJobs);
     expect(

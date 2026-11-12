@@ -64,21 +64,23 @@ function stalledFlag(job: {
   });
 }
 
-/** A start that never queued is not a job. Drop the row, its Redis payload, and the start audit. */
+/** A start that never queued is not a job. The audit log is insert-only, so this writes nothing there. */
 async function abandonUnqueuedStart(input: {
   jobId: string;
   orgId: string;
   redisKey: string;
   redis: { del: (key: string) => Promise<unknown> };
 }): Promise<void> {
-  // redis.set can be the thing that failed. A second error here must not keep the row.
-  await input.redis.del(input.redisKey).catch(() => undefined);
-  await prisma.auditLog.deleteMany({
-    where: { orgId: input.orgId, targetId: input.jobId, action: 'migration.start' },
-  });
-  await prisma.migrationJob.deleteMany({
-    where: { id: input.jobId, orgId: input.orgId, status: 'PENDING' },
-  });
+  const removed = await prisma.$transaction((tx) =>
+    tx.migrationJob.deleteMany({
+      where: { id: input.jobId, orgId: input.orgId, status: 'PENDING' },
+    }),
+  );
+  // Release the rows only after the pending row is gone. A cancel that already
+  // won keeps its job and its key.
+  if (removed.count > 0) {
+    await input.redis.del(input.redisKey).catch(() => undefined);
+  }
 }
 
 async function enqueueCsvChunks(input: {
@@ -245,17 +247,6 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
 
-      await prisma.auditLog.create({
-        data: {
-          orgId,
-          userId,
-          action: 'migration.start',
-          targetType: 'MigrationJob',
-          targetId: job.id,
-          diff: { source, entityType, totalRows: rows.length },
-        },
-      });
-
       await prisma.migrationMapping.upsert({
         where: { orgId_source_sourceEntity: { orgId, source, sourceEntity: entityType } },
         create: { orgId, source, sourceEntity: entityType, mappings },
@@ -263,7 +254,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       });
 
       // Store rows in Redis with 1h TTL so the worker can read them in chunks.
-      // A failure here must not leave the row, its start audit, or the key.
+      // The start audit is written only after the queue accepts the job.
       const redisKey = `migration:${job.id}:${entityType}:rows`;
       try {
         await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
@@ -300,6 +291,19 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         await abandonUnqueuedStart({ jobId: job.id, orgId, redisKey, redis: server.redis });
         throw server.httpErrors.conflict('The import could not be queued. Try again.');
       }
+
+      // The queue accepted the job. A cancel that landed during enqueue must
+      // still have this record; the RUNNING claim below may already have lost.
+      await prisma.auditLog.create({
+        data: {
+          orgId,
+          userId,
+          action: 'migration.start',
+          targetType: 'MigrationJob',
+          targetId: job.id,
+          diff: { source, entityType, totalRows: rows.length },
+        },
+      });
 
       const claimed = await prisma.migrationJob.updateMany({
         where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
