@@ -184,4 +184,43 @@ describe('migration chunk guards', () => {
     expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(1);
     await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
   });
+
+  t('a chunk for the failed attempt returns without an error', async () => {
+    // WHY: the same chunk is retried while the job stays failed. Throwing
+    // marks the queue job failed and prints an error stack on every retry.
+    const attempt = 'attempt-same';
+    const failed = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: failed.job.id },
+      data: { meta: { entityType: 'companies', attemptId: attempt } },
+    });
+    let reads = 0;
+    const readRows = async () => {
+      reads += 1;
+      return JSON.stringify([{ Name: 'Acme' }]);
+    };
+    const info = vi.fn();
+    await processMigrationChunk(
+      {
+        migrationJobId: failed.job.id,
+        orgId: failed.org.id,
+        userId: failed.job.userId,
+        source: 'CSV',
+        entityType: 'companies',
+        chunkOffset: 0,
+        chunkSize: 100,
+        totalRows: 1,
+        redisKey: 'rows',
+        mappings: { Name: 'company.name' },
+        dedupStrategy: 'skip',
+        attemptId: attempt,
+      },
+      deps(readRows),
+      { info, warn: () => undefined },
+    );
+    expect(reads).toBe(0);
+    expect(info).toHaveBeenCalled();
+    expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(0);
+    await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
+  });
 });

@@ -849,10 +849,23 @@ export async function processMigrationChunk(
     select: { status: true, meta: true, orgId: true },
   });
   // Start and retry enqueue before the RUNNING claim. A chunk that arrives
-  // while the row is still PENDING or FAILED must be retried, not completed,
-  // or the claim that follows has nothing left to process.
-  if (jobRow?.status === 'PENDING' || jobRow?.status === 'FAILED') {
+  // while the row is still PENDING, or that carries a newer attempt than the
+  // failed row, must be retried, not completed. A chunk for the attempt that
+  // already failed is finished: throwing would log an error on every retry.
+  if (jobRow?.status === 'PENDING') {
     throw new Error('migration job is not running yet');
+  }
+  if (jobRow?.status === 'FAILED') {
+    const storedAttempt = migrationAttemptId(jobRow.meta);
+    const chunkAttempt = payload.attemptId ?? null;
+    if (storedAttempt != null && chunkAttempt !== storedAttempt) {
+      throw new Error('migration job is not running yet');
+    }
+    log.info(
+      { migrationJobId: payload.migrationJobId },
+      'migration chunk skipped — job already failed',
+    );
+    return;
   }
   if (!jobRow || !migrationChunkMayRun(jobRow.status)) {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
