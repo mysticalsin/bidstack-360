@@ -308,55 +308,42 @@ describe('migration queue acquisition', () => {
   });
 
   t('two concurrent starts without a key create one import', async () => {
-    // WHY: a missing Idempotency-Key used to insert one migration_job per
-    // request. Two processes posting the same file at once created two
-    // imports. The in-flight twin is refused, and a later start still creates
-    // the next import.
+    // WHY: a missing Idempotency-Key inserts one migration_job per request
+    // unless the database allows only one active import for that tenant and
+    // source. The second start is refused. A finished import can be followed
+    // by another.
     const payload = {
       source: 'CSV',
       entityType: 'company',
       rows: [{ name: 'Hammer Concurrent' }],
       mappings: { name: 'company.name' },
     };
+    await prisma.migrationJob.updateMany({
+      where: {
+        orgId: org.orgId,
+        source: { in: ['CSV', 'SALESFORCE_CSV'] },
+        status: { in: ['PENDING', 'RUNNING'] },
+      },
+      data: { status: 'COMPLETE', completedAt: new Date() },
+    });
     const before = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
-    // The winner stays inside the lock until the loser has been refused. Two
-    // inject() calls otherwise finish one after the other when the suite is busy.
-    const originalSet = server.redis.set.bind(server.redis);
-    let releaseWinner: (() => void) | undefined;
-    const winnerGate = new Promise<void>((resolve) => {
-      releaseWinner = resolve;
-    });
-    const releaseTimer = setTimeout(() => releaseWinner?.(), 8_000);
-    const set = vi.spyOn(server.redis, 'set').mockImplementation(async (...args) => {
-      const key = String(args[0]);
-      const result = await originalSet(...args);
-      if (key.startsWith('migration:start-lock:')) {
-        if (result === 'OK') await winnerGate;
-        else releaseWinner?.();
-      }
-      return result;
-    });
-    let first: Awaited<ReturnType<typeof server.inject>> | undefined;
-    let second: Awaited<ReturnType<typeof server.inject>> | undefined;
-    try {
-      [first, second] = await Promise.all([
-        server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
-        server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
-      ]);
-    } finally {
-      clearTimeout(releaseTimer);
-      releaseWinner?.();
-      set.mockRestore();
-    }
-    if (!first || !second) throw new Error('starts did not finish');
+    const [first, second] = await Promise.all([
+      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+    ]);
     const codes = [first.statusCode, second.statusCode].sort();
     expect(codes).toEqual([201, 409]);
     const refused = first.statusCode === 409 ? first : second;
     expect(refused.json()).toMatchObject({
-      message: 'Idempotent request is already in flight',
+      message: 'An import from this source is already running.',
     });
     expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(before + 1);
 
+    const winnerId = (first.statusCode === 201 ? first : second).json<{ id: string }>().id;
+    await prisma.migrationJob.update({
+      where: { id: winnerId },
+      data: { status: 'COMPLETE', completedAt: new Date() },
+    });
     const again = await server.inject({
       method: 'POST',
       url: '/api/v1/migrations/start-csv',

@@ -12,7 +12,7 @@
 //
 // HubSpot OAuth + import → migrations-hubspot.routes.ts
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import * as XLSX from '@e965/xlsx';
 import { Queue } from 'bullmq';
@@ -72,34 +72,6 @@ function stalledFlag(job: {
  * the Redis key. A throw before the key is deleted leaves the pending job with
  * its rows. A throw from the key delete cannot leave a pending job.
  */
-const START_IN_FLIGHT_SECONDS = 30;
-
-function csvStartLockKey(
-  orgId: string,
-  body: {
-    source: string;
-    entityType: string;
-    rows: Record<string, string>[];
-    mappings: Record<string, string | null>;
-    dedupStrategy: string;
-    externalIdColumn?: string;
-  },
-): string {
-  const digest = createHash('sha256')
-    .update(
-      JSON.stringify({
-        source: body.source,
-        entityType: body.entityType,
-        rows: body.rows,
-        mappings: body.mappings,
-        dedupStrategy: body.dedupStrategy,
-        externalIdColumn: body.externalIdColumn ?? null,
-      }),
-    )
-    .digest('hex');
-  return `migration:start-lock:${orgId}:${digest}`;
-}
-
 async function abandonUnqueuedStart(input: {
   jobId: string;
   orgId: string;
@@ -295,35 +267,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('The import could not be queued. Try again.');
       }
 
-      // No Idempotency-Key: hold the body only while this request is in flight.
-      // A later start of the same file is a new import. A Redis miss does not
-      // block the start; storing the rows still fails closed.
-      const lockKey = csvStartLockKey(orgId, {
-        source,
-        entityType,
-        rows,
-        mappings,
-        dedupStrategy,
-        externalIdColumn,
-      });
-      let holdLock = false;
-      try {
-        const locked = await server.redis.set(lockKey, '1', 'EX', START_IN_FLIGHT_SECONDS, 'NX');
-        if (locked !== 'OK') {
-          throw server.httpErrors.conflict('Idempotent request is already in flight');
-        }
-        holdLock = true;
-      } catch (err) {
-        const statusCode =
-          err && typeof err === 'object' && 'statusCode' in err
-            ? (err as { statusCode?: number }).statusCode
-            : undefined;
-        if (statusCode === 409) throw err;
-        req.log.warn({ err }, 'csv start in-flight lock unavailable');
-      }
-
-      try {
-        const job = await prisma.migrationJob.create({
+      const job = await prisma.migrationJob.create({
           data: {
             orgId,
             userId,
@@ -430,13 +374,6 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           where: { id: job.id, orgId },
         });
         return reply.code(201).send(serializeJob(updated));
-      } finally {
-        if (holdLock) {
-          await server.redis.del(lockKey).catch((err: unknown) => {
-            req.log.warn({ err }, 'csv start in-flight lock release failed');
-          });
-        }
-      }
     },
   );
 
