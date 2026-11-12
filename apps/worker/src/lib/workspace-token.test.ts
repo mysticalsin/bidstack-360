@@ -10,7 +10,20 @@ vi.mock('@bidstack/db', () => ({
     integrationToken: {
       update: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),
-      findFirst: vi.fn(async () => ({ status: 'revoked' })),
+      findFirst: vi.fn(async () => ({
+        id: 'tok-1',
+        orgId: 'org-1',
+        provider: grant.provider,
+        status: grant.status,
+        accessTokenEncrypted: grant.access,
+        refreshTokenEncrypted: grant.refresh,
+        expiresAt: grant.expiresAt,
+        scope: [
+          'https://graph.microsoft.com/Mail.Read',
+          'https://graph.microsoft.com/Calendars.Read',
+          'offline_access',
+        ],
+      })),
     },
   },
 }));
@@ -22,9 +35,16 @@ vi.mock('@bidstack/shared/token-crypto', () => ({
 
 const updateMany = vi.mocked(prisma.integrationToken.updateMany);
 const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as pino.Logger;
-const grant = { status: 'active', access: 'enc(old-access)' };
+const grant = {
+  status: 'active',
+  access: 'enc(old-access)',
+  refresh: 'enc(old-refresh)',
+  expiresAt: new Date(Date.now() - 1_000),
+  provider: 'gmail' as 'gmail' | 'microsoft_graph' | 'google_workspace',
+};
 
 function row(provider: 'gmail' | 'microsoft_graph' | 'google_workspace', expired = true) {
+  grant.provider = provider;
   return {
     id: 'tok-1',
     orgId: 'org-1',
@@ -47,20 +67,32 @@ beforeEach(() => {
   process.env.GMAIL_CLIENT_SECRET = 'test-google-secret';
   grant.status = 'active';
   grant.access = 'enc(old-access)';
+  grant.refresh = 'enc(old-refresh)';
+  grant.expiresAt = new Date(Date.now() - 1_000);
+  grant.provider = 'gmail';
   updateMany.mockImplementation(async (args: {
     where: { status?: { in?: string[] } };
-    data: { status?: string; accessTokenEncrypted?: string };
+    data: {
+      status?: string;
+      accessTokenEncrypted?: string;
+      refreshTokenEncrypted?: string;
+      expiresAt?: Date | null;
+    };
   }) => {
     const from = args.where.status?.in;
-    // A missing from-list is the bug: the write lands on the current row.
-    if (!from) {
+    const apply = () => {
       if (args.data.status) grant.status = args.data.status;
       if (args.data.accessTokenEncrypted) grant.access = args.data.accessTokenEncrypted;
+      if (args.data.refreshTokenEncrypted) grant.refresh = args.data.refreshTokenEncrypted;
+      if (args.data.expiresAt) grant.expiresAt = args.data.expiresAt;
+    };
+    // A missing from-list is the bug: the write lands on the current row.
+    if (!from) {
+      apply();
       return { count: 1 };
     }
     if (!from.includes(grant.status)) return { count: 0 };
-    if (args.data.status) grant.status = args.data.status;
-    if (args.data.accessTokenEncrypted) grant.access = args.data.accessTokenEncrypted;
+    apply();
     return { count: 1 };
   });
 });
@@ -142,6 +174,29 @@ describe('getWorkspaceAccessToken', () => {
     await expect(getWorkspaceAccessToken(row('gmail'), log, fetchImpl)).rejects.toBeInstanceOf(GrantRevokedError);
     expect(grant.status).toBe('revoked');
     expect(grant.access).toBe('enc(old-access)');
+  });
+
+  it('does not send a second Microsoft refresh while the first one is still in flight', async () => {
+    // WHY: Microsoft rotates the refresh token. A second call with the old
+    // token is invalid_grant, and the status predicate then revokes the grant
+    // that the first call just stored.
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) await gate;
+      return json({ access_token: 'new-access', refresh_token: 'rotated', expires_in: 3600 });
+    });
+    const first = getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    const second = getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl);
+    release();
+    await expect(Promise.all([first, second])).resolves.toEqual(['new-access', 'new-access']);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(grant.status).toBe('active');
   });
 
   it('marks a transient provider failure as error, not revoked', async () => {

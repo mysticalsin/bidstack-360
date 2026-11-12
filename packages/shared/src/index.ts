@@ -13,6 +13,7 @@ export * from './tech-stack/index.js';
 export * from './bid-classification/index.js';
 export * from './stage-transitions/index.js';
 export * from './state-machines/index.js';
+export * from './oauth-refresh-lock.js';
 export * from './document-category.js';
 export * from './workflow-engine.js';
 // Provider catalogue only (pure data). The LLM wire client stays behind the

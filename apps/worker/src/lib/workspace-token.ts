@@ -8,11 +8,18 @@
  * - invalid_grant means the user revoked access at the provider: the row is
  *   marked revoked with a reconnect hint and sync stops for it.
  */
+import IORedis from 'ioredis';
 import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
-import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
+import {
+  GrantRevokedError,
+  microsoftRefreshScopes,
+  runWithOAuthRefreshLock,
+  tokenFrom,
+  type OAuthRefreshLockRedis,
+} from '@bidstack/shared';
 
 export { GrantRevokedError };
 
@@ -104,6 +111,50 @@ async function markToken(
   if (moved.count === 0) await warnIllegalToken(id, data.status, log);
 }
 
+let refreshClient: IORedis | null = null;
+
+/** The worker's Redis, so this process takes the same lock as the API. Tests use the in-process fallback. */
+function refreshLockRedis(): OAuthRefreshLockRedis | null {
+  if (process.env.NODE_ENV === 'test' || !process.env.REDIS_URL) return null;
+  if (!refreshClient) {
+    refreshClient = new IORedis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+      enableOfflineQueue: false,
+    });
+  }
+  const client = refreshClient;
+  return {
+    ready: async () => {
+      try {
+        if ((client.status as string) !== 'ready') await client.connect();
+        const status = client.status as string;
+        return status === 'ready' || status === 'connect';
+      } catch {
+        return false;
+      }
+    },
+    set: (key, value, expiryMode, ttlMs, condition) => client.set(key, value, expiryMode, ttlMs, condition),
+    eval: (script, numKeys, key, owner) => client.eval(script, numKeys, key, owner),
+  };
+}
+
+async function readGrant(id: string, orgId: string): Promise<WorkspaceTokenRow | null> {
+  return prisma.integrationToken.findFirst({
+    where: { id, orgId, deletedAt: null },
+    select: {
+      id: true,
+      orgId: true,
+      provider: true,
+      accessTokenEncrypted: true,
+      refreshTokenEncrypted: true,
+      expiresAt: true,
+      scope: true,
+      status: true,
+    },
+  });
+}
+
 /** Return a usable access token, refreshing and persisting it when needed. */
 export async function getWorkspaceAccessToken(
   row: WorkspaceTokenRow,
@@ -121,7 +172,38 @@ export async function getWorkspaceAccessToken(
     throw new GrantRevokedError('Access token expired and no refresh token is stored');
   }
 
-  const { url, body } = refreshRequest(row, decryptToken(row.refreshTokenEncrypted));
+  return runWithOAuthRefreshLock({
+    tokenId: row.id,
+    log,
+    redis: refreshLockRedis(),
+    redisRequired:
+      process.env.NODE_ENV === 'production' &&
+      process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED !== 'false',
+    getFreshValue: async () => {
+      const current = await readGrant(row.id, row.orgId);
+      if (!current || current.status !== 'active' || !current.accessTokenEncrypted) return null;
+      const stillFresh = current.expiresAt
+        ? current.expiresAt.getTime() > Date.now() + EXPIRY_SKEW_MS
+        : true;
+      if (!stillFresh) return null;
+      return decryptToken(current.accessTokenEncrypted);
+    },
+    refresh: () => refreshGrant(row, log, fetchImpl),
+  });
+}
+
+async function refreshGrant(
+  row: WorkspaceTokenRow,
+  log: pino.Logger,
+  fetchImpl: typeof fetch,
+): Promise<string> {
+  const current = (await readGrant(row.id, row.orgId)) ?? row;
+  if (!current.refreshTokenEncrypted) {
+    await markToken(row.id, { status: 'revoked', errorMessage: REVOKED_MESSAGE }, log);
+    throw new GrantRevokedError('Access token expired and no refresh token is stored');
+  }
+
+  const { url, body } = refreshRequest(current, decryptToken(current.refreshTokenEncrypted));
   const res = await fetchImpl(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
