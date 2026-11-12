@@ -227,6 +227,9 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
       REDIS_URL: redis://localhost:6379
+      # Test-only. The integration Postgres uses scram, which rejects an empty
+      # app_role password. This is not a live secret.
+      APP_ROLE_TEST_PASSWORD: bidstack_app_role_test
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

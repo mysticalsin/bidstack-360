@@ -36,7 +36,7 @@ An empty result is the only result that may create the index.
 
 ## Invalid index after CREATE INDEX CONCURRENTLY
 
-If that statement fails, Postgres keeps an invalid index named `migration_jobs_one_active_per_file`, and Prisma records `20261112170100_migration_jobs_one_active_per_file` as failed. Do not delete rows to make the next boot succeed.
+If that statement fails, Postgres keeps `migration_jobs_one_active_per_file` with `pg_index.indisvalid = false`. Prisma records `20261112170100_migration_jobs_one_active_per_file` as failed. The next `prisma migrate deploy` is P3009 until both steps below have happened. Do not delete rows to make the next boot succeed.
 
 Drop the invalid index as its own statement, outside a transaction:
 
@@ -44,47 +44,37 @@ Drop the invalid index as its own statement, outside a transaction:
 DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file;
 ```
 
-Then mark the index migration rolled back. The column migration stays applied.
+Then mark that failed migration rolled back. The column migration stays applied.
 
 ```bash
 prisma migrate resolve --rolled-back 20261112170100_migration_jobs_one_active_per_file --schema packages/db/prisma/schema.prisma
 ```
+
+`migrate resolve --rolled-back` on a migration that succeeded returns P3012 (`cannot be rolled back because it is not in a failed state`). Use it only for the failed attempt.
 
 Run the precheck again. If it returns rows, do not retry the index migration. Deleting those rows is Tony's decision. This repo has no cleanup statement for them.
 
 ## Rollback
 
-Use this when the index and the file hash column should come back off.
+This is the failed-index recovery above, not a down migration. `20261112170000` only adds `file_hash`. Resolving that directory, or resolving the index migration after it succeeded, returns P3012. This repo does not add a migration to reverse a successful index.
 
-The index drop is outside a transaction when it uses `CONCURRENTLY`:
+## Live database check
 
-```sql
-DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file;
-ALTER TABLE migration_jobs DROP COLUMN IF EXISTS file_hash;
-```
+`20261112170000_migration_jobs_one_active_per_org_source` on this branch is unapplied SQL that only adds `file_hash`. It is not on `origin/main` or `origin/demo`, and the container image is built from main, so no database migrated from this repo has applied it. Prisma 5.22 does not halt on a checksum mismatch. Do not add a repair migration for an older copy of that file. A later drop would run, `20261112170100` would then fail with `42703` because `file_hash` was never added, and the next deploy is P3009.
 
-`ALTER TABLE` is a separate statement. Resolve both directory names, index first:
-
-```bash
-prisma migrate resolve --rolled-back 20261112170100_migration_jobs_one_active_per_file --schema packages/db/prisma/schema.prisma
-prisma migrate resolve --rolled-back 20261112170000_migration_jobs_one_active_per_org_source --schema packages/db/prisma/schema.prisma
-```
-
-## Databases that applied the earlier SQL of 20261112170000
-
-The first SQL in `20261112170000_migration_jobs_one_active_per_org_source` created index `migration_jobs_one_active_per_org_source`. The file on this branch no longer does. `prisma migrate deploy` stops while `_prisma_migrations.checksum` for that directory still matches the earlier SQL, and it will not run anything after it.
-
-Before that checksum is replaced with the checksum of the current `migration.sql`, drop the old index outside a transaction. Do not delete rows.
+Before anyone treats a live database as already migrated, this read-only check is the gate. Jarvis decides whether to run it. This change does not run it.
 
 ```sql
-DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_org_source;
+SELECT migration_name, checksum, finished_at, rolled_back_at
+FROM _prisma_migrations
+WHERE migration_name = '20261112170000_migration_jobs_one_active_per_org_source';
 ```
 
-`20261112170050_drop_migration_jobs_one_active_per_org_source` is that same statement and nothing else, so Prisma runs it outside a transaction. `IF EXISTS` does nothing when the index was never created. It runs only after the checksum of `20261112170000` matches the current file.
+If that query returns a row, stop. Do not drop an index and do not edit the checksum from this repo.
 
 ## Recovery when deploy already failed with P3018 / 23505
 
-`P3018` is Prisma reporting that the migration failed. `23505` is Postgres `unique_violation` from this index. The index migration is not wrapped in a transaction, so a failed attempt can leave the invalid index above. Drop it with `DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file`, then resolve `20261112170100_migration_jobs_one_active_per_file` rolled back.
+`P3018` is Prisma reporting that the migration failed. `23505` is Postgres `unique_violation` from this index. The index migration is not wrapped in a transaction, so a failed attempt leaves `indisvalid = false` and the next deploy is P3009. Drop it with `DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file`, then resolve the failed `20261112170100_migration_jobs_one_active_per_file`. Do not resolve a migration that succeeded: that is P3012.
 
 1. Mark the failed index attempt rolled back, using the resolve command above.
 2. Run the precheck again once `file_hash` exists. If it returns rows, do not retry the index migration.
@@ -107,7 +97,7 @@ The container image is built with the Worker (`apps/polo-preview/wrangler.toml`,
 
 A failed boot is not snapshotted. Snapshots are saved only after the container is ready, so the object restored on the next boot does not contain a failed `_prisma_migrations` row.
 
-If a database you are repairing does contain a failed row for the index migration, drop the invalid index with `DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file`, then:
+If a database you are repairing does contain a failed row for the index migration, the index has `indisvalid = false` and a rerun is P3009. Drop it with `DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file`, then resolve only that failed migration. A migration that succeeded returns P3012:
 
 ```bash
 prisma migrate resolve --rolled-back 20261112170100_migration_jobs_one_active_per_file --schema packages/db/prisma/schema.prisma

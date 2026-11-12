@@ -159,7 +159,14 @@ describe('migration queue reconnect', () => {
         server.inject({ method: 'POST', url: `/api/v1/migrations/${left}/retry` }),
         server.inject({ method: 'POST', url: `/api/v1/migrations/${right}/retry` }),
       ]);
-      expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+      // Tony's rule: only block starting the same import twice. Same import is
+      // org + source + sha256 of the rows. HubSpot is excluded because
+      // file_hash is null. Left and Right are two different failed jobs with
+      // different row payloads, so both retries return 200. This is not an
+      // idempotent resume of one job, and it is not a second start of the
+      // same import. That second start is still 409.
+      expect(a.statusCode).toBe(200);
+      expect(b.statusCode).toBe(200);
       expect(opened.length).toBe(before + 1);
       expect(close).toHaveBeenCalled();
     } finally {

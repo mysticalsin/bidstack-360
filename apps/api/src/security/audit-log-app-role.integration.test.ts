@@ -25,10 +25,14 @@ beforeAll(async () => {
   }
 }, 30_000);
 
-function appRoleUrl(base: string): string {
+function quoteLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function appRoleUrl(base: string, password: string): string {
   const url = new URL(base);
   url.username = 'app_role';
-  url.password = '';
+  url.password = password;
   return url.toString();
 }
 
@@ -61,10 +65,20 @@ describe('audit log app role', () => {
     expect(migration).not.toMatch(/PASSWORD\s+'/i);
   });
 
-  it('the app role cannot delete or truncate an audit row and retention still can', async () => {
+  it('the app role cannot delete or truncate an audit row and retention still can', async (ctx) => {
     if (!dbReachable) throw new Error('[skip] app role — DATABASE_URL not reachable');
     const base = process.env.DATABASE_URL;
     if (!base) throw new Error('[skip] app role — DATABASE_URL not reachable');
+    // The test environment supplies a test-only value. This test does not
+    // invent or read a live secret. Without that value, scram rejects an
+    // empty password, so the check is skipped with that reason.
+    const password = process.env.APP_ROLE_TEST_PASSWORD;
+    if (!password) {
+      ctx.skip(
+        'scram rejects an empty password; set APP_ROLE_TEST_PASSWORD to a test-only value',
+      );
+      return;
+    }
 
     const org = await prisma.org.create({
       data: { clerkOrg: `org_app_role_${randomUUID()}`, name: 'app role' },
@@ -72,7 +86,8 @@ describe('audit log app role', () => {
     const row = await prisma.auditLog.create({
       data: { orgId: org.id, action: 'test.app-role', targetType: 'test' },
     });
-    const app = new PrismaClient({ datasources: { db: { url: appRoleUrl(base) } } });
+    await prisma.$executeRawUnsafe(`ALTER ROLE app_role PASSWORD ${quoteLiteral(password)}`);
+    const app = new PrismaClient({ datasources: { db: { url: appRoleUrl(base, password) } } });
     try {
       const who = await app.$queryRaw<Array<{ user: string }>>`SELECT current_user AS user`;
       expect(who[0]?.user).toBe('app_role');
