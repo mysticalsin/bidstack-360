@@ -1166,6 +1166,8 @@
       "reasonStalled": "导入在保存任何行之前已停滞。",
       "reasonEnqueue": "导入没有开始。请重试。",
       "reasonRowsExpired": "这些行已过期。请重新上传文件。",
+      "reasonConflict": "导入与另一次写入发生了冲突。",
+      "reasonEnqueueStopped": "导入在保存剩余行之前停止了。",
       "reasonUnknown": "无法完成导入。",
       "actionFailed": "没有成功。请重试。",
       "cancelling": "正在取消…",

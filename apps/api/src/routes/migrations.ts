@@ -36,7 +36,7 @@ import {
   MIGRATION_ENQUEUE_FAILED,
   MIGRATION_ROWS_EXPIRED,
   migrationErrorsCsv,
-  migrationRetryAllowed,
+  migrationRetryOffered,
   migrationStaleDue,
 } from '@bidstack/shared';
 
@@ -370,7 +370,15 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       };
       if (
         job.status !== 'FAILED' ||
-        !migrationRetryAllowed(job.processedRows, job.errorRows) ||
+        !migrationRetryOffered(
+          job.processedRows,
+          job.errorRows,
+          (Array.isArray(job.errorSummary) ? job.errorSummary : []).flatMap((row) =>
+            row && typeof row === 'object' && typeof (row as { message?: unknown }).message === 'string'
+              ? [(row as { message: string }).message]
+              : [],
+          ),
+        ) ||
         !meta.entityType
       ) {
         throw server.httpErrors.conflict('This import cannot be retried. Start it again from the file.');

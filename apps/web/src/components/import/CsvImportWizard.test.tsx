@@ -274,4 +274,97 @@ describe('CsvImportWizard', () => {
     expect(screen.getByRole('alert').textContent).toBe('That did not work. Try again.');
     expect(screen.queryByText('Migration job is no longer running')).toBeNull();
   });
+
+  it('keeps a stored English enqueue failure specific', async () => {
+    // WHY: jobs written before the codes still need the sentence they had,
+    // not the generic failure.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'Failed to enqueue import chunks' }],
+    });
+    await waitFor(() => expect(screen.getByText('The import did not start. Try again.')).toBeTruthy());
+    expect(screen.queryByText('The import could not be completed.')).toBeNull();
+  });
+
+  it('keeps a stored English expiry specific and offers no retry', async () => {
+    // WHY: an old job stored the English sentence. The wizard still says to
+    // upload the file, and does not offer a retry that would fail.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [
+        { row: 0, field: null, message: 'Import rows expired. Upload the file again.' },
+      ],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('Those rows expired. Upload the file again.')).toBeTruthy(),
+    );
+    expect(screen.queryByText('The import could not be completed.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+  });
+
+  it('does not offer retry when the rows are gone', async () => {
+    // WHY: retrying an expired upload fails again. The sentence says to upload,
+    // and there is no Retry button.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'rows_expired' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('Those rows expired. Upload the file again.')).toBeTruthy(),
+    );
+    expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+    expect(screen.queryByText('Try again.')).toBeNull();
+  });
+
+  it('does not tell a partial import to try again', async () => {
+    // WHY: a later page that could not be queued already saved rows. Retry is
+    // not offered, so the sentence must not ask for it.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 4,
+      processedRows: 2,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'enqueue_failed' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import stopped before the remaining rows were saved.')).toBeTruthy(),
+    );
+    expect(screen.queryByText('The import did not start. Try again.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+  });
+
+  it('does not say an exhausted conflict will be tried again', async () => {
+    // WHY: the last attempt is over. The error file and the wizard must not
+    // promise another try.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'import_conflict' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import conflicted with another write.')).toBeTruthy(),
+    );
+    expect(screen.queryByText(/will be tried again/)).toBeNull();
+  });
 });

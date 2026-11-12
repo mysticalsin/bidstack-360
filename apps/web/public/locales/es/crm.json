@@ -1229,6 +1229,8 @@
       "reasonStalled": "La importación se detuvo antes de guardar alguna fila.",
       "reasonEnqueue": "La importación no comenzó. Inténtalo de nuevo.",
       "reasonRowsExpired": "Esas filas caducaron. Vuelve a subir el archivo.",
+      "reasonConflict": "La importación entró en conflicto con otra escritura.",
+      "reasonEnqueueStopped": "La importación se detuvo antes de guardar las filas restantes.",
       "reasonUnknown": "No se pudo completar la importación.",
       "actionFailed": "Eso no funcionó. Inténtalo de nuevo.",
       "cancelling": "Cancelando…",

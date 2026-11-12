@@ -1,10 +1,16 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  MIGRATION_CONFLICT,
   MIGRATION_ENQUEUE_FAILED,
+  MIGRATION_ENQUEUE_STOPPED,
+  MIGRATION_LEGACY_CONFLICT,
+  MIGRATION_LEGACY_ENQUEUE_FAILED,
+  MIGRATION_LEGACY_ROWS_EXPIRED,
   MIGRATION_ROWS_EXPIRED,
   MIGRATION_STALE_REASON,
   migrationRetryAllowed,
+  migrationRetryOffered,
 } from '@bidstack/shared';
 
 import { Icon } from '@/components/ui/Icon';
@@ -40,17 +46,48 @@ const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
     'csvImport.progress.reasonEnqueue',
     'The import did not start. Try again.',
   ],
+  [MIGRATION_ENQUEUE_STOPPED]: [
+    'csvImport.progress.reasonEnqueueStopped',
+    'The import stopped before the remaining rows were saved.',
+  ],
   [MIGRATION_ROWS_EXPIRED]: [
     'csvImport.progress.reasonRowsExpired',
     'Those rows expired. Upload the file again.',
+  ],
+  [MIGRATION_LEGACY_ENQUEUE_FAILED]: [
+    'csvImport.progress.reasonEnqueue',
+    'The import did not start. Try again.',
+  ],
+  [MIGRATION_LEGACY_ROWS_EXPIRED]: [
+    'csvImport.progress.reasonRowsExpired',
+    'Those rows expired. Upload the file again.',
+  ],
+  [MIGRATION_CONFLICT]: [
+    'csvImport.progress.reasonConflict',
+    'The import conflicted with another write.',
+  ],
+  [MIGRATION_LEGACY_CONFLICT]: [
+    'csvImport.progress.reasonConflict',
+    'The import conflicted with another write.',
   ],
 };
 
 function importErrorCopy(
   t: (key: string, fallback: string) => string,
   message: string | undefined,
+  processedRows: number,
+  errorRows: number,
 ): string | null {
   if (!message) return null;
+  if (
+    (message === MIGRATION_ENQUEUE_FAILED || message === MIGRATION_LEGACY_ENQUEUE_FAILED) &&
+    !migrationRetryAllowed(processedRows, errorRows)
+  ) {
+    return t(
+      'csvImport.progress.reasonEnqueueStopped',
+      'The import stopped before the remaining rows were saved.',
+    );
+  }
   const known = IMPORT_ERROR_KEYS[message];
   if (!known) return t('csvImport.progress.reasonUnknown', 'The import could not be completed.');
   return t(known[0], known[1]);
@@ -486,6 +523,8 @@ function ImportProgress({
   const failure = importErrorCopy(
     t,
     job.status === 'FAILED' ? job.errorSummary?.[0]?.message : undefined,
+    job.processedRows,
+    job.errorRows,
   );
   const pct =
     job.totalRows > 0 ? Math.round((job.processedRows / job.totalRows) * 100) : done ? 100 : 0;
@@ -542,7 +581,12 @@ function ImportProgress({
         </button>
       )}
 
-      {job.status === 'FAILED' && migrationRetryAllowed(job.processedRows, job.errorRows) ? (
+      {job.status === 'FAILED' &&
+      migrationRetryOffered(
+        job.processedRows,
+        job.errorRows,
+        (job.errorSummary ?? []).map((row) => row.message),
+      ) ? (
         <button type="button" className="btn btn-primary" disabled={retryPending} onClick={onRetry}>
           {retryPending
             ? t('csvImport.progress.retrying', 'Retrying…')

@@ -193,6 +193,40 @@ describe('migration status races', () => {
     }
   });
 
+  t('retry is refused when the uploaded rows have expired', async () => {
+    // WHY: the rows are gone. A retry would fail again, so the API refuses it.
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValueOnce(new Error('queue down'));
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'name' },
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string }>();
+      await prisma.migrationJob.update({
+        where: { id: body.id },
+        data: { errorSummary: [{ row: 0, field: null, message: 'rows_expired' }] },
+      });
+      const retry = await server.inject({
+        method: 'POST',
+        url: `/api/v1/migrations/${body.id}/retry`,
+      });
+      expect(retry.statusCode).toBe(409);
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
+      expect(stored.status).toBe('FAILED');
+    } finally {
+      add.mockRestore();
+    }
+  });
+
   t('a retry is not failed stale before a new claim', async () => {
     // WHY: the stale scan fails a running import 15 minutes after the last
     // claim. A retry that kept that clock would be failed without a worker

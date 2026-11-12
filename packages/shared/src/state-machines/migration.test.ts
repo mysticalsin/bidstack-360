@@ -14,6 +14,7 @@ import {
   migrationFailureText,
   migrationFrom,
   migrationRetryAllowed,
+  migrationRetryOffered,
   migrationStaleDue,
   migrationTransition,
   migrationUndoStillOpen,
@@ -36,12 +37,35 @@ describe('migration transition table', () => {
   it('turns a stored failure code into the sentence the error file shows', () => {
     expect(migrationFailureText('enqueue_failed')).toBe('The import did not start. Try again.');
     expect(migrationFailureText('rows_expired')).toBe('Those rows expired. Upload the file again.');
+    expect(migrationFailureText('import_conflict')).toBe('The import conflicted with another write.');
+    expect(migrationFailureText('import_conflict')).not.toMatch(/will be tried again/);
+    expect(
+      migrationFailureText('The import conflicted with another write and will be tried again.'),
+    ).toBe('The import conflicted with another write.');
+    expect(migrationFailureText('Failed to enqueue import chunks')).toBe(
+      'The import did not start. Try again.',
+    );
+    expect(migrationFailureText('Import rows expired. Upload the file again.')).toBe(
+      'Those rows expired. Upload the file again.',
+    );
+    expect(migrationRetryOffered(0, 0, ['enqueue_failed'])).toBe(true);
+    expect(migrationRetryOffered(0, 0, ['rows_expired'])).toBe(false);
+    expect(migrationRetryOffered(0, 0, ['Import rows expired. Upload the file again.'])).toBe(false);
+    expect(migrationRetryOffered(2, 0, ['enqueue_failed'])).toBe(false);
+    expect(migrationFailureText('enqueue_stopped')).toBe(
+      'The import stopped before the remaining rows were saved.',
+    );
     expect(migrationFailureText('company.name is required')).toBe('company.name is required');
     const csv = migrationErrorsCsv([
       { row: 2, field: '=cmd', message: '+sum' },
       { row: 3, field: '-1', message: '@x' },
       { row: 4, field: '\tcell', message: '\rmsg' },
       { row: 5, field: 'name', message: 'company.name is required' },
+      {
+        row: 6,
+        field: 'name',
+        message: 'The import conflicted with another write and will be tried again.',
+      },
     ]);
     expect(csv).toContain(`"'=cmd"`);
     expect(csv).toContain(`"'+sum"`);
@@ -51,6 +75,8 @@ describe('migration transition table', () => {
     expect(csv).toContain('"\'\\rmsg"');
     expect(csv).not.toContain('"=cmd"');
     expect(csv).toContain('"company.name is required"');
+    expect(csv).toContain('"The import conflicted with another write."');
+    expect(csv).not.toMatch(/will be tried again/);
   });
 
   it('takes the status a chunk may write from the fail transition', () => {

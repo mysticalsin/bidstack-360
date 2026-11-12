@@ -1167,6 +1167,8 @@
       "reasonStalled": "The import stalled before any rows were saved.",
       "reasonEnqueue": "The import did not start. Try again.",
       "reasonRowsExpired": "Those rows expired. Upload the file again.",
+      "reasonConflict": "The import conflicted with another write.",
+      "reasonEnqueueStopped": "The import stopped before the remaining rows were saved.",
       "reasonUnknown": "The import could not be completed.",
       "actionFailed": "That did not work. Try again.",
       "cancelling": "Cancelling…",
