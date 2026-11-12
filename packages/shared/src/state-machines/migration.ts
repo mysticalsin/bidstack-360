@@ -69,7 +69,7 @@ const FROM: Record<MigrationEvent, readonly MigrationState[]> = {
   cancel: ['PENDING', 'RUNNING'],
   complete: ['RUNNING'],
   fail: ['RUNNING'],
-  undo: ['COMPLETE'],
+  undo: ['COMPLETE', 'FAILED'],
   retry: ['FAILED'],
   stale: ['RUNNING'],
 };

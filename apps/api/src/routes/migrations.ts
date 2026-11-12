@@ -114,6 +114,7 @@ async function markMigrationEnqueueFailed(
     data: {
       status: 'FAILED',
       completedAt: new Date(),
+      undoableUntil: new Date(Date.now() + 24 * 3600 * 1000),
       errorSummary: [{ row: 0, field: null, message }],
     },
   });
@@ -655,7 +656,10 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      if (job.status !== 'COMPLETE') {
+      if (
+        job.status !== 'COMPLETE' &&
+        !(job.status === 'FAILED' && job.undoableUntil)
+      ) {
         throw server.httpErrors.conflict('Only completed jobs can be undone');
       }
       if (!job.undoableUntil || job.undoableUntil < new Date()) {

@@ -268,6 +268,59 @@ describe('migration status races', () => {
     }
   });
 
+  t('a committed chunk can still be undone when a later enqueue fails', async () => {
+    // WHY: the first chunk can commit before the next queue add throws.
+    // The job is then failed, retry refuses it, and undo refuses it too.
+    const { redis } = await import('../redis.js');
+    (server as unknown as { redis: typeof redis }).redis = redis;
+    let calls = 0;
+    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async () => {
+      calls += 1;
+      if (calls > 1) throw new Error('queue down');
+      return { id: 'chunk-0' } as never;
+    });
+    try {
+      const rows = Array.from({ length: 101 }, (_, i) => ({ name: `Co ${i}` }));
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows,
+          mappings: { name: 'company.name' },
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json<{ id: string; status: string }>();
+      expect(body.status).toBe('FAILED');
+      const company = await prisma.company.create({
+        data: { orgId: org.orgId, name: `Kept ${body.id}`, source: `migration:${body.id}` },
+      });
+      await prisma.migrationJob.update({
+        where: { id: body.id },
+        data: { processedRows: 1 },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: org.orgId,
+          action: 'migration.chunk.imported',
+          targetType: 'MigrationJob',
+          targetId: body.id,
+          diff: { entity: 'company', createdIds: [company.id] },
+        },
+      });
+      const undo = await server.inject({
+        method: 'DELETE',
+        url: `/api/v1/migrations/${body.id}/undo`,
+      });
+      expect(undo.statusCode).toBe(200);
+      expect(await prisma.company.findUnique({ where: { id: company.id } })).toBeNull();
+    } finally {
+      add.mockRestore();
+    }
+  });
+
   t('a retry is not failed stale before a new claim', async () => {
     // WHY: the stale scan fails a running import 15 minutes after the last
     // claim. A retry that kept that clock would be failed without a worker

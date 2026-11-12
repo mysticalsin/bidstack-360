@@ -30,6 +30,7 @@ const LEGAL: Array<[MigrationState, MigrationEvent, MigrationState]> = [
   ['RUNNING', 'complete', 'COMPLETE'],
   ['RUNNING', 'fail', 'FAILED'],
   ['COMPLETE', 'undo', 'FAILED'],
+  ['FAILED', 'undo', 'FAILED'],
   ['FAILED', 'retry', 'RUNNING'],
   ['RUNNING', 'stale', 'FAILED'],
 ];
