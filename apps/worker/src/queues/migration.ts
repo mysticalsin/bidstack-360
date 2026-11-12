@@ -848,9 +848,26 @@ export async function processMigrationChunk(
     where: { id: payload.migrationJobId },
     select: { status: true, meta: true, orgId: true },
   });
+  // The reaper already ended this attempt. Retrying the chunk does no work
+  // and logs a misleading error. A newer attempt id is the retry route, which
+  // still has to wait for the RUNNING claim.
+  if (
+    jobRow?.status === 'FAILED' &&
+    migrationChunkMatchesAttempt(migrationAttemptId(jobRow.meta), payload.attemptId ?? null)
+  ) {
+    log.info(
+      {
+        migrationJobId: payload.migrationJobId,
+        attemptId: payload.attemptId ?? null,
+        status: jobRow.status,
+      },
+      'migration chunk skipped — attempt already ended',
+    );
+    return;
+  }
   // Start and retry enqueue before the RUNNING claim. A chunk that arrives
-  // while the row is still PENDING or FAILED must be retried, not completed,
-  // or the claim that follows has nothing left to process.
+  // while the row is still PENDING, or FAILED on a different attempt, must be
+  // retried, not completed, or the claim that follows has nothing left to process.
   if (jobRow?.status === 'PENDING' || jobRow?.status === 'FAILED') {
     throw new Error('migration job is not running yet');
   }
