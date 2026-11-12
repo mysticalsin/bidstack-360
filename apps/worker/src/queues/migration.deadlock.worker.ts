@@ -2,7 +2,7 @@
 // worker until the suite stops it. Not a product entrypoint.
 import { appendFileSync } from 'node:fs';
 
-import { Queue, Worker } from 'bullmq';
+import type { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import pino from 'pino';
 
