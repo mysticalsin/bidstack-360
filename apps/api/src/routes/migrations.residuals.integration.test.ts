@@ -135,7 +135,7 @@ describe('migration residual failures', () => {
         await prisma.auditLog.count({
           where: { orgId: org.orgId, targetId: jobId, action: 'migration.start' },
         }),
-      ).toBe(0);
+      ).toBe(1);
     } finally {
       add.mockRestore();
     }

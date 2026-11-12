@@ -1,7 +1,7 @@
 // Same import as the partial index: org, source, and file hash, while the
 // row is PENDING or RUNNING. The boot guard reads this and does not write.
 
-export const ACTIVE_IMPORT_MIGRATION = '20261112170000_migration_jobs_one_active_per_org_source';
+export const ACTIVE_IMPORT_MIGRATION = '20261112170100_migration_jobs_one_active_per_file';
 
 export const DUPLICATE_PRECHECK_SQL = `
 SELECT org_id::text, sum(active)::text
@@ -28,4 +28,13 @@ export function decideBootMigration(rows) {
   const log = [...totals.entries()].map(([orgId, active]) => ({ orgId, active }));
   if (log.length === 0) return { applyMigration: true, modifyRows: false, log: [] };
   return { applyMigration: false, modifyRows: false, log };
+}
+
+// Duplicates skip the index migration only. The other migrations still deploy.
+// Nothing here deletes or rewrites a row.
+export function planBootMigration(decision) {
+  if (decision.applyMigration) {
+    return { deploy: true, skipIndexMigration: false, servePreviousSchema: false, modifyRows: false };
+  }
+  return { deploy: true, skipIndexMigration: true, servePreviousSchema: false, modifyRows: false };
 }

@@ -136,7 +136,7 @@ export const MigrationJobPayload = z
     // Which column name (if any) holds the source system's record ID for dedup.
     externalIdColumn: z.string().optional(),
     // The attempt that enqueued this chunk. A retry mints a new id; older chunks are refused.
-    attemptId: z.string().uuid().optional(),
+    attemptId: z.string().uuid().nullish(),
     // Non-secret provider-specific state. Queue payloads may carry stable
     // references such as IntegrationConfig ids; raw provider tokens stay in the
     // encrypted credential store and are resolved by workers just in time.

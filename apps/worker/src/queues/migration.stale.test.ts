@@ -171,7 +171,8 @@ describe('migration stale scan', () => {
   t('an old pending start that never queued is removed', async () => {
     // WHY: a crash after migration.start_failed, or before the chunks were
     // queued, leaves a PENDING job the wizard never received. The sweep has
-    // to remove it. A job that still has a queue entry, and a young one, stay.
+    // to remove it. An old job that still has a queue entry is marked failed
+    // so it does not keep the slot. A young one stays.
     const abandoned = await pendingJob(16 * 60_000);
     await prisma.auditLog.create({
       data: {
@@ -203,11 +204,11 @@ describe('migration stale scan', () => {
         deleted.push(key);
       },
     });
-    expect(reaped).toBe(2);
+    expect(reaped).toBe(3);
     expect(await prisma.migrationJob.findUnique({ where: { id: abandoned.job.id } })).toBeNull();
     expect(await prisma.migrationJob.findUnique({ where: { id: unqueued.job.id } })).toBeNull();
     expect((await prisma.migrationJob.findUnique({ where: { id: queued.job.id } }))?.status).toBe(
-      'PENDING',
+      'FAILED',
     );
     expect((await prisma.migrationJob.findUnique({ where: { id: young.job.id } }))?.status).toBe(
       'PENDING',

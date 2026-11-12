@@ -148,10 +148,9 @@ describe('migration queue acquisition', () => {
   });
 
   t('repeated starts that cannot be queued leave no pending job', async () => {
-    // WHY: each click created a PENDING job, stored its rows, and wrote an
-    // audit, then returned 409 with no id. The next click added another.
-    // The failure is an extra audit row. The log is insert-only, so cleanup
-    // must not delete one.
+    // WHY: the start is recorded, then the queue refuses the chunks and the
+    // pending row is removed. The log is insert-only, so both the start and
+    // the failure row stay. The next click must not find a pending job.
     await expect(prisma.auditLog.deleteMany({ where: { orgId: org.orgId } })).rejects.toThrow(
       /insert-only/,
     );
@@ -193,7 +192,7 @@ describe('migration queue acquisition', () => {
     ).toBe(beforePending);
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start' } }),
-    ).toBe(beforeAudits);
+    ).toBe(beforeAudits + 2);
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start_failed' } }),
     ).toBe(beforeFailed + 2);
@@ -201,8 +200,8 @@ describe('migration queue acquisition', () => {
   });
 
   t('a failed start keeps the job and its rows when the failure audit cannot be written', async () => {
-    // WHY: the failure row is written first. If that insert throws, deleting
-    // the Redis key would leave a PENDING job whose rows are already gone.
+    // WHY: the start audit is rejected, so the handler cannot finish. The slot
+    // is released, and the stored rows stay with the failed job.
     const create = vi.spyOn(prisma.auditLog, 'create').mockRejectedValue(new Error('audit down'));
     const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
     const beforePending = await prisma.migrationJob.count({
@@ -226,17 +225,23 @@ describe('migration queue acquisition', () => {
     }
     expect(
       await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
-    ).toBe(beforePending + 1);
+    ).toBe(beforePending);
+    const kept = await prisma.migrationJob.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(kept.status).toBe('FAILED');
     expect((await server.redis.keys('migration:*')).length).toBe(beforeKeys.length + 1);
   });
 
   t('a failed start does not drop the rows when the job cannot be removed', async () => {
     // WHY: the Redis key is last. A throw from the job delete must leave the
-    // key in place, and the failure audit must already be stored.
+    // key in place, and the failure audit must already be stored. The slot is
+    // already released, so the row is failed rather than pending.
     const original = prisma.migrationJob.deleteMany.bind(prisma.migrationJob);
     const removeJob = vi.spyOn(prisma.migrationJob, 'deleteMany').mockImplementation((args) => {
       const where = args?.where as { id?: string; status?: string } | undefined;
-      if (where?.status === 'PENDING' && where.id) throw new Error('job delete down');
+      if (where?.id) throw new Error('job delete down');
       return original(args);
     });
     const add = vi.spyOn(Queue.prototype, 'addBulk').mockRejectedValue(new Error('queue down'));
@@ -265,7 +270,12 @@ describe('migration queue acquisition', () => {
     }
     expect(
       await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
-    ).toBe(beforePending + 1);
+    ).toBe(beforePending);
+    const kept = await prisma.migrationJob.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(kept.status).toBe('FAILED');
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start_failed' } }),
     ).toBe(beforeFailed + 1);

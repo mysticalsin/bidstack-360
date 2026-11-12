@@ -7,14 +7,14 @@
 // it seeds by itself so the app never stays dark.
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, createReadStream, createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
-import { decideBootMigration, DUPLICATE_PRECHECK_SQL } from '../src/active-import-precheck.js';
+import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
@@ -242,15 +242,32 @@ function activeImportDuplicates() {
   });
 }
 
+function stageMigrationsWithoutIndex() {
+  const staging = '/tmp/polo-migrate';
+  rmSync(staging, { recursive: true, force: true });
+  cpSync(join(APP, 'packages/db/prisma'), staging, {
+    recursive: true,
+    filter: (src) => !src.includes(`/${ACTIVE_IMPORT_MIGRATION}`),
+  });
+  return join(staging, 'schema.prisma');
+}
+
 function migrate() {
   const decision = decideBootMigration(activeImportDuplicates());
-  if (!decision.applyMigration) {
-    servePreviousSchema = true;
-    for (const row of decision.log) log(`active import precheck org ${row.orgId} count ${row.active}`);
-    log('refusing 20261112170000_migration_jobs_one_active_per_org_source; serving the restored schema');
-    return;
+  const plan = planBootMigration(decision);
+  for (const row of decision.log) log(`active import precheck org ${row.orgId} count ${row.active}`);
+  let schema = join(APP, 'packages/db/prisma/schema.prisma');
+  if (plan.skipIndexMigration) {
+    log(`skipping ${ACTIVE_IMPORT_MIGRATION}; duplicate rows are unchanged`);
+    try {
+      schema = stageMigrationsWithoutIndex();
+    } catch {
+      servePreviousSchema = true;
+      log('could not skip the index migration; serving the restored schema');
+      return;
+    }
   }
-  runSync(join(APP, 'packages/db/node_modules/.bin/prisma'), ['migrate', 'deploy', '--schema', 'packages/db/prisma/schema.prisma'], {
+  runSync(join(APP, 'packages/db/node_modules/.bin/prisma'), ['migrate', 'deploy', '--schema', schema], {
     cwd: APP,
     env: migrateEnv(),
   });

@@ -865,9 +865,8 @@ export async function processMigrationChunk(
     );
     return;
   }
-  // Start and retry enqueue before the RUNNING claim. A chunk that arrives
-  // while the row is still PENDING, or FAILED on a different attempt, must be
-  // retried, not completed, or the claim that follows has nothing left to process.
+  // A chunk that arrives before the RUNNING claim, or for a different
+  // attempt, waits. Null attempt ids are the legacy pair and match each other.
   if (jobRow?.status === 'PENDING' || jobRow?.status === 'FAILED') {
     throw new Error('migration job is not running yet');
   }
@@ -1180,12 +1179,14 @@ function migrationEntityType(meta: unknown): string | null {
 /**
  * Remove a PENDING start the handler did not finish. A start_failed row means
  * the queue already refused it. No queue entry means the chunks were never
- * accepted. A job that still has a chunk waiting is left for the worker.
+ * accepted. A job that still has a chunk waiting is marked FAILED so it does
+ * not keep the same-import slot.
  */
 export async function sweepAbandonedPending(
   now = new Date(),
   deps: {
     hasQueueEntry?: (migrationJobId: string) => Promise<boolean>;
+    dropQueuedChunks?: (migrationJobId: string) => Promise<void>;
     deleteRows?: (key: string) => Promise<unknown>;
     log?: {
       info: (obj: object, msg?: string) => void;
@@ -1214,7 +1215,24 @@ export async function sweepAbandonedPending(
         } catch {
           continue;
         }
-        if (queued) continue;
+        if (queued) {
+          const released = await prisma.migrationJob.updateMany({
+            where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+            data: {
+              status: 'FAILED',
+              completedAt: new Date(),
+              errorSummary: [{ row: 0, field: null, message: 'pending import released' }],
+            },
+          });
+          if (released.count !== 1) continue;
+          deps.log?.info(
+            { migrationJobId: job.id, orgId: job.orgId },
+            'released a pending import that still had queued chunks',
+          );
+          await deps.dropQueuedChunks?.(job.id).catch(() => undefined);
+          reaped += 1;
+          continue;
+        }
       }
       const reason = failedStart ? 'start_failed' : 'no_queue_entry';
       // The audit and the delete commit together. A delete that removes
@@ -1367,8 +1385,9 @@ export async function startMigrationWorker(
       if (job.name === MIGRATION_STALE_SCAN) {
         await sweepStaleMigrations();
         let hasQueueEntry: ((migrationJobId: string) => Promise<boolean>) | undefined;
+        let waiting: Awaited<ReturnType<typeof queue.getJobs>> = [];
         try {
-          const waiting = await queue.getJobs(['waiting', 'active', 'delayed', 'paused', 'prioritized']);
+          waiting = await queue.getJobs(['waiting', 'active', 'delayed', 'paused', 'prioritized']);
           const queued = new Set<string>();
           for (const entry of waiting) {
             const id = (entry?.data as { migrationJobId?: unknown } | undefined)?.migrationJobId;
@@ -1380,6 +1399,13 @@ export async function startMigrationWorker(
         }
         await sweepAbandonedPending(new Date(), {
           hasQueueEntry,
+          dropQueuedChunks: async (migrationJobId) => {
+            await Promise.all(
+              waiting
+                .filter((entry) => (entry?.data as { migrationJobId?: unknown } | undefined)?.migrationJobId === migrationJobId)
+                .map((entry) => entry.remove()),
+            );
+          },
           deleteRows: (key) => connection.del(key),
           log,
         });
