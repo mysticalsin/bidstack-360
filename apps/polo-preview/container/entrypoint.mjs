@@ -14,6 +14,7 @@ import { extname, join, normalize } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
+import { decideBootMigration, DUPLICATE_PRECHECK_SQL } from '../src/active-import-precheck.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
@@ -34,6 +35,7 @@ const REDIS_PASS = randomUUID().replaceAll('-', '');
 let redisHost = 'polo-redis';
 
 let phase = 'booting';
+let servePreviousSchema = false;
 let detail = '';
 let apiChild = null;
 let apiRestarts = 0;
@@ -123,6 +125,14 @@ function migrateEnv() {
 }
 
 function apiEnv() {
+  // The restored database is still the previous schema. Connect as the owner
+  // so the API can answer. The app role belongs to the migration we refused.
+  if (servePreviousSchema) {
+    const env = runtimeEnv(OWNER_URL);
+    env.DATABASE_URL_APP = OWNER_URL;
+    delete env.DATABASE_URL_OWNER;
+    return env;
+  }
   const app = appDatabaseUrl(process.env.POLO_APP_DB_PASSWORD);
   const env = runtimeEnv(app);
   env.DATABASE_URL_APP = app;
@@ -204,7 +214,42 @@ function startDatabase() {
   if (exists.stdout.trim() !== '1') runSync('createdb', ['-h', '127.0.0.1', '-U', PG_USER, DB]);
 }
 
+function psqlText(sql) {
+  const res = spawnSync(
+    'psql',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-tAc', sql],
+    { encoding: 'utf8' },
+  );
+  if (res.status !== 0) {
+    if (/does not exist/i.test(`${res.stderr || ''}`)) return '';
+    throw new Error('active import precheck failed');
+  }
+  return (res.stdout || '').trim();
+}
+
+function activeImportDuplicates() {
+  const column = psqlText(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'migration_jobs' AND column_name = 'file_hash'",
+  );
+  // The current predicate excludes a null file hash. Until the column exists,
+  // no restored row can match it.
+  if (column !== '1') return [];
+  const raw = psqlText(DUPLICATE_PRECHECK_SQL);
+  if (!raw) return [];
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const [orgId, active] = line.split('|');
+    return { orgId: (orgId || '').trim(), active: Number((active || '').trim()) };
+  });
+}
+
 function migrate() {
+  const decision = decideBootMigration(activeImportDuplicates());
+  if (!decision.applyMigration) {
+    servePreviousSchema = true;
+    for (const row of decision.log) log(`active import precheck org ${row.orgId} count ${row.active}`);
+    log('refusing 20261112170000_migration_jobs_one_active_per_org_source; serving the restored schema');
+    return;
+  }
   runSync(join(APP, 'packages/db/node_modules/.bin/prisma'), ['migrate', 'deploy', '--schema', 'packages/db/prisma/schema.prisma'], {
     cwd: APP,
     env: migrateEnv(),
@@ -240,6 +285,10 @@ function startApi() {
 // Queued jobs (public registry and filings pulls, imports) run here. A crash
 // never takes the API down; the worker restarts on its own.
 function startWorker() {
+  if (servePreviousSchema) {
+    log('worker not started; active import migration was refused');
+    return;
+  }
   workerChild = spawn(process.execPath, ['apps/worker/dist/main.js'], { cwd: APP, env: workerEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
   workerChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   workerChild.stderr.on('data', (chunk) => {

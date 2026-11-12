@@ -52,3 +52,31 @@ prisma migrate resolve --rolled-back 20261112170000_migration_jobs_one_active_pe
 2. Run the precheck again once `file_hash` exists. If it returns rows, **STOP**.
 3. Duplicate cleanup happens only after Tony decides which rows to keep. This repo has no cleanup statement for those rows.
 4. When the precheck returns no rows, run `prisma migrate deploy` again.
+
+## Cloudflare boot loop
+
+Polo production is the `polo-preview` Container. Postgres listens on `127.0.0.1` inside that container. The container disk is wiped on every restart. Boot restores the R2 object `polo-preview/latest.tgz`, then runs `prisma migrate deploy`. Redis is not in the snapshot, so a restored `PENDING` or `RUNNING` row has no live queue.
+
+If that migration fails, the container stays in the failed phase and the site answers 503. The Worker cron destroys a failed container at most every 15 minutes. The next boot restores the same snapshot and the migration fails again.
+
+Before `prisma migrate deploy`, the container runs the precheck above. The `WHERE` is the current index predicate: pending or running `CSV` or `SALESFORCE_CSV` rows with the same org, source, and file hash. A null file hash is not a duplicate. If the precheck returns rows, the container does not run that migration, does not change any row, and logs only the org id and the count. It then serves the restored schema instead of entering the failed phase, so the cron does not restart it.
+
+### Revert the image
+
+The container image is built with the Worker (`apps/polo-preview/wrangler.toml`, `image = "./container/Dockerfile"`). Roll the Worker back to the previous deployment. That image does not contain `20261112170000`, so its migrate does not try to create this index. Do not change Worker secrets as part of the rollback.
+
+### Resolve the migration
+
+A failed boot is not snapshotted. Snapshots are saved only after the container is ready, so the object restored on the next boot does not contain a failed `_prisma_migrations` row.
+
+If a database you are repairing does contain a failed row for this migration:
+
+```bash
+prisma migrate resolve --rolled-back 20261112170000_migration_jobs_one_active_per_org_source --schema packages/db/prisma/schema.prisma
+```
+
+Then drop the index and `file_hash` with the statements in Rollback. Run the precheck. If it returns rows, stop. Deleting those rows is Tony's decision. This repo has no cleanup statement for them.
+
+### Where the snapshot fits
+
+`polo-preview/latest.tgz` is the database that comes back on boot. Daily copies are `polo-preview/daily/<date>.tgz`. The guard does not write a cleaned snapshot and does not delete the R2 object. Leave the snapshot in place: the previous image restores it and serves it. After the duplicate rows are removed and a ready container saves a new snapshot, the next boot can apply the migration.
