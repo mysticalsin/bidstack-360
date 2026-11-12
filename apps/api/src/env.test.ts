@@ -151,6 +151,22 @@ describe('boot environment validation', () => {
     expect(env.STORAGE_DRIVER).toBe('local');
   });
 
+  it('refuses to start in production when the refresh lock opts out of Redis', async () => {
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).rejects.toThrow(
+      'OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false is refused when NODE_ENV=production',
+    );
+    const env = await loadEnvWith({
+      NODE_ENV: 'development',
+      OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+    });
+    expect(env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED).toBe('false');
+  });
+
   it('requires an explicit non-loopback Redis URL in production', async () => {
     await expect(loadEnvWith({ ...COMPLETE_PRODUCTION_ENV, REDIS_URL: undefined })).rejects.toThrow(
       'REDIS_URL is required in production',

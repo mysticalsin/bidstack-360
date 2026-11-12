@@ -34,6 +34,21 @@ describe('worker production env contract', () => {
     ]);
   });
 
+  it('refuses the refresh-lock opt-out in production', () => {
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toEqual(['OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false is refused when NODE_ENV=production']);
+    expect(
+      validateWorkerProductionEnv({
+        NODE_ENV: 'development',
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toEqual([]);
+  });
+
   it('requires the tenant-scope guard set to warn or enforce in production', () => {
     // BIDSTACK_TENANT_SCOPE_GUARD defaults 'off' for backward compatibility, but
     // the worker shares the same @bidstack/db Prisma client (and its middleware

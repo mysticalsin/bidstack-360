@@ -123,8 +123,8 @@ describe('runWithOAuthRefreshLock', () => {
 
   it('fails closed when NODE_ENV is missing and Redis is down', async () => {
     // WHY: a missing NODE_ENV used to look like "not production" and four
-    // processes refreshed the same token. Redis is required unless local
-    // development or the test runner opts out.
+    // processes refreshed the same token. Redis stays required until the
+    // one opt-out is set.
     delete process.env.NODE_ENV;
     delete process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED;
     mocks.ensureRedisReady.mockResolvedValue(false);
@@ -158,11 +158,11 @@ describe('runWithOAuthRefreshLock', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it('ignores the memory opt-out when NODE_ENV is missing', async () => {
+  it('uses the memory lock when the opt-out is set, even if NODE_ENV is missing', async () => {
     delete process.env.NODE_ENV;
     process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED = 'false';
     mocks.ensureRedisReady.mockResolvedValue(false);
-    const refresh = vi.fn();
+    const refresh = vi.fn().mockResolvedValue('local-token');
 
     await expect(
       runWithOAuthRefreshLock({
@@ -171,23 +171,25 @@ describe('runWithOAuthRefreshLock', () => {
         getFreshValue: vi.fn().mockResolvedValue(null),
         refresh,
       }),
-    ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
-    expect(refresh).not.toHaveBeenCalled();
+    ).resolves.toBe('local-token');
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps Redis required in production when the memory opt-out is set', async () => {
+  it('follows the opt-out in production; startup is what refuses that combination', async () => {
     process.env.NODE_ENV = 'production';
     process.env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED = 'false';
     mocks.ensureRedisReady.mockResolvedValue(false);
+    const refresh = vi.fn().mockResolvedValue('local-token');
 
     await expect(
       runWithOAuthRefreshLock({
         tokenId: 'token-prod-optout',
         log,
         getFreshValue: vi.fn().mockResolvedValue(null),
-        refresh: vi.fn(),
+        refresh,
       }),
-    ).rejects.toBeInstanceOf(OAuthRefreshLockUnavailableError);
+    ).resolves.toBe('local-token');
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it('uses the in-memory lock in development only after an explicit opt-out', async () => {

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { oauthRefreshLockStartupError } from '@bidstack/shared/server';
+
 import { parseAllowedUsers } from './lib/allowed-users.js';
 
 /**
@@ -194,9 +196,9 @@ export const envSchema = z.object({
   TWILIO_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   TWILIO_RECORDING_DOWNLOAD_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
 
-  // OAuth refresh single-flight. Redis is required unless NODE_ENV is
-  // development or test and this flag is false. A missing NODE_ENV does not
-  // opt out. The API and the worker share oauthRefreshLockRedisRequired.
+  // OAuth refresh single-flight. Redis is required in every mode until
+  // OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false. Production refuses to start
+  // when that opt-out is set. The API and the worker share the same check.
   OAUTH_REFRESH_LOCK_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
   OAUTH_REFRESH_LOCK_TTL_MS: z.coerce.number().int().positive().default(30_000),
   OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(30_000),
@@ -385,6 +387,8 @@ export function getEnv(): Env {
   }
   const env = parsed.data;
   const semanticErrors: string[] = [];
+  const lockStartup = oauthRefreshLockStartupError(env);
+  if (lockStartup) semanticErrors.push(lockStartup);
 
   if (env.NODE_ENV === 'production') {
     const publicBaseUrl = new URL(env.PUBLIC_BASE_URL);

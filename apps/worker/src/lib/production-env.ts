@@ -1,3 +1,5 @@
+import { oauthRefreshLockStartupError } from '@bidstack/shared/server';
+
 type Env = Record<string, string | undefined>;
 
 const REQUIRED_PRODUCTION_KEYS = ['DATABASE_URL', 'REDIS_URL'] as const;
@@ -36,6 +38,8 @@ export function validateWorkerProductionEnv(env: Env = process.env): string[] {
   }
 
   const errors: string[] = [];
+  const lockStartup = oauthRefreshLockStartupError(env);
+  if (lockStartup) errors.push(lockStartup);
   for (const key of REQUIRED_PRODUCTION_KEYS) {
     if (!trimmed(env, key)) {
       errors.push(`${key} is required in production`);

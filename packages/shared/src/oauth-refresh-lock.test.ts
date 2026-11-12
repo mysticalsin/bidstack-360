@@ -3,39 +3,60 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   OAuthRefreshLockTimeoutError,
   oauthRefreshLockRedisRequired,
+  oauthRefreshLockStartupError,
   runWithOAuthRefreshLock,
 } from './oauth-refresh-lock.js';
 
 const FALLBACK = 'OAuth refresh Redis lock unavailable; using process-local fallback';
 
 describe('oauthRefreshLockRedisRequired', () => {
-  it('requires Redis when NODE_ENV is missing, even if the opt-out is set', () => {
+  it('requires Redis in every mode until the one opt-out is set', () => {
     expect(oauthRefreshLockRedisRequired({})).toBe(true);
-    expect(oauthRefreshLockRedisRequired({ OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false' })).toBe(true);
     expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'production' })).toBe(true);
+    expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'development' })).toBe(true);
+    expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'test' })).toBe(true);
+    expect(oauthRefreshLockRedisRequired({ OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false' })).toBe(
+      false,
+    );
     expect(
       oauthRefreshLockRedisRequired({
         NODE_ENV: 'production',
         OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
       }),
-    ).toBe(true);
-    expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'development' })).toBe(true);
-    expect(oauthRefreshLockRedisRequired({ NODE_ENV: 'test' })).toBe(true);
-  });
-
-  it('allows the in-memory lock only for development or test with an explicit opt-out', () => {
+    ).toBe(false);
     expect(
       oauthRefreshLockRedisRequired({
         NODE_ENV: 'development',
         OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
       }),
     ).toBe(false);
+  });
+
+  it('refuses startup in production when the opt-out is set', () => {
+    // WHY: the lock follows the one variable in every mode. Production must
+    // not boot with that variable set, or a deployed process would refresh
+    // tokens with a process-local lock.
+    const refused = 'OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false is refused when NODE_ENV=production';
     expect(
-      oauthRefreshLockRedisRequired({
+      oauthRefreshLockStartupError({
+        NODE_ENV: 'production',
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toBe(refused);
+    expect(oauthRefreshLockStartupError({})).toBeNull();
+    expect(oauthRefreshLockStartupError({ NODE_ENV: 'production' })).toBeNull();
+    expect(
+      oauthRefreshLockStartupError({
+        NODE_ENV: 'development',
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toBeNull();
+    expect(
+      oauthRefreshLockStartupError({
         NODE_ENV: 'test',
         OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
       }),
-    ).toBe(false);
+    ).toBeNull();
   });
 });
 
