@@ -1,0 +1,10 @@
+{
+  "name": "@bidstack/deploy-cli",
+  "private": true,
+  "description": "Exact deploy CLIs. Workflows and scripts call these binaries after npm ci. Do not npx an unpinned release.",
+  "dependencies": {
+    "@railway/cli": "5.71.0",
+    "vercel": "65.14.0",
+    "wrangler": "4.161.0"
+  }
+}

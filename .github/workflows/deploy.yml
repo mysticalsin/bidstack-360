@@ -90,12 +90,15 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.gates.outputs.sha }}
+      - name: Install pinned deploy CLIs
+        working-directory: deploy/cli
+        run: npm ci
       - name: Deploy backend (Railway — api, worker, mcp; runs migrate stage)
-        run: npx railway up --service api --detach
+        run: ./deploy/cli/node_modules/.bin/railway up --service api --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       - name: Deploy web (Vercel)
-        run: npx vercel deploy --prod --token "$VERCEL_TOKEN" --yes
+        run: ./deploy/cli/node_modules/.bin/vercel deploy --prod --token "$VERCEL_TOKEN" --yes
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

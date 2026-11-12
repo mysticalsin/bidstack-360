@@ -17,6 +17,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { pinnedDeployCli } from './pinned-deploy-cli.mjs';
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENV_FILE = join(REPO, '.env.production.local');
 const API_PORT = Number(process.env.PORT_API ?? 4100);
@@ -87,12 +89,13 @@ if (!apiOrigin || !(await waitUp(`${apiOrigin}/health`))) die('tunnel');
 log(`tunnel: ${apiOrigin}`);
 
 // 4. Redeploy the SPA (Clerk) against the fresh tunnel URL.
-run('vercel', ['env', 'rm', 'VITE_API_URL', 'production', '--yes'], { stdio: 'ignore' });
-spawnSync('vercel', ['env', 'add', 'VITE_API_URL', 'production'], { cwd: REPO, input: apiOrigin, encoding: 'utf8', shell: process.platform === 'win32' });
+const vercel = pinnedDeployCli('vercel');
+run(vercel, ['env', 'rm', 'VITE_API_URL', 'production', '--yes'], { stdio: 'ignore' });
+spawnSync(vercel, ['env', 'add', 'VITE_API_URL', 'production'], { cwd: REPO, input: apiOrigin, encoding: 'utf8', shell: process.platform === 'win32' });
 rmSync(join(REPO, '.vercel', 'output'), { recursive: true, force: true });
 rmSync(join(REPO, '.vercel', '.env.production.local'), { force: true });
 const spaEnv = { ...process.env, VITE_AUTH_MODE: 'clerk', VITE_API_URL: apiOrigin, VITE_CLERK_PUBLISHABLE_KEY: env.CLERK_PUBLISHABLE_KEY };
-if (run('vercel', ['build', '--prod', '--yes'], { env: spaEnv }).status !== 0) die('vercel build');
-if (run('vercel', ['deploy', '--prebuilt', '--prod', '--yes'], { env: spaEnv }).status !== 0) die('vercel deploy');
+if (run(vercel, ['build', '--prod', '--yes'], { env: spaEnv }).status !== 0) die('vercel build');
+if (run(vercel, ['deploy', '--prebuilt', '--prod', '--yes'], { env: spaEnv }).status !== 0) die('vercel deploy');
 await waitUp(DEMO_ORIGIN, 60_000);
 log(`LIVE — ${DEMO_ORIGIN} (real Clerk login) → ${apiOrigin}`);
