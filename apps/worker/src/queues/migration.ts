@@ -908,22 +908,31 @@ export async function processMigrationChunk(
   // The inserts, the counters, and the undo trail commit together. A retry
   // that already replaced the attempt writes nothing.
   let written: { createdIds: string[]; processed: number; errors: MigrationJobError[] } | null;
+  let skipReason: 'org' | 'attempt' | 'status' | null = null;
   try {
     written = await prisma.$transaction(
     async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ status: string; meta: unknown }>>`
-        SELECT status::text AS status, meta
+      const locked = await tx.$queryRaw<Array<{ status: string; org_id: string; meta: unknown }>>`
+        SELECT status::text AS status, org_id::text AS org_id, meta
         FROM migration_jobs
         WHERE id = ${payload.migrationJobId}::uuid
         FOR UPDATE
       `;
       const holder = locked[0];
-      if (!holder || holder.status !== 'RUNNING') return null;
+      if (!holder || holder.status !== 'RUNNING') {
+        skipReason = 'status';
+        return null;
+      }
+      if (holder.org_id !== payload.orgId) {
+        skipReason = 'org';
+        return null;
+      }
       if (!migrationChunkMatchesAttempt(migrationAttemptId(holder.meta), payload.attemptId ?? null)) {
+        skipReason = 'attempt';
         return null;
       }
       const ctx: WriteCtx = {
-        orgId: payload.orgId,
+        orgId: holder.org_id,
         sourceTag: `migration:${payload.migrationJobId}`,
         dedupStrategy: payload.dedupStrategy,
         tx,
@@ -948,7 +957,7 @@ export async function processMigrationChunk(
         }
       }
       const booked = await persistChunkBookkeeping(tx, {
-        orgId: payload.orgId,
+        orgId: holder.org_id,
         userId: payload.userId,
         migrationJobId: payload.migrationJobId,
         entity,
@@ -971,7 +980,11 @@ export async function processMigrationChunk(
     throw err;
   }
   if (!written) {
-    log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
+    if (skipReason === 'org') {
+      log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — org mismatch');
+    } else if (skipReason === 'attempt') {
+      log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — attempt mismatch');
+    }
     return;
   }
   const { createdIds, processed, errors } = written;
