@@ -392,6 +392,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       // write would leave the old progressAt in place for the stale scan.
       const fresh = { ...(job.meta as object) } as Record<string, unknown>;
       delete fresh.progressAt;
+      delete fresh.undone;
+      delete fresh.undoneAt;
       fresh.attemptId = attemptId;
       const claimed = await prisma.$transaction(async (tx) => {
         const moved = await tx.migrationJob.updateMany({
