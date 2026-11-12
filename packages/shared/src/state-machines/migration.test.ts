@@ -10,6 +10,7 @@ import {
   migrationChunkMatchesAttempt,
   migrationProgressAt,
   migrationChunkMayRun,
+  migrationErrorsCsv,
   migrationFailureText,
   migrationFrom,
   migrationRetryAllowed,
@@ -36,6 +37,20 @@ describe('migration transition table', () => {
     expect(migrationFailureText('enqueue_failed')).toBe('The import did not start. Try again.');
     expect(migrationFailureText('rows_expired')).toBe('Those rows expired. Upload the file again.');
     expect(migrationFailureText('company.name is required')).toBe('company.name is required');
+    const csv = migrationErrorsCsv([
+      { row: 2, field: '=cmd', message: '+sum' },
+      { row: 3, field: '-1', message: '@x' },
+      { row: 4, field: '\tcell', message: '\rmsg' },
+      { row: 5, field: 'name', message: 'company.name is required' },
+    ]);
+    expect(csv).toContain(`"'=cmd"`);
+    expect(csv).toContain(`"'+sum"`);
+    expect(csv).toContain(`"'-1"`);
+    expect(csv).toContain(`"'@x"`);
+    expect(csv).toContain('"\'\\tcell"');
+    expect(csv).toContain('"\'\\rmsg"');
+    expect(csv).not.toContain('"=cmd"');
+    expect(csv).toContain('"company.name is required"');
   });
 
   it('takes the status a chunk may write from the fail transition', () => {

@@ -29,6 +29,24 @@ export function migrationFailureText(message: string): string {
   return MIGRATION_FAILURE_TEXT[message] ?? message;
 }
 
+/** A spreadsheet treats a cell starting with one of these as a formula. */
+function migrationCsvCell(value: string): string {
+  return JSON.stringify(value.replace(/^(=|\+|-|@|\t|\r)/, "'$1"));
+}
+
+/** Error file body. A leading formula character is prefixed so a spreadsheet reads the cell as text. */
+export function migrationErrorsCsv(
+  errors: readonly { row: number; field: string | null; message: string }[],
+): string {
+  const header = 'row,field,message';
+  if (errors.length === 0) return `${header}\n`;
+  const rows = errors.map(
+    (error) =>
+      `${error.row},${migrationCsvCell(error.field ?? '')},${migrationCsvCell(migrationFailureText(error.message))}`,
+  );
+  return `${header}\n${rows.join('\n')}`;
+}
+
 const FROM: Record<MigrationEvent, readonly MigrationState[]> = {
   start: ['PENDING'],
   cancel: ['PENDING', 'RUNNING'],

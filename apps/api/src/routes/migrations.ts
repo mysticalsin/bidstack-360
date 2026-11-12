@@ -35,7 +35,7 @@ import {
   migrationProgressAt,
   MIGRATION_ENQUEUE_FAILED,
   MIGRATION_ROWS_EXPIRED,
-  migrationFailureText,
+  migrationErrorsCsv,
   migrationRetryAllowed,
   migrationStaleDue,
 } from '@bidstack/shared';
@@ -769,22 +769,10 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!job) throw server.httpErrors.notFound('Migration job not found');
 
       const errors = (job.errorSummary as MigrationJobError[]) ?? [];
-      if (errors.length === 0) {
-        return reply.header('Content-Type', 'text/csv; charset=utf-8').send('row,field,message\n');
-      }
-
-      const header = 'row,field,message\n';
-      const rows = errors
-        .map(
-          (e) =>
-            `${e.row},${JSON.stringify(e.field ?? '')},${JSON.stringify(migrationFailureText(e.message))}`,
-        )
-        .join('\n');
-
       return reply
         .header('Content-Type', 'text/csv; charset=utf-8')
         .header('Content-Disposition', `attachment; filename="migration-errors-${job.id}.csv"`)
-        .send(header + rows);
+        .send(migrationErrorsCsv(errors));
     },
   );
 };
