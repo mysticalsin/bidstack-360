@@ -1108,6 +1108,60 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
   return claimed;
 }
 
+type FailLog = {
+  error: (obj: object, msg?: string) => void;
+  warn: (obj: object, msg?: string) => void;
+};
+
+/** The last BullMQ attempt failed. Only the attempt that still owns the job may mark it failed. */
+export async function failExhaustedMigrationChunk(
+  data: { migrationJobId?: string; attemptId?: string | null },
+  err: { message: string },
+  log: FailLog,
+): Promise<void> {
+  const migrationJobId = data.migrationJobId;
+  if (!migrationJobId) return;
+  const holder = await prisma.migrationJob.findUnique({
+    where: { id: migrationJobId },
+    select: { meta: true },
+  });
+  if (!migrationChunkMatchesAttempt(migrationAttemptId(holder?.meta), data.attemptId ?? null)) {
+    log.warn({ migrationJobId }, 'exhausted chunk belongs to an older attempt');
+    return;
+  }
+  const moved = await prisma.migrationJob
+    .updateMany({
+      where: { id: migrationJobId, status: { in: [...migrationFrom('fail')] } },
+      data: { status: 'FAILED', completedAt: new Date() },
+    })
+    .catch((updateErr) => {
+      log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED');
+      return { count: 0 };
+    });
+  if (moved.count !== 1) {
+    log.warn({ migrationJobId, to: 'FAILED' }, 'illegal migration transition');
+  } else {
+    await prisma.$executeRaw`
+      UPDATE migration_jobs
+      SET error_summary = CASE
+        WHEN jsonb_array_length(error_summary) < 200
+        THEN error_summary || ${JSON.stringify([
+          {
+            row: 0,
+            field: null,
+            message: isMigrationDeadlock(err)
+              ? MIGRATION_DEADLOCK_PUBLIC
+              : `chunk failed permanently: ${err.message}`,
+          },
+        ])}::jsonb
+        ELSE error_summary
+      END
+      WHERE id = ${migrationJobId}::uuid AND status = 'FAILED'`.catch((rawErr) =>
+      log.warn({ err: rawErr, migrationJobId }, 'best-effort error_summary append failed'),
+    );
+  }
+}
+
 // ─── Worker ────────────────────────────────────────────────────────────────
 
 let queueSingleton: Queue | null = null;
@@ -1182,40 +1236,11 @@ export async function startMigrationWorker(
     // After BullMQ exhausts retries (attempts: 5), fail the parent job row so
     // the UI never shows RUNNING forever on a dead chunk.
     if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
-      const migrationJobId = (job.data as { migrationJobId?: string }).migrationJobId;
-      if (migrationJobId) {
-        const moved = await prisma.migrationJob
-          .updateMany({
-            where: { id: migrationJobId, status: { in: [...migrationFrom('fail')] } },
-            data: { status: 'FAILED', completedAt: new Date() },
-          })
-          .catch((updateErr) => {
-            log.error({ updateErr, migrationJobId }, 'failed to mark migration job FAILED');
-            return { count: 0 };
-          });
-        if (moved.count !== 1) {
-          log.warn({ migrationJobId, to: 'FAILED' }, 'illegal migration transition');
-        } else {
-          await prisma.$executeRaw`
-            UPDATE migration_jobs
-            SET error_summary = CASE
-              WHEN jsonb_array_length(error_summary) < 200
-              THEN error_summary || ${JSON.stringify([
-                {
-                  row: 0,
-                  field: null,
-                  message: isMigrationDeadlock(err)
-                    ? MIGRATION_DEADLOCK_PUBLIC
-                    : `chunk failed permanently: ${err.message}`,
-                },
-              ])}::jsonb
-              ELSE error_summary
-            END
-            WHERE id = ${migrationJobId}::uuid AND status = 'FAILED'`.catch((rawErr) =>
-            log.warn({ err: rawErr, migrationJobId }, 'best-effort error_summary append failed'),
-          );
-        }
-      }
+      await failExhaustedMigrationChunk(
+        job.data as { migrationJobId?: string; attemptId?: string | null },
+        err,
+        log,
+      );
     }
   });
 
