@@ -70,6 +70,18 @@ prisma migrate resolve --rolled-back 20261112170100_migration_jobs_one_active_pe
 prisma migrate resolve --rolled-back 20261112170000_migration_jobs_one_active_per_org_source --schema packages/db/prisma/schema.prisma
 ```
 
+## Databases that applied the earlier SQL of 20261112170000
+
+The first SQL in `20261112170000_migration_jobs_one_active_per_org_source` created index `migration_jobs_one_active_per_org_source`. The file on this branch no longer does. `prisma migrate deploy` stops while `_prisma_migrations.checksum` for that directory still matches the earlier SQL, and it will not run anything after it.
+
+Before that checksum is replaced with the checksum of the current `migration.sql`, drop the old index outside a transaction. Do not delete rows.
+
+```sql
+DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_org_source;
+```
+
+`20261112170050_drop_migration_jobs_one_active_per_org_source` is that same statement and nothing else, so Prisma runs it outside a transaction. `IF EXISTS` does nothing when the index was never created. It runs only after the checksum of `20261112170000` matches the current file.
+
 ## Recovery when deploy already failed with P3018 / 23505
 
 `P3018` is Prisma reporting that the migration failed. `23505` is Postgres `unique_violation` from this index. The index migration is not wrapped in a transaction, so a failed attempt can leave the invalid index above. Drop it with `DROP INDEX CONCURRENTLY IF EXISTS migration_jobs_one_active_per_file`, then resolve `20261112170100_migration_jobs_one_active_per_file` rolled back.

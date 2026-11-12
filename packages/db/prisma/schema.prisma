@@ -2530,8 +2530,9 @@ enum MigrationStatus {
 }
 
 /// One active CSV or Salesforce CSV import per tenant, source, and uploaded
-/// file. Raw SQL in 20261112170000_migration_jobs_one_active_per_org_source
-/// adds file_hash and the partial unique index Prisma cannot express.
+/// file. The partial unique index lives in
+/// 20261112170100_migration_jobs_one_active_per_file. Prisma cannot express
+/// it, so the next `migrate dev` must not drop it.
 /// HubSpot rows leave file_hash null, so they are not in that index.
 model MigrationJob {
   id            String          @id @default(uuid()) @db.Uuid
