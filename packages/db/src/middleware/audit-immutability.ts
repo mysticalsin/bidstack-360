@@ -31,7 +31,9 @@ import type { Prisma } from '../../generated/client/index.js';
  * Migration 20261112180000 makes app_role the runtime login and revokes
  * UPDATE, DELETE, and TRUNCATE on audit_log from that role. The API and worker
  * connect with DATABASE_URL_APP. Migrations and retention connect with
- * DATABASE_URL_OWNER, which can still delete. Left: this is not deployed until
+ * DATABASE_URL_OWNER, which can still delete. On Polo the container builds
+ * those URLs: the app password is Worker secret POLO_APP_DB_PASSWORD, and the
+ * owner login stays on migrate and retention. Left: this is not deployed until
  * Tony's go, and deleting an org still cascades to its audit rows.
  */
 

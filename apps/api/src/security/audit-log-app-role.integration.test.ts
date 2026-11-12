@@ -33,9 +33,11 @@ function appRoleUrl(base: string): string {
 }
 
 describe('audit log app role', () => {
-  it('points the api and worker at the app role and retention at the owner', () => {
+  it('points the polo container at the app role and retention at the owner', () => {
+    const wrangler = readFileSync(resolve(root, 'apps/polo-preview/wrangler.toml'), 'utf8');
+    const passed = readFileSync(resolve(root, 'apps/polo-preview/src/container-env.js'), 'utf8');
+    const entry = readFileSync(resolve(root, 'apps/polo-preview/container/entrypoint.mjs'), 'utf8');
     const bicep = readFileSync(resolve(root, 'infra/azure/main.bicep'), 'utf8');
-    const migrate = readFileSync(resolve(root, 'scripts/run-safe-migrate-deploy.mjs'), 'utf8');
     const migration = readFileSync(
       resolve(
         root,
@@ -44,19 +46,19 @@ describe('audit log app role', () => {
       'utf8',
     );
 
-    // The Key Vault secret is a reference. The password stays a secure
-    // parameter and is not written into the template as a literal.
-    expect(bicep).toContain("'database-url-app-api'");
-    expect(bicep).toContain("'database-url-app-worker'");
-    expect(bicep).toContain("secretRef: 'database-url-app-api'");
-    expect(bicep).toContain("name: 'DATABASE_URL_APP'");
-    expect(bicep).toContain("secretRef: 'database-url-direct'");
-    expect(bicep).toContain("name: 'DATABASE_URL_OWNER'");
-    expect(bicep.match(/resource kv 'Microsoft\.KeyVault\/vaults@/g)).toHaveLength(1);
+    // WHY: the live database is the container. The password is a Worker secret
+    // name. Azure Key Vault is a draft and does not carry this login.
+    expect(wrangler).toContain('POLO_APP_DB_PASSWORD');
+    expect(wrangler).not.toMatch(/POLO_APP_DB_PASSWORD\s*=/);
+    expect(passed).toContain("'POLO_APP_DB_PASSWORD'");
+    expect(entry).toContain('env: migrateEnv()');
+    expect(entry).toContain('delete env.DATABASE_URL_OWNER');
+    expect(entry).toContain('DATABASE_URL_OWNER: OWNER_URL');
+    expect(entry).toContain('could not set the app role password');
+    expect(bicep).not.toContain('database-url-app-api');
+    expect(bicep).not.toContain('pgAppPassword');
     expect(migration).toContain('REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public.audit_log FROM app_role');
     expect(migration).not.toMatch(/PASSWORD\s+'/i);
-    expect(migrate).toContain('DATABASE_URL_OWNER is required');
-    expect(migrate).toContain('could not set the app role password');
   });
 
   it('the app role cannot delete or truncate an audit row and retention still can', async () => {
