@@ -222,6 +222,21 @@ describe('migration stale scan', () => {
       where: { orgId: abandoned.org.id, targetId: abandoned.job.id, action: 'migration.start_failed' },
     });
     expect(audit).toBeTruthy();
+    const traces = await prisma.auditLog.findMany({
+      where: {
+        action: 'migration.reaped',
+        targetId: { in: [abandoned.job.id, unqueued.job.id] },
+      },
+    });
+    expect(traces.map((row) => row.targetId).sort()).toEqual(
+      [abandoned.job.id, unqueued.job.id].sort(),
+    );
+    expect(traces.find((row) => row.targetId === abandoned.job.id)?.diff).toMatchObject({
+      reason: 'start_failed',
+    });
+    expect(traces.find((row) => row.targetId === unqueued.job.id)?.diff).toMatchObject({
+      reason: 'no_queue_entry',
+    });
     for (const row of [abandoned, unqueued, queued, young]) {
       await prisma.org.delete({ where: { id: row.org.id } }).catch(() => undefined);
     }

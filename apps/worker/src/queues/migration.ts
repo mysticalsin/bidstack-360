@@ -1169,6 +1169,7 @@ export async function sweepAbandonedPending(
   deps: {
     hasQueueEntry?: (migrationJobId: string) => Promise<boolean>;
     deleteRows?: (key: string) => Promise<unknown>;
+    log?: { info: (obj: object, msg?: string) => void };
   } = {},
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - MIGRATION_ABANDONED_PENDING_MS);
@@ -1192,6 +1193,20 @@ export async function sweepAbandonedPending(
       }
       if (queued) continue;
     }
+    const reason = failedStart ? 'start_failed' : 'no_queue_entry';
+    await prisma.auditLog.create({
+      data: {
+        orgId: job.orgId,
+        action: 'migration.reaped',
+        targetType: 'MigrationJob',
+        targetId: job.id,
+        diff: { reason },
+      },
+    });
+    deps.log?.info(
+      { migrationJobId: job.id, orgId: job.orgId, reason },
+      'reaped an abandoned pending import',
+    );
     const removed = await prisma.migrationJob.deleteMany({
       where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
     });
@@ -1331,6 +1346,7 @@ export async function startMigrationWorker(
         await sweepAbandonedPending(new Date(), {
           hasQueueEntry,
           deleteRows: (key) => connection.del(key),
+          log,
         });
         return;
       }
