@@ -1,0 +1,76 @@
+# Feature Specification: Post-merge import and audit follow-up
+
+**Feature Branch**: `cursor/post-merge-followup-a111`
+**Created**: 2026-11-12
+**Status**: Draft
+**Input**: Follow-up after PR 343 merged to main at `e88aa902` (head `110a4fc8`). Production deploy is watched separately and is out of scope.
+
+## User Scenarios & Testing
+
+### User Story 1 — One bad import does not stall the reaper (Priority: P1)
+
+An operator leaves several imports pending after a queue failure. The sweep removes each abandoned import and records that it did so. If deleting one of them raises, the sweep records the failure for that import and continues with the rest. A later scan can try the one that raised. It does not skip every import after it.
+
+**Independent Test**: Two abandoned pending imports. A database trigger rejects the first delete and allows the second. One sweep reaps the second import and leaves the first pending, with no reap audit for the first.
+
+**Acceptance Scenarios**:
+
+1. **Given** two abandoned pending imports and a delete that raises for the first, **When** the sweep runs, **Then** the second import is removed, a reap audit exists for it, and the first import is still pending with no reap audit.
+2. **Given** a delete that raises, **When** the sweep runs twice, **Then** it does not write a new reap row for the import that is still pending.
+
+### User Story 2 — The deploy CLI tree is consistent (Priority: P1)
+
+The pinned Railway and Vercel CLIs install from `deploy/cli`. `npm ls` in that directory exits 0. The versions Trivy flagged stay on the fixed releases. `railway --version` and `vercel --version` from the pinned resolver still start. No workflow is run and nothing is deployed.
+
+**Independent Test**: After `npm ci --ignore-scripts`, `npm ls` exits 0, `npm audit` reports no vulnerabilities, and both CLIs print a version.
+
+**Acceptance Scenarios**:
+
+1. **Given** the `path-to-regexp` 8.x override, **When** the lockfile is installed, **Then** every 8.x copy is 8.4.2, which is the copy `@vercel/fun` already resolved, and `npm ls` does not report that package as invalid.
+2. **Given** the other overrides, **When** audit runs, **Then** js-yaml, tar, undici, minimatch, path-to-regexp, busboy, smol-toml, glob, ajv, and zod stay on the fixed versions already chosen. `@railway/cli` stays 5.71.0 and vercel stays 65.14.0.
+
+### User Story 3 — The app role cannot delete audit rows (Priority: P2)
+
+The audit log is append-only for the application role. A migration revokes `DELETE` on `audit_log` from that role. The table owner used by today's process, and by the retention purge and the test teardown, is unchanged. Switching the running process onto the app role is a later cutover and is not part of this change.
+
+**Independent Test**: As the app role, `DELETE FROM audit_log` is rejected. As the table owner, a delete still succeeds.
+
+**Acceptance Scenarios**:
+
+1. **Given** the migration has been applied, **When** the session uses the app role and deletes an audit row, **Then** Postgres rejects it.
+2. **Given** the same row, **When** the table owner deletes it, **Then** the delete succeeds.
+
+### User Story 4 — A chunk for an already-failed attempt is quiet (Priority: P2)
+
+A chunk whose attempt is the one already stored on a failed import is done. The worker logs that it skipped the chunk and returns. It does not throw, so the queue does not record a failure or print an error stack on every retry. A chunk that carries a newer attempt than the failed row is still waiting for the retry claim, and that chunk still throws "not running yet" so it is retried rather than acknowledged.
+
+**Independent Test**: A failed import whose stored attempt matches the chunk resolves without reading rows. The same import with a newer attempt id on the chunk still rejects.
+
+**Acceptance Scenarios**:
+
+1. **Given** a failed import and a chunk with the same attempt id, **When** the worker processes the chunk, **Then** it returns without reading rows and without throwing.
+2. **Given** a failed import and a chunk with a different attempt id, **When** the worker processes the chunk, **Then** it throws "not running yet" and does not read rows.
+
+## Requirements
+
+### Functional Requirements
+
+- **FR-001**: `sweepAbandonedPending` catches an error from one candidate and continues with the next candidate.
+- **FR-002**: A candidate whose delete raises gets no `migration.reaped` row.
+- **FR-003**: The deploy CLI override for `path-to-regexp` 8.x is 8.4.2. The lockfile is regenerated. `npm ls` in `deploy/cli` exits 0.
+- **FR-004**: A migration creates the app role if it is missing and revokes `DELETE` on `audit_log` from that role. It does not revoke `DELETE` from the table owner.
+- **FR-005**: A chunk for a failed import is skipped when its attempt id is the attempt stored on the row, or when the row has no attempt id. A chunk with a different attempt id still throws while the row is `FAILED`. A chunk for a `PENDING` row still throws.
+- **FR-006**: Commit subjects name the change. No published commit is amended. Nothing in this slice rewrites `110a4fc8`.
+
+## Success Criteria
+
+- **SC-001**: The two-import sweep test fails before the per-job catch exists, and passes after.
+- **SC-002**: `npm ls` and `npm audit` in `deploy/cli` exit 0, and both pinned CLIs print a version.
+- **SC-003**: The app-role delete test fails before the migration and passes after.
+- **SC-004**: The same-attempt failed chunk test fails before the quiet skip and passes after, and the newer-attempt test still rejects.
+
+## Out of Scope
+
+- Production deploy, `deploy.yml` changes, and changing which database user the API and worker connect as.
+- A `DELETE` trigger on `audit_log`, `REVOKE` from the table owner, and a scheduled chain verifier.
+- Rewriting commit subjects on `main`.
