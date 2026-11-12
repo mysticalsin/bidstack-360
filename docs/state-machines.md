@@ -139,7 +139,7 @@ On bca5 the erasure route has no status column. Risk there is n/a. It is not a m
 
 Purpose: one request reaches signed, declined, voided, or expired. The public page is a guard, not a writer of this column.
 
-Code: one table, `signatureFrom('void')` in `packages/shared/src/state-machines/signature.ts`. `voidSignatureRequest` refuses anything that table rejects (at 436) and compare-and-sets `status in signatureFrom('void')` (at 473). An illegal void and a lost compare-and-set are logged with the status the request was in. A request that becomes `SIGNED` after the read matches nothing, and no void event is stored. The DocuSign void still runs after the read and before that write (at 444). DocuSign webhook claim and internal sign already exclude terminal statuses.
+Code: one table, `signatureFrom('void')` in `packages/shared/src/state-machines/signature.ts`. `voidSignatureRequest` refuses anything that table rejects (at 436) and compare-and-sets `status in signatureFrom('void')` (at 452). An illegal void and a lost compare-and-set are logged with the status the request was in. A request that becomes `SIGNED` after the read matches nothing, and no void event is stored. The local compare-and-set claims `VOIDED` before the DocuSign call. A lost claim does not call the provider. If the provider then fails, the row is put back to the status it had and no void event is stored. DocuSign webhook claim and internal sign already exclude terminal statuses.
 
 Public page: `apps/web/src/pages/PublicSignPage.tsx` steps `welcome | sign | submit | confirm`. `goTo` at 51 sets the step. That state stays in the component. The page must not write `signature_requests.status`.
 
@@ -481,7 +481,7 @@ Each Prisma enum in `packages/db/prisma/schema.prisma`, named. Status machines t
 
 - A partial import is not marked stale. Retry refuses a job that already imported rows, and failing it here would leave those rows with no retry. F-NEW-4.
 - A late `failed` callback that cannot move `DELIVERED` still stores the error code, price, and segments. F-NEW-6.
-- Signature void answers 400 for a terminal status (`signature.service.ts` at 436), not 409. The DocuSign void runs after that read and before the compare-and-set (at 444, write at 473). The from-list is now `signatureFrom('void')`. The 400 and the provider call before the write stay. F-NEW-7, F-NEW-8, F-NEW-9.
+- Signature void answers 400 for a terminal status (`signature.service.ts` at 436), not 409. The compare-and-set claims `VOIDED` before the DocuSign call. A lost claim does not call the provider, and a provider failure restores the previous status. The from-list is `signatureFrom('void')`. The HTTP answer for a terminal status stays 400. F-NEW-7, F-NEW-8, F-NEW-9.
 - The RFP gate says "Proposal has already been approved" when the from-state does not match (`rfp-pipeline.ts` at 456), including a submitted proposal that was never approved. F-NEW-10.
 - The three OAuth connect writers, `SyncState`, `RfpResponsePhase`, RFP extraction, and opportunity stage stay as recorded above.
 - The Arabic `csvImport` catalog is still only the progress block. The rest of the wizard stays in English. F-F2.

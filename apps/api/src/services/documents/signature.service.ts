@@ -441,61 +441,75 @@ export async function voidSignatureRequest(params: {
     badRequest(`Cannot void a request with status ${request.status}`);
   }
 
-  if (request.provider === 'DOCUSIGN' && request.providerRequestId) {
-    const env = getEnv();
-    const baseUrl = env.DOCUSIGN_BASE_URL || 'https://demo.docusign.net/restapi';
-    const accountId = env.DOCUSIGN_ACCOUNT_ID;
-    if (accountId) {
-      const token = await getDocuSignAccessToken();
-      const res = await fetch(
-        `${baseUrl}/v2.1/accounts/${accountId}/envelopes/${request.providerRequestId}`,
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'voided', voidedReason: reason }),
-        },
-      );
-      if (!res.ok) {
-        const body = await res.text();
-        throw credentialError(`DocuSign void failed: ${res.status} ${body}`);
-      }
-    }
+  // Claim the void before DocuSign. A signature that lands after the read
+  // matches nothing, so the envelope is never voided for a row we do not own.
+  const previousStatus = request.status;
+  const claimed = await prisma.signatureRequest.updateMany({
+    where: {
+      id: requestId,
+      orgId,
+      deletedAt: null,
+      status: { in: [...signatureFrom('void')] },
+    },
+    data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
+  });
+  if (claimed.count !== 1) {
+    const current = await prisma.signatureRequest.findFirst({
+      where: { id: requestId, orgId },
+      select: { status: true },
+    });
+    log.warn(
+      { signatureRequestId: requestId, from: current?.status ?? null, to: 'VOIDED' },
+      'illegal signature transition',
+    );
+    badRequest(`Cannot void a request with status ${current?.status ?? request.status}`);
   }
 
-  await prisma.$transaction(async (tx) => {
-    // Same shape as proposal approval: the write matches the legal from-states.
-    // A signature that landed after the read above matches nothing.
-    const changed = await tx.signatureRequest.updateMany({
-      where: {
-        id: requestId,
-        orgId,
-        deletedAt: null,
-        status: { in: [...signatureFrom('void')] },
-      },
-      data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
+  try {
+    if (request.provider === 'DOCUSIGN' && request.providerRequestId) {
+      const env = getEnv();
+      const baseUrl = env.DOCUSIGN_BASE_URL || 'https://demo.docusign.net/restapi';
+      const accountId = env.DOCUSIGN_ACCOUNT_ID;
+      if (accountId) {
+        const token = await getDocuSignAccessToken();
+        const res = await fetch(
+          `${baseUrl}/v2.1/accounts/${accountId}/envelopes/${request.providerRequestId}`,
+          {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'voided', voidedReason: reason }),
+          },
+        );
+        if (!res.ok) {
+          const body = await res.text();
+          throw credentialError(`DocuSign void failed: ${res.status} ${body}`);
+        }
+      }
+    }
+  } catch (err) {
+    const restored = await prisma.signatureRequest.updateMany({
+      where: { id: requestId, orgId, deletedAt: null, status: 'VOIDED', voidReason: reason },
+      data: { status: previousStatus, voidedAt: null, voidReason: null },
     });
-    if (changed.count !== 1) {
-      const current = await tx.signatureRequest.findFirst({
-        where: { id: requestId, orgId },
-        select: { status: true },
-      });
+    if (restored.count !== 1) {
       log.warn(
-        { signatureRequestId: requestId, from: current?.status ?? null, to: 'VOIDED' },
+        { signatureRequestId: requestId, from: 'VOIDED', to: previousStatus },
         'illegal signature transition',
       );
-      badRequest(`Cannot void a request with status ${current?.status ?? request.status}`);
     }
-    await tx.signatureEvent.create({
-      data: {
-        signatureRequestId: requestId,
-        type: 'VOIDED',
-        recipientEmail: null,
-        occurredAt: new Date(),
-        ipAddress: null,
-        userAgent: null,
-        payload: { reason } as object,
-      },
-    });
+    throw err;
+  }
+
+  await prisma.signatureEvent.create({
+    data: {
+      signatureRequestId: requestId,
+      type: 'VOIDED',
+      recipientEmail: null,
+      occurredAt: new Date(),
+      ipAddress: null,
+      userAgent: null,
+      payload: { reason } as object,
+    },
   });
 }
 

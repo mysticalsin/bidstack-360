@@ -2,7 +2,7 @@
 // that lands after that read must stay signed, and no void event is stored.
 
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 
@@ -21,6 +21,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.$disconnect();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
@@ -101,5 +106,105 @@ describe('void signature request', () => {
     expect(events).toBe(0);
     read.mockRestore();
     await prisma.org.delete({ where: { id: org.id } });
+  });
+
+  t('a signature that lands during a DocuSign void is not voided at the provider', async () => {
+    // WHY: the envelope must stay live when the local compare-and-set loses.
+    // Voiding at DocuSign first leaves a signed CRM row and a dead envelope.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_ds_${ns}`, name: `ds ${ns}` },
+    });
+    try {
+      const document = await prisma.document.create({
+        data: { orgId: org.id, name: 'proposal.pdf', kind: 'proposal', storageUrl: `s3://test/${ns}` },
+      });
+      const request = await prisma.signatureRequest.create({
+        data: {
+          orgId: org.id,
+          documentId: document.id,
+          provider: 'DOCUSIGN',
+          providerRequestId: `env-${ns}`,
+          status: 'SENT',
+          recipients: [],
+        },
+      });
+      const urls: string[] = [];
+      vi.stubGlobal('fetch', async (url: string) => {
+        urls.push(String(url));
+        if (String(url).includes('oauth/token')) {
+          return new Response(JSON.stringify({ access_token: 'ds-tok', expires_in: 7200 }), { status: 200 });
+        }
+        return new Response('voided', { status: 200 });
+      });
+      const original = prisma.signatureRequest.findFirst.bind(prisma.signatureRequest);
+      const read = vi.spyOn(prisma.signatureRequest, 'findFirst').mockImplementation(async (args) => {
+        const row = await original(args as never);
+        if (row?.id === request.id && row.status === 'SENT') {
+          read.mockImplementation(original as never);
+          await prisma.signatureRequest.update({
+            where: { id: request.id },
+            data: { status: 'SIGNED', completedAt: new Date() },
+          });
+        }
+        return row;
+      });
+      await expect(
+        voidSignatureRequest({ orgId: org.id, requestId: request.id, reason: 'late' }),
+      ).rejects.toThrow(/cannot void/i);
+      expect(urls.some((url) => url.includes('/envelopes/'))).toBe(false);
+      const stored = await prisma.signatureRequest.findUnique({
+        where: { id: request.id },
+        select: { status: true },
+      });
+      expect(stored?.status).toBe('SIGNED');
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
+
+  t('a DocuSign failure puts the request back to the status it had', async () => {
+    // WHY: the local claim happens first. If the provider refuses, the CRM
+    // row must not stay voided while the envelope is still live.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_dsf_${ns}`, name: `dsf ${ns}` },
+    });
+    try {
+      const document = await prisma.document.create({
+        data: { orgId: org.id, name: 'proposal.pdf', kind: 'proposal', storageUrl: `s3://test/${ns}` },
+      });
+      const request = await prisma.signatureRequest.create({
+        data: {
+          orgId: org.id,
+          documentId: document.id,
+          provider: 'DOCUSIGN',
+          providerRequestId: `env-${ns}`,
+          status: 'SENT',
+          recipients: [],
+        },
+      });
+      vi.stubGlobal('fetch', async (url: string) => {
+        if (String(url).includes('oauth/token')) {
+          return new Response(JSON.stringify({ access_token: 'ds-tok', expires_in: 7200 }), { status: 200 });
+        }
+        return new Response('nope', { status: 400 });
+      });
+      await expect(
+        voidSignatureRequest({ orgId: org.id, requestId: request.id, reason: 'withdrawn' }),
+      ).rejects.toThrow(/DocuSign void failed/);
+      const stored = await prisma.signatureRequest.findUnique({
+        where: { id: request.id },
+        select: { status: true, voidReason: true },
+      });
+      expect(stored).toMatchObject({ status: 'SENT', voidReason: null });
+      expect(
+        await prisma.signatureEvent.count({
+          where: { signatureRequestId: request.id, type: 'VOIDED' },
+        }),
+      ).toBe(0);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
   });
 });
