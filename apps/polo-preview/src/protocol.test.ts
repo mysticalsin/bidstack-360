@@ -88,6 +88,24 @@ describe('polo-preview header contract', () => {
     expect(headers).toContainEqual(['cookie', 'session=abc']);
   });
 
+  it('drops client identity, relay, and front-door headers and keeps Authorization', () => {
+    // WHY: the preview relay used to forward headers the API treats as
+    // identity or admission. Authorization stays: the demo bearer uses it.
+    const headers = filterRequestHeaders([
+      ['Forwarded', 'for=203.0.113.9'],
+      ['True-Client-IP', '203.0.113.9'],
+      ['x-polo-internal-key', 'secret'],
+      ['x-relay-key', 'secret'],
+      ['cf-access-client-id', 'id'],
+      ['cf-access-client-secret', 'secret'],
+      ['x-bidstack-sentry-smoke-token', 'token'],
+      ['x-azure-fdid', 'front-door'],
+      ['authorization', 'Bearer demo'],
+    ]);
+    const names = headers.map(([name]) => name.toLowerCase());
+    expect(names).toEqual(['authorization']);
+  });
+
   it('drops the Access email header and reattaches only a verified JWT', () => {
     // WHY: the API used to trust this header from loopback. The client copy
     // must not survive, and a code-login session must not invent a JWT.
