@@ -8,11 +8,12 @@ const state = { status: 'active' as string, access: 'enc(old)' };
 
 const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
+  findFirst: vi.fn(),
   fetchWithTimeout: vi.fn(),
 }));
 
 vi.mock('@bidstack/db', () => ({
-  prisma: { integrationToken: { updateMany: mocks.updateMany, findFirst: vi.fn() } },
+  prisma: { integrationToken: { updateMany: mocks.updateMany, findFirst: mocks.findFirst } },
 }));
 
 vi.mock('@bidstack/shared/token-crypto', () => ({
@@ -58,6 +59,12 @@ beforeEach(() => {
   mocks.fetchWithTimeout.mockResolvedValue(
     new Response(JSON.stringify({ access_token: 'new-access', expires_in: 3600 }), { status: 200 }),
   );
+  mocks.findFirst.mockImplementation(async () => ({
+    refreshTokenEncrypted: 'enc(refresh)',
+    provider: 'gmail',
+    scope: [],
+    status: state.status,
+  }));
 });
 
 const expired = {
@@ -92,7 +99,29 @@ describe('mailbox refresh versus revoke', () => {
     expect(state.access).toBe('enc(old)');
   });
 
+  it('refreshes with the refresh token stored on the row', async () => {
+    // WHY: the lock serializes callers, then the winner stores a rotated
+    // refresh token. The next caller still holds the old ciphertext in memory.
+    mocks.findFirst.mockImplementation(async () => ({
+      refreshTokenEncrypted: 'enc(rotated)',
+      provider: 'gmail',
+      scope: [],
+      status: 'active',
+    }));
+    mocks.fetchWithTimeout.mockClear();
+    await expect(getAccessToken(expired, log)).resolves.toBe('new-access');
+    const init = mocks.fetchWithTimeout.mock.calls.at(-1)?.[1] as { body?: string } | undefined;
+    expect(init?.body).toContain('refresh_token=rotated');
+    expect(init?.body).not.toContain('refresh_token=refresh');
+  });
+
   it('reports a missing refresh token as a revoked grant', async () => {
+    mocks.findFirst.mockResolvedValue({
+      refreshTokenEncrypted: null,
+      provider: 'gmail',
+      scope: [],
+      status: 'active',
+    });
     await expect(getAccessToken({ ...expired, refreshTokenEncrypted: null }, log)).rejects.toBeInstanceOf(
       GrantRevokedError,
     );

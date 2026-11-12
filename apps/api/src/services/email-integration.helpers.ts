@@ -197,13 +197,23 @@ export async function getAccessToken(
     log,
     getFreshValue: () => getFreshIntegrationAccessToken(tokenRecord.id, tokenRecord.orgId),
     refresh: async () => {
-      if (!tokenRecord.refreshTokenEncrypted) {
+      // The caller may still hold the refresh token from before the lock.
+      // The row is the one the previous refresh stored.
+      const fresh = await prisma.integrationToken.findFirst({
+        where: { id: tokenRecord.id, orgId: tokenRecord.orgId, deletedAt: null },
+        select: { refreshTokenEncrypted: true, provider: true, scope: true, status: true },
+      });
+      if (
+        !fresh?.refreshTokenEncrypted ||
+        fresh.status === 'expired' ||
+        fresh.status === 'revoked'
+      ) {
         throw new GrantRevokedError('Token expired and no refresh token available');
       }
 
-      const refresh = decryptToken(tokenRecord.refreshTokenEncrypted);
+      const refresh = decryptToken(fresh.refreshTokenEncrypted);
       return refreshToken(
-        { id: tokenRecord.id, provider: tokenRecord.provider, scope: tokenRecord.scope ?? [] },
+        { id: tokenRecord.id, provider: fresh.provider, scope: fresh.scope ?? [] },
         refresh,
         log,
       );
