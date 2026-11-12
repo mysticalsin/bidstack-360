@@ -176,6 +176,35 @@ describe('getWorkspaceAccessToken', () => {
     expect(grant.access).toBe('enc(old-access)');
   });
 
+  it('keeps a rotated Microsoft refresh token when the overlapping call is rejected', async () => {
+    // WHY: Microsoft invalidates the previous refresh token. If that rejection
+    // is applied after the winner has already rotated, the grant is revoked
+    // and the new ciphertext is thrown away.
+    let calls = 0;
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) {
+        await held;
+        return json({ access_token: 'new-access', refresh_token: 'rotated', expires_in: 3600 });
+      }
+      return json({ error: 'invalid_grant' }, 400);
+    });
+    const first = getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    const second = getWorkspaceAccessToken(row('microsoft_graph'), log, fetchImpl);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    release?.();
+    await expect(Promise.all([first, second])).resolves.toEqual(['new-access', 'new-access']);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(grant.status).toBe('active');
+    expect(grant.refresh).toBe('enc(rotated)');
+    expect(grant.access).toBe('enc(new-access)');
+  });
+
   it('does not send a second Microsoft refresh while the first one is still in flight', async () => {
     // WHY: Microsoft rotates the refresh token. A second call with the old
     // token is invalid_grant, and the status predicate then revokes the grant
