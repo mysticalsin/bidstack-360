@@ -12,11 +12,12 @@
 //
 // HubSpot OAuth + import → migrations-hubspot.routes.ts
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import * as XLSX from '@e965/xlsx';
 import { Queue } from 'bullmq';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type Redis from 'ioredis';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
@@ -40,6 +41,7 @@ import {
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
+import { redisRetryDelay, waitForRedisClient, waitForRedisReady } from '../redis.js';
 import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
@@ -70,6 +72,34 @@ function stalledFlag(job: {
  * the Redis key. A throw before the key is deleted leaves the pending job with
  * its rows. A throw from the key delete cannot leave a pending job.
  */
+const START_IN_FLIGHT_SECONDS = 30;
+
+function csvStartLockKey(
+  orgId: string,
+  body: {
+    source: string;
+    entityType: string;
+    rows: Record<string, string>[];
+    mappings: Record<string, string | null>;
+    dedupStrategy: string;
+    externalIdColumn?: string;
+  },
+): string {
+  const digest = createHash('sha256')
+    .update(
+      JSON.stringify({
+        source: body.source,
+        entityType: body.entityType,
+        rows: body.rows,
+        mappings: body.mappings,
+        dedupStrategy: body.dedupStrategy,
+        externalIdColumn: body.externalIdColumn ?? null,
+      }),
+    )
+    .digest('hex');
+  return `migration:start-lock:${orgId}:${digest}`;
+}
+
 async function abandonUnqueuedStart(input: {
   jobId: string;
   orgId: string;
@@ -167,15 +197,22 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
   // BullMQ queue handle (producer side only — worker consumes).
   // Lazily initialised so the test environment doesn't need Redis configured.
+  // The queue connection is not the process client. When it has stopped, the
+  // next start opens another one with the same capped reconnect delay.
   let migrationQueue: Queue | null = null;
-  const getQueue = () => {
-    if (!migrationQueue) {
+  let queueRedis: Redis | null = null;
+  const getQueue = async (): Promise<Queue> => {
+    if (!queueRedis || queueRedis.status === 'end') {
+      queueRedis = server.redis.duplicate({ retryStrategy: redisRetryDelay });
       migrationQueue = new Queue(MIGRATION.name, {
-        connection: server.redis.duplicate() as never,
+        connection: queueRedis as never,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,
       });
     }
-    return migrationQueue;
+    if (!(await waitForRedisClient(queueRedis, 3_000))) {
+      throw new Error('migration queue redis is not ready');
+    }
+    return migrationQueue!;
   };
 
   // ─── List jobs ─────────────────────────────────────────────────────────
@@ -254,113 +291,152 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const { source, entityType, rows, mappings, dedupStrategy, externalIdColumn } = req.body;
 
-      const job = await prisma.migrationJob.create({
-        data: {
-          orgId,
-          userId,
-          source,
-          status: 'PENDING',
-          totalRows: rows.length,
-          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings },
-        },
-      });
-
-      await prisma.migrationMapping.upsert({
-        where: { orgId_source_sourceEntity: { orgId, source, sourceEntity: entityType } },
-        create: { orgId, source, sourceEntity: entityType, mappings },
-        update: { mappings },
-      });
-
-      // Store rows in Redis with 1h TTL so the worker can read them in chunks.
-      // The start audit is written only after the queue accepts the job.
-      const redisKey = `migration:${job.id}:${entityType}:rows`;
-      try {
-        await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
-      } catch (err) {
-        req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
-        await abandonUnqueuedStart({
-          jobId: job.id,
-          orgId,
-          userId,
-          redisKey,
-          redis: server.redis,
-          reason: 'rows',
-        });
+      if (!(await waitForRedisReady(3_000))) {
         throw server.httpErrors.conflict('The import could not be queued. Try again.');
       }
 
-      // Enqueue while the row is still PENDING. A queue that cannot be opened
-      // removes that row. The RUNNING claim is the write that follows a
-      // successful enqueue, so a cancel in between is not overwritten.
-      const attemptId = randomUUID();
+      // No Idempotency-Key: hold the body only while this request is in flight.
+      // A later start of the same file is a new import. A Redis miss does not
+      // block the start; storing the rows still fails closed.
+      const lockKey = csvStartLockKey(orgId, {
+        source,
+        entityType,
+        rows,
+        mappings,
+        dedupStrategy,
+        externalIdColumn,
+      });
+      let holdLock = false;
       try {
-        const queue = getQueue();
-        await enqueueCsvChunks({
-          jobId: job.id,
-          orgId,
-          userId,
-          source,
-          entityType,
-          rows,
-          redisKey,
-          mappings,
-          dedupStrategy,
-          externalIdColumn,
-          attemptId,
-          queue,
-          nameFor: (i) => `${job.id}-chunk-${i}`,
-          idFor: (i) => `${job.id}-${entityType}-chunk-${i}`,
-        });
+        const locked = await server.redis.set(lockKey, '1', 'EX', START_IN_FLIGHT_SECONDS, 'NX');
+        if (locked !== 'OK') {
+          throw server.httpErrors.conflict('Idempotent request is already in flight');
+        }
+        holdLock = true;
       } catch (err) {
-        req.log.error({ err, migrationJobId: job.id }, 'failed to enqueue import chunks');
-        await abandonUnqueuedStart({
-          jobId: job.id,
-          orgId,
-          userId,
-          redisKey,
-          redis: server.redis,
-          reason: 'queue',
-        });
-        throw server.httpErrors.conflict('The import could not be queued. Try again.');
+        const statusCode =
+          err && typeof err === 'object' && 'statusCode' in err
+            ? (err as { statusCode?: number }).statusCode
+            : undefined;
+        if (statusCode === 409) throw err;
+        req.log.warn({ err }, 'csv start in-flight lock unavailable');
       }
 
-      // The queue accepted the job. A cancel that landed during enqueue must
-      // still have this record; the RUNNING claim below may already have lost.
-      await prisma.auditLog.create({
-        data: {
-          orgId,
-          userId,
-          action: 'migration.start',
-          targetType: 'MigrationJob',
-          targetId: job.id,
-          diff: { source, entityType, totalRows: rows.length },
-        },
-      });
+      try {
+        const job = await prisma.migrationJob.create({
+          data: {
+            orgId,
+            userId,
+            source,
+            status: 'PENDING',
+            totalRows: rows.length,
+            meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings },
+          },
+        });
 
-      const claimed = await prisma.migrationJob.updateMany({
-        where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
-        data: {
-          status: 'RUNNING',
-          startedAt: new Date(),
-          meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings, attemptId },
-        },
-      });
-      if (claimed.count !== 1) {
-        const current = await prisma.migrationJob.findFirst({
+        await prisma.migrationMapping.upsert({
+          where: { orgId_source_sourceEntity: { orgId, source, sourceEntity: entityType } },
+          create: { orgId, source, sourceEntity: entityType, mappings },
+          update: { mappings },
+        });
+
+        // Store rows in Redis with 1h TTL so the worker can read them in chunks.
+        // The start audit is written only after the queue accepts the job.
+        const redisKey = `migration:${job.id}:${entityType}:rows`;
+        try {
+          await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+        } catch (err) {
+          req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
+          await abandonUnqueuedStart({
+            jobId: job.id,
+            orgId,
+            userId,
+            redisKey,
+            redis: server.redis,
+            reason: 'rows',
+          });
+          throw server.httpErrors.conflict('The import could not be queued. Try again.');
+        }
+
+        // Enqueue while the row is still PENDING. A queue that cannot be opened
+        // removes that row. The RUNNING claim is the write that follows a
+        // successful enqueue, so a cancel in between is not overwritten.
+        const attemptId = randomUUID();
+        try {
+          const queue = await getQueue();
+          await enqueueCsvChunks({
+            jobId: job.id,
+            orgId,
+            userId,
+            source,
+            entityType,
+            rows,
+            redisKey,
+            mappings,
+            dedupStrategy,
+            externalIdColumn,
+            attemptId,
+            queue,
+            nameFor: (i) => `${job.id}-chunk-${i}`,
+            idFor: (i) => `${job.id}-${entityType}-chunk-${i}`,
+          });
+        } catch (err) {
+          req.log.error({ err, migrationJobId: job.id }, 'failed to enqueue import chunks');
+          await abandonUnqueuedStart({
+            jobId: job.id,
+            orgId,
+            userId,
+            redisKey,
+            redis: server.redis,
+            reason: 'queue',
+          });
+          throw server.httpErrors.conflict('The import could not be queued. Try again.');
+        }
+
+        // The queue accepted the job. A cancel that landed during enqueue must
+        // still have this record; the RUNNING claim below may already have lost.
+        await prisma.auditLog.create({
+          data: {
+            orgId,
+            userId,
+            action: 'migration.start',
+            targetType: 'MigrationJob',
+            targetId: job.id,
+            diff: { source, entityType, totalRows: rows.length },
+          },
+        });
+
+        const claimed = await prisma.migrationJob.updateMany({
+          where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
+          data: {
+            status: 'RUNNING',
+            startedAt: new Date(),
+            meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings, attemptId },
+          },
+        });
+        if (claimed.count !== 1) {
+          const current = await prisma.migrationJob.findFirst({
+            where: { id: job.id, orgId },
+            select: { status: true },
+          });
+          req.log.warn(
+            { migrationJobId: job.id, from: current?.status ?? null, to: 'RUNNING' },
+            'illegal migration transition',
+          );
+          throw server.httpErrors.conflict('Migration job is no longer pending');
+        }
+
+        const updated = await prisma.migrationJob.findFirstOrThrow({
           where: { id: job.id, orgId },
-          select: { status: true },
         });
-        req.log.warn(
-          { migrationJobId: job.id, from: current?.status ?? null, to: 'RUNNING' },
-          'illegal migration transition',
-        );
-        throw server.httpErrors.conflict('Migration job is no longer pending');
+        return reply.code(201).send(serializeJob(updated));
+      } finally {
+        if (holdLock) {
+          await server.redis.del(lockKey).catch((err: unknown) => {
+            req.log.warn({ err }, 'csv start in-flight lock release failed');
+          });
+        }
       }
-
-      const updated = await prisma.migrationJob.findFirstOrThrow({
-        where: { id: job.id, orgId },
-      });
-      return reply.code(201).send(serializeJob(updated));
     },
   );
 
@@ -404,7 +480,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const attemptId = randomUUID();
       const previousAttempt = migrationAttemptId(job.meta);
       try {
-        const queue = getQueue();
+        const queue = await getQueue();
         if (job.source === 'HUBSPOT_OAUTH') {
           await enqueueHubspotChunk({
             jobId: job.id,

@@ -849,10 +849,23 @@ export async function processMigrationChunk(
     select: { status: true, meta: true, orgId: true },
   });
   // Start and retry enqueue before the RUNNING claim. A chunk that arrives
-  // while the row is still PENDING or FAILED must be retried, not completed,
-  // or the claim that follows has nothing left to process.
-  if (jobRow?.status === 'PENDING' || jobRow?.status === 'FAILED') {
+  // while the row is still PENDING, or that carries a newer attempt than the
+  // failed row, must be retried, not completed. A chunk for the attempt that
+  // already failed is finished: throwing would log an error on every retry.
+  if (jobRow?.status === 'PENDING') {
     throw new Error('migration job is not running yet');
+  }
+  if (jobRow?.status === 'FAILED') {
+    const storedAttempt = migrationAttemptId(jobRow.meta);
+    const chunkAttempt = payload.attemptId ?? null;
+    if (storedAttempt != null && chunkAttempt !== storedAttempt) {
+      throw new Error('migration job is not running yet');
+    }
+    log.info(
+      { migrationJobId: payload.migrationJobId },
+      'migration chunk skipped — job already failed',
+    );
+    return;
   }
   if (!jobRow || !migrationChunkMayRun(jobRow.status)) {
     log.info({ status: jobRow?.status }, 'migration chunk skipped — job not running');
@@ -1170,7 +1183,10 @@ export async function sweepAbandonedPending(
   deps: {
     hasQueueEntry?: (migrationJobId: string) => Promise<boolean>;
     deleteRows?: (key: string) => Promise<unknown>;
-    log?: { info: (obj: object, msg?: string) => void };
+    log?: {
+      info: (obj: object, msg?: string) => void;
+      warn?: (obj: object, msg?: string) => void;
+    };
   } = {},
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - MIGRATION_ABANDONED_PENDING_MS);
@@ -1180,49 +1196,57 @@ export async function sweepAbandonedPending(
   });
   let reaped = 0;
   for (const job of candidates) {
-    const failedStart = await prisma.auditLog.findFirst({
-      where: { orgId: job.orgId, targetId: job.id, action: 'migration.start_failed' },
-      select: { id: true },
-    });
-    if (!failedStart) {
-      if (!deps.hasQueueEntry) continue;
-      let queued: boolean;
-      try {
-        queued = await deps.hasQueueEntry(job.id);
-      } catch {
-        continue;
+    // One rejected delete must not skip the imports after it.
+    try {
+      const failedStart = await prisma.auditLog.findFirst({
+        where: { orgId: job.orgId, targetId: job.id, action: 'migration.start_failed' },
+        select: { id: true },
+      });
+      if (!failedStart) {
+        if (!deps.hasQueueEntry) continue;
+        let queued: boolean;
+        try {
+          queued = await deps.hasQueueEntry(job.id);
+        } catch {
+          continue;
+        }
+        if (queued) continue;
       }
-      if (queued) continue;
-    }
-    const reason = failedStart ? 'start_failed' : 'no_queue_entry';
-    // The audit and the delete commit together. A delete that removes
-    // nothing, or is rejected, must not leave a reap row for the next scan.
-    const removed = await prisma.$transaction(async (tx) => {
-      const deleted = await tx.migrationJob.deleteMany({
-        where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+      const reason = failedStart ? 'start_failed' : 'no_queue_entry';
+      // The audit and the delete commit together. A delete that removes
+      // nothing, or is rejected, must not leave a reap row for the next scan.
+      const removed = await prisma.$transaction(async (tx) => {
+        const deleted = await tx.migrationJob.deleteMany({
+          where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+        });
+        if (deleted.count !== 1) return 0;
+        await tx.auditLog.create({
+          data: {
+            orgId: job.orgId,
+            action: 'migration.reaped',
+            targetType: 'MigrationJob',
+            targetId: job.id,
+            diff: { reason },
+          },
+        });
+        return 1;
       });
-      if (deleted.count !== 1) return 0;
-      await tx.auditLog.create({
-        data: {
-          orgId: job.orgId,
-          action: 'migration.reaped',
-          targetType: 'MigrationJob',
-          targetId: job.id,
-          diff: { reason },
-        },
-      });
-      return 1;
-    });
-    if (removed !== 1) continue;
-    deps.log?.info(
-      { migrationJobId: job.id, orgId: job.orgId, reason },
-      'reaped an abandoned pending import',
-    );
-    const entityType = migrationEntityType(job.meta);
-    if (entityType && deps.deleteRows) {
-      await deps.deleteRows(`migration:${job.id}:${entityType}:rows`).catch(() => undefined);
+      if (removed !== 1) continue;
+      deps.log?.info(
+        { migrationJobId: job.id, orgId: job.orgId, reason },
+        'reaped an abandoned pending import',
+      );
+      const entityType = migrationEntityType(job.meta);
+      if (entityType && deps.deleteRows) {
+        await deps.deleteRows(`migration:${job.id}:${entityType}:rows`).catch(() => undefined);
+      }
+      reaped += 1;
+    } catch (err) {
+      deps.log?.warn?.(
+        { err, migrationJobId: job.id, orgId: job.orgId },
+        'abandoned import reap failed',
+      );
     }
-    reaped += 1;
   }
   return reaped;
 }
