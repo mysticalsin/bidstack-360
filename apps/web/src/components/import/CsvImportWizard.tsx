@@ -541,12 +541,6 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
-function importRowsExpired(messages: readonly string[]): boolean {
-  return messages.some(
-    (message) => message === MIGRATION_ROWS_EXPIRED || message === MIGRATION_LEGACY_ROWS_EXPIRED,
-  );
-}
-
 function ImportProgress({
   job,
   isLoading,
@@ -656,32 +650,27 @@ function ImportProgress({
         </button>
       ) : null}
 
-      {(job.errorRows > 0 ||
-        (job.status === 'FAILED' &&
-          (job.errorSummary?.length ?? 0) > 0 &&
-          !importRowsExpired((job.errorSummary ?? []).map((row) => row.message)))) && (
+      {job.errorRows > 0 ? (
         <div className="rounded-md bg-[var(--surface-sunken)] p-3 text-sm">
-          {job.errorRows > 0 ? (
-            <p className="text-[var(--fg-primary)]">
-              {job.errorRows === 1
-                ? t(
-                    'csvImport.progress.errorRow',
-                    '{{formattedCount}} row could not be imported.',
-                    {
-                      count: job.errorRows,
-                      formattedCount: job.errorRows.toLocaleString(),
-                    },
-                  )
-                : t(
-                    'csvImport.progress.errorRows',
-                    '{{formattedCount}} rows could not be imported.',
-                    {
-                      count: job.errorRows,
-                      formattedCount: job.errorRows.toLocaleString(),
-                    },
-                  )}
-            </p>
-          ) : null}
+          <p className="text-[var(--fg-primary)]">
+            {job.errorRows === 1
+              ? t(
+                  'csvImport.progress.errorRow',
+                  '{{formattedCount}} row could not be imported.',
+                  {
+                    count: job.errorRows,
+                    formattedCount: job.errorRows.toLocaleString(),
+                  },
+                )
+              : t(
+                  'csvImport.progress.errorRows',
+                  '{{formattedCount}} rows could not be imported.',
+                  {
+                    count: job.errorRows,
+                    formattedCount: job.errorRows.toLocaleString(),
+                  },
+                )}
+          </p>
           <button
             type="button"
             className="mt-1 text-[var(--brand-primary)] hover:underline"
@@ -690,7 +679,7 @@ function ImportProgress({
             {t('csvImport.progress.downloadErrors', 'Download error report (CSV)')}
           </button>
         </div>
-      )}
+      ) : null}
 
       {done && (
         <button type="button" className="btn btn-secondary" onClick={onDone}>

@@ -415,7 +415,8 @@ describe('CsvImportWizard', () => {
     await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
     expect(screen.queryByText('The import could not be completed.')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Download error report (CSV)' })).toBeTruthy();
+    // The sentence is on the page. The CSV is the row list, and this failure has no row.
+    expect(screen.queryByRole('button', { name: 'Download error report (CSV)' })).toBeNull();
   });
 
   it('maps pathless driver text to the existing sentence', async () => {
@@ -456,7 +457,7 @@ describe('CsvImportWizard', () => {
     );
     expect(screen.queryByText(/Connection is closed/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Download error report (CSV)' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Download error report (CSV)' })).toBeNull();
   });
 
   it('shows a stored failure sentence that has no code', async () => {
