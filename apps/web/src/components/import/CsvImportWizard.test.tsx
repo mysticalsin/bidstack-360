@@ -350,6 +350,28 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
   });
 
+  it('says the import stopped when a row error is stored ahead of that code', async () => {
+    // WHY: the row sentence is for the error file. The reason line is the job
+    // stopping, which is the code stored after the rows that were already saved.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 4,
+      processedRows: 2,
+      errorRows: 1,
+      errorSummary: [
+        { row: 5, field: 'company.name', message: 'company.name is required' },
+        { row: 0, field: null, message: 'enqueue_stopped' },
+      ],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import stopped before the remaining rows were saved.')).toBeTruthy(),
+    );
+    expect(screen.queryByText('company.name is required')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
+  });
+
   it('shows an unsupported-entity failure when no rows were saved', async () => {
     // WHY: the worker stores the sentence on the job and leaves both counters
     // at zero. The generic failure and a hidden error file would leave the

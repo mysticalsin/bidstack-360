@@ -73,6 +73,20 @@ const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
   ],
 };
 
+function wizardReasonMessage(
+  messages: readonly string[],
+  processedRows: number,
+  errorRows: number,
+): string | undefined {
+  const stopped = messages.find(
+    (message) =>
+      message === MIGRATION_ENQUEUE_STOPPED ||
+      ((message === MIGRATION_ENQUEUE_FAILED || message === MIGRATION_LEGACY_ENQUEUE_FAILED) &&
+        !migrationRetryAllowed(processedRows, errorRows)),
+  );
+  return stopped ?? messages[0];
+}
+
 function importErrorCopy(
   t: (key: string, fallback: string) => string,
   message: string | undefined,
@@ -525,7 +539,13 @@ function ImportProgress({
   const done = job.status === 'COMPLETE' || job.status === 'FAILED' || job.status === 'CANCELLED';
   const failure = importErrorCopy(
     t,
-    job.status === 'FAILED' ? job.errorSummary?.[0]?.message : undefined,
+    job.status === 'FAILED'
+      ? wizardReasonMessage(
+          (job.errorSummary ?? []).map((row) => row.message),
+          job.processedRows,
+          job.errorRows,
+        )
+      : undefined,
     job.processedRows,
     job.errorRows,
   );
