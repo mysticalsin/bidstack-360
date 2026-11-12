@@ -121,6 +121,12 @@ export function useRetryMigration() {
       qc.invalidateQueries({ queryKey: ['migrations'] });
       qc.invalidateQueries({ queryKey: ['migrations', id] });
     },
+    // A 409 stores the real reason on the job (the rows expired). The list the
+    // wizard is showing is the one from before that write.
+    onError: (_err, id) => {
+      qc.invalidateQueries({ queryKey: ['migrations'] });
+      qc.invalidateQueries({ queryKey: ['migrations', id] });
+    },
   });
 }
 
