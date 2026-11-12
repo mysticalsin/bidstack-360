@@ -42,6 +42,7 @@ import {
 } from '@bidstack/shared';
 
 import { previewImportRows } from '../lib/import-preview.js';
+import { redis } from '../redis.js';
 import { enqueueHubspotChunk } from '../services/hubspot-import.js';
 import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
@@ -174,11 +175,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   let migrationQueue: Queue | null = null;
   const getQueue = () => {
     if (!migrationQueue) {
-      const { redis } = server as unknown as {
-        redis: { status: string; duplicate: () => unknown };
-      };
       migrationQueue = new Queue(MIGRATION.name, {
-        connection: (redis as unknown as { duplicate: () => unknown }).duplicate() as never,
+        connection: redis.duplicate() as never,
         defaultJobOptions: MIGRATION.defaultJobOptions as never,
       });
     }
@@ -291,12 +289,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Store rows in Redis with 1h TTL so the worker can read them in chunks.
       const redisKey = `migration:${job.id}:${entityType}:rows`;
-      const redisConn = (
-        server as unknown as {
-          redis: { set: (k: string, v: string, ex: string, ttl: number) => Promise<void> };
-        }
-      ).redis;
-      await redisConn.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+      await redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
 
       // Claim RUNNING before any chunk exists. A by-id write after enqueue
       // overwrites a cancel that landed while the chunks were being queued,
@@ -323,9 +316,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('Migration job is no longer pending');
       }
 
-      const queue = getQueue();
-
       try {
+        const queue = getQueue();
         await enqueueCsvChunks({
           jobId: job.id,
           orgId,
@@ -443,8 +435,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.conflict('Migration job is no longer failed');
       }
 
-      const queue = getQueue();
       try {
+        const queue = getQueue();
         if (job.source === 'HUBSPOT_OAUTH') {
           await enqueueHubspotChunk({
             jobId: job.id,
@@ -458,10 +450,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           });
         } else {
           const redisKey = `migration:${job.id}:${meta.entityType}:rows`;
-          const redisConn = (
-            server as unknown as { redis: { get: (key: string) => Promise<string | null> } }
-          ).redis;
-          const raw = await redisConn.get(redisKey);
+          const raw = await redis.get(redisKey);
           if (!raw) throw new Error(MIGRATION_ROWS_EXPIRED);
           const rows = JSON.parse(raw) as Record<string, string>[];
           const stored = meta.mappings;
