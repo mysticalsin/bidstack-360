@@ -188,6 +188,48 @@ describe('migration chunk guards', () => {
     await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
   });
 
+  t('a failed chunk with two null attempt ids is not retried', async () => {
+    // WHY: a legacy failed row and its chunk both have no attempt id. Treating
+    // that pair as a mismatch makes BullMQ retry the chunk five times.
+    const failed = await fixture('FAILED');
+    await prisma.migrationJob.update({
+      where: { id: failed.job.id },
+      data: { meta: { attemptId: null } },
+    });
+    let reads = 0;
+    const info = vi.fn();
+    await processMigrationChunk(
+      {
+        migrationJobId: failed.job.id,
+        orgId: failed.org.id,
+        userId: failed.job.userId,
+        source: 'CSV',
+        entityType: 'companies',
+        chunkOffset: 0,
+        chunkSize: 100,
+        totalRows: 1,
+        redisKey: 'rows',
+        mappings: { Name: 'company.name' },
+        dedupStrategy: 'skip',
+        attemptId: null,
+      },
+      deps(async () => {
+        reads += 1;
+        return JSON.stringify([{ Name: 'Acme' }]);
+      }),
+      { info, warn: () => undefined },
+    );
+    expect(reads).toBe(0);
+    expect(await prisma.company.count({ where: { orgId: failed.org.id, deletedAt: null } })).toBe(0);
+    expect(info).toHaveBeenCalledWith(
+      { migrationJobId: failed.job.id, attemptId: null, status: 'FAILED' },
+      'migration chunk skipped — attempt already ended',
+    );
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: failed.job.id } });
+    expect(stored.status).toBe('FAILED');
+    await prisma.org.delete({ where: { id: failed.org.id } }).catch(() => undefined);
+  });
+
   t('a running job accepts a chunk that passes a null attempt id', async () => {
     // WHY: a legacy row and a legacy chunk both have no attempt id. Null is
     // that missing id, and the chunk still has to import.
