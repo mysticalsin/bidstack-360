@@ -37,6 +37,13 @@ export function migrationFrom(event: MigrationEvent): readonly MigrationState[] 
   return FROM[event];
 }
 
+/** The status a chunk may still write. Taken from the fail transition, not a second copy of the word. */
+export function migrationActiveStatus(): MigrationState {
+  const status = migrationFrom('fail')[0];
+  if (status === undefined) throw new Error('migration fail transition has no from-status');
+  return status;
+}
+
 export function migrationTransition(
   from: MigrationState,
   event: MigrationEvent,

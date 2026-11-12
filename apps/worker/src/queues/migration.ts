@@ -37,6 +37,7 @@ import {
   MIGRATION_STALE_REASON,
   migrationAttemptId,
   migrationChunkMatchesAttempt,
+  migrationActiveStatus,
   migrationChunkMayRun,
   migrationFrom,
   migrationProgressAt,
@@ -602,7 +603,7 @@ async function recordChunkOutcome(
         error_rows = error_rows + ${errored},
         updated_at = date_trunc('milliseconds', NOW())
     WHERE id = ${migrationJobId}::uuid
-      AND status = 'RUNNING'
+      AND status::text = ${migrationActiveStatus()}
       AND (
         (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
         OR meta->>'attemptId' = ${attemptId}
@@ -739,7 +740,7 @@ export async function maybeComplete(
         undoable_until = ${undoableUntil},
         updated_at = date_trunc('milliseconds', NOW())
     WHERE id = ${migrationJobId}::uuid
-      AND status = 'RUNNING'
+      AND status::text = ${migrationActiveStatus()}
       AND (
         (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
         OR meta->>'attemptId' = ${attemptId}
@@ -809,7 +810,7 @@ async function noteChunkClaimed(id: string): Promise<void> {
         ),
         updated_at = date_trunc('milliseconds', NOW())
     WHERE id = ${id}::uuid
-      AND status = 'RUNNING'
+      AND status::text = ${migrationActiveStatus()}
   `;
 }
 
@@ -919,7 +920,7 @@ export async function processMigrationChunk(
         FOR UPDATE
       `;
       const holder = locked[0];
-      if (!holder || holder.status !== 'RUNNING') {
+      if (!holder || holder.status !== migrationActiveStatus()) {
         skipReason = 'status';
         return null;
       }
@@ -1083,7 +1084,7 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - MIGRATION_STALE_MS);
   const candidates = await prisma.migrationJob.findMany({
     where: {
-      status: 'RUNNING',
+      status: migrationActiveStatus(),
       processedRows: 0,
       errorRows: 0,
       updatedAt: { lte: cutoff },

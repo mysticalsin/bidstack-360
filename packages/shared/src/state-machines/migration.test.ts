@@ -5,6 +5,7 @@ import {
   MIGRATION_EVENTS,
   MIGRATION_STALE_MS,
   MIGRATION_STATES,
+  migrationActiveStatus,
   migrationAttemptId,
   migrationChunkMatchesAttempt,
   migrationProgressAt,
@@ -31,6 +32,10 @@ const LEGAL: Array<[MigrationState, MigrationEvent, MigrationState]> = [
 ];
 
 describe('migration transition table', () => {
+  it('takes the status a chunk may write from the fail transition', () => {
+    expect(migrationActiveStatus()).toBe(migrationFrom('fail')[0]);
+  });
+
   it('accepts every legal row and uses that from-list', () => {
     for (const [from, event, to] of LEGAL) {
       expect(migrationTransition(from, event)).toBe(to);
