@@ -553,6 +553,7 @@ export async function voidSignatureRequest(params: {
   const heldIds = (await prisma.signatureEvent.findMany({
     where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
     select: { id: true, payload: true },
+    take: 10,
   }))
     .filter((event) => isHeldDuringVoid(event.payload))
     .map((event) => event.id);
@@ -577,6 +578,7 @@ async function heldSignatureDuringVoid(
     where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
     orderBy: { occurredAt: 'desc' },
     select: { type: true, payload: true },
+    take: 10,
   });
   const held = events.find((event) => isHeldDuringVoid(event.payload));
   if (held?.type === 'SIGNED' || held?.type === 'DECLINED') return { type: held.type };
