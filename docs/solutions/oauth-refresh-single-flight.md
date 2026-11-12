@@ -32,6 +32,20 @@ peer and break the connection.
   The API and the worker share oauthRefreshLockRedisRequired and
   oauthRefreshLockStartupError.
 
+## Refresh-token rotation
+
+Microsoft rotates the refresh token on every successful refresh. The worker
+asks `https://login.microsoftonline.com/.../oauth2/v2.0/token` and stores
+`refresh_token` only when the response includes one.
+
+Google's refresh goes to `https://oauth2.googleapis.com/token`. A new refresh
+token is stored only when the response includes one. Google does not rotate
+on every refresh the way Microsoft does.
+
+A holder that crashes after the provider has rotated the refresh token and
+before that value is written is a separate backlog slice. Nothing here changes
+that write.
+
 ## Prevention
 
 New OAuth providers that store access/refresh tokens in `IntegrationToken`
