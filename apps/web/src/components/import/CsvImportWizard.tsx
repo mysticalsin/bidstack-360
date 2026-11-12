@@ -15,6 +15,7 @@ import {
 } from '@bidstack/shared';
 
 import { Icon } from '@/components/ui/Icon';
+import { ApiError } from '@/lib/api';
 import { parseCsv, type ParsedCsv } from '@/lib/csv-parse';
 import {
   autoMap,
@@ -493,6 +494,7 @@ export function CsvImportWizard() {
           cancelPending={cancel.isPending}
           retryPending={retry.isPending}
           actionFailed={cancel.isError || retry.isError}
+          retryError={retry.error}
         />
       )}
     </div>
@@ -550,6 +552,7 @@ function ImportProgress({
   cancelPending,
   retryPending,
   actionFailed,
+  retryError,
 }: {
   job: MigrationJob | null;
   isLoading: boolean;
@@ -559,6 +562,7 @@ function ImportProgress({
   cancelPending: boolean;
   retryPending: boolean;
   actionFailed: boolean;
+  retryError: unknown;
 }) {
   const { t } = useTranslation('crm');
   if (isLoading || !job) {
@@ -582,6 +586,10 @@ function ImportProgress({
     job.processedRows,
     job.errorRows,
   );
+  // A 409 is the request's own reason. A stalled job already has a sentence,
+  // so the generic alert would stay hidden and this refusal would vanish.
+  const refusal =
+    retryError instanceof ApiError && retryError.status === 409 ? retryError.message : null;
   const pct =
     job.totalRows > 0 ? Math.round((job.processedRows / job.totalRows) * 100) : done ? 100 : 0;
 
@@ -616,7 +624,13 @@ function ImportProgress({
         </div>
       </div>
 
-      {actionFailed && !failure ? (
+      {refusal && refusal !== failure ? (
+        <p className="text-sm text-[var(--danger)]" role="alert">
+          {refusal}
+        </p>
+      ) : null}
+
+      {actionFailed && !failure && !refusal ? (
         <p className="text-sm text-[var(--danger)]" role="alert">
           {t('csvImport.progress.actionFailed', 'That did not work. Try again.')}
         </p>

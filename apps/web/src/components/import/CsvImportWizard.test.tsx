@@ -37,6 +37,8 @@ vi.mock('@/hooks/useMigrations', () => ({
   downloadMigrationErrors: hookMocks.downloadMigrationErrors,
 }));
 
+import { ApiError } from '@/lib/api';
+
 import { CsvImportWizard } from './CsvImportWizard';
 
 function csvFile(text: string, name = 'contacts.csv'): File {
@@ -355,6 +357,31 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByRole('button', { name: 'Retry import' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Download error report (CSV)' })).toBeNull();
     expect(screen.queryByText('Try again.')).toBeNull();
+  });
+
+  it('shows the queue refusal when a stalled import cannot be retried', async () => {
+    // WHY: a stalled job already has its own sentence, so the generic alert
+    // stays hidden. The 409 from a queue that is down is the new fact.
+    stubHooks();
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('The import could not be queued. Try again.', 409, null),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      stalled: true,
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'stale' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import could not be queued. Try again.')).toBeTruthy(),
+    );
+    expect(screen.getByText('The import stalled before any rows were saved.')).toBeTruthy();
   });
 
   it('drops the generic retry error once the job shows why it was refused', async () => {
