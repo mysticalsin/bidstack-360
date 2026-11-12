@@ -26,9 +26,14 @@ import type { Prisma } from '../../generated/client/index.js';
  *
  * DB-level layer: migration 20261107070020_audit_log_hash_chain_triggers adds triggers
  * that hash-chain every insert per org and reject content UPDATE and TRUNCATE
- * for every writer, raw SQL included. Migration 20261112160000 revokes DELETE
- * from app_role. The process still connects as the table owner, who keeps
- * DELETE for the retention purge and for teardown.
+ * for every writer, raw SQL included. DELETE stays possible for the retention
+ * purge and org cascade; chain verification reports the gap it leaves.
+ * Migration 20261112160000 revokes DELETE from app_role. That step is
+ * preparatory: app_role has no members, and the process still connects as
+ * the table owner, who keeps DELETE for the retention purge and for teardown.
+ * Remaining follow-up: REVOKE DELETE ON audit_log from the app role so only the
+ * retention role may purge. R-2 stays open until the runtime connection is
+ * that role.
  */
 
 const AUDIT_MODEL = 'AuditLog';

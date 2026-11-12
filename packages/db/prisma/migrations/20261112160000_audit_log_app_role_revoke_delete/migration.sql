@@ -1,6 +1,7 @@
--- The application role may read and insert audit rows. It may not delete
--- them. The table owner keeps DELETE for the retention purge and for
--- teardown. This migration does not change the user the API connects as.
+-- Preparatory only. app_role has no members, and the API, worker, and
+-- migrate job connect as the table owner, who keeps DELETE. This does not
+-- close THREAT-MODEL R-2. SELECT, INSERT, and UPDATE are granted for a later
+-- role split, and DELETE is revoked so that split does not inherit delete.
 
 DO $$
 BEGIN

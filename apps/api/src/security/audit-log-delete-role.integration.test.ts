@@ -1,6 +1,7 @@
-// WHY: the audit log is append-only for the application role. The table
-// owner still deletes rows for retention and for test teardown. This proves
-// the revoke, not a change of the user the API connects as.
+// WHY: app_role is not the role the services connect as. This migration is
+// preparatory. It records the grants a future role should have. It does not
+// prove the process is unable to delete audit rows. The table owner still
+// can, and THREAT-MODEL R-2 stays open.
 
 import { randomUUID } from 'node:crypto';
 
