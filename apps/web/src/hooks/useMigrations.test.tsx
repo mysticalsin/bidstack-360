@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, api } from '@/lib/api';
 import { useRetryMigration, useStartCsvImport } from './useMigrations';
@@ -43,6 +43,10 @@ function appClient() {
 }
 
 describe('useStartCsvImport', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('sends a failed start once', async () => {
     vi.mocked(api).mockRejectedValue(new ApiError('down', 500, null));
     const { wrapper } = appClient();
@@ -61,6 +65,59 @@ describe('useStartCsvImport', () => {
     });
 
     expect(api).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends one idempotency key for a start and a new key after it settles', async () => {
+    // WHY: two overlapping starts of one click must present the same key, or
+    // the server treats them as two imports. A later start is a new action.
+    const pending: Array<(value: { id: string }) => void> = [];
+    vi.mocked(api).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    const { wrapper } = appClient();
+    const { result } = renderHook(() => useStartCsvImport(), { wrapper });
+    const input = {
+      source: 'CSV' as const,
+      entityType: 'company',
+      rows: [{ Name: 'Acme' }],
+      mappings: { Name: 'name' },
+      dedupStrategy: 'skip' as const,
+    };
+
+    let first: Promise<unknown> = Promise.resolve();
+    let second: Promise<unknown> = Promise.resolve();
+    await act(async () => {
+      first = result.current.mutateAsync(input);
+      second = result.current.mutateAsync(input);
+    });
+
+    const keyOf = (call: number) => {
+      const options = vi.mocked(api).mock.calls[call]?.[1] as
+        | { headers?: Record<string, string> }
+        | undefined;
+      return options?.headers?.['Idempotency-Key'];
+    };
+
+    expect(vi.mocked(api)).toHaveBeenCalledTimes(2);
+    expect(keyOf(0)).toMatch(/^import-csv-.{8,}$/);
+    expect(keyOf(1)).toBe(keyOf(0));
+
+    await act(async () => {
+      pending[0]?.({ id: 'job-1' });
+      pending[1]?.({ id: 'job-1' });
+      await Promise.all([first, second]);
+    });
+
+    vi.mocked(api).mockResolvedValue({ id: 'job-2' });
+    await act(async () => {
+      await result.current.mutateAsync(input);
+    });
+
+    expect(keyOf(2)).toMatch(/^import-csv-.{8,}$/);
+    expect(keyOf(2)).not.toBe(keyOf(0));
   });
 });
 

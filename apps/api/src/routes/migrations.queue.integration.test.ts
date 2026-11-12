@@ -98,7 +98,11 @@ describe('migration queue acquisition', () => {
     // return 500 after the cleanup had already removed the job. The queue-down
     // path returns 409, and this one has to as well.
     const { redis } = await import('../redis.js');
-    const set = vi.spyOn(redis, 'set').mockRejectedValueOnce(new Error('redis down'));
+    const originalSet = redis.set.bind(redis);
+    const set = vi.spyOn(redis, 'set').mockImplementation((...args) => {
+      if (String(args[0]).includes(':rows')) return Promise.reject(new Error('redis down'));
+      return originalSet(...args);
+    });
     const before = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
@@ -301,6 +305,39 @@ describe('migration queue acquisition', () => {
     expect(
       await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
     ).toBe(beforePending);
+  });
+
+  t('two concurrent starts without a key create one import', async () => {
+    // WHY: a missing Idempotency-Key used to insert one migration_job per
+    // request. Two processes posting the same file at once created two
+    // imports. The in-flight twin is refused, and a later start still creates
+    // the next import.
+    const payload = {
+      source: 'CSV',
+      entityType: 'company',
+      rows: [{ name: 'Hammer Concurrent' }],
+      mappings: { name: 'company.name' },
+    };
+    const before = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
+    const [first, second] = await Promise.all([
+      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+      server.inject({ method: 'POST', url: '/api/v1/migrations/start-csv', payload }),
+    ]);
+    const codes = [first.statusCode, second.statusCode].sort();
+    expect(codes).toEqual([201, 409]);
+    const refused = first.statusCode === 409 ? first : second;
+    expect(refused.json()).toMatchObject({
+      message: 'Idempotent request is already in flight',
+    });
+    expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(before + 1);
+
+    const again = await server.inject({
+      method: 'POST',
+      url: '/api/v1/migrations/start-csv',
+      payload,
+    });
+    expect(again.statusCode).toBe(201);
+    expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(before + 2);
   });
 
   t('starts a csv import on the process Redis client', async () => {
