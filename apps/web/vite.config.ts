@@ -4,12 +4,20 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
 import { visualizer } from 'rollup-plugin-visualizer';
 
+import { isServerOnlySpecifier } from './src/lib/server-only-specifiers';
+
 function rejectNodeBuiltins(): Plugin {
   return {
     name: 'reject-node-builtins',
     enforce: 'pre',
     resolveId(source, importer) {
-      if (!importer || !source.startsWith('node:')) return null;
+      if (!importer) return null;
+      if (isServerOnlySpecifier(source) && importer.includes('/apps/web/')) {
+        this.error(
+          `Server-only module ${source} reached the web bundle from ${importer}. Import it from the API or the worker.`,
+        );
+      }
+      if (!source.startsWith('node:')) return null;
       const appCode =
         importer.includes('/packages/shared/') ||
         importer.includes('/apps/web/src/') ||
