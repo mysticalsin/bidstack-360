@@ -263,6 +263,48 @@ describe('migration queue acquisition', () => {
     expect((await server.redis.keys('migration:*')).length).toBe(beforeKeys.length + 1);
   });
 
+  t('a later chunk that fails to queue removes the chunks already accepted', async () => {
+    // WHY: chunk 0 is already in BullMQ when chunk 1 throws. Deleting the
+    // job row leaves that chunk to run against a job that no longer exists.
+    const rows = Array.from({ length: 101 }, (_, index) => ({ name: `Acme ${index}` }));
+    let added = 0;
+    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async () => {
+      added += 1;
+      if (added > 1) throw new Error('queue down');
+      return { id: 'chunk-0' } as never;
+    });
+    const removed: string[] = [];
+    const remove = vi.spyOn(Queue.prototype, 'remove').mockImplementation(async (id: string) => {
+      removed.push(id);
+      return 1;
+    });
+    const beforePending = await prisma.migrationJob.count({
+      where: { orgId: org.orgId, status: 'PENDING' },
+    });
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows,
+          mappings: { name: 'company.name' },
+        },
+      });
+      expect(res.statusCode).toBe(409);
+      expect(added).toBe(2);
+      expect(removed).toHaveLength(1);
+      expect(removed[0]).toMatch(/-company-chunk-0$/);
+    } finally {
+      add.mockRestore();
+      remove.mockRestore();
+    }
+    expect(
+      await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
+    ).toBe(beforePending);
+  });
+
   t('starts a csv import on the process Redis client', async () => {
     // WHY: buildServer() has to hand the route the same Redis the process
     // already connected. A start that cannot see that client returns 500.

@@ -130,7 +130,15 @@ async function enqueueCsvChunks(input: {
       externalIdColumn: input.externalIdColumn,
       attemptId: input.attemptId,
     };
-    await input.queue.add(input.nameFor(i), payload, { jobId: input.idFor(i) });
+    const jobId = input.idFor(i);
+    try {
+      await input.queue.add(input.nameFor(i), payload, { jobId });
+    } catch (err) {
+      for (let prior = 0; prior < i; prior += 1) {
+        await input.queue.remove(input.idFor(prior)).catch(() => undefined);
+      }
+      throw err;
+    }
   }
 }
 
