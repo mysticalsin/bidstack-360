@@ -6,7 +6,7 @@ import {
   isOAuthRefreshLockError,
   runWithOAuthRefreshLock as runSharedLock,
   type OAuthRefreshLockRedis,
-} from '@bidstack/shared';
+} from '@bidstack/shared/server';
 
 import { ensureRedisReady, redis } from '../redis.js';
 

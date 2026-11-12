@@ -13,13 +13,8 @@ import type pino from 'pino';
 
 import { prisma } from '@bidstack/db';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
-import {
-  GrantRevokedError,
-  microsoftRefreshScopes,
-  runWithOAuthRefreshLock,
-  tokenFrom,
-  type OAuthRefreshLockRedis,
-} from '@bidstack/shared';
+import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
+import { runWithOAuthRefreshLock, type OAuthRefreshLockRedis } from '@bidstack/shared/server';
 
 export { GrantRevokedError };
 

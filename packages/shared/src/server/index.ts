@@ -5,3 +5,4 @@ export * from './dust-credentials.js';
 export * from './open-tech-stack.js';
 export * from './safe-outbound-fetch.js';
 export * from './trust-proxy.js';
+export * from '../oauth-refresh-lock.js';
