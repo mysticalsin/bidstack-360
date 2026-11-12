@@ -64,22 +64,36 @@ function stalledFlag(job: {
   });
 }
 
-/** A start that never queued is not a job. The audit log is insert-only, so this writes nothing there. */
+/**
+ * A start that never queued is not a job. The audit log is insert-only, so the
+ * failure is a new row. That row is written first, then the pending job, then
+ * the Redis key. A throw before the key is deleted leaves the pending job with
+ * its rows. A throw from the key delete cannot leave a pending job.
+ */
 async function abandonUnqueuedStart(input: {
   jobId: string;
   orgId: string;
+  userId: string;
   redisKey: string;
   redis: { del: (key: string) => Promise<unknown> };
+  reason: string;
 }): Promise<void> {
-  const removed = await prisma.$transaction((tx) =>
-    tx.migrationJob.deleteMany({
-      where: { id: input.jobId, orgId: input.orgId, status: 'PENDING' },
-    }),
-  );
-  // Release the rows only after the pending row is gone. A cancel that already
-  // won keeps its job and its key.
+  await prisma.auditLog.create({
+    data: {
+      orgId: input.orgId,
+      userId: input.userId,
+      action: 'migration.start_failed',
+      targetType: 'MigrationJob',
+      targetId: input.jobId,
+      diff: { reason: input.reason },
+    },
+  });
+  const removed = await prisma.migrationJob.deleteMany({
+    where: { id: input.jobId, orgId: input.orgId, status: 'PENDING' },
+  });
+  // A cancel that already won is not pending, so its key stays.
   if (removed.count > 0) {
-    await input.redis.del(input.redisKey).catch(() => undefined);
+    await input.redis.del(input.redisKey);
   }
 }
 
@@ -260,7 +274,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
       } catch (err) {
         req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
-        await abandonUnqueuedStart({ jobId: job.id, orgId, redisKey, redis: server.redis });
+        await abandonUnqueuedStart({
+          jobId: job.id,
+          orgId,
+          userId,
+          redisKey,
+          redis: server.redis,
+          reason: 'rows',
+        });
         throw err;
       }
 
@@ -288,7 +309,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         });
       } catch (err) {
         req.log.error({ err, migrationJobId: job.id }, 'failed to enqueue import chunks');
-        await abandonUnqueuedStart({ jobId: job.id, orgId, redisKey, redis: server.redis });
+        await abandonUnqueuedStart({
+          jobId: job.id,
+          orgId,
+          userId,
+          redisKey,
+          redis: server.redis,
+          reason: 'queue',
+        });
         throw server.httpErrors.conflict('The import could not be queued. Try again.');
       }
 

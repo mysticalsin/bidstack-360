@@ -98,16 +98,14 @@ describe('migration queue acquisition', () => {
     // 500 and leaves the row PENDING, which the wizard never shows.
     const { redis } = await import('../redis.js');
     const set = vi.spyOn(redis, 'set').mockRejectedValueOnce(new Error('redis down'));
-    // The audit log is insert-only outside tests. A cleanup that deletes the
-    // start row throws, and the pending job is what remains.
-    const removeAudit = vi.spyOn(prisma.auditLog, 'deleteMany').mockRejectedValue(
-      new Error("AuditLog is insert-only: 'deleteMany' is not permitted."),
-    );
     const before = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
     const audits = await prisma.auditLog.count({
       where: { orgId: org.orgId, action: 'migration.start' },
+    });
+    const failed = await prisma.auditLog.count({
+      where: { orgId: org.orgId, action: 'migration.start_failed' },
     });
     try {
       const res = await server.inject({
@@ -123,31 +121,37 @@ describe('migration queue acquisition', () => {
       expect(res.statusCode).toBe(500);
     } finally {
       set.mockRestore();
-      removeAudit.mockRestore();
     }
     const pending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
     expect(pending).toBe(before);
-    // The start audit names a job that no longer exists.
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start' } }),
     ).toBe(audits);
+    expect(
+      await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start_failed' } }),
+    ).toBe(failed + 1);
   });
 
   t('repeated starts that cannot be queued leave no pending job', async () => {
     // WHY: each click created a PENDING job, stored its rows, and wrote an
     // audit, then returned 409 with no id. The next click added another.
-    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
-    const removeAudit = vi.spyOn(prisma.auditLog, 'deleteMany').mockRejectedValue(
-      new Error("AuditLog is insert-only: 'deleteMany' is not permitted."),
+    // The failure is an extra audit row. The log is insert-only, so cleanup
+    // must not delete one.
+    await expect(prisma.auditLog.deleteMany({ where: { orgId: org.orgId } })).rejects.toThrow(
+      /insert-only/,
     );
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
     const beforeJobs = await prisma.migrationJob.count({ where: { orgId: org.orgId } });
     const beforePending = await prisma.migrationJob.count({
       where: { orgId: org.orgId, status: 'PENDING' },
     });
     const beforeAudits = await prisma.auditLog.count({
       where: { orgId: org.orgId, action: 'migration.start' },
+    });
+    const beforeFailed = await prisma.auditLog.count({
+      where: { orgId: org.orgId, action: 'migration.start_failed' },
     });
     const beforeKeys = (await server.redis.keys('migration:*')).sort();
     try {
@@ -167,10 +171,8 @@ describe('migration queue acquisition', () => {
           message: 'The import could not be queued. Try again.',
         });
       }
-      expect(removeAudit).not.toHaveBeenCalled();
     } finally {
       add.mockRestore();
-      removeAudit.mockRestore();
     }
     expect(await prisma.migrationJob.count({ where: { orgId: org.orgId } })).toBe(beforeJobs);
     expect(
@@ -179,7 +181,82 @@ describe('migration queue acquisition', () => {
     expect(
       await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start' } }),
     ).toBe(beforeAudits);
+    expect(
+      await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start_failed' } }),
+    ).toBe(beforeFailed + 2);
     expect((await server.redis.keys('migration:*')).sort()).toEqual(beforeKeys);
+  });
+
+  t('a failed start keeps the job and its rows when the failure audit cannot be written', async () => {
+    // WHY: the failure row is written first. If that insert throws, deleting
+    // the Redis key would leave a PENDING job whose rows are already gone.
+    const create = vi.spyOn(prisma.auditLog, 'create').mockRejectedValue(new Error('audit down'));
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const beforePending = await prisma.migrationJob.count({
+      where: { orgId: org.orgId, status: 'PENDING' },
+    });
+    const beforeKeys = (await server.redis.keys('migration:*')).sort();
+    try {
+      await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'company.name' },
+        },
+      });
+    } finally {
+      create.mockRestore();
+      add.mockRestore();
+    }
+    expect(
+      await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
+    ).toBe(beforePending + 1);
+    expect((await server.redis.keys('migration:*')).length).toBe(beforeKeys.length + 1);
+  });
+
+  t('a failed start does not drop the rows when the job cannot be removed', async () => {
+    // WHY: the Redis key is last. A throw from the job delete must leave the
+    // key in place, and the failure audit must already be stored.
+    const original = prisma.migrationJob.deleteMany.bind(prisma.migrationJob);
+    const removeJob = vi.spyOn(prisma.migrationJob, 'deleteMany').mockImplementation((args) => {
+      const where = args?.where as { id?: string; status?: string } | undefined;
+      if (where?.status === 'PENDING' && where.id) throw new Error('job delete down');
+      return original(args);
+    });
+    const add = vi.spyOn(Queue.prototype, 'add').mockRejectedValue(new Error('queue down'));
+    const beforePending = await prisma.migrationJob.count({
+      where: { orgId: org.orgId, status: 'PENDING' },
+    });
+    const beforeFailed = await prisma.auditLog.count({
+      where: { orgId: org.orgId, action: 'migration.start_failed' },
+    });
+    const beforeKeys = (await server.redis.keys('migration:*')).sort();
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/v1/migrations/start-csv',
+        payload: {
+          source: 'CSV',
+          entityType: 'company',
+          rows: [{ name: 'Acme' }],
+          mappings: { name: 'company.name' },
+        },
+      });
+      expect(res.statusCode).toBe(500);
+    } finally {
+      removeJob.mockRestore();
+      add.mockRestore();
+    }
+    expect(
+      await prisma.migrationJob.count({ where: { orgId: org.orgId, status: 'PENDING' } }),
+    ).toBe(beforePending + 1);
+    expect(
+      await prisma.auditLog.count({ where: { orgId: org.orgId, action: 'migration.start_failed' } }),
+    ).toBe(beforeFailed + 1);
+    expect((await server.redis.keys('migration:*')).length).toBe(beforeKeys.length + 1);
   });
 
   t('starts a csv import on the process Redis client', async () => {
