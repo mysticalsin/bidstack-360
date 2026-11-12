@@ -20,7 +20,9 @@ describe('Redis reconnect delay', () => {
 describe('Redis connection status helpers', () => {
   it('only runs commands on statuses ioredis can accept immediately', () => {
     expect(redisStatusCanRunCommand('ready')).toBe(true);
-    expect(redisStatusCanRunCommand('connect')).toBe(true);
+    // WHY: ioredis rejects commands until ready when the offline queue is off.
+    // Treating connect as ready made the next command fail.
+    expect(redisStatusCanRunCommand('connect')).toBe(false);
 
     expect(redisStatusCanRunCommand('wait')).toBe(false);
     expect(redisStatusCanRunCommand('close')).toBe(false);
