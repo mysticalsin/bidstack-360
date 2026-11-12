@@ -491,4 +491,36 @@ describe('CsvImportWizard', () => {
     );
     expect(screen.queryByText(/will be tried again/)).toBeNull();
   });
+
+  it('shows a failed start on the confirm step and sends it once', async () => {
+    // WHY: Confirm lives on the preview step. The error was only rendered on
+    // the mapping step, so a 500 left the screen unchanged, and a second click
+    // before pending flipped sent the import again.
+    stubHooks();
+    hookMocks.useStartCsvImport.mockReturnValue({
+      mutate: hookMocks.mutate,
+      isPending: false,
+      isError: true,
+    });
+    render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    expect(
+      screen.getByText('Could not start the import. Check your mappings and try again.'),
+    ).toBeTruthy();
+    const confirm = screen.getByRole('button', { name: 'Confirm import' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(hookMocks.mutate).toHaveBeenCalledTimes(1);
+  });
 });

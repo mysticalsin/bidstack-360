@@ -123,6 +123,7 @@ export function CsvImportWizard() {
   const [dedup, setDedup] = useState<Dedup>('update');
   const [jobId, setJobId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const starting = useRef(false);
 
   const start = useStartCsvImport();
   const cancel = useCancelMigration();
@@ -195,7 +196,8 @@ export function CsvImportWizard() {
   }
 
   function runImport() {
-    if (!parsed) return;
+    if (!parsed || starting.current || start.isPending) return;
+    starting.current = true;
     start.mutate(
       {
         source: 'CSV',
@@ -208,6 +210,9 @@ export function CsvImportWizard() {
         onSuccess: (created) => {
           setJobId(created.id);
           setStep('run');
+        },
+        onSettled: () => {
+          starting.current = false;
         },
       },
     );
@@ -426,6 +431,14 @@ export function CsvImportWizard() {
           ) : (
             <p className="text-sm text-[var(--fg-primary)]">
               {t('csvImport.preview.allValid', 'Money, dates, and required fields passed validation.')}
+            </p>
+          )}
+          {start.isError && (
+            <p className="text-sm text-[var(--danger)]">
+              {t(
+                'csvImport.map.startError',
+                'Could not start the import. Check your mappings and try again.',
+              )}
             </p>
           )}
           <div className="flex items-center gap-2">
