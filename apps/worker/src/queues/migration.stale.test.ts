@@ -10,6 +10,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   claimStaleMigration,
   processMigrationChunk,
+  sweepAbandonedPending,
   sweepStaleMigrations,
   type MigrationChunkDeps,
 } from './migration.js';
@@ -57,6 +58,31 @@ async function runningJob(progressAt?: string) {
     UPDATE migration_jobs SET updated_at = ${past}, started_at = ${past} WHERE id = ${job.id}::uuid
   `;
   return { org, job };
+}
+
+async function pendingJob(ageMs: number, entityType = 'company') {
+  const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+  const org = await prisma.org.create({
+    data: { clerkOrg: `org_mig_pending_${ns}`, name: `pending ${ns}` },
+  });
+  const user = await prisma.user.create({
+    data: { orgId: org.id, clerkUser: `user_${ns}`, email: `${ns}@test.local`, name: 'Pending' },
+  });
+  const job = await prisma.migrationJob.create({
+    data: {
+      orgId: org.id,
+      userId: user.id,
+      source: 'CSV',
+      status: 'PENDING',
+      totalRows: 1,
+      meta: { entityType },
+    },
+  });
+  const past = new Date(Date.now() - ageMs);
+  await prisma.$executeRaw`
+    UPDATE migration_jobs SET created_at = ${past}, updated_at = ${past} WHERE id = ${job.id}::uuid
+  `;
+  return { org, user, job };
 }
 
 describe('migration stale scan', () => {
@@ -140,5 +166,64 @@ describe('migration stale scan', () => {
     const summary = stored.errorSummary as Array<{ message?: string }>;
     expect(summary[0]?.message).toBe('stale');
     await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+  });
+
+  t('an old pending start that never queued is removed', async () => {
+    // WHY: a crash after migration.start_failed, or before the chunks were
+    // queued, leaves a PENDING job the wizard never received. The sweep has
+    // to remove it. A job that still has a queue entry, and a young one, stay.
+    const abandoned = await pendingJob(16 * 60_000);
+    await prisma.auditLog.create({
+      data: {
+        orgId: abandoned.org.id,
+        userId: abandoned.user.id,
+        action: 'migration.start_failed',
+        targetType: 'MigrationJob',
+        targetId: abandoned.job.id,
+        diff: { reason: 'queue' },
+      },
+    });
+    const unqueued = await pendingJob(16 * 60_000);
+    const queued = await pendingJob(16 * 60_000);
+    const young = await pendingJob(60_000);
+    await prisma.auditLog.create({
+      data: {
+        orgId: young.org.id,
+        userId: young.user.id,
+        action: 'migration.start_failed',
+        targetType: 'MigrationJob',
+        targetId: young.job.id,
+        diff: { reason: 'rows' },
+      },
+    });
+    const deleted: string[] = [];
+    const reaped = await sweepAbandonedPending(new Date(), {
+      hasQueueEntry: async (id) => id === queued.job.id,
+      deleteRows: async (key) => {
+        deleted.push(key);
+      },
+    });
+    expect(reaped).toBe(2);
+    expect(await prisma.migrationJob.findUnique({ where: { id: abandoned.job.id } })).toBeNull();
+    expect(await prisma.migrationJob.findUnique({ where: { id: unqueued.job.id } })).toBeNull();
+    expect((await prisma.migrationJob.findUnique({ where: { id: queued.job.id } }))?.status).toBe(
+      'PENDING',
+    );
+    expect((await prisma.migrationJob.findUnique({ where: { id: young.job.id } }))?.status).toBe(
+      'PENDING',
+    );
+    expect(deleted.sort()).toEqual(
+      [
+        `migration:${abandoned.job.id}:company:rows`,
+        `migration:${unqueued.job.id}:company:rows`,
+      ].sort(),
+    );
+    const audit = await prisma.auditLog.findFirst({
+      where: { orgId: abandoned.org.id, targetId: abandoned.job.id, action: 'migration.start_failed' },
+    });
+    expect(audit).toBeTruthy();
+    for (const row of [abandoned, unqueued, queued, young]) {
+      await prisma.org.delete({ where: { id: row.org.id } }).catch(() => undefined);
+    }
   });
 });

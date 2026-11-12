@@ -1098,6 +1098,12 @@ export const MIGRATION_STALE_SCAN = 'migration-stale-scan';
 export const MIGRATION_STALE_SCAN_MS = 60_000;
 
 /**
+ * A PENDING job this old was not an in-flight start. The same window as a
+ * stalled running import: a request still inside the handler is shorter.
+ */
+export const MIGRATION_ABANDONED_PENDING_MS = MIGRATION_STALE_MS;
+
+/**
  * Compare-and-set RUNNING → FAILED for one observed progress time.
  * A chunk that committed after this time moved `updatedAt`, so the write misses.
  */
@@ -1145,6 +1151,58 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
     if (await claimStaleMigration(job.id, job.updatedAt)) claimed += 1;
   }
   return claimed;
+}
+
+function migrationEntityType(meta: unknown): string | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+  const value = (meta as { entityType?: unknown }).entityType;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Remove a PENDING start the handler did not finish. A start_failed row means
+ * the queue already refused it. No queue entry means the chunks were never
+ * accepted. A job that still has a chunk waiting is left for the worker.
+ */
+export async function sweepAbandonedPending(
+  now = new Date(),
+  deps: {
+    hasQueueEntry?: (migrationJobId: string) => Promise<boolean>;
+    deleteRows?: (key: string) => Promise<unknown>;
+  } = {},
+): Promise<number> {
+  const cutoff = new Date(now.getTime() - MIGRATION_ABANDONED_PENDING_MS);
+  const candidates = await prisma.migrationJob.findMany({
+    where: { status: 'PENDING', createdAt: { lte: cutoff } },
+    select: { id: true, orgId: true, meta: true },
+  });
+  let reaped = 0;
+  for (const job of candidates) {
+    const failedStart = await prisma.auditLog.findFirst({
+      where: { orgId: job.orgId, targetId: job.id, action: 'migration.start_failed' },
+      select: { id: true },
+    });
+    if (!failedStart) {
+      if (!deps.hasQueueEntry) continue;
+      let queued: boolean;
+      try {
+        queued = await deps.hasQueueEntry(job.id);
+      } catch {
+        continue;
+      }
+      if (queued) continue;
+    }
+    const removed = await prisma.migrationJob.deleteMany({
+      where: { id: job.id, orgId: job.orgId, status: 'PENDING' },
+    });
+    if (removed.count !== 1) continue;
+    const entityType = migrationEntityType(job.meta);
+    if (entityType && deps.deleteRows) {
+      await deps.deleteRows(`migration:${job.id}:${entityType}:rows`).catch(() => undefined);
+    }
+    reaped += 1;
+  }
+  return reaped;
 }
 
 type FailLog = {
@@ -1258,6 +1316,22 @@ export async function startMigrationWorker(
     async (job: Job) => {
       if (job.name === MIGRATION_STALE_SCAN) {
         await sweepStaleMigrations();
+        let hasQueueEntry: ((migrationJobId: string) => Promise<boolean>) | undefined;
+        try {
+          const waiting = await queue.getJobs(['waiting', 'active', 'delayed', 'paused', 'prioritized']);
+          const queued = new Set<string>();
+          for (const entry of waiting) {
+            const id = (entry?.data as { migrationJobId?: unknown } | undefined)?.migrationJobId;
+            if (typeof id === 'string') queued.add(id);
+          }
+          hasQueueEntry = async (migrationJobId) => queued.has(migrationJobId);
+        } catch (err) {
+          log.warn({ err }, 'migration sweep could not read the queue');
+        }
+        await sweepAbandonedPending(new Date(), {
+          hasQueueEntry,
+          deleteRows: (key) => connection.del(key),
+        });
         return;
       }
       const payload = MigrationJobPayload.parse(job.data);
