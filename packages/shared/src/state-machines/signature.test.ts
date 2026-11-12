@@ -5,7 +5,6 @@ import {
   SIGNATURE_EVENTS,
   SIGNATURE_STATES,
   signatureFrom,
-  signatureStateFromStored,
   signatureTransition,
   type SignatureTransitionEvent,
   type SignatureState,
@@ -35,12 +34,5 @@ describe('signature transition table', () => {
         expect(signatureFrom(event)).not.toContain(from);
       }
     }
-  });
-
-  it('loads a known status as itself and an unknown status as expired without calling it known', () => {
-    for (const state of SIGNATURE_STATES) {
-      expect(signatureStateFromStored(state)).toEqual({ state, known: true });
-    }
-    expect(signatureStateFromStored('mystery')).toEqual({ state: 'EXPIRED', known: false });
   });
 });

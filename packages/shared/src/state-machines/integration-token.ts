@@ -37,14 +37,3 @@ export function tokenTransition(from: TokenState, event: TokenEvent): TokenState
 export function tokenRefreshAllowed(deletedAt: Date | null): boolean {
   return deletedAt === null;
 }
-
-/**
- * An unknown stored value is viewed as revoked and is not a known state.
- * Callers do not write that view back and do not refresh the grant.
- */
-export function tokenStateFromStored(value: string): { state: TokenState; known: boolean } {
-  if ((TOKEN_STATES as readonly string[]).includes(value)) {
-    return { state: value as TokenState, known: true };
-  }
-  return { state: 'revoked', known: false };
-}

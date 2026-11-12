@@ -6,7 +6,6 @@ import {
   PROPOSAL_STATES,
   proposalApprovalAllowed,
   proposalFrom,
-  proposalStateFromStored,
   proposalTransition,
   type ProposalEvent,
   type ProposalState,
@@ -39,12 +38,5 @@ describe('proposal transition table', () => {
   it('allows approval only while the proposal is not deleted', () => {
     expect(proposalApprovalAllowed(null)).toBe(true);
     expect(proposalApprovalAllowed(new Date('2026-11-11T12:00:00.000Z'))).toBe(false);
-  });
-
-  it('loads a known status as itself and an unknown status as lost without calling it known', () => {
-    for (const state of PROPOSAL_STATES) {
-      expect(proposalStateFromStored(state)).toEqual({ state, known: true });
-    }
-    expect(proposalStateFromStored('mystery')).toEqual({ state: 'lost', known: false });
   });
 });

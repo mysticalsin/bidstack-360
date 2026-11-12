@@ -54,7 +54,7 @@ Events: `connect`, `refresh_ok`, `refresh_fail`, `revoke`, `expire`.
 
 Transitions: `connect → active` (the three writers above, LATER). `refresh_ok` from `active` or `error` → `active`. `refresh_fail` from `active` or `error` → `error`. `revoke` from `active` or `error` → `revoked` when the provider rejects the grant. `expire` is in the enum and has no writer on this tree. `revoked` and a tombstone are not rewritten by refresh.
 
-Legacy / unknown: a value outside the Prisma enum is rejected by the database. `expired` is never written. A stored `expired` refuses refresh and is not rewritten. The pure loader views an unknown string as `revoked` and does not write it back. A row with `deletedAt` set is not refreshed.
+Legacy / unknown: a value outside the Prisma enum is rejected by the database. `expired` is never written. A stored `expired` refuses refresh and is not rewritten. A row with `deletedAt` set is not refreshed.
 
 ## 2. Access policy
 
@@ -97,7 +97,7 @@ Events: `start`, `cancel`, `complete`, `fail`, `undo`, `retry`, `stale`.
 
 Transitions: `start` is `PENDING → RUNNING` and must win before any chunk is enqueued. `cancel` from `PENDING|RUNNING → CANCELLED`. `complete` from `RUNNING → COMPLETE`. `fail` from `RUNNING → FAILED`. `undo` from `COMPLETE → FAILED` with `meta.undone` (there is no `UNDONE` status). `retry` from `FAILED → RUNNING` only when nothing was imported. `stale` from `RUNNING → FAILED` only after a worker claim with no progress for 15 minutes, and only from the worker. `COMPLETE` and `CANCELLED` do not move again. A `FAILED` job that already imported rows does not retry.
 
-Legacy / unknown: the column is a Prisma enum, so an unknown value is rejected by the database. The pure loader views an unknown string as `FAILED` and does not write it back. `undo` is stored as `FAILED` plus `meta.undone`, not as its own status.
+Legacy / unknown: the column is a Prisma enum, so an unknown value is rejected by the database. `undo` is stored as `FAILED` plus `meta.undone`, not as its own status.
 
 Platform: cancel and undo return HTTP 409 when the from-state does not match. The worker does not throw on a lost complete; it leaves the row.
 
@@ -149,7 +149,7 @@ Events: `send`, `view`, `sign`, `decline`, `void`, `expire`.
 
 Transitions: void is legal from `DRAFT`, `SENT`, or `VIEWED`. `SIGNED`, `DECLINED`, `VOIDED`, and `EXPIRED` do not move.
 
-Legacy / unknown: Prisma enum. The pure loader views an unknown string as `EXPIRED` and does not write it back.
+Legacy / unknown: Prisma enum. An unknown value cannot be stored.
 
 Page guard: `welcome → sign → submit → confirm`. `confirm` is terminal in the component. Jumping backward is a UI concern and does not void or sign.
 
@@ -251,7 +251,7 @@ Events: Twilio `queued`, `sent`, `delivered`, `failed`, `undelivered`.
 
 Transitions: `QUEUED → SENT → DELIVERED`. `FAILED` and `UNDELIVERED` are forward moves from `QUEUED` or `SENT`. Nothing moves out of `DELIVERED`, `FAILED`, or `UNDELIVERED`. A same-rank callback does not replace a terminal status.
 
-Legacy / unknown: an unrecognized Twilio status is ignored, and its price and error are not stored. A recognized status that loses the compare-and-set keeps those facts and does not change status. The column is a Prisma enum. The pure loader views an unknown stored string as `FAILED` and does not write it back.
+Legacy / unknown: an unrecognized Twilio status is ignored, and its price and error are not stored. A recognized status that loses the compare-and-set keeps those facts and does not change status. The column is a Prisma enum. An unknown value cannot be stored.
 
 The forward-only guard and the org scope are in. Risk for the callback race is closed.
 

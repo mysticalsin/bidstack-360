@@ -132,14 +132,3 @@ export function migrationAttemptId(meta: unknown): string | null {
   const value = (meta as { attemptId?: unknown }).attemptId;
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
-
-/**
- * An unknown stored value is viewed as failed and is not a known state.
- * Callers do not write that view back.
- */
-export function migrationStateFromStored(value: string): { state: MigrationState; known: boolean } {
-  if ((MIGRATION_STATES as readonly string[]).includes(value)) {
-    return { state: value as MigrationState, known: true };
-  }
-  return { state: 'FAILED', known: false };
-}

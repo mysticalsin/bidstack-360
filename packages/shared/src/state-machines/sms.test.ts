@@ -6,7 +6,6 @@ import {
   SMS_STATES,
   smsEventFromProvider,
   smsFrom,
-  smsStateFromStored,
   smsTarget,
   smsTransition,
   type SmsEvent,
@@ -49,12 +48,5 @@ describe('sms transition table', () => {
     expect(smsEventFromProvider('DELIVERED')).toBe('delivered');
     expect(smsEventFromProvider('accepted')).toBeNull();
     expect(smsEventFromProvider('')).toBeNull();
-  });
-
-  it('loads a known status as itself and an unknown status as failed without calling it known', () => {
-    for (const state of SMS_STATES) {
-      expect(smsStateFromStored(state)).toEqual({ state, known: true });
-    }
-    expect(smsStateFromStored('mystery')).toEqual({ state: 'FAILED', known: false });
   });
 });

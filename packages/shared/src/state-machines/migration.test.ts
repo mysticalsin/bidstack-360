@@ -14,7 +14,6 @@ import {
   migrationFrom,
   migrationRetryAllowed,
   migrationStaleDue,
-  migrationStateFromStored,
   migrationTransition,
   migrationUndoStillOpen,
   type MigrationEvent,
@@ -110,13 +109,5 @@ describe('migration transition table', () => {
     for (const state of MIGRATION_STATES) {
       expect(migrationChunkMayRun(state)).toBe(state === 'RUNNING');
     }
-  });
-
-  it('loads a known status as itself and an unknown status as failed without calling it known', () => {
-    for (const state of MIGRATION_STATES) {
-      expect(migrationStateFromStored(state)).toEqual({ state, known: true });
-    }
-    expect(migrationStateFromStored('mystery')).toEqual({ state: 'FAILED', known: false });
-    expect(migrationStateFromStored('')).toEqual({ state: 'FAILED', known: false });
   });
 });

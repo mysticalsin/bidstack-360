@@ -34,14 +34,3 @@ export function signatureTransition(
   if (!FROM[event].includes(from)) return illegalTransition();
   return TO[event];
 }
-
-/**
- * An unknown stored value is viewed as expired and is not a known state.
- * Callers do not write that view back. Expired does not void.
- */
-export function signatureStateFromStored(value: string): { state: SignatureState; known: boolean } {
-  if ((SIGNATURE_STATES as readonly string[]).includes(value)) {
-    return { state: value as SignatureState, known: true };
-  }
-  return { state: 'EXPIRED', known: false };
-}

@@ -43,14 +43,3 @@ export function smsEventFromProvider(raw: string): SmsEvent | null {
   const key = raw.toLowerCase();
   return (SMS_EVENTS as readonly string[]).includes(key) ? (key as SmsEvent) : null;
 }
-
-/**
- * An unknown stored value is viewed as failed and is not a known state.
- * Callers do not write that view back.
- */
-export function smsStateFromStored(value: string): { state: SmsState; known: boolean } {
-  if ((SMS_STATES as readonly string[]).includes(value)) {
-    return { state: value as SmsState, known: true };
-  }
-  return { state: 'FAILED', known: false };
-}

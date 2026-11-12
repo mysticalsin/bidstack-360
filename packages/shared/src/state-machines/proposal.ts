@@ -31,14 +31,3 @@ export function proposalTransition(
 export function proposalApprovalAllowed(deletedAt: Date | null): boolean {
   return deletedAt === null;
 }
-
-/**
- * An unknown stored value is viewed as lost and is not a known state.
- * Callers do not write that view back. Lost does not approve.
- */
-export function proposalStateFromStored(value: string): { state: ProposalState; known: boolean } {
-  if ((PROPOSAL_STATES as readonly string[]).includes(value)) {
-    return { state: value as ProposalState, known: true };
-  }
-  return { state: 'lost', known: false };
-}

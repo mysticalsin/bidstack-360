@@ -6,7 +6,6 @@ import {
   TOKEN_STATES,
   tokenFrom,
   tokenRefreshAllowed,
-  tokenStateFromStored,
   tokenTransition,
   type TokenEvent,
   type TokenState,
@@ -50,13 +49,5 @@ describe('integration token transition table', () => {
   it('allows a refresh only while the grant is not deleted', () => {
     expect(tokenRefreshAllowed(null)).toBe(true);
     expect(tokenRefreshAllowed(new Date('2026-11-11T12:00:00.000Z'))).toBe(false);
-  });
-
-  it('loads a known status as itself and an unknown status as revoked without calling it known', () => {
-    for (const state of TOKEN_STATES) {
-      expect(tokenStateFromStored(state)).toEqual({ state, known: true });
-    }
-    expect(tokenStateFromStored('mystery')).toEqual({ state: 'revoked', known: false });
-    expect(tokenStateFromStored('').known).toBe(false);
   });
 });
