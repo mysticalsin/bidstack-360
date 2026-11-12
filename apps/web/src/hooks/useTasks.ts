@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
@@ -26,6 +28,18 @@ export function useTasks(filter: Partial<TaskFilter> = {}) {
 }
 
 export function useTaskSummary() {
+  const qc = useQueryClient();
+  const { pathname } = useLocation();
+  const seen = useRef<string | null>(null);
+  useEffect(() => {
+    if (seen.current === null) {
+      seen.current = pathname;
+      return;
+    }
+    if (seen.current === pathname) return;
+    seen.current = pathname;
+    void qc.invalidateQueries({ queryKey: ['tasks', 'summary'] });
+  }, [pathname, qc]);
   return useQuery({
     queryKey: ['tasks', 'summary'],
     queryFn: ({ signal }) => api<TaskSummaryPayload>('/api/tasks/summary', { signal }),
