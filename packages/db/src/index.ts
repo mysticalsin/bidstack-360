@@ -73,17 +73,10 @@ function buildPrismaClient(): PrismaClient {
   // ai_invocations has a retention purge; AuditLog itself is not yet pruned —
   // tracked as follow-up. See audit-immutability.ts.)
   //
-  // WHY the test-env skip: integration tests seed AuditLog fixtures and must purge
-  // them in teardown via the ordinary client. The guard's behaviour is proven by
-  // audit-immutability.test.ts (it calls the factory directly), and real
-  // tamper-resistance is enforced in prod/dev here AND, as the recommended
-  // backstop, by a DB-level trigger + REVOKE (see audit-immutability.ts). Leaving
-  // the app-layer guard unconditional in test would force every suite onto a raw
-  // SQL purge path for no added safety, so we skip registration only under Vitest.
-  const isTestRuntime = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
-  if (!isTestRuntime) {
-    client.$use(makeAuditImmutabilityMiddleware());
-  }
+  // On in every runtime, including integration tests. A delete that only fails
+  // outside Vitest is how a start cleanup shipped a 500. Test teardown purges
+  // with raw SQL, which is the retention path and does not pass through $use.
+  client.$use(makeAuditImmutabilityMiddleware());
 
   return client;
 }

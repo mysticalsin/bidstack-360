@@ -11,6 +11,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 const {
   enqueueCrewRunMock,
@@ -100,7 +101,7 @@ afterAll(async () => {
   if (dbReachable) {
     const targetIds = [...createdRunIds, ...createdCrewIds];
     if (targetIds.length > 0) {
-      await prisma.auditLog.deleteMany({ where: { targetId: { in: targetIds } } });
+      await purgeAuditRows({ where: { targetId: { in: targetIds } } });
     }
     if (createdRunIds.length > 0) {
       await prisma.$executeRaw`

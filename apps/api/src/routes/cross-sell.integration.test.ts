@@ -13,6 +13,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -59,7 +60,7 @@ afterAll(async () => {
     if (cleanupCompanyIds.length > 0) {
       await prisma.company.deleteMany({ where: { orgId, id: { in: cleanupCompanyIds } } });
     }
-    await prisma.auditLog.deleteMany({
+    await purgeAuditRows({
       where: { orgId, action: { startsWith: 'cross_sell_action.' } },
     });
     if (stubUserId) invalidateAccessScope(orgId, stubUserId);

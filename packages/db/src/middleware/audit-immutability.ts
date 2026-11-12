@@ -20,9 +20,9 @@ import type { Prisma } from '../../generated/client/index.js';
  *
  * WHY $executeRaw over a middleware-level flag: a flag the purge sets/clears is
  * an ambient, racy escape hatch any caller could reach for; the raw-SQL boundary
- * is explicit, auditable in one place (the retention worker), and can itself be
- * locked down further with a DB role. Keeping the exception OUT of this
- * middleware keeps the rule here unconditional and easy to reason about.
+ * is explicit and can itself be locked down further with a DB role. The
+ * retention worker and test teardown are the callers. Keeping the exception
+ * OUT of this middleware keeps the rule here unconditional.
  *
  * DB-level layer: migration 20261107070020_audit_log_hash_chain_triggers adds triggers
  * that hash-chain every insert per org and reject content UPDATE and TRUNCATE

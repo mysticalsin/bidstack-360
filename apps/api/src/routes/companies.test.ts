@@ -12,6 +12,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -40,7 +41,7 @@ beforeAll(async () => {
 afterEach(async () => {
   if (!dbReachable) return;
   if (auditIds.length > 0) {
-    await prisma.auditLog.deleteMany({ where: { id: { in: auditIds } } });
+    await purgeAuditRows({ where: { id: { in: auditIds } } });
     auditIds.length = 0;
   }
   if (createdCompanyIds.length > 0) {

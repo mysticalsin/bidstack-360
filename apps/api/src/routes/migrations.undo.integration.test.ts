@@ -17,6 +17,7 @@ import { describe, expect } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { makeMigrationsTestContext } from './migrations.test-helpers.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 const {
   ctx,
@@ -267,7 +268,7 @@ describe('DELETE /api/v1/migrations/:id/undo', () => {
     expect(jobRow?.status).toBe('COMPLETE');
 
     // Clean up fixtures created outside the shared helpers.
-    await prisma.auditLog.deleteMany({ where: { id: { in: chunkLogs.map((l) => l.id) } } });
+    await purgeAuditRows({ where: { id: { in: chunkLogs.map((l) => l.id) } } });
     await prisma.opportunity.delete({ where: { id: opportunity.id } });
     await prisma.contact.delete({ where: { id: contact.id } });
   });
