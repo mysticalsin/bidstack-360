@@ -1,3 +1,4 @@
+import IORedis from 'ioredis';
 import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -288,6 +289,28 @@ describe('getWorkspaceAccessToken', () => {
       },
     });
     expect(await ready()).toBe(false);
+  });
+
+  it('listens for errors on the refresh Redis client', () => {
+    // WHY: ioredis prints "Unhandled error" when this client has no error
+    // listener. The API client swallows that event; this one must too.
+    const on = vi.spyOn(IORedis.prototype, 'on');
+    const previousEnv = process.env.NODE_ENV;
+    const previousUrl = process.env.REDIS_URL;
+    process.env.NODE_ENV = 'development';
+    process.env.REDIS_URL = 'redis://127.0.0.1:1';
+    try {
+      refreshLockRedis();
+      expect(on.mock.calls.some((call) => call[0] === 'error' && typeof call[1] === 'function')).toBe(
+        true,
+      );
+    } finally {
+      process.env.NODE_ENV = previousEnv;
+      if (previousUrl === undefined) delete process.env.REDIS_URL;
+      else process.env.REDIS_URL = previousUrl;
+      for (const instance of on.mock.instances) instance.disconnect();
+      on.mockRestore();
+    }
   });
 
   it('marks a transient provider failure as error, not revoked', async () => {

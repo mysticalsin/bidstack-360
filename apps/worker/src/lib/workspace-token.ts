@@ -161,6 +161,9 @@ export function refreshLockRedis(injected?: RefreshLockClient): OAuthRefreshLock
         lazyConnect: true,
         enableOfflineQueue: false,
       });
+      refreshClient.on('error', () => {
+        // Prevent unhandled 'error' events; the API client does the same.
+      });
     }
   }
   const client = injected ?? (refreshClient as RefreshLockClient);
