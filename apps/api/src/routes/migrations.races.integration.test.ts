@@ -112,14 +112,14 @@ describe('migration status races', () => {
     const { redis } = await import('../redis.js');
     (server as unknown as { redis: typeof redis }).redis = redis;
 
-    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (name: unknown) => {
-      const jobId = String(name).split('-chunk-')[0];
-      // The cancel lands after the chunk is queued and before start returns.
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
+      const jobId = String(jobs[0]?.name ?? '').split('-chunk-')[0];
+      // The cancel lands after the chunks are handed to the queue and before start returns.
       await prisma.migrationJob.update({
         where: { id: jobId },
         data: { status: 'CANCELLED', completedAt: new Date() },
       });
-      return { id: String(name) } as never;
+      return [{ id: jobId }] as never;
     });
 
     try {
@@ -223,9 +223,10 @@ describe('migration status races', () => {
       update: { mappings: { Name: 'company.website' } },
     });
     const added: Array<{ mappings?: Record<string, string | null> }> = [];
-    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (_name, data) => {
-      added.push(data as { mappings?: Record<string, string | null> });
-      return { id: 'chunk' } as never;
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
+      const data = jobs[0]?.data as { mappings?: Record<string, string | null> } | undefined;
+      if (data) added.push(data);
+      return [{ id: 'chunk' }] as never;
     });
     try {
       const retry = await server.inject({
@@ -240,15 +241,14 @@ describe('migration status races', () => {
   });
 
   t('a later enqueue failure does not leave the job', async () => {
-    // WHY: the first chunk is queued before the next add throws. The start
+    // WHY: the chunks go out in one bulk add. If that add throws, the start
     // never claimed the job, so the row and its stored rows are removed.
     let calls = 0;
     let jobId = '';
-    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (_name, data) => {
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
       calls += 1;
-      jobId = (data as { migrationJobId: string }).migrationJobId;
-      if (calls > 1) throw new Error('queue down');
-      return { id: 'chunk-0' } as never;
+      jobId = (jobs[0]?.data as { migrationJobId: string }).migrationJobId;
+      throw new Error('queue down');
     });
     try {
       const rows = Array.from({ length: 101 }, (_, i) => ({ name: `Co ${i}` }));
@@ -266,7 +266,7 @@ describe('migration status races', () => {
       expect(res.json<{ message: string }>().message).toBe(
         'The import could not be queued. Try again.',
       );
-      expect(calls).toBe(2);
+      expect(calls).toBe(1);
       expect(await prisma.migrationJob.findUnique({ where: { id: jobId } })).toBeNull();
       expect(await server.redis.get(`migration:${jobId}:company:rows`)).toBeNull();
     } finally {
@@ -275,8 +275,8 @@ describe('migration status races', () => {
   });
 
   t('a chunk does not import while the next enqueue is still waiting', async () => {
-    // WHY: chunk 0 is queued before chunk 1's add returns. The job is still
-    // pending, so importing now would save rows the start never claimed.
+    // WHY: the bulk add has not returned, so the job is still pending.
+    // Importing a chunk now would save rows the start never claimed.
     const { redis } = await import('../redis.js');
     (server as unknown as { redis: typeof redis }).redis = redis;
     let calls = 0;
@@ -285,12 +285,9 @@ describe('migration status races', () => {
       rejectNext = reject;
     });
     let chunk0: { migrationJobId?: string } | null = null;
-    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (_name, data) => {
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
       calls += 1;
-      if (calls === 1) {
-        chunk0 = data as { migrationJobId?: string };
-        return { id: 'chunk-0' } as never;
-      }
+      chunk0 = (jobs[0]?.data ?? null) as { migrationJobId?: string } | null;
       return blocked;
     });
     try {
@@ -305,7 +302,7 @@ describe('migration status races', () => {
           mappings: { name: 'company.name' },
         },
       });
-      await vi.waitFor(() => expect(calls).toBe(2));
+      await vi.waitFor(() => expect(calls).toBe(1));
       const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
       await expect(
         processMigrationChunk(

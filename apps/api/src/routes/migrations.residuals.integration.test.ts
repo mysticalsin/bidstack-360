@@ -103,14 +103,13 @@ describe('migration residual failures', () => {
   });
 
   t('a partial enqueue does not leave the pending job', async () => {
-    // WHY: a later chunk that cannot be queued used to leave a PENDING job
-    // the response never named. The start removes it and its stored rows.
+    // WHY: if the bulk enqueue throws, the start removes the PENDING job
+    // and its stored rows. The response never names that job.
     let jobId = '';
-    const add = vi.spyOn(Queue.prototype, 'add').mockImplementation(async (name, data) => {
-      const payload = data as { migrationJobId?: string; chunkOffset?: number };
-      if (payload.migrationJobId) jobId = payload.migrationJobId;
-      if ((payload.chunkOffset ?? 0) > 0) throw new Error('queue down');
-      return { id: String(name) } as never;
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
+      const payload = jobs[0]?.data as { migrationJobId?: string } | undefined;
+      if (payload?.migrationJobId) jobId = payload.migrationJobId;
+      throw new Error('queue down');
     });
     try {
       const rows = Array.from({ length: 101 }, (_, i) => ({ name: `Co ${i}` }));
