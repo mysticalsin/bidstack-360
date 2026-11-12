@@ -289,11 +289,17 @@ export function CsvImportWizard() {
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
             <span className="font-medium text-[var(--fg-primary)]">{fileName}</span> —{' '}
-            {t(
-              'csvImport.map.summary',
-              '{{rows}} rows. Match each column to a field, or leave it as Don’t import.',
-              { rows: parsed.rows.length.toLocaleString() },
-            )}
+            {parsed.rows.length === 1
+              ? t(
+                  'csvImport.map.summaryOne',
+                  '{{rows}} row. Match each column to a field, or leave it as Don’t import.',
+                  { rows: parsed.rows.length.toLocaleString() },
+                )
+              : t(
+                  'csvImport.map.summary',
+                  '{{rows}} rows. Match each column to a field, or leave it as Don’t import.',
+                  { rows: parsed.rows.length.toLocaleString() },
+                )}
           </p>
 
           <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)]">
@@ -395,9 +401,13 @@ export function CsvImportWizard() {
             >
               {preview.isPending
                 ? t('csvImport.map.previewing', 'Validating…')
-                : t('csvImport.map.previewRows', 'Preview {{rows}} rows', {
-                    rows: parsed.rows.length.toLocaleString(),
-                  })}
+                : parsed.rows.length === 1
+                  ? t('csvImport.map.previewRow', 'Preview {{rows}} row', {
+                      rows: parsed.rows.length.toLocaleString(),
+                    })
+                  : t('csvImport.map.previewRows', 'Preview {{rows}} rows', {
+                      rows: parsed.rows.length.toLocaleString(),
+                    })}
             </button>
           </div>
         </div>
@@ -406,18 +416,28 @@ export function CsvImportWizard() {
       {step === 'preview' && previewResult && (
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
-            {t(
-              'csvImport.preview.summary',
-              '{{valid}} of {{total}} rows look valid. Confirm to write them. Nothing has been saved yet.',
-              { valid: previewResult.validCount, total: previewResult.rowCount },
-            )}
+            {previewResult.rowCount === 1
+              ? t(
+                  'csvImport.preview.summaryOne',
+                  '{{valid}} of {{total}} row looks valid. Confirm to write it. Nothing has been saved yet.',
+                  { valid: previewResult.validCount, total: previewResult.rowCount },
+                )
+              : t(
+                  'csvImport.preview.summary',
+                  '{{valid}} of {{total}} rows look valid. Confirm to write them. Nothing has been saved yet.',
+                  { valid: previewResult.validCount, total: previewResult.rowCount },
+                )}
           </p>
           {previewResult.invalidCount > 0 ? (
             <div className="rounded-lg border border-[var(--danger)]/40 bg-[var(--danger)]/5 p-3 text-sm">
               <p className="font-medium text-[var(--danger)]">
-                {t('csvImport.preview.issuesTitle', '{{count}} rows have problems', {
-                  count: previewResult.invalidCount,
-                })}
+                {previewResult.invalidCount === 1
+                  ? t('csvImport.preview.issueTitle', '{{count}} row has problems', {
+                      count: previewResult.invalidCount,
+                    })
+                  : t('csvImport.preview.issuesTitle', '{{count}} rows have problems', {
+                      count: previewResult.invalidCount,
+                    })}
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--fg-secondary)]">
                 {previewResult.issues.slice(0, 8).map((issue) => (
@@ -634,10 +654,23 @@ function ImportProgress({
         <div className="rounded-md bg-[var(--surface-sunken)] p-3 text-sm">
           {job.errorRows > 0 ? (
             <p className="text-[var(--fg-primary)]">
-              {t('csvImport.progress.errorRows', '{{formattedCount}} rows could not be imported.', {
-                count: job.errorRows,
-                formattedCount: job.errorRows.toLocaleString(),
-              })}
+              {job.errorRows === 1
+                ? t(
+                    'csvImport.progress.errorRow',
+                    '{{formattedCount}} row could not be imported.',
+                    {
+                      count: job.errorRows,
+                      formattedCount: job.errorRows.toLocaleString(),
+                    },
+                  )
+                : t(
+                    'csvImport.progress.errorRows',
+                    '{{formattedCount}} rows could not be imported.',
+                    {
+                      count: job.errorRows,
+                      formattedCount: job.errorRows.toLocaleString(),
+                    },
+                  )}
             </p>
           ) : null}
           <button

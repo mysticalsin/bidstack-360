@@ -49,7 +49,7 @@ async function uploadFile(text: string) {
   Object.defineProperty(input, 'files', { value: [file] });
   fireEvent.change(input);
   // parseCsv runs through file.text() (async) before the wizard advances.
-  await screen.findByText(/rows\. Match each column/);
+  await screen.findByText(/rows?\. Match each column/);
 }
 
 describe('CsvImportWizard', () => {
@@ -96,7 +96,7 @@ describe('CsvImportWizard', () => {
     expect(
       screen.getByText('Map a column to: Name.'),
     ).toBeTruthy();
-    const previewButton = screen.getByRole('button', { name: /Preview \d+ rows/ });
+    const previewButton = screen.getByRole('button', { name: /Preview \d+ rows?/ });
     expect(previewButton).toHaveProperty('disabled', true);
   });
 
@@ -114,7 +114,7 @@ describe('CsvImportWizard', () => {
     fireEvent.change(screen.getByLabelText('If a record already exists'), {
       target: { value: 'skip' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
 
     expect(hookMocks.previewMutate).toHaveBeenCalledOnce();
     expect(hookMocks.mutate).not.toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe('CsvImportWizard', () => {
       sample: [{ name: 'Acme' }],
     });
 
-    await waitFor(() => expect(screen.getByText(/1 of 1 rows look valid/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/1 of 1 row looks valid/)).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
 
     expect(hookMocks.mutate).toHaveBeenCalledOnce();
@@ -157,6 +157,15 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByText(/Match each column/)).toBeNull();
   });
 
+  it('uses the singular when the file has one row', async () => {
+    // WHY: a one-row file was labelled "1 rows" on the map step and the preview button.
+    stubHooks();
+    render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    expect(screen.getByText(/1 row\. Match each column/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Preview 1 row' })).toBeTruthy();
+  });
+
   it('renders progress from the polled migration job and exposes the error-report download once rows fail', async () => {
     stubHooks();
     hookMocks.useMigrationJob.mockReturnValue({
@@ -172,7 +181,7 @@ describe('CsvImportWizard', () => {
 
     render(<CsvImportWizard />);
     await uploadFile('name,domain\nAcme,acme.com');
-    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
     const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
     previewOpts.onSuccess({
       entityType: 'company',
@@ -200,7 +209,7 @@ describe('CsvImportWizard', () => {
     hookMocks.useMigrationJob.mockReturnValue({ data: job, isLoading: false });
     render(<CsvImportWizard />);
     await uploadFile('name,domain\nAcme,acme.com');
-    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
     const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
     previewOpts.onSuccess({
       entityType: 'company',
@@ -215,6 +224,21 @@ describe('CsvImportWizard', () => {
     const [, opts] = hookMocks.mutate.mock.calls[0]!;
     opts.onSuccess({ id: 'job-1' });
   }
+
+  it('uses the singular when one row could not be imported', async () => {
+    // WHY: the progress line always said "rows", so a single failure read "1 rows".
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 1,
+      errorSummary: [{ row: 2, field: 'name', message: 'company.name is required' }],
+    });
+    await waitFor(() => expect(screen.getByText('1 row could not be imported.')).toBeTruthy());
+    expect(screen.queryByText('1 rows could not be imported.')).toBeNull();
+  });
 
   it('offers cancel while an import is running', async () => {
     // WHY: a job stuck on Importing… had no control. Cancel is the recovery
@@ -504,7 +528,7 @@ describe('CsvImportWizard', () => {
     });
     render(<CsvImportWizard />);
     await uploadFile('name,domain\nAcme,acme.com');
-    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
     const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
     previewOpts.onSuccess({
       entityType: 'company',
