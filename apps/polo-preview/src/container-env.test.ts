@@ -15,6 +15,12 @@ describe('container env', () => {
     expect(allowedUsersFromEmails(' A@x.com,b@x.com ,,', ['a@x.com'])).toBe('a@x.com:Admin,b@x.com:Sales Manager');
   });
 
+  it('passes @domain entries through as Sales Manager domain rules', () => {
+    expect(allowedUsersFromEmails('a@x.com,@Amaris.com,@mantu.com', ['a@x.com'])).toBe(
+      'a@x.com:Admin,@amaris.com:Sales Manager,@mantu.com:Sales Manager',
+    );
+  });
+
   it('maps Worker secrets to the API names and uses the public origin', () => {
     const env = containerEnv({
       ...SECRETS,

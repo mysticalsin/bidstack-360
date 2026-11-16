@@ -18,6 +18,8 @@ export function legacyRoleForSystemRole(role: SystemRoleName): AllowedUser['lega
 
 /**
  * Parse `POLO_ALLOWED_USERS` (`email:Role,email:Role`).
+ * An entry may name a whole domain as `@domain:Role` (e.g. `@amaris.com:Sales Manager`);
+ * the domain must match exactly. A named email always wins over its domain rule.
  * Role must be a seeded system role name (Admin, Sales Manager, …).
  */
 export function parseAllowedUsers(raw: string | undefined): AllowedUser[] {
@@ -34,7 +36,8 @@ export function parseAllowedUsers(raw: string | undefined): AllowedUser[] {
     }
     const email = trimmed.slice(0, sep).trim().toLowerCase();
     const roleRaw = trimmed.slice(sep + 1).trim();
-    if (!email.includes('@') || email.startsWith('@') || email.endsWith('@')) {
+    const domainRule = /^@[^\s@,:]+\.[a-z]{2,}$/.test(email);
+    if (!domainRule && (!email.includes('@') || email.startsWith('@') || email.endsWith('@'))) {
       throw new Error(`Invalid POLO_ALLOWED_USERS email "${email}".`);
     }
     const role = SYSTEM_ROLE_LOOKUP.get(roleRaw.toLowerCase());
@@ -58,7 +61,12 @@ export function findAllowedUser(
 ): AllowedUser | undefined {
   if (!email) return undefined;
   const needle = email.trim().toLowerCase();
-  return list.find((user) => user.email === needle);
+  const at = needle.lastIndexOf('@');
+  if (at <= 0) return undefined;
+  const exact = list.find((user) => user.email === needle);
+  if (exact) return exact;
+  const domain = list.find((user) => user.email === needle.slice(at));
+  return domain ? { ...domain, email: needle } : undefined;
 }
 
 export function displayNameFromEmail(email: string): string {

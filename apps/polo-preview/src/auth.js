@@ -23,13 +23,21 @@ export function normalizeEmail(value) {
   return /^[^\s@,;<>"]{1,64}@[^\s@,;<>"]+\.[a-z]{2,}$/.test(email) ? email : null;
 }
 
+/**
+ * True when `email` is listed exactly, or its domain is listed as `@domain`.
+ * Domains match exactly: `@amaris.com` does not admit `sub.amaris.com` or
+ * `evil-amaris.com`.
+ */
 export function isAllowed(email, allowList) {
   if (!email) return false;
-  return String(allowList || '')
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return false;
+  const domain = email.slice(at);
+  const entries = String(allowList || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email);
+    .filter(Boolean);
+  return entries.includes(email) || entries.includes(domain);
 }
 
 /** Six digits, uniform: rejection sampling avoids modulo bias. */
