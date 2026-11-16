@@ -37,7 +37,8 @@ preview_urls = false
 
 [vars]
 ACCESS_AUD = "826c47f72e2aa2bb7973d533363fcc2b536137578c33a3f1972afb90584e686c"
-ALLOWED_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com,marc.bisiou@amaris.com,acamaret@amaris.com"
+# Exact emails, or @domain to admit a whole domain (exact match) as Sales Manager.
+ALLOWED_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com,marc.bisiou@amaris.com,acamaret@amaris.com,tmassin@amaris.com,@amaris.com,@mantu.com"
 POLO_ADMIN_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com"
 PUBLIC_ORIGIN = "https://polo-preview.tony-walteur.workers.dev"
 # SEC EDGAR and public registries require a contact User-Agent.
