@@ -10,8 +10,7 @@ import { IntegrationTokenKeyMissingError } from '@bidstack/shared/server-crypto'
 
 import { errorHandlerPlugin } from './error-handler.js';
 
-const HUBSPOT_NOT_CONFIGURED =
-  'HubSpot OAuth not configured — set HUBSPOT_CLIENT_ID and HUBSPOT_REDIRECT_URI';
+const HUBSPOT_NOT_CONFIGURED = 'HubSpot is not configured';
 const SECRET = 'postgres://bidstack:secret-token@db.internal:5432/bidstack';
 
 async function app() {

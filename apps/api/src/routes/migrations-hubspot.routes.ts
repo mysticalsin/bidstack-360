@@ -79,9 +79,16 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const redirectUri = process.env.HUBSPOT_REDIRECT_URI;
 
       if (!clientId || !redirectUri) {
-        throw server.httpErrors.serviceUnavailable(
-          'HubSpot OAuth not configured — set HUBSPOT_CLIENT_ID and HUBSPOT_REDIRECT_URI',
+        req.log.warn(
+          {
+            missingEnv: [
+              clientId ? null : 'HUBSPOT_CLIENT_ID',
+              redirectUri ? null : 'HUBSPOT_REDIRECT_URI',
+            ].filter((name) => name !== null),
+          },
+          'HubSpot is not configured',
         );
+        throw server.httpErrors.serviceUnavailable('HubSpot is not configured');
       }
 
       // Encode orgId + userId in state so the callback can reconstruct auth
