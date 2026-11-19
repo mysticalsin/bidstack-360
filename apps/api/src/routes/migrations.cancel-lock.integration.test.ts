@@ -69,6 +69,8 @@ skipIfNoDb(
       const body = outcome.res.json<{ status: string; cancelRequested?: boolean }>();
       expect(body.status).toBe('RUNNING');
       expect(body.cancelRequested).toBe(true);
+      const raw = JSON.stringify(body);
+      expect(raw).not.toMatch(/55P03|PostgresError|lock_timeout|FOR UPDATE/);
 
       const mark = await prisma.auditLog.findFirst({
         where: { targetId: job.id, action: 'migration.cancel.requested' },
@@ -91,6 +93,24 @@ skipIfNoDb(
     }
   },
 );
+
+skipIfNoDb('lock_timeout does not leak onto the next pooled checkout', async () => {
+  // WHY: set_config(..., true) is transaction-local. A false third argument
+  // would leave 2s on the pooled session and the next request would wait less
+  // than it should for unrelated locks.
+  const job = await createJob({ status: 'RUNNING' });
+  const res = await ctx.server.inject({
+    method: 'DELETE',
+    url: `/api/v1/migrations/${job.id}/cancel`,
+  });
+  expect(res.statusCode).toBe(200);
+  const seen = new Set<string>();
+  for (let i = 0; i < 16; i++) {
+    const rows = await prisma.$queryRaw<Array<{ lock_timeout: string }>>`SHOW lock_timeout`;
+    seen.add(rows[0]?.lock_timeout ?? '');
+  }
+  expect([...seen]).toEqual(['0']);
+});
 
 skipIfNoDb(
   'a row lock that is not a live chunk does not leave a mark that cancels the import',

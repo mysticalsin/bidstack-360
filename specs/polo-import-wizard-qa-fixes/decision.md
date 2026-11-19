@@ -28,6 +28,8 @@ The HTTP call returns in about 2s. The job becomes `CANCELLED` when the chunk ne
 
 `CANCEL_RESPONSE_BOUND_MS` is 5000. The integration test fails if Cancel is still blocked at that bound while the chunk lock is held.
 
+`set_config('lock_timeout', '2s', true)` is local to the cancel transaction, the same as `SET LOCAL`. The audit insert inside that transaction shares the 2 second limit. `maxWait: 2_000` means a pool that cannot start the transaction returns 500 and does not write a mark. The next checkout of a pooled connection still reports `SHOW lock_timeout` as `0`.
+
 ## Who may write the cancel actions
 
 No route accepts an action string from the client. The writers are:
