@@ -271,7 +271,7 @@ export async function applyMarkedCancel(
       action: MIGRATION_CANCEL_REQUESTED,
     },
     orderBy: { at: 'desc' },
-    select: { userId: true },
+    select: { userId: true, diff: true },
   });
   if (!mark?.userId) return;
   const moved = await prisma.migrationJob.updateMany({
@@ -281,8 +281,17 @@ export async function applyMarkedCancel(
   if (moved.count !== 1) {
     const current = await prisma.migrationJob.findFirst({
       where: { id: jobId, orgId },
-      select: { status: true },
+      select: { status: true, meta: true },
     });
+    const rawAttempt = (mark.diff as { attemptId?: unknown } | null)?.attemptId;
+    const markAttempt = typeof rawAttempt === 'string' ? rawAttempt : null;
+    // The other chunk already cancelled this attempt. That is not a lost cancel.
+    if (
+      current?.status === 'CANCELLED' &&
+      migrationChunkMatchesAttempt(migrationAttemptId(current.meta), markAttempt)
+    ) {
+      return;
+    }
     log.info({ migrationJobId: jobId, status: current?.status ?? null }, 'migration cancel lost');
     await prisma.auditLog.create({
       data: {
