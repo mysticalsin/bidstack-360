@@ -19,6 +19,7 @@ const FAIL_LOUD_WITHOUT_DB = [
   'src/queues/migration.orphan-rows.test.ts',
   'src/queues/migration.savepoint.test.ts',
   'src/queues/migration.stale.test.ts',
+  'src/queues/migration.cancel-request.test.ts',
 ];
 
 describe('CI unit job database excludes', () => {
