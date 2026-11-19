@@ -880,6 +880,8 @@ export interface MigrationChunkDeps {
   enqueueChunk(name: string, data: MigrationJobPayload, opts: { jobId: string }): Promise<unknown>;
   enqueueIntel(jobs: IntelEnqueueJob[]): Promise<void>;
   env: Record<string, string | undefined>;
+  /** Test seam. Runs after row writes and before the pre-commit cancel check. */
+  afterRows?: () => Promise<void>;
 }
 
 type ChunkLog = Pick<pino.Logger, 'info' | 'warn'>;
