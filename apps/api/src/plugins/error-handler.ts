@@ -6,35 +6,48 @@ import type { FastifyError, FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
 
-import { IntegrationTokenKeyMissingError } from '@bidstack/shared/server-crypto';
+import { DELIBERATE_503, isDeliberate503 } from '@bidstack/shared/server-crypto';
 
 import { isProviderTimeoutError } from '../lib/fetch-timeout.js';
 import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-client-abort.js';
 import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
 import { captureSentryServerError } from './sentry.js';
 
-let serviceUnavailablePrototype: object | null = null;
-
-function isDeliberateUnavailable(
-  err: unknown,
-  httpErrors: { serviceUnavailable: (message?: string) => Error },
-): boolean {
-  // Match the class, not the name string. A plain Error can set
-  // name = 'ServiceUnavailableError' and statusCode = 503, and its message
-  // must not leave the process. http-errors sets the prototype; our config
-  // error is a real subclass.
-  if (err instanceof IntegrationTokenKeyMissingError) return true;
-  if (!serviceUnavailablePrototype) {
-    serviceUnavailablePrototype = Object.getPrototypeOf(httpErrors.serviceUnavailable(''));
+function stampDeliberate503(err: unknown): void {
+  if (typeof err === 'object' && err !== null) {
+    Object.defineProperty(err, DELIBERATE_503, { value: true });
   }
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    Object.getPrototypeOf(err) === serviceUnavailablePrototype
-  );
+}
+
+/** Drop cause before a log or Sentry capture. Pino appends cause to the message. */
+function withoutCause(err: unknown): unknown {
+  if (!(err instanceof Error)) return err;
+  const copy = new Error(err.message);
+  copy.name = err.name;
+  copy.stack = err.stack;
+  return copy;
 }
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
+  // Sensible decorates every server with one shared httpErrors object. Replacing
+  // a method on it would stamp errors built on other servers too. This server
+  // gets its own object whose serviceUnavailable carries the brand.
+  const shared = server.httpErrors;
+  const original = shared.serviceUnavailable.bind(shared);
+  const wrapped = Object.assign(Object.create(shared), {
+    serviceUnavailable: (...args: unknown[]) => {
+      const err = original(...(args as []));
+      stampDeliberate503(err);
+      return err;
+    },
+  });
+  Object.defineProperty(server, 'httpErrors', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: wrapped,
+  });
+
   server.setErrorHandler((err: FastifyError, req, reply) => {
     if (isExpectedClientAbortError(err, req.raw)) {
       req.log.info(
@@ -119,7 +132,7 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       });
     }
 
-    if (isDeliberateUnavailable(err, req.server.httpErrors)) {
+    if (isDeliberate503(err)) {
       // WHY: httpErrors.serviceUnavailable and a missing integration token key
       // are deliberate. Their messages are written by our code. Masking them
       // as a generic 500 hides a condition the caller can act on.
@@ -143,8 +156,9 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       });
     }
 
-    req.log.error({ err }, 'unhandled error');
-    captureSentryServerError(err);
+    const logged = withoutCause(err);
+    req.log.error({ err: logged }, 'unhandled error');
+    captureSentryServerError(logged);
     return reply.status(500).send({
       statusCode: 500,
       error: 'Internal Server Error',
