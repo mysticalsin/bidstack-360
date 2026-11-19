@@ -65,7 +65,7 @@ skipIfNoDb(
       expect(outcome.kind).toBe('response');
       if (outcome.kind !== 'response') return;
       expect(outcome.ms).toBeLessThanOrEqual(CANCEL_RESPONSE_BOUND_MS);
-      expect(outcome.res.statusCode).toBe(200);
+      expect(outcome.res.statusCode).toBe(202);
       const body = outcome.res.json<{ status: string; cancelRequested?: boolean }>();
       expect(body.status).toBe('RUNNING');
       expect(body.cancelRequested).toBe(true);
@@ -126,8 +126,8 @@ skipIfNoDb('a second cancel while the chunk holds the row does not insert anothe
       method: 'DELETE',
       url: `/api/v1/migrations/${job.id}/cancel`,
     });
-    expect(first.statusCode).toBe(200);
-    expect(second.statusCode).toBe(200);
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(202);
     const marks = await prisma.auditLog.count({
       where: { targetId: job.id, action: 'migration.cancel.requested', targetType: 'MigrationJob' },
     });
@@ -160,10 +160,10 @@ skipIfNoDb('lock_timeout does not leak onto the next pooled checkout', async () 
 });
 
 skipIfNoDb(
-  'a row lock that is not a live chunk does not leave a mark that cancels the import',
+  'a busy row lock without progressAt still records cancel for this attempt',
   async () => {
-    // WHY: Undo, a retry claim, the reaper, or a second Cancel can hold the
-    // same row. A mark written for that wait would cancel a later chunk.
+    // WHY: start used to leave progressAt empty, so the same wait as a long
+    // chunk was refused. A busy lock on a running attempt is cancel pending.
     const job = await createJob({ status: 'RUNNING' });
     let releaseLock!: () => void;
     const released = new Promise<void>((resolve) => {
@@ -187,17 +187,14 @@ skipIfNoDb(
         method: 'DELETE',
         url: `/api/v1/migrations/${job.id}/cancel`,
       });
-      expect(res.statusCode).toBe(409);
+      expect(res.statusCode).toBe(202);
       const marks = await prisma.auditLog.count({
         where: { targetId: job.id, action: 'migration.cancel.requested' },
       });
-      expect(marks).toBe(0);
+      expect(marks).toBe(1);
     } finally {
       releaseLock();
       await holder;
-      await purgeAuditRows({
-        where: { targetId: job.id, action: 'migration.cancel.requested' },
-      });
     }
 
     const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
@@ -224,9 +221,11 @@ skipIfNoDb(
       { info: () => undefined, warn: () => undefined },
     );
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
-    expect(stored.status).not.toBe('CANCELLED');
-    expect(await prisma.company.count({ where: { orgId: job.orgId, name: 'Northwind Traders' } })).toBe(1);
-    await prisma.company.deleteMany({ where: { orgId: job.orgId, name: 'Northwind Traders' } });
+    expect(stored.status).toBe('CANCELLED');
+    expect(await prisma.company.count({ where: { orgId: job.orgId, name: 'Northwind Traders' } })).toBe(0);
+    await purgeAuditRows({
+      where: { targetId: job.id, action: { in: ['migration.cancel.requested', 'migration.cancel'] } },
+    });
   },
 );
 
