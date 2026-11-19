@@ -28,6 +28,15 @@ The HTTP call returns in about 2s. The job becomes `CANCELLED` when the chunk ne
 
 `CANCEL_RESPONSE_BOUND_MS` is 5000. The integration test fails if Cancel is still blocked at that bound while the chunk lock is held.
 
+## Who may write the cancel actions
+
+No route accepts an action string from the client. The writers are:
+
+- `DELETE /api/v1/migrations/:id/cancel`, and only after `settings:write`. A free lock writes `migration.cancel`. A live chunk writes `migration.cancel.requested` with `targetType: 'MigrationJob'` and `diff.attemptId`.
+- The import worker, after it reads that mark, writes `migration.cancel` when the compare-and-set lands and `migration.cancel.lost` when it does not. The actor is the mark's `userId`, the person who cancelled.
+
+A job id from another org is 404 on cancel and on retry. A caller without `settings:write` is 403 on both.
+
 ## What did not change
 
 A cancel of a job that is already `COMPLETE`, `FAILED`, or `CANCELLED` is still 409. A cancel that gets the lock is still a single `CANCELLED` write. The chunk still refuses to import when the locked status is not RUNNING.

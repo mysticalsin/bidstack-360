@@ -230,6 +230,7 @@ async function cancelWasRequested(
     where: {
       orgId,
       targetId: jobId,
+      targetType: 'MigrationJob',
       action: MIGRATION_CANCEL_REQUESTED,
       at: {
         gte: new Date(
@@ -248,16 +249,48 @@ async function cancelWasRequested(
   });
 }
 
-export async function applyMarkedCancel(orgId: string, userId: string, jobId: string): Promise<void> {
+export async function applyMarkedCancel(
+  orgId: string,
+  jobId: string,
+  log: { info: (obj: object, msg?: string) => void },
+): Promise<void> {
+  const mark = await prisma.auditLog.findFirst({
+    where: {
+      orgId,
+      targetId: jobId,
+      targetType: 'MigrationJob',
+      action: MIGRATION_CANCEL_REQUESTED,
+    },
+    orderBy: { at: 'desc' },
+    select: { userId: true },
+  });
+  if (!mark?.userId) return;
   const moved = await prisma.migrationJob.updateMany({
     where: { id: jobId, orgId, status: { in: [...migrationFrom('cancel')] } },
     data: { status: 'CANCELLED', completedAt: new Date() },
   });
-  if (moved.count !== 1) return;
+  if (moved.count !== 1) {
+    const current = await prisma.migrationJob.findFirst({
+      where: { id: jobId, orgId },
+      select: { status: true },
+    });
+    log.info({ migrationJobId: jobId, status: current?.status ?? null }, 'migration cancel lost');
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        userId: mark.userId,
+        action: 'migration.cancel.lost',
+        targetType: 'MigrationJob',
+        targetId: jobId,
+        diff: { status: current?.status ?? null },
+      },
+    });
+    return;
+  }
   await prisma.auditLog.create({
     data: {
       orgId,
-      userId,
+      userId: mark.userId,
       action: 'migration.cancel',
       targetType: 'MigrationJob',
       targetId: jobId,
@@ -1120,7 +1153,7 @@ export async function processMigrationChunk(
     );
   } catch (err) {
     if (err instanceof MigrationCancelRequested) {
-      await applyMarkedCancel(payload.orgId, payload.userId, payload.migrationJobId);
+      await applyMarkedCancel(payload.orgId, payload.migrationJobId, log);
       log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk rolled back — cancel requested');
       return;
     }
@@ -1130,7 +1163,7 @@ export async function processMigrationChunk(
   }
   if (!written) {
     if (skipReason === 'cancel') {
-      await applyMarkedCancel(payload.orgId, payload.userId, payload.migrationJobId);
+      await applyMarkedCancel(payload.orgId, payload.migrationJobId, log);
       log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — cancel requested');
       return;
     }
