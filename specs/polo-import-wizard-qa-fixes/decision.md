@@ -39,6 +39,20 @@ No route accepts an action string from the client. The writers are:
 
 A job id from another org is 404 on cancel and on retry. A caller without `settings:write` is 403 on both.
 
+## Retry single-flight
+
+The wizard ref stops a second click in one tab. Two browsers are settled by the database: retry's compare-and-set only matches `FAILED`, and `migration_jobs_one_active_per_file` refuses a second active import of the same file. The loser is `409` with `code: RETRY_LOST`. The wizard matches that code. If the winner then fails to enqueue, the job is `FAILED` and the wizard shows that failure.
+
+## Residuals
+
+Owner of each residual: Devin (Polo interim owner).
+
+1. **Window before COMMIT.** The chunk checks the mark, then `persistChunkBookkeeping` commits. A mark that lands in that gap is missed. If it was the last chunk, the job can be `COMPLETE` while the response said cancel was only requested (`cancelRequested: true`, button "Cancelling…"). The final status on the job is the truth. Closing it would mean re-checking in the completion `UPDATE`, which still leaves a smaller race. Left open on purpose.
+
+2. **The mark is unsigned.** Anyone who can insert into `audit_log` can write `migration.cancel.requested`. That write access is the trust boundary. Duplicate clicks for one attempt are de-duplicated. The lookup index is `audit_log_target_action_idx` on `(target_id, action)`, with `down.sql` beside the migration. A signature on the mark is not in this change.
+
+3. **Leakage is clean.** The locked branch does not log the error object. A forced `55P03` returns the job JSON. The test asserts that body has no `55P03`, `PostgresError`, `lock_timeout`, or `FOR UPDATE`. The 409 for a job that cannot be cancelled still names the status enum. That enum is not driver text.
+
 ## What did not change
 
 A cancel of a job that is already `COMPLETE`, `FAILED`, or `CANCELLED` is still 409. A cancel that gets the lock is still a single `CANCELLED` write. The chunk still refuses to import when the locked status is not RUNNING.

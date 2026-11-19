@@ -35,6 +35,7 @@ import {
   MIGRATION_NO_LONGER_FAILED,
   RETRY_LOST,
   migrationAttemptId,
+  migrationChunkMatchesAttempt,
   migrationFrom,
   migrationProgressAt,
   MIGRATION_ROWS_EXPIRED,
@@ -934,16 +935,35 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           );
           throw server.httpErrors.conflict(`Cannot cancel a job with status ${current.status}`);
         }
-        await prisma.auditLog.create({
-          data: {
+        const attemptId = migrationAttemptId(current.meta);
+        const prior = await prisma.auditLog.findMany({
+          where: {
             orgId,
-            userId,
-            action: MIGRATION_CANCEL_REQUESTED,
-            targetType: 'MigrationJob',
             targetId: job.id,
-            diff: { attemptId: migrationAttemptId(current.meta) },
+            targetType: 'MigrationJob',
+            action: MIGRATION_CANCEL_REQUESTED,
           },
+          orderBy: { at: 'desc' },
+          take: 5,
+          select: { diff: true },
         });
+        const already = prior.some((row) => {
+          const diff = row.diff as { attemptId?: unknown } | null;
+          const markAttempt = typeof diff?.attemptId === 'string' ? diff.attemptId : null;
+          return migrationChunkMatchesAttempt(attemptId, markAttempt);
+        });
+        if (!already) {
+          await prisma.auditLog.create({
+            data: {
+              orgId,
+              userId,
+              action: MIGRATION_CANCEL_REQUESTED,
+              targetType: 'MigrationJob',
+              targetId: job.id,
+              diff: { attemptId },
+            },
+          });
+        }
         return { ...serializeJob(current), cancelRequested: true as const };
       }
       if (outcome === 'lost') {
