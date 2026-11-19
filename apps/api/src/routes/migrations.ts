@@ -610,6 +610,13 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         externalIdColumn?: string | null;
         mappings?: Record<string, string | null>;
       };
+      if (job.status === 'RUNNING' || job.status === 'COMPLETE') {
+        const lost = server.httpErrors.conflict(MIGRATION_NO_LONGER_FAILED) as Error & {
+          migrationCode?: string;
+        };
+        lost.migrationCode = RETRY_LOST;
+        throw lost;
+      }
       if (
         job.status !== 'FAILED' ||
         !migrationRetryOffered(
@@ -915,18 +922,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         if (!isLockTimeout(err)) throw err;
         outcome = 'locked';
       }
-      if (outcome === 'locked') {
-        const current = await prisma.migrationJob.findFirst({
-          where: { id: job.id, orgId },
-        });
-        if (!current) throw server.httpErrors.notFound('Migration job not found');
-        if (current.status !== 'PENDING' && current.status !== 'RUNNING') {
-          req.log.warn(
-            { migrationJobId: job.id, from: current.status, to: 'CANCELLED' },
-            'illegal migration transition',
-          );
-          throw server.httpErrors.conflict(`Cannot cancel a job with status ${current.status}`);
-        }
+      const replyPending = async (current: NonNullable<Awaited<ReturnType<typeof prisma.migrationJob.findFirst>>>) => {
         const attemptId = migrationAttemptId(current.meta);
         const prior = await prisma.auditLog.findMany({
           where: {
@@ -957,19 +953,23 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           });
         }
         return reply.code(202).send({ ...serializeJob(current), cancelRequested: true as const });
-      }
-      if (outcome === 'lost') {
+      };
+      if (outcome === 'locked' || outcome === 'lost') {
         const current = await prisma.migrationJob.findFirst({
           where: { id: job.id, orgId },
-          select: { status: true },
         });
+        if (!current) throw server.httpErrors.notFound('Migration job not found');
+        // A RUNNING job is never told it cannot be cancelled. The row was
+        // busy or the compare-and-set lost a race with the chunk; the mark
+        // still applies.
+        if (current.status === 'PENDING' || current.status === 'RUNNING') {
+          return replyPending(current);
+        }
         req.log.warn(
-          { migrationJobId: job.id, from: current?.status ?? null, to: 'CANCELLED' },
+          { migrationJobId: job.id, from: current.status, to: 'CANCELLED' },
           'illegal migration transition',
         );
-        throw server.httpErrors.conflict(
-          `Cannot cancel a job with status ${current?.status ?? job.status}`,
-        );
+        throw server.httpErrors.conflict(`Cannot cancel a job with status ${current.status}`);
       }
       const updated = await prisma.migrationJob.findFirstOrThrow({
         where: { id: job.id, orgId },

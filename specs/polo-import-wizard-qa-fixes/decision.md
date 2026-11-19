@@ -91,7 +91,18 @@ Owner of each residual: Devin (Polo interim owner).
 
 3. **Leakage is clean.** The locked branch does not log the error object. A forced `55P03` returns the job JSON. The test asserts that body has no `55P03`, `PostgresError`, `lock_timeout`, or `FOR UPDATE`. The 409 for a job that cannot be cancelled still names the status enum. That enum is not driver text.
 
-No Low from the Inspector pass on `3a1975bd` is deferred. N-1 (cancel-requested state, one mark per attempt), N-3 (losing retry is not an error, second tap is not Cancel), and N-4 (select width at 768 and 900) are in this change. There is no Backlog row.
+N-1 (cancel-requested state, one mark per attempt), the first half of N-3 (losing retry is not an error, second tap is not Cancel), and N-4 (select width at 768 and 900) are in this change. A second chunk of the same attempt does not write `migration.cancel.lost` after the first chunk's `migration.cancel`. A retry that finds the job already `RUNNING` or `COMPLETE` returns `409` with `code: RETRY_LOST`, and the wizard shows no red text. A running job is never answered `Cannot cancel a job with status RUNNING`.
+
+## Backlog
+
+Owner: Devin (Polo interim owner). Not in this round.
+
+| Item | Note |
+| --- | --- |
+| N-7 | Inspector round 2. Deferred. |
+| L-series Lows | Deferred. L-1 and L-2 were the gate defects and are fixed here. |
+| T-1 | Deferred. |
+| I-6 | Deferred. |
 
 ## What did not change
 
