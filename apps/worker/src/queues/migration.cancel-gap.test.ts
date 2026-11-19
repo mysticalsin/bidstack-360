@@ -398,6 +398,19 @@ describe('migration cancel gap', () => {
         diff: { attemptId },
       },
     });
+    let arrived = 0;
+    let releaseBoth!: () => void;
+    const bothAtCancel = new Promise<void>((resolve) => {
+      releaseBoth = resolve;
+    });
+    const chunkDeps = (offset: number): MigrationChunkDeps => ({
+      ...deps(JSON.stringify([{ Name: `Chunk ${offset}` }])),
+      onMarkedCancel: async () => {
+        arrived += 1;
+        if (arrived >= 2) releaseBoth();
+        await bothAtCancel;
+      },
+    });
     const chunk = (offset: number) =>
       processMigrationChunk(
         {
@@ -414,7 +427,7 @@ describe('migration cancel gap', () => {
           dedupStrategy: 'skip',
           attemptId,
         },
-        deps(JSON.stringify([{ Name: `Chunk ${offset}` }])),
+        chunkDeps(offset),
         log,
       );
     try {

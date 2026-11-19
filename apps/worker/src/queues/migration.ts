@@ -936,6 +936,8 @@ export interface MigrationChunkDeps {
   env: Record<string, string | undefined>;
   /** Test seam. Runs after row writes and before the pre-commit cancel check. */
   afterRows?: () => Promise<void>;
+  /** Test seam. Runs once this chunk has decided to apply the cancel mark. */
+  onMarkedCancel?: () => Promise<void>;
 }
 
 type ChunkLog = Pick<pino.Logger, 'info' | 'warn'>;
@@ -1208,6 +1210,7 @@ export async function processMigrationChunk(
     );
   } catch (err) {
     if (err instanceof MigrationCancelRequested) {
+      if (deps.onMarkedCancel) await deps.onMarkedCancel();
       await applyMarkedCancel(payload.orgId, payload.migrationJobId, log);
       log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk rolled back — cancel requested');
       return;
@@ -1218,6 +1221,7 @@ export async function processMigrationChunk(
   }
   if (!written) {
     if (skipReason === 'cancel') {
+      if (deps.onMarkedCancel) await deps.onMarkedCancel();
       await applyMarkedCancel(payload.orgId, payload.migrationJobId, log);
       log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — cancel requested');
       return;
