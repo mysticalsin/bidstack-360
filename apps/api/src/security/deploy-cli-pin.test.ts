@@ -122,7 +122,7 @@ describe('deploy CLIs are pinned', () => {
       'undici@5': '6.29.1',
       minimatch: '11.0.1',
       'path-to-regexp@6': '6.3.0',
-      'path-to-regexp@8': '8.4.0',
+      'path-to-regexp@8': '8.4.2',
       '@fastify/busboy': '3.2.2',
       'smol-toml': '1.9.0',
       glob: '14.0.2',
@@ -151,6 +151,26 @@ describe('deploy CLIs are pinned', () => {
         throw new Error(`${name}@${entry.version} is still in the deploy lockfile`);
       }
     }
+  });
+
+  it('resolves path-to-regexp 8 to at least 8.4.2', () => {
+    // WHY: 8.4.0 already contains the March 2026 ReDoS fixes. 8.4.1
+    // restores non-ending wildcard matches that 8.4.0 truncated, and
+    // 8.4.2 rejects a trailing backslash. @vercel/fun depends on 8.4.2,
+    // so an override left at 8.4.0 keeps a second copy and pins every
+    // other 8.x consumer below the CLI's own dependency.
+    const parsed = JSON.parse(readFileSync(join(repo, 'deploy/cli/package-lock.json'), 'utf8')) as {
+      packages: Record<string, { version?: string }>;
+    };
+    const below = Object.entries(parsed.packages).flatMap(([path, entry]) => {
+      const name = path.split('node_modules/').pop() ?? '';
+      if (name !== 'path-to-regexp') return [];
+      const [major = 0, minor = 0, patch = 0] = (entry.version ?? '').split('.').map(Number);
+      if (major !== 8) return [];
+      const atLeast842 = minor > 4 || (minor === 4 && patch >= 2);
+      return atLeast842 ? [] : [`${path}@${entry.version ?? 'missing'}`];
+    });
+    expect(below).toEqual([]);
   });
 
   it('ignores install scripts and checksums the Railway binary instead of running its postinstall', () => {
