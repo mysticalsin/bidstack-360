@@ -656,4 +656,65 @@ describe('CsvImportWizard', () => {
     fireEvent.click(confirm);
     expect(hookMocks.mutate).toHaveBeenCalledTimes(1);
   });
+
+  it('two Retry clicks send one request and show no error when the job is no longer failed', async () => {
+    // WHY: a double click raced two retries. The loser got 409 because the
+    // winner had already moved the job, and that raw English was shown in red
+    // on a job that had completed.
+    stubHooks();
+    const view = render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const [, opts] = hookMocks.mutate.mock.calls[0]!;
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'FAILED',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        errorSummary: [{ row: 0, field: null, message: 'enqueue_failed' }],
+      },
+      isLoading: false,
+    });
+    opts.onSuccess({ id: 'job-1' });
+
+    const retry = await screen.findByRole('button', { name: 'Retry import' });
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+    expect(hookMocks.retryMutate).toHaveBeenCalledTimes(1);
+
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('Migration job is no longer failed', 409, null),
+    });
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'COMPLETE',
+        totalRows: 1,
+        processedRows: 1,
+        errorRows: 0,
+        errorSummary: [],
+      },
+      isLoading: false,
+    });
+    view.rerender(<CsvImportWizard />);
+    expect(screen.queryByText('Migration job is no longer failed')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });
