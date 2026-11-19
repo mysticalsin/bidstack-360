@@ -592,4 +592,55 @@ describe('migration cancel request', () => {
       await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
     }
   });
+
+  t('a lost cancel keeps FAILED', async () => {
+    // WHY: the compare-and-set is limited to PENDING and RUNNING. Without that
+    // filter a mark rewrites a failed job to CANCELLED.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_failed_${ns}`, name: `failed ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: {
+        orgId: org.id,
+        clerkUser: `user_${ns}`,
+        email: `${ns}@test.local`,
+        name: 'Failed',
+      },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'FAILED',
+        totalRows: 1,
+        processedRows: 0,
+        startedAt: new Date(Date.now() - 60_000),
+        completedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: 'attempt-failed' },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        action: 'migration.cancel.requested',
+        targetType: 'MigrationJob',
+        targetId: job.id,
+        diff: { attemptId: 'attempt-failed' },
+      },
+    });
+    try {
+      await applyMarkedCancel(org.id, job.id, { info: () => undefined });
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.status).toBe('FAILED');
+      const cancel = await prisma.auditLog.findFirst({
+        where: { orgId: org.id, targetId: job.id, action: 'migration.cancel' },
+      });
+      expect(cancel).toBeNull();
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
 });

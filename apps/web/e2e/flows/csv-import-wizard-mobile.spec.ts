@@ -3,7 +3,7 @@
  * so a phone user could not map Name. The control has to sit inside the
  * viewport and Name has to be the selected field.
  */
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const CSV = {
   name: 'accounts.csv',
@@ -51,6 +51,31 @@ test('maps-to controls sit inside a 390x844 viewport and Name is mapped', async 
   expectInside(await boxOf(country), viewport);
   await expect(employees).toHaveValue('company.employeeCount');
   await expect(country).toHaveValue('company.countryCode');
+});
+
+async function openMap(page: Page) {
+  await page.goto('/settings?tab=data-import', { waitUntil: 'load' });
+  await page.locator('input[type="file"]').setInputFiles(CSV);
+  await expect(page.getByRole('combobox', { name: 'Map column Account Name' })).toBeVisible();
+}
+
+test('the map layout switches at the md breakpoint and the option text fits', async ({ page }) => {
+  // WHY: md is 768px. min-[769px] would still be the phone list at 768.
+  // From 768 to about 900 the table was squeezing the Maps-to select so the
+  // chosen field was cut off.
+  await page.setViewportSize({ width: 767, height: 900 });
+  await openMap(page);
+  await expect(page.getByRole('columnheader', { name: 'Maps to' })).toBeHidden();
+
+  for (const width of [768, 769, 900]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole('columnheader', { name: 'Maps to' })).toBeVisible();
+    const employees = page.getByRole('combobox', { name: 'Map column Employees' });
+    await employees.scrollIntoViewIfNeeded();
+    const box = await employees.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(160);
+    await expect(employees).toHaveValue('company.employeeCount');
+  }
 });
 
 test('maps-to controls stay inside a 1440px viewport', async ({ page }) => {
