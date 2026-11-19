@@ -14,4 +14,6 @@ Out of scope: deploying, the polo-preview Worker, wrangler, and merging. Devin g
 
 ## Challenger: Sentinel
 
-CONSENSUS: OPEN
+Verbatim record: `plan-debate-polo-pr349-3a1975bd-20261119.md` (sha256 abe3d4a519cd14fbdca3fc997ac0db3756ae1aae63f2c4ceeba10a1dcdfa2cef).
+
+CONSENSUS: OBJECTIONS
