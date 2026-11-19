@@ -3,7 +3,7 @@
 
 import { createHash } from 'node:crypto';
 
-import type { SyncRun, SyncSource } from '@bidstack/shared';
+import { migrationFailureText, type SyncRun, type SyncSource } from '@bidstack/shared';
 
 /** Deterministic run id: same org + source + idempotency key, same run. */
 export function syncRunId(orgId: string, source: SyncSource, idempotencyKey: string): string {
@@ -115,7 +115,7 @@ export function hubspotRunFromJobs(
   for (const j of jobs) {
     if (!Array.isArray(j.errorSummary)) continue;
     for (const e of j.errorSummary as Array<{ message?: unknown }>) {
-      if (typeof e?.message === 'string') reasons.add(e.message.slice(0, 200));
+      if (typeof e?.message === 'string') reasons.add(migrationFailureText(e.message).slice(0, 200));
       if (reasons.size >= MAX_REASONS) break;
     }
   }

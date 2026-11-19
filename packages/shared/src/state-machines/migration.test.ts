@@ -13,6 +13,7 @@ import {
   migrationErrorsCsv,
   migrationEnqueueFailureCode,
   migrationFailureText,
+  migrationPublicMessage,
   migrationFrom,
   migrationRetryAllowed,
   migrationRetryOffered,
@@ -60,6 +61,12 @@ describe('migration transition table', () => {
       'The import stopped before the remaining rows were saved.',
     );
     expect(migrationFailureText('company.name is required')).toBe('company.name is required');
+    expect(migrationPublicMessage('enqueue_failed')).toBe('enqueue_failed');
+    expect(migrationPublicMessage('company.name is required')).toBe('company.name is required');
+    expect(
+      migrationPublicMessage('chunk failed permanently: Process 4242 deadlock detected'),
+    ).toBe('chunk failed permanently: import_failed');
+    expect(migrationPublicMessage('PostgresError { code: "42P01" }')).toBe('import_failed');
     expect(migrationFailureText('financial.periodEnd must be an ISO date')).toBe(
       'financial.periodEnd must be an ISO date',
     );

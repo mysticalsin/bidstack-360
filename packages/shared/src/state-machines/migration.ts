@@ -75,6 +75,21 @@ export function migrationFailureText(message: string): string {
   return 'The import could not be completed.';
 }
 
+const CHUNK_FAILED_PREFIX = 'chunk failed permanently:';
+
+/**
+ * The message a job response may return. Known codes and row sentences stay,
+ * because the import wizard keys on them. Driver and provider text becomes a
+ * code. A permanent chunk failure keeps its prefix so retry stays hidden,
+ * without the raw tail.
+ */
+export function migrationPublicMessage(message: string): string {
+  if (message.startsWith(CHUNK_FAILED_PREFIX)) return `${CHUNK_FAILED_PREFIX} import_failed`;
+  if (MIGRATION_FAILURE_TEXT[message] !== undefined) return message;
+  if (migrationKnownRowSentence(message)) return message;
+  return 'import_failed';
+}
+
 /** A spreadsheet treats a cell starting with one of these as a formula. */
 function migrationCsvCell(value: string): string {
   return JSON.stringify(value.replace(/^(=|\+|-|@|\t|\r)/, "'$1"));
