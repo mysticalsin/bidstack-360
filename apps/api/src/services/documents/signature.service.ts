@@ -110,7 +110,7 @@ async function getDocuSignAccessToken(): Promise<string> {
 
   if (!res.ok) {
     await discardUpstreamBody(res);
-    throw credentialError(`DocuSign OAuth token exchange failed: ${res.status}`);
+    throw new Error(`DocuSign OAuth token exchange failed: ${res.status}`);
   }
 
   const json = (await res.json()) as { access_token: string; expires_in: number };
@@ -259,7 +259,7 @@ async function sendDocuSignEnvelope(params: {
 
   // Fetch the document bytes from S3 storage URL
   const docRes = await fetch(doc.storageUrl);
-  if (!docRes.ok) throw credentialError(`Failed to fetch document for signing: ${docRes.status}`);
+  if (!docRes.ok) throw new Error(`Failed to fetch document for signing: ${docRes.status}`);
   const docBytes = Buffer.from(await docRes.arrayBuffer()).toString('base64');
 
   const signers = recipients.map((r, i) => ({
@@ -301,7 +301,7 @@ async function sendDocuSignEnvelope(params: {
 
   if (!res.ok) {
     await discardUpstreamBody(res);
-    throw credentialError(`DocuSign envelope creation failed: ${res.status}`);
+    throw new Error(`DocuSign envelope creation failed: ${res.status}`);
   }
 
   const result = (await res.json()) as { envelopeId: string };
@@ -512,7 +512,7 @@ export async function voidSignatureRequest(params: {
         );
         if (!res.ok) {
           await discardUpstreamBody(res);
-          throw credentialError(`DocuSign void failed: ${res.status}`);
+          throw new Error(`DocuSign void failed: ${res.status}`);
         }
       }
     }

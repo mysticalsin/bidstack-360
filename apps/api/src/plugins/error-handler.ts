@@ -6,10 +6,22 @@ import type { FastifyError, FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
 
+import { IntegrationTokenKeyMissingError } from '@bidstack/shared/server-crypto';
+
 import { isProviderTimeoutError } from '../lib/fetch-timeout.js';
 import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-client-abort.js';
 import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
 import { captureSentryServerError } from './sentry.js';
+
+function isDeliberateUnavailable(err: { statusCode?: number; name?: string }): boolean {
+  // Sensible's serviceUnavailable, and the one typed config error. A homemade
+  // Error that only sets statusCode (DocuSign credential failures) stays a
+  // generic 500 so the provider name does not reach the client.
+  return (
+    err.statusCode === 503 &&
+    (err.name === 'ServiceUnavailableError' || err.name === IntegrationTokenKeyMissingError.name)
+  );
+}
 
 const plugin: FastifyPluginAsync = fp(async (server) => {
   server.setErrorHandler((err: FastifyError, req, reply) => {
@@ -96,12 +108,10 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       });
     }
 
-    if (err.statusCode === 503) {
-      // WHY: a thrown 503 is deliberate (HubSpot OAuth missing, a scanner that
-      // is not configured, a queue that cannot take work). The message is
-      // written by our code, same as a 4xx. Masking it as a generic 500 hides
-      // a condition the caller can act on. Anything without this status stays
-      // a generic 500 below, so an unexpected error cannot leak its text.
+    if (isDeliberateUnavailable(err)) {
+      // WHY: httpErrors.serviceUnavailable and a missing integration token key
+      // are deliberate. Their messages are written by our code. Masking them
+      // as a generic 500 hides a condition the caller can act on.
       return reply.status(503).send({
         statusCode: 503,
         error: 'Service Unavailable',
