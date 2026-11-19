@@ -245,9 +245,9 @@ describe('migration cancel request', () => {
     }
   });
 
-  t('a cancel mark older than the chunk lock window does not cancel the attempt', async () => {
-    // WHY: a mark has to expire. Otherwise a lock that was not a chunk leaves
-    // a row that cancels the import long after the waiter is gone.
+  t('a cancel mark older than 150s still cancels the live attempt', async () => {
+    // WHY: the attempt is still running. Age does not clear an accepted cancel.
+    // A later attempt has a newer startedAt, and that is what drops the mark.
     const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const org = await prisma.org.create({
       data: { clerkOrg: `org_mig_expire_${ns}`, name: `expire ${ns}` },
@@ -308,9 +308,9 @@ describe('migration cancel request', () => {
         deps,
         log,
       );
-      expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(1);
+      expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(0);
       const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
-      expect(stored.status).not.toBe('CANCELLED');
+      expect(stored.status).toBe('CANCELLED');
     } finally {
       await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
     }
