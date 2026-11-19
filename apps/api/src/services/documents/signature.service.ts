@@ -259,7 +259,10 @@ async function sendDocuSignEnvelope(params: {
 
   // Fetch the document bytes from S3 storage URL
   const docRes = await fetch(doc.storageUrl);
-  if (!docRes.ok) throw new Error(`Failed to fetch document for signing: ${docRes.status}`);
+  if (!docRes.ok) {
+    await discardUpstreamBody(docRes);
+    throw new Error(`Failed to fetch document for signing: ${docRes.status}`);
+  }
   const docBytes = Buffer.from(await docRes.arrayBuffer()).toString('base64');
 
   const signers = recipients.map((r, i) => ({
