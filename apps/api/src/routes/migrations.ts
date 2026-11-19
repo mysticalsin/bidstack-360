@@ -76,7 +76,7 @@ const CANCEL_LOCK_TIMEOUT = '2s';
 
 const LOCK_TIMEOUT_CODE = /PostgresError \{\s*code:\s*"55P03"/;
 
-function isLockTimeout(err: unknown, seen?: Set<unknown>): boolean {
+export function isLockTimeout(err: unknown, seen?: Set<unknown>): boolean {
   if (!err || typeof err !== 'object') return false;
   const visited = seen ?? new Set<unknown>();
   if (visited.has(err)) return false;
