@@ -7,7 +7,7 @@ import { exchangeHubSpotCode } from './hubspot-client.js';
 import { sendViaGmail } from '../services/email-integration.gmail.js';
 import type { ServiceLogger } from '../services/email-integration.helpers.js';
 
-const SENTINEL = 'provider-body-SENTINEL-ya29.secret-token';
+const SENTINEL = 'provider-body-SENTINEL-upstream-text';
 
 function capturingLog(): { log: ServiceLogger; lines: string[] } {
   const lines: string[] = [];

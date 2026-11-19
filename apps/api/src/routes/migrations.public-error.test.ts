@@ -9,7 +9,7 @@ import { serializeJob } from './migrations.helpers.js';
 const RAW =
   'PostgresError { code: "42P01", message: "relation secret_table does not exist" } chunk at /apps/worker/src/queues/migration.ts:1015';
 const PROVIDER =
-  'HubSpot API 500 {"token":"ya29.SECRETVALUE","email":"buyer@secret.example"}';
+  'HubSpot API 500 {"token":"hubspot-body-marker","email":"buyer@secret.example"}';
 
 function jobRow(errorSummary: unknown) {
   const now = new Date('2026-01-01T00:00:00.000Z');
@@ -73,7 +73,7 @@ describe('migration error text on the way out', () => {
       0,
     );
     const text = JSON.stringify(run);
-    expect(text).not.toContain('ya29.SECRETVALUE');
+    expect(text).not.toContain('hubspot-body-marker');
     expect(text).not.toContain('buyer@secret.example');
     expect(run.reasons).toEqual(['The import could not be completed.']);
   });
