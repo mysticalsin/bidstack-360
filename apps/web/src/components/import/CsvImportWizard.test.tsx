@@ -259,6 +259,26 @@ describe('CsvImportWizard', () => {
     expect(hookMocks.cancelMutate).toHaveBeenCalledWith('job-1');
   });
 
+  it('shows Cancelling while a locked cancel is only requested', async () => {
+    // WHY: a 200 with the job still running looked like Cancel did nothing.
+    // The locked branch says cancel was requested, and the button keeps the
+    // translated Cancelling sentence until the poll reaches a final status.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'RUNNING',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel import' }));
+    const [, opts] = hookMocks.cancelMutate.mock.calls[0]!;
+    opts.onSuccess({ id: 'job-1', status: 'RUNNING', cancelRequested: true });
+    expect(screen.getByRole('button', { name: 'Cancelling…' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
+  });
+
   it('offers retry only after a failure that imported nothing', async () => {
     // WHY: an enqueue failure must be visible and retryable. A failure that
     // already wrote rows must not offer a replay of the same file.

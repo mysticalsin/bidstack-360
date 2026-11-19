@@ -18,6 +18,10 @@ skipIfNoDb(
   'returns within CANCEL_RESPONSE_BOUND_MS while a chunk holds the job row lock',
   async () => {
     const job = await createJob({ status: 'RUNNING' });
+    await prisma.migrationJob.update({
+      where: { id: job.id },
+      data: { meta: { progressAt: new Date().toISOString() }, startedAt: new Date() },
+    });
     let releaseLock!: () => void;
     const released = new Promise<void>((resolve) => {
       releaseLock = resolve;
@@ -62,7 +66,9 @@ skipIfNoDb(
       if (outcome.kind !== 'response') return;
       expect(outcome.ms).toBeLessThanOrEqual(CANCEL_RESPONSE_BOUND_MS);
       expect(outcome.res.statusCode).toBe(200);
-      expect(outcome.res.json<{ status: string }>().status).toBe('RUNNING');
+      const body = outcome.res.json<{ status: string; cancelRequested?: boolean }>();
+      expect(body.status).toBe('RUNNING');
+      expect(body.cancelRequested).toBe(true);
 
       const mark = await prisma.auditLog.findFirst({
         where: { targetId: job.id, action: 'migration.cancel.requested' },
