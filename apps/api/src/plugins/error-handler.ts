@@ -96,6 +96,19 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       });
     }
 
+    if (err.statusCode === 503) {
+      // WHY: a thrown 503 is deliberate (HubSpot OAuth missing, a scanner that
+      // is not configured, a queue that cannot take work). The message is
+      // written by our code, same as a 4xx. Masking it as a generic 500 hides
+      // a condition the caller can act on. Anything without this status stays
+      // a generic 500 below, so an unexpected error cannot leak its text.
+      return reply.status(503).send({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: err.message,
+      });
+    }
+
     if (err.statusCode && err.statusCode < 500) {
       // WHY: 4xx errors are application-generated (route handlers, httpErrors.*).
       // Unlike 5xx errors — which may contain DB connection strings, stack traces,
