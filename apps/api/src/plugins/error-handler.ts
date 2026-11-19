@@ -33,20 +33,22 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
   // a method on it would stamp errors built on other servers too. This server
   // gets its own object whose serviceUnavailable carries the brand.
   const shared = server.httpErrors;
-  const original = shared.serviceUnavailable.bind(shared);
-  const wrapped = Object.assign(Object.create(shared), {
-    serviceUnavailable: (...args: unknown[]) => {
-      const err = original(...(args as []));
-      stampDeliberate503(err);
-      return err;
-    },
-  });
-  Object.defineProperty(server, 'httpErrors', {
-    configurable: true,
-    enumerable: true,
-    writable: true,
-    value: wrapped,
-  });
+  if (shared?.serviceUnavailable) {
+    const original = shared.serviceUnavailable.bind(shared);
+    const wrapped = Object.assign(Object.create(shared), {
+      serviceUnavailable: (...args: unknown[]) => {
+        const err = original(...(args as []));
+        stampDeliberate503(err);
+        return err;
+      },
+    });
+    Object.defineProperty(server, 'httpErrors', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: wrapped,
+    });
+  }
 
   server.setErrorHandler((err: FastifyError, req, reply) => {
     if (isExpectedClientAbortError(err, req.raw)) {
