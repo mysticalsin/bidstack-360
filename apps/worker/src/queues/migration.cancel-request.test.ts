@@ -247,6 +247,73 @@ describe('migration cancel request', () => {
     }
   });
 
+  t('a cancel mark for a different target type does not stop the chunk', async () => {
+    // WHY: targetId is a string. Another audit row with the same id and the
+    // cancel action must not be treated as a migration cancel.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_type_${ns}`, name: `type ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: {
+        orgId: org.id,
+        clerkUser: `user_${ns}`,
+        email: `${ns}@test.local`,
+        name: 'Type',
+      },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        startedAt: new Date(Date.now() - 1_000),
+        meta: { entityType: 'companies' },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        action: 'migration.cancel.requested',
+        targetType: 'Company',
+        targetId: job.id,
+      },
+    });
+    const deps: MigrationChunkDeps = {
+      readRows: async () => JSON.stringify([{ Name: 'Other Target Co' }]),
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    };
+    try {
+      await processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: user.id,
+          source: 'CSV',
+          entityType: 'companies',
+          chunkOffset: 0,
+          chunkSize: 100,
+          totalRows: 1,
+          redisKey: 'rows',
+          mappings: { Name: 'company.name' },
+          dedupStrategy: 'skip',
+        },
+        deps,
+        log,
+      );
+      expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(1);
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.status).not.toBe('CANCELLED');
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
+
   t('a marked cancel audits the canceller, not the importer', async () => {
     const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const org = await prisma.org.create({
@@ -370,7 +437,7 @@ describe('migration cancel request', () => {
     });
     const info = vi.fn();
     try {
-      await applyMarkedCancel(org.id, importer.id, job.id, { info });
+      await applyMarkedCancel(org.id, job.id, { info });
       const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
       expect(stored.status).toBe('COMPLETE');
       const lost = await prisma.auditLog.findFirst({
