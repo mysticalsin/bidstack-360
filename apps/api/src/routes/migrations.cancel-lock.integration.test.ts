@@ -229,3 +229,96 @@ skipIfNoDb(
     await prisma.company.deleteMany({ where: { orgId: job.orgId, name: 'Northwind Traders' } });
   },
 );
+
+skipIfNoDb(
+  'a chunk lock older than 120s still accepts cancel and the next chunk cancels',
+  async () => {
+    // WHY: progressAt goes stale while the chunk still holds the row. Cancel
+    // answered 409 and wrote no mark, so the import kept running.
+    const job = await createJob({ status: 'RUNNING' });
+    const attemptId = 'attempt-long';
+    await prisma.$executeRaw`
+      UPDATE migration_jobs
+      SET started_at = NOW() - interval '10 minutes',
+          meta = jsonb_build_object(
+            'entityType', 'companies',
+            'attemptId', ${attemptId}::text,
+            'progressAt', to_char(
+              (NOW() - interval '121 seconds') AT TIME ZONE 'UTC',
+              'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+            )
+          )
+      WHERE id = ${job.id}::uuid
+    `;
+    let releaseLock!: () => void;
+    const released = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    let lockHeld!: () => void;
+    const held = new Promise<void>((resolve) => {
+      lockHeld = resolve;
+    });
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM migration_jobs WHERE id = ${job.id}::uuid FOR UPDATE`;
+        lockHeld();
+        await released;
+      },
+      { maxWait: 5_000, timeout: 20_000 },
+    );
+    await held;
+    try {
+      const res = await ctx.server.inject({
+        method: 'DELETE',
+        url: `/api/v1/migrations/${job.id}/cancel`,
+      });
+      expect(res.statusCode).toBe(202);
+      const body = res.json<{ status: string; cancelRequested?: boolean }>();
+      expect(body.status).toBe('RUNNING');
+      expect(body.cancelRequested).toBe(true);
+      const marks = await prisma.auditLog.findMany({
+        where: { targetId: job.id, action: 'migration.cancel.requested', targetType: 'MigrationJob' },
+      });
+      expect(marks).toHaveLength(1);
+      expect(marks[0]?.diff).toMatchObject({ attemptId });
+    } finally {
+      releaseLock();
+      await holder;
+    }
+
+    const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
+    await processMigrationChunk(
+      {
+        migrationJobId: job.id,
+        orgId: job.orgId,
+        userId: job.userId,
+        source: 'CSV',
+        entityType: 'companies',
+        chunkOffset: 0,
+        chunkSize: 100,
+        totalRows: 1,
+        redisKey: 'rows',
+        mappings: { Name: 'company.name' },
+        dedupStrategy: 'skip',
+        attemptId,
+      },
+      {
+        readRows: async () => JSON.stringify([{ Name: 'Long Chunk Co' }]),
+        enqueueChunk: async () => undefined,
+        enqueueIntel: async () => undefined,
+        env: {},
+      },
+      { info: () => undefined, warn: () => undefined },
+    );
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(stored.status).toBe('CANCELLED');
+    expect(await prisma.company.count({ where: { orgId: job.orgId, name: 'Long Chunk Co' } })).toBe(0);
+    const audits = await prisma.auditLog.findMany({
+      where: { targetId: job.id, action: 'migration.cancel' },
+    });
+    expect(audits).toHaveLength(1);
+    await purgeAuditRows({
+      where: { targetId: job.id, action: { in: ['migration.cancel.requested', 'migration.cancel'] } },
+    });
+  },
+);
