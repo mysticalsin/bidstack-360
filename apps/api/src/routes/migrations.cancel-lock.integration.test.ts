@@ -94,6 +94,53 @@ skipIfNoDb(
   },
 );
 
+skipIfNoDb('a second cancel while the chunk holds the row does not insert another mark', async () => {
+  const job = await createJob({ status: 'RUNNING' });
+  await prisma.migrationJob.update({
+    where: { id: job.id },
+    data: { meta: { progressAt: new Date().toISOString(), attemptId: 'attempt-live' }, startedAt: new Date() },
+  });
+  let releaseLock!: () => void;
+  const released = new Promise<void>((resolve) => {
+    releaseLock = resolve;
+  });
+  let lockHeld!: () => void;
+  const held = new Promise<void>((resolve) => {
+    lockHeld = resolve;
+  });
+  const holder = prisma.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT id FROM migration_jobs WHERE id = ${job.id}::uuid FOR UPDATE`;
+      lockHeld();
+      await released;
+    },
+    { maxWait: 5_000, timeout: 20_000 },
+  );
+  await held;
+  try {
+    const first = await ctx.server.inject({
+      method: 'DELETE',
+      url: `/api/v1/migrations/${job.id}/cancel`,
+    });
+    const second = await ctx.server.inject({
+      method: 'DELETE',
+      url: `/api/v1/migrations/${job.id}/cancel`,
+    });
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    const marks = await prisma.auditLog.count({
+      where: { targetId: job.id, action: 'migration.cancel.requested', targetType: 'MigrationJob' },
+    });
+    expect(marks).toBe(1);
+  } finally {
+    releaseLock();
+    await holder;
+    await purgeAuditRows({
+      where: { targetId: job.id, action: 'migration.cancel.requested' },
+    });
+  }
+});
+
 skipIfNoDb('lock_timeout does not leak onto the next pooled checkout', async () => {
   // WHY: set_config(..., true) is transaction-local. A false third argument
   // would leave 2s on the pooled session and the next request would wait less
