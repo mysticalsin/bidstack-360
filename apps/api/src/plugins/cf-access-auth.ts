@@ -18,6 +18,7 @@ import {
   parseAllowedUsers,
   type AllowedUser,
 } from '../lib/allowed-users.js';
+import { throwIntegrationNotConfigured } from '../lib/integration-not-configured.js';
 import { realOrgClerkId } from '../lib/polo-mode.js';
 import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import type { AuthContext } from './auth.js';
@@ -168,7 +169,7 @@ export async function verifyCfAccessAuth(req: FastifyRequest): Promise<AuthConte
   try {
     allowlist = parseAllowedUsers(process.env.POLO_ALLOWED_USERS);
   } catch {
-    throw req.server.httpErrors.serviceUnavailable('POLO_ALLOWED_USERS is not configured correctly');
+    throwIntegrationNotConfigured(req, 'POLO_ALLOWED_USERS');
   }
   const allowed = findAllowedUser(identity.email, allowlist);
   if (!allowed) {
