@@ -6,6 +6,8 @@ import sensible from '@fastify/sensible';
 import Fastify from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { IntegrationTokenKeyMissingError } from '@bidstack/shared/server-crypto';
+
 import { errorHandlerPlugin } from './error-handler.js';
 
 const HUBSPOT_NOT_CONFIGURED =
@@ -76,6 +78,76 @@ describe('error handler status contract', () => {
       message: 'Something went wrong',
     });
     expect(forgedKey.body).not.toContain('secret-token');
+  });
+
+  it('does not pass through a ServiceUnavailable built on another server', async () => {
+    const other = Fastify({ logger: false });
+    await other.register(sensible);
+    const foreign = other.httpErrors.serviceUnavailable(SECRET);
+    server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(errorHandlerPlugin);
+    server.get('/foreign', async () => {
+      throw foreign;
+    });
+    const res = await server.inject({ method: 'GET', url: '/foreign' });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Something went wrong',
+    });
+    expect(res.body).not.toContain('secret-token');
+    await other.close();
+  });
+
+  it('keeps the token-key 503 when the prototype is no longer the class', async () => {
+    server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(errorHandlerPlugin);
+    server.get('/key', async () => {
+      const err = new IntegrationTokenKeyMissingError();
+      Object.setPrototypeOf(err, Error.prototype);
+      err.name = 'mangled';
+      throw err;
+    });
+    const res = await server.inject({ method: 'GET', url: '/key' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({
+      statusCode: 503,
+      error: 'Service Unavailable',
+      message: 'Integration token encryption is not configured',
+    });
+  });
+
+  it('does not copy a sentinel buried in cause into the 500 body or the log', async () => {
+    const lines: string[] = [];
+    server = Fastify({
+      logger: {
+        level: 'error',
+        stream: {
+          write(chunk: string) {
+            lines.push(chunk);
+          },
+        },
+      },
+    });
+    await server.register(sensible);
+    await server.register(errorHandlerPlugin);
+    server.get('/cause', async () => {
+      const err = new Error('Something failed');
+      err.cause = new Error('provider-body-SENTINEL-upstream-text');
+      throw err;
+    });
+    const res = await server.inject({ method: 'GET', url: '/cause' });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Something went wrong',
+    });
+    expect(res.body).not.toContain('provider-body-SENTINEL-upstream-text');
+    expect(lines.join('\n')).not.toContain('provider-body-SENTINEL-upstream-text');
   });
 
   it('hides unexpected failures behind a generic 500', async () => {
