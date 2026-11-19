@@ -43,6 +43,27 @@ describe('error handler status contract', () => {
     });
   });
 
+  it('does not pass through a plain Error that only forges a 503 name', async () => {
+    server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(errorHandlerPlugin);
+    const secret = 'postgres://bidstack:secret-token@db.internal/bidstack';
+    server.get('/forged', async () => {
+      const err = new Error(secret);
+      err.name = 'ServiceUnavailableError';
+      (err as { statusCode?: number }).statusCode = 503;
+      throw err;
+    });
+    const res = await server.inject({ method: 'GET', url: '/forged' });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Something went wrong',
+    });
+    expect(res.body).not.toContain('secret-token');
+  });
+
   it('hides unexpected failures behind a generic 500', async () => {
     server = await app();
     const res = await server.inject({ method: 'GET', url: '/boom' });
