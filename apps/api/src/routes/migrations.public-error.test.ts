@@ -95,6 +95,15 @@ describe('migration error text on the way out', () => {
     expect(JSON.stringify(job.errorSummary)).not.toContain('deadlock');
   });
 
+  it('caps an unmasked error field at 100 characters', () => {
+    const field = `column-${'x'.repeat(200)}`;
+    const job = serializeJob(
+      jobRow([{ row: 2, field, message: 'company.name is required' }]),
+    );
+    expect(job.errorSummary[0]?.field).toHaveLength(100);
+    expect(job.errorSummary[0]?.field).toBe(field.slice(0, 100));
+  });
+
   it('maps raw HubSpot sync-now reasons to a safe message', () => {
     const run = hubspotRunFromJobs(
       'hubspot-1',
