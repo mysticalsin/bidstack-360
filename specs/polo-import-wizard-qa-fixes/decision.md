@@ -43,15 +43,51 @@ A job id from another org is 404 on cancel and on retry. A caller without `setti
 
 The wizard ref stops a second click in one tab. Two browsers are settled by the database: retry's compare-and-set only matches `FAILED`, and `migration_jobs_one_active_per_file` refuses a second active import of the same file. The loser is `409` with `code: RETRY_LOST`. The wizard matches that code. If the winner then fails to enqueue, the job is `FAILED` and the wizard shows that failure.
 
+## Lost cancel on the bookkeeping update
+
+A `BEFORE UPDATE` on `processed_rows` can insert `migration.cancel.requested` during `recordChunkOutcome`, after the last read inside the chunk transaction. The company rows commit. `maybeComplete` then used to set `COMPLETE`, and `applyMarkedCancel` never ran. A chunk that does not finish the file (`processed + errors < total`) stayed `RUNNING`, because the stale sweep only claims `processedRows = 0`.
+
+The statement that sets `COMPLETE` now requires that no matching mark exists. If that update misses because the mark is present, the worker compare-and-sets `CANCELLED` and writes `migration.cancel`. A partial chunk takes the same cancel path after the commit. A third read before the bookkeeping `UPDATE` does not close this: the mark does not exist until that `UPDATE` runs.
+
+The rows of that chunk are already committed, because the mark was written by the same transaction as the inserts. The job does not become `COMPLETE`, and a partial chunk does not stay `RUNNING`.
+
+## Retry, a dead worker, and an old mark
+
+Cancel while the chunk holds the lock writes one `migration.cancel.requested` row for that attempt (`diff.attemptId`, the clicker's `userId`). A repeat Cancel for the same attempt does not insert another row.
+
+If the worker dies before it applies the mark, the stale sweep used to set `FAILED`. Retry was then offered, and the old mark cancelled the new attempt at 0 rows. The original Cancel ended as `FAILED`.
+
+The sweep now treats a mark for the current attempt as cancel: status `CANCELLED`, `migration.cancel` audited as the person on the mark, not the person who started the import. The 150s chunk TTL does not apply here. The sweep runs after that window, and the attempt on the job has not changed. A mark for a previous attempt, or older than this attempt's `startedAt`, does not cancel the job. A retry stores a new `attemptId`, writes `migration.retry`, and the chunk ignores the old mark. Sequence covered by tests: cancel, fail, retry, the retry imports; and cancel, worker death, sweep, the job is `CANCELLED`.
+
+The wizard shows Cancelling… while the job is still `RUNNING` and `cancelRequested` is true. A losing retry (`409` code `RETRY_LOST`) is not an error. A second tap within 750ms of Retry cannot hit Cancel after the button swaps.
+
+The Maps-to select has a minimum width so the chosen field is not clipped from the `md` breakpoint (768px) through about 900px. The table scrolls instead of squashing the control.
+
+## Who clicked Cancel
+
+`migration.cancel.requested.userId` is the authenticated user on the Cancel request. `applyMarkedCancel` copies that id onto `migration.cancel`. It is not the import's `userId`. The same path is used when the sweep applies a mark the chunk never saw.
+
+## Stub auth with no role header
+
+A request that does not send `x-bidstack-e2e-role` is the seeded Admin only on the local and test stub.
+
+The path is `resolveStubAuth` in `apps/api/src/plugins/auth.ts`. When `readStubRoleOverride` returns null (no header, lines 194–197 and 339–342), the function loads the oldest user in the seed org (`createdAt` ascending, lines 344–357) and returns that row's `role`. The fixture seed creates Jane Smith first with `role: 'admin'` (`packages/db/src/seed-data.ts` line 16, `packages/db/src/seed.ts` lines 90–102) and grants the system role Admin (`packages/db/src/seed.rbac.ts` lines 488–489 and 638–644).
+
+That function runs only from the auth hook's final branch (`apps/api/src/plugins/auth.ts` lines 725–732): no `CLERK_SECRET_KEY`, Cloudflare Access off, demo mode off. `assertPoloAuthBoot` (`apps/api/src/lib/polo-mode.ts` lines 69–71) refuses to boot that branch unless `NODE_ENV` is `development` or `test`. Production compose sets `NODE_ENV=production` and requires `CLERK_SECRET_KEY` (`docker-compose.prod.yml`). The public preview sets `DEMO_MODE` (`deploy/vercel-demo/README.md`, `DEPLOY.md`) and uses `resolveDemoAuth`, not the stub. `resolveStubAuth` also rejects any remote address that is not loopback (lines 317–324).
+
+This is not reachable on preview or production. It is not a merge-blocking finding. No code change.
+
 ## Residuals
 
 Owner of each residual: Devin (Polo interim owner).
 
-1. **Window before COMMIT.** The chunk checks the mark, then `persistChunkBookkeeping` commits. A mark that lands in that gap is missed. If it was the last chunk, the job can be `COMPLETE` while the response said cancel was only requested (`cancelRequested: true`, button "Cancelling…"). The final status on the job is the truth. Closing it would mean re-checking in the completion `UPDATE`, which still leaves a smaller race. Left open on purpose.
+1. **Rows of the in-flight chunk.** The bookkeeping-update gap no longer completes the job or leaves a partial chunk `RUNNING`. What remains: those rows commit, because the mark was inserted by the same transaction. A mark that arrives after the completion statement is still a smaller race.
 
 2. **The mark is unsigned.** Anyone who can insert into `audit_log` can write `migration.cancel.requested`. That write access is the trust boundary. Duplicate clicks for one attempt are de-duplicated. The lookup index is `audit_log_target_action_idx` on `(target_id, action)`, with `down.sql` beside the migration. A signature on the mark is not in this change.
 
 3. **Leakage is clean.** The locked branch does not log the error object. A forced `55P03` returns the job JSON. The test asserts that body has no `55P03`, `PostgresError`, `lock_timeout`, or `FOR UPDATE`. The 409 for a job that cannot be cancelled still names the status enum. That enum is not driver text.
+
+No Low from the Inspector pass on `3a1975bd` is deferred. N-1 (cancel-requested state, one mark per attempt), N-3 (losing retry is not an error, second tap is not Cancel), and N-4 (select width at 768 and 900) are in this change. There is no Backlog row.
 
 ## What did not change
 

@@ -220,7 +220,7 @@ class MigrationCancelRequested extends Error {
 }
 
 async function cancelWasRequested(
-  db: Prisma.TransactionClient,
+  db: Pick<Prisma.TransactionClient, 'auditLog'>,
   orgId: string,
   jobId: string,
   attemptId: string | null,
@@ -242,11 +242,39 @@ async function cancelWasRequested(
     orderBy: { at: 'desc' },
     take: 20,
   });
-  return rows.some((row) => {
-    const diff = row.diff as { attemptId?: unknown } | null;
-    const markAttempt = typeof diff?.attemptId === 'string' ? diff.attemptId : null;
-    return migrationChunkMatchesAttempt(attemptId, markAttempt);
+  return rows.some((row) => markMatchesAttempt(row.diff, attemptId));
+}
+
+function markMatchesAttempt(diff: unknown, attemptId: string | null): boolean {
+  const mark = diff as { attemptId?: unknown } | null;
+  const markAttempt = typeof mark?.attemptId === 'string' ? mark.attemptId : null;
+  return migrationChunkMatchesAttempt(attemptId, markAttempt);
+}
+
+/**
+ * A cancel for this attempt that the chunk never applied. The 150s chunk TTL
+ * does not apply: the stale sweep runs after that window, and the attempt is
+ * still the one on the job.
+ */
+async function pendingCancelForAttempt(
+  orgId: string,
+  jobId: string,
+  attemptId: string | null,
+  startedAt: Date | null,
+): Promise<boolean> {
+  const rows = await prisma.auditLog.findMany({
+    where: {
+      orgId,
+      targetId: jobId,
+      targetType: 'MigrationJob',
+      action: MIGRATION_CANCEL_REQUESTED,
+      ...(startedAt ? { at: { gte: startedAt } } : {}),
+    },
+    select: { diff: true },
+    orderBy: { at: 'desc' },
+    take: 20,
   });
+  return rows.some((row) => markMatchesAttempt(row.diff, attemptId));
 }
 
 export async function applyMarkedCancel(
@@ -841,11 +869,20 @@ export async function maybeComplete(
   if (!migrationChunkMatchesAttempt(migrationAttemptId(job.meta), attemptId)) return;
   const done = job.processedRows + job.errorRows;
   const total = forceTotal ?? job.totalRows;
-  if (done < total) return;
-  // A cancel or a newer attempt can land after the read above. Only the
-  // attempt that is still current, and still RUNNING, becomes COMPLETE.
+  // A mark inserted by the counter UPDATE is not visible to a read that ran
+  // before that statement. The stale sweep only claims processedRows = 0, so
+  // a partial chunk would stay RUNNING. Cancel it here, after the commit.
+  if (done < total) {
+    if (await cancelWasRequested(prisma, job.orgId, migrationJobId, attemptId, job.startedAt)) {
+      await applyMarkedCancel(job.orgId, migrationJobId, cancelChunkLog(log));
+    }
+    return;
+  }
+  // The predicate is in the statement that sets COMPLETE. A read before this
+  // UPDATE can miss a mark the bookkeeping UPDATE just committed.
   const completedAt = new Date();
   const undoableUntil = new Date(Date.now() + 24 * 3600 * 1000);
+  const ttlSeconds = MIGRATION_CANCEL_MARK_TTL_MS / 1000;
   const moved = await prisma.$executeRaw`
     UPDATE migration_jobs
     SET status = 'COMPLETE',
@@ -859,17 +896,46 @@ export async function maybeComplete(
         (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
         OR meta->>'attemptId' = ${attemptId}
       )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log AS mark
+        WHERE mark.org_id = migration_jobs.org_id
+          AND mark.target_id = migration_jobs.id::text
+          AND mark.target_type = 'MigrationJob'
+          AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+          AND mark.at >= GREATEST(
+            COALESCE(migration_jobs.started_at, '-infinity'::timestamptz),
+            NOW() - make_interval(secs => ${ttlSeconds})
+          )
+          AND (
+            (${attemptId}::text IS NULL AND (mark.diff->>'attemptId') IS NULL)
+            OR mark.diff->>'attemptId' = ${attemptId}
+          )
+      )
   `;
-  if (Number(moved) !== 1) {
-    const current = await prisma.migrationJob.findUnique({
-      where: { id: migrationJobId },
-      select: { status: true },
-    });
-    log?.warn(
-      { migrationJobId, from: current?.status ?? null, to: 'COMPLETE' },
-      'illegal migration transition',
-    );
+  if (Number(moved) === 1) return;
+  if (await cancelWasRequested(prisma, job.orgId, migrationJobId, attemptId, job.startedAt)) {
+    await applyMarkedCancel(job.orgId, migrationJobId, cancelChunkLog(log));
+    return;
   }
+  const current = await prisma.migrationJob.findUnique({
+    where: { id: migrationJobId },
+    select: { status: true },
+  });
+  log?.warn(
+    { migrationJobId, from: current?.status ?? null, to: 'COMPLETE' },
+    'illegal migration transition',
+  );
+}
+
+function cancelChunkLog(log: ChunkLog | undefined): {
+  info: (obj: object, msg?: string) => void;
+} {
+  return {
+    info: (obj, msg) => {
+      log?.info(obj, msg ?? '');
+    },
+  };
 }
 
 // ─── Chunk processing ──────────────────────────────────────────────────────
@@ -1280,7 +1346,16 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
       errorRows: 0,
       updatedAt: { lte: cutoff },
     },
-    select: { id: true, status: true, meta: true, updatedAt: true, processedRows: true, errorRows: true },
+    select: {
+      id: true,
+      orgId: true,
+      status: true,
+      meta: true,
+      startedAt: true,
+      updatedAt: true,
+      processedRows: true,
+      errorRows: true,
+    },
   });
   let claimed = 0;
   for (const job of candidates) {
@@ -1293,6 +1368,24 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
         now,
       })
     ) {
+      continue;
+    }
+    // The worker died after Cancel had already been accepted. Failing the job
+    // offers Retry, and the pending mark would then cancel that attempt.
+    if (
+      await pendingCancelForAttempt(
+        job.orgId,
+        job.id,
+        migrationAttemptId(job.meta),
+        job.startedAt,
+      )
+    ) {
+      await applyMarkedCancel(job.orgId, job.id, { info() {} });
+      const stored = await prisma.migrationJob.findUnique({
+        where: { id: job.id },
+        select: { status: true },
+      });
+      if (stored?.status === 'CANCELLED') claimed += 1;
       continue;
     }
     if (await claimStaleMigration(job.id, job.updatedAt)) claimed += 1;

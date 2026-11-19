@@ -174,6 +174,7 @@ export function CsvImportWizard() {
   const fileInput = useRef<HTMLInputElement>(null);
   const starting = useRef(false);
   const retrying = useRef(false);
+  const retryTapAt = useRef(0);
 
   const start = useStartCsvImport();
   const cancel = useCancelMigration();
@@ -283,7 +284,7 @@ export function CsvImportWizard() {
   function mapControl(header: string) {
     return (
       <select
-        className="input min-h-11"
+        className="input min-h-11 w-full min-w-44"
         aria-label={t('csvImport.map.mapColumnAria', 'Map column {{header}}', { header })}
         value={mappings[header] ?? ''}
         onChange={(e) => setMappings((m) => ({ ...m, [header]: e.target.value || null }))}
@@ -414,7 +415,7 @@ export function CsvImportWizard() {
                     <td className="max-w-[12rem] truncate px-3 py-2 text-[var(--fg-tertiary)]">
                       {parsed.rows[0]?.[header] || '—'}
                     </td>
-                    <td className="px-3 py-2">{mapControl(header)}</td>
+                    <td className="min-w-44 px-3 py-2">{mapControl(header)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -551,6 +552,9 @@ export function CsvImportWizard() {
           isLoading={job.isLoading}
           onDone={reset}
           onCancel={() => {
+            // A double-tap on Retry can land on Cancel once the job flips to
+            // RUNNING and the button swaps. That tap is not a cancel.
+            if (Date.now() - retryTapAt.current < 750) return;
             if (!jobId || cancel.isPending) return;
             cancel.mutate(jobId, {
               onSuccess: (updated) => {
@@ -560,6 +564,7 @@ export function CsvImportWizard() {
           }}
           onRetry={() => {
             if (!jobId || retrying.current || retry.isPending) return;
+            retryTapAt.current = Date.now();
             retrying.current = true;
             retry.mutate(jobId, {
               onSettled: () => {
