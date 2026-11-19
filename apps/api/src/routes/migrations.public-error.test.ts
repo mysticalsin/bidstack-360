@@ -56,6 +56,45 @@ describe('migration error text on the way out', () => {
     ]);
   });
 
+  it('maps company.name is required followed by driver text to import_failed', () => {
+    const job = serializeJob(
+      jobRow([
+        {
+          row: 2,
+          field: 'name',
+          message: 'company.name is required; driver said relation secret_table',
+        },
+      ]),
+    );
+    expect(job.errorSummary.map((row) => row.message)).toEqual(['import_failed']);
+    expect(JSON.stringify(job.errorSummary)).not.toContain('secret_table');
+  });
+
+  it('maps a known code with a suffix to import_failed', () => {
+    const job = serializeJob(
+      jobRow([{ row: 0, field: null, message: 'enqueue_failed: connection reset by driver' }]),
+    );
+    expect(job.errorSummary.map((row) => row.message)).toEqual(['import_failed']);
+    expect(JSON.stringify(job.errorSummary)).not.toContain('connection reset');
+  });
+
+  it('maps chunk failed permanently plus raw text to chunk failed permanently: import_failed', () => {
+    const job = serializeJob(
+      jobRow([
+        {
+          row: 0,
+          field: null,
+          message: 'chunk failed permanently: Process 4242 deadlock detected',
+        },
+      ]),
+    );
+    expect(job.errorSummary.map((row) => row.message)).toEqual([
+      'chunk failed permanently: import_failed',
+    ]);
+    expect(JSON.stringify(job.errorSummary)).not.toContain('4242');
+    expect(JSON.stringify(job.errorSummary)).not.toContain('deadlock');
+  });
+
   it('maps raw HubSpot sync-now reasons to a safe message', () => {
     const run = hubspotRunFromJobs(
       'hubspot-1',
