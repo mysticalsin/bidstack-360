@@ -35,7 +35,6 @@ import {
   MIGRATION_NO_LONGER_FAILED,
   RETRY_LOST,
   migrationAttemptId,
-  migrationChunkMatchesAttempt,
   migrationFrom,
   migrationProgressAt,
   MIGRATION_ROWS_EXPIRED,
@@ -75,6 +74,24 @@ const ACTIVE_IMPORT_MESSAGE = 'This import is already running.';
 
 /** How long Cancel waits for the job-row lock a chunk holds with FOR UPDATE. */
 const CANCEL_LOCK_TIMEOUT = '2s';
+
+/**
+ * Test isolation for POST /migrations/start-csv. That route allows 10 starts
+ * per minute per user. The queue suite issues more than that in one process,
+ * so each case gets its own bucket. Production does not read this counter.
+ */
+let csvStartLimitGeneration = 0;
+
+export function advanceCsvStartRateLimitForTests(): void {
+  csvStartLimitGeneration += 1;
+}
+
+function csvStartRateKey(req: { auth?: { userId?: string; orgId?: string }; ip: string }): string {
+  const auth = req.auth;
+  const base = auth?.userId ? `u:${auth.orgId ?? 'no-org'}:${auth.userId}` : `ip:${req.ip}`;
+  if (process.env.NODE_ENV === 'test') return `${base}:g${csvStartLimitGeneration}`;
+  return base;
+}
 
 const LOCK_TIMEOUT_CODE = /PostgresError \{\s*code:\s*"55P03"/;
 
@@ -387,7 +404,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/start-csv',
     {
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+          keyGenerator: (req: { auth?: { userId?: string; orgId?: string }; ip: string }) =>
+            csvStartRateKey(req),
+        },
+      },
       schema: {
         body: z.object({
           source: z.enum(['SALESFORCE_CSV', 'CSV']),
@@ -922,54 +946,66 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         if (!isLockTimeout(err)) throw err;
         outcome = 'locked';
       }
-      const replyPending = async (current: NonNullable<Awaited<ReturnType<typeof prisma.migrationJob.findFirst>>>) => {
-        const attemptId = migrationAttemptId(current.meta);
-        const prior = await prisma.auditLog.findMany({
-          where: {
-            orgId,
-            targetId: job.id,
-            targetType: 'MigrationJob',
-            action: MIGRATION_CANCEL_REQUESTED,
-          },
-          orderBy: { at: 'desc' },
-          take: 5,
-          select: { diff: true },
-        });
-        const already = prior.some((row) => {
-          const diff = row.diff as { attemptId?: unknown } | null;
-          const markAttempt = typeof diff?.attemptId === 'string' ? diff.attemptId : null;
-          return migrationChunkMatchesAttempt(attemptId, markAttempt);
-        });
-        if (!already) {
-          await prisma.auditLog.create({
-            data: {
-              orgId,
-              userId,
-              action: MIGRATION_CANCEL_REQUESTED,
-              targetType: 'MigrationJob',
-              targetId: job.id,
-              diff: { attemptId },
-            },
-          });
-        }
-        return reply.code(202).send({ ...serializeJob(current), cancelRequested: true as const });
-      };
       if (outcome === 'locked' || outcome === 'lost') {
-        const current = await prisma.migrationJob.findFirst({
-          where: { id: job.id, orgId },
-        });
-        if (!current) throw server.httpErrors.notFound('Migration job not found');
-        // A RUNNING job is never told it cannot be cancelled. The row was
-        // busy or the compare-and-set lost a race with the chunk; the mark
-        // still applies.
-        if (current.status === 'PENDING' || current.status === 'RUNNING') {
-          return replyPending(current);
+        // One statement. A plain SELECT of the committed row does not wait on
+        // the chunk's FOR UPDATE, and the INSERT happens only when that row is
+        // still PENDING or RUNNING. A finished job matches nothing, so a stale
+        // in-memory read cannot turn it into 202.
+        const decided = await prisma.$queryRaw<Array<{ live: number; inserted: number }>>`
+          WITH live AS (
+            SELECT id, org_id, meta
+            FROM migration_jobs
+            WHERE id = ${job.id}::uuid
+              AND org_id = ${orgId}::uuid
+              AND status::text IN ('PENDING', 'RUNNING')
+          ),
+          ins AS (
+            INSERT INTO audit_log (org_id, user_id, action, target_type, target_id, diff)
+            SELECT
+              live.org_id,
+              ${userId}::uuid,
+              ${MIGRATION_CANCEL_REQUESTED},
+              'MigrationJob',
+              live.id::text,
+              jsonb_build_object('attemptId', live.meta->>'attemptId')
+            FROM live
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM audit_log AS mark
+              WHERE mark.org_id = live.org_id
+                AND mark.target_id = live.id::text
+                AND mark.target_type = 'MigrationJob'
+                AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+                AND mark.deleted_at IS NULL
+                AND (
+                  (live.meta->>'attemptId' IS NULL AND (mark.diff->>'attemptId') IS NULL)
+                  OR mark.diff->>'attemptId' = live.meta->>'attemptId'
+                )
+            )
+            RETURNING id
+          )
+          SELECT
+            (SELECT count(*)::int FROM live) AS live,
+            (SELECT count(*)::int FROM ins) AS inserted
+        `;
+        if (Number(decided[0]?.live) === 1) {
+          const current = await prisma.migrationJob.findUnique({
+            where: { id: job.id },
+          });
+          if (!current) throw server.httpErrors.notFound('Migration job not found');
+          return reply.code(202).send({ ...serializeJob(current), cancelRequested: true as const });
         }
+        const current = await prisma.migrationJob.findUnique({
+          where: { id: job.id },
+          select: { status: true },
+        });
         req.log.warn(
-          { migrationJobId: job.id, from: current.status, to: 'CANCELLED' },
+          { migrationJobId: job.id, from: current?.status ?? null, to: 'CANCELLED' },
           'illegal migration transition',
         );
-        throw server.httpErrors.conflict(`Cannot cancel a job with status ${current.status}`);
+        throw server.httpErrors.conflict(
+          `Cannot cancel a job with status ${current?.status ?? 'unknown'}`,
+        );
       }
       const updated = await prisma.migrationJob.findFirstOrThrow({
         where: { id: job.id, orgId },

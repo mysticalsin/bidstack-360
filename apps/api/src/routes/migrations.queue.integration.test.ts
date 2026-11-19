@@ -15,6 +15,7 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
+import { advanceCsvStartRateLimitForTests } from './migrations.js';
 import { retireActiveImports } from './migrations.test-helpers.js';
 
 let server: FastifyInstance;
@@ -43,6 +44,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  advanceCsvStartRateLimitForTests();
   if (org) await retireActiveImports(org.orgId);
 });
 
