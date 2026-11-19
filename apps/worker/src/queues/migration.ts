@@ -220,12 +220,25 @@ async function cancelWasRequested(
   db: Prisma.TransactionClient,
   orgId: string,
   jobId: string,
+  attemptId: string | null,
+  startedAt: Date | null,
 ): Promise<boolean> {
-  const mark = await db.auditLog.findFirst({
-    where: { orgId, targetId: jobId, action: MIGRATION_CANCEL_REQUESTED },
-    select: { id: true },
+  const rows = await db.auditLog.findMany({
+    where: {
+      orgId,
+      targetId: jobId,
+      action: MIGRATION_CANCEL_REQUESTED,
+      ...(startedAt ? { at: { gte: startedAt } } : {}),
+    },
+    select: { diff: true },
+    orderBy: { at: 'desc' },
+    take: 20,
   });
-  return mark !== null;
+  return rows.some((row) => {
+    const diff = row.diff as { attemptId?: unknown } | null;
+    const markAttempt = typeof diff?.attemptId === 'string' ? diff.attemptId : null;
+    return migrationChunkMatchesAttempt(attemptId, markAttempt);
+  });
 }
 
 async function applyMarkedCancel(orgId: string, userId: string, jobId: string): Promise<void> {
@@ -1011,8 +1024,10 @@ export async function processMigrationChunk(
   try {
     written = await prisma.$transaction(
     async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ status: string; org_id: string; meta: unknown }>>`
-        SELECT status::text AS status, org_id::text AS org_id, meta
+      const locked = await tx.$queryRaw<
+        Array<{ status: string; org_id: string; meta: unknown; started_at: Date | null }>
+      >`
+        SELECT status::text AS status, org_id::text AS org_id, meta, started_at
         FROM migration_jobs
         WHERE id = ${payload.migrationJobId}::uuid
         FOR UPDATE
@@ -1030,7 +1045,15 @@ export async function processMigrationChunk(
         skipReason = 'attempt';
         return null;
       }
-      if (await cancelWasRequested(tx, holder.org_id, payload.migrationJobId)) {
+      if (
+        await cancelWasRequested(
+          tx,
+          holder.org_id,
+          payload.migrationJobId,
+          migrationAttemptId(holder.meta),
+          holder.started_at,
+        )
+      ) {
         skipReason = 'cancel';
         return null;
       }
@@ -1059,7 +1082,15 @@ export async function processMigrationChunk(
           });
         }
       }
-      if (await cancelWasRequested(tx, holder.org_id, payload.migrationJobId)) {
+      if (
+        await cancelWasRequested(
+          tx,
+          holder.org_id,
+          payload.migrationJobId,
+          migrationAttemptId(holder.meta),
+          holder.started_at,
+        )
+      ) {
         throw new MigrationCancelRequested();
       }
       const booked = await persistChunkBookkeeping(tx, {

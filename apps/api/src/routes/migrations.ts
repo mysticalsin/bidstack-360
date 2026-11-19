@@ -921,6 +921,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             action: MIGRATION_CANCEL_REQUESTED,
             targetType: 'MigrationJob',
             targetId: job.id,
+            diff: { attemptId: migrationAttemptId(current.meta) },
           },
         });
         return serializeJob(current);
