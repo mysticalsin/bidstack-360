@@ -100,7 +100,7 @@ export function isLockTimeout(err: unknown, seen?: Set<unknown>): boolean {
     cause?: unknown;
   };
   if (row.code === '55P03' || row.meta?.code === '55P03') return true;
-  if (typeof row.message === 'string' && LOCK_TIMEOUT_CODE.test(row.message)) return true;
+  if (typeof row.message === 'string' && (LOCK_TIMEOUT_CODE.test(row.message) || /lock timeout/i.test(row.message))) return true;
   return row.cause !== undefined && isLockTimeout(row.cause, visited);
 }
 

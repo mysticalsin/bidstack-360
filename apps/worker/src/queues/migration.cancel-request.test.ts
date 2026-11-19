@@ -176,6 +176,75 @@ describe('migration cancel request', () => {
     }
   });
 
+  t('a newer mark for the previous attempt does not cancel the current attempt', async () => {
+    // WHY: dropping the attempt filter must go red. The mark is newer than
+    // startedAt, so only the attempt id keeps this chunk alive.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_newmark_${ns}`, name: `newmark ${ns}` },
+    });
+    const user = await prisma.user.create({
+      data: {
+        orgId: org.id,
+        clerkUser: `user_${ns}`,
+        email: `${ns}@test.local`,
+        name: 'Newmark',
+      },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        startedAt: new Date(Date.now() - 60_000),
+        meta: { entityType: 'companies', attemptId: 'attempt-2' },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        action: 'migration.cancel.requested',
+        targetType: 'MigrationJob',
+        targetId: job.id,
+        diff: { attemptId: 'attempt-1' },
+      },
+    });
+    const deps: MigrationChunkDeps = {
+      readRows: async () => JSON.stringify([{ Name: 'Newer Mark Co' }]),
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    };
+    try {
+      await processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: user.id,
+          source: 'CSV',
+          entityType: 'companies',
+          chunkOffset: 0,
+          chunkSize: 100,
+          totalRows: 1,
+          redisKey: 'rows',
+          mappings: { Name: 'company.name' },
+          dedupStrategy: 'skip',
+          attemptId: 'attempt-2',
+        },
+        deps,
+        log,
+      );
+      expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(1);
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.status).not.toBe('CANCELLED');
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
+
   t('a cancel mark older than the chunk lock window does not cancel the attempt', async () => {
     // WHY: a mark has to expire. Otherwise a lock that was not a chunk leaves
     // a row that cancels the import long after the waiter is gone.
