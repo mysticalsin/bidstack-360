@@ -372,6 +372,71 @@ describe('migration cancel gap', () => {
     }
   });
 
+  t('a two-chunk locked cancel writes one migration.cancel and no cancel.lost', async () => {
+    // WHY: both chunks see the mark. The second applyMarkedCancel used to
+    // record migration.cancel.lost after the first had already cancelled.
+    const { org, importer, canceller } = await orgWithUsers('two');
+    const attemptId = randomUUID();
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: importer.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 2,
+        startedAt: new Date(Date.now() - 1_000),
+        meta: { entityType: 'companies', attemptId },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        orgId: org.id,
+        userId: canceller.id,
+        action: 'migration.cancel.requested',
+        targetType: 'MigrationJob',
+        targetId: job.id,
+        diff: { attemptId },
+      },
+    });
+    const chunk = (offset: number) =>
+      processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: importer.id,
+          source: 'CSV',
+          entityType: 'companies',
+          chunkOffset: offset,
+          chunkSize: 1,
+          totalRows: 2,
+          redisKey: 'rows',
+          mappings: { Name: 'company.name' },
+          dedupStrategy: 'skip',
+          attemptId,
+        },
+        deps(JSON.stringify([{ Name: `Chunk ${offset}` }])),
+        log,
+      );
+    try {
+      await Promise.all([chunk(0), chunk(1)]);
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.status).toBe('CANCELLED');
+      expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(0);
+      expect(
+        await prisma.auditLog.count({
+          where: { orgId: org.id, targetId: job.id, action: 'migration.cancel' },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.auditLog.count({
+          where: { orgId: org.id, targetId: job.id, action: 'migration.cancel.lost' },
+        }),
+      ).toBe(0);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
+
   t('an accepted cancel still cancels the next chunk after the database clock passes 150s', async () => {
     // WHY: the mark used to expire at 150s. A later chunk of the same attempt
     // then imported the row and the job completed with no migration.cancel.
