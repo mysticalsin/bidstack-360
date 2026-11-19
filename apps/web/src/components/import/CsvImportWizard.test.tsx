@@ -739,4 +739,29 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByText('That did not work. Try again.')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('shows the job failure when the other retry lost and the winner did not enqueue', async () => {
+    // WHY: hiding the loser's 409 must not hide the failure the winner stored
+    // when the queue refused the new attempt. The match is the stable code.
+    stubHooks();
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('retry lost', 409, { code: 'RETRY_LOST' }),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'enqueue_failed' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import did not start. Try again.')).toBeTruthy(),
+    );
+    expect(screen.queryByText('Migration job is no longer failed')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+  });
 });
