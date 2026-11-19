@@ -372,6 +372,80 @@ describe('migration cancel gap', () => {
     }
   });
 
+  t('an accepted cancel still cancels the next chunk after the database clock passes 150s', async () => {
+    // WHY: the mark used to expire at 150s. A later chunk of the same attempt
+    // then imported the row and the job completed with no migration.cancel.
+    // The age is Postgres NOW(), not the test process clock.
+    const { org, importer, canceller } = await orgWithUsers('ttl');
+    const attemptId = randomUUID();
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: importer.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        meta: { entityType: 'companies', attemptId },
+      },
+    });
+    await prisma.$executeRaw`
+      UPDATE migration_jobs
+      SET started_at = NOW() - interval '10 minutes'
+      WHERE id = ${job.id}::uuid
+    `;
+    await prisma.$executeRaw`
+      INSERT INTO audit_log (org_id, user_id, action, target_type, target_id, diff, at)
+      VALUES (
+        ${org.id}::uuid,
+        ${canceller.id}::uuid,
+        'migration.cancel.requested',
+        'MigrationJob',
+        ${job.id},
+        jsonb_build_object('attemptId', ${attemptId}::text),
+        NOW() - interval '5 minutes'
+      )
+    `;
+    const age = await prisma.$queryRaw<Array<{ seconds: number }>>`
+      SELECT EXTRACT(EPOCH FROM (NOW() - at))::float8 AS seconds
+      FROM audit_log
+      WHERE target_id = ${job.id}
+        AND action = 'migration.cancel.requested'
+      ORDER BY at DESC
+      LIMIT 1
+    `;
+    expect(age[0]?.seconds ?? 0).toBeGreaterThan(150);
+    try {
+      await processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: importer.id,
+          source: 'CSV',
+          entityType: 'companies',
+          chunkOffset: 0,
+          chunkSize: 100,
+          totalRows: 1,
+          redisKey: 'rows',
+          mappings: { Name: 'company.name' },
+          dedupStrategy: 'skip',
+          attemptId,
+        },
+        deps(JSON.stringify([{ Name: 'Late Cancel Co' }])),
+        log,
+      );
+      expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(0);
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.status).toBe('CANCELLED');
+      const audits = await prisma.auditLog.findMany({
+        where: { orgId: org.id, targetId: job.id, action: 'migration.cancel' },
+      });
+      expect(audits).toHaveLength(1);
+      expect(audits[0]?.userId).toBe(canceller.id);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
+
   t('a mark already present means the chunk issues no insert', async () => {
     const { ns, org, importer, canceller } = await orgWithUsers('pre');
     const attemptId = randomUUID();
