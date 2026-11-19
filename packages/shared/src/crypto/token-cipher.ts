@@ -13,13 +13,16 @@
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
+import { IntegrationTokenKeyMissingError } from '../utils/crypto.js';
+
 const ALGORITHM = 'aes-256-gcm';
 const IV_BYTES = 12; // GCM recommended IV length
 const TAG_BYTES = 16;
 
 function getKey(): Buffer {
   const hex = process.env.INTEGRATION_TOKEN_KEY;
-  if (!hex || !/^[0-9a-fA-F]{64}$/.test(hex)) {
+  if (!hex) throw new IntegrationTokenKeyMissingError();
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
     throw new Error(
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string (32 bytes). ' +
         'Generate with: openssl rand -hex 32',
