@@ -31,6 +31,7 @@ import {
 } from '@bidstack/shared';
 import { htmlToPdf } from './document.service.js';
 import { getEnv } from '../../env.js';
+import { discardUpstreamBody } from '../../lib/upstream-body.js';
 
 const log = pino({ name: 'signature', level: process.env.LOG_LEVEL ?? 'info' });
 
@@ -108,8 +109,8 @@ async function getDocuSignAccessToken(): Promise<string> {
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw credentialError(`DocuSign OAuth token exchange failed: ${res.status} ${body}`);
+    await discardUpstreamBody(res);
+    throw credentialError(`DocuSign OAuth token exchange failed: ${res.status}`);
   }
 
   const json = (await res.json()) as { access_token: string; expires_in: number };
@@ -299,8 +300,8 @@ async function sendDocuSignEnvelope(params: {
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw credentialError(`DocuSign envelope creation failed: ${res.status} ${body}`);
+    await discardUpstreamBody(res);
+    throw credentialError(`DocuSign envelope creation failed: ${res.status}`);
   }
 
   const result = (await res.json()) as { envelopeId: string };
@@ -510,8 +511,8 @@ export async function voidSignatureRequest(params: {
           },
         );
         if (!res.ok) {
-          const body = await res.text();
-          throw credentialError(`DocuSign void failed: ${res.status} ${body}`);
+          await discardUpstreamBody(res);
+          throw credentialError(`DocuSign void failed: ${res.status}`);
         }
       }
     }

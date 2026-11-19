@@ -13,6 +13,7 @@ import {
   type ServiceLogger,
 } from './email-integration.helpers.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../lib/upstream-body.js';
 
 // ─── Send via Gmail ────────────────────────────────────────────────────────────
 
@@ -63,8 +64,8 @@ export async function sendViaGmail(
   );
 
   if (!res.ok) {
-    const body = await res.text();
-    log.error({ status: res.status, body }, 'Gmail send failed');
+    await discardUpstreamBody(res);
+    log.error({ status: res.status }, 'Gmail send failed');
     throw new Error(`Gmail send failed: ${res.status}`);
   }
 

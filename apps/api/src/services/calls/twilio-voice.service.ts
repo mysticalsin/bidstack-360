@@ -22,6 +22,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../../lib/upstream-body.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -160,8 +161,8 @@ export async function initiateVoiceCall(
   );
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Twilio initiateVoiceCall failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Twilio initiateVoiceCall failed (${resp.status})`);
   }
 
   const data = (await resp.json()) as {

@@ -142,10 +142,8 @@ export const hubspotMigrationRoutes: FastifyPluginAsyncZod = async (server) => {
       let tokens: HubSpotTokens;
       try {
         tokens = await exchangeHubSpotCode(code, clientId, clientSecret, redirectUri);
-      } catch (err) {
-        throw server.httpErrors.badGateway(
-          `HubSpot token exchange failed: ${err instanceof Error ? err.message : 'unknown error'}`,
-        );
+      } catch {
+        throw server.httpErrors.badGateway('HubSpot token exchange failed');
       }
 
       // Encrypt tokens before storing.

@@ -22,6 +22,7 @@ import { decryptToken } from '@bidstack/shared/token-crypto';
 import { prisma } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../../lib/upstream-body.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -126,8 +127,8 @@ export async function createGoogleMeetEvent(
   );
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Google Meet createEvent failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Google Meet createEvent failed (${resp.status})`);
   }
 
   const event = (await resp.json()) as GoogleMeetEvent;
@@ -165,7 +166,7 @@ export async function deleteGoogleMeetEvent(
 
   if (!resp.ok && resp.status !== 410) {
     // 410 Gone is fine — event already deleted
-    const text = await resp.text();
-    throw new Error(`Google Meet deleteEvent failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Google Meet deleteEvent failed (${resp.status})`);
   }
 }
