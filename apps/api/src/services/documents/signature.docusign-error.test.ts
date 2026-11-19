@@ -29,10 +29,14 @@ const SENTINEL = 'provider-body-SENTINEL-upstream-text';
 describe('DocuSign send failure', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.resetModules();
   });
 
   it('cancels a 401 document body and the handler hides the status error', async () => {
+    // env.ts validates on import. The no-DB CI job does not set DATABASE_URL,
+    // and this test never opens a connection.
+    if (!process.env.DATABASE_URL) {
+      process.env.DATABASE_URL = 'postgresql://bidstack:bidstack@127.0.0.1:5432/bidstack';
+    }
     const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
     const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
     process.env.DOCUSIGN_INTEGRATION_KEY = 'integration-key';
