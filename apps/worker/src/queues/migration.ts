@@ -31,6 +31,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import {
   ACCOUNT_INTEL,
   MIGRATION,
+  MIGRATION_CANCEL_REQUESTED,
   MigrationJobPayload,
   type MigrationJobError,
   MIGRATION_STALE_MS,
@@ -205,6 +206,44 @@ export function isMigrationDeadlock(err: unknown, seen?: Set<unknown>): boolean 
   if (migrationConflictCode(row.code) || migrationConflictCode(row.meta?.code)) return true;
   if (typeof row.message === 'string' && DRIVER_CONFLICT_CODE.test(row.message)) return true;
   return row.cause !== undefined && isMigrationDeadlock(row.cause, visited);
+}
+
+/** Cancel asked while this chunk held the row. Roll the inserts back and stop. */
+class MigrationCancelRequested extends Error {
+  constructor() {
+    super('migration cancel requested');
+    this.name = 'MigrationCancelRequested';
+  }
+}
+
+async function cancelWasRequested(
+  db: Prisma.TransactionClient,
+  orgId: string,
+  jobId: string,
+): Promise<boolean> {
+  const mark = await db.auditLog.findFirst({
+    where: { orgId, targetId: jobId, action: MIGRATION_CANCEL_REQUESTED },
+    select: { id: true },
+  });
+  return mark !== null;
+}
+
+async function applyMarkedCancel(orgId: string, userId: string, jobId: string): Promise<void> {
+  const moved = await prisma.migrationJob.updateMany({
+    where: { id: jobId, orgId, status: { in: [...migrationFrom('cancel')] } },
+    data: { status: 'CANCELLED', completedAt: new Date() },
+  });
+  if (moved.count !== 1) return;
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      userId,
+      action: 'migration.cancel',
+      targetType: 'MigrationJob',
+      targetId: jobId,
+      diff: { via: MIGRATION_CANCEL_REQUESTED },
+    },
+  });
 }
 
 /** A deadlock aborts the transaction. The chunk fails so BullMQ retries the whole chunk. */
@@ -968,7 +1007,7 @@ export async function processMigrationChunk(
   // The inserts, the counters, and the undo trail commit together. A retry
   // that already replaced the attempt writes nothing.
   let written: { createdIds: string[]; processed: number; errors: MigrationJobError[] } | null;
-  let skipReason: 'org' | 'attempt' | 'status' | null = null;
+  let skipReason: 'org' | 'attempt' | 'status' | 'cancel' | null = null;
   try {
     written = await prisma.$transaction(
     async (tx) => {
@@ -989,6 +1028,10 @@ export async function processMigrationChunk(
       }
       if (!migrationChunkMatchesAttempt(migrationAttemptId(holder.meta), payload.attemptId ?? null)) {
         skipReason = 'attempt';
+        return null;
+      }
+      if (await cancelWasRequested(tx, holder.org_id, payload.migrationJobId)) {
+        skipReason = 'cancel';
         return null;
       }
       const ctx: WriteCtx = {
@@ -1016,6 +1059,9 @@ export async function processMigrationChunk(
           });
         }
       }
+      if (await cancelWasRequested(tx, holder.org_id, payload.migrationJobId)) {
+        throw new MigrationCancelRequested();
+      }
       const booked = await persistChunkBookkeeping(tx, {
         orgId: holder.org_id,
         userId: payload.userId,
@@ -1035,11 +1081,21 @@ export async function processMigrationChunk(
     { maxWait: 10_000, timeout: 120_000 },
     );
   } catch (err) {
+    if (err instanceof MigrationCancelRequested) {
+      await applyMarkedCancel(payload.orgId, payload.userId, payload.migrationJobId);
+      log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk rolled back — cancel requested');
+      return;
+    }
     if (err instanceof MigrationChunkConflict) throw err;
     if (isMigrationDeadlock(err)) throw new MigrationChunkConflict();
     throw err;
   }
   if (!written) {
+    if (skipReason === 'cancel') {
+      await applyMarkedCancel(payload.orgId, payload.userId, payload.migrationJobId);
+      log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — cancel requested');
+      return;
+    }
     if (skipReason === 'org') {
       log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — org mismatch');
     } else if (skipReason === 'attempt') {

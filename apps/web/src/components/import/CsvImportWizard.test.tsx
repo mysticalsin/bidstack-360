@@ -274,7 +274,8 @@ describe('CsvImportWizard', () => {
     await waitFor(() => expect(screen.getByText('The import did not start. Try again.')).toBeTruthy());
     expect(screen.queryByText('enqueue_failed')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry import' }));
-    expect(hookMocks.retryMutate).toHaveBeenCalledWith('job-1');
+    expect(hookMocks.retryMutate).toHaveBeenCalledTimes(1);
+    expect(hookMocks.retryMutate.mock.calls[0]?.[0]).toBe('job-1');
     expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
   });
 

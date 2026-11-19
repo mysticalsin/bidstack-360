@@ -3,7 +3,7 @@
  * so a phone user could not map Name. The control has to sit inside the
  * viewport and Name has to be the selected field.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 
 const CSV = {
   name: 'accounts.csv',
@@ -11,7 +11,7 @@ const CSV = {
   buffer: Buffer.from('Account Name,Employees,Country\nNorthwind Traders,120,US\n'),
 };
 
-async function boxOf(select: import('@playwright/test').Locator) {
+async function boxOf(select: Locator) {
   return select.evaluate((el) => {
     el.scrollIntoView({ block: 'center', inline: 'nearest' });
     const r = el.getBoundingClientRect();
