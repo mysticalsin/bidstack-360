@@ -1,7 +1,7 @@
 # Hands-on QA for a non-author (Inspector)
 
 Ticket: `polo-fix-hermeticity-5xx-residuals`
-Code head: `e7defdb07c1c752ea9091a265a9f748734e145ac`
+Code head: run this file on the branch head you were given. The PASS recorded against `e7defdb07c1c752ea9091a265a9f748734e145ac` is void. Debate round 1 changed product code.
 
 Run the API locally with Clerk unset so stub auth is the Admin of the seed org. Base URL: `http://127.0.0.1:4000`. Do not deploy. Do not change the polo-preview Worker.
 
