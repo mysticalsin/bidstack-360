@@ -50,7 +50,7 @@ function publicErrorSummary(value: unknown): MigrationJobError[] {
     const error = (entry ?? {}) as Partial<MigrationJobError>;
     return {
       row: typeof error.row === 'number' ? error.row : 0,
-      field: typeof error.field === 'string' ? error.field : null,
+      field: typeof error.field === 'string' ? error.field.slice(0, 100) : null,
       message: migrationPublicMessage(typeof error.message === 'string' ? error.message : ''),
     };
   });
