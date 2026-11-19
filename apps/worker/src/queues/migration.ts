@@ -1124,6 +1124,7 @@ export async function processMigrationChunk(
           });
         }
       }
+      if (deps.afterRows) await deps.afterRows();
       if (
         await cancelWasRequested(
           tx,
