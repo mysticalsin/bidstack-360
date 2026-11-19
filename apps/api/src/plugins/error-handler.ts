@@ -13,13 +13,24 @@ import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-cl
 import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
 import { captureSentryServerError } from './sentry.js';
 
-function isDeliberateUnavailable(err: { statusCode?: number; name?: string }): boolean {
-  // Sensible's serviceUnavailable, and the one typed config error. A homemade
-  // Error that only sets statusCode (DocuSign credential failures) stays a
-  // generic 500 so the provider name does not reach the client.
+let serviceUnavailablePrototype: object | null = null;
+
+function isDeliberateUnavailable(
+  err: unknown,
+  httpErrors: { serviceUnavailable: (message?: string) => Error },
+): boolean {
+  // Match the class, not the name string. A plain Error can set
+  // name = 'ServiceUnavailableError' and statusCode = 503, and its message
+  // must not leave the process. http-errors sets the prototype; our config
+  // error is a real subclass.
+  if (err instanceof IntegrationTokenKeyMissingError) return true;
+  if (!serviceUnavailablePrototype) {
+    serviceUnavailablePrototype = Object.getPrototypeOf(httpErrors.serviceUnavailable(''));
+  }
   return (
-    err.statusCode === 503 &&
-    (err.name === 'ServiceUnavailableError' || err.name === IntegrationTokenKeyMissingError.name)
+    typeof err === 'object' &&
+    err !== null &&
+    Object.getPrototypeOf(err) === serviceUnavailablePrototype
   );
 }
 
@@ -108,7 +119,7 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       });
     }
 
-    if (isDeliberateUnavailable(err)) {
+    if (isDeliberateUnavailable(err, req.server.httpErrors)) {
       // WHY: httpErrors.serviceUnavailable and a missing integration token key
       // are deliberate. Their messages are written by our code. Masking them
       // as a generic 500 hides a condition the caller can act on.
