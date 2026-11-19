@@ -721,7 +721,7 @@ describe('CsvImportWizard', () => {
       mutate: hookMocks.retryMutate,
       isPending: false,
       isError: true,
-      error: new ApiError('Migration job is no longer failed', 409, null),
+      error: new ApiError('retry lost', 409, { code: 'RETRY_LOST' }),
     });
     hookMocks.useMigrationJob.mockReturnValue({
       data: {

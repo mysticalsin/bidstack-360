@@ -2,7 +2,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MIGRATION_CONFLICT,
-  MIGRATION_NO_LONGER_FAILED,
+  RETRY_LOST,
   MIGRATION_ENQUEUE_FAILED,
   MIGRATION_ENQUEUE_STOPPED,
   MIGRATION_LEGACY_CONFLICT,
@@ -114,10 +114,12 @@ function importErrorCopy(
 
 /** A retry 409 whose job has already moved on. The poll shows the new status. */
 function retryConflictSettled(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 409) return false;
+  const body = error.body;
   return (
-    error instanceof ApiError &&
-    error.status === 409 &&
-    error.message === MIGRATION_NO_LONGER_FAILED
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === RETRY_LOST
   );
 }
 

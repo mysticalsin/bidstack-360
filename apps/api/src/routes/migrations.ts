@@ -33,6 +33,7 @@ import {
   MIGRATION,
   MIGRATION_CANCEL_REQUESTED,
   MIGRATION_NO_LONGER_FAILED,
+  RETRY_LOST,
   migrationAttemptId,
   migrationFrom,
   migrationProgressAt,
@@ -719,7 +720,11 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           { migrationJobId: job.id, orgId, from: current?.status ?? null, to: 'RUNNING' },
           'illegal migration transition',
         );
-        throw server.httpErrors.conflict(MIGRATION_NO_LONGER_FAILED);
+        const lost = server.httpErrors.conflict(MIGRATION_NO_LONGER_FAILED) as Error & {
+          migrationCode?: string;
+        };
+        lost.migrationCode = RETRY_LOST;
+        throw lost;
       }
 
       try {
