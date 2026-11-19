@@ -387,4 +387,37 @@ describe('migration queue acquisition', () => {
     const job = await prisma.migrationJob.findUniqueOrThrow({ where: { id: body.id } });
     expect(job.status).toBe('RUNNING');
   });
+
+  t('starting an import sets progressAt from the database clock', async () => {
+    // WHY: Cancel treated a missing progressAt as "not a chunk" and refused
+    // the request. The attempt clock has to exist when the job becomes RUNNING.
+    const name = `Progress ${Date.now()}`;
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/migrations/start-csv',
+      payload: {
+        source: 'CSV',
+        entityType: 'company',
+        rows: [{ name }],
+        mappings: { name: 'company.name' },
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const id = res.json<{ id: string }>().id;
+    try {
+      const rows = await prisma.$queryRaw<Array<{ progress_at: string | null; age: number | null }>>`
+        SELECT meta->>'progressAt' AS progress_at,
+               EXTRACT(EPOCH FROM (NOW() - (meta->>'progressAt')::timestamptz))::float8 AS age
+        FROM migration_jobs
+        WHERE id = ${id}::uuid
+      `;
+      expect(rows[0]?.progress_at).toEqual(expect.any(String));
+      expect(rows[0]?.age ?? 999).toBeLessThan(5);
+    } finally {
+      await prisma.migrationJob.update({
+        where: { id },
+        data: { status: 'COMPLETE', completedAt: new Date() },
+      });
+    }
+  });
 });
