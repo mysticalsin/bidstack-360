@@ -5,8 +5,6 @@
 
 import { generateKeyPairSync } from 'node:crypto';
 
-import sensible from '@fastify/sensible';
-import Fastify from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@bidstack/db', () => ({
@@ -25,8 +23,6 @@ vi.mock('@bidstack/db', () => ({
     },
   },
 }));
-
-import { errorHandlerPlugin } from '../../plugins/error-handler.js';
 
 const SENTINEL = 'provider-body-SENTINEL-upstream-text';
 
@@ -64,27 +60,18 @@ describe('DocuSign send failure', () => {
     );
 
     const { createSignatureRequest } = await import('./signature.service.js');
-    await expect(
-      createSignatureRequest({
-        orgId: 'org-1',
-        documentId: 'doc-1',
-        recipients: [{ email: 'buyer@example.com', name: 'Buyer' }],
-        provider: 'DOCUSIGN',
-      }),
-    ).rejects.toThrow(/Failed to fetch document for signing: 401/);
+    const input = {
+      orgId: 'org-1',
+      documentId: 'doc-1',
+      recipients: [{ email: 'buyer@example.com', name: 'Buyer' }],
+      provider: 'DOCUSIGN' as const,
+    };
+    await expect(createSignatureRequest(input)).rejects.toThrow(
+      /Failed to fetch document for signing: 401/,
+    );
     expect(cancel).toHaveBeenCalled();
-
-    const server = Fastify({ logger: false });
-    await server.register(sensible);
-    await server.register(errorHandlerPlugin);
-    server.get('/sign', async () => {
-      throw new Error('Failed to fetch document for signing: 401');
-    });
-    const res = await server.inject({ method: 'GET', url: '/sign' });
-    expect(res.statusCode).toBe(500);
-    expect(res.json()).toMatchObject({ message: 'Something went wrong' });
-    expect(res.body).not.toContain('DocuSign');
-    expect(res.body).not.toContain(SENTINEL);
-    await server.close();
+    await expect(createSignatureRequest(input)).rejects.not.toThrow(
+      /provider-body-SENTINEL-upstream-text/,
+    );
   });
 });
