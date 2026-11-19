@@ -54,6 +54,12 @@ describe('error handler status contract', () => {
       (err as { statusCode?: number }).statusCode = 503;
       throw err;
     });
+    server.get('/forged-key', async () => {
+      const err = new Error(secret);
+      err.name = 'IntegrationTokenKeyMissingError';
+      (err as { statusCode?: number }).statusCode = 503;
+      throw err;
+    });
     const res = await server.inject({ method: 'GET', url: '/forged' });
     expect(res.statusCode).toBe(500);
     expect(res.json()).toEqual({
@@ -62,6 +68,14 @@ describe('error handler status contract', () => {
       message: 'Something went wrong',
     });
     expect(res.body).not.toContain('secret-token');
+    const forgedKey = await server.inject({ method: 'GET', url: '/forged-key' });
+    expect(forgedKey.statusCode).toBe(500);
+    expect(forgedKey.json()).toEqual({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Something went wrong',
+    });
+    expect(forgedKey.body).not.toContain('secret-token');
   });
 
   it('hides unexpected failures behind a generic 500', async () => {
