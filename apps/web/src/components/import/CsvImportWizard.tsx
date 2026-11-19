@@ -181,6 +181,7 @@ export function CsvImportWizard() {
   const job = useMigrationJob(jobId);
   const fields = TARGET_FIELDS[entity];
   const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
+  const [cancelRequested, setCancelRequested] = useState(false);
 
   const requiredMissing = useMemo(() => {
     const mapped = new Set(Object.values(mappings).filter(Boolean) as string[]);
@@ -274,6 +275,7 @@ export function CsvImportWizard() {
     setJobId(null);
     setParseError(null);
     setPreviewResult(null);
+    setCancelRequested(false);
   }
 
   function mapControl(header: string) {
@@ -547,7 +549,12 @@ export function CsvImportWizard() {
           isLoading={job.isLoading}
           onDone={reset}
           onCancel={() => {
-            if (jobId) cancel.mutate(jobId);
+            if (!jobId || cancel.isPending) return;
+            cancel.mutate(jobId, {
+              onSuccess: (updated) => {
+                if (updated.cancelRequested) setCancelRequested(true);
+              },
+            });
           }}
           onRetry={() => {
             if (!jobId || retrying.current || retry.isPending) return;
@@ -559,6 +566,7 @@ export function CsvImportWizard() {
             });
           }}
           cancelPending={cancel.isPending}
+          cancelRequested={cancelRequested}
           retryPending={retry.isPending}
           actionFailed={cancel.isError || retry.isError}
           retryError={retry.error}
@@ -617,6 +625,7 @@ function ImportProgress({
   onCancel,
   onRetry,
   cancelPending,
+  cancelRequested,
   retryPending,
   actionFailed,
   retryError,
@@ -627,6 +636,7 @@ function ImportProgress({
   onCancel: () => void;
   onRetry: () => void;
   cancelPending: boolean;
+  cancelRequested: boolean;
   retryPending: boolean;
   actionFailed: boolean;
   retryError: unknown;
@@ -711,10 +721,10 @@ function ImportProgress({
         <button
           type="button"
           className="btn btn-secondary"
-          disabled={cancelPending}
+          disabled={cancelPending || cancelRequested}
           onClick={onCancel}
         >
-          {cancelPending
+          {cancelPending || cancelRequested
             ? t('csvImport.progress.cancelling', 'Cancelling…')
             : t('csvImport.progress.cancel', 'Cancel import')}
         </button>

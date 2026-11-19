@@ -27,6 +27,8 @@ export interface MigrationJob {
   updatedAt: string;
   /** Derived by GET. The worker is what persists FAILED. */
   stalled?: boolean;
+  /** Set on the cancel response when the chunk still holds the row. */
+  cancelRequested?: boolean;
 }
 
 export interface StartCsvImportInput {

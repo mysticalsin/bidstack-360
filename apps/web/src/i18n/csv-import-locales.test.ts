@@ -18,6 +18,13 @@ function placeholders(value: string): string[] {
 }
 
 describe('csv import progress copy', () => {
+  it('serves the Brazilian Portuguese Cancelling sentence for pt-BR', () => {
+    // WHY: i18n load: 'languageOnly' maps pt-BR onto the pt catalog. The
+    // wizard must keep using t() so that catalog is what a pt-BR browser reads.
+    expect(progress('pt').cancelling).toBe('Cancelando…');
+    expect(progress('pt').cancelling).not.toBe(progress('en').cancelling);
+  });
+
   it('has every progress string in every locale', () => {
     const english = progress('en');
     const keys = Object.keys(english);

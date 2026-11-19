@@ -256,7 +256,8 @@ describe('CsvImportWizard', () => {
     });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel import' })).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
-    expect(hookMocks.cancelMutate).toHaveBeenCalledWith('job-1');
+    expect(hookMocks.cancelMutate).toHaveBeenCalledTimes(1);
+    expect(hookMocks.cancelMutate.mock.calls[0]?.[0]).toBe('job-1');
   });
 
   it('shows Cancelling while a locked cancel is only requested', async () => {
@@ -275,7 +276,7 @@ describe('CsvImportWizard', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel import' }));
     const [, opts] = hookMocks.cancelMutate.mock.calls[0]!;
     opts.onSuccess({ id: 'job-1', status: 'RUNNING', cancelRequested: true });
-    expect(screen.getByRole('button', { name: 'Cancelling…' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancelling…' })).toBeTruthy());
     expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
   });
 

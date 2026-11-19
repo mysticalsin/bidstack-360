@@ -74,6 +74,16 @@ const ACTIVE_IMPORT_MESSAGE = 'This import is already running.';
 /** How long Cancel waits for the job-row lock a chunk holds with FOR UPDATE. */
 const CANCEL_LOCK_TIMEOUT = '2s';
 
+/** Same bound as the chunk transaction. Older progress is not a live chunk. */
+const CHUNK_LOCK_WINDOW_MS = 120_000;
+
+function chunkClaimIsLive(meta: unknown, now = new Date()): boolean {
+  const progressAt = migrationProgressAt(meta);
+  if (!progressAt) return false;
+  const age = now.getTime() - progressAt.getTime();
+  return age >= 0 && age <= CHUNK_LOCK_WINDOW_MS;
+}
+
 const LOCK_TIMEOUT_CODE = /PostgresError \{\s*code:\s*"55P03"/;
 
 export function isLockTimeout(err: unknown, seen?: Set<unknown>): boolean {
@@ -88,9 +98,7 @@ export function isLockTimeout(err: unknown, seen?: Set<unknown>): boolean {
     cause?: unknown;
   };
   if (row.code === '55P03' || row.meta?.code === '55P03') return true;
-  if (typeof row.message === 'string') {
-    if (LOCK_TIMEOUT_CODE.test(row.message) || /lock timeout/i.test(row.message)) return true;
-  }
+  if (typeof row.message === 'string' && LOCK_TIMEOUT_CODE.test(row.message)) return true;
   return row.cause !== undefined && isLockTimeout(row.cause, visited);
 }
 
@@ -914,6 +922,13 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           );
           throw server.httpErrors.conflict(`Cannot cancel a job with status ${current.status}`);
         }
+        if (!chunkClaimIsLive(current.meta)) {
+          req.log.warn(
+            { migrationJobId: job.id, from: current.status, to: 'CANCELLED' },
+            'illegal migration transition',
+          );
+          throw server.httpErrors.conflict(`Cannot cancel a job with status ${current.status}`);
+        }
         await prisma.auditLog.create({
           data: {
             orgId,
@@ -924,7 +939,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             diff: { attemptId: migrationAttemptId(current.meta) },
           },
         });
-        return serializeJob(current);
+        return { ...serializeJob(current), cancelRequested: true as const };
       }
       if (outcome === 'lost') {
         const current = await prisma.migrationJob.findFirst({
