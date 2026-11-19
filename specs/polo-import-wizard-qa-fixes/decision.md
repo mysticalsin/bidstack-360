@@ -13,9 +13,13 @@ Prisma's 120s timeout is a client timer on the chunk's transaction. It does not 
 Cancel waits at most 2 seconds for the row lock (`SET LOCAL lock_timeout = '2s'` inside the cancel transaction). Two outcomes:
 
 1. **The lock is free.** The conditional update to `CANCELLED` commits with the existing `migration.cancel` audit row. Behavior for an idle job is unchanged. The chunk's `FOR UPDATE` then sees a status other than RUNNING and writes nothing.
-2. **The lock is not free within 2s.** Postgres cancels the waiting statement (`55P03`). Cancel does not keep waiting. It inserts `migration.cancel.requested` on `audit_log` (that insert does not lock `migration_jobs`) and returns 200 with the job still `RUNNING`.
+2. **The lock is not free within 2s.** Postgres cancels the waiting statement (`55P03`). Cancel does not keep waiting. If the job is still `PENDING` or `RUNNING`, it inserts one `migration.cancel.requested` for the current attempt and returns **202** with the job still `RUNNING` and `cancelRequested: true`. A missing or old `progressAt` does not turn that into 409. A job that is already terminal is still 409 and writes no mark.
 
-The chunk checks `migration.cancel.requested` for its org and job id twice, both inside the locked transaction:
+Start sets `progressAt` from Postgres `NOW()` in the same claim that moves the job to `RUNNING`, so the attempt has a clock before the first chunk.
+
+The chunk checks `migration.cancel.requested` for its org, job id, and attempt twice, both inside the locked transaction. The mark does not expire while that attempt is still `PENDING` or `RUNNING`. It is ignored once the attempt reaches a terminal state, or once a retry replaces `startedAt` and `attemptId`. Both checks, and the statement that would set `COMPLETE`, read `started_at` on the job row. They do not use a process clock and they do not use a 150s cutoff.
+
+The two checks are:
 
 - before any entity insert, so a cancel that landed first writes nothing;
 - again after the row loop, before bookkeeping, so a cancel that landed while the chunk held the lock rolls the inserts back.
@@ -57,7 +61,7 @@ Cancel while the chunk holds the lock writes one `migration.cancel.requested` ro
 
 If the worker dies before it applies the mark, the stale sweep used to set `FAILED`. Retry was then offered, and the old mark cancelled the new attempt at 0 rows. The original Cancel ended as `FAILED`.
 
-The sweep now treats a mark for the current attempt as cancel: status `CANCELLED`, `migration.cancel` audited as the person on the mark, not the person who started the import. The 150s chunk TTL does not apply here. The sweep runs after that window, and the attempt on the job has not changed. A mark for a previous attempt, or older than this attempt's `startedAt`, does not cancel the job. A retry stores a new `attemptId`, writes `migration.retry`, and the chunk ignores the old mark. Sequence covered by tests: cancel, fail, retry, the retry imports; and cancel, worker death, sweep, the job is `CANCELLED`.
+The sweep now treats a mark for the current attempt as cancel: status `CANCELLED`, `migration.cancel` audited as the person on the mark, not the person who started the import. There is no 150s expiry. A mark for a previous attempt, or older than this attempt's `startedAt`, does not cancel the job. A mark for the attempt that is still running still cancels the next chunk after the database clock has moved past 150s. A chunk that has held the row for longer than 120s gets 202 and the mark, and the worker finishes `CANCELLED` when it next reaches a check. A retry stores a new `attemptId`, writes `migration.retry`, and the chunk ignores the old mark. Sequence covered by tests: cancel, fail, retry, the retry imports; and cancel, worker death, sweep, the job is `CANCELLED`.
 
 The wizard shows Cancelling… while the job is still `RUNNING` and `cancelRequested` is true. A losing retry (`409` code `RETRY_LOST`) is not an error. A second tap within 750ms of Retry cannot hit Cancel after the button swaps.
 

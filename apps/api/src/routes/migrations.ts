@@ -501,13 +501,22 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
         let claimed: number;
         try {
+          const [clock] = await prisma.$queryRaw<Array<{ now: Date }>>`SELECT NOW() AS now`;
+          const startedAt = clock?.now ?? new Date();
           claimed = (
             await prisma.migrationJob.updateMany({
               where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
               data: {
                 status: 'RUNNING',
-                startedAt: new Date(),
-                meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings, attemptId },
+                startedAt,
+                meta: {
+                  entityType,
+                  dedupStrategy,
+                  externalIdColumn: externalIdColumn ?? null,
+                  mappings,
+                  attemptId,
+                  progressAt: startedAt.toISOString(),
+                },
               },
             })
           ).count;
