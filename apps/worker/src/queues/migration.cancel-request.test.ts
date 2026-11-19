@@ -4,9 +4,9 @@
 
 import { prisma } from '@bidstack/db';
 import { randomUUID } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { processMigrationChunk, type MigrationChunkDeps } from './migration.js';
+import { applyMarkedCancel, processMigrationChunk, type MigrationChunkDeps } from './migration.js';
 
 let dbReachable = false;
 
@@ -242,6 +242,145 @@ describe('migration cancel request', () => {
       expect(await prisma.company.count({ where: { orgId: org.id, deletedAt: null } })).toBe(1);
       const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
       expect(stored.status).not.toBe('CANCELLED');
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
+
+  t('a marked cancel audits the canceller, not the importer', async () => {
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_actor_${ns}`, name: `actor ${ns}` },
+    });
+    const importer = await prisma.user.create({
+      data: {
+        orgId: org.id,
+        clerkUser: `imp_${ns}`,
+        email: `imp-${ns}@test.local`,
+        name: 'Importer',
+      },
+    });
+    const canceller = await prisma.user.create({
+      data: {
+        orgId: org.id,
+        clerkUser: `can_${ns}`,
+        email: `can-${ns}@test.local`,
+        name: 'Canceller',
+      },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: importer.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        startedAt: new Date(Date.now() - 1_000),
+        meta: { entityType: 'companies' },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        orgId: org.id,
+        userId: canceller.id,
+        action: 'migration.cancel.requested',
+        targetType: 'MigrationJob',
+        targetId: job.id,
+      },
+    });
+    const deps: MigrationChunkDeps = {
+      readRows: async () => JSON.stringify([{ Name: 'Actor Co' }]),
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    };
+    try {
+      await processMigrationChunk(
+        {
+          migrationJobId: job.id,
+          orgId: org.id,
+          userId: importer.id,
+          source: 'CSV',
+          entityType: 'companies',
+          chunkOffset: 0,
+          chunkSize: 100,
+          totalRows: 1,
+          redisKey: 'rows',
+          mappings: { Name: 'company.name' },
+          dedupStrategy: 'skip',
+        },
+        deps,
+        log,
+      );
+      const audit = await prisma.auditLog.findFirst({
+        where: { orgId: org.id, targetId: job.id, action: 'migration.cancel' },
+      });
+      expect(audit?.userId).toBe(canceller.id);
+    } finally {
+      await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
+    }
+  });
+
+  t('a lost cancel keeps COMPLETE and audits the canceller', async () => {
+    // WHY: the compare-and-set can lose to a chunk that already finished.
+    // Dropping that on the floor hides the click, and the audit must name
+    // the person who cancelled, not the person who started the import.
+    const ns = `t${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_mig_lost_${ns}`, name: `lost ${ns}` },
+    });
+    const importer = await prisma.user.create({
+      data: {
+        orgId: org.id,
+        clerkUser: `imp_${ns}`,
+        email: `imp-${ns}@test.local`,
+        name: 'Importer',
+      },
+    });
+    const canceller = await prisma.user.create({
+      data: {
+        orgId: org.id,
+        clerkUser: `can_${ns}`,
+        email: `can-${ns}@test.local`,
+        name: 'Canceller',
+      },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.id,
+        userId: importer.id,
+        source: 'CSV',
+        status: 'COMPLETE',
+        totalRows: 1,
+        processedRows: 1,
+        startedAt: new Date(Date.now() - 60_000),
+        completedAt: new Date(),
+        meta: { entityType: 'companies', attemptId: 'attempt-done' },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        orgId: org.id,
+        userId: canceller.id,
+        action: 'migration.cancel.requested',
+        targetType: 'MigrationJob',
+        targetId: job.id,
+        diff: { attemptId: 'attempt-done' },
+      },
+    });
+    const info = vi.fn();
+    try {
+      await applyMarkedCancel(org.id, importer.id, job.id, { info });
+      const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.status).toBe('COMPLETE');
+      const lost = await prisma.auditLog.findFirst({
+        where: { orgId: org.id, targetId: job.id, action: 'migration.cancel.lost' },
+      });
+      expect(lost?.userId).toBe(canceller.id);
+      expect(info).toHaveBeenCalledWith(
+        { migrationJobId: job.id, status: 'COMPLETE' },
+        'migration cancel lost',
+      );
     } finally {
       await prisma.org.delete({ where: { id: org.id } }).catch(() => undefined);
     }

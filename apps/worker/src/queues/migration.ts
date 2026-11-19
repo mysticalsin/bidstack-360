@@ -208,6 +208,9 @@ export function isMigrationDeadlock(err: unknown, seen?: Set<unknown>): boolean 
   return row.cause !== undefined && isMigrationDeadlock(row.cause, visited);
 }
 
+/** A mark older than the chunk transaction plus a small grace no longer applies. */
+const MIGRATION_CANCEL_MARK_TTL_MS = 150_000;
+
 /** Cancel asked while this chunk held the row. Roll the inserts back and stop. */
 class MigrationCancelRequested extends Error {
   constructor() {
@@ -228,7 +231,11 @@ async function cancelWasRequested(
       orgId,
       targetId: jobId,
       action: MIGRATION_CANCEL_REQUESTED,
-      ...(startedAt ? { at: { gte: startedAt } } : {}),
+      at: {
+        gte: new Date(
+          Math.max(startedAt?.getTime() ?? 0, Date.now() - MIGRATION_CANCEL_MARK_TTL_MS),
+        ),
+      },
     },
     select: { diff: true },
     orderBy: { at: 'desc' },
@@ -241,7 +248,7 @@ async function cancelWasRequested(
   });
 }
 
-async function applyMarkedCancel(orgId: string, userId: string, jobId: string): Promise<void> {
+export async function applyMarkedCancel(orgId: string, userId: string, jobId: string): Promise<void> {
   const moved = await prisma.migrationJob.updateMany({
     where: { id: jobId, orgId, status: { in: [...migrationFrom('cancel')] } },
     data: { status: 'CANCELLED', completedAt: new Date() },
