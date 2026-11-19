@@ -181,7 +181,7 @@ describe('SectorViewPage pipeline by sector', () => {
     const { container } = renderPage();
     const chart = screen.getByTestId('sector-pipeline-iso');
     expect(within(chart).getByRole('group', { name: /pipeline by sector/i })).toBeTruthy();
-    expect(container.querySelector('[aria-label="Technology, front row: Overdue 1k"]')).toBeTruthy();
+    expect(container.querySelector('[aria-label="Technology, front row: Overdue 1K"]')).toBeTruthy();
     const strip = container.querySelector('.sector-command-strip')!;
     expect(strip.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('Global opportunity map')).toBeTruthy();
