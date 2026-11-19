@@ -749,6 +749,69 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('a losing retry that finds the job running leaves no alert after import complete', async () => {
+    // WHY: the early 409 has no code, so the wizard shows "That did not work"
+    // in red while the winning retry is still running and after it completes.
+    stubHooks();
+    const view = render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const [, opts] = hookMocks.mutate.mock.calls[0]!;
+    const lost = new ApiError('This import cannot be retried. Start it again from the file.', 409, {
+      code: 'RETRY_LOST',
+    });
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: lost,
+    });
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        errorSummary: [],
+      },
+      isLoading: false,
+    });
+    opts.onSuccess({ id: 'job-1' });
+    view.rerender(<CsvImportWizard />);
+    await waitFor(() => expect(screen.getByText('Importing…')).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'COMPLETE',
+        totalRows: 1,
+        processedRows: 1,
+        errorRows: 0,
+        errorSummary: [],
+      },
+      isLoading: false,
+    });
+    view.rerender(<CsvImportWizard />);
+    await waitFor(() => expect(screen.getByText('Import complete')).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+    expect(screen.queryByText('This import cannot be retried. Start it again from the file.')).toBeNull();
+  });
+
   it('shows the job failure when the other retry lost and the winner did not enqueue', async () => {
     // WHY: hiding the loser's 409 must not hide the failure the winner stored
     // when the queue refused the new attempt. The match is the stable code.

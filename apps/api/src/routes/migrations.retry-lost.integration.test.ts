@@ -46,4 +46,27 @@ describe('parallel migration retry', () => {
       await ctx.server.redis.del(`migration:${job.id}:company:rows`);
     }
   });
+
+  skipIfNoDb('a retry that finds the job already running is RETRY_LOST', async () => {
+    // WHY: the early status check answered a plain 409. The wizard painted
+    // that as a red failure on a job the other retry had already started.
+    const job = await createJob({ status: 'RUNNING' });
+    await prisma.migrationJob.update({
+      where: { id: job.id },
+      data: {
+        meta: {
+          entityType: 'company',
+          dedupStrategy: 'skip',
+          mappings: { Name: 'company.name' },
+          attemptId: 'attempt-running',
+        },
+      },
+    });
+    const res = await ctx.server.inject({
+      method: 'POST',
+      url: `/api/v1/migrations/${job.id}/retry`,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json<{ code?: string; message?: string }>().code).toBe('RETRY_LOST');
+  });
 });
