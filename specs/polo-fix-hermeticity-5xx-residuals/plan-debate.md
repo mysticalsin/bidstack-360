@@ -73,3 +73,49 @@ Plan challenge only, not merge approval. Security Q&A NOT RUN. Static read via t
 9. No change needed (verified in the diff, so no new risk here). `hubspotFetch` puts the secret in the Authorization header, not the URL, and the thrown path `/crm/v3/objects/${objectType}` has no query string (params are applied to the URL object separately; `objectType` is a fixed union), so `HubSpot API ${res.status} for ${path}` is safe. The 4xx branch still echoes `err.message` for any error with statusCode below 500, so an upstream library error carrying a 4xx statusCode would pass through; this is old behaviour, so say it is out of scope.
 
 What gets AGREE: items 1 to 8 each either change, or a named residual with an owner in decision.md. Items 2, 4 and the item 1 forged-name test need code or test changes, so the head moves and the PASS evidence on e7defdb0 is void; re-gate on the new head. Not merge approval.
+
+## Writer response, Sentinel item 1
+
+Devin 2: the handler no longer matches `err.name`. A 503 must carry `Symbol.for('bidstack.deliberate503')`. This server stamps that brand on its own `serviceUnavailable`. `IntegrationTokenKeyMissingError` sets the same brand, so a rebuilt package and a replaced prototype still return 503. A plain Error named `ServiceUnavailableError`, and a `ServiceUnavailable` built on another server, return 500 `Something went wrong`. Red `674e29eb` (`expected 503 to be 500`, and `expected 500 to be 503` after the prototype is replaced). Fix `7bbbae8a`.
+
+Devin 1: no 503 body in this set names an env var. HubSpot auth, which is `settings:write` and seeded only on Admin, now says `HubSpot is not configured` and logs the two names. The qa-inspector expected body matches. Red `f6f576e1` (body was `HubSpot OAuth not configured — set HUBSPOT_CLIENT_ID and HUBSPOT_REDIRECT_URI`). Fix `e24c7f29`. The non-admin routes already return `integration not configured` from Devin round 1.
+
+Devin 5: `cancel()` runs first, bounded by 2 seconds. Without `cancel`, the read stops at 64 KiB or 2 seconds, and a thrown `text()` is ignored. Red `fbde4b3c` (`too slow`). Fix `2ac952af`.
+
+## Writer response, Sentinel item 2
+
+`migrationFailureText` and `migrationPublicMessage` use `Object.hasOwn`. `constructor` and `__proto__` become `import_failed` and `The import could not be completed.` Red `d09acb2a` (`expected 'constructor' to be 'import_failed'`). Fix `e94b3c72`.
+
+## Writer response, Sentinel item 3
+
+The two echo expressions allow 1 to 80 characters and no controls or quotes. A 5 KB name and a newline become `import_failed`. Same red and fix as item 2. `field` is the upload's column name. It stays unmasked and is capped at 100 characters. Red `9510745b` (length 207). Fix `72b6645e`.
+
+## Writer response, Sentinel item 4
+
+`apps/api/src/lib/provider-body-sites.test.ts` stubs fetch for HubSpot exchange, HubSpot refresh, `hubspotFetch` via `probeHubSpotConnection`, Gmail send, Graph send, Cohere embed, Deepgram, and Zoom `getZoomRecordings`. The thrown error and the captured logs do not contain `provider-body-SENTINEL-upstream-text`. Re-adding the body to Zoom `getZoomRecordings` fails that test (`expected ... not to contain 'provider-body-SENTINEL-upstream-text'`). The mutant was not committed.
+
+`scripts/scan-upstream-error-body.mjs` fails when a `!res.ok` branch throws or logs `text()` or `json()`. `pnpm test:hermeticity` runs it. A sample leak is red in `upstream-error-body-scan.test.ts`. The current tree has no such leak. Sites that still do not cancel, and do not throw the body, are listed in `decision.md`: the NVIDIA NIM eval judge, company news (returns an empty list), and the MCP clients (they read the body only after `ok`). DocuSign document fetch now cancels. Commit `6f6e4dc5`.
+
+## Writer response, Sentinel item 5
+
+Readers are listed in `decision.md`. Job JSON uses `migrationPublicMessage`. The CSV and HubSpot sync-now use `migrationFailureText`. The wizard reads that API payload and calls `migrationFailureText` again. No log line prints the column. Retry reads the stored strings only to decide the offer and returns `serializeJob`. New rows are not rewritten in this PR. Residual ticket `polo-residual-scrub-error-summary-at-rest`, owner Tony, file `residual-scrub-error-summary-at-rest.md`.
+
+## Writer response, Sentinel item 6
+
+No converted fetch site sets `cause` or attaches the response. The only `cause` under `apps/api/src` is demo auth. Red `674e29eb`: the log line contained `provider-body-SENTINEL-upstream-text` from `cause`. Fix `7bbbae8a` logs and sends Sentry a copy with no `cause`. `beforeSend` still scrubs `exception.values[].value` and does not walk `Error.cause`. The copy has no `cause`. The HTTP body stays `Something went wrong`.
+
+## Writer response, Sentinel item 7
+
+Callers and failure behaviour are in `decision.md`. `getDocuSignAccessToken`, `sendDocuSignEnvelope`, and `voidSignatureRequest` throw a plain status error after cancelling the body. Missing credentials stay a 503-shaped `credentialError` without the brand, so the handler returns 500 `Something went wrong`. The void route test already expects that 500 and leaves the row `SENT`. The send path test `c8300144` expected `cancel()` on a 401 document body and it was not called. Fix `ffa6bb16`. The public sign route does not call these functions.
+
+## Writer response, Sentinel item 8
+
+Accepted in `decision.md`. Unset token key is 503 `Integration token encryption is not configured`. A malformed key is 500 `Something went wrong`. The two `import_failed` shapes tell the wizard whether retry is offered. They do not include driver text.
+
+## Writer response, Sentinel item 9
+
+No change. `hubspotFetch` keeps the token in the header, and the thrown path has no query string. The 4xx `err.message` passthrough is older than this PR and stays out of scope.
+
+PASS evidence on `e7defdb0` is void. Merge waits on Inspector running `qa-inspector.md` on this head, and on Devin and Sentinel both agreeing. This response does not merge. The polo-preview Worker and the deploy config were not touched. Deploy stays held for Tony's Q1.
+
+CONSENSUS: OPEN

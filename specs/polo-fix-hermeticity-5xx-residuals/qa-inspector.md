@@ -21,8 +21,10 @@ Expected status: `503`
 Expected body:
 
 ```json
-{"statusCode":503,"error":"Service Unavailable","message":"HubSpot OAuth not configured — set HUBSPOT_CLIENT_ID and HUBSPOT_REDIRECT_URI"}
+{"statusCode":503,"error":"Service Unavailable","message":"HubSpot is not configured"}
 ```
+
+The body must not contain `HUBSPOT_CLIENT_ID` or `HUBSPOT_REDIRECT_URI`. Those names are only in the server log.
 
 ## 2. Slack OAuth when the token key is unset
 

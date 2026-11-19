@@ -1,7 +1,8 @@
 # Residual: scrub migration errorSummary at rest
 
-Ticket: `polo-fix-hermeticity-5xx-residuals`
-Opened from Devin debate round 1, item 4. This file is the residual ticket. No GitHub issue was opened.
+Ticket: `polo-residual-scrub-error-summary-at-rest`
+Owner: Tony (product). This is a data rewrite, not part of PR #348.
+Opened from Devin debate round 1, item 4, and Sentinel item 5. This file is the residual ticket. No GitHub issue was opened.
 
 ## What is left
 

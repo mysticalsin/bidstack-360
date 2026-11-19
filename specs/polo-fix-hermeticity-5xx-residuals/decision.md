@@ -8,17 +8,17 @@ Earlier code head `e7defdb07c1c752ea9091a265a9f748734e145ac` (tree `01f3d6b7fdd4
 
 A missing HubSpot OAuth app and a missing `INTEGRATION_TOKEN_KEY` are setup gaps. The route or the crypto helper already knows the safe sentence. Returning 500 `Something went wrong` hides that.
 
-The error handler keeps a 503 only when the thrown value is a real `http-errors` service-unavailable error or an `instanceof IntegrationTokenKeyMissingError`. It compares the prototype of `server.httpErrors.serviceUnavailable` with the thrown value. It does not compare `err.name`. A plain `Error` that only sets `name` and `statusCode` is a generic 500, and its message is not copied into the body.
+The error handler keeps a 503 only when the error carries `Symbol.for('bidstack.deliberate503')` and `statusCode` is 503. It does not compare `err.name`. This server stamps that brand on its own `httpErrors.serviceUnavailable`. `IntegrationTokenKeyMissingError` sets the same brand. A plain `Error` that only sets `name` and `statusCode`, and a `ServiceUnavailable` built on another server, are a generic 500. The message is not copied into the body.
 
 | Case | Who can call it | Status | Body message |
 | --- | --- | --- | --- |
-| `GET /api/v1/migrations/hubspot/auth` | Signed-in, `settings:write`. The seed grants that permission only to Admin. | 503 | `HubSpot OAuth not configured — set HUBSPOT_CLIENT_ID and HUBSPOT_REDIRECT_URI` |
+| `GET /api/v1/migrations/hubspot/auth` | Signed-in, `settings:write`. The seed grants that permission only to Admin. | 503 | `HubSpot is not configured` |
 | `GET /api/v1/migrations/hubspot/callback` | Unauthenticated | 503 when the app is unset | `HubSpot OAuth not configured` |
 | `GET /api/v1/integrations/slack/oauth/start` | Signed-in, `integrations:write`. Seeded on Admin, Sales, Sales Manager, Account Executive, SDR, and Customer Success. | 503 | `Integration token encryption is not configured` |
 | Public Dust webhook, public Clerk webhook, public Sentry smoke, Clerk auth (`CLERK_SECRET_KEY`, `PUBLIC_BASE_URL`), Cloudflare Access allowlist parse | Unauthenticated, or any caller who reaches Clerk auth | 503 | `integration not configured` |
 | Any other thrown error, including a plain Error with a forged 503 name, and a DocuSign error that only sets `statusCode` | — | 500 | `Something went wrong` |
 
-The HubSpot auth sentence names `HUBSPOT_CLIENT_ID` and `HUBSPOT_REDIRECT_URI` because that route is the Admin settings permission. The callback sentence does not name them. Slack does not name `INTEGRATION_TOKEN_KEY`.
+No 503 body in this set names an env var. HubSpot auth logs `HUBSPOT_CLIENT_ID` and `HUBSPOT_REDIRECT_URI` as `missingEnv`. The callback sentence does not name them. Slack does not name `INTEGRATION_TOKEN_KEY`.
 
 The other routes above used to put the env var name in the 503 body. Those names now stay in the server log (`missingEnv`) and the body is `integration not configured`.
 
@@ -30,7 +30,7 @@ Gmail and Microsoft already answered 503 by sending the response in the route. T
 
 ## How secret text is scrubbed
 
-`discardUpstreamBody` cancels the response stream and does not read it. It does not call `text()`. Callers log the status only. They throw an error whose message is the provider name and the status, not the body.
+`discardUpstreamBody` calls `cancel()` first and gives up after 2 seconds. If there is no `cancel`, it reads at most 64 KiB and also stops at 2 seconds. It never throws. A thrown `text()` is ignored. Callers log the status only. They throw an error whose message is the provider name and the status, not the body.
 
 The HubSpot token-exchange route does not interpolate `err.message` into the HTTP response. It throws a bad gateway with the fixed sentence `HubSpot token exchange failed`. That is not a service-unavailable class, so the handler replaces it with 500 `Something went wrong`. The upstream body is not in the log line and not in the HTTP body.
 
@@ -61,3 +61,37 @@ No log line in `apps/api`, `apps/web`, or `apps/worker` prints `errorSummary`. T
 Rows already stored keep the raw text. Scrubbing them is the residual in `residual-scrub-error-summary-at-rest.md`.
 
 The test sentinel for a provider-shaped summary is the plain marker `hubspot-body-marker` plus `buyer@secret.example`. Neither string may appear on the sync-now run. The test sentinel for a logged Gmail body is `provider-body-SENTINEL-upstream-text`.
+
+`field` on a job error is the column name from that org's upload. It is not a driver sentence. The serializer still returns it, capped at 100 characters, so a long or odd cell header cannot fill the response.
+
+The account-name and entity-type sentences echo at most 80 characters, and those characters cannot be a control character or a quote. A longer name, or a newline, becomes `import_failed`.
+
+Known failure codes are read with `Object.hasOwn`. `constructor` and `__proto__` are not codes.
+
+## Cause, Sentry, and callers
+
+No converted fetch site sets `cause` or attaches the response to the thrown error. A search of `apps/api/src` finds `cause` only in demo auth, which is not one of these sites.
+
+The handler logs and reports a copy of an unhandled error that has no `cause`. Pino's err serializer appends `cause` onto the message, which is why the copy drops it. `captureSentryServerError` then calls `Sentry.captureException` on that copy. `scrubSentryEvent` (`beforeSend`) scrubs `exception.values[].value` as a message. It does not walk `Error.cause` itself. The copy has no `cause`, so there is nothing further to walk.
+
+### DocuSign
+
+| Function | Who calls it | On failure |
+| --- | --- | --- |
+| `getDocuSignAccessToken` | `sendDocuSignEnvelope`, `voidSignatureRequest` | Missing credentials: `credentialError`, `statusCode` 503, no brand, so the handler returns 500 `Something went wrong`. HTTP failure: body cancelled, plain `Error` `DocuSign OAuth token exchange failed: <status>`, same 500. |
+| `sendDocuSignEnvelope` | `createSignatureRequest` when the provider is `DOCUSIGN` (`POST /signatures/requests`) | Document fetch and envelope creation cancel the body and throw a plain status error. The route does not catch it. The caller sees 500 `Something went wrong`. The request row stays `DRAFT` because the status update is after the throw. No retry classifier reads the error class. |
+| `voidSignatureRequest` | `POST /signatures/requests/:id/void` | Provider HTTP failure is a plain status error. The existing test expects 500 `Something went wrong`, and the row stays `SENT`. |
+
+The public signing route uses the INTERNAL link. It does not call these functions.
+
+### 503 unset versus 500 malformed
+
+Accepted. An unset `INTEGRATION_TOKEN_KEY` is a 503 whose message is `Integration token encryption is not configured`. A key that is present but not 64 hex characters is a plain Error and a 500 `Something went wrong`. A caller with `integrations:write` can tell those two apart. That is the point: an operator can see that the feature is not set up, and a bad key is not described. `import_failed` versus `chunk failed permanently: import_failed` tells the wizard whether retry is offered. It does not include driver text.
+
+### Left as written
+
+`hubspotFetch` puts the token in the Authorization header. The thrown path is `/crm/v3/objects/${objectType}` with `objectType` a fixed union, and query params are not part of that string. A 4xx whose `statusCode` is below 500 still returns `err.message`. That passthrough is older than this PR and is out of scope.
+
+`judgeWithOpenAiCompatible` in `apps/api/src/evals/llm-judge.ts` throws `NVIDIA NIM eval judge error: <status>` and does not read the body. It also does not cancel it. Company news returns an empty list when the feed is not ok. The MCP clients read `text()` only after `response.ok`. Those are not not-ok body leaks. The scan in `scripts/scan-upstream-error-body.mjs` fails the hermeticity run if a not-ok branch throws or logs the response text.
+
+Rows already stored are not rewritten here. The residual ticket is `polo-residual-scrub-error-summary-at-rest`, owner Tony.
