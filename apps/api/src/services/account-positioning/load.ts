@@ -2,7 +2,6 @@
 // risks, and the key-numbers strip. Read only, built from data already held.
 // Nothing is estimated: a number with no source comes back as null.
 import { prisma } from '@bidstack/db';
-import { recordedOutcome } from '../account-signals/load.js';
 import {
   buildGaps,
   buildPlays,
@@ -31,9 +30,17 @@ import type { AccessScope } from '../../lib/access-scope.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
 import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
-import { groupMap, loadMomentumInputs, momentumFor } from '../account-signals/load.js';
+import { groupMap, loadMomentumInputs, momentumFor, recordedOutcome } from '../account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../account-signals/live-signals.js';
 import { loadSourcedExtras, manualOrigin, manualProvenance, providerLabel } from './sourced-figures.js';
+
+/** Same outcome as account momentum. Lost wins, and a deleted stage stays open. */
+export function positioningDealOutcome(o: {
+  stage: string;
+  pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
+}): 'won' | 'lost' | 'open' {
+  return recordedOutcome(o);
+}
 
 const DAY = 86_400_000;
 const RISK_KINDS = ['RESTRUCTURING', 'LAYOFFS', 'LEADERSHIP_CHANGE', 'INSOLVENCY', 'GUIDANCE_CHANGE'] as const;
@@ -184,10 +191,9 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const won: WonDeal[] = wonOrg.map((o) => ({ name: o.name, valueMicros: o.valueMicros ?? 0n, here: !!o.companyId && ids.includes(o.companyId) }));
   const plays = buildPlays({ initiatives, financialSignals: finSignals, financialSource: finSource, people, won, themeOf: themeForText, now });
 
-  const outcomeOf = (o: (typeof opps)[number]) => recordedOutcome(o);
-  const open = opps.filter((o) => outcomeOf(o) === 'open');
+  const open = opps.filter((o) => positioningDealOutcome(o) === 'open');
   const closed24 = opps.filter((o) => {
-    if (outcomeOf(o) === 'open') return false;
+    if (positioningDealOutcome(o) === 'open') return false;
     return (o.closedAt ?? o.updatedAt) >= since24;
   });
   const seniorPeople = people.filter((p) => SENIOR.has(p.seniority));
@@ -221,8 +227,8 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     pipeline: {
       openCount: open.length,
       openMicros: open.reduce((s, o) => s + (o.valueMicros ?? 0n), 0n).toString(),
-      won24m: closed24.filter((o) => outcomeOf(o) === 'won').length,
-      lost24m: closed24.filter((o) => outcomeOf(o) === 'lost').length,
+      won24m: closed24.filter((o) => positioningDealOutcome(o) === 'won').length,
+      lost24m: closed24.filter((o) => positioningDealOutcome(o) === 'lost').length,
     },
     people: {
       known: people.length,
@@ -424,11 +430,10 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   } else items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', goodWhen: 'down', source: 'Meeting intel and logged meetings', period: 'Last 24 months', missing: 'No meeting logged' }));
 
   // Pipeline value and trend: open value now vs reconstructed 90 days ago.
-  const outcomeOf = (o: (typeof opps)[number]) => recordedOutcome(o);
-  const open = opps.filter((o) => outcomeOf(o) === 'open');
+  const open = opps.filter((o) => positioningDealOutcome(o) === 'open');
   const openAt = (t: Date) =>
     opps
-      .filter((o) => o.createdAt <= t && (outcomeOf(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
+      .filter((o) => o.createdAt <= t && (positioningDealOutcome(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
       .reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
   const nowOpen = open.reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
   const series = [150, 120, 90, 60, 30].map((d) => openAt(new Date(now.getTime() - d * DAY))).concat(nowOpen);
