@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { databaseLogin } from '@bidstack/db';
+import { boot, type RuntimeEnv } from '@bidstack/shared';
 import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
 
 import { parseAllowedUsers } from './lib/allowed-users.js';
@@ -36,9 +37,9 @@ export const envSchema = z.object({
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
 
   // ─── Polo data mode + Cloudflare Access identity ──────────────────────
-  // Default stays demo so main/preview keep fixture data. Real mode refuses
-  // the shared stub Jane Smith session and requires Clerk or CF Access.
-  POLO_DATA_MODE: z.enum(['demo', 'real']).default('demo'),
+  // Unset means real. Only the exact string "demo" is synthetic data.
+  // The runtime-mode machine owns that reading. This field keeps the raw value.
+  POLO_DATA_MODE: z.string().optional(),
   POLO_ALLOWED_USERS: z.string().optional().or(z.literal('')),
   POLO_REAL_ORG_CLERK: z.string().min(1).default('org_polo_real'),
   CF_ACCESS_AUTH: z.enum(['true', 'false']).default('false'),
@@ -495,9 +496,6 @@ export function getEnv(): Env {
   // Demo-mode gate: the public passwordless door must never run alongside real
   // Clerk auth, and needs its own HMAC secret to sign session tokens.
   if (env.DEMO_MODE === 'true') {
-    if (env.CLERK_SECRET_KEY) {
-      semanticErrors.push('DEMO_MODE=true is mutually exclusive with CLERK_SECRET_KEY');
-    }
     if (!env.DEMO_SESSION_SECRET) {
       semanticErrors.push('DEMO_SESSION_SECRET is required when DEMO_MODE=true');
     }
@@ -521,21 +519,9 @@ export function getEnv(): Env {
   if (env.SERUM_DEMO_MODE_ENABLED === 'true' && env.NODE_ENV === 'production') {
     semanticErrors.push('SERUM_DEMO_MODE_ENABLED=true is not allowed in production');
   }
-  if (env.POLO_DATA_MODE === 'real' && env.DEMO_MODE === 'true') {
-    semanticErrors.push('POLO_DATA_MODE=real cannot run with DEMO_MODE=true');
-  }
-  if (env.POLO_DATA_MODE === 'real' && !env.CLERK_SECRET_KEY && env.CF_ACCESS_AUTH !== 'true') {
-    semanticErrors.push(
-      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true (shared stub identity is disabled)',
-    );
-  }
+  const runtimeBoot = boot(env as unknown as RuntimeEnv);
+  if (!runtimeBoot.ok) semanticErrors.push(runtimeBoot.error);
   if (env.CF_ACCESS_AUTH === 'true') {
-    if (env.DEMO_MODE === 'true') {
-      semanticErrors.push('CF_ACCESS_AUTH=true is mutually exclusive with DEMO_MODE=true');
-    }
-    if (env.CLERK_SECRET_KEY) {
-      semanticErrors.push('CF_ACCESS_AUTH=true is mutually exclusive with CLERK_SECRET_KEY');
-    }
     if (!env.POLO_ALLOWED_USERS?.trim()) {
       semanticErrors.push('POLO_ALLOWED_USERS is required when CF_ACCESS_AUTH=true');
     } else {

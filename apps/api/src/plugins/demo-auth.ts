@@ -27,6 +27,7 @@ import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
 
 import { Prisma, prisma, seedOrgData } from '@bidstack/db';
+import { isPublicDemoDoor } from '@bidstack/shared';
 
 import { enqueueApolloEnrich } from '../queues/company-enrich-apollo.js';
 
@@ -41,7 +42,7 @@ const DEMO_ORG_PREFIX = 'demo_org_';
 const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export function isDemoMode(): boolean {
-  return process.env.DEMO_MODE === 'true';
+  return isPublicDemoDoor(process.env);
 }
 
 function demoSecret(): string {

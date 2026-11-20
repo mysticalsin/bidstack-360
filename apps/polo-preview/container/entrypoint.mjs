@@ -18,6 +18,7 @@ import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, p
 import { alterRolePasswordSql, appRolePasswordError, APP_ROLE_GATE_SQL, APP_ROLE_LOCK_SQL, ENSURE_APP_ROLE_SQL, restoreFailure, scramSha256Verifier, scrubChildEnv } from '../src/database-boot.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
+import { guardContainerEnv } from '../../../packages/shared/dist/runtime-mode/index.js';
 
 // Production paths and ports. A drill may point these at a temp directory
 // and free ports. Unset, the container layout is unchanged.
@@ -153,7 +154,6 @@ function runtimeEnv(databaseUrl) {
     CF_ACCESS_AUTH: 'true',
     CF_ACCESS_TEAM_DOMAIN: 'tony-walteur.cloudflareaccess.com',
     CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'false',
-    POLO_DATA_MODE: 'demo',
     POLO_REAL_ORG_CLERK: 'org_seed_mantu',
     STORAGE_DRIVER: 'local',
     LOCAL_STORAGE_ROOT: STORAGE,
@@ -176,7 +176,8 @@ function runtimeEnv(databaseUrl) {
   };
   delete env.POLO_APP_DB_PASSWORD;
   delete env.POLO_INTERNAL_KEY;
-  return env;
+  // Pass POLO_DATA_MODE through. Do not assign it, and do not infer preview.
+  return guardContainerEnv(process.env, env);
 }
 
 function migrateEnv() {

@@ -10,6 +10,8 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 
+import { resolveProcessData, type RuntimeEnv } from '@bidstack/shared';
+
 import { apiVersioningPlugin } from './plugins/api-versioning.js';
 import { authPlugin } from './plugins/auth.js';
 import { cacheHeadersPlugin } from './plugins/cache-headers.js';
@@ -225,7 +227,7 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     // is exhausted). Rate limiting is a guard, not a hard dependency — a store
     // outage must never turn every request into a 500. The request is allowed
     // through; the limit simply isn't enforced until the store recovers.
-    skipOnError: config.POLO_DATA_MODE !== 'real',
+    skipOnError: resolveProcessData(process.env as unknown as RuntimeEnv) !== 'real',
     keyGenerator: (req) => {
       // Registered after auth so authenticated routes get per-user buckets.
       // Fold in orgId so the per-user bucket is partitioned per tenant and keys

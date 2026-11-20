@@ -25,6 +25,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
+import { isPublicDemoDoor } from '@bidstack/shared';
 
 import { pingRedis } from '../redis.js';
 
@@ -262,7 +263,7 @@ export function storageConfigReady(env: NodeJS.ProcessEnv = process.env): boolea
   }
   // Local storage is ready in non-prod, and in prod DEMO deployments — matches
   // env.ts which permits STORAGE_DRIVER=local in production only when DEMO_MODE.
-  return env.NODE_ENV !== 'production' || env.DEMO_MODE === 'true';
+  return env.NODE_ENV !== 'production' || isPublicDemoDoor(env);
 }
 
 function releaseMetadata(env: NodeJS.ProcessEnv = process.env): z.infer<typeof ReleaseSchema> {

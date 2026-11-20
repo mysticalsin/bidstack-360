@@ -260,6 +260,8 @@ jobs:
         run: |
           pnpm db:migrate:deploy
           pnpm db:seed
+        env:
+          POLO_DATA_MODE: demo
 
       - name: API integration tests
         run: pnpm --filter @bidstack/api test
@@ -340,6 +342,8 @@ jobs:
         run: |
           pnpm db:migrate:deploy
           pnpm db:seed
+        env:
+          POLO_DATA_MODE: demo
 
       - name: Build web
         run: pnpm --filter @bidstack/web build
@@ -365,6 +369,8 @@ jobs:
           PORT_API: '4000'
           DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
           REDIS_URL: redis://localhost:6379
+          POLO_DATA_MODE: demo
+          POLO_DEPLOYMENT_ENV: local
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
           BIDSTACK_ALLOW_STUB_ROLE_HEADER: 'true'
 

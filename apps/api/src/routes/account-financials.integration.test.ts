@@ -52,13 +52,10 @@ describe('account financials', () => {
     expect(await prisma.accountFinancialProfile.count({ where: { companyId: c.id } })).toBe(0);
   });
 
-  skipIfNoDb('Strategic account with no filings yet shows the labeled sample', async () => {
+  skipIfNoDb('Strategic account with no filings stays Not connected until the provider is approved', async () => {
     const c = await mk('Strategic Co', 'key');
     const body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${c.id}/financials` })).json();
-    expect(body).toMatchObject({ tierLabel: 'Strategic', gate: 'tier', sample: true });
-    expect(body.periods.length).toBeGreaterThan(0);
-    expect(body.periods.every((p: { source: string }) => p.source === 'sample')).toBe(true);
-    expect(body.signals.every((s: { sample: boolean; title: string }) => s.sample && s.title.startsWith('Sample:'))).toBe(true);
+    expect(body).toMatchObject({ tierLabel: 'Strategic', gate: 'tier', sample: false, periods: [], signals: [], statusCopy: 'Not connected' });
     // Viewing a Strategic / Top account queues the public-filings pull.
     expect(await prisma.accountFinancialProfile.findUnique({ where: { companyId: c.id } })).toMatchObject({ status: 'pending' });
     expect(
@@ -95,7 +92,7 @@ describe('account financials', () => {
     const c = await mk('Optin Co', 'standard');
     const on = await server.inject({ method: 'PATCH', url: `/api/v1/accounts/${c.id}/financials/track`, headers: { 'x-bidstack-e2e-role': 'account-executive' }, payload: { trackFinancials: true } });
     expect(on.statusCode).toBe(200);
-    expect(on.json()).toMatchObject({ gate: 'opt_in', trackFinancials: true, status: 'pending', sample: true });
+    expect(on.json()).toMatchObject({ gate: 'opt_in', trackFinancials: true, status: 'pending', sample: false, statusCopy: 'Not connected' });
     expect(await prisma.accountFinancialProfile.findUnique({ where: { companyId: c.id } })).toMatchObject({ status: 'pending' });
     const off = await server.inject({ method: 'PATCH', url: `/api/v1/accounts/${c.id}/financials/track`, headers: { 'x-bidstack-e2e-role': 'account-executive' }, payload: { trackFinancials: false } });
     expect(off.json()).toMatchObject({ gate: 'general', status: 'paused', sample: false });

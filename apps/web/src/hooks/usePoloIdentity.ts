@@ -4,19 +4,23 @@ import { api } from '@/lib/api';
 
 export interface PoloPublicIdentity {
   dataMode: 'demo' | 'real';
+  processData: 'demo' | 'real';
+  auth: 'stub' | 'cf-access' | 'clerk' | null;
   authProvider: 'stub' | 'clerk' | 'demo' | 'cf-access';
+  deployment: 'local' | 'preview' | 'production';
   demoBanner: boolean;
+  stubBanner: string | null;
   cfAccessEnabled: boolean;
+  publicDemoDoor: boolean;
+  toggleActor: 'owner' | 'admin' | 'member' | 'api-key';
 }
 
-export interface PoloMeIdentity {
+export interface PoloMeIdentity extends PoloPublicIdentity {
   id: string;
   email: string | null;
   name: string | null;
   role: string;
   roles: string[];
-  dataMode: 'demo' | 'real';
-  authProvider: 'stub' | 'clerk' | 'demo' | 'cf-access';
   allowlist?: Array<{ email: string; role: string }>;
 }
 

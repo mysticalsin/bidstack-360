@@ -85,11 +85,14 @@ describe('runtime-mode transitions', () => {
     expect(RUNTIME_TRANSITIONS).not.toContain('enable-provider');
   });
 
-  it('does not skip or xfail a guard', () => {
-    const source = readFileSync(new URL(import.meta.url), 'utf8');
+  it('does not skip a guard', () => {
+    const source = readFileSync(new URL(import.meta.url), 'utf8')
+      .split('\n')
+      .filter((line) => !line.includes('not.toMatch'))
+      .join('\n');
     expect(source).not.toMatch(/\b(?:it|test|describe)\.skip\b/);
     expect(source).not.toMatch(/\b(?:it|test|describe)\.todo\b/);
-    expect(source).not.toMatch(/\bxfail\b/);
+    expect(source).not.toMatch(/\b(?:xit|xtest|xdescribe)\b/);
   });
 
   it('classifies a runner timeout as infrastructure, not a missed guard', () => {

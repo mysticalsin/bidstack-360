@@ -95,7 +95,7 @@ jobs:
             echo "E2E seed complete"
           else
             echo "seed-e2e.ts not found — falling back to standard seed"
-            pnpm db:seed
+            POLO_DATA_MODE=demo pnpm db:seed
           fi
 
       - name: Build web app
@@ -207,7 +207,7 @@ jobs:
           if pnpm --filter @bidstack/db exec ts-node --esm prisma/seed-e2e.ts 2>/dev/null; then
             echo "E2E seed complete"
           else
-            pnpm db:seed
+            POLO_DATA_MODE=demo pnpm db:seed
           fi
 
       - name: Start API
@@ -227,6 +227,8 @@ jobs:
           PORT_API: '4000'
           DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
           REDIS_URL: redis://localhost:6379
+          POLO_DATA_MODE: demo
+          POLO_DEPLOYMENT_ENV: local
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
           BIDSTACK_ALLOW_STUB_ROLE_HEADER: 'true'
 

@@ -4,8 +4,7 @@ import type { Firmographics } from '@bidstack/shared';
 
 import { api } from '@/lib/api';
 
-import { fromApi, isSampleStatus, noticeFor, type ApiHiring, type ApiProjects } from './live';
-import { mockEnrichment } from './mock';
+import { fromApi, isSampleStatus, type ApiHiring, type ApiProjects } from './live';
 import type { CompanyEnrichment } from './types';
 
 const base = (companyId: string) => `/api/companies/${encodeURIComponent(companyId)}/enrichment`;
@@ -13,7 +12,17 @@ const base = (companyId: string) => `/api/companies/${encodeURIComponent(company
 export async function fetchEnrichment(companyId: string, signal?: AbortSignal): Promise<CompanyEnrichment> {
   const f = await api<Firmographics>(base(companyId), { signal });
   if (isSampleStatus(f)) {
-    return { ...mockEnrichment(companyId), status: f.status, notice: noticeFor(f.status) ?? noticeFor('not_configured'), stale: f.stale };
+    return {
+      companyId,
+      sample: false,
+      status: 'not_connected',
+      notice: 'Not connected',
+      stale: false,
+      fetchedAt: null,
+      firmographics: { revenue: null, headcount: null, industry: null, locations: null },
+      hiring: { source: 'Not connected', asOf: '', roles: [], total: 0 },
+      projects: [],
+    };
   }
   const [h, p] = await Promise.all([
     api<ApiHiring>(`${base(companyId)}/hiring?limit=100`, { signal }).catch(() => null),

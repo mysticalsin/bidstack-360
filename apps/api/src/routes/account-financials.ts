@@ -11,8 +11,11 @@ import {
   FINANCIALS_STATUS_COPY,
   FinancialSignal,
   GATE_COPY,
+  NOT_CONNECTED,
   SAMPLE_FINANCIAL_PERIODS,
   SAMPLE_FINANCIAL_SIGNALS,
+  connectProvider,
+  providerApprovalFromEnv,
   TrackFinancialsUpdate,
   filingPeriodPage,
   financialPeriodTake,
@@ -76,7 +79,10 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
   const signals = z.array(FinancialSignal).catch([]).parse(p?.signals ?? []);
   // Sample only for tracked accounts still waiting for real filings; General
   // accounts get the plain empty state instead.
-  const sample = periods.length === 0 && financialsEligible(c);
+  const providerApproved =
+    connectProvider('sec-edgar', providerApprovalFromEnv(process.env, 'sec-edgar')).ok ||
+    connectProvider('esef', providerApprovalFromEnv(process.env, 'esef')).ok;
+  const sample = providerApproved && periods.length === 0 && financialsEligible(c);
   return {
     companyId: c.id,
     tier: c.tier,
@@ -86,7 +92,12 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
     trackFinancials: c.trackFinancials,
     canToggle: toggle,
     status,
-    statusCopy: status === 'ok' ? null : (FINANCIALS_STATUS_COPY[status] ?? null),
+    statusCopy:
+      !providerApproved && periods.length === 0
+        ? NOT_CONNECTED
+        : status === 'ok'
+          ? null
+          : (FINANCIALS_STATUS_COPY[status] ?? null),
     entity: p?.source && p.entityId ? { source: SOURCE_NAME[p.source] ?? p.source, id: p.entityId, name: p.entityName ?? '' } : null,
     lastPulledAt: p?.lastPulledAt ? p.lastPulledAt.toISOString() : null,
     nextPullAt: p?.nextPullAt && financialsEligible(c) ? p.nextPullAt.toISOString() : null,

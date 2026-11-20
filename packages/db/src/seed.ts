@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import dotenvFlow from 'dotenv-flow';
+import { resolveProcessData } from '@bidstack/shared';
 
 import { type Prisma, PrismaClient } from '../generated/client/index.js';
 import {
@@ -58,10 +59,10 @@ async function main() {
   // Guard: this seed creates PROTOTYPE FIXTURES (demo users, companies,
   // opportunities). It must never run against a production database — the
   // production bootstrap is seed-prod.ts (system rows only, no fixtures).
-  if (process.env.POLO_DATA_MODE === 'real' && process.env.BIDSTACK_ALLOW_FIXTURE_SEED !== 'true') {
+  if (resolveProcessData(process.env) !== 'demo' && process.env.BIDSTACK_ALLOW_FIXTURE_SEED !== 'true') {
     console.error(
-      'Refusing to run the FIXTURE seed with POLO_DATA_MODE=real. ' +
-        'Use `pnpm db:seed:prod` for a seed-free real tenant (system rows only).',
+      'Refusing to run the FIXTURE seed unless POLO_DATA_MODE=demo. ' +
+        'Unset means real. Use `pnpm db:seed:prod` for a seed-free tenant (system rows only).',
     );
     process.exitCode = 1;
     return;

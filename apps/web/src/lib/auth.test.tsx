@@ -218,15 +218,16 @@ function FetchingChild() {
   return null;
 }
 
-describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
+describe('AuthProvider — public demo door', () => {
+  const demoRuntime = { auth: null, publicDemoDoor: true } as const;
+
   it('registers the api token provider synchronously, before a child effect can fire the first request', async () => {
-    vi.stubEnv('VITE_AUTH_MODE', 'demo');
     localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
     const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
 
     render(
-      <AuthProvider publishableKey={undefined}>
+      <AuthProvider publishableKey={undefined} runtime={demoRuntime}>
         <FetchingChild />
       </AuthProvider>,
     );
@@ -249,12 +250,11 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
   });
 
   it('marks an explicit sign-out and ends the edge session, so /login does not sign straight back in', async () => {
-    vi.stubEnv('VITE_AUTH_MODE', 'demo');
     localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
     const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
     render(
-      <AuthProvider publishableKey={undefined}>
+      <AuthProvider publishableKey={undefined} runtime={demoRuntime}>
         <Probe />
       </AuthProvider>,
     );
@@ -369,9 +369,10 @@ describe('AuthProvider — clerk mode (publishableKey set)', () => {
   });
 });
 
-describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => {
+describe('AuthProvider — Cloudflare Access', () => {
+  const accessRuntime = { auth: 'cf-access' as const, publicDemoDoor: false };
+
   it('maps /me to the signed-in user instead of Jane Smith', async () => {
-    vi.stubEnv('VITE_AUTH_MODE', 'cf-access');
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
       if (url.includes('/api/v1/me') || url.includes('/api/me')) {
@@ -390,7 +391,7 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
     vi.stubGlobal('fetch', fetchMock);
 
     render(
-      <AuthProvider publishableKey={undefined}>
+      <AuthProvider publishableKey={undefined} runtime={accessRuntime}>
         <Probe />
       </AuthProvider>,
     );
@@ -403,7 +404,6 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
   });
 
   it('retries /me while the box is waking up instead of showing the sign-in screen', async () => {
-    vi.stubEnv('VITE_AUTH_MODE', 'cf-access');
     let meCalls = 0;
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
@@ -417,7 +417,7 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
     vi.stubGlobal('fetch', fetchMock);
 
     render(
-      <AuthProvider publishableKey={undefined}>
+      <AuthProvider publishableKey={undefined} runtime={accessRuntime}>
         <Probe />
       </AuthProvider>,
     );

@@ -9,6 +9,7 @@ import { useHelpDrawer } from '@/components/help/useHelpDrawer';
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useSignOut, useUser, useRole } from '@/lib/auth';
+import { useRuntimeMode } from '@/lib/runtime-mode';
 import { useThemeStore } from '@/stores/theme';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useUiStore } from '@/stores/ui';
@@ -68,8 +69,7 @@ function prettifySegment(s: string, detailLabel: string): string {
 
 // Real-auth (Clerk) account + organization management. Clerk mounts these
 // methods on window.Clerk once loaded; the buttons that call them only render
-// in clerk mode, so demo/stub builds never reach here.
-const clerkActive = import.meta.env.VITE_AUTH_MODE === 'clerk';
+// when the identity endpoint says the auth mode is clerk.
 function openClerk(method: 'openUserProfile' | 'openOrganizationProfile'): void {
   const clerk = (window as unknown as { Clerk?: Record<string, (() => void) | undefined> }).Clerk;
   clerk?.[method]?.();
@@ -84,6 +84,7 @@ export function Topbar() {
     defaultValue: `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`,
   });
   const { user } = useUser();
+  const clerkActive = useRuntimeMode()?.auth === 'clerk';
   const { signOut } = useSignOut();
   const navigate = useNavigate();
   const { role } = useRole();

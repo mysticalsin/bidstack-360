@@ -12,6 +12,8 @@ import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
 import { ApiError } from '@/lib/api';
 import { initAccent } from '@/lib/accent';
 import { AuthProvider } from '@/lib/auth';
+import { RuntimeModeProvider } from '@/lib/runtime-mode';
+import type { PoloPublicIdentity } from '@/hooks/usePoloIdentity';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { logVitalsToConsole, reportWebVitals } from '@/lib/web-vitals';
 import { persistCache, hydrateCache, watchAuthForCacheClear } from '@/lib/queryCache';
@@ -98,11 +100,6 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const authMode = import.meta.env.VITE_AUTH_MODE;
-
-if (!clerkKey && authMode === 'clerk') {
-  throw new Error('VITE_CLERK_PUBLISHABLE_KEY is missing while VITE_AUTH_MODE=clerk.');
-}
 
 const APP_SHELL_CACHE_NAME = 'bidstack-v4-network-owned-routes';
 type ViteManifestEntry = {
@@ -222,9 +219,57 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && !disableServiceWorke
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
 
+function RuntimeAuthRoot({ children }: { children: React.ReactNode }) {
+  const [runtime, setRuntime] = React.useState<PoloPublicIdentity | null>(null);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/identity', { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`identity ${response.status}`);
+        return (await response.json()) as PoloPublicIdentity;
+      })
+      .then((body) => {
+        if (!cancelled) setRuntime(body);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (failed) {
+    return (
+      <p role="alert" style={{ padding: 24 }}>
+        Polo could not read its runtime mode.
+      </p>
+    );
+  }
+  if (!runtime) {
+    return (
+      <p role="status" style={{ padding: 24 }}>
+        Loading Polo…
+      </p>
+    );
+  }
+  return (
+    <RuntimeModeProvider value={runtime}>
+      <AuthProvider
+        publishableKey={clerkKey}
+        runtime={{ auth: runtime.auth, publicDemoDoor: runtime.publicDemoDoor }}
+      >
+        {children}
+      </AuthProvider>
+    </RuntimeModeProvider>
+  );
+}
+
 root.render(
   <React.StrictMode>
-    <AuthProvider publishableKey={clerkKey}>
+    <RuntimeAuthRoot>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
           <ErrorBoundary>
@@ -241,6 +286,6 @@ root.render(
           </ErrorBoundary>
         </BrowserRouter>
       </QueryClientProvider>
-    </AuthProvider>
+    </RuntimeAuthRoot>
   </React.StrictMode>,
 );

@@ -8,6 +8,7 @@ import { AppearanceSection } from '@/components/settings/AppearanceSection';
 import { NotificationPrefsSection } from '@/components/settings/NotificationPrefsSection';
 import { SecuritySection } from '@/components/settings/SecuritySection';
 import { IdentitySection } from '@/components/settings/IdentitySection';
+import { DemoDataSection } from '@/components/settings/DemoDataSection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
 import { CrmConfigurationSection } from '@/components/settings/CrmConfigurationSection';
 import { DataImportSection } from '@/components/settings/DataImportSection';
@@ -27,7 +28,9 @@ import { ModulesSection } from '@/components/settings/ModulesSection';
 import { SigningEntitiesSection } from '@/components/settings/SigningEntitiesSection';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
-import { useOrgAdminStatus } from '@/lib/auth';
+import { usePoloMe } from '@/hooks/usePoloIdentity';
+import { actorMayToggle, type ToggleActor } from '@bidstack/shared';
+import { useAuth, useOrgAdminStatus } from '@/lib/auth';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
 // The English default is passed to t() so the UI never shows a raw key.
@@ -41,6 +44,7 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   security: ['sectionSecurity', 'Profile & Security'],
   workspace: ['sectionWorkspace', 'Workspace'],
   identity: ['sectionIdentity', 'Identity & roles'],
+  'demo-data': ['sectionDemoData', 'Demo data'],
   crm: ['sectionCrm', 'Data configuration'],
   'data-import': ['sectionDataImport', 'Data import'],
   'top-accounts': ['sectionTopAccounts', 'Top accounts'],
@@ -82,9 +86,11 @@ function resolveSettingsTab(
   tab: string | null,
   isAdmin: boolean,
   canReadAudit: boolean,
+  canToggleDemo: boolean,
 ): SettingsSection {
   const candidate =
     tab && SETTINGS_SECTIONS.has(tab as SettingsSection) ? (tab as SettingsSection) : 'overview';
+  if (candidate === 'demo-data') return canToggleDemo ? candidate : 'overview';
   if (candidate === 'audit-log' && canReadAudit) return candidate;
   if (!isAdmin && ADMIN_SETTINGS_SECTIONS.has(candidate)) return 'overview';
   return candidate;
@@ -94,13 +100,16 @@ export function SettingsPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isLoading: adminLoading } = useOrgAdminStatus();
+  const { isSignedIn } = useAuth();
+  const me = usePoloMe(isSignedIn);
+  const canToggleDemo = me.data ? actorMayToggle(me.data.toggleActor as ToggleActor) : false;
   const capabilitiesLoading = useCapabilities().isLoading;
   const canReadAudit = useHasPermission('audit-log:read');
   const requestedTab = searchParams.get('tab');
   // Until the capability manifest arrives every gated tab resolves to
   // overview, so a deep link must not be rewritten (or rendered) yet.
-  const accessPending = adminLoading || capabilitiesLoading;
-  const activeTab = resolveSettingsTab(requestedTab, isAdmin, canReadAudit);
+  const accessPending = adminLoading || capabilitiesLoading || (isSignedIn && me.isLoading);
+  const activeTab = resolveSettingsTab(requestedTab, isAdmin, canReadAudit, canToggleDemo);
 
   useEffect(() => {
     if (accessPending) return;
@@ -136,6 +145,7 @@ export function SettingsPage() {
     ),
     workspace: <WorkspaceSection />,
     identity: <IdentitySection />,
+    'demo-data': <DemoDataSection />,
     crm: <CrmConfigurationSection />,
     'data-import': <DataImportSection />,
     'top-accounts': <TopAccountsSection />,

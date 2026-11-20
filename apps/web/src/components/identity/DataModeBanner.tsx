@@ -8,7 +8,7 @@ const LAST_MODE_KEY = 'polo:last-data-mode';
 
 function readLastMode(): PoloPublicIdentity['dataMode'] {
   try {
-    return localStorage.getItem(LAST_MODE_KEY) === 'real' ? 'real' : 'demo';
+    return localStorage.getItem(LAST_MODE_KEY) === 'demo' ? 'demo' : 'real';
   } catch {
     return 'demo';
   }

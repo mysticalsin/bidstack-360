@@ -20,6 +20,10 @@ export default defineConfig({
     fileParallelism: false,
     env: {
       NODE_ENV: 'test',
+      // The suite is a local synthetic sign-in. Unset product default is real,
+      // and stub+real refuses to boot.
+      POLO_DATA_MODE: 'demo',
+      POLO_DEPLOYMENT_ENV: 'local',
     },
     coverage: {
       provider: 'v8',

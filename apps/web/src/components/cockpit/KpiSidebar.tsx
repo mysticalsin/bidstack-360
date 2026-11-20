@@ -37,7 +37,11 @@ export const KpiSidebar = memo(function KpiSidebar({
       <div className="pulse-stack">
         <PulseRow
           label={t('kpiSidebar.releaseScore', 'Release score')}
-          value={`${snapshot.releaseScore.total}/100`}
+          value={
+            snapshot.releaseScore.recorded === false
+              ? t('kpiSidebar.releaseScoreMissing', 'Not connected')
+              : `${snapshot.releaseScore.total}/100`
+          }
           tone={snapshot.releaseScore.passed ? 'jade' : 'amber'}
           progress={snapshot.releaseScore.total}
           index={0}

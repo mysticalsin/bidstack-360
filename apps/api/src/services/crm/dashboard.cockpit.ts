@@ -265,11 +265,13 @@ export function applyFieldOverrides(
 function resolveCockpitTechnicalStack(
   providerStack: z.infer<typeof AccountCockpitSnapshot>['technicalStack'],
   overrides: CockpitFieldOverride[],
+  includeSampleStack: boolean,
 ): z.infer<typeof AccountCockpitSnapshot>['technicalStack'] {
   const technicalStackOverride = parseTechnicalStackOverride(
     overrides.find((override) => override.fieldKey === TECHNICAL_STACK_FIELD_KEY)?.value,
   );
   if (technicalStackOverride) return technicalStackOverride.stack;
+  if (!includeSampleStack) return providerStack;
   return mergeTechnicalStack(providerStack, defaultTechnicalStack());
 }
 
@@ -482,6 +484,7 @@ export function buildCockpit({
   fieldOverrides = [],
   winLossAvailable = false,
   performance,
+  includeSampleStack = true,
 }: {
   company: z.infer<typeof CrmCompany>;
   fieldOverrides?: CockpitFieldOverride[];
@@ -494,6 +497,8 @@ export function buildCockpit({
    * derived from the passed opportunities instead.
    */
   performance?: AccountPerformance;
+  /** Sample catalog is off unless the org is allowed to show demo data. */
+  includeSampleStack?: boolean;
   companies: Array<z.infer<typeof CrmCompany>>;
   opportunities: Array<{
     id: string;
@@ -715,7 +720,7 @@ export function buildCockpit({
           ]
         : []),
     ],
-    technicalStack: resolveCockpitTechnicalStack(company.technicalStack ?? [], fieldOverrides),
+    technicalStack: resolveCockpitTechnicalStack(company.technicalStack ?? [], fieldOverrides, includeSampleStack),
     // Score on THIS company's contacts/tasks only. The org-wide dashboard path
     // passes every org row; the single-company path passes pre-filtered rows —
     // scoping here keeps the score identical across both entry points.

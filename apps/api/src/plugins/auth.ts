@@ -13,6 +13,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 
 import { prisma } from '@bidstack/db';
+import type { RuntimeMode } from '@bidstack/shared';
 
 import { emailDomainForTelemetry } from '../lib/email-privacy.js';
 import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
@@ -23,6 +24,10 @@ import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
 import { isDemoMode, resolveDemoAuth } from './demo-auth.js';
 
 declare module 'fastify' {
+  interface FastifyInstance {
+    /** Process runtime mode, resolved once when the server boots. */
+    runtimeMode: RuntimeMode;
+  }
   interface FastifyRequest {
     auth: AuthContext;
   }
@@ -687,12 +692,14 @@ const plugin: FastifyPluginAsync = fp(
     const cfAccess = isCfAccessAuthEnabled();
     const realMode = isRealDataMode();
 
+    let runtimeMode;
     try {
-      assertPoloAuthBoot(process.env);
+      runtimeMode = assertPoloAuthBoot(process.env);
     } catch (err) {
       server.log.error({ err }, 'AUTH CONFIG ERROR');
       throw err;
     }
+    server.decorate('runtimeMode', runtimeMode);
 
     if (demoMode) {
       server.log.warn(

@@ -10,19 +10,23 @@
 import { type z } from 'zod';
 
 import { OpportunityStage, Prisma, type PrismaClient } from '@bidstack/db';
-import type {
-  CrmCompany,
-  CrmDeal,
-  DashboardWidget,
-  AccountCockpitSnapshot,
-  ProviderHealth,
-  QueueHealth,
-  ReleaseScore,
+import {
+  applyOrgOverride,
+  resolveProcessData,
+  type AccountCockpitSnapshot,
+  type CrmCompany,
+  type CrmDeal,
+  type DashboardWidget,
+  type ProviderHealth,
+  type QueueHealth,
+  type ReleaseScore,
+  type RuntimeEnv,
 } from '@bidstack/shared';
 
 import { buildCompanies } from './company-enrichment.service.js';
 import { buildCockpit, type AccountPerformance } from './dashboard.cockpit.js';
-import { defaultReleaseScore } from './dashboard.defaults.js';
+
+import { defaultReleaseScore, unrecordedReleaseScore } from './dashboard.defaults.js';
 import { asProviderStatus, mapDealStage, normalizeName, record } from './dashboard.utils.js';
 import {
   applyOpportunityScope,
@@ -174,7 +178,20 @@ export async function getReleaseScore(
     },
     orderBy: { scoredAt: 'desc' },
   });
-  return row ? serializeReleaseScore(row) : defaultReleaseScore();
+  if (row) return serializeReleaseScore(row);
+  let showSamples = false;
+  try {
+    const settings = await prisma.orgSettings.findFirst({
+      where: { orgId, deletedAt: null },
+      select: { demoData: true },
+    });
+    showSamples =
+      applyOrgOverride(resolveProcessData(process.env as RuntimeEnv), settings?.demoData === true).effectiveData ===
+      'demo';
+  } catch {
+    // A failed settings read stays hidden. Sample numbers are not the fallback.
+  }
+  return showSamples ? defaultReleaseScore() : unrecordedReleaseScore();
 }
 
 // ─── Lean company query ────────────────────────────────────────────────────────

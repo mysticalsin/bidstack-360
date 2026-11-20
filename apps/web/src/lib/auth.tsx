@@ -586,17 +586,28 @@ function CfAccessAuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+export type WebAuthMode = 'stub' | 'cf-access' | 'clerk' | null;
+
+/** Identity payload. The web does not decide this from VITE_AUTH_MODE. */
+export type WebRuntimeAuth = {
+  auth: WebAuthMode;
+  publicDemoDoor: boolean;
+};
+
 export function AuthProvider({
   publishableKey,
+  runtime,
   children,
 }: {
   publishableKey: string | undefined;
+  runtime?: WebRuntimeAuth;
   children: ReactNode;
 }) {
   const hasKey = publishableKey !== undefined && publishableKey !== null && publishableKey !== '';
-  const authMode = import.meta.env.VITE_AUTH_MODE;
+  const publicDemoDoor = runtime?.publicDemoDoor ?? false;
+  const authMode = runtime?.auth ?? (hasKey ? 'clerk' : 'stub');
   // Public demo deployment: no Clerk, no stub — a per-visitor passwordless door.
-  if (authMode === 'demo') {
+  if (publicDemoDoor) {
     return <DemoAuthProvider>{children}</DemoAuthProvider>;
   }
   if (authMode === 'cf-access') {
@@ -605,7 +616,7 @@ export function AuthProvider({
   const forceClerkAuth = authMode === 'clerk';
   if (!hasKey) {
     if (forceClerkAuth) {
-      throw new Error('VITE_CLERK_PUBLISHABLE_KEY is required when VITE_AUTH_MODE=clerk');
+      throw new Error('A Clerk publishable key is required when the identity endpoint says auth is clerk');
     }
     return <StubAuthProvider>{children}</StubAuthProvider>;
   }
