@@ -174,6 +174,26 @@ describe('composeBrief', () => {
     const txt = composeBrief(f, (v) => String(v), (m) => m);
     expect(txt).toContain('2 open deals worth 100 among the latest 500 deals');
   });
+
+  it('does not hang the sample phrase on the 24-month clause', () => {
+    // WHY: "months among the latest 500 deals" reads as if only the won/lost
+    // line were a sample, and the phrase has no verb of its own.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 2, openMicros: '100', won24m: 1, lost24m: 0, latest: 500 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: null,
+    };
+    const txt = composeBrief(f, (v) => String(v), (m) => m);
+    expect(txt).toContain('among the latest 500 deals, 1 won and 0 lost in the last 24 months');
+    expect(txt).not.toContain('months among the latest 500 deals');
+  });
 });
 
 describe('labels', () => {
