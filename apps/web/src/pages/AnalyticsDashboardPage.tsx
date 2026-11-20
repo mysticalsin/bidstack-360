@@ -54,10 +54,10 @@ export function AnalyticsDashboardPage() {
     };
   }, [dropdownOpen]);
   const [addingWidget, setAddingWidget] = useState(false);
-  // Add/delete widget both persist through POST/DELETE
-  // /api/dashboards/:id/widgets*, gated server-side behind reports:write
-  // (apps/api/src/routes/analytics-dashboards.ts:94,139) — hide the write
-  // affordances rather than let a read-only role 403.
+  // Mutations stay owner-or-admin on the server (requireDashboardEditor).
+  // canEdit is that same answer on the dashboard payload. reports:write alone
+  // is not enough: a Sales Manager can open a shared dashboard and still be
+  // refused. The Sales role has no reports:write, so it never sees the button.
   const canWrite = useHasPermission('reports:write');
 
   // Resolve the active dashboard (default to first). Fall back to the first
@@ -65,6 +65,7 @@ export function AnalyticsDashboardPage() {
   // shows a real dashboard instead of the false "No dashboards" empty state.
   const activeDash =
     (activeDashId ? dashboards.find((d) => d.id === activeDashId) : undefined) ?? dashboards[0];
+  const canEditDashboard = canWrite && activeDash?.canEdit === true;
 
   const {
     data: rawWidgets = [],
@@ -205,7 +206,7 @@ export function AnalyticsDashboardPage() {
           >
             {t('analyticsDashboard.newReportLink', 'New report')}
           </Link>
-          {activeDash && canWrite && (
+          {activeDash && canEditDashboard && (
             <button
               onClick={() => setAddingWidget(true)}
               className={cn(
@@ -281,7 +282,7 @@ export function AnalyticsDashboardPage() {
               'Add your first widget to start visualising data.',
             )}
             action={
-              canWrite ? (
+              canEditDashboard ? (
                 <button
                   onClick={() => setAddingWidget(true)}
                   className={cn(
@@ -316,7 +317,7 @@ export function AnalyticsDashboardPage() {
                     action isn't rendered. Re-add when editing is implemented. */}
                 <WidgetRenderer
                   widget={w}
-                  onDelete={canWrite ? () => handleDeleteWidget(w.id) : undefined}
+                  onDelete={canEditDashboard ? () => handleDeleteWidget(w.id) : undefined}
                 />
               </Reorder.Item>
             ))}
@@ -325,7 +326,7 @@ export function AnalyticsDashboardPage() {
       </div>
 
       {/* Add widget modal */}
-      {activeDash && canWrite && (
+      {activeDash && canEditDashboard && (
         <WidgetConfigModal
           open={addingWidget}
           onOpenChange={setAddingWidget}

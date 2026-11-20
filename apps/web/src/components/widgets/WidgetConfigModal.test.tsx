@@ -5,7 +5,7 @@
 // widget and no error. The modal must now await onSave and only close on
 // success, keeping the user's config on screen to retry on failure.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { WidgetConfigModal } from './WidgetConfigModal';
@@ -24,11 +24,22 @@ afterEach(() => {
   reportMocks.useAnalyticsReportsList.mockReturnValue({ data: [] });
 });
 
+const REPORT_ID = '11111111-1111-4111-8111-111111111111';
+
+function renderWithReport(ui: Parameters<typeof render>[0]) {
+  reportMocks.useAnalyticsReportsList.mockReturnValue({
+    data: [{ id: REPORT_ID, name: 'Open pipeline' }],
+  });
+  const view = render(ui);
+  fireEvent.change(screen.getByLabelText(/Data source/i), { target: { value: REPORT_ID } });
+  return view;
+}
+
 describe('WidgetConfigModal', () => {
   it('closes only after onSave resolves', async () => {
     const onOpenChange = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(<WidgetConfigModal open onOpenChange={onOpenChange} onSave={onSave} />);
+    renderWithReport(<WidgetConfigModal open onOpenChange={onOpenChange} onSave={onSave} />);
 
     screen.getByRole('button', { name: 'Save widget' }).click();
 
@@ -39,7 +50,7 @@ describe('WidgetConfigModal', () => {
   it('keeps the dialog open and re-enables Save when onSave rejects', async () => {
     const onOpenChange = vi.fn();
     const onSave = vi.fn().mockRejectedValue(new Error('Forbidden'));
-    render(<WidgetConfigModal open onOpenChange={onOpenChange} onSave={onSave} />);
+    renderWithReport(<WidgetConfigModal open onOpenChange={onOpenChange} onSave={onSave} />);
 
     screen.getByRole('button', { name: 'Save widget' }).click();
 
@@ -56,7 +67,7 @@ describe('WidgetConfigModal', () => {
   it('disables Save and shows "Saving…" while onSave is pending', async () => {
     let resolveSave: () => void = () => {};
     const onSave = vi.fn(() => new Promise<void>((resolve) => (resolveSave = resolve)));
-    render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={onSave} />);
+    renderWithReport(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={onSave} />);
 
     screen.getByRole('button', { name: 'Save widget' }).click();
 
@@ -70,7 +81,7 @@ describe('WidgetConfigModal', () => {
 
   it('does not call the empty report choice a static demo', () => {
     reportMocks.useAnalyticsReportsList.mockReturnValue({
-      data: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Open pipeline' }],
+      data: [{ id: REPORT_ID, name: 'Open pipeline' }],
     });
     render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={vi.fn()} />);
 
@@ -79,7 +90,7 @@ describe('WidgetConfigModal', () => {
 
   it('does not save a widget when no report is selected', async () => {
     reportMocks.useAnalyticsReportsList.mockReturnValue({
-      data: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Open pipeline' }],
+      data: [{ id: REPORT_ID, name: 'Open pipeline' }],
     });
     const onSave = vi.fn();
     render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={onSave} />);

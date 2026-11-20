@@ -219,6 +219,9 @@ export const AnalyticsDashboard = z.object({
   description: z.string().optional(),
   ownerId: z.string().uuid(),
   isShared: z.boolean(),
+  // Computed for this caller. True for the owner and for an org admin.
+  // Not stored, and not a permission change: mutations still enforce the same rule.
+  canEdit: z.boolean(),
   widgets: z.array(AnalyticsWidget).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

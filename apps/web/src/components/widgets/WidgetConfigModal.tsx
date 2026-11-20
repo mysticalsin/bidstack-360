@@ -45,23 +45,35 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
   const [xKey, setXKey] = useState('name');
   const [yKey, setYKey] = useState('value');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // onSave (handleAddWidget in the parent) is async and can reject — e.g. a
-  // 403 from a role without reports:write, or a transient network error. Await
-  // it and only close on success; on failure the caller has already surfaced a
-  // toast, so just keep the modal open with the user's input intact for retry.
+  // A widget with no report cannot draw. Refuse that save here, and keep a
+  // rejected save (403, network) on screen with the reason. The caller still toasts.
   const handleSave = async () => {
+    if (!reportId) {
+      setSaveError(
+        reports.length === 0
+          ? t('widgetConfig.noReports', 'Create a report before adding a widget.')
+          : t('widgetConfig.reportRequired', 'Choose a report for this widget.'),
+      );
+      return;
+    }
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave({
         title: title || (WIDGET_TYPES.find((w) => w.type === type)?.label ?? type),
         type,
-        reportId: reportId || undefined,
+        reportId,
         config: { xKey, yKey },
       });
       onOpenChange(false);
-    } catch {
-      // handled by the caller's toast
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : t('widgetConfig.saveError', 'Could not save this widget.');
+      setSaveError(message);
     } finally {
       setSaving(false);
     }
@@ -97,6 +109,9 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
               <Dialog.Title className="text-base font-semibold text-[var(--fg-primary)]">
                 {t('widgetConfig.title', 'Configure Widget')}
               </Dialog.Title>
+              <Dialog.Description className="sr-only">
+                {t('widgetConfig.description', 'Choose a report, a title, and a chart type.')}
+              </Dialog.Description>
               <Dialog.Close asChild>
                 <button
                   aria-label={t('widgetConfig.closeAriaLabel', 'Close')}
@@ -127,18 +142,25 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                 />
               </div>
 
-              {/* Report */}
+              {/* Report — required. There is no static widget. */}
               {reports.length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
+                  <label
+                    htmlFor="widget-config-report"
+                    className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5"
+                  >
                     {t('widgetConfig.dataSourceLabel', 'Data source (report)')}
                   </label>
                   <select
+                    id="widget-config-report"
                     value={reportId}
-                    onChange={(e) => setReportId(e.target.value)}
+                    onChange={(e) => {
+                      setReportId(e.target.value);
+                      setSaveError(null);
+                    }}
                     className={inputCls}
                   >
-                    <option value="">{t('widgetConfig.dataSourceNone', '— None (static demo) —')}</option>
+                    <option value="">{t('widgetConfig.dataSourcePlaceholder', 'Select a report')}</option>
                     {reports.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -203,6 +225,12 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                   </div>
                 </div>
               )}
+
+              {saveError ? (
+                <p role="alert" className="text-sm text-[var(--danger)]">
+                  {saveError}
+                </p>
+              ) : null}
 
               {/* Footer */}
               <div className="flex justify-end gap-2 pt-2">

@@ -40,6 +40,8 @@ export interface Dashboard {
   description?: string;
   ownerId: string;
   isShared: boolean;
+  /** True when this caller is the owner or an org admin. Computed by the API. */
+  canEdit?: boolean;
   widgets?: DashboardWidget[];
   createdAt: string;
   updatedAt: string;

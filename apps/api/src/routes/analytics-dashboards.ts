@@ -59,9 +59,14 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
     return dashboard;
   }
 
+  /** Same predicate as requireDashboardEditor. Exposed on the payload as canEdit. */
+  async function callerCanEdit(req: FastifyRequest, dashboard: DbDashboard): Promise<boolean> {
+    return dashboard.ownerId === req.auth.userId || (await isOrgAdmin(req));
+  }
+
   /** Owner-or-admin gate shared by dashboard PATCH/DELETE and ALL widget mutations. */
   async function requireDashboardEditor(req: FastifyRequest, dashboard: DbDashboard): Promise<void> {
-    if (dashboard.ownerId !== req.auth.userId && !(await isOrgAdmin(req))) {
+    if (!(await callerCanEdit(req, dashboard))) {
       throw server.httpErrors.forbidden('Only the owner or an admin can modify this dashboard');
     }
   }
@@ -84,7 +89,9 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
       });
       const allWidgets = dashboards.flatMap((d) => d.widgets);
       const latest = await latestRunIds(req.auth.orgId, allWidgets);
-      return dashboards.map((d) => serializeDashboard(d, d.widgets, latest));
+      return dashboards.map((d) =>
+        serializeDashboard(d, d.widgets, latest, d.ownerId === req.auth.userId || admin),
+      );
     },
   );
 
@@ -114,7 +121,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
           diff: { name: created.name, isShared: created.isShared },
         },
       });
-      return reply.code(201).send(serializeDashboard(created, []));
+      return reply.code(201).send(serializeDashboard(created, [], undefined, true));
     },
   );
 
@@ -129,7 +136,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
         take: 200,
       });
       const latest = await latestRunIds(req.auth.orgId, widgets);
-      return serializeDashboard(dashboard, widgets, latest);
+      return serializeDashboard(dashboard, widgets, latest, await callerCanEdit(req, dashboard));
     },
   );
 
@@ -165,7 +172,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
         },
       });
       const latest = await latestRunIds(req.auth.orgId, updated.widgets);
-      return serializeDashboard(updated, updated.widgets, latest);
+      return serializeDashboard(updated, updated.widgets, latest, await callerCanEdit(req, updated));
     },
   );
 

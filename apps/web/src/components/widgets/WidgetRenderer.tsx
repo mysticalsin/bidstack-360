@@ -5,7 +5,7 @@
 // An internal ErrorBoundary catches chart render failures so one bad widget
 // cannot crash the entire dashboard.
 
-import { Component, type ReactNode, useCallback } from 'react';
+import { Component, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Settings, Copy, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -215,12 +215,29 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   const { t } = useTranslation('crm');
   const qc = useQueryClient();
   const runMutation = useRunReport();
+  const startedFor = useRef<string | null>(null);
+  const [autoRunError, setAutoRunError] = useState<string | null>(null);
+  const latestRunId = (widget.config as { latestRunId?: string }).latestRunId ?? '';
 
-  // If the widget has a reportId, poll the latest run
-  const { data: run, isLoading, error } = useReportRun(
-    widget.reportId ?? '',
-    (widget.config as { latestRunId?: string }).latestRunId ?? '',
-  );
+  // A saved widget has no stored run until something executes the report.
+  // Kick that off once; the dashboard refetch then fills config.latestRunId.
+  useEffect(() => {
+    if (!widget.reportId || latestRunId) return;
+    if (startedFor.current === widget.reportId) return;
+    startedFor.current = widget.reportId;
+    void runMutation.mutateAsync({ id: widget.reportId }).then(
+      () => {
+        void qc.invalidateQueries({ queryKey: ['dashboards', 'widgets', widget.dashboardId] });
+      },
+      (err: unknown) => {
+        setAutoRunError(
+          err instanceof Error && err.message ? err.message : 'Could not run this report.',
+        );
+      },
+    );
+  }, [widget.reportId, latestRunId, widget.dashboardId, qc, runMutation]);
+
+  const { data: run, isLoading, error } = useReportRun(widget.reportId ?? '', latestRunId);
 
   const handleRefresh = useCallback(async () => {
     if (!widget.reportId) return;
@@ -268,14 +285,22 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   ];
 
   const data: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
-  const empty = !isLoading && !error && data.length === 0;
+  const needsReport = !widget.reportId;
+  const runError = error instanceof Error ? error.message : autoRunError;
+  const waitingForRun = Boolean(widget.reportId) && !latestRunId && !runError;
+  const empty = !needsReport && !isLoading && !runError && data.length === 0;
 
   return (
     <ChartContainer
       title={widget.type !== 'kpi' ? widget.title : undefined}
-      loading={isLoading}
-      error={error instanceof Error ? error.message : null}
-      empty={empty}
+      loading={isLoading || waitingForRun}
+      error={runError}
+      empty={needsReport || empty}
+      emptyMessage={
+        needsReport
+          ? t('widgetRenderer.needsReport', 'This widget needs a report.')
+          : undefined
+      }
       onRefresh={widget.reportId ? handleRefresh : undefined}
       actions={actions}
       aria-label={widget.title}

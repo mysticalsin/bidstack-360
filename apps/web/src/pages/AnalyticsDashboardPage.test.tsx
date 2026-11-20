@@ -7,7 +7,7 @@
 // WidgetRenderer/WidgetConfigModal are stubbed: their own behaviour (chart
 // rendering, report picking) is out of this page's scope, and stubbing keeps
 // this test focused on the canWrite plumbing this page owns.
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -31,8 +31,11 @@ const capabilitiesMocks = vi.hoisted(() => ({ useHasPermission: vi.fn(() => true
 vi.mock('@/hooks/useCapabilities', () => capabilitiesMocks);
 
 const modalMocks = vi.hoisted(() => ({ useReal: false }));
+const reportMocks = vi.hoisted(() => ({
+  useAnalyticsReportsList: vi.fn(() => ({ data: [] as Array<{ id: string; name: string }> })),
+}));
 vi.mock('@/hooks/useAnalyticsReports', () => ({
-  useAnalyticsReportsList: () => ({ data: [] }),
+  useAnalyticsReportsList: reportMocks.useAnalyticsReportsList,
 }));
 
 const dashboard = {
@@ -86,12 +89,23 @@ vi.mock('@/components/widgets/WidgetRenderer', () => ({
   ),
 }));
 
+type WidgetConfigModalProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (config: {
+    title: string;
+    type: string;
+    reportId?: string;
+    config?: Record<string, unknown>;
+  }) => void | Promise<void>;
+};
+
 vi.mock('@/components/widgets/WidgetConfigModal', async () => {
-  const actual = await vi.importActual<typeof import('@/components/widgets/WidgetConfigModal')>(
-    '@/components/widgets/WidgetConfigModal',
-  );
+  const actual = (await vi.importActual('@/components/widgets/WidgetConfigModal')) as {
+    WidgetConfigModal: (props: WidgetConfigModalProps) => ReactNode;
+  };
   return {
-    WidgetConfigModal: (props: ComponentProps<typeof actual.WidgetConfigModal>) =>
+    WidgetConfigModal: (props: WidgetConfigModalProps) =>
       modalMocks.useReal ? (
         <actual.WidgetConfigModal {...props} />
       ) : (
@@ -292,6 +306,10 @@ describe('AnalyticsDashboardPage — who may add a widget', () => {
   it('shows the rejected save reason inline in the modal and leaves the dialog open', async () => {
     modalMocks.useReal = true;
     capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    const reportId = '11111111-1111-4111-8111-111111111111';
+    reportMocks.useAnalyticsReportsList.mockReturnValue({
+      data: [{ id: reportId, name: 'Open pipeline' }],
+    });
     const mutateAsync = vi.fn().mockRejectedValue(
       new Error('Only the owner or an admin can modify this dashboard'),
     );
@@ -300,6 +318,7 @@ describe('AnalyticsDashboardPage — who may add a widget', () => {
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: /Add widget/i }));
+    fireEvent.change(await screen.findByLabelText(/Data source/i), { target: { value: reportId } });
     fireEvent.click(await screen.findByRole('button', { name: 'Save widget' }));
 
     const alert = await screen.findByRole('alert');

@@ -58,8 +58,9 @@ export function serializeWidget(w: DbWidget, latestRunId?: string): AnalyticsWid
 
 export function serializeDashboard(
   d: DbDashboard,
-  widgets?: DbWidget[],
-  latestRunByReport?: Map<string, string>,
+  widgets: DbWidget[] | undefined,
+  latestRunByReport: Map<string, string> | undefined,
+  canEdit: boolean,
 ): AnalyticsDashboard {
   return {
     id: d.id,
@@ -68,6 +69,7 @@ export function serializeDashboard(
     description: d.description ?? undefined,
     ownerId: d.ownerId,
     isShared: d.isShared,
+    canEdit,
     widgets: widgets?.map((w) =>
       serializeWidget(w, w.reportId ? latestRunByReport?.get(w.reportId) : undefined),
     ),
