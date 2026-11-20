@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatKpiValue } from './kpi-value';
+import { formatKpiCountFrame, formatKpiValue } from './kpi-value';
 
 describe('formatKpiValue', () => {
   it('does not turn 7.86 million into 7.9 million', () => {
@@ -32,6 +32,7 @@ describe('formatKpiValue', () => {
     const value = 7_860_000;
     const final = formatKpiValue(value);
     expect(final).toBe('7.86m');
+    expect(formatKpiValue(5_063_132.1)).toBe('5.1m');
     const frames = [5_063_132.1, -5_063_132.1];
     for (let step = 1; step <= 16; step += 1) {
       const progress = step / 16;
@@ -39,7 +40,7 @@ describe('formatKpiValue', () => {
       frames.push(value * eased, -value * eased);
     }
     for (const frame of frames) {
-      const shown = formatKpiValue(frame);
+      const shown = formatKpiCountFrame(frame);
       expect(shown, `frame ${frame}`).not.toMatch(/,/);
       if (Math.abs(frame) >= 1_000_000) expect(shown).toMatch(/m$/);
       else if (Math.abs(frame) >= 1_000) expect(shown).toMatch(/k$/);
