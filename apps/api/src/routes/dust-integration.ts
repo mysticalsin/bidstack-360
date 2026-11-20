@@ -15,6 +15,7 @@ import { enqueueDustResync } from '../queues/dust-poll.js';
 import {
   DustStatus,
   ApiKeySummary,
+  ApiKeyCreateBody,
   IntegrationSetupGuide,
   IntegrationProbeBody,
   IntegrationProbeResult,
@@ -206,23 +207,39 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: server.requirePermission('integrations:read'),
-      schema: { response: { 200: z.object({ items: z.array(ApiKeySummary) }) } },
+      schema: {
+        response: {
+          200: z.object({
+            items: z.array(ApiKeySummary),
+            pageContinues: z.boolean(),
+          }),
+        },
+      },
     },
     async (req) => {
-      const keys = await prisma.apiKey.findMany({
+      // One row past the page is the probe. It is dropped and is not a key total.
+      const API_KEY_LIST_PAGE = 500;
+      const loaded = await prisma.apiKey.findMany({
         where: { orgId: req.auth.orgId, revokedAt: null, deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        take: 500,
+        take: API_KEY_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > API_KEY_LIST_PAGE;
+      const keys = pageContinues ? loaded.slice(0, API_KEY_LIST_PAGE) : loaded;
       return {
         items: keys.map((k) => ({
           id: k.id,
           name: k.name,
           prefix: k.prefix,
           scopes: k.scopes,
+          readOnly: k.readOnly,
+          unrestrictedScope: k.unrestrictedScope,
+          companyIds: k.companyIds,
+          msaIds: k.msaIds,
           lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
           createdAt: k.createdAt.toISOString(),
         })),
+        pageContinues,
       };
     },
   );
@@ -234,19 +251,13 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: server.requirePermission('integrations:write'),
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
-        body: z.object({
-          name: z.string().min(1).max(80),
-          scopes: z
-            .array(z.string().trim().min(1))
-            .min(1)
-            .superRefine((scopes, ctx) => {
-              for (const failure of validateApiKeyScopes(scopes)) {
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  message: failure,
-                });
-              }
-            }),
+        body: ApiKeyCreateBody.superRefine((body, ctx) => {
+          for (const failure of validateApiKeyScopes(body.scopes)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: failure,
+            });
+          }
         }),
         response: {
           201: ApiKeySummary.extend({ secret: z.string(), warning: z.string().optional() }),
@@ -257,6 +268,25 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       const raw = `bidstack_${randomBytes(28).toString('hex')}`;
       const prefix = raw.slice(0, 12);
       const hashedKey = createHash('sha256').update(raw).digest('hex');
+      const companyIds = [...new Set(req.body.companyIds)];
+      const msaIds = [...new Set(req.body.msaIds)];
+
+      if (companyIds.length > 0) {
+        const n = await prisma.company.count({
+          where: { id: { in: companyIds }, orgId: req.auth.orgId, deletedAt: null },
+        });
+        if (n !== companyIds.length) {
+          throw server.httpErrors.badRequest('Unknown company id in API key scope');
+        }
+      }
+      if (msaIds.length > 0) {
+        const n = await prisma.contractAgreement.count({
+          where: { id: { in: msaIds }, orgId: req.auth.orgId, deletedAt: null },
+        });
+        if (n !== msaIds.length) {
+          throw server.httpErrors.badRequest('Unknown MSA id in API key scope');
+        }
+      }
 
       const created = await prisma.$transaction(async (tx) => {
         const key = await tx.apiKey.create({
@@ -266,6 +296,10 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
             hashedKey,
             prefix,
             scopes: req.body.scopes,
+            readOnly: req.body.readOnly,
+            unrestrictedScope: req.body.unrestrictedScope,
+            companyIds,
+            msaIds,
           },
         });
         await tx.auditLog.create({
@@ -275,7 +309,15 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'apikey.create',
             targetType: 'api_key',
             targetId: key.id,
-            diff: { name: req.body.name, scopes: req.body.scopes, prefix },
+            diff: {
+              name: req.body.name,
+              scopes: req.body.scopes,
+              prefix,
+              readOnly: req.body.readOnly,
+              unrestrictedScope: req.body.unrestrictedScope,
+              companyIds,
+              msaIds,
+            },
           },
         });
         return key;
@@ -286,6 +328,10 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
         name: created.name,
         prefix: created.prefix,
         scopes: created.scopes,
+        readOnly: created.readOnly,
+        unrestrictedScope: created.unrestrictedScope,
+        companyIds: created.companyIds,
+        msaIds: created.msaIds,
         lastUsedAt: null,
         createdAt: created.createdAt.toISOString(),
         secret: raw,
@@ -345,17 +391,24 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
                 error: z.string().nullable(),
               }),
             ),
+            /** True when one event past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
           }),
         },
       },
     },
     async (req) => {
-      const events = await prisma.syncEvent.findMany({
+      // One row past the page is the probe. It is dropped and is not an event total.
+      const WEBHOOK_EVENT_PAGE = 50;
+      const loaded = await prisma.syncEvent.findMany({
         where: { orgId: req.auth.orgId },
         orderBy: { receivedAt: 'desc' },
-        take: 50,
+        take: WEBHOOK_EVENT_PAGE + 1,
       });
+      const pageContinues = loaded.length > WEBHOOK_EVENT_PAGE;
+      const events = pageContinues ? loaded.slice(0, WEBHOOK_EVENT_PAGE) : loaded;
       return {
+        pageContinues,
         items: events.map((e) => ({
           id: e.id.toString(),
           receivedAt: e.receivedAt.toISOString(),

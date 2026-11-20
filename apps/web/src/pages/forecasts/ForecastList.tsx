@@ -21,22 +21,16 @@ import {
   TableCell,
   TableScrollArea,
 } from '@/components/ui/Table';
-import { microsToUnitsText, unitsTextToMicros, type Forecast } from '@bidstack/shared';
+import type { Forecast } from '@bidstack/shared';
 
-import {
-  CATEGORIES,
-  CATEGORY_LABELS,
-  forecastRowTotalCurrency,
-  formatForecastAmount,
-  sumForecastMicros,
-  type ForecastRow,
-} from './forecastsConfig';
+import { FORECAST_LIST_PAGE, forecastGroupCaption } from './forecast-list-caption';
+import { CATEGORIES, CATEGORY_LABELS, type ForecastRow } from './forecastsConfig';
 
 interface EditingCell {
   ownerId: string;
   period: string;
   category: Forecast['category'];
-  value: string;
+  value: number;
 }
 
 interface ForecastListProps {
@@ -50,10 +44,16 @@ interface ForecastListProps {
     ownerId: string,
     period: string,
     category: Forecast['category'],
-    micros: string,
-    currency: string,
+    micros: number,
   ) => void;
   onDeleteRow: (row: ForecastRow) => void;
+  formatMoneyMicros: (micros: number, currency: string) => string;
+  /** territories:write — gates cell edits, per-row delete, and the empty-state CTA. */
+  canWrite: boolean;
+  /** Shown as the `title` on disabled controls when `canWrite` is false. */
+  readOnlyHint: string;
+  /** True when the list read one forecast past this page and dropped it. */
+  pageContinues?: boolean;
 }
 
 export function ForecastList({
@@ -65,6 +65,10 @@ export function ForecastList({
   onNewForecast,
   onSaveCell,
   onDeleteRow,
+  formatMoneyMicros,
+  canWrite,
+  readOnlyHint,
+  pageContinues = false,
 }: ForecastListProps) {
   const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
@@ -79,9 +83,9 @@ export function ForecastList({
     row: ForecastRow,
     cat: Forecast['category'],
   ) => {
-    const micros = unitsTextToMicros(e.target.value);
-    if (micros != null) {
-      onSaveCell(row.ownerId, row.period, cat, micros.toString(), row.currencies[cat] ?? 'XXX');
+    const num = Number(e.target.value);
+    if (!Number.isNaN(num)) {
+      onSaveCell(row.ownerId, row.period, cat, Math.round(num * 1_000_000));
     }
     setEditingCell(null);
   };
@@ -91,14 +95,7 @@ export function ForecastList({
     if (e.key === 'Escape') setEditingCell(null);
   };
 
-  const formatForecastRowTotal = (row: ForecastRow): string => {
-    const currency = forecastRowTotalCurrency(row);
-    const total = sumForecastMicros(row.pipeline, row.bestCase, row.commit, row.closed).toString();
-    if (currency === 'mixed') return t('forecastList.mixedCurrencies', 'Mixed currencies');
-    return formatForecastAmount(total, currency);
-  };
-
-  const rowVal = (row: ForecastRow, cat: Forecast['category']): string => {
+  const rowVal = (row: ForecastRow, cat: Forecast['category']): number => {
     if (cat === 'best_case') return row.bestCase;
     if (cat === 'pipeline') return row.pipeline;
     if (cat === 'commit') return row.commit;
@@ -109,9 +106,16 @@ export function ForecastList({
     <Card>
       <SectionHeader
         title={t('forecastList.sectionTitle', 'Forecast Details')}
-        caption={t('forecastList.sectionCaption', '{{count}} forecast groups', {
-          count: rows.length,
-        })}
+        caption={
+          pageContinues
+            ? t(
+                'forecastList.sectionCaptionPartial',
+                forecastGroupCaption(rows.length, true, FORECAST_LIST_PAGE),
+              )
+            : t('forecastList.sectionCaption', '{{count}} forecast groups', {
+                count: rows.length,
+              })
+        }
       />
 
       {isError ? (
@@ -182,11 +186,10 @@ export function ForecastList({
                           <TableCell key={cat} className="text-right">
                             {isEditingCell(row, cat) ? (
                               <Input
-                                type="text"
-                                inputMode="decimal"
+                                type="number"
                                 size="sm"
                                 autoFocus
-                                defaultValue={microsToUnitsText(val)}
+                                defaultValue={val / 1_000_000}
                                 className="w-28 text-right"
                                 aria-label={t(
                                   'forecastList.cellLabel',
@@ -224,7 +227,7 @@ export function ForecastList({
                                       )} — ${readOnlyHint}`
                                 }
                               >
-                                {formatForecastAmount(val, row.currencies[cat])}
+                                {formatMoneyMicros(val, 'EUR')}
                               </button>
                             )}
                           </TableCell>
@@ -232,7 +235,10 @@ export function ForecastList({
                       })}
                       <TableCell className="text-right">
                         <span className="text-sm font-semibold tabular-nums text-[var(--fg-primary)]">
-                          {formatForecastRowTotal(row)}
+                          {formatMoneyMicros(
+                            row.pipeline + row.bestCase + row.commit + row.closed,
+                            'EUR',
+                          )}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -278,16 +284,15 @@ export function ForecastList({
                     const val = rowVal(row, cat);
                     return (
                       <div key={cat} className="flex flex-col gap-1">
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
+                        <span className="text-xs font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
                           {CATEGORY_LABELS[cat]}
                         </span>
                         {isEditingCell(row, cat) ? (
                           <Input
-                            type="text"
-                            inputMode="decimal"
+                            type="number"
                             size="sm"
                             autoFocus
-                            defaultValue={microsToUnitsText(val)}
+                            defaultValue={val / 1_000_000}
                             aria-label={t('forecastList.cellLabel', '{{category}} for {{period}}', {
                               category: CATEGORY_LABELS[cat],
                               period: row.period,
@@ -323,7 +328,7 @@ export function ForecastList({
                                   )} — ${readOnlyHint}`
                             }
                           >
-                            {formatForecastAmount(val, row.currencies[cat])}
+                            {formatMoneyMicros(val, 'EUR')}
                           </button>
                         )}
                       </div>
@@ -333,7 +338,10 @@ export function ForecastList({
                 <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                   <span className="text-xs font-semibold text-[var(--fg-primary)]">
                     {t('forecastList.totalLabel', 'Total:')}{' '}
-                    {formatForecastRowTotal(row)}
+                    {formatMoneyMicros(
+                      row.pipeline + row.bestCase + row.commit + row.closed,
+                      'EUR',
+                    )}
                   </span>
                   <button
                     type="button"

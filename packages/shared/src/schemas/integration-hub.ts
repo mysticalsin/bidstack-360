@@ -18,6 +18,12 @@ export const EmailRecipient = z.object({
 });
 export type EmailRecipient = z.infer<typeof EmailRecipient>;
 
+/** Addresses as captured from a provider: may be empty or an Exchange internal address. */
+const CapturedRecipient = z.object({
+  email: z.string(),
+  name: z.string().optional(),
+});
+
 export const SendEmailRequest = z.object({
   to: z.array(EmailRecipient).min(1).max(50),
   cc: z.array(EmailRecipient).max(20).optional().default([]),
@@ -43,9 +49,9 @@ export const EmailMessageDto = z.object({
   provider: z.enum(['GMAIL', 'OUTLOOK']),
   externalMessageId: z.string(),
   threadId: z.string().nullable(),
-  fromEmail: z.string().email(),
-  toEmails: z.array(EmailRecipient),
-  ccEmails: z.array(EmailRecipient),
+  fromEmail: z.string(),
+  toEmails: z.array(CapturedRecipient),
+  ccEmails: z.array(CapturedRecipient),
   subject: z.string(),
   bodyText: z.string().nullable(),
   isOutbound: z.boolean(),
@@ -55,6 +61,9 @@ export const EmailMessageDto = z.object({
   clickedAt: z.string().datetime().nullable(),
   entityType: z.string().nullable(),
   entityId: z.string().uuid().nullable(),
+  contactId: z.string().uuid().nullable().optional(),
+  companyId: z.string().uuid().nullable().optional(),
+  opportunityId: z.string().uuid().nullable().optional(),
   createdAt: z.string().datetime(),
 });
 export type EmailMessageDto = z.infer<typeof EmailMessageDto>;
@@ -65,6 +74,52 @@ export const EmailListResponse = z.object({
   hasMore: z.boolean(),
 });
 export type EmailListResponse = z.infer<typeof EmailListResponse>;
+
+/** One message of a thread view. bodyHtml is raw provider HTML: sanitize before rendering. */
+export const EmailThreadMessageDto = EmailMessageDto.extend({
+  bodyHtml: z.string().nullable(),
+});
+export type EmailThreadMessageDto = z.infer<typeof EmailThreadMessageDto>;
+
+export const EmailThreadResponse = z.object({
+  threadId: z.string(),
+  subject: z.string(),
+  messages: z.array(EmailThreadMessageDto),
+});
+export type EmailThreadResponse = z.infer<typeof EmailThreadResponse>;
+
+/** Drafts live in Polo only. Nothing here reaches the mail provider. */
+export const CreateEmailDraftRequest = z.object({
+  to: z.array(EmailRecipient).min(1).max(50),
+  cc: z.array(EmailRecipient).max(50).optional(),
+  subject: z.string().max(998),
+  text: z.string().max(100_000).optional(),
+  threadId: z.string().max(256).optional(),
+  contactId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
+  opportunityId: z.string().uuid().optional(),
+  clientRequestId: z.string().min(8).max(64),
+});
+export type CreateEmailDraftRequest = z.infer<typeof CreateEmailDraftRequest>;
+
+export const EmailDraftDto = z.object({
+  id: z.string().uuid(),
+  status: z.literal('draft'),
+  to: z.array(EmailRecipient),
+  cc: z.array(EmailRecipient),
+  subject: z.string(),
+  text: z.string().nullable(),
+  threadId: z.string().nullable(),
+  contactId: z.string().uuid().nullable(),
+  companyId: z.string().uuid().nullable(),
+  opportunityId: z.string().uuid().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type EmailDraftDto = z.infer<typeof EmailDraftDto>;
+
+export const EmailDraftListResponse = z.object({ items: z.array(EmailDraftDto) });
+export type EmailDraftListResponse = z.infer<typeof EmailDraftListResponse>;
 
 // ─── Integration status (used on IntegrationsPage) ────────────────────────
 

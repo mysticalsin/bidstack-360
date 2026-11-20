@@ -20,7 +20,10 @@ export function useForecasts(period?: string) {
     queryFn: ({ signal }) => {
       const params = new URLSearchParams();
       if (period) params.set('period', period);
-      return api<{ items: Forecast[] }>(`/api/forecasts?${params.toString()}`, { signal });
+      return api<{ items: Forecast[]; pageContinues?: boolean }>(
+        `/api/forecasts?${params.toString()}`,
+        { signal },
+      );
     },
   });
 }
@@ -31,7 +34,7 @@ export function useCreateForecast() {
     mutationFn: (body: {
       period: string;
       category: Forecast['category'];
-      amountMicros: string | number;
+      amountMicros: number;
       currency?: string;
       note?: string;
       // Target a specific owner's row (the grid edits org-wide rows). Omit to

@@ -27,11 +27,16 @@ const NAMES = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot'];
 /** A body row, as opposed to the single full-width empty/skeleton row. */
 const DATA_ROWS = '[data-slot="table-body"] tr:not(:has(td[colspan]))';
 
+function proposalsApiUrl(path: string): string {
+  const base = (process.env.E2E_API_URL ?? '').replace(/\/$/, '');
+  return `${base}${path}`;
+}
+
 async function seedProposals(page: Page, stamp: string): Promise<SeededProposal[]> {
   const created: SeededProposal[] = [];
   for (const [index, label] of NAMES.entries()) {
-    const res = await page.request.post('/api/v1/proposals', {
-      // Every other row is left without a deadline on purpose — the em-dash
+    const res = await page.request.post(proposalsApiUrl('/api/v1/proposals'), {
+      // Every other row is left without a deadline on purpose - the em-dash
       // assertion below needs a genuinely null cell to look at.
       data: {
         name: `${stamp} ${label}`,
@@ -48,7 +53,9 @@ async function seedProposals(page: Page, stamp: string): Promise<SeededProposal[
 
 async function cleanup(page: Page, created: SeededProposal[]): Promise<void> {
   for (const proposal of created) {
-    await page.request.delete(`/api/v1/proposals/${proposal.id}`, { timeout: 15_000 });
+    await page.request
+      .delete(proposalsApiUrl(`/api/v1/proposals/${proposal.id}`), { timeout: 5_000 })
+      .catch(() => undefined);
   }
 }
 
@@ -57,10 +64,32 @@ function firstRowName(page: Page) {
   return page.locator(DATA_ROWS).first().locator('td').first();
 }
 
+/** The Quick-actions FAB used to sit on Proposals Next. A force-click would
+ *  hide that from CI; real users cannot force-click. Fail if the discs overlap. */
+async function expectNextClearOfQuickActions(page: Page) {
+  const next = page
+    .getByRole('navigation', { name: /pagination/i })
+    .getByRole('button', { name: /^next$/i });
+  const fab = page.getByRole('button', { name: /^quick actions$/i });
+  await next.scrollIntoViewIfNeeded();
+  const nextBox = await next.boundingBox();
+  const fabBox = await fab.boundingBox();
+  expect(nextBox, 'pagination Next must be on screen').toBeTruthy();
+  expect(fabBox, 'Quick actions must be on screen').toBeTruthy();
+  if (!nextBox || !fabBox) return;
+  const overlap =
+    nextBox.x < fabBox.x + fabBox.width &&
+    nextBox.x + nextBox.width > fabBox.x &&
+    nextBox.y < fabBox.y + fabBox.height &&
+    nextBox.y + nextBox.height > fabBox.y;
+  expect(overlap, 'Quick-actions FAB must not cover pagination Next').toBe(false);
+}
+
 test('proposals view round-trips search, sort and page through the URL', async ({
   page,
   gotoAndWait,
 }) => {
+  test.setTimeout(90_000);
   const stamp = `E2ERT${Date.now()}`;
   const created = await seedProposals(page, stamp);
 
@@ -87,7 +116,11 @@ test('proposals view round-trips search, sort and page through the URL', async (
     // (3) Pagination pushes history, so Back walks pages (url-param-audit §6).
     await page.goto(listUrl, { waitUntil: 'load' });
     await expect(firstRowName(page)).toHaveText(`${stamp} Alpha`, { timeout: 20_000 });
-    await page.getByRole('button', { name: 'Next' }).click();
+    await expectNextClearOfQuickActions(page);
+    await page
+      .getByRole('navigation', { name: /pagination/i })
+      .getByRole('button', { name: /^next$/i })
+      .click();
     await expect(page).toHaveURL(/[?&]page=2\b/, { timeout: 10_000 });
     await expect(page.locator(DATA_ROWS)).toHaveCount(1);
     await expect(firstRowName(page)).toHaveText(`${stamp} Foxtrot`);
@@ -110,6 +143,7 @@ test('the proposals table body never goes empty during a page transition', async
   page,
   gotoAndWait,
 }) => {
+  test.setTimeout(90_000);
   const stamp = `E2EBLANK${Date.now()}`;
   const created = await seedProposals(page, stamp);
 
@@ -136,9 +170,11 @@ test('the proposals table body never goes empty during a page transition', async
       scope.__blankTimer = window.setInterval(sample, 16);
     });
 
-    await page.getByRole('button', { name: 'Next' }).click();
+    const pager = page.getByRole('navigation', { name: /pagination/i });
+    await expectNextClearOfQuickActions(page);
+    await pager.getByRole('button', { name: /^next$/i }).click();
     await expect(page.locator(DATA_ROWS)).toHaveCount(1, { timeout: 10_000 });
-    await page.getByRole('button', { name: 'Previous' }).click();
+    await pager.getByRole('button', { name: /^previous$/i }).click();
     await expect(page.locator(DATA_ROWS)).toHaveCount(5, { timeout: 10_000 });
 
     const blankFrames = await page.evaluate(() => {

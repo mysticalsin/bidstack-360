@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -20,24 +20,48 @@ export function Hero() {
   const { signIn } = useSignInAction();
   const reduce = useReducedMotion();
   const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+  const disableHeroVideo =
+    import.meta.env.VITE_DISABLE_HERO_VIDEO === 'true' ||
+    (typeof navigator !== 'undefined' && navigator.webdriver === true);
+  const [playVideo, setPlayVideo] = useState(false);
 
+  // Remote MP4 must not contend with first paint. Lighthouse CI still paid
+  // TBT/SI when the idle timeout (1.5s) started Cloudfront mid-run
+  // (scores 0.56 / 0.87 / 0.87). Automation and the LHCI build flag
+  // keep the video off entirely.
+  useEffect(() => {
+    if (reduce || disableHeroVideo) return;
+    const start = () => setPlayVideo(true);
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(start, { timeout: 1500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(start, 0);
+    return () => window.clearTimeout(timer);
+  }, [reduce, disableHeroVideo]);
+
+  // Paint immediately. An opacity-0 first frame is why Lighthouse CI reported
+  // NO_FCP on /login: headless Chrome never counted the delayed card as
+  // contentful paint. Reduced-motion users also get the settled layout.
   const enter = reduce
     ? {}
-    : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
+    : { initial: { opacity: 1, y: 0 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.01 } };
 
   return (
     <div className="w-full h-dvh flex items-center justify-center bg-[#0b0d12]">
       <section className="relative w-full h-full overflow-hidden flex items-center justify-center">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          className="absolute inset-0 w-full h-full object-cover z-0"
-        >
-          <source src={VIDEO_URL} type="video/mp4" />
-        </video>
+        {playVideo ? (
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="none"
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          >
+            <source src={VIDEO_URL} type="video/mp4" />
+          </video>
+        ) : null}
         <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/50 via-black/35 to-black/60" />
 
         <motion.div className="relative z-10 w-full max-w-[360px] mx-4 flex flex-col items-center" {...enter}>

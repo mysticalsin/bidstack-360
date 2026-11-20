@@ -3,7 +3,7 @@
 // writers). Mapping values sent to start-csv are these `key`s (or null to skip
 // a source column).
 
-export type ImportEntity = 'company' | 'contact' | 'lead' | 'opportunity';
+export type ImportEntity = 'company' | 'contact' | 'lead' | 'opportunity' | 'financial';
 
 export interface TargetField {
   key: string;
@@ -16,6 +16,7 @@ export const IMPORT_ENTITIES: { value: ImportEntity; label: string }[] = [
   { value: 'contact', label: 'Contacts' },
   { value: 'lead', label: 'Leads' },
   { value: 'opportunity', label: 'Opportunities / Deals' },
+  { value: 'financial', label: 'Account financials' },
 ];
 
 export const TARGET_FIELDS: Record<ImportEntity, TargetField[]> = {
@@ -54,6 +55,17 @@ export const TARGET_FIELDS: Record<ImportEntity, TargetField[]> = {
     { key: 'opportunity.stage', label: 'Stage' },
     { key: 'opportunity.probability', label: 'Probability (%)' },
     { key: 'opportunity.closeDate', label: 'Close date' },
+  ],
+  financial: [
+    { key: 'financial.companyName', label: 'Account name', required: true },
+    { key: 'financial.periodEnd', label: 'Period end (YYYY-MM-DD)', required: true },
+    { key: 'financial.currency', label: 'Currency', required: true },
+    { key: 'financial.revenue', label: 'Revenue (amount)' },
+    { key: 'financial.operatingIncome', label: 'Operating income' },
+    { key: 'financial.netIncome', label: 'Net income' },
+    { key: 'financial.periodType', label: 'Period type (FY or Q)' },
+    { key: 'financial.fiscalYear', label: 'Fiscal year' },
+    { key: 'financial.periodStart', label: 'Period start (YYYY-MM-DD)' },
   ],
 };
 

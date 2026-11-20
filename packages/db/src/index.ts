@@ -9,7 +9,8 @@
 // Default is false for backward compatibility with existing plaintext rows.
 // Runbook: docs/security/pii-field-encryption.md
 
-import { PrismaClient } from '../generated/client/index.js';
+import { Prisma, PrismaClient } from '../generated/client/index.js';
+import { appDatabaseUrl, ownerDatabaseUrl } from './database-url.js';
 import { makeAuditImmutabilityMiddleware } from './middleware/audit-immutability.js';
 import { isPiiEncryptionEnabled, makePiiMiddleware } from './middleware/pii-encryption.js';
 import { makeSoftDeleteMiddleware } from './middleware/soft-delete.js';
@@ -20,7 +21,7 @@ import {
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-function buildPrismaClient(): PrismaClient {
+function buildPrismaClient(databaseUrl?: string): PrismaClient {
   // Connection-pool sizing is NOT configured here on purpose. Prisma's canonical
   // knob is the connection string itself (`?connection_limit=N&pool_timeout=S`),
   // so the pool is owned by per-service env (DATABASE_URL) + the infra pooler,
@@ -34,6 +35,7 @@ function buildPrismaClient(): PrismaClient {
   //   sum(replicas * connection_limit) + worker < Postgres max_connections.
   // See DEPLOY.production.md §"Connection pool sizing" and .env.example.
   const client = new PrismaClient({
+    ...(databaseUrl ? { datasources: { db: { url: databaseUrl } } } : {}),
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 
@@ -73,17 +75,10 @@ function buildPrismaClient(): PrismaClient {
   // ai_invocations has a retention purge; AuditLog itself is not yet pruned —
   // tracked as follow-up. See audit-immutability.ts.)
   //
-  // WHY the test-env skip: integration tests seed AuditLog fixtures and must purge
-  // them in teardown via the ordinary client. The guard's behaviour is proven by
-  // audit-immutability.test.ts (it calls the factory directly), and real
-  // tamper-resistance is enforced in prod/dev here AND, as the recommended
-  // backstop, by a DB-level trigger + REVOKE (see audit-immutability.ts). Leaving
-  // the app-layer guard unconditional in test would force every suite onto a raw
-  // SQL purge path for no added safety, so we skip registration only under Vitest.
-  const isTestRuntime = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
-  if (!isTestRuntime) {
-    client.$use(makeAuditImmutabilityMiddleware());
-  }
+  // On in every runtime, including integration tests. A delete that only fails
+  // outside Vitest is how a start cleanup shipped a 500. Test teardown purges
+  // with raw SQL, which is the retention path and does not pass through $use.
+  client.$use(makeAuditImmutabilityMiddleware());
 
   return client;
 }
@@ -104,7 +99,36 @@ const globalForPrisma2 = globalForPrisma as unknown as { prisma?: PrismaClient }
  * const leads = await prisma.lead.findMany({ where: { orgId, deletedAt: null } });
  * ```
  */
-export const prisma = globalForPrisma2.prisma ?? buildPrismaClient();
+const configuredAppUrl = appDatabaseUrl();
+export const prisma = globalForPrisma2.prisma ?? buildPrismaClient(configuredAppUrl || undefined);
+
+let retentionClient: PrismaClient | undefined;
+
+export function retentionPrisma(): PrismaClient {
+  if (!retentionClient) {
+    const url = ownerDatabaseUrl();
+    if (!url) throw new Error('DATABASE_URL is required');
+    retentionClient = buildPrismaClient(url);
+  }
+  return retentionClient;
+}
+
+export async function closeRetentionPrisma(): Promise<void> {
+  if (!retentionClient) return;
+  const client = retentionClient;
+  retentionClient = undefined;
+  await client.$disconnect();
+}
+
+export async function deleteAuditRowsAsRetention(ids: readonly bigint[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const removed = await retentionPrisma().$executeRaw`
+    DELETE FROM audit_log WHERE id IN (${Prisma.join(ids)})
+  `;
+  return removed;
+}
+
+export { appDatabaseUrl, assertDistinctDatabaseLogins, databaseLogin, ownerDatabaseUrl } from './database-url.js';
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma2.prisma = prisma;
@@ -139,6 +163,7 @@ export type {
   ReleaseScore,
   Lead,
   TenantExport,
+  DataSubjectRequest,
   SavedView,
   SavedViewEntity,
   KamConsultant,
@@ -147,6 +172,7 @@ export type {
   KamSessionDraft,
   KamHandoff,
   KamProspection,
+  AccessPolicyVersion,
 } from '../generated/client/index.js';
 
 // `Prisma` is exported as a value because we need its runtime classes
@@ -175,9 +201,22 @@ export {
   KamHandoffStatus,
 } from '../generated/client/index.js';
 
+// Lets integration tests build a client with the guard forced to `enforce`.
+export { makeTenantScopeGuardMiddleware };
+
 // Curated multi-tenant demo seeding — shared by the `db:seed:demo` CLI and the
 // runtime demo sign-in door, which populates a fresh per-visitor org on sign-in.
-export { seedOrgData, seedPeopleEvidence } from './seed-org-data.js';
+export { seedOrgData } from './seed-org-data.js';
+export {
+  WEBHOOK_OUTBOX_MAX_ATTEMPTS,
+  claimWebhookOutboxBatch,
+  markWebhookOutboxDispatched,
+  markWebhookOutboxFailed,
+  recordWebhookOutboxEvent,
+  webhookOutboxBackoffMs,
+  type WebhookOutboxClaimMode,
+  type WebhookOutboxRow,
+} from './webhook-outbox.js';
 export type { SeedOrgDataOptions } from './seed-org-data.js';
 
 // System RBAC seeding (roles + permission manifest, NO fixture data) — shared
@@ -185,3 +224,128 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
+export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
+
+// Account intelligence read model (slice 12), shared by the API, MCP and worker.
+export { loadCompanyIntel } from './company-intel-read.js';
+export type { CompanyIntelSnapshot } from './company-intel-read.js';
+
+// Open data technology stack refresh (slice 16), shared by the API and worker.
+export {
+  apolloOrgEnrichmentConfigured,
+  loadOpenTechCoverage,
+  normalizeEnrichmentName,
+  openTechNetworkEnabled,
+  refreshCompanyOpenTechStack,
+} from './open-tech-refresh.js';
+export type { ApolloFallbackDecision, OpenTechApolloJob, OpenTechRefreshResult } from './open-tech-refresh.js';
+// Inbound activity API + account activity aggregates. One service behind the
+// REST route (apps/api) and the MCP tools (apps/mcp-server).
+export {
+  ingestActivities,
+  ingestContentHash,
+  ingestDedupeKey,
+  normalizeIngestDomain,
+  type IngestActivitiesInput,
+  type IngestActor,
+} from './services/activity-ingest.js';
+export {
+  bucketActivitySummary,
+  getCompanyActivitySummary,
+  weekStartIn,
+} from './services/account-activity.js';
+// Synced meetings and emails as account activities (slice 20).
+export {
+  commsActivityKey,
+  createCommsActivityBridge,
+  syncCalendarEventActivity,
+  syncEmailMessageActivity,
+  type CommsBridgeDb,
+  type CommsBridgeResult,
+  type CommsCaptureMeta,
+  type CommsSkipReason,
+  type MeetingHints,
+} from './services/comms-activity.js';
+export { listAccountConversations } from './services/account-conversations.js';
+export {
+  digestAccountActivity,
+  onAccountActivityCreated,
+  runAccountActivityBatch,
+  subscribeAccountActivityCreated,
+  subscribeAccountActivityDigest,
+  type AccountActivityCreated,
+  type AccountActivityDigest,
+  type AccountActivityDigestListener,
+  type AccountActivityListener,
+} from './services/account-activity-events.js';
+// Teams chat import (slice 26): read-only Graph client and filing to accounts.
+export {
+  createTeamsGraphClient,
+  teamsPlainText,
+  TeamsConsentError,
+  TeamsGraphError,
+  TeamsNotFoundError,
+  TeamsThrottledError,
+  type TeamsChannel,
+  type TeamsChat,
+  type TeamsGraphClient,
+  type TeamsMember,
+  type TeamsMessage,
+  type TeamsTeam,
+} from './services/teams-graph.js';
+export {
+  createTeamsActivityService,
+  fileTeamsMessages,
+  filedTeamsMessageIds,
+  loadTeamsThread,
+  suggestTeamsAccounts,
+  teamsActivityKey,
+  teamsThreadKey,
+  teamsThreadTitle,
+  type FileTeamsMessagesInput,
+  type FileTeamsMessagesResult,
+  type LoadedTeamsThread,
+  type TeamsActivityDb,
+  type TeamsCaptureMeta,
+} from './services/teams-activity.js';
+
+// Agreement ingest staging (slice 13a), shared by the REST route and MCP.
+export {
+  AgreementStageError,
+  INGEST_ITEM_SELECT,
+  serializeIngestItem,
+  stageAgreementIngest,
+} from './agreements/stage.js';
+export { companyScopeWhere, loadAccountActivityLines, loadRelationshipMap, loadWhitespaceFlags } from './msa-whitespace/index.js';
+export type { LoadWhitespaceOptions, ScopeActor } from './msa-whitespace/index.js';
+export type {
+  IngestActor as AgreementIngestActor,
+  StageAgreementInput,
+  StageAgreementResult,
+} from './agreements/stage.js';
+// GDPR data subject export / erase and retention per data class (compliance pack).
+export * from './compliance/index.js';
+export {
+  intelConnections,
+  loadIntelSummaryInput,
+  markImportBatchCompany,
+  openImportBatch,
+  parseIntelSummary,
+  pruneImportBatches,
+  readCompanyIntelSummaries,
+  readImportBatches,
+  recomputeCompanyIntelSummary,
+} from './company-intel-summary.js';
+export {
+  countPartnerEngagements,
+  isInternalPartnerRow,
+  loadOrgFirmCatalog,
+  loadPartnerEvidenceRows,
+  loadPartnerRun,
+  ownedPartnerRowIds,
+  prunePartnerEvidence,
+  savePartnerEvidence,
+  scanInternalPartnerEvidence,
+  toPartnerEvidence,
+} from './consulting-partners.js';
+export type { PartnerEvidenceRow, PartnerSaveResult } from './consulting-partners.js';

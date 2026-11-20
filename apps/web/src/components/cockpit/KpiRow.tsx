@@ -3,20 +3,24 @@ import { memo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { SourceChip } from '@/components/figures/SourcedFigure';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
+import { beatsProvider, figureText, useSourcedFigures } from '@/hooks/useSourcedFigures';
 import { api } from '@/lib/api';
 import { springSnap, staggerChild, staggerParent } from '@/lib/motion';
 import { GlassCard } from '@/components/ui/GlassCard';
 
-import type { AccountCockpitSnapshot, CockpitKpi } from '@bidstack/shared';
+import type { AccountCockpitSnapshot, CockpitKpi, KeyNumber } from '@bidstack/shared';
 
 import { KPI_TONE_BG, KPI_TONE_FG, iconForKpi } from './_tokens';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
 }
+
+type SourcedByField = Record<'annualRevenueMicros' | 'employeeCount', KeyNumber | null>;
 
 // The account view never mixes its two data worlds: Apollo-sourced External
 // Intelligence renders apart from Internal Data (ABC / Opportunity
@@ -27,6 +31,8 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
   const external = cockpit.kpis.filter((k) => k.block === 'external');
   const internal = cockpit.kpis.filter((k) => k.block !== 'external');
   const companyOverrideKey = cockpit.company.name;
+  const sourced = useSourcedFigures(cockpit.company.id);
+  const figures: SourcedByField = { annualRevenueMicros: sourced.revenue, employeeCount: sourced.employees };
   const lastSynced = cockpit.externalLastSyncedAt
     ? cockpit.externalLastSyncedAt.slice(0, 10)
     : null;
@@ -42,6 +48,7 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
         }
         kpis={external}
         companyKey={companyOverrideKey}
+        figures={figures}
         editable
       />
       <KpiBlock
@@ -49,6 +56,7 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
         caption={t('kpiRow.internalCaption', 'ABC / Opportunity Management — projects, deals, outcomes')}
         kpis={internal}
         companyKey={companyOverrideKey}
+        figures={figures}
       />
     </section>
   );
@@ -59,12 +67,14 @@ function KpiBlock({
   caption,
   kpis,
   companyKey,
+  figures,
   editable = false,
 }: {
   title: string;
   caption: string;
   kpis: CockpitKpi[];
   companyKey: string;
+  figures: SourcedByField;
   editable?: boolean;
 }) {
   const { t } = useTranslation('crm');
@@ -86,7 +96,11 @@ function KpiBlock({
         <span className="text-[11px] text-[var(--fg-tertiary)]">{caption}</span>
       </div>
       <div className={`kpi-grid ${colsClass}`}>
-        {kpis.map((kpi) => (
+        {kpis.map((kpi) => {
+          const figure = kpi.fieldKey === 'annualRevenueMicros' || kpi.fieldKey === 'employeeCount' ? figures[kpi.fieldKey] : null;
+          const figureValue = figureText(figure);
+          const sourcedValue = figureValue && (kpi.sourceState === 'missing' || beatsProvider(figure)) ? figureValue : null;
+          return (
           <GlassCard
             key={kpi.label}
             className="flex flex-wrap gap-3"
@@ -105,9 +119,9 @@ function KpiBlock({
             <div className="kpi-text">
               <div className="kpi-label">{kpi.label}</div>
               <div className="kpi-value">
-                <KpiValue raw={kpi.value} reduced={reduced} />
+                <KpiValue raw={sourcedValue ?? kpi.value} reduced={reduced} />
               </div>
-              {kpi.detail ? <div className="kpi-sub">{kpi.detail}</div> : null}
+              {kpi.detail && !(sourcedValue && kpi.sourceState === 'missing') ? <div className="kpi-sub">{kpi.detail}</div> : null}
             </div>
             <div
               style={{
@@ -119,17 +133,22 @@ function KpiBlock({
                 gap: 2,
               }}
             >
-              <SourceBadge
-                label={kpi.overridden ? t('kpiRow.manuallyOverridden', 'Manually overridden') : (kpi.sourceLabel ?? t('kpiRow.internal', 'Internal'))}
-                state={kpi.sourceState ?? 'crm'}
-                hint={kpi.sourceHint ?? kpi.detail ?? t('kpiRow.internalDataHint', 'Polo PreSales internal data')}
-              />
+              {sourcedValue && figure?.provenance ? (
+                <SourceChip p={figure.provenance} testId={`kpi-chip-${kpi.fieldKey}`} />
+              ) : (
+                <SourceBadge
+                  label={kpi.overridden ? t('kpiRow.manuallyOverridden', 'Manually overridden') : (kpi.sourceLabel ?? t('kpiRow.internal', 'Internal'))}
+                  state={kpi.sourceState ?? 'crm'}
+                  hint={kpi.sourceHint ?? kpi.detail ?? t('kpiRow.internalDataHint', 'Polo PreSales internal data')}
+                />
+              )}
               {(editable || kpi.overridden) && kpi.fieldKey ? (
                 <FieldOverrideEditor kpi={kpi} companyKey={companyKey} />
               ) : null}
             </div>
           </GlassCard>
-        ))}
+          );
+        })}
       </div>
     </motion.section>
   );

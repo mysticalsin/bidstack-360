@@ -117,6 +117,26 @@ describe('notifications routes', () => {
     expect(ids).not.toContain(read.id);
   });
 
+  t('unreadOnly=false returns read notifications too; junk values are rejected', async () => {
+    const read = await prisma.notification.create({
+      data: {
+        orgId: orgId!,
+        userId: stubUserId!,
+        type: 'system',
+        title: `${TITLE_TAG} read-visible`,
+        readAt: new Date(),
+      },
+    });
+
+    const res = await server.inject({ method: 'GET', url: '/api/notifications?unreadOnly=false' });
+    expect(res.statusCode).toBe(200);
+    const ids = (res.json() as { items: { id: string }[] }).items.map((n) => n.id);
+    expect(ids).toContain(read.id);
+
+    const junk = await server.inject({ method: 'GET', url: '/api/notifications?unreadOnly=nope' });
+    expect(junk.statusCode).toBe(400);
+  });
+
   t('read-all clears every unread notification for the caller', async () => {
     await prisma.notification.create({
       data: { orgId: orgId!, userId: stubUserId!, type: 'system', title: `${TITLE_TAG} bulk` },

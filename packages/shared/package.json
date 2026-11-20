@@ -26,6 +26,10 @@
       "types": "./dist/server/index.d.ts",
       "default": "./dist/server/index.js"
     },
+    "./public-sector": {
+      "types": "./dist/public-sector/index.d.ts",
+      "default": "./dist/public-sector/index.js"
+    },
     "./llm": {
       "types": "./dist/llm/index.d.ts",
       "default": "./dist/llm/index.js"

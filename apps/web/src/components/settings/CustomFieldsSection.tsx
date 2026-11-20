@@ -12,6 +12,7 @@ import {
   useDeleteCustomFieldDefinition,
 } from '@/hooks/useCustomFields';
 import type { EntityType, FieldType } from '@bidstack/shared';
+import { customFieldListCaption } from './custom-field-list-caption';
 
 const ENTITY_TYPES: { value: EntityType; label: string }[] = [
   { value: 'company', label: 'Companies' },
@@ -51,7 +52,14 @@ export function CustomFieldsSection() {
     <Card>
       <SectionHeader
         title={t('customFields.heading', 'Custom Fields')}
-        caption={t('customFields.caption', 'Define extra fields for each entity type.')}
+        caption={
+          defs.data?.pageContinues
+            ? `${t(
+                'customFields.caption',
+                'Define extra fields for each entity type.',
+              )} ${customFieldListCaption(defs.data.items.length, true)}`
+            : t('customFields.caption', 'Define extra fields for each entity type.')
+        }
       />
       <div className="p-5 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -111,7 +119,9 @@ export function CustomFieldsSection() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-[var(--fg-primary)]">{d.label}</span>
                     <Badge tone="gray">{d.fieldType}</Badge>
-                    {d.required && <Badge tone="tomato">{t('customFields.required', 'Required')}</Badge>}
+                    {d.required && (
+                      <Badge tone="tomato">{t('customFields.required', 'Required')}</Badge>
+                    )}
                   </div>
                   <div className="text-xs text-[var(--fg-tertiary)]">
                     {t('customFields.meta', 'Key: {{fieldKey}} · Order: {{orderIndex}}', {
@@ -278,7 +288,9 @@ function FieldForm({
           {t('customFields.form.cancel', 'Cancel')}
         </button>
         <button type="submit" className="btn btn-primary btn-sm" disabled={isPending}>
-          {isPending ? t('customFields.form.saving', 'Saving…') : t('customFields.form.save', 'Save')}
+          {isPending
+            ? t('customFields.form.saving', 'Saving…')
+            : t('customFields.form.save', 'Save')}
         </button>
       </div>
     </form>

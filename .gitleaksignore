@@ -1,0 +1,2 @@
+# RFC 6455 sample Sec-WebSocket-Key ("the sample nonce") in a proxy test, not a credential.
+67ac0d0290c2a259ec04b4f98b6b72981ea74c68:apps/polo-preview/src/container-proxy.test.ts:generic-api-key:91

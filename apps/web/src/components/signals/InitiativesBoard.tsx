@@ -12,6 +12,7 @@ import type { Initiative } from '@bidstack/shared';
 import { useAccountInitiatives } from '@/hooks/useAccountSignals';
 
 import { noDash, sourceLabel } from './category';
+import { initiativeEvidenceLabel, shownInitiativeEvidence } from './initiative-evidence-caption';
 
 const TOP = 4;
 const CONF_LABEL: Record<Initiative['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
@@ -40,8 +41,9 @@ function Confidence({ level }: { level: Initiative['confidence'] }) {
 function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
   const [open, setOpen] = useState(false);
   const id = useId();
+  const page = shownInitiativeEvidence(it.evidence, it.evidenceContinues);
   const byKind = new Map<string, number>();
-  for (const e of it.evidence) byKind.set(e.kind, (byKind.get(e.kind) ?? 0) + 1);
+  for (const e of page.items) byKind.set(e.kind, (byKind.get(e.kind) ?? 0) + 1);
   return (
     <article className="sg-init sg-arrive" style={{ '--i': Math.min(i, 5) } as React.CSSProperties} aria-labelledby={`${id}-t`}>
       <div className="sg-init-top">
@@ -66,11 +68,11 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
         )}
       </div>
       <button type="button" className="sg-link" aria-expanded={open} aria-controls={`${id}-ev`} onClick={() => setOpen((v) => !v)}>
-        {open ? 'Hide evidence' : `See ${it.evidence.length} evidence ${it.evidence.length === 1 ? 'item' : 'items'}`}
+        {initiativeEvidenceLabel(page.items.length, page.pageContinues, open)}
         <ChevronDown size={14} strokeWidth={1.5} aria-hidden style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 200ms cubic-bezier(0.22,1,0.36,1)' }} />
       </button>
       <ul id={`${id}-ev`} className="sg-ev" hidden={!open}>
-        {it.evidence.map((e, n) => (
+        {page.items.map((e, n) => (
           <li key={`${e.kind}-${n}`}>
             {e.url && /^https?:\/\//.test(e.url) ? (
               <a href={e.url} target="_blank" rel="noreferrer">{noDash(e.title)} <ExternalLink size={12} strokeWidth={1.5} aria-hidden /></a>

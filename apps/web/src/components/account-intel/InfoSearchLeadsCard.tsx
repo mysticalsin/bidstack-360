@@ -1,7 +1,7 @@
 /**
  * InfoSearch call lists / lead intel for the open account (A6).
- * Shows live rows only when InfoSearch is connected. A preview payload is
- * not listed, so sample names never read as people on this account.
+ * Shows live data when INFOSEARCH_ENABLED is configured; otherwise the API
+ * returns clearly-labelled sample data so the section is never empty.
  */
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -50,7 +50,10 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
         title={t('infoSearchLeads.title', 'InfoSearch leads')}
         caption={
           preview
-            ? t('infoSearchLeads.captionPreview', 'InfoSearch is not connected for this workspace.')
+            ? t(
+                'infoSearchLeads.captionPreview',
+                'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists',
+              )
             : t(
                 'infoSearchLeads.captionLive',
                 'Call lists and lead intel for this account — pulled live from InfoSearch',
@@ -68,13 +71,6 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
               t('infoSearchLeads.errorMessage', 'Lead intel could not be loaded.')
             }
           />
-        ) : preview ? (
-          <p className="text-sm text-[var(--fg-secondary)]">
-            {t(
-              'infoSearchLeads.previewHidden',
-              'No live call list. Sample names are not shown on this account.',
-            )}
-          </p>
         ) : (leads.data?.items.length ?? 0) === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
             {t('infoSearchLeads.empty', 'No InfoSearch leads matched this account.')}
@@ -84,7 +80,10 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
             {leads.data!.items.map((lead) => (
               <li key={lead.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-[var(--fg-primary)]">
+                  <div
+                    className="truncate text-sm font-medium text-[var(--fg-primary)]"
+                    title={[lead.name, lead.title].filter(Boolean).join(', ')}
+                  >
                     {lead.name}
                     {lead.title ? (
                       <span className="ml-1.5 text-xs font-normal text-[var(--fg-tertiary)]">
@@ -92,7 +91,10 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
                       </span>
                     ) : null}
                   </div>
-                  <div className="truncate text-xs text-[var(--fg-tertiary)]">
+                  <div
+                    className="truncate text-xs text-[var(--fg-tertiary)]"
+                    title={[lead.company, lead.listName].filter(Boolean).join(' · ')}
+                  >
                     {[lead.company, lead.listName].filter(Boolean).join(' · ')}
                   </div>
                 </div>

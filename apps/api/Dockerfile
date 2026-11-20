@@ -43,7 +43,7 @@ RUN pnpm --filter @bidstack/shared build \
 # install pruned hoisted/undeclared deps (e.g. pino) that the compiled bundle
 # resolves at runtime, crashing the boot. Copying the proven tree eliminates
 # that whole class of failure. Larger image, but image size is not a concern
-# for the demo. Runs as root — acceptable for an isolated demo container.
+# for the demo. Run as a non-root user (Semgrep dockerfile.security.missing-user).
 FROM node:${NODE_VERSION} AS runtime
 ENV NODE_ENV=production
 ENV PNPM_HOME=/pnpm
@@ -51,8 +51,10 @@ ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 RUN apk add --no-cache openssl
 WORKDIR /app
-COPY --from=builder /app ./
+RUN addgroup -S bidstack && adduser -S -G bidstack bidstack
+COPY --chown=bidstack:bidstack --from=builder /app ./
 WORKDIR /app/apps/api
+USER bidstack
 EXPOSE 4000
 # Apply pending Prisma migrations against Railway's private Postgres (reachable
 # only from inside the container) then boot. `migrate deploy` is idempotent —

@@ -41,7 +41,7 @@ export const ServiceCaseFilter = z.object({
   priority: CasePriority.optional(),
   ownerId: z.string().uuid().optional(),
   search: z.string().max(100).optional(),
-  cursor: z.string().optional(),
+  cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 export type ServiceCaseFilter = z.infer<typeof ServiceCaseFilter>;

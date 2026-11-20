@@ -78,4 +78,26 @@ describe('ApiKeysSection', () => {
     expect(mcpTransport.checked).toBe(false);
     expect(mcpRead.checked).toBe(false);
   });
+
+  it('defaults new keys to read-only and not org-wide', () => {
+    // WHY: B2 default-deny. An unchecked org-wide box plus a checked
+    // read-only box is the only safe create-dialog starting point.
+    hookMocks.useApiKeys.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hookMocks.refetch,
+    });
+    hookMocks.useCreateApiKey.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    hookMocks.useRevokeApiKey.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+    render(<ApiKeysSection />);
+    fireEvent.click(screen.getByRole('button', { name: '+ New API key' }));
+
+    const readOnly = screen.getByRole('checkbox', { name: /^Read-only/ }) as HTMLInputElement;
+    const orgWide = screen.getByRole('checkbox', { name: /^Org-wide access/ }) as HTMLInputElement;
+    expect(readOnly.checked).toBe(true);
+    expect(orgWide.checked).toBe(false);
+  });
 });

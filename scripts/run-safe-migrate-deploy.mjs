@@ -26,9 +26,10 @@ function main() {
     DEFAULT_MAX_AGE_MINUTES,
   );
 
+  const databaseUrl = resolveMigrationDatabaseUrl(process.env, isProductionLike);
   const preflight = validateMigrationSafetyPreflight({
     backupProofPath: options.backupProofPath ?? process.env.BIDSTACK_MIGRATE_BACKUP_PROOF,
-    databaseUrl: process.env.DATABASE_URL,
+    databaseUrl,
     deployEnv,
     isProductionLike,
     maxAgeMinutes,
@@ -47,16 +48,88 @@ function main() {
   const command = buildMigrateCommand(options);
   console.log(`[safe-migrate] running ${command.displayName}; backup gate=${preflight.status}`);
 
-  const result = runMigrateCommand(command);
+  const result = runMigrateCommand(command, databaseUrl);
 
   if (result.error) {
     throw new Error(`[safe-migrate] failed to start migrate command: ${result.error.message}`);
   }
 
-  process.exit(result.status ?? 1);
+  if ((result.status ?? 1) !== 0) {
+    process.exit(result.status ?? 1);
+  }
+
+  if (isProductionLike) {
+    setAppRolePassword(options, databaseUrl);
+  }
+
+  process.exit(0);
 }
 
-function runMigrateCommand(command) {
+function databaseLogin(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'postgresql:' && url.protocol !== 'postgres:') return '';
+    return decodeURIComponent(url.username);
+  } catch {
+    return '';
+  }
+}
+
+function resolveMigrationDatabaseUrl(env, isProductionLike) {
+  const owner = (env.DATABASE_URL_OWNER ?? '').trim();
+  const current = (env.DATABASE_URL ?? '').trim();
+  if (isProductionLike && !owner) {
+    throw new Error(
+      '[safe-migrate] DATABASE_URL_OWNER is required for staging/production migrations.',
+    );
+  }
+  const chosen = owner || current;
+  if (!chosen) {
+    throw new Error(
+      '[safe-migrate] DATABASE_URL is required for staging/production migration backup verification.',
+    );
+  }
+  const app = (env.DATABASE_URL_APP ?? '').trim();
+  const appLogin = app ? databaseLogin(app) : '';
+  const ownerLogin = databaseLogin(chosen);
+  if (appLogin && ownerLogin && appLogin === ownerLogin) {
+    throw new Error('[safe-migrate] migrations must use the owner login, not the app role.');
+  }
+  return chosen;
+}
+
+function quoteLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function setAppRolePassword(options, databaseUrl) {
+  const password = process.env.BIDSTACK_APP_DB_PASSWORD ?? '';
+  if (!password) {
+    throw new Error(
+      '[safe-migrate] BIDSTACK_APP_DB_PASSWORD is required before the app role can log in.',
+    );
+  }
+  const schema = options.schema ?? 'packages/db/prisma/schema.prisma';
+  const usePrismaBin = Boolean(options.prismaBin);
+  const bin = usePrismaBin ? options.prismaBin : process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+  const args = usePrismaBin
+    ? ['db', 'execute', '--stdin', '--schema', schema]
+    : ['--filter', '@bidstack/db', 'exec', 'prisma', 'db', 'execute', '--stdin', '--schema', schema];
+  const sql = `ALTER ROLE app_role PASSWORD ${quoteLiteral(password)};\n`;
+  const result = spawnSync(bin, args, {
+    env: { ...process.env, DATABASE_URL: databaseUrl },
+    encoding: 'utf8',
+    input: sql,
+    shell: false,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if ((result.status ?? 1) !== 0) {
+    throw new Error('[safe-migrate] could not set the app role password.');
+  }
+  console.log('[safe-migrate] app role password set');
+}
+
+function runMigrateCommand(command, databaseUrl) {
   // Node >= 20.12 refuses to spawn .cmd shims (pnpm.cmd) without a shell
   // (CVE-2024-27980 fix throws EINVAL), so Windows must route through the
   // shell like write-a11y-evidence.mjs does. Quote shell args ourselves
@@ -66,7 +139,7 @@ function runMigrateCommand(command) {
     useShell ? quoteForCmdShell(command.bin) : command.bin,
     useShell ? command.args.map(quoteForCmdShell) : command.args,
     {
-      env: process.env,
+      env: { ...process.env, DATABASE_URL: databaseUrl },
       shell: useShell,
       stdio: 'inherit',
     },
@@ -560,7 +633,31 @@ function runSelftest() {
 
     assert(devPass.status === 'not-required', 'test env should not require proof');
 
-    console.log('[safe-migrate] selftest PASS (8/8)');
+    expectFailure(
+      'production migrate without owner url',
+      () => resolveMigrationDatabaseUrl({ DATABASE_URL: databaseUrl }, true),
+      'DATABASE_URL_OWNER is required',
+    );
+
+    const fixturePassword = 'fixture-password';
+    try {
+      resolveMigrationDatabaseUrl(
+        {
+          DATABASE_URL_APP: `postgresql://app_role:${fixturePassword}@db.example:5432/bidstack`,
+          DATABASE_URL_OWNER: `postgresql://app_role:${fixturePassword}@db.example:5432/bidstack`,
+        },
+        true,
+      );
+      throw new Error('[safe-migrate] selftest accepted the app login for migrations');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('owner login')) throw error;
+      if (message.includes(fixturePassword)) {
+        throw new Error('[safe-migrate] selftest migrate error leaked a password');
+      }
+    }
+
+    console.log('[safe-migrate] selftest PASS (9/9)');
   } finally {
     rmSync(root, { force: true, recursive: true });
   }

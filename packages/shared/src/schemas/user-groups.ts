@@ -62,5 +62,7 @@ export type UserGroupMemberAdd = z.infer<typeof UserGroupMemberAdd>;
 
 export const UserGroupList = z.object({
   items: z.array(UserGroup),
+  /** True when one group past this page was loaded and dropped. Not a total. */
+  pageContinues: z.boolean(),
 });
 export type UserGroupList = z.infer<typeof UserGroupList>;

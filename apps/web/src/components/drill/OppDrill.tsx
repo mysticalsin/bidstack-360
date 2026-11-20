@@ -4,6 +4,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { closeMonthLabel } from '@/components/charts/bid-chart-data';
+
 import { DrillSheet, type DrillCrumb } from './DrillSheet';
 import { filterOpps, type OppDrillFilter } from './filterOpps';
 import { closeDate, fmtCompact, OPEN_STAGES, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
@@ -41,10 +43,12 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
   }, [rows, f, q]);
   const maxStage = Math.max(1, ...byStage.map((s) => s.value));
 
-  const title = f.account ?? (f.stage ? stageText(f.stage) : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
+  const month = f.closeMonth ? closeMonthLabel(f.closeMonth) : null;
+  const title = f.account ?? (f.stage ? stageText(f.stage) : month ? `Closing ${month}` : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
   const trail: DrillCrumb[] = [
     { label: rootLabel, onSelect: onClose },
-    { label: STATUS_LABEL[status], onSelect: f.stage || f.account ? () => onFilterChange({ status, thisYear: f.thisYear }) : undefined },
+    { label: STATUS_LABEL[status], onSelect: f.stage || f.account || f.closeMonth ? () => onFilterChange({ status, thisYear: f.thisYear }) : undefined },
+    ...(month ? [{ label: month, onSelect: f.stage || f.account ? () => onFilterChange({ status, closeMonth: f.closeMonth }) : undefined }] : []),
     ...(f.stage ? [{ label: stageText(f.stage) }] : []),
     ...(f.account ? [{ label: f.account }] : []),
   ];

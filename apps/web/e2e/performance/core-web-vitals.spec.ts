@@ -42,7 +42,7 @@ const BUDGETS = {
 async function injectCwvObservers(page: Page): Promise<void> {
   await page.addInitScript(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).__cwvResults = { lcp: null, inp: null, cls: 0 };
+    (window as any).__cwvResults = { lcp: null, inp: null, cls: 0, shifts: [] };
 
     // LCP — last entry wins (largest contentful paint updates over time)
     const lcpObs = new PerformanceObserver((list) => {
@@ -64,6 +64,29 @@ async function injectCwvObservers(page: Page): Promise<void> {
           clsValue += (entry as any).value ?? 0;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__cwvResults.cls = clsValue;
+          const shift = entry as PerformanceEntry & {
+            value: number;
+            sources?: Array<{
+              node?: Node;
+              previousRect: DOMRectReadOnly;
+              currentRect: DOMRectReadOnly;
+            }>;
+          };
+          // Keep attribution in the report: a score alone cannot distinguish
+          // a late KPI row from fonts, banners, or animated column totals.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).__cwvResults.shifts.push({
+            time: shift.startTime,
+            value: shift.value,
+            sources: shift.sources?.map((source) => ({
+              node:
+                source.node instanceof Element
+                  ? `${source.node.tagName.toLowerCase()}.${source.node.className}`
+                  : source.node?.nodeName,
+              previousRect: source.previousRect.toJSON(),
+              currentRect: source.currentRect.toJSON(),
+            })),
+          });
         }
       }
     });
@@ -108,6 +131,7 @@ interface CwvResults {
   lcp: number | null;
   inp: number | null;
   cls: number;
+  shifts: unknown[];
 }
 
 type PerfMetricName = 'LCP' | 'CLS' | 'INP' | 'SPA_NAVIGATION';
@@ -119,7 +143,7 @@ interface PerfEvidence {
   unit: 'ms' | 'score';
   budget: number;
   headroomBudget?: number;
-  status: 'pass' | 'warning' | 'not-measured';
+  status: 'pass' | 'fail' | 'warning' | 'not-measured';
 }
 
 type PerfEvidenceRecord = PerfEvidence & { measuredAt: string };
@@ -255,16 +279,97 @@ for (const route of PERF_ROUTES) {
       });
     }
 
+    await testInfo.attach(`layout-shifts-${route.name}`, {
+      contentType: 'application/json',
+      body: Buffer.from(JSON.stringify(cwv.shifts, null, 2)),
+    });
+
     await attachPerfEvidence(testInfo, {
       route: route.name,
       metric: 'CLS',
       value: cwv.cls,
       unit: 'score',
       budget: BUDGETS.CLS,
-      status: 'pass',
+      status: cwv.cls > BUDGETS.CLS ? 'fail' : 'pass',
     });
 
     expect(cwv.cls).toBeLessThanOrEqual(BUDGETS.CLS);
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 720 },
+  { width: 390, height: 844 },
+]) {
+  test(`pipeline: loading KPI row reserves space at ${viewport.width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await injectCwvObservers(page);
+
+    // Reproduce the CI race deliberately: opportunities resolve while stage
+    // definitions are still pending, leaving the board skeleton on screen.
+    let releaseOpportunities!: () => void;
+    let releaseStages!: () => void;
+    const opportunitiesReady = new Promise<void>((resolve) => {
+      releaseOpportunities = resolve;
+    });
+    const stagesReady = new Promise<void>((resolve) => {
+      releaseStages = resolve;
+    });
+    await page.route(/\/api\/(?:v1\/)?opportunities\?/, async (route) => {
+      await opportunitiesReady;
+      await route.continue();
+    });
+    await page.route(/\/api\/(?:v1\/)?pipeline-stages$/, async (route) => {
+      await stagesReady;
+      await route.continue();
+    });
+
+    try {
+      await page.goto('/pipeline', { waitUntil: 'load' });
+      const main = page.getByRole('main');
+      const summary = main.locator('[data-tour="pipeline-kanban"]');
+      await expect(summary).toBeVisible();
+      await expect(summary.getByText('…', { exact: true })).toHaveCount(4);
+      const skeleton = main.locator('.bs-shimmer').first();
+      await expect(skeleton).toBeVisible();
+      // Allow the existing skeleton entrance transform to settle before
+      // comparing positions; API gates, not this delay, enforce the race.
+      await page.waitForTimeout(600);
+      const before = await skeleton.boundingBox();
+      expect(before).not.toBeNull();
+      const beforeData = await collectCwv(page);
+
+      const loaded = page.waitForResponse(
+        (response) => /\/api\/(?:v1\/)?opportunities\?/.test(response.url()) && response.ok(),
+      );
+      releaseOpportunities();
+      await loaded;
+      await expect(summary.getByText('…', { exact: true })).toHaveCount(0);
+      await expect(main.getByTestId('pipeline-column')).toHaveCount(0);
+      const after = await skeleton.boundingBox();
+      expect(after).not.toBeNull();
+      expect(
+        Math.abs(after!.y - before!.y),
+        'KPI data must not push the loading board down',
+      ).toBeLessThanOrEqual(1);
+
+      releaseStages();
+      await expect(main.getByTestId('pipeline-column').first()).toBeVisible();
+      await waitForPageIdle(page);
+      const cwv = await collectCwv(page);
+      await testInfo.attach('pipeline-loading-layout-shifts', {
+        contentType: 'application/json',
+        body: Buffer.from(JSON.stringify({ ...cwv, clsBeforeData: beforeData.cls }, null, 2)),
+      });
+      // This regression covers the pending-to-loaded transition at both
+      // widths. The existing route test above keeps the full-load CLS gate.
+      expect(cwv.cls - beforeData.cls).toBeLessThanOrEqual(BUDGETS.CLS);
+    } finally {
+      releaseOpportunities();
+      releaseStages();
+    }
   });
 }
 
@@ -323,7 +428,9 @@ test('dashboard: simulated interaction INP < 200ms', async ({ page }, testInfo) 
   expect(cwv.inp).toBeLessThanOrEqual(BUDGETS.INP_MS);
 });
 
-test('navigation: LCP stays under budget after client-side route change', async ({ page }, testInfo) => {
+test('navigation: LCP stays under budget after client-side route change', async ({
+  page,
+}, testInfo) => {
   // WHY: SPA navigation doesn't trigger a real page load; LCP resets on
   // soft nav. We measure paint time after a React Router push to catch
   // slow-loading route chunks.

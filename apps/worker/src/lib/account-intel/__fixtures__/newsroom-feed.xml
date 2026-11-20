@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Acme newsroom</title>
+    <link>https://www.acme.example/newsroom</link>
+    <item>
+      <title>Acme acquires Nordic payments specialist PayCo</title>
+      <link>https://www.acme.example/newsroom/acme-acquires-payco</link>
+      <pubDate>Mon, 26 Oct 2026 07:00:00 GMT</pubDate>
+      <description><![CDATA[Acme has signed an agreement to acquire PayCo to expand its payments platform in the Nordics.]]></description>
+    </item>
+    <item>
+      <title>Acme reports third-quarter results: revenue up 6%</title>
+      <link>https://www.acme.example/newsroom/q3-2026-results</link>
+      <pubDate>Thu, 22 Oct 2026 06:00:00 GMT</pubDate>
+      <description>Operating margin improved; the company reiterates full-year guidance and its cloud migration programme.</description>
+    </item>
+    <item>
+      <title>Acme launches AI assistant for business customers</title>
+      <link>https://www.acme.example/newsroom/ai-assistant</link>
+      <pubDate>Tue, 06 Oct 2026 09:00:00 GMT</pubDate>
+      <description>A generative AI assistant for invoicing and cash management.</description>
+    </item>
+  </channel>
+</rss>

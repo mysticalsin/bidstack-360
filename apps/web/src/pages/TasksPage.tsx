@@ -341,14 +341,6 @@ export function TasksPage() {
                     ? t('tasks.empty.headline', 'Nothing on the bid clock')
                     : t('tasks.empty.filteredTitle', 'No tasks match this filter')
                 }
-                message={
-                  filter === 'all'
-                    ? t(
-                        'tasks.empty.body',
-                        'Deadlines, follow-ups, and deliverables all land here. Add the next action on a live bid so nothing slips before submission day.',
-                      )
-                    : undefined
-                }
                 action={filter === 'all' && canWrite ? <CreateTaskDialog /> : null}
               />
             ) : sort === 'natural' ? (
@@ -438,7 +430,7 @@ function Chip({
         active
           ? tone === 'danger'
             ? 'border-[var(--danger)] bg-[var(--danger-tint)] text-[var(--danger)]'
-            : 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+            : 'border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
           : 'border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--fg-secondary)] hover:border-[var(--border-strong)]'
       }`}
     >

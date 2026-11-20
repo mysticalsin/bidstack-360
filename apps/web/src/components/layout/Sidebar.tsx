@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 import { useOpportunityCount } from '@/hooks/useOpportunities';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useTaskSummary } from '@/hooks/useTasks';
 import { relativeTime } from '@/lib/format';
 import { cn } from '@/lib/cn';
@@ -14,15 +15,13 @@ import { prefetchRoute } from '@/lib/prefetch';
 import { useAccountHistory, type AccountEntry } from '@/stores/accountHistory';
 import { useIsAdmin } from '@/lib/auth';
 import { useUiStore } from '@/stores/ui';
-import { useOnboardingStore } from '@/stores/onboarding';
 import { api } from '@/lib/api';
 import { useAppModules } from '@/hooks/useAppModules';
 import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
-  visibleNavSections,
+  NAV_SECTIONS,
   isNavItemVisible,
-  navBadgeCopy,
   type NavItem,
   type NavSection,
 } from './navConfig';
@@ -49,6 +48,8 @@ export function Sidebar() {
   const taskSummary = useTaskSummary();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggle = useUiStore((s) => s.toggleSidebar);
+  const reduced = useReducedMotion();
+  const [instant, setInstant] = useState(false);
   const isAdmin = useIsAdmin();
   const { t } = useTranslation('common');
   const { data: appModules } = useAppModules();
@@ -71,8 +72,7 @@ export function Sidebar() {
 
   // Hide module-gated items (agent-studio, Collaborate) unless enabled in
   // Settings → Modules; drop a section that ends up empty after filtering.
-  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
-  const sections = visibleNavSections(quickStartVisible).map((s) => ({
+  const sections = NAV_SECTIONS.map((s) => ({
     ...s,
     items: s.items.filter((it) => isNavItemVisible(it, appModules)),
   })).filter((s) => s.items.length > 0);
@@ -100,16 +100,24 @@ export function Sidebar() {
 
   const settings = isAdmin ? ADMIN_SETTINGS : MEMBER_SETTINGS;
 
+  const toggleFrom = (event: MouseEvent) => {
+    // detail 0 = Enter/Space (no pointer): resize at once, like the console pattern.
+    setInstant(event.detail === 0);
+    toggle();
+  };
+
   return (
     <TooltipProvider delayDuration={300} disableHoverableContent>
       <nav
         className={cn('sidebar', collapsed && 'is-collapsed')}
         aria-label="Primary navigation"
         data-tour="nav-sidebar"
+        // Read by `.app-shell:has(> .sidebar[data-motion='instant'])` to skip the width ease.
+        data-motion={reduced || instant ? 'instant' : 'animate'}
       >
         <button
           type="button"
-          onClick={toggle}
+          onClick={toggleFrom}
           className="sb-toggle"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
@@ -124,13 +132,13 @@ export function Sidebar() {
 
         <div className="sb-brand">
           <div className="sb-mark" aria-hidden>
-            <PoloPreSalesLogo variant="mark" title="" className="h-5 w-5" />
+            <PoloPreSalesLogo variant="mark" title="" className="h-6 w-auto" />
           </div>
           <div>
             <div className="sb-name">
               Polo PreSales
             </div>
-            <div className="sb-tag">Mantu · Bid &amp; presales</div>
+            <div className="sb-tag" title="Mantu · Bid &amp; presales">Mantu · Bid &amp; presales</div>
           </div>
         </div>
 
@@ -145,6 +153,7 @@ export function Sidebar() {
             section={section}
             badges={badges}
             collapsed={collapsed}
+            onExpand={toggleFrom}
           />
         ))}
 
@@ -206,10 +215,12 @@ function SidebarSection({
   section,
   badges,
   collapsed,
+  onExpand,
 }: {
   section: NavSection;
   badges: Badges;
   collapsed: boolean;
+  onExpand: (event: MouseEvent) => void;
 }) {
   const location = useLocation();
   const override = useUiStore((s) => s.collapsedSections[section.key]);
@@ -247,10 +258,7 @@ function SidebarSection({
           className="sb-item sb-parent-trigger"
           aria-label={sectionTitle}
           title={sectionTitle}
-          onClick={() => {
-            const toggleSidebar = useUiStore.getState().toggleSidebar;
-            toggleSidebar();
-          }}
+          onClick={onExpand}
         >
           <Icon name={section.icon} size={16} />
           {totalBadge > 0 && <span className="sb-badge-dot" />}
@@ -261,26 +269,10 @@ function SidebarSection({
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
-              const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
-              const badgePhrase =
-                badgeCopy && badge > 0
-                  ? t(badgeCopy.key, badgeCopy.fallback, { count: badge })
-                  : null;
-              const itemLabel = t(item.labelKey, item.label);
               return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className="sb-flyout-item"
-                  aria-label={badgePhrase ? `${itemLabel}, ${badgePhrase}` : itemLabel}
-                >
-                  <span>{itemLabel}</span>
-                  {badge > 0 && (
-                    <span className="sb-badge" title={badgePhrase ?? undefined}>
-                      {badge}
-                    </span>
-                  )}
+                <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
+                  <span>{t(item.labelKey, item.label)}</span>
+                  {badge > 0 && <span className="sb-badge">{badge}</span>}
                 </NavLink>
               );
             })}
@@ -353,10 +345,6 @@ function SidebarItem({
   const { t } = useTranslation('common');
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
-  const badgeCopy = item.badgeKey ? navBadgeCopy(item.badgeKey) : null;
-  const badgePhrase =
-    badgeCopy && badge > 0 ? t(badgeCopy.key, badgeCopy.fallback, { count: badge }) : null;
-  const accessibleName = badgePhrase ? `${label}, ${badgePhrase}` : label;
   const prefetch = () => prefetchRoute(item.to);
 
   const isActive = useMemo(() => {
@@ -385,19 +373,15 @@ function SidebarItem({
       end={item.end}
       aria-current={isActive ? 'page' : undefined}
       className={cn('sb-item', isActive && 'is-active')}
-      aria-label={accessibleName}
-      title={collapsed ? undefined : accessibleName}
+      aria-label={label}
+      title={collapsed ? undefined : label}
       onMouseEnter={prefetch}
       onFocus={prefetch}
       onTouchStart={prefetch}
     >
       <Icon name={item.icon} size={16} />
       <span>{label}</span>
-      {badge > 0 && (
-        <span className="sb-badge" title={badgePhrase ?? undefined}>
-          {badge}
-        </span>
-      )}
+      {badge > 0 && <span className="sb-badge">{badge}</span>}
     </NavLink>
   );
   // Tooltips only when the label is hidden (collapsed mode) — otherwise
@@ -441,6 +425,7 @@ function AccountShortcut({
     <NavLink
       to={`/accounts/${acc.slug}`}
       className="sb-item"
+      aria-label={acc.name}
       title={collapsed ? undefined : acc.name}
       onMouseEnter={prefetch}
       onFocus={prefetch}

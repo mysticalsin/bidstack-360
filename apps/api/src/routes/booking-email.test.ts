@@ -168,3 +168,30 @@ describe('escapeHtml', () => {
     expect(twice).toBe('A &amp;amp; B');
   });
 });
+
+// ─── Time zone ───────────────────────────────────────────────────────────────
+
+describe('booking time zone', () => {
+  it('shows the time in the attendee time zone, not UTC', () => {
+    const params = { ...BASE_PARAMS, timeZone: 'America/Toronto' };
+    const text = buildBookingConfirmationText(params);
+    // 14:00Z on 15 March 2025 is 10:00 EDT in Toronto.
+    expect(text).toContain('10:00 AM EDT');
+    expect(buildBookingConfirmationHtml(params)).toContain('10:00 AM EDT');
+  });
+
+  it('keeps the calendar date of the attendee time zone', () => {
+    const params = {
+      ...BASE_PARAMS,
+      startAt: new Date('2025-03-16T02:00:00Z'),
+      endAt: new Date('2025-03-16T02:30:00Z'),
+      timeZone: 'America/Toronto',
+    };
+    expect(buildBookingConfirmationText(params)).toContain('Saturday, March 15, 2025');
+  });
+
+  it('falls back to UTC for an unknown time zone', () => {
+    const text = buildBookingConfirmationText({ ...BASE_PARAMS, timeZone: 'Mars/Olympus' });
+    expect(text).toContain('2:00 PM UTC');
+  });
+});

@@ -32,66 +32,6 @@ function toBigIntMicros(micros: bigint | number): bigint {
  * micros) — nine orders of magnitude beyond where the naive
  * `Number(micros) / 1_000_000` starts corrupting values (~$9.007B).
  */
-/** en-US amount rounded to the cent in integer micros. No currency symbol. */
-export function formatMicrosAmount(micros: bigint | number): string {
-  const value = toBigIntMicros(micros);
-  const negative = value < 0n;
-  const abs = negative ? -value : value;
-  const cents = (abs + 5_000n) / 10_000n;
-  const units = cents / 100n;
-  const frac = cents % 100n;
-  const body = units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const text = frac === 0n ? body : `${body}.${frac.toString().padStart(2, '0')}`;
-  return negative ? `-${text}` : text;
-}
-
-/** Unit text with up to 6 decimal places. No rounding. */
-export function microsToUnitsText(micros: bigint | number | string): string {
-  const value = typeof micros === 'bigint' ? micros : BigInt(micros);
-  const whole = value / MICROS_PER_UNIT;
-  const frac = value % MICROS_PER_UNIT;
-  if (frac === 0n) return whole.toString();
-  return `${whole}.${frac.toString().padStart(6, '0').replace(/0+$/, '')}`;
-}
-
-/** Parse a unit amount into integer micros. Rejects more than 6 decimal places. */
-export function unitsTextToMicros(text: string): bigint | null {
-  const trimmed = text.trim().replace(/,/g, '').replace(/^\+/, '');
-  if (!/^\d+(\.\d{1,6})?$/.test(trimmed)) return null;
-  const [whole = '0', frac = ''] = trimmed.split('.');
-  const padded = (frac + '000000').slice(0, 6);
-  return BigInt(whole) * MICROS_PER_UNIT + BigInt(padded);
-}
-
-/**
- * Units to integer micros. A digit string keeps the remainder. A number is exact
- * when it is a safe integer of units. A fractional number is kept only while the
- * rounded micros still fit in a safe integer.
- */
-export function unitsToMicros(value: number | string): bigint | null {
-  if (typeof value === 'string') return unitsTextToMicros(value);
-  if (!Number.isFinite(value) || value < 0) return null;
-  if (Number.isSafeInteger(value)) return BigInt(value) * MICROS_PER_UNIT;
-  const rounded = Math.round(value * 1_000_000);
-  if (!Number.isSafeInteger(rounded) || rounded < 0) return null;
-  return BigInt(rounded);
-}
-
-/** A JS number only when every digit of the micros integer survives. */
-export function microsToSafeNumber(
-  micros: bigint | number | string | null | undefined,
-): number | null {
-  if (micros == null || micros === '') return null;
-  let value: bigint;
-  try {
-    value = typeof micros === 'bigint' ? micros : BigInt(micros);
-  } catch {
-    return null;
-  }
-  if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-  return Number(value);
-}
-
 export function microsToUnits(micros: bigint | number): number {
   const value = toBigIntMicros(micros);
   const whole = value / MICROS_PER_UNIT;
@@ -112,4 +52,55 @@ export function sumMicros(values: ReadonlyArray<bigint | number | null | undefin
     total += toBigIntMicros(value);
   }
   return total;
+}
+
+const UNITS_RE = /^-?(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+
+/**
+ * Converts a unit amount (dollars, euros, …) to integer micros.
+ *
+ * WHY a string parse: `BigInt(Math.round(units * 1_000_000))` multiplies in
+ * IEEE-754 first. Past ~$9.007B the product is not a safe integer, so the
+ * stored micros are already wrong. `toFixed(6)` (number input) or a decimal
+ * string (exact input) is split into whole + fraction, then combined with
+ * BigInt — the same whole/remainder split as `microsToUnits`, inverted.
+ */
+export function unitsToMicros(units: string | number): bigint {
+  const raw = typeof units === 'number' ? unitsToFixedMicrosString(units) : units.trim();
+  if (!UNITS_RE.test(raw)) {
+    throw new Error('Invalid money units');
+  }
+  const negative = raw.startsWith('-');
+  const unsigned = negative ? raw.slice(1) : raw;
+  const dot = unsigned.indexOf('.');
+  const wholePart = dot === -1 ? unsigned : unsigned.slice(0, dot);
+  const fracPart = dot === -1 ? '' : unsigned.slice(dot + 1);
+  const micros = BigInt(wholePart) * MICROS_PER_UNIT + BigInt(fracPart.padEnd(6, '0'));
+  return negative ? -micros : micros;
+}
+
+function unitsToFixedMicrosString(units: number): string {
+  if (!Number.isFinite(units)) {
+    throw new Error('Invalid money units');
+  }
+  return units.toFixed(6);
+}
+
+/**
+ * Formats integer micros as an exact decimal string (no IEEE-754).
+ *
+ * WHY: brief, Dust markdown, and email tokens must not call
+ * `Number(micros) / 1e6` or `toString()` on that Number. Large values and
+ * fractional cents have to survive as the same digits that are stored.
+ * Trailing fractional zeros are dropped (`1_230_000` → `1.23`).
+ */
+export function formatMicrosDecimal(micros: bigint | number): string {
+  const value = toBigIntMicros(micros);
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const whole = abs / MICROS_PER_UNIT;
+  const remainder = abs % MICROS_PER_UNIT;
+  const frac = remainder.toString().padStart(6, '0').replace(/0+$/, '');
+  const body = frac.length === 0 ? whole.toString() : `${whole.toString()}.${frac}`;
+  return negative ? `-${body}` : body;
 }

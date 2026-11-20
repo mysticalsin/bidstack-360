@@ -16,7 +16,8 @@ import type { OrgChartSeedJob } from './schemas/org-chart.js';
  */
 export interface QueueDefaults {
   attempts: number;
-  backoff: { type: 'exponential' | 'fixed'; delay: number };
+  /** `webhook-endpoint` is a custom strategy the delivery worker registers. */
+  backoff: { type: 'exponential' | 'fixed' | 'webhook-endpoint'; delay: number };
   removeOnComplete: { age: number; count?: number };
   removeOnFail: { age: number; count?: number };
 }
@@ -150,6 +151,152 @@ export type AccountEnrichmentJob =
   // search). Only enqueued by an admin; never swept.
   | OrgChartSeedJob;
 
+/**
+ * Account intelligence (slice 12): job boards, company posts, registries and
+ * filings per account.
+ *   'account-intel.refresh'          refresh chosen sources for one account
+ *   'account-intel.sweep'            repeatable, only when ACCOUNT_INTEL_AUTO_REFRESH=true
+ *   'account-intel.financials-scan'  repeatable filings scan unless FINANCIALS_SCAN_ENABLED=false
+ *   'account-intel.full-refresh'     every public source plus Apollo organization data for one
+ *                                    company, then its list summary (manual Refresh, imports)
+ */
+export const ACCOUNT_INTEL: QueueConfig = {
+  name: 'account-intel',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 120_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the account-intel queue. */
+export type AccountIntelQueueJob =
+  | { kind: 'refresh'; orgId: string; companyId: string; sources: Array<'hiring' | 'posts' | 'financials' | 'registry'>; requestedBy?: string | null }
+  | { kind: 'full-refresh'; orgId: string; companyId: string; batchId: string | null; force: boolean; requestedBy?: string | null }
+  | { kind: 'sweep' }
+  | { kind: 'financials-scan' };
+
+/**
+ * Open data technology stack (slice 16): DNS, certificate transparency,
+ * homepage, stored job postings and GitHub per account.
+ *   'company-tech-detect.refresh'  one account, on create, import or the sweep
+ *   'company-tech-detect.sweep'    repeatable weekly, batched over every account
+ */
+export const COMPANY_TECH_DETECT: QueueConfig = {
+  name: 'company-tech-detect',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 120_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the company-tech-detect queue. */
+export type CompanyTechDetectQueueJob =
+  | { kind: 'refresh'; orgId: string; companyId: string; reason: 'create' | 'import' | 'sweep' }
+  | { kind: 'sweep' };
+
+/**
+ * Consulting partners (slice 15): which consulting firms work with an account.
+ *   'consulting-partners.refresh'  manual Refresh on the account page
+ *   'consulting-partners.sweep'    repeatable daily: rescans our own records for
+ *                                  recently changed accounts and prunes old
+ *                                  evidence; public fetches only when
+ *                                  CONSULTING_PARTNERS_AUTO_REFRESH=true
+ */
+export const CONSULTING_PARTNERS: QueueConfig = {
+  name: 'consulting-partners',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 120_000 },
+    removeOnComplete: { age: 86_400, count: 500 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the consulting-partners queue. */
+export type ConsultingPartnersQueueJob =
+  | { kind: 'refresh'; orgId: string; companyId: string; requestedBy?: string | null }
+  | { kind: 'sweep' };
+
+/**
+ * Notification delivery (slice 21): instant email and Teams posts for alerts
+ * the user opted into, plus the daily account digest.
+ *   'notification-delivery.deliver'  one alert, one channel, one user
+ *   'notification-delivery.digest'   repeatable daily account digest
+ */
+export const NOTIFICATION_DELIVERY: QueueConfig = {
+  name: 'notification-delivery',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { age: 86_400, count: 1000 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** Jobs on the notification-delivery queue. Content is Polo data for Polo users only. */
+export type NotificationDeliveryJob =
+  | {
+      kind: 'deliver';
+      channel: 'email' | 'teams';
+      orgId: string;
+      userId: string;
+      notificationId: string | null;
+      companyId: string | null;
+      title: string;
+      body: string | null;
+      url: string | null;
+    }
+  | { kind: 'digest' };
+
+/**
+ * Account activity alerts raised outside apps/api (worker mail and calendar
+ * sync, MCP ingest). apps/api consumes them and fans out through the account
+ * events service, so recipients, prefs and coalescing have one owner.
+ *   'account-activity-alerts.digest'  one account, one import run
+ */
+export const ACCOUNT_ACTIVITY_ALERTS: QueueConfig = {
+  name: 'account-activity-alerts',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 10_000 },
+    removeOnComplete: { age: 86_400, count: 1000 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+/** One account, one import run. Ids only: titles are built from the rows at send time. */
+export interface AccountActivityAlertJob {
+  orgId: string;
+  companyId: string;
+  activityIds: string[];
+  actorUserId: string | null;
+  excludeUserIds: string[];
+}
+
+/**
+ * Teams chat sync (slice 26): a 10-minute fanout plus one job per Microsoft
+ * grant that has chats linked with "keep syncing". Read-only Graph pulls.
+ */
+export const TEAMS_CHAT_SYNC: QueueConfig = {
+  name: 'teams-chat-sync',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { age: 86_400, count: 1000 },
+    removeOnFail: { age: 604_800, count: 2000 },
+  },
+};
+
+export interface TeamsChatSyncJob {
+  orgId: string;
+  userId: string;
+  integrationTokenId: string;
+}
+
 export interface MsaTextExtractJob {
   orgId: string;
   contractId: string;
@@ -257,6 +404,37 @@ export const TENANT_EXPORT: QueueConfig = {
  */
 export const AI_AUDIT_RETENTION: QueueConfig = {
   name: 'ai-audit-retention',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 30 },
+    removeOnFail: { age: 86_400 * 30, count: 100 },
+  },
+};
+
+/**
+ * GDPR data subject requests (export / erase, Art. 15, 17, 20). One job per
+ * request row; the runner claims the row, so a redelivery after completion is
+ * a no-op. Erasure is not retried aggressively: a failed run leaves the row
+ * `failed` with the error for an admin to re-file.
+ */
+export const DATA_SUBJECT_REQUEST: QueueConfig = {
+  name: 'data-subject-request',
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 60_000 },
+    removeOnComplete: { age: 86_400 * 7, count: 200 },
+    removeOnFail: { age: 86_400 * 30, count: 1000 },
+  },
+};
+
+/**
+ * Retention sweep per data class (GDPR Art. 5(1)(e)). Daily repeatable cron.
+ * Report-only unless RETENTION_MODE=enforce. Idempotent: it only touches rows
+ * older than a cutoff.
+ */
+export const RETENTION_SWEEP: QueueConfig = {
+  name: 'retention-sweep',
   defaultJobOptions: {
     attempts: 2,
     backoff: { type: 'fixed', delay: 60_000 },

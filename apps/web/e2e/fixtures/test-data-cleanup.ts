@@ -32,6 +32,11 @@ const TEST_OPPORTUNITY_SEARCHES = [
   'E2E Pipeline QA',
 ] as const;
 
+function apiUrl(path: string): string {
+  const base = (process.env.E2E_API_URL ?? '').replace(/\/$/, '');
+  return `${base}${path}`;
+}
+
 function isMeetingImportArtifact(contact: ContactListResponse['items'][number]): boolean {
   const name = contact.name.trim();
   const customer = contact.customer.trim();
@@ -61,7 +66,7 @@ export async function cleanupMeetingImportContacts(request: APIRequestContext): 
   const ids = new Set<string>();
 
   for (const search of TEST_IMPORT_SEARCHES) {
-    const res = await request.get(`/api/v1/contacts?search=${encodeURIComponent(search)}&limit=100`);
+    const res = await request.get(apiUrl(`/api/v1/contacts?search=${encodeURIComponent(search)}&limit=100`));
     if (!res.ok()) {
       throw new Error(`Could not search test contact artifacts for "${search}" (${res.status()})`);
     }
@@ -72,7 +77,7 @@ export async function cleanupMeetingImportContacts(request: APIRequestContext): 
   }
 
   for (const id of ids) {
-    const res = await request.delete(`/api/v1/contacts/${id}`);
+    const res = await request.delete(apiUrl(`/api/v1/contacts/${id}`));
     if (!res.ok() && res.status() !== 404) {
       throw new Error(`Could not delete test contact artifact ${id} (${res.status()})`);
     }
@@ -83,7 +88,9 @@ export async function cleanupOpportunityArtifacts(request: APIRequestContext): P
   const ids = new Set<string>();
 
   for (const search of TEST_OPPORTUNITY_SEARCHES) {
-    const res = await request.get(`/api/v1/opportunities?search=${encodeURIComponent(search)}&limit=100`);
+    const res = await request.get(
+      apiUrl(`/api/v1/opportunities?search=${encodeURIComponent(search)}&limit=100`),
+    );
     if (!res.ok()) {
       throw new Error(`Could not search test opportunity artifacts for "${search}" (${res.status()})`);
     }
@@ -94,7 +101,7 @@ export async function cleanupOpportunityArtifacts(request: APIRequestContext): P
   }
 
   for (const id of ids) {
-    const res = await request.delete(`/api/v1/opportunities/${id}`);
+    const res = await request.delete(apiUrl(`/api/v1/opportunities/${id}`));
     if (!res.ok() && res.status() !== 404) {
       throw new Error(`Could not delete test opportunity artifact ${id} (${res.status()})`);
     }

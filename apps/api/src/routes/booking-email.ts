@@ -19,6 +19,8 @@ export interface BookingEmailParams {
   endAt: Date;
   bookingId: string;
   cancelToken: string;
+  /** Attendee IANA time zone from the booking form. Unknown values fall back to UTC. */
+  timeZone?: string;
 }
 
 type TemplateParams = BookingEmailParams & {
@@ -28,25 +30,7 @@ type TemplateParams = BookingEmailParams & {
 };
 
 export function buildBookingConfirmationHtml(p: TemplateParams): string {
-  const dateStr = p.startAt.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-  const startTime = p.startAt.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    timeZoneName: 'short',
-  });
-  const endTime = p.endAt.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    timeZoneName: 'short',
-  });
+  const { dateStr, startTime, endTime } = formatSlot(p);
 
   // WHY table-based layout: many email clients still use Word's rendering engine
   // and strip CSS. Tables + inline styles are the only reliable cross-client
@@ -88,25 +72,7 @@ export function buildBookingConfirmationHtml(p: TemplateParams): string {
 }
 
 export function buildBookingConfirmationText(p: TemplateParams): string {
-  const dateStr = p.startAt.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-  const startTime = p.startAt.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    timeZoneName: 'short',
-  });
-  const endTime = p.endAt.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'UTC',
-    timeZoneName: 'short',
-  });
+  const { dateStr, startTime, endTime } = formatSlot(p);
   return [
     p.greeting,
     '',
@@ -121,6 +87,32 @@ export function buildBookingConfirmationText(p: TemplateParams): string {
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+function resolveTimeZone(tz: string | undefined): string {
+  if (!tz) return 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return tz;
+  } catch {
+    return 'UTC';
+  }
+}
+
+function formatSlot(p: BookingEmailParams): { dateStr: string; startTime: string; endTime: string } {
+  const timeZone = resolveTimeZone(p.timeZone);
+  const time = { hour: 'numeric', minute: '2-digit', timeZone, timeZoneName: 'short' } as const;
+  return {
+    dateStr: p.startAt.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone,
+    }),
+    startTime: p.startAt.toLocaleTimeString('en-US', time),
+    endTime: p.endAt.toLocaleTimeString('en-US', time),
+  };
+}
 
 /**
  * Minimal HTML escaping for user-supplied strings inserted into the template.

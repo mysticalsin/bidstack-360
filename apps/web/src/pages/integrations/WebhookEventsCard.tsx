@@ -15,14 +15,18 @@ import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { relativeTime } from '@/lib/format';
 
 import { webhookStatusTone } from './integration-helpers';
+import { webhookEventCaption } from './webhook-event-caption';
 import type { WebhookEvent } from './types';
 
 export function WebhookEventsCard({
   events,
   isLoading,
+  pageContinues = false,
 }: {
   events: WebhookEvent[];
   isLoading: boolean;
+  /** True when the list read one row past the page and dropped it. */
+  pageContinues?: boolean;
 }) {
   const { t } = useTranslation('integrations');
   const errorCount = events.filter((event) => event.status === 'error').length;
@@ -31,10 +35,14 @@ export function WebhookEventsCard({
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
         title={t('webhookEvents.title', 'Recent webhook events')}
-        caption={t(
-          'webhookEvents.caption',
-          'A live evidence stream for Dust callbacks, CRM event subscribers and external automations.',
-        )}
+        caption={
+          pageContinues
+            ? t('webhookEvents.captionPartial', webhookEventCaption(events.length, true))
+            : t(
+                'webhookEvents.caption',
+                'A live evidence stream for Dust callbacks, CRM event subscribers and external automations.',
+              )
+        }
         action={
           <Badge tone={errorCount > 0 ? 'tomato' : events.length > 0 ? 'jade' : 'gray'}>
             {errorCount > 0

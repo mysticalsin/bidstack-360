@@ -1,13 +1,8 @@
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  compareMicros,
-  formatExactUnspecified,
-  microsSharePercent,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { useDisplayMoneyMicros } from '@/hooks/useDisplayMoney';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
@@ -27,23 +22,13 @@ export const RevenueEvolutionCard = memo(function RevenueEvolutionCard({ cockpit
   const points = cockpit.revenueEvolution ?? [];
   if (!flags.showRevenueBlock || points.length === 0) return null;
 
-  const max = points.reduce<string>(
-    (largest, point) => (compareMicros(point.revenueMicros, largest) > 0 ? point.revenueMicros : largest),
-    '0',
-  );
-  const peak = points.reduce(
-    (best, point) => (compareMicros(point.revenueMicros, best.revenueMicros) > 0 ? point : best),
-    points[0]!,
-  );
+  const max = Math.max(...points.map((p) => p.revenueMicros), 1);
+  const peak = points.reduce((a, b) => (b.revenueMicros > a.revenueMicros ? b : a), points[0]!);
   return (
     <Card role="region" aria-label={t('revenueEvolution.regionLabel', 'Revenue evolution')}>
       <SectionHeader
         title={t('revenueEvolution.title', 'Revenue evolution')}
-        caption={t(
-          'revenueEvolution.caption',
-          'Won-deal amounts by month on this account. {{basis}}',
-          { basis: UNSPECIFIED_CURRENCY_BASIS },
-        )}
+        caption={t('revenueEvolution.caption', 'Won-deal revenue with this client by month')}
       />
       <p className="sr-only">
         {t('revenueEvolution.srSummary', '{{count}} months of won-deal revenue. Peak {{period}}.', {
@@ -64,19 +49,9 @@ export const RevenueEvolutionCard = memo(function RevenueEvolutionCard({ cockpit
   );
 });
 
-function RevenueBar({
-  period,
-  micros,
-  max,
-}: {
-  period: string;
-  micros: string;
-  max: string;
-}) {
+function RevenueBar({ period, micros, max }: { period: string; micros: number; max: number }) {
   const { t } = useTranslation('crm');
-  const formatted = formatExactUnspecified(micros);
-  const share = microsSharePercent(micros, max);
-  const height = share <= 0 ? 0 : Math.max(6, (share / 100) * 96);
+  const formatted = useDisplayMoneyMicros(micros, 'EUR', { compact: true });
   return (
     <li
       className="flex flex-1 flex-col items-center gap-1"
@@ -84,7 +59,7 @@ function RevenueBar({
     >
       <div
         className="w-full rounded-t bg-[var(--brand-primary)]"
-        style={{ height: `${height}px` }}
+        style={{ height: `${Math.max(6, (micros / max) * 96)}px` }}
         aria-hidden
       />
       <span className="text-[11px] text-[var(--fg-tertiary)]">{period}</span>
