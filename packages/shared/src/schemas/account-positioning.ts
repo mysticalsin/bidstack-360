@@ -101,6 +101,8 @@ export const BriefFacts = z.object({
     lost24m: z.number().int(),
     /** Set when the counts are the latest N deals, not the whole book. */
     latest: z.number().int().positive().nullable().optional(),
+    /** The open count is known, and the amount does not fit in one total. */
+    tooLarge: z.boolean().optional(),
   }),
   people: z.object({ known: z.number().int(), senior: z.number().int(), metLast12m: z.number().int(), lastMeeting: z.object({ at: Iso, title: z.string() }).nullable() }),
   topSignal: z.object({ title: z.string(), at: Iso.nullable(), source: z.string(), sample: z.boolean() }).nullable(),
@@ -481,8 +483,12 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
   const p = f.pipeline;
   const sampleLead = p.latest ? `among the latest ${p.latest} deals, ` : '';
   const hist = p.won24m || p.lost24m ? `; ${sampleLead}${p.won24m} won and ${p.lost24m} lost in the last 24 months` : '';
-  const sampleTail = p.latest && !hist ? ` among the latest ${p.latest} deals` : '';
-  s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${fmtMicros(p.openMicros)}${sampleTail}${hist}.` : `We have no open deals${sampleTail}${hist}.`);
+  const deals = `${p.openCount} open deal${p.openCount === 1 ? '' : 's'}`;
+  if (p.tooLarge) {
+    s.push(p.openCount ? `We have ${deals}. The amount is too large to show${hist}.` : `The open amount is too large to show${hist}.`);
+  } else {
+    s.push(p.openCount ? `We have ${deals} worth ${fmtMicros(p.openMicros)}${hist}.` : `We have no open deals${hist}.`);
+  }
   const pe = f.people;
   if (pe.known) {
     const last = pe.lastMeeting ? `, last meeting on ${pe.lastMeeting.at.slice(0, 10)} (${pe.lastMeeting.title})` : ', no meeting logged';

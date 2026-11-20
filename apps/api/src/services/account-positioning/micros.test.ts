@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { recordedOutcome } from '../account-signals/load.js';
-
-import { capDealSample, openDealWhere, openTotalUnits, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros';
+import { capDealSample, openTotalUnits, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros';
 
 describe('capDealSample', () => {
   it('keeps a short account book and does not call it a sample', () => {
@@ -53,27 +51,6 @@ describe('sumMicrosAsNumber', () => {
     const tenBn = 10_000_000_000_000_000n;
     expect(sumMicrosAsNumber([tenBn])).toBeNull();
     expect(openTotalUnits(tenBn)).toBe(10_000_000_000);
-  });
-});
-
-describe('openDealWhere', () => {
-  it('matches recordedOutcome for open, and drops a live loss', () => {
-    // WHY: the open total is an aggregate, so the where clause has to name
-    // the same deals the page already calls open.
-    const where = openDealWhere();
-    const stages = ['s1_lead', 's2_sent', 'closed_won', 'closed_lost'] as const;
-    for (const stage of stages) {
-      for (const isWon of [false, true]) {
-        for (const isLost of [false, true]) {
-          for (const deleted of [false, true]) {
-            const row = { isWon, isLost, deletedAt: deleted ? new Date('2026-02-01T00:00:00.000Z') : null };
-            const deal = { stage, pipelineStage: row };
-            expect(matchesWhere(where, deal)).toBe(recordedOutcome(deal) === 'open');
-          }
-        }
-      }
-      expect(matchesWhere(where, { stage, pipelineStage: null })).toBe(recordedOutcome({ stage, pipelineStage: null }) === 'open');
-    }
   });
 });
 

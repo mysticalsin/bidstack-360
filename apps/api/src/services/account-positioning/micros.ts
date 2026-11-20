@@ -32,23 +32,6 @@ export function referenceWinWhere() {
 const SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 const MILLION = 1_000_000n;
 
-/**
- * Open deals for an aggregate. Lost wins, then a live won stage, same as
- * `recordedOutcome`. A soft-deleted stage row does not close the deal.
- */
-export function openDealWhere() {
-  return {
-    NOT: {
-      OR: [
-        { stage: 'closed_lost' as const },
-        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
-        { stage: 'closed_won' as const },
-        { pipelineStage: { is: { deletedAt: null, isWon: true } } },
-      ],
-    },
-  };
-}
-
 /** Sum integer micros. Null when the total cannot be a JavaScript number without drifting. */
 export function sumMicrosAsNumber(values: ReadonlyArray<bigint | null | undefined>): number | null {
   let total = 0n;

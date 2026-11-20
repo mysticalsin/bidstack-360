@@ -9,6 +9,7 @@ import { composeBrief, formatCompactMoney, type AccountKeyNumbers, type AccountP
 
 import { invalidateAccessScope } from '../../lib/access-scope.js';
 import { buildServer } from '../../server.js';
+import { recordedOutcome } from '../account-signals/load.js';
 import { createIsolatedOrg, dropIsolatedOrg, useIsolatedOrgAuth } from '../../test-support/isolated-org.js';
 
 const TAG = `ot${Date.now().toString(36)}`;
@@ -167,5 +168,52 @@ describe('open pipeline total', () => {
     expect(numbers.statusCode, numbers.body).toBe(200);
     const pipeline = numbers.json<AccountKeyNumbers>().items.find((item) => item.id === 'pipeline');
     expect(pipeline).toMatchObject({ value: null, missing: 'Open pipeline is too large to show' });
+  });
+
+  it('sums the deals recordedOutcome calls open, including a deleted lost stage', async () => {
+    // WHY: a hand-written reading of the where clause can agree with itself
+    // and still disagree with the query Postgres runs.
+    const pipeline = await prisma.pipeline.create({ data: { orgId: org.orgId, name: `${TAG} pipe` } });
+    const lost = await prisma.pipelineStage.create({
+      data: { orgId: org.orgId, pipelineId: pipeline.id, key: `${TAG}-lost`, name: 'Lost', isLost: true },
+    });
+    const won = await prisma.pipelineStage.create({
+      data: { orgId: org.orgId, pipelineId: pipeline.id, key: `${TAG}-won`, name: 'Won', isWon: true },
+    });
+    const retired = await prisma.pipelineStage.create({
+      data: { orgId: org.orgId, pipelineId: pipeline.id, key: `${TAG}-old`, name: 'Old', isLost: true, deletedAt: new Date('2020-01-01') },
+    });
+    const id = (await prisma.company.create({ data: { orgId: org.orgId, name: `${TAG} Stages` } })).id;
+    const rows = [
+      { code: 'open', stage: 's2_sent' as const, valueMicros: 100n, pipelineStageId: null },
+      { code: 'won', stage: 'closed_won' as const, valueMicros: 50n, pipelineStageId: null },
+      { code: 'lost', stage: 'closed_lost' as const, valueMicros: 40n, pipelineStageId: null },
+      { code: 'live-lost', stage: 's2_sent' as const, valueMicros: 70n, pipelineStageId: lost.id },
+      { code: 'live-won', stage: 's2_sent' as const, valueMicros: 80n, pipelineStageId: won.id },
+      { code: 'retired', stage: 's2_sent' as const, valueMicros: 90n, pipelineStageId: retired.id },
+    ];
+    await prisma.opportunity.createMany({
+      data: rows.map((row) => ({
+        orgId: org.orgId,
+        companyId: id,
+        code: `${TAG}-${row.code}`,
+        customer: `${TAG} Stages`,
+        name: row.code,
+        stage: row.stage,
+        valueMicros: row.valueMicros,
+        pipelineStageId: row.pipelineStageId,
+      })),
+    });
+    const stages = new Map(
+      [lost, won, retired].map((stage) => [stage.id, { isWon: stage.isWon, isLost: stage.isLost, deletedAt: stage.deletedAt }]),
+    );
+    const expected = rows
+      .filter((row) => recordedOutcome({ stage: row.stage, pipelineStage: row.pipelineStageId ? stages.get(row.pipelineStageId) ?? null : null }) === 'open')
+      .reduce((sum, row) => sum + row.valueMicros, 0n);
+    const numbers = await get(`/accounts/${id}/key-numbers`);
+    expect(numbers.statusCode, numbers.body).toBe(200);
+    const tile = numbers.json<AccountKeyNumbers>().items.find((item) => item.id === 'pipeline');
+    expect(tile).toMatchObject({ value: Number(expected), unit: 'money_micros' });
+    expect(expected).toBe(190n);
   });
 });
