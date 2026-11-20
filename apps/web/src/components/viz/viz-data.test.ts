@@ -54,12 +54,14 @@ describe('viz-data', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
   });
 
-  it('keeps a pipeline amount when one compact digit would move it', () => {
-    // WHY: 7,860,000 was 7.9M, and 12,015,000 was 12.0M, on the dashboard charts.
+  it('keeps two compact digits when they name the same amount', () => {
+    // WHY: 7,860,000 was 7.9m, and an exact 11,890,000 stays 11.89m rather than 11.9m.
+    // A non-exact amount uses one digit, so it does not spill the full figure.
+    expect(fmtCompact(7_860_000)).toBe('7.86m');
     expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
-    expect(fmtCompact(7_860_000)).toMatch(/7\.86/);
-    expect(fmtCompact(12_015_000)).toBe('12,015,000');
-    expect(fmtCompact(1_500_000)).toMatch(/1\.5/);
+    expect(fmtCompact(11_890_000)).toBe('11.89m');
+    expect(fmtCompact(12_015_000)).toBe('12m');
+    expect(fmtCompact(1_500_000)).toBe('1.5m');
   });
 
   it('compacts a fractional amount instead of printing the full figure', () => {

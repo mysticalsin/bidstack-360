@@ -145,8 +145,9 @@ export function cumulativeOpen(rows: OppRow[]) {
 }
 
 const chartCompact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 2 });
+const chartCompactRounded = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });
 
-/** Compact only when two fraction digits still name this unit count. */
+/** True when two fraction digits still name this unit count. */
 function compactKeepsUnits(units: number): boolean {
   const abs = Math.abs(units);
   for (const div of [1e9, 1e6, 1e3]) {
@@ -159,10 +160,12 @@ function compactKeepsUnits(units: number): boolean {
   return false;
 }
 
-/** Currency-free amount. Compact only when that label names the same unit. */
+/**
+ * Currency-free amount. Two digits when they name the same unit (7.86m, 11.89m).
+ * Otherwise one digit, including fractions. The full figure wrapped the hero.
+ */
 export function fmtCompact(v: number): string {
-  if (!Number.isFinite(v)) return '—';
-  if (!Number.isSafeInteger(v) || !compactKeepsUnits(v)) return v.toLocaleString('en-GB');
+  if (!Number.isFinite(v) || !compactKeepsUnits(v)) return chartCompactRounded.format(v);
   return chartCompact.format(v);
 }
 
