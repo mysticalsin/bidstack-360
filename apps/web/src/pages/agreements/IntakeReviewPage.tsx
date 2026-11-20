@@ -11,18 +11,21 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useConfirmMsaIntake, useMsaIntakeDraft } from '@/hooks/useMsaIntake';
 import { useSigningEntities } from '@/hooks/useSigningEntities';
 
-/** Grouped cents from integer micros. The shared cent formatter is gone on main. */
+/** Grouped cents from integer micros. Half a cent rounds away from zero. */
 function centsFromIntegerMicros(micros: bigint): string {
-  const cents = (micros + 5_000n) / 10_000n;
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const cents = (abs + 5_000n) / 10_000n;
   const units = cents / 100n;
   const frac = cents % 100n;
   const body = units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return frac === 0n ? body : `${body}.${frac.toString().padStart(2, '0')}`;
+  const text = frac === 0n ? body : `${body}.${frac.toString().padStart(2, '0')}`;
+  return negative && cents !== 0n ? `-${text}` : text;
 }
 
 /** Integer micros. A missing currency stays unspecified instead of becoming a euro amount. */
 export function formatExtractedMicros(micros: number, currency?: string | null): string {
-  if (!Number.isSafeInteger(micros) || micros < 0) return 'amount not readable';
+  if (!Number.isSafeInteger(micros)) return 'amount not readable';
   const amount = centsFromIntegerMicros(BigInt(micros));
   if (currency && /^[A-Za-z]{3}$/.test(currency)) return `${amount} ${currency.toUpperCase()}`;
   return `${amount} unspecified`;
