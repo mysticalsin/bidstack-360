@@ -223,7 +223,7 @@ export type { SeedOrgDataOptions } from './seed-org-data.js';
 // by the seed CLIs and the Clerk organization.created webhook so a brand-new
 // production org is usable the moment it exists.
 export { seedRolesAndPermissions } from './seed.rbac.js';
-export { seedAnalyticsCommandCenter } from './seed-analytics-dashboard.js';
+export { commandCenterPlan, seedAnalyticsCommandCenter } from './seed-analytics-dashboard.js';
 export { seedSigningEntities } from './seed-signing-entities.js';
 export { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
 

@@ -3,7 +3,7 @@
 // throwaway isolated stub org; fixtures cleaned up in afterAll.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { prisma, seedAnalyticsCommandCenter } from '@bidstack/db';
+import { commandCenterPlan, prisma, seedAnalyticsCommandCenter } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
 import {
@@ -501,6 +501,110 @@ describe('analytics dashboards routes', () => {
       if (fixture) await seedAnalyticsCommandCenter(prisma, fixture.orgId, fixture.ownerId);
     }
   });
+
+  skipIfNoDb(
+    'refuses to re-parent a command-center id that already belongs to another org',
+    async () => {
+      const stamp = `${Date.now()}`;
+      const orgA = await prisma.org.create({
+        data: { clerkOrg: `org_cc_hold_a_${stamp}`, name: `Hold A ${stamp}` },
+      });
+      const orgB = await prisma.org.create({
+        data: { clerkOrg: `org_cc_hold_b_${stamp}`, name: `Hold B ${stamp}` },
+      });
+      const userA = await prisma.user.create({
+        data: {
+          orgId: orgA.id,
+          clerkUser: `cc_hold_a_${stamp}`,
+          email: `cc-hold-a-${stamp}@test.local`,
+          name: 'Seeder A',
+          role: 'admin',
+        },
+      });
+      const userB = await prisma.user.create({
+        data: {
+          orgId: orgB.id,
+          clerkUser: `cc_hold_b_${stamp}`,
+          email: `cc-hold-b-${stamp}@test.local`,
+          name: 'Holder B',
+          role: 'admin',
+        },
+      });
+      const plan = commandCenterPlan(orgA.id);
+      const reportId = plan.reports[0]!.id;
+      const widgetId = plan.widgets[0]!.id;
+      try {
+        await prisma.analyticsReport.create({
+          data: {
+            id: reportId,
+            orgId: orgB.id,
+            ownerId: userB.id,
+            name: 'foreign-held-report',
+            query: { entity: 'opportunity' },
+            chartType: 'table',
+          },
+        });
+        await prisma.analyticsDashboard.create({
+          data: {
+            id: plan.dashboardId,
+            orgId: orgB.id,
+            ownerId: userB.id,
+            name: 'foreign-held-dashboard',
+            isShared: false,
+          },
+        });
+        await prisma.analyticsDashboardWidget.create({
+          data: {
+            id: widgetId,
+            orgId: orgB.id,
+            dashboardId: plan.dashboardId,
+            reportId,
+            title: 'foreign-held-widget',
+            type: 'kpi',
+          },
+        });
+
+        await expect(seedAnalyticsCommandCenter(prisma, orgA.id, userA.id)).rejects.toThrow(
+          /another org/,
+        );
+
+        const report = await prisma.analyticsReport.findUniqueOrThrow({ where: { id: reportId } });
+        const dashboard = await prisma.analyticsDashboard.findUniqueOrThrow({
+          where: { id: plan.dashboardId },
+        });
+        const widget = await prisma.analyticsDashboardWidget.findUniqueOrThrow({
+          where: { id: widgetId },
+        });
+        expect(report.orgId).toBe(orgB.id);
+        expect(report.ownerId).toBe(userB.id);
+        expect(report.name).toBe('foreign-held-report');
+        expect(dashboard.orgId).toBe(orgB.id);
+        expect(dashboard.ownerId).toBe(userB.id);
+        expect(dashboard.name).toBe('foreign-held-dashboard');
+        expect(widget.orgId).toBe(orgB.id);
+        expect(widget.title).toBe('foreign-held-widget');
+      } finally {
+        await prisma.analyticsReportRun.deleteMany({
+          where: { reportId: { in: plan.reports.map((report) => report.id) } },
+        });
+        await prisma.analyticsDashboardWidget.deleteMany({
+          where: { id: { in: plan.widgets.map((widget) => widget.id) } },
+        });
+        await prisma.analyticsReport.deleteMany({
+          where: { id: { in: plan.reports.map((report) => report.id) } },
+        });
+        await prisma.analyticsDashboard.deleteMany({ where: { id: plan.dashboardId } });
+        for (const id of [orgA.id, orgB.id]) {
+          await prisma.analyticsReportRun.deleteMany({ where: { orgId: id } });
+          await prisma.analyticsDashboardWidget.deleteMany({ where: { orgId: id } });
+          await prisma.analyticsReport.deleteMany({ where: { orgId: id } });
+          await prisma.analyticsDashboard.deleteMany({ where: { orgId: id } });
+          await prisma.user.deleteMany({ where: { orgId: id } });
+          await prisma.org.deleteMany({ where: { id } });
+        }
+      }
+    },
+  );
 
   it('mutation routes return 2xx only when canEdit, 403 otherwise, and 404 for a hidden private dashboard', async () => {
     if (!dbReachable || !orgId) throw new Error('[skip] DATABASE_URL not reachable');
