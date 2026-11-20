@@ -1,4 +1,3 @@
-import { headlineMicrosLabel } from "@/components/dashboard/unspecified-currency";
 import {
   type CurveFactory,
   curveLinear,
@@ -260,6 +259,18 @@ export function sparklineIndexAtX(
   return Math.min(count - 1, Math.max(0, raw));
 }
 
+function compactKeepsUnits(units: number): boolean {
+  const abs = Math.abs(units);
+  for (const div of [1e9, 1e6, 1e3]) {
+    if (abs < div) continue;
+    for (let digits = 0; digits <= 2; digits += 1) {
+      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 function formatCompact(value: number): string {
   if (!Number.isFinite(value)) return "—";
   if (!Number.isSafeInteger(value)) {
@@ -268,7 +279,11 @@ function formatCompact(value: number): string {
       maximumFractionDigits: 1,
     }).format(value);
   }
-  return headlineMicrosLabel(BigInt(value) * 1_000_000n, "en");
+  if (!compactKeepsUnits(value)) return value.toLocaleString("en");
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 /** Screen-reader summary, e.g. "12 points, from 3.1K to 4.2K, up 35%". */
