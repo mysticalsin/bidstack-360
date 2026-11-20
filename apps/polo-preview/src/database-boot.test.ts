@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { ENSURE_APP_ROLE_SQL, restoreFailure } from './database-boot.js';
+import { appRolePasswordError, ENSURE_APP_ROLE_SQL, restoreFailure } from './database-boot.js';
 
 const entry = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../container/entrypoint.mjs'), 'utf8');
 
@@ -108,5 +108,10 @@ describe('polo app role boot', () => {
     expect(body).not.toContain('quoteLiteral');
     expect(body).toContain('appRolePasswordError(');
     expect(body).not.toContain('remember(');
+    const leaked = "ERROR:  42601: syntax error at or near \"pass\"\nLINE 1: ALTER ROLE app_role PASSWORD 'fix'ture\\pass'\n";
+    expect(appRolePasswordError(leaked)).toBe('could not set the app role password (42601)');
+    expect(appRolePasswordError(leaked)).not.toContain('fix');
+    expect(appRolePasswordError(leaked)).not.toContain('ALTER ROLE');
+    expect(appRolePasswordError('')).toBe('could not set the app role password (unknown)');
   });
 });

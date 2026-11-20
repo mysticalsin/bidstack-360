@@ -15,7 +15,7 @@ import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
-import { ENSURE_APP_ROLE_SQL, restoreFailure } from '../src/database-boot.js';
+import { appRolePasswordError, ENSURE_APP_ROLE_SQL, restoreFailure } from '../src/database-boot.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
@@ -43,6 +43,10 @@ const PORT = configuredPort('POLO_HTTP_PORT', 8080);
 const PG_PORT = configuredPort('POLO_PG_PORT', 5432);
 const REDIS_PORT = configuredPort('POLO_REDIS_PORT', 6379);
 const PG_SOCKET = process.env.POLO_PG_SOCKET || '/tmp';
+const MIGRATE_STAGING = process.env.POLO_MIGRATE_STAGING || '/tmp/polo-migrate';
+const SNAPSHOT_DIR = process.env.POLO_SNAPSHOT_DIR || '/tmp/snapshot';
+const SNAPSHOT_TGZ = process.env.POLO_SNAPSHOT_TGZ || '/tmp/snapshot.tgz';
+const RESTORE_DIR = process.env.POLO_RESTORE_DIR || '/tmp/restore';
 const API_ENTRY = entryFile(process.env.POLO_API_ENTRY || 'apps/api/dist/main.js');
 const WORKER_ENTRY = entryFile(process.env.POLO_WORKER_ENTRY || 'apps/worker/dist/main.js');
 const SELF_SEED_AFTER_MS = 120_000;
@@ -172,28 +176,24 @@ function workerEnv() {
   return env;
 }
 
-function quoteLiteral(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
-}
-
 function pgCli(args) {
   return ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, ...args];
 }
 
 function setAppRolePassword() {
-  const password = process.env.POLO_APP_DB_PASSWORD || '';
-  if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
-  // psql must not echo the statement. A failure reports the role, not the secret.
+  if (!process.env.POLO_APP_DB_PASSWORD) throw new Error('POLO_APP_DB_PASSWORD is required');
+  // The value stays in the environment. psql :'var' quotes it. A failure
+  // keeps the SQLSTATE only, never the statement.
   const res = spawnSync(
     'psql',
     pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q']),
     {
       encoding: 'utf8',
-      input: `ALTER ROLE app_role PASSWORD ${quoteLiteral(password)};\n`,
+      input: "\\set VERBOSITY verbose\n\\getenv app_db_password POLO_APP_DB_PASSWORD\nALTER ROLE app_role PASSWORD :'app_db_password';\n",
       stdio: ['pipe', 'pipe', 'pipe'],
     },
   );
-  if (res.status !== 0) throw new Error('could not set the app role password');
+  if (res.status !== 0) throw new Error(appRolePasswordError(res.stderr));
 }
 
 function startDatabase() {
@@ -278,7 +278,7 @@ function activeImportDuplicates() {
 }
 
 function stageMigrationsWithoutIndex() {
-  const staging = '/tmp/polo-migrate';
+  const staging = MIGRATE_STAGING;
   rmSync(staging, { recursive: true, force: true });
   cpSync(join(APP, 'packages/db/prisma'), staging, {
     recursive: true,
@@ -419,18 +419,18 @@ function changeCounter() {
 }
 
 function snapshotFile() {
-  const dir = '/tmp/snapshot';
+  const dir = SNAPSHOT_DIR;
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   runSync('pg_dump', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, '-Fc', '-f', join(dir, 'db.dump'), DB]);
   writeFileSync(join(dir, 'meta.json'), JSON.stringify({ at: new Date().toISOString(), bootId: BOOT_ID }));
-  const out = '/tmp/snapshot.tgz';
+  const out = SNAPSHOT_TGZ;
   runSync('tar', ['-czf', out, '-C', dir, 'db.dump', 'meta.json', '-C', DATA, 'storage']);
   return out;
 }
 
 async function restoreFrom(req) {
-  const dir = '/tmp/restore';
+  const dir = RESTORE_DIR;
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const file = join(dir, 'snapshot.tgz');

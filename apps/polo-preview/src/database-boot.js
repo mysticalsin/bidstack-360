@@ -16,8 +16,10 @@ END
 $$;
 `;
 
-// createdb already made schema public. pg_restore reporting that is not data loss.
-const HARMLESS_RESTORE_ERROR = /schema "public" already exists/i;
+// createdb already made schema public. This is the only pg_restore line that
+// is not data loss. A longer line that merely contains the phrase is not it.
+export const HARMLESS_RESTORE_ERROR_LINE =
+  'pg_restore: error: could not execute query: ERROR:  schema "public" already exists';
 
 function lines(text) {
   return String(text || '')
@@ -26,19 +28,28 @@ function lines(text) {
     .filter(Boolean);
 }
 
+function isHarmlessRestoreError(line) {
+  return line === HARMLESS_RESTORE_ERROR_LINE;
+}
+
 export function restoreErrorsThatMatter(text) {
-  return lines(text).filter((line) => /^pg_restore: error:/i.test(line) && !HARMLESS_RESTORE_ERROR.test(line));
+  return lines(text).filter((line) => /^pg_restore: error:/i.test(line) && !isHarmlessRestoreError(line));
 }
 
 // Null means the restore can proceed. Any other non-zero exit, or an error
-// line that is not the public-schema notice, must fail the boot.
+// line that is not the one public-schema notice, must fail the boot.
 export function restoreFailure(status, text) {
   const matter = restoreErrorsThatMatter(text);
   if (matter.length === 0 && status === 0) return null;
   const errors = lines(text).filter((line) => /^pg_restore: error:/i.test(line));
-  if (matter.length === 0 && errors.length > 0 && errors.every((line) => HARMLESS_RESTORE_ERROR.test(line))) {
-    return null;
-  }
+  if (matter.length === 0 && errors.length > 0 && errors.every(isHarmlessRestoreError)) return null;
   const sample = (matter.length > 0 ? matter : lines(text)).slice(0, 5).join(' | ').slice(0, 500);
   return `pg_restore failed (${status ?? 'error'})${sample ? `: ${sample}` : ''}`;
+}
+
+// A failed ALTER ROLE must not keep the statement. psql verbose prints
+// `ERROR:  42601: ...`; only that SQLSTATE is safe to record.
+export function appRolePasswordError(stderr) {
+  const match = /ERROR:\s+([0-9A-Z]{5})\b/.exec(String(stderr || ''));
+  return `could not set the app role password (${match?.[1] || 'unknown'})`;
 }
