@@ -6,7 +6,9 @@
 // other org, must keep the dates that were stored.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fixturePostingShiftMs } from '@bidstack/db';
+import { demoFixtureShifts, type PrismaClient } from '@bidstack/db';
+
+const held = vi.hoisted(() => ({ prisma: null as PrismaClient | null }));
 
 import type { AccessScope } from '../../lib/access-scope.js';
 import { loadKeyNumbers } from './load.js';
@@ -55,7 +57,8 @@ const scope: AccessScope = {
 
 const postings: Posting[] = [];
 const writes: string[] = [];
-const orgLookups: string[] = [];
+const orgLookups: Array<Record<string, unknown>> = [];
+const postingWheres: Where[] = [];
 
 function stamp(rows: Posting[]) {
   return rows.map((row) => ({
@@ -147,15 +150,14 @@ function emptyModel() {
 
 vi.mock('@bidstack/db', async (importOriginal) => {
   const actual = await importOriginal();
-  return {
-    ...actual,
-    prisma: new Proxy(
+  const prisma = new Proxy(
     {},
     {
       get(_target, model: string) {
         if (model === 'companyJobPosting') {
           return {
             findMany: async ({ where, take }: { where?: Where; take?: number }) => {
+              if (where) postingWheres.push(where);
               const rows = postings.filter((row) => matches(row, where));
               return take == null ? rows : rows.slice(0, take);
             },
@@ -174,8 +176,9 @@ vi.mock('@bidstack/db', async (importOriginal) => {
         }
         if (model === 'org') {
           return {
-            findUnique: async ({ where }: { where: { id: string } }) => {
-              orgLookups.push(where.id);
+            findUnique: async ({ where }: { where: { id?: string; clerkOrg?: string } }) => {
+              orgLookups.push(where);
+              if (where.clerkOrg === FIXTURE_CLERK) return { id: FIXTURE_ORG };
               if (where.id === FIXTURE_ORG) return { clerkOrg: FIXTURE_CLERK };
               if (where.id === OTHER_ORG) return { clerkOrg: 'org_live_other' };
               return null;
@@ -196,8 +199,9 @@ vi.mock('@bidstack/db', async (importOriginal) => {
         return emptyModel();
       },
     },
-    ),
-  };
+    );
+  held.prisma = prisma as PrismaClient;
+  return { ...actual, prisma };
 });
 
 /** Same shape the seed writes: last seen one day before the seed clock, posted `daysAgo` before it. */
@@ -224,8 +228,12 @@ function openJobs(orgId: string, companyId: string, now = NOW) {
 
 /** Seen time the open-jobs window must use: the cohort anchor moved to now minus one day. */
 function projectedSeen(rows: Posting[], now: Date): number {
-  const anchor = rows[0]!.lastSeenAt.getTime();
-  return anchor + fixturePostingShiftMs(rows, now);
+  let anchor = Number.NEGATIVE_INFINITY;
+  for (const row of rows) {
+    const seen = row.lastSeenAt?.getTime() ?? row.fetchedAt.getTime();
+    if (seen > anchor) anchor = seen;
+  }
+  return now.getTime() - DAY - anchor + (rows[0]!.lastSeenAt?.getTime() ?? anchor);
 }
 
 describe('demo fixture open jobs', () => {
@@ -233,6 +241,7 @@ describe('demo fixture open jobs', () => {
     postings.length = 0;
     writes.length = 0;
     orgLookups.length = 0;
+    postingWheres.length = 0;
     const aged = new Date(NOW.getTime() - 80 * DAY);
     const ancient = new Date(NOW.getTime() - 400 * DAY);
     postings.push(
@@ -311,5 +320,45 @@ describe('demo fixture open jobs', () => {
     expect(writes).toEqual([]);
     expect(stamp(postings.filter((row) => row.id === 'other-fixture'))).toEqual(original.filter((row) => row.id === 'other-fixture'));
     expect(stamp(postings)).toEqual(original);
+  });
+
+  it('builds one fixture-only shift for the whole org, ignoring a newer non-fixture row', async () => {
+    const newerLive = new Date(NOW.getTime() - 3 * DAY);
+    const apollo = postings.find((row) => row.id === 'live-apollo')!;
+    apollo.lastSeenAt = newerLive;
+    apollo.fetchedAt = newerLive;
+    apollo.postedAt = new Date(NOW.getTime() - 400 * DAY);
+    const fixtureSeen = postings.find((row) => row.id === 'fx-4')!.lastSeenAt.getTime();
+    const expectedShift = NOW.getTime() - DAY - fixtureSeen;
+    postingWheres.length = 0;
+
+    const shifts = await demoFixtureShifts(held.prisma!, FIXTURE_ORG, [FIXTURE_CO, ANCIENT_CO], NOW, process.env);
+    const shiftQuery = postingWheres.find((where) => where.source === 'fixture');
+    expect(shiftQuery?.source).toBe('fixture');
+    expect([shifts?.get(FIXTURE_CO), shifts?.get(ANCIENT_CO)]).toEqual([expectedShift, expectedShift]);
+    expect(expectedShift).not.toBe(NOW.getTime() - DAY - newerLive.getTime());
+
+    expect(await openJobs(FIXTURE_ORG, FIXTURE_CO)).toBe(3);
+    expect(await openJobs(FIXTURE_ORG, ANCIENT_CO)).toBe(0);
+    expect(apollo.lastSeenAt.getTime()).toBe(newerLive.getTime());
+    expect(writes).toEqual([]);
+  });
+
+  it.each(['Demo', 'DEMO', 'demo-x', ' demo', 'notdemo'])('does not treat %j as demo', async (mode) => {
+    vi.stubEnv('POLO_DATA_MODE', mode);
+    orgLookups.length = 0;
+    writes.length = 0;
+    expect(await openJobs(FIXTURE_ORG, FIXTURE_CO)).toBe(0);
+    expect(orgLookups).toEqual([]);
+    expect(writes).toEqual([]);
+  });
+
+  it('looks up the fixture tenant by clerk id, not the caller org, when the caller is not that tenant', async () => {
+    orgLookups.length = 0;
+    postingWheres.length = 0;
+    expect(await openJobs(OTHER_ORG, OTHER_CO)).toBe(0);
+    expect(orgLookups).toEqual([{ clerkOrg: FIXTURE_CLERK }]);
+    expect(postingWheres.some((where) => where.source === 'fixture')).toBe(false);
+    expect(writes).toEqual([]);
   });
 });
