@@ -52,11 +52,21 @@ function compactKeepsUnits(units: number): boolean {
   return false;
 }
 
+/** Whole units plus the micros remainder. Integer division alone turns 1.50 into 1. */
+function unitsFromMicros(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const whole = abs / 1_000_000n;
+  const remainder = abs % 1_000_000n;
+  const units = Number(whole) + Number(remainder) / 1_000_000;
+  return negative ? -units : units;
+}
+
 export function fmtMoneyMicros(amountMicros: number, currency: string): string {
-  if (!Number.isSafeInteger(amountMicros) || amountMicros < 0) return 'amount not readable';
+  if (!Number.isSafeInteger(amountMicros)) return 'amount not readable';
   const micros = BigInt(amountMicros);
   if (!/^[A-Za-z]{3}$/.test(currency)) return `${groupedUnits(micros)} unspecified`;
-  const units = Number(micros / 1_000_000n);
+  const units = unitsFromMicros(micros);
   const code = currency.toUpperCase();
   if (!compactKeepsUnits(units)) {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: code, maximumFractionDigits: 2 }).format(units);
