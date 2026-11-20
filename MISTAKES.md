@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-20 TESTING: int64 equality and a commented tile rule were untested
+
+- **What went wrong:** The open-book check `micros > INT64_MAX_MICROS` still passed every test when changed to `>=`, so a total equal to the signed int64 maximum became "too large" without a failure. The tile test read the first `.kn-value` block with comments included, so a comment containing `overflow-wrap: anywhere` passed while a later block still clipped.
+- **Root cause:** No assertion pinned the equality boundary, and the stylesheet check used a first-match regex instead of stripping comments and reading every `.kn-value` block.
+- **Prevention rule:** Pin a comparison's equality case with the exact boundary value. A CSS contract test must ignore comments and assert every matching rule, not the first match.
+- **Files affected:** `apps/api/src/services/account-positioning/open-book.test.ts`, `apps/web/src/components/positioning/key-number-tile.test.ts`.
+
+---
+
 ### 2026-11-02 TESTING: B2 `readOnly` default 403'd write-scoped integration keys
 
 - **What went wrong:** M2 defaulted new `ApiKey.readOnly` to true. Integration tests that insert write-scoped keys via `prisma.apiKey.create` did not set `readOnly: false`, so `requirePermission` returned "API key is read-only" before the intended admin / human-actor / missing-scope message. CI Integration failed on 7 assertions.
