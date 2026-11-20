@@ -45,4 +45,20 @@ describe('enrichment fmtMoney', () => {
     expect(compactStep(999_999.5)).toEqual([1_000, 'k']);
     expect(compactStep(1_000_000)).toEqual([1_000_000, 'M']);
   });
+
+  it('keeps the thousands cut at exactly 1,000', () => {
+    // WHY: `>= 999` still prints the same full amount for 999, because that
+    // compact is not exact. `> 1000` drops the exact thousand. The step is
+    // what those mutants change. Mutant-red, not red-first: this head already
+    // uses `>= 1_000`.
+    expect(compactStep(999)).toBeNull();
+    expect(compactStep(-999)).toBeNull();
+    expect(compactStep(1_000)).toEqual([1_000, 'k']);
+    expect(compactStep(-1_000)).toBeNull();
+    expect(fmtMoney(999, 'USD')).toBe('USD 999');
+    expect(fmtMoney(999, 'USD')).not.toContain('k');
+    expect(fmtMoney(-999, 'USD')).toBe('-USD 999');
+    expect(fmtMoney(1_000, 'USD')).toBe('USD 1k');
+    expect(fmtMoney(-1_000, 'USD')).toBe('-USD 1k');
+  });
 });
