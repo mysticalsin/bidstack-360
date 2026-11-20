@@ -14,6 +14,7 @@ import type { AccountFinancials } from '@bidstack/shared';
 import { Spark } from '@/components/viz/charts';
 import { noDash } from '@/components/signals/category';
 import { useAccountFinancials, useTrackFinancials } from '@/hooks/useAccountFinancials';
+import { usePoloPublicIdentity } from '@/hooks/usePoloIdentity';
 
 import { buildTiles, type Tile } from './financials-format';
 
@@ -104,7 +105,11 @@ function TrackToggle({ data, companyId }: { data: AccountFinancials; companyId: 
 
 export function FinancialHealthSection({ companyId }: { companyId: string }) {
   const q = useAccountFinancials(companyId);
-  const d = q.data;
+  const mode = usePoloPublicIdentity().data?.dataMode;
+  const loaded = q.data;
+  // Built-in example periods are demo-only. A real-mode payload that still
+  // carries them is shown as an empty filing, not as unlabelled numbers.
+  const d = loaded?.sample && mode !== 'demo' ? { ...loaded, periods: [], signals: [], sample: false, statusCopy: loaded.statusCopy } : loaded;
   const general = d?.gate === 'general';
   const tiles = d ? buildTiles(d.periods) : [];
   const latest = d && !d.sample ? d.periods.reduce<string | null>((m, p) => (!m || p.periodEnd > m ? p.periodEnd : m), null) : null;

@@ -27,6 +27,7 @@ import {
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { getPoloDataMode } from '../lib/polo-mode.js';
 import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
@@ -83,9 +84,9 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
   const page = filingPeriodPage(loaded);
   const periods = page.periods;
   const signals = z.array(FinancialSignal).catch([]).parse(p?.signals ?? []);
-  // Sample only for tracked accounts still waiting for real filings; General
-  // accounts get the plain empty state instead.
-  const sample = periods.length === 0 && financialsEligible(c);
+  // Sample only in demo, and only for tracked accounts still waiting for real
+  // filings. Real mode and General accounts get the plain empty state.
+  const sample = getPoloDataMode() === 'demo' && periods.length === 0 && financialsEligible(c);
   return {
     companyId: c.id,
     tier: c.tier,

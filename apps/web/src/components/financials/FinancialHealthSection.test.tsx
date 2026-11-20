@@ -43,6 +43,7 @@ describe('FinancialHealthSection', () => {
   afterEach(() => {
     cleanup();
     mutate.mockReset();
+    identity.dataMode = 'demo';
   });
 
   it('General account: explains why it is not pulled and offers Track financials to Admin / AE', () => {
@@ -106,7 +107,6 @@ describe('FinancialHealthSection', () => {
     render(<FinancialHealthSection companyId="c1" />);
     expect(screen.queryByText('Sample')).toBeNull();
     expect(screen.queryByText('11.0%')).toBeNull();
-    identity.dataMode = 'demo';
   });
 
   it('falls back to net margin for banks and formats money', () => {
