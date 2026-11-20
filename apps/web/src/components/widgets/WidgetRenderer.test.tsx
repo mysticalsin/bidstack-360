@@ -136,4 +136,39 @@ describe('WidgetRenderer report binding', () => {
       );
     expect(posted).toBe(false);
   });
+
+  it('formats a currency KPI from micros into units and leaves a number KPI raw', async () => {
+    // The seeded pipeline sum is valueMicros. Treating that integer as a unit
+    // amount prints 11.89tn. config.format decides which conversion applies.
+    const reportId = '22222222-2222-4222-8222-222222222222';
+    const runId = '33333333-3333-4333-8333-333333333333';
+    const micros = 11_890_000_000_000;
+    vi.mocked(api).mockResolvedValue({
+      id: runId,
+      reportId,
+      status: 'done',
+      result: [{ value: micros }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    const { unmount } = renderWidget({
+      ...widgetBase,
+      title: 'Open pipeline',
+      reportId,
+      config: { format: 'currency', latestRunId: runId },
+    });
+    const currency = await screen.findByLabelText(/Open pipeline:/i);
+    expect(currency.getAttribute('aria-label') ?? '').not.toMatch(/tn/i);
+    expect(currency.getAttribute('aria-label') ?? '').not.toContain(String(micros));
+    expect(currency.getAttribute('aria-label') ?? '').toMatch(/11\.89/);
+    unmount();
+
+    renderWidget({
+      ...widgetBase,
+      title: 'Raw count',
+      reportId,
+      config: { format: 'number', latestRunId: runId },
+    });
+    const raw = await screen.findByLabelText(/Raw count:/i);
+    expect(raw.getAttribute('aria-label') ?? '').toMatch(/tn/i);
+  });
 });

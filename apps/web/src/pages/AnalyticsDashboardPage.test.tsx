@@ -10,7 +10,7 @@
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -301,6 +301,23 @@ describe('AnalyticsDashboardPage — who may add a widget', () => {
     expect(screen.queryAllByRole('button', { name: /Add widget/i })).toHaveLength(0);
     expect(screen.queryByTestId('widget-config-modal')).toBeNull();
     expect(screen.getByText('Empty dashboard')).toBeTruthy();
+    // The add prompt with no button tells a non-editor to do something they cannot.
+    expect(screen.queryByText(/Add your first widget/i)).toBeNull();
+    expect(screen.getByText(/no widgets yet/i)).toBeTruthy();
+  });
+
+  it('returns focus to the Add widget button after Escape', async () => {
+    modalMocks.useReal = true;
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    renderPage();
+
+    const trigger = screen.getByRole('button', { name: /Add widget/i });
+    fireEvent.click(trigger);
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(trigger);
   });
 
   it('shows the rejected save reason inline in the modal and leaves the dialog open', async () => {

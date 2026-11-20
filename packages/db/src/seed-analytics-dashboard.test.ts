@@ -34,7 +34,7 @@ describe('command center seed plan', () => {
     expect(plan.reports.find((report) => report.name === 'Open pipeline')?.id).toBe(
       uuidV5(`${orgId}:report:open-pipeline`, COMMAND_CENTER_NAMESPACE),
     );
-    expect(plan.widgets.find((widget) => widget.title === 'Weighted Pipeline')?.id).toBe(
+    expect(plan.widgets.find((widget) => widget.title === 'Open pipeline')?.id).toBe(
       uuidV5(`${orgId}:widget:weighted-pipeline`, COMMAND_CENTER_NAMESPACE),
     );
     expect(plan.dashboardId).not.toBe(mod.commandCenterPlan(`${orgId}-other`).dashboardId);
@@ -58,9 +58,21 @@ describe('command center seed plan', () => {
     );
 
     const widgets = new Map(plan.widgets.map((widget) => [widget.title, widget]));
-    expect(widgets.get('Weighted Pipeline')?.reportId).toBe(pipeline?.id);
+    expect(widgets.get('Open pipeline')?.reportId).toBe(pipeline?.id);
+    expect(widgets.get('Open pipeline')?.title).not.toMatch(/weighted/i);
     expect(widgets.get('Pipeline by Stage')?.reportId).toBe(byStage?.id);
     expect(widgets.get('Pipeline by Stage')?.config.xKey).toBe('stage');
+  });
+
+  it('writes reportId on the widget row, so dropping it from the seed fails this test', async () => {
+    // The plan object having a reportId is not the write. A seed that copies
+    // the plan and then stores reportId: null still leaves every card empty.
+    const mod = await import('./seed-analytics-dashboard.js');
+    const plan = mod.commandCenterPlan('11111111-1111-4111-8111-111111111111');
+    for (const widget of plan.widgets) {
+      const written = mod.commandCenterWidgetWrite(widget, plan.dashboardId);
+      expect(written.reportId).toBe(widget.reportId);
+    }
   });
 });
 
@@ -122,6 +134,11 @@ describe('command center seed isolation', () => {
         expect(widgetsB.every((widget) => widget.dashboard.orgId === orgB.id)).toBe(true);
         expect(widgetsA.every((widget) => widget.report?.orgId === orgA.id)).toBe(true);
         expect(widgetsB.every((widget) => widget.report?.orgId === orgB.id)).toBe(true);
+        const planA = commandCenterPlan(orgA.id);
+        expect(widgetsA.map((widget) => widget.reportId).sort()).toEqual(
+          planA.widgets.map((widget) => widget.reportId).sort(),
+        );
+        expect(widgetsA.every((widget) => widget.reportId !== null)).toBe(true);
         expect(widgetsA.every((widget) => widget.report?.ownerId === userA.id)).toBe(true);
         expect(widgetsB.every((widget) => widget.report?.ownerId === userB.id)).toBe(true);
       } finally {

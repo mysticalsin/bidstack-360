@@ -193,6 +193,30 @@ describe('analytics dashboards routes', () => {
     expect((gone.json() as Array<{ id: string }>).some((w) => w.id === widget.id)).toBe(false);
   });
 
+  skipIfNoDb('POST /api/dashboards/:id/widgets without a reportId is rejected', async () => {
+    // The modal already refuses a widget with no report. The API still created
+    // one, so a client that skips the modal stored an empty card.
+    const board = await server.inject({
+      method: 'POST',
+      url: '/api/dashboards',
+      payload: { name: 'Report required board', isShared: true },
+    });
+    expect(board.statusCode).toBe(201);
+    const dashboardId = (board.json() as { id: string }).id;
+    createdDashboardIds.push(dashboardId);
+
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/dashboards/${dashboardId}/widgets`,
+      payload: { title: 'No report', type: 'kpi' },
+    });
+    expect(res.statusCode).toBe(400);
+    const stored = await prisma.analyticsDashboardWidget.findFirst({
+      where: { orgId: orgId!, title: 'No report' },
+    });
+    expect(stored).toBeNull();
+  });
+
   skipIfNoDb('DELETE /api/dashboards/:id soft-deletes and audit rows exist', async () => {
     const res = await server.inject({
       method: 'DELETE',

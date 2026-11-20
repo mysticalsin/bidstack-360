@@ -114,4 +114,52 @@ describe('WidgetConfigModal', () => {
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent ?? '').toMatch(/report/i);
   });
+
+  it('uses the selected report columns as the axis defaults', () => {
+    // A stage report groups by stage. Leaving xKey at "name" draws a blank chart.
+    reportMocks.useAnalyticsReportsList.mockReturnValue({
+      data: [
+        {
+          id: REPORT_ID,
+          name: 'Deals by stage',
+          query: {
+            entity: 'opportunity',
+            aggregates: [{ fn: 'COUNT', field: '*', alias: 'value' }],
+            groupBy: [{ field: 'stage' }],
+          },
+        },
+      ],
+    });
+    render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/Data source/i), { target: { value: REPORT_ID } });
+
+    expect((screen.getByPlaceholderText('name') as HTMLInputElement).value).toBe('stage');
+    expect((screen.getByPlaceholderText('value') as HTMLInputElement).value).toBe('value');
+  });
+
+  it('associates the title and axis labels, and points the alert at the report field', async () => {
+    reportMocks.useAnalyticsReportsList.mockReturnValue({
+      data: [{ id: REPORT_ID, name: 'Open pipeline' }],
+    });
+    render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={vi.fn()} />);
+
+    expect(screen.getByLabelText(/^Title$/)).toBeTruthy();
+    expect(screen.getByLabelText(/X-axis field/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Y-axis field/i)).toBeTruthy();
+
+    screen.getByRole('button', { name: 'Save widget' }).click();
+    const alert = await screen.findByRole('alert');
+    expect(screen.getByLabelText(/Data source/i).getAttribute('aria-describedby')).toBe(alert.id);
+  });
+
+  it('returns focus to Save after a rejected save', async () => {
+    const onSave = vi.fn().mockRejectedValue(new Error('Forbidden'));
+    renderWithReport(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={onSave} />);
+
+    screen.getByRole('button', { name: 'Save widget' }).click();
+    await screen.findByRole('alert');
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Save widget' }));
+  });
 });
