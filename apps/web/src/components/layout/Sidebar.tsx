@@ -135,10 +135,7 @@ export function Sidebar() {
             <PoloPreSalesLogo variant="mark" title="" className="h-6 w-auto" />
           </div>
           <div>
-            <div className="sb-name">
-              Polo PreSales
-            </div>
-            <div className="sb-tag" title="Mantu · Bid &amp; presales">Mantu · Bid &amp; presales</div>
+            <div className="sb-name">Polo PreSales</div>
           </div>
         </div>
 
