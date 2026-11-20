@@ -150,17 +150,16 @@ describe('WidgetRenderer report binding', () => {
       result: [{ value: micros }],
       createdAt: '2026-01-01T00:00:00.000Z',
     });
-    const { unmount } = renderWidget({
+    const currency = renderWidget({
       ...widgetBase,
       title: 'Open pipeline',
       reportId,
       config: { format: 'currency', latestRunId: runId },
     });
-    const currency = await screen.findByLabelText(/Open pipeline:/i);
-    expect(currency.getAttribute('aria-label') ?? '').not.toMatch(/tn/i);
-    expect(currency.getAttribute('aria-label') ?? '').not.toContain(String(micros));
-    expect(currency.getAttribute('aria-label') ?? '').toMatch(/11\.89/);
-    unmount();
+    expect(await screen.findByText('€11.89M')).toBeTruthy();
+    expect(screen.queryByText(/tn/i)).toBeNull();
+    expect(screen.queryByText(String(micros))).toBeNull();
+    currency.unmount();
 
     renderWidget({
       ...widgetBase,
@@ -168,7 +167,7 @@ describe('WidgetRenderer report binding', () => {
       reportId,
       config: { format: 'number', latestRunId: runId },
     });
-    const raw = await screen.findByLabelText(/Raw count:/i);
-    expect(raw.getAttribute('aria-label') ?? '').toMatch(/tn/i);
+    expect(await screen.findByText(/tn/i)).toBeTruthy();
+    expect(screen.queryByText('€11.89M')).toBeNull();
   });
 });

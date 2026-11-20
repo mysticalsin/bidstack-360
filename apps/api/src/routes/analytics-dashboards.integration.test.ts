@@ -63,6 +63,22 @@ afterAll(async () => {
 
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
+async function createBackingReport(name: string): Promise<string> {
+  const res = await server.inject({
+    method: 'POST',
+    url: '/api/reports',
+    payload: {
+      name,
+      query: { entity: 'task', aggregates: [{ fn: 'COUNT', field: '*' }] },
+      chartType: 'gauge',
+    },
+  });
+  expect(res.statusCode).toBe(201);
+  const id = (res.json() as { id: string }).id;
+  createdReportIds.push(id);
+  return id;
+}
+
 describe('analytics dashboards routes', () => {
   skipIfNoDb('POST /api/dashboards creates a dashboard', async () => {
     const res = await server.inject({
@@ -257,10 +273,11 @@ describe('analytics dashboards routes', () => {
 
         const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
         const forbidden = 'Only the owner or an admin can modify this dashboard';
+        const reportId = await createBackingReport('Owner widget report');
         const ownerWidget = await server.inject({
           method: 'POST',
           url: `/api/dashboards/${dashboardId}/widgets`,
-          payload: { title: 'Owner widget', type: 'kpi' },
+          payload: { reportId, title: 'Owner widget', type: 'kpi' },
         });
         expect(ownerWidget.statusCode).toBe(201);
         const widgetId = (ownerWidget.json() as { id: string }).id;
@@ -282,7 +299,7 @@ describe('analytics dashboards routes', () => {
             method: 'POST',
             url: `/api/dashboards/${dashboardId}/widgets`,
             headers: salesManager,
-            payload: { title: 'Teammate widget', type: 'kpi' },
+            payload: { reportId, title: 'Teammate widget', type: 'kpi' },
           }),
           server.inject({
             method: 'PATCH',
@@ -341,10 +358,11 @@ describe('analytics dashboards routes', () => {
         const managerDashboardId = (ownedByManager.json() as { id: string }).id;
         createdDashboardIds.push(managerDashboardId);
 
+        const reportId = await createBackingReport('Admin widget report');
         const adminWidget = await server.inject({
           method: 'POST',
           url: `/api/dashboards/${managerDashboardId}/widgets`,
-          payload: { title: 'Admin widget', type: 'kpi' },
+          payload: { reportId, title: 'Admin widget', type: 'kpi' },
         });
         expect(adminWidget.statusCode).toBe(201);
         const widgetId = (adminWidget.json() as { id: string }).id;
@@ -665,11 +683,12 @@ describe('analytics dashboards routes', () => {
       expect(sharedRes.statusCode).toBe(201);
       const sharedId = (sharedRes.json() as { id: string }).id;
       createdDashboardIds.push(sharedId);
+      const reportId = await createBackingReport('Role matrix report');
       const sharedWidgetRes = await server.inject({
         method: 'POST',
         url: `/api/dashboards/${sharedId}/widgets`,
         headers: ownerHeaders,
-        payload: { title: 'Shared widget', type: 'kpi' },
+        payload: { reportId, title: 'Shared widget', type: 'kpi' },
       });
       expect(sharedWidgetRes.statusCode).toBe(201);
       const sharedWidgetId = (sharedWidgetRes.json() as { id: string }).id;
@@ -688,7 +707,7 @@ describe('analytics dashboards routes', () => {
         method: 'POST',
         url: `/api/dashboards/${privateId}/widgets`,
         headers: ownerHeaders,
-        payload: { title: 'Private widget', type: 'kpi' },
+        payload: { reportId, title: 'Private widget', type: 'kpi' },
       });
       expect(privateWidgetRes.statusCode).toBe(201);
       const privateWidgetId = (privateWidgetRes.json() as { id: string }).id;
@@ -733,7 +752,7 @@ describe('analytics dashboards routes', () => {
               method: 'POST',
               url: `/api/dashboards/${board.id}/widgets`,
               headers,
-              payload: { title: 'Extra', type: 'kpi' },
+              payload: { reportId, title: 'Extra', type: 'kpi' },
             });
             expect(add.statusCode, `${label} POST widget`).toBe(expected);
             const edit = await server.inject({
@@ -777,7 +796,7 @@ describe('analytics dashboards routes', () => {
             method: 'POST',
             url: `/api/dashboards/${board.id}/widgets`,
             headers,
-            payload: { title: `${role} widget`, type: 'kpi' },
+            payload: { reportId, title: `${role} widget`, type: 'kpi' },
           });
           expect(added.statusCode, `${label} POST widget`).toBe(201);
           const addedId = (added.json() as { id: string }).id;

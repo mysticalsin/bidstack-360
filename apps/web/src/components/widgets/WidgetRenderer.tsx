@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { csvCell } from '@/lib/csv';
+import { formatMoney } from '@/lib/format';
 import { ChartContainer } from '@/components/charts/ChartContainer';
 import {
   AreaChart,
@@ -27,6 +28,7 @@ import {
   TableChart,
 } from '@/components/charts/charts';
 import { KpiCard } from '@/components/charts/KpiCard';
+import { formatKpiValue } from '@/components/charts/kpi-value';
 import type { DashboardWidget } from '@/hooks/useDashboards';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useReportRun, useRunReport, type ReportRun } from '@/hooks/useAnalyticsReports';
@@ -83,6 +85,21 @@ class ChartErrorBoundary extends Component<
 
 type DataRow = Record<string, unknown>;
 
+const MICROS_PER_UNIT = 1_000_000n;
+
+/** Currency widgets carry integer micros. Split before Number() so a large sum stays exact. */
+function unitsFromMicros(micros: number): number {
+  if (!Number.isFinite(micros)) return micros;
+  const value = BigInt(Math.trunc(micros));
+  return Number(value / MICROS_PER_UNIT) + Number(value % MICROS_PER_UNIT) / 1_000_000;
+}
+
+function kpiPresentation(format: string | undefined, raw: number): { value: number; format: (n: number) => string } {
+  if (format === 'currency') return { value: unitsFromMicros(raw), format: (n) => formatMoney(n) };
+  if (format === 'percent') return { value: raw, format: (n) => `${formatKpiValue(n)}%` };
+  return { value: raw, format: formatKpiValue };
+}
+
 function ChartBody({
   widget,
   data,
@@ -99,6 +116,7 @@ function ChartBody({
     gaugeValue?: number;
     gaugeLabel?: string;
     columns?: number;
+    format?: string;
   };
 
   const xKey = cfg.xKey ?? 'name';
@@ -107,11 +125,13 @@ function ChartBody({
   switch (widget.type) {
     case 'kpi': {
       const rows = data as { value?: number; current?: number }[];
-      const val = Number(rows[0]?.value ?? rows[0]?.current ?? 0);
+      const raw = Number(rows[0]?.value ?? rows[0]?.current ?? 0);
+      const presented = kpiPresentation(cfg.format, raw);
       return (
         <KpiCard
           title={widget.title}
-          value={val}
+          value={presented.value}
+          format={presented.format}
           aria-label={widget.title}
         />
       );

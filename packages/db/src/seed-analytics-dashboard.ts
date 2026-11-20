@@ -58,7 +58,7 @@ export function commandCenterPlan(orgId: string) {
     widgets: [
       {
         id: commandCenterId(orgId, 'widget:weighted-pipeline'),
-        title: 'Weighted Pipeline',
+        title: 'Open pipeline',
         type: 'kpi',
         reportId: pipelineReportId,
         config: { format: 'currency', subtitle: 'Sum of open opportunity value' },
@@ -77,6 +77,19 @@ export function commandCenterPlan(orgId: string) {
         position: { x: 3, y: 0, w: 6, h: 4 },
       },
     ],
+  };
+}
+
+type CommandCenterWidget = ReturnType<typeof commandCenterPlan>['widgets'][number];
+
+export function commandCenterWidgetWrite(widget: CommandCenterWidget, dashboardId: string) {
+  return {
+    dashboardId,
+    reportId: widget.reportId,
+    title: widget.title,
+    type: widget.type,
+    config: widget.config as Prisma.InputJsonValue,
+    position: widget.position,
   };
 }
 
@@ -213,26 +226,11 @@ export async function seedAnalyticsCommandCenter(
       select: { orgId: true },
     });
     await refuseForeignRow(existingWidget?.orgId ?? null, orgId, 'analytics widget', widget.id);
+    const written = commandCenterWidgetWrite(widget, plan.dashboardId);
     await prisma.analyticsDashboardWidget.upsert({
       where: { id: widget.id },
-      create: {
-        id: widget.id,
-        orgId,
-        dashboardId: plan.dashboardId,
-        reportId: widget.reportId,
-        title: widget.title,
-        type: widget.type,
-        config: widget.config,
-        position: widget.position,
-      },
-      update: {
-        dashboardId: plan.dashboardId,
-        reportId: widget.reportId,
-        title: widget.title,
-        type: widget.type,
-        config: widget.config,
-        position: widget.position,
-      },
+      create: { id: widget.id, orgId, ...written },
+      update: written,
     });
   }
 

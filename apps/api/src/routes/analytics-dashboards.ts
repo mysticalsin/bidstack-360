@@ -246,18 +246,17 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
     async (req, reply) => {
       const dashboard = await findVisibleDashboard(req, req.params.id);
       await requireDashboardEditor(req, dashboard);
-      if (req.body.reportId) {
-        const report = await prisma.analyticsReport.findFirst({
-          where: { id: req.body.reportId, orgId: req.auth.orgId, deletedAt: null },
-          select: { id: true },
-        });
-        if (!report) throw server.httpErrors.badRequest('Report not found in this org');
-      }
+      if (!req.body.reportId) throw server.httpErrors.badRequest('A widget requires a report');
+      const report = await prisma.analyticsReport.findFirst({
+        where: { id: req.body.reportId, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!report) throw server.httpErrors.badRequest('Report not found in this org');
       const created = await prisma.analyticsDashboardWidget.create({
         data: {
           orgId: req.auth.orgId,
           dashboardId: dashboard.id,
-          reportId: req.body.reportId ?? null,
+          reportId: req.body.reportId,
           title: req.body.title,
           type: req.body.type,
           config: req.body.config as object,

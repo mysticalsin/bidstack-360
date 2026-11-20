@@ -54,6 +54,11 @@ export function AnalyticsDashboardPage() {
     };
   }, [dropdownOpen]);
   const [addingWidget, setAddingWidget] = useState(false);
+  const addWidgetTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const openAddWidget = (event: { currentTarget: HTMLButtonElement }) => {
+    addWidgetTriggerRef.current = event.currentTarget;
+    setAddingWidget(true);
+  };
   // Mutations stay owner-or-admin on the server (requireDashboardEditor).
   // canEdit is that same answer on the dashboard payload. reports:write alone
   // is not enough: a Sales Manager can open a shared dashboard and still be
@@ -208,7 +213,7 @@ export function AnalyticsDashboardPage() {
           </Link>
           {activeDash && canEditDashboard && (
             <button
-              onClick={() => setAddingWidget(true)}
+              onClick={openAddWidget}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white',
                 'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
@@ -277,14 +282,21 @@ export function AnalyticsDashboardPage() {
         ) : widgets.length === 0 ? (
           <EmptyState
             title={t('analyticsDashboard.emptyDashboardTitle', 'Empty dashboard')}
-            message={t(
-              'analyticsDashboard.emptyDashboardMessage',
-              'Add your first widget to start visualising data.',
-            )}
+            message={
+              canEditDashboard
+                ? t(
+                    'analyticsDashboard.emptyDashboardMessage',
+                    'Add your first widget to start visualising data.',
+                  )
+                : t(
+                    'analyticsDashboard.emptyDashboardReadOnly',
+                    'This dashboard has no widgets yet.',
+                  )
+            }
             action={
               canEditDashboard ? (
                 <button
-                  onClick={() => setAddingWidget(true)}
+                  onClick={openAddWidget}
                   className={cn(
                     'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
                     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] min-h-[44px]',
@@ -331,6 +343,7 @@ export function AnalyticsDashboardPage() {
           open={addingWidget}
           onOpenChange={setAddingWidget}
           onSave={handleAddWidget}
+          triggerRef={addWidgetTriggerRef}
         />
       )}
     </div>
