@@ -96,6 +96,25 @@ export const FinancialValue = z.object({
 });
 export type FinancialValue = z.infer<typeof FinancialValue>;
 
+/**
+ * Operating and net margin in percent, and free cash flow (operating cash
+ * flow minus capex), when the inputs exist. Same rule the filings worker
+ * stores under metrics._derived. Nothing is estimated: a missing input stays null.
+ */
+export function derived(
+  m: Partial<Record<FinancialMetric, Pick<FinancialValue, 'value'>>>,
+): { operatingMargin: number | null; netMargin: number | null; freeCashFlow: number | null } {
+  const rev = m.revenue?.value;
+  const op = m.operatingIncome?.value;
+  const ocf = m.operatingCashFlow?.value;
+  const capex = m.capex?.value;
+  return {
+    operatingMargin: rev && op !== undefined && rev > 0 ? Math.round((op / rev) * 1000) / 10 : null,
+    netMargin: rev && m.netIncome && rev > 0 ? Math.round((m.netIncome.value / rev) * 1000) / 10 : null,
+    freeCashFlow: ocf !== undefined && capex !== undefined ? ocf - Math.abs(capex) : null,
+  };
+}
+
 export const FinancialPeriod = z.object({
   periodType: z.enum(['FY', 'Q']),
   fiscalYear: z.number().int(),
