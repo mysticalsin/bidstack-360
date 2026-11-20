@@ -154,7 +154,14 @@ export function FilterRow({
 }) {
   return (
     <div role="search" aria-label={ariaLabel} className="flex flex-wrap items-center gap-3">
-      <div className="relative min-w-[200px] flex-1">
+      {/* flex-1 is basis 0%. A real 144px basis lets this field share the row
+          with the selects at 1280px (992px page column). The input itself has
+          flex-grow 1 so it fills that leftover; flex-grow 0 would leave it at
+          the 144px basis (240px at 1280, 174px at 390). */}
+      <div
+        className="relative min-w-0"
+        style={{ display: 'flex', flex: '1 1 144px', minWidth: '0px' }}
+      >
         <label htmlFor={searchId} className="sr-only">
           {searchLabel}
         </label>
@@ -171,6 +178,7 @@ export function FilterRow({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={searchPlaceholder}
           className="input w-full pl-9"
+          style={{ flexGrow: 1, flexShrink: 1, flexBasis: '0px', minWidth: '0px', width: '100%' }}
         />
       </div>
       {children}
@@ -202,15 +210,26 @@ export function FilterSelect({
   children: ReactNode;
 }) {
   return (
-    <select
-      id={id}
-      aria-label={ariaLabel}
-      aria-describedby={ariaDescribedBy}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="input"
-    >
-      {children}
-    </select>
+    // The shared `.input` rule is unlayered `width: 100%`. On this row that
+    // makes every select a full line, so the account cards start below the
+    // fold at 1280px. A 176px basis that does not grow (max 224px) keeps four
+    // selects beside search inside the 992px column — wide enough for
+    // "Sort: pipeline value" when Reset is on the row — and leaves the leftover
+    // width to the search field. A long option stays in the list instead of
+    // widening the closed box. Inline, because a utility cannot beat that
+    // unlayered width and this page does not edit global CSS.
+    <div style={{ flex: '0 1 176px', maxWidth: 224, minWidth: '0px' }}>
+      <select
+        id={id}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input"
+        style={{ width: '100%', minWidth: '0px' }}
+      >
+        {children}
+      </select>
+    </div>
   );
 }
