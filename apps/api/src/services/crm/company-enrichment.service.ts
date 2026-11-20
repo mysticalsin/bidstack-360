@@ -329,6 +329,24 @@ function dedupeTechnicalStack(
 
 // ─── Fallback company ─────────────────────────────────────────────────────────
 
+/** Cockpit placeholder when the org has no account yet. No headcount and no revenue. */
+export function emptyWorkspaceCompany(): z.infer<typeof CrmCompany> {
+  return {
+    ...fallbackCompany('Workspace'),
+    id: 'none',
+    name: 'Workspace',
+    legalName: null,
+    domain: null,
+    website: null,
+    industry: null,
+    employeeCount: null,
+    annualRevenueMicros: null,
+    logo: null,
+    confidence: 0,
+    sourceAttribution: [],
+  };
+}
+
 export function fallbackCompany(name: string): z.infer<typeof CrmCompany> {
   const domain = domainFor(name);
   return {
@@ -455,6 +473,7 @@ export function buildCompanies(
     updatedAt: Date;
   }>,
   companyRows: Array<{ id: string; name: string; domain: string | null; logoUrl: string | null }> = [],
+  options?: { houseAccount?: boolean },
 ) {
   const byName = new Map<string, z.infer<typeof CrmCompany>>();
   for (const enrichment of enrichments) {
@@ -511,6 +530,6 @@ export function buildCompanies(
     }
   }
 
-  if (!byName.has('mantu')) byName.set('mantu', fallbackCompany('Mantu'));
+  if (options?.houseAccount !== false && !byName.has('mantu')) byName.set('mantu', fallbackCompany('Mantu'));
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

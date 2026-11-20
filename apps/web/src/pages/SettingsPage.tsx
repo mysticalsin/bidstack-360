@@ -25,6 +25,7 @@ import { OpportunityFiltersSection } from '@/components/settings/OpportunityFilt
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
 import { SigningEntitiesSection } from '@/components/settings/SigningEntitiesSection';
+import { DemoDataSection } from '@/components/settings/DemoDataSection';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
 import { useOrgAdminStatus } from '@/lib/auth';
@@ -41,6 +42,7 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   security: ['sectionSecurity', 'Profile & Security'],
   workspace: ['sectionWorkspace', 'Workspace'],
   identity: ['sectionIdentity', 'Identity & roles'],
+  'demo-data': ['sectionDemoData', 'Demo data'],
   crm: ['sectionCrm', 'Data configuration'],
   'data-import': ['sectionDataImport', 'Data import'],
   'top-accounts': ['sectionTopAccounts', 'Top accounts'],
@@ -64,6 +66,7 @@ const SETTINGS_SECTIONS = new Set<SettingsSection>(
 const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'serum',
   'identity',
+  'demo-data',
   'crm',
   'data-import',
   'top-accounts',
@@ -136,6 +139,7 @@ export function SettingsPage() {
     ),
     workspace: <WorkspaceSection />,
     identity: <IdentitySection />,
+    'demo-data': <DemoDataSection />,
     crm: <CrmConfigurationSection />,
     'data-import': <DataImportSection />,
     'top-accounts': <TopAccountsSection />,

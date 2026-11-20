@@ -122,9 +122,11 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
       <div className="en-foot">
         <p className="en-src" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} role="status">
           {d.sample ? <SampleBadge show /> : null}
-          {polling
-            ? 'Enrichment queued. Results appear here when the run finishes.'
-            : d.notice ?? (d.sample ? 'Illustrative firmographics until company enrichment is connected.' : null)}
+          {d.status === 'not_connected'
+            ? 'Not connected'
+            : polling
+              ? 'Enrichment queued. Results appear here when the run finishes.'
+              : d.notice ?? (d.sample ? 'Illustrative firmographics until company enrichment is connected.' : null)}
           {!d.sample && d.fetchedAt && !polling ? (
             <span>
               Enriched <time dateTime={d.fetchedAt}>{fmtAsOf(d.fetchedAt)}</time>{d.stale ? ' · due for refresh' : ''}

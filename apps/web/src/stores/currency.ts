@@ -355,7 +355,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
         if (Date.now() < ratesRetryAt) {
           set({
             ratesLoading: false,
-            ratesError: get().rates ? null : 'Exchange rates unavailable',
+            ratesError: get().rates ? null : 'Not connected',
           });
           return;
         }
@@ -374,9 +374,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
               (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
                 ? retryAfterSeconds * 1000
                 : 60_000);
-            throw new Error(
-              res.status === 429 ? 'Exchange rates rate limited' : `HTTP ${res.status}`,
-            );
+            throw new Error(res.status === 429 ? 'Exchange rates rate limited' : 'Not connected');
           }
           const rates = normalizeExchangeRates(await res.json());
           if (!rates) throw new Error('Exchange rates missing required CRM currencies');
@@ -388,14 +386,10 @@ export const useCurrencyStore = create<CurrencyStore>()(
           }
           set({ rates, ratesLoading: false, ratesError: null });
         })()
-          .catch((err) => {
+          .catch(() => {
             set({
               ratesLoading: false,
-              ratesError: get().rates
-                ? null
-                : err instanceof Error
-                  ? err.message
-                  : 'Failed to load rates',
+              ratesError: get().rates ? null : 'Not connected',
             });
           })
           .finally(() => {

@@ -182,6 +182,8 @@ export const ReleaseScore = z.object({
   total: z.number().int().min(0).max(100),
   passed: z.boolean(),
   scoredAt: z.string().datetime(),
+  /** False when no score has been recorded. The UI says Not connected. */
+  recorded: z.boolean().optional(),
 });
 export type ReleaseScore = z.infer<typeof ReleaseScore>;
 

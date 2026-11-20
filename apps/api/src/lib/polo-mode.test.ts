@@ -21,15 +21,18 @@ afterEach(() => {
 });
 
 describe('polo data mode', () => {
-  it('defaults to demo so main stays a fixture preview', () => {
+  it('defaults to real so an unset variable is not a fixture preview', () => {
     delete process.env.POLO_DATA_MODE;
-    expect(getPoloDataMode({})).toBe('demo');
+    expect(getPoloDataMode({})).toBe('real');
     expect(resolvePoloAuthProvider({})).toBe('stub');
   });
 
-  it('refuses real mode without Clerk or Cloudflare Access — that is the shared Jane Smith path', () => {
+  it('lets development boot in real mode and still refuses the stub in production', () => {
     expect(() =>
       assertPoloAuthBoot({ POLO_DATA_MODE: 'real', NODE_ENV: 'development' }),
+    ).not.toThrow();
+    expect(() =>
+      assertPoloAuthBoot({ POLO_DATA_MODE: 'real', NODE_ENV: 'production' }),
     ).toThrow(/stub\/shared Jane Smith is disabled/);
   });
 

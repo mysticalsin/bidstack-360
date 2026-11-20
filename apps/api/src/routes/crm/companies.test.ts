@@ -76,7 +76,8 @@ describe('crm companies routes', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(Array.isArray(body.items)).toBe(true);
-    expect(body.items.length).toBeGreaterThan(0);
+    // An empty org does not invent a house account.
+    expect(body.items.some((c: { name: string }) => c.name === 'Mantu')).toBe(false);
   });
 
   skipIfNoDb('GET /api/crm/companies/search?q= filters by query', async () => {
@@ -86,8 +87,7 @@ describe('crm companies routes', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.items.length).toBeGreaterThan(0);
-    expect(body.items.some((c: { name: string }) => c.name === 'Mantu')).toBe(true);
+    expect(body.items.some((c: { name: string }) => c.name === 'Mantu')).toBe(false);
   });
 
   skipIfNoDb('GET /api/crm/companies/search?limit= respects the limit', async () => {
@@ -100,18 +100,17 @@ describe('crm companies routes', () => {
   });
 
   skipIfNoDb(
-    'GET /api/crm/companies/lookup matches by domain and preserves Mantu attribution',
+    'GET /api/crm/companies/lookup does not invent Mantu for a domain nobody entered',
     async () => {
+      // WHY: mantu.com used to resolve to a fixture company with 12,000 employees.
       const res = await server.inject({
         method: 'GET',
         url: '/api/crm/companies/lookup?domain=mantu.com',
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.match).toBe('exact_domain');
-      expect(body.company.name).toBe('Mantu');
-      expect(body.company.logo.url).toBe('https://mantu.com/favicon.ico');
-      expect(body.company.logo.attribution.source).toBe('official_website');
+      expect(body.match).toBe('none');
+      expect(body.company).toBeNull();
     },
   );
 
@@ -122,8 +121,8 @@ describe('crm companies routes', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.match).toBe('exact_name');
-    expect(body.company.name).toBe('Mantu');
+    expect(body.match).toBe('none');
+    expect(body.company).toBeNull();
   });
 
   skipIfNoDb('GET /api/crm/companies/lookup with no params returns none', async () => {
@@ -142,8 +141,8 @@ describe('crm companies routes', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.match).toBe('fuzzy_name');
-    expect(body.company).not.toBeNull();
+    expect(body.match).toBe('none');
+    expect(body.company).toBeNull();
   });
 
   skipIfNoDb('GET /api/crm/companies/:id returns 404 for unknown company', async () => {

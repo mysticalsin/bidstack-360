@@ -2,7 +2,7 @@
 
 **Baseline:** `main` @ `8143d882` (green required CI: unit, integration, Chromium smoke, gitleaks).
 **Audience:** Mantu / Amaris group sales — a small colleague team, not a public SaaS.
-**Default branch stays demo.** Real-data mode is opt-in (`POLO_DATA_MODE=real`).
+**Real mode is the default.** Demo fixtures are opt-in (`POLO_DATA_MODE=demo`) and still hidden until Settings → Demo data is on. See `docs/real-mode.md`.
 
 This document is the gap list against loading **real** accounts, **real** revenue, and **real** signed MSAs/contracts. Priorities:
 
@@ -41,7 +41,7 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 | A1 | **P0** | **Fixed** | Preview visitors all share stub admin Jane Smith (`jane@mantu.com` UI / `jane.smith@mantu.com` DB). Cloudflare Access only gates the Worker. |
 | A2 | **P0** | **Fixed** | Access JWT/email was stripped before the box API. Polo now maps `Cf-Access-Authenticated-User-Email` (loopback, Worker-verified) or a re-verified Access JWT to a per-user Polo user + system role. |
 | A3 | **P0** | **Fixed** | No application allowlist. `POLO_ALLOWED_USERS=email:Role,…` is required when `CF_ACCESS_AUTH=true`. Unlisted emails get 403. |
-| A4 | **P0** | **Fixed** | `POLO_DATA_MODE=real` refuses stub and demo. Default remains `demo`. |
+| A4 | **P0** | **Fixed** | Unset `POLO_DATA_MODE` is real. Production still refuses the stub. Development may use it to enter records. |
 | A5 | P1 | Open | SPA stub persona email (`jane@mantu.com`) still differs from the seed user in demo/stub. Harmless in demo; do not use stub for real data. |
 | A6 | P2 | Open | No direct Entra OIDC adapter (Clerk remains the corporate IdP path if Access is not used). |
 

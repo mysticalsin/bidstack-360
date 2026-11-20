@@ -18,6 +18,7 @@ import { type z } from 'zod';
 import { type PrismaClient } from '@bidstack/db';
 import type { AiInsight, CrmDashboardSnapshot } from '@bidstack/shared';
 
+import { orgDemoDataEnabled, unrecordedReleaseScore } from '../../lib/demo-data.js';
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
 import {
   accountOpportunityScopePredicate,
@@ -28,6 +29,7 @@ import {
 import {
   buildCompanies,
   companyFromRow,
+  emptyWorkspaceCompany,
   fallbackCompany,
   findSelectedCompany,
 } from './company-enrichment.service.js';
@@ -328,7 +330,10 @@ export async function buildDashboardSnapshot(
     scope && !scope.unrestricted
       ? new Set(opportunities.map((opportunity) => opportunity.id))
       : null;
-  const companies = buildCompanies(opportunities, enrichments, companyRows).filter(
+  const demo = await orgDemoDataEnabled(orgId, prisma);
+  const companies = buildCompanies(opportunities, enrichments, companyRows, {
+    houseAccount: demo,
+  }).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
   // A requested account with no opportunity or enrichment yet (new, imported or sparse) still
@@ -359,14 +364,17 @@ export async function buildDashboardSnapshot(
         sourceAttribution: parseAttribution(insight.sourceAttribution),
         createdAt: insight.createdAt.toISOString(),
       }))
-    : buildDefaultInsights(opportunities);
-  const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : DEFAULT_WIDGETS;
-  const selectedCompany =
-    findSelectedCompany(companies, accountId) ??
-    companies.find((company) => company.name === 'CI Financial') ??
-    companies.find((company) => company.name === 'Mantu') ??
-    companies[0] ??
-    fallbackCompany('Mantu');
+    : demo
+      ? buildDefaultInsights(opportunities)
+      : [];
+  const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : demo ? DEFAULT_WIDGETS : [];
+  const selectedCompany = demo
+    ? (findSelectedCompany(companies, accountId) ??
+      companies.find((company) => company.name === 'CI Financial') ??
+      companies.find((company) => company.name === 'Mantu') ??
+      companies[0] ??
+      fallbackCompany('Mantu'))
+    : (findSelectedCompany(companies, accountId) ?? companies[0] ?? emptyWorkspaceCompany());
   const [fieldOverrides, performance] = await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },
@@ -383,6 +391,7 @@ export async function buildDashboardSnapshot(
     cockpit: buildCockpit({
       company: selectedCompany,
       companies,
+      includeSampleStack: demo,
       opportunities,
       contacts,
       tasks,
@@ -399,12 +408,18 @@ export async function buildDashboardSnapshot(
     widgets: dashboardWidgets,
     bidOpportunities: bidRows.length
       ? bidRows.map(serializeBidOpportunity)
-      : defaultBidOpportunities(),
+      : demo
+        ? defaultBidOpportunities()
+        : [],
     providerHealth: providerRows.length
       ? mergeProviderHealth(providerRows.map(serializeProviderHealth))
       : defaultProviderHealth(),
     queueHealth: queueRows.length ? queueRows.map(serializeQueueHealth) : defaultQueueHealth(),
-    releaseScore: releaseScoreRow ? serializeReleaseScore(releaseScoreRow) : defaultReleaseScore(),
+    releaseScore: releaseScoreRow
+      ? serializeReleaseScore(releaseScoreRow)
+      : demo
+        ? defaultReleaseScore()
+        : unrecordedReleaseScore(),
   };
 }
 

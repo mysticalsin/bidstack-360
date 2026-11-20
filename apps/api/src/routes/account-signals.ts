@@ -25,6 +25,7 @@ import {
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { orgDemoDataEnabled, presentKeyNumbers, presentPositioning } from '../lib/demo-data.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import {
@@ -105,6 +106,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const from = new Date(now.getTime() - req.query.days * DAY);
       const to = new Date(now.getTime() + 90 * DAY);
       const ids = (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
+      const demo = await orgDemoDataEnabled(orgId);
       const live = await companiesWithLiveSignals(orgId, ids);
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
@@ -123,12 +125,28 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 100,
         }),
         prisma.accountWatchEvent.findMany({
-          where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) },
+          where: {
+            orgId,
+            companyId: { in: ids },
+            status: { not: 'DISMISSED' },
+            occurredAt: { gte: from, lte: to },
+            ...(demo ? hideSampleWhere(live) : { sample: false }),
+          },
           orderBy: { occurredAt: 'desc' },
           take: timelineEventTake(),
         }),
         prisma.accountEarningsDate.findMany({ where: { orgId, companyId: { in: ids }, expectedAt: { gte: from, lte: to } }, take: 20 }),
-        prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: from } }, select: { postedAt: true }, orderBy: { postedAt: 'desc' }, take: 1000 }),
+        prisma.companyJobPosting.findMany({
+          where: {
+            orgId,
+            companyId: { in: ids },
+            postedAt: { gte: from },
+            ...(demo ? {} : { sample: false, source: { not: 'fixture' } }),
+          },
+          select: { postedAt: true },
+          orderBy: { postedAt: 'desc' },
+          take: 1000,
+        }),
       ]);
       const items: TimelineItem[] = [];
       const push = (i: Omit<TimelineItem, 'upcoming'>) => items.push({ ...i, upcoming: new Date(i.at).getTime() > now.getTime() });
@@ -178,6 +196,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         });
       }
       for (const d of earnings) {
+        if (!demo && d.source === 'sample') continue;
         push({ id: `er:${d.id}`, at: d.expectedAt.toISOString(), lane: 'theirs', category: 'earnings', title: `Results ${d.fiscalPeriod}${d.confirmed ? '' : ' (expected)'}`, summary: d.confirmed ? 'Confirmed date' : 'Estimated date', source: d.source, sourceUrl: d.sourceUrl || null, href: null, importance: 45, implication: 'NEUTRAL', sample: d.source === 'sample' });
       }
       // Hiring spikes: weeks with at least 5 postings and twice the median week.
@@ -235,7 +254,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const company = await readable(req, req.params.companyId);
       const scope = await getAccessScope(orgId, userId);
       const items = await loadInitiatives(orgId, scope, company, new Date());
-      return { companyId: company.id, items };
+      const demo = await orgDemoDataEnabled(orgId);
+      return { companyId: company.id, items: demo ? items : items.filter((item) => !item.sample) };
     },
   );
 
@@ -245,7 +265,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { orgId, userId } = req.auth;
       const company = await readable(req, req.params.companyId);
-      return loadPositioning(orgId, await getAccessScope(orgId, userId), company.id);
+      const body = await loadPositioning(orgId, await getAccessScope(orgId, userId), company.id);
+      return presentPositioning(body, await orgDemoDataEnabled(orgId));
     },
   );
 
@@ -255,7 +276,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { orgId, userId } = req.auth;
       const company = await readable(req, req.params.companyId);
-      return loadKeyNumbers(orgId, await getAccessScope(orgId, userId), company.id);
+      const body = await loadKeyNumbers(orgId, await getAccessScope(orgId, userId), company.id);
+      return presentKeyNumbers(body, await orgDemoDataEnabled(orgId));
     },
   );
 

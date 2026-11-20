@@ -36,9 +36,10 @@ export const envSchema = z.object({
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
 
   // ─── Polo data mode + Cloudflare Access identity ──────────────────────
-  // Default stays demo so main/preview keep fixture data. Real mode refuses
-  // the shared stub Jane Smith session and requires Clerk or CF Access.
-  POLO_DATA_MODE: z.enum(['demo', 'real']).default('demo'),
+  // Unset means real. Demo is an explicit opt-in. Production real mode
+  // refuses the shared stub and requires Clerk or Cloudflare Access.
+  // Development and test may use the existing stub.
+  POLO_DATA_MODE: z.enum(['demo', 'real']).default('real'),
   POLO_ALLOWED_USERS: z.string().optional().or(z.literal('')),
   POLO_REAL_ORG_CLERK: z.string().min(1).default('org_polo_real'),
   CF_ACCESS_AUTH: z.enum(['true', 'false']).default('false'),
@@ -524,7 +525,12 @@ export function getEnv(): Env {
   if (env.POLO_DATA_MODE === 'real' && env.DEMO_MODE === 'true') {
     semanticErrors.push('POLO_DATA_MODE=real cannot run with DEMO_MODE=true');
   }
-  if (env.POLO_DATA_MODE === 'real' && !env.CLERK_SECRET_KEY && env.CF_ACCESS_AUTH !== 'true') {
+  if (
+    env.POLO_DATA_MODE === 'real' &&
+    env.NODE_ENV === 'production' &&
+    !env.CLERK_SECRET_KEY &&
+    env.CF_ACCESS_AUTH !== 'true'
+  ) {
     semanticErrors.push(
       'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true (shared stub identity is disabled)',
     );

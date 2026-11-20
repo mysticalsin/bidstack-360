@@ -22,6 +22,7 @@ import type {
 
 import { buildCompanies } from './company-enrichment.service.js';
 import { buildCockpit, type AccountPerformance } from './dashboard.cockpit.js';
+import { orgDemoDataEnabled, unrecordedReleaseScore } from '../../lib/demo-data.js';
 import { defaultReleaseScore } from './dashboard.defaults.js';
 import { asProviderStatus, mapDealStage, normalizeName, record } from './dashboard.utils.js';
 import {
@@ -174,7 +175,9 @@ export async function getReleaseScore(
     },
     orderBy: { scoredAt: 'desc' },
   });
-  return row ? serializeReleaseScore(row) : defaultReleaseScore();
+  if (row) return serializeReleaseScore(row);
+  if (!(await orgDemoDataEnabled(orgId, prisma))) return unrecordedReleaseScore();
+  return defaultReleaseScore();
 }
 
 // ─── Lean company query ────────────────────────────────────────────────────────
@@ -235,7 +238,8 @@ export async function getCompaniesOnly(
     scope && !scope.unrestricted
       ? new Set(opportunities.map((opportunity) => normalizeName(opportunity.customer)))
       : null;
-  return buildCompanies(opportunities, enrichments).filter(
+  const demo = await orgDemoDataEnabled(orgId, prisma);
+  return buildCompanies(opportunities, enrichments, [], { houseAccount: demo }).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
 }
@@ -261,7 +265,10 @@ export async function resolveCockpitCompany(
     where: { orgId, deletedAt: null, ...(isUuid ? { id: companyId } : { normalizedName: companyId }) },
     select: ENRICHMENT_SELECT,
   });
-  if (enrichment) return buildCompanies([], [enrichment])[0] ?? null;
+  if (enrichment) {
+    const list = buildCompanies([], [enrichment], [], { houseAccount: false });
+    return list.find((company) => company.id === enrichment.id) ?? null;
+  }
   if (isUuid) {
     // A UUID that isn't an enrichment may be a Company-table row (manual / key /
     // top account). Resolve it so the cockpit doesn't 404; merge its by-name
@@ -276,11 +283,12 @@ export async function resolveCockpitCompany(
       select: ENRICHMENT_SELECT,
     });
     const list = byNameEnrichment
-      ? buildCompanies([], [byNameEnrichment], [company])
+      ? buildCompanies([], [byNameEnrichment], [company], { houseAccount: false })
       : buildCompanies(
           [{ customer: company.name, industry: null, logoUrl: company.logoUrl, updatedAt: new Date() }],
           [],
           [company],
+          { houseAccount: false },
         );
     // buildCompanies always appends a Mantu fallback and sorts by name, so pick by
     // identity, not position. An enrichment keeps its id unless its display name
@@ -305,7 +313,7 @@ export async function resolveCockpitCompany(
     distinct: ['customer'],
     take: 1000,
   });
-  return buildCompanies(opportunities, []).find((c) => c.id === companyId) ?? null;
+  return buildCompanies(opportunities, [], [], { houseAccount: false }).find((c) => c.id === companyId) ?? null;
 }
 
 // ─── Per-company cockpit query ────────────────────────────────────────────────
@@ -448,11 +456,13 @@ export async function buildCompanyCockpit(
       }),
     ]);
 
+  const demo = await orgDemoDataEnabled(orgId, prismaClient);
   return buildCockpit({
     company,
     // buildCockpit's type accepts the company list but never reads it; pass the
     // resolved company alone rather than re-loading the whole org.
     companies: [company],
+    includeSampleStack: demo,
     opportunities,
     contacts,
     tasks,

@@ -1,16 +1,17 @@
 /**
  * Polo data-mode and auth-provider resolution.
  *
- * Default is demo so `main` stays a fixture-friendly preview. Real mode is an
- * explicit operator opt-in (`POLO_DATA_MODE=real`) and refuses the shared stub
- * Jane Smith session.
+ * Real mode is the default. Demo mode is an explicit opt-in
+ * (`POLO_DATA_MODE=demo`). Production real mode refuses the shared stub.
+ * Development and test keep that stub so an operator can sign in and enter
+ * their own records without a new identity provider.
  */
 
 export type PoloDataMode = 'demo' | 'real';
 export type PoloAuthProvider = 'stub' | 'clerk' | 'demo' | 'cf-access';
 
 export function getPoloDataMode(env: NodeJS.ProcessEnv = process.env): PoloDataMode {
-  return env.POLO_DATA_MODE === 'real' ? 'real' : 'demo';
+  return env.POLO_DATA_MODE === 'demo' ? 'demo' : 'real';
 }
 
 export function isRealDataMode(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -61,7 +62,8 @@ export function assertPoloAuthBoot(env: NodeJS.ProcessEnv = process.env): void {
   if (dataMode === 'real' && demo) {
     throw new Error('POLO_DATA_MODE=real cannot run with DEMO_MODE=true');
   }
-  if (dataMode === 'real' && !hasClerk && !cfAccess) {
+  // Development and test may use the existing stub. Production may not.
+  if (dataMode === 'real' && !allowStub && !hasClerk && !cfAccess) {
     throw new Error(
       'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true (stub/shared Jane Smith is disabled)',
     );

@@ -12,11 +12,11 @@ import { verifyToken } from '@clerk/backend';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 
-import { prisma } from '@bidstack/db';
+import { prisma, seedRolesAndPermissions } from '@bidstack/db';
 
 import { emailDomainForTelemetry } from '../lib/email-privacy.js';
 import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
-import { assertPoloAuthBoot, isCfAccessAuthEnabled, isRealDataMode } from '../lib/polo-mode.js';
+import { assertPoloAuthBoot, getPoloDataMode, isCfAccessAuthEnabled, isRealDataMode } from '../lib/polo-mode.js';
 import { writeAuthAudit } from './auth-audit.js';
 import { verifyCfAccessAuth } from './cf-access-auth.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
@@ -44,6 +44,48 @@ export interface AuthContext {
 }
 
 const STUB_CLERK_ORG = 'org_seed_mantu';
+
+/**
+ * First local sign-in in real mode. Creates the workspace, the system roles,
+ * and one admin user. No companies, contacts, deals, or sample numbers.
+ */
+async function ensureEmptyRealWorkspace(clerkOrg: string) {
+  const org = await prisma.org.upsert({
+    where: { clerkOrg },
+    create: { clerkOrg, name: 'Workspace' },
+    update: {},
+  });
+  await seedRolesAndPermissions(prisma, org.id, new Map());
+  await ensureEmptyRealUser(org.id);
+  return org;
+}
+
+async function ensureEmptyRealUser(orgId: string) {
+  const existing = await prisma.user.findFirst({
+    where: { orgId, deletedAt: null },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (existing) return existing;
+  const user = await prisma.user.create({
+    data: {
+      orgId,
+      clerkUser: 'user_stub_jane',
+      email: 'jane.smith@mantu.com',
+      name: 'Jane Smith',
+      role: 'admin',
+    },
+  });
+  const admin = await prisma.role.findFirst({
+    where: { orgId, name: 'Admin', deletedAt: null },
+    select: { id: true },
+  });
+  if (admin) {
+    await prisma.userRole.create({
+      data: { orgId, userId: user.id, roleId: admin.id },
+    });
+  }
+  return user;
+}
 const STUB_ROLE_HEADER = 'x-bidstack-e2e-role';
 // Test-only seam: lets an integration test point a stub session at a throwaway
 // org (clerkOrg value) instead of the shared seed org, so suites can isolate on
@@ -328,11 +370,14 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
   // All three only reachable in stub mode, which is dev/test + loopback only.
   const clerkOrg =
     readStubOrgOverride(req) ?? process.env.BIDSTACK_STUB_ORG_CLERK ?? STUB_CLERK_ORG;
-  const org = await prisma.org.findUnique({ where: { clerkOrg } });
+  let org = await prisma.org.findUnique({ where: { clerkOrg } });
+  if (!org && getPoloDataMode() === 'real' && clerkOrg === STUB_CLERK_ORG) {
+    org = await ensureEmptyRealWorkspace(clerkOrg);
+  }
   if (!org) {
     throw req.server.httpErrors.serviceUnavailable(
       clerkOrg === STUB_CLERK_ORG
-        ? 'Stub auth: seed org missing — run `pnpm db:seed`'
+        ? 'Stub auth: seed org missing — run `pnpm db:seed` with POLO_DATA_MODE=demo, or leave the variable unset to start an empty workspace'
         : `Stub auth: override org ${clerkOrg} not found`,
     );
   }
@@ -345,6 +390,16 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
     where: { orgId: org.id },
     orderBy: { createdAt: 'asc' },
   });
+  if (!user && getPoloDataMode() === 'real' && clerkOrg === STUB_CLERK_ORG) {
+    const created = await ensureEmptyRealUser(org.id);
+    return {
+      orgId: org.id,
+      userId: created.id,
+      scopes: ['read', 'write'],
+      role: created.role,
+      email: created.email ?? undefined,
+    };
+  }
   if (!user) {
     throw req.server.httpErrors.serviceUnavailable('Stub auth: no seed user — run `pnpm db:seed`');
   }

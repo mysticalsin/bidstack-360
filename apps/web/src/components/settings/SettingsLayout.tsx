@@ -29,6 +29,7 @@ export type SettingsSection =
   | 'webhooks'
   | 'audit-log'
   | 'identity'
+  | 'demo-data'
   | 'developer';
 
 interface Group {
@@ -67,6 +68,7 @@ const GROUPS: Group[] = [
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
       { id: 'identity', label: 'Identity & roles', icon: 'contacts', admin: true },
+      { id: 'demo-data', label: 'Demo data', icon: 'sparkle', admin: true },
       { id: 'crm', label: 'Data configuration', icon: 'sliders', admin: true },
       { id: 'data-import', label: 'Data import', icon: 'upload', admin: true },
       { id: 'top-accounts', label: 'Top accounts', icon: 'star', admin: true },
@@ -133,6 +135,8 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemWorkspace', 'Workspace');
       case 'identity':
         return t('settingsLayout.itemIdentity', 'Identity & roles');
+      case 'demo-data':
+        return t('settingsLayout.itemDemoData', 'Demo data');
       case 'crm':
         return t('settingsLayout.itemCrm', 'Data configuration');
       case 'data-import':
