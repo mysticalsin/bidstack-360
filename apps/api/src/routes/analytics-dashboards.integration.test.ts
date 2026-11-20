@@ -215,4 +215,142 @@ describe('analytics dashboards routes', () => {
     });
     expect(audit).not.toBeNull();
   });
+
+  skipIfNoDb(
+    'a non-owner sales manager is forbidden from adding a widget to a shared dashboard',
+    async () => {
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const created = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          payload: { name: 'Owner shared board', isShared: true },
+        });
+        expect(created.statusCode).toBe(201);
+        const dashboardId = (created.json() as { id: string; ownerId: string }).id;
+        createdDashboardIds.push(dashboardId);
+
+        const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
+        const denied = await server.inject({
+          method: 'POST',
+          url: `/api/dashboards/${dashboardId}/widgets`,
+          headers: salesManager,
+          payload: { title: 'Teammate widget', type: 'kpi' },
+        });
+        expect(denied.statusCode).toBe(403);
+        expect((denied.json() as { message: string }).message).toBe(
+          'Only the owner or an admin can modify this dashboard',
+        );
+
+        const widgets = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${dashboardId}/widgets`,
+          headers: salesManager,
+        });
+        expect(widgets.statusCode).toBe(200);
+        expect(widgets.json()).toEqual([]);
+      } finally {
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
+
+  skipIfNoDb(
+    'an org admin who does not own a shared dashboard can still add a widget',
+    async () => {
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
+        const ownedByManager = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          headers: salesManager,
+          payload: { name: 'Manager shared board', isShared: true },
+        });
+        expect(ownedByManager.statusCode).toBe(201);
+        const managerDashboardId = (ownedByManager.json() as { id: string }).id;
+        createdDashboardIds.push(managerDashboardId);
+
+        const adminWidget = await server.inject({
+          method: 'POST',
+          url: `/api/dashboards/${managerDashboardId}/widgets`,
+          payload: { title: 'Admin widget', type: 'kpi' },
+        });
+        expect(adminWidget.statusCode).toBe(201);
+        const widgetId = (adminWidget.json() as { id: string }).id;
+        createdWidgetIds.push(widgetId);
+
+        const widgets = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${managerDashboardId}/widgets`,
+        });
+        expect(widgets.statusCode).toBe(200);
+        expect((widgets.json() as Array<{ id: string }>).some((w) => w.id === widgetId)).toBe(true);
+      } finally {
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
+
+  skipIfNoDb(
+    'canEdit is true for the owner and for an admin, and false for any other reports:write user',
+    async () => {
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
+        const ownedByManager = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          headers: salesManager,
+          payload: { name: 'Manager flag board', isShared: true },
+        });
+        expect(ownedByManager.statusCode).toBe(201);
+        const managerDashboardId = (ownedByManager.json() as { id: string }).id;
+        createdDashboardIds.push(managerDashboardId);
+
+        const managerList = await server.inject({
+          method: 'GET',
+          url: '/api/dashboards',
+          headers: salesManager,
+        });
+        const managerRow = (
+          managerList.json() as Array<{ id: string; canEdit?: boolean }>
+        ).find((d) => d.id === managerDashboardId);
+        expect(managerRow?.canEdit).toBe(true);
+
+        const adminList = await server.inject({ method: 'GET', url: '/api/dashboards' });
+        const adminRow = (adminList.json() as Array<{ id: string; canEdit?: boolean }>).find(
+          (d) => d.id === managerDashboardId,
+        );
+        expect(adminRow?.canEdit).toBe(true);
+
+        const ownedByAdmin = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          payload: { name: 'Admin flag board', isShared: true },
+        });
+        expect(ownedByAdmin.statusCode).toBe(201);
+        const adminDashboardId = (ownedByAdmin.json() as { id: string }).id;
+        createdDashboardIds.push(adminDashboardId);
+
+        const teammateList = await server.inject({
+          method: 'GET',
+          url: '/api/dashboards',
+          headers: salesManager,
+        });
+        const teammateRow = (
+          teammateList.json() as Array<{ id: string; canEdit?: boolean }>
+        ).find((d) => d.id === adminDashboardId);
+        expect(teammateRow?.canEdit).toBe(false);
+      } finally {
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
 });
