@@ -107,7 +107,7 @@ function cockpit(kpis: CockpitKpi[]): AccountCockpitSnapshot {
     externalLastSyncedAt: '2026-06-01T12:00:00.000Z',
     kpis,
     revenueEvolution: [],
-    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: '0', lostValueMicros: '0', winRate: 0 },
+    winLoss: { wonCount: 0, lostCount: 0, wonValueMicros: 0, lostValueMicros: 0, winRate: 0 },
     technicalStack: [],
     health: { score: 80, band: 'good', counts: {}, factors: [] },
     keyContacts: [],
@@ -162,6 +162,43 @@ describe('KpiRow field overrides', () => {
         body: { fieldKey: 'industry', value: 'Aerospace & Defense' },
       });
     });
+  });
+
+  it('shows a sourced revenue in its own currency instead of "connect Apollo to verify"', async () => {
+    vi.mocked(api).mockImplementation(async (path: string) =>
+      path.endsWith('/key-numbers')
+        ? {
+            companyName: 'Acme North',
+            items: [
+              {
+                id: 'revenue',
+                value: 86_100_000_000,
+                unit: 'money',
+                currency: 'NOK',
+                provenance: { origin: 'manual_sourced', label: 'Annual report 2025', url: 'https://acme.example/ar', unverified: false },
+              },
+            ],
+          }
+        : {},
+    );
+    renderKpiRow([
+      {
+        label: 'Annual revenue',
+        value: 'Not verified',
+        detail: 'connect Apollo to verify',
+        tone: 'amber',
+        sourceLabel: 'Needs enrichment',
+        sourceState: 'missing',
+        sourceHint: 'Connect an external data source',
+        block: 'external',
+        fieldKey: 'annualRevenueMicros',
+      },
+    ]);
+
+    expect(await screen.findByTestId('kpi-chip-annualRevenueMicros')).toBeTruthy();
+    expect(screen.getByText(/NOK/)).toBeTruthy();
+    expect(screen.queryByText('connect Apollo to verify')).toBeNull();
+    expect(screen.queryByText('Needs enrichment')).toBeNull();
   });
 
   it('keeps the revert action visible after an overridden KPI moves to Internal Data', async () => {

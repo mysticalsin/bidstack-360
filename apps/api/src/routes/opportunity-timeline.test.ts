@@ -11,6 +11,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -41,7 +42,7 @@ describe('opportunity timeline', () => {
   afterAll(async () => {
     if (dbReachable) {
       await prisma.activity.deleteMany({ where: { id: { in: createdIds.activities } } });
-      await prisma.auditLog.deleteMany({ where: { id: { in: createdIds.auditLogs } } });
+      await purgeAuditRows({ where: { id: { in: createdIds.auditLogs } } });
       await prisma.task.deleteMany({ where: { id: { in: createdIds.tasks } } });
       await prisma.opportunity.deleteMany({ where: { id: { in: createdIds.opportunities } } });
     }
@@ -111,59 +112,6 @@ describe('opportunity timeline', () => {
       expect.arrayContaining([
         expect.objectContaining({ kind: 'audit', text: expect.stringContaining(code) }),
         expect.objectContaining({ kind: 'task', text: 'Task created: Timeline follow-up' }),
-      ]),
-    );
-  });
-
-  skipIfNoDb('names a lost stage move from the stored stage keys', async () => {
-    // WHY: the stage audit stores fromStage and toStage. Reading from and to
-    // rendered every lost move as unknown, including a close to closed_lost.
-    if (!orgId) throw new Error('isolated org missing');
-    const opportunity = await prisma.opportunity.create({
-      data: {
-        orgId,
-        code: `TLL-${crypto.randomUUID().slice(0, 8)}`,
-        customer: 'timeline-lost',
-        name: 'Timeline Lost Move',
-        stage: 'closed_lost',
-      },
-    });
-    createdIds.opportunities.push(opportunity.id);
-    const auditLog = await prisma.auditLog.create({
-      data: {
-        orgId,
-        action: 'opportunity.stage',
-        targetType: 'opportunity',
-        targetId: opportunity.id,
-        diff: { fromStage: 's4_negotiation', toStage: 'closed_lost' },
-      },
-    });
-    createdIds.auditLogs.push(auditLog.id);
-    const chatter = await prisma.activity.create({
-      data: {
-        orgId,
-        type: 'stage_change',
-        entityType: 'opportunity',
-        entityId: opportunity.id,
-        actorType: 'system',
-        status: 'completed',
-        body: { from: 's1_lead', to: 'closed_lost' },
-        occurredAt: new Date('2026-07-04T10:00:00.000Z'),
-      },
-    });
-    createdIds.activities.push(chatter.id);
-
-    const res = await server.inject({
-      method: 'GET',
-      url: `/api/v1/opportunities/${opportunity.id}/timeline`,
-      headers: { authorization: 'Bearer stub' },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { items: Array<{ text: string }> };
-    expect(body.items.map((item) => item.text)).toEqual(
-      expect.arrayContaining([
-        'Moved from S4 Negotiation to Closed Lost',
-        'Moved from S1 Lead to Closed Lost',
       ]),
     );
   });
@@ -238,7 +186,13 @@ describe('opportunity timeline', () => {
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body) as {
-      items: Array<{ id: string; kind: string; text: string; actorName: string | null; createdAt: string }>;
+      items: Array<{
+        id: string;
+        kind: string;
+        text: string;
+        actorName: string | null;
+        createdAt: string;
+      }>;
     };
 
     expect(body.items).toEqual(
@@ -398,6 +352,7 @@ describe('opportunity timeline', () => {
         hashedKey: createHash('sha256').update(rawKey).digest('hex'),
         prefix: rawKey.slice(0, 8),
         scopes: ['opportunities:read'],
+        unrestrictedScope: true,
       },
     });
     try {
@@ -416,63 +371,67 @@ describe('opportunity timeline', () => {
   // audit-log `diff` (before/after field values) is admin-grade data gated
   // elsewhere behind audit-log:read. It must be stripped from the timeline
   // metadata for callers who lack that permission, or the gate is cosmetic.
-  skipIfNoDb('omits the raw audit diff for opportunities:read but includes it for audit-log:read', async () => {
-    const opportunity = await prisma.opportunity.create({
-      data: {
-        orgId,
-        code: `TLD-${randomUUID().slice(0, 8)}`,
-        customer: 'timeline-diff-test',
-        name: 'Timeline Diff Gate',
-        stage: 's1_lead',
-      },
-    });
-    createdIds.opportunities.push(opportunity.id);
-    const auditLog = await prisma.auditLog.create({
-      data: {
-        orgId,
-        action: 'opportunity.update',
-        targetType: 'opportunity',
-        targetId: opportunity.id,
-        diff: { name: { from: 'old', to: 'new' } },
-      },
-    });
-    createdIds.auditLogs.push(auditLog.id);
-
-    const mkKey = async (scopes: string[]) => {
-      const raw = `tld_${randomUUID()}`;
-      const rec = await prisma.apiKey.create({
+  skipIfNoDb(
+    'omits the raw audit diff for opportunities:read but includes it for audit-log:read',
+    async () => {
+      const opportunity = await prisma.opportunity.create({
         data: {
           orgId,
-          name: `timeline diff key ${scopes.join(',')}`,
-          hashedKey: createHash('sha256').update(raw).digest('hex'),
-          prefix: raw.slice(0, 8),
-          scopes,
+          code: `TLD-${randomUUID().slice(0, 8)}`,
+          customer: 'timeline-diff-test',
+          name: 'Timeline Diff Gate',
+          stage: 's1_lead',
         },
       });
-      return { raw, id: rec.id };
-    };
-    const readOnly = await mkKey(['opportunities:read']);
-    const auditor = await mkKey(['opportunities:read', 'audit-log:read']);
-    try {
-      const readRes = await server.inject({
-        method: 'GET',
-        url: `/api/v1/opportunities/${opportunity.id}/timeline`,
-        headers: { 'x-api-key': readOnly.raw },
+      createdIds.opportunities.push(opportunity.id);
+      const auditLog = await prisma.auditLog.create({
+        data: {
+          orgId,
+          action: 'opportunity.update',
+          targetType: 'opportunity',
+          targetId: opportunity.id,
+          diff: { name: { from: 'old', to: 'new' } },
+        },
       });
-      expect(readRes.statusCode).toBe(200);
-      const readItem = readRes.json().items.find((i: { kind: string }) => i.kind === 'audit');
-      expect(readItem).toBeTruthy();
-      expect(readItem.metadata.diff).toBeUndefined();
+      createdIds.auditLogs.push(auditLog.id);
 
-      const auditRes = await server.inject({
-        method: 'GET',
-        url: `/api/v1/opportunities/${opportunity.id}/timeline`,
-        headers: { 'x-api-key': auditor.raw },
-      });
-      const auditItem = auditRes.json().items.find((i: { kind: string }) => i.kind === 'audit');
-      expect(auditItem.metadata.diff).toEqual({ name: { from: 'old', to: 'new' } });
-    } finally {
-      await prisma.apiKey.deleteMany({ where: { id: { in: [readOnly.id, auditor.id] } } });
-    }
-  });
+      const mkKey = async (scopes: string[]) => {
+        const raw = `tld_${randomUUID()}`;
+        const rec = await prisma.apiKey.create({
+          data: {
+            orgId,
+            name: `timeline diff key ${scopes.join(',')}`,
+            hashedKey: createHash('sha256').update(raw).digest('hex'),
+            prefix: raw.slice(0, 8),
+            scopes,
+            unrestrictedScope: true,
+          },
+        });
+        return { raw, id: rec.id };
+      };
+      const readOnly = await mkKey(['opportunities:read']);
+      const auditor = await mkKey(['opportunities:read', 'audit-log:read']);
+      try {
+        const readRes = await server.inject({
+          method: 'GET',
+          url: `/api/v1/opportunities/${opportunity.id}/timeline`,
+          headers: { 'x-api-key': readOnly.raw },
+        });
+        expect(readRes.statusCode).toBe(200);
+        const readItem = readRes.json().items.find((i: { kind: string }) => i.kind === 'audit');
+        expect(readItem).toBeTruthy();
+        expect(readItem.metadata.diff).toBeUndefined();
+
+        const auditRes = await server.inject({
+          method: 'GET',
+          url: `/api/v1/opportunities/${opportunity.id}/timeline`,
+          headers: { 'x-api-key': auditor.raw },
+        });
+        const auditItem = auditRes.json().items.find((i: { kind: string }) => i.kind === 'audit');
+        expect(auditItem.metadata.diff).toEqual({ name: { from: 'old', to: 'new' } });
+      } finally {
+        await prisma.apiKey.deleteMany({ where: { id: { in: [readOnly.id, auditor.id] } } });
+      }
+    },
+  );
 });

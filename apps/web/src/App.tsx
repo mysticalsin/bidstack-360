@@ -4,6 +4,8 @@ import { useLocation } from 'react-router-dom';
 
 import { useUser } from '@/lib/auth';
 import { CommandPalette } from '@/components/command/CommandPalette';
+import { JarvisPanel } from '@/components/command/JarvisPanel';
+import { useJarvisHotkey } from '@/components/command/jarvisStore';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LiveAnnouncer } from '@/components/a11y/LiveAnnouncer';
 import { ConfettiHost } from '@/components/delight/Confetti';
@@ -33,6 +35,7 @@ import { AppRoutes } from '@/routes/AppRoutes';
 export function App() {
   const palette = useCommandPalette();
   useHelpDrawerHotkey();
+  useJarvisHotkey();
   useCmdDotClose();
   useGlobalShortcuts();
   useGlobalUndoHotkey();
@@ -87,6 +90,7 @@ export function App() {
           <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
           <QuickAddMenu />
           <HelpDrawer />
+          <JarvisPanel />
           {/* Global hosts — mount once so any component can dispatch without prop-drilling */}
           <Toaster />
           <ConfirmHost />

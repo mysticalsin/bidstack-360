@@ -123,8 +123,9 @@ test('technical stack source pull and manual add flow stay usable', async ({
 
   try {
     await gotoAndWait(`/accounts/${accountId}`);
-    // The cockpit cards sit behind the "Account details" fold.
-    await page.getByRole('main').getByRole('button', { name: /^Account details/ }).click();
+    // The cockpit cards sit in the "Account details" fold, open by default.
+    const fold = page.getByRole('main').getByRole('button', { name: /^Account details/ });
+    if ((await fold.getAttribute('aria-expanded')) !== 'true') await fold.click();
 
     const stackSection = page.getByRole('region', { name: /technical stack overview/i });
     await expect(stackSection, 'technical stack region must mount').toBeVisible({

@@ -51,7 +51,9 @@ afterAll(async () => {
 
 const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
-async function createApiKey(scopes: string[]): Promise<string> {
+async function createApiKey(scopes: string[], readOnly = false): Promise<string> {
+  // B2 defaults new keys to readOnly=true. These tests exercise scope and
+  // human-actor gates, so they opt into a writable key explicitly.
   const raw = `ai-compute-${randomUUID()}`;
   const apiKey = await prisma.apiKey.create({
     data: {
@@ -60,6 +62,7 @@ async function createApiKey(scopes: string[]): Promise<string> {
       hashedKey: createHash('sha256').update(raw).digest('hex'),
       prefix: raw.slice(0, 8),
       scopes,
+      readOnly,
     },
   });
   apiKeyIds.push(apiKey.id);

@@ -113,10 +113,6 @@ function CreateProposalSheet({
       <SheetContent
         size="md"
         title={t('proposals.createProposal', 'Create Proposal')}
-        description={t(
-          'proposals.createSubtitle',
-          'Name it now; everything else is editable on the proposal itself.',
-        )}
         footer={
           <>
             <Button variant="secondary" size="sm" onClick={onClose}>
@@ -313,10 +309,6 @@ function ProposalsHead({ onCreate, canWrite }: { onCreate: () => void; canWrite:
   return (
     <PageHeader
       title={t('proposals.title', 'Proposals')}
-      description={t(
-        'proposals.subtitle',
-        'RFP workspace — draft, review, and submit winning proposals.',
-      )}
       actions={
         canWrite ? (
           <Button variant="primary" size="sm" onClick={onCreate}>

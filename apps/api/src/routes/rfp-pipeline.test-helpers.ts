@@ -23,6 +23,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,11 +73,8 @@ export function makeRfpTestContext() {
     },
   };
   let restoreAuth: (() => void) | null = null;
-  let previousStubRoleHeader: string | undefined;
 
   beforeAll(async () => {
-    previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
-    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
     try {
       await prisma.$queryRaw`SELECT 1`;
       ctx.dbReachable = true;
@@ -121,12 +119,10 @@ export function makeRfpTestContext() {
   }, 30_000);
 
   afterAll(async () => {
-    if (previousStubRoleHeader === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
-    else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previousStubRoleHeader;
     if (ctx.dbReachable && ctx.rfpTablesReady) {
       // Delete in FK-dependency order (children before parents).
       if (ctx.cleanup.auditLogs.length > 0) {
-        await prisma.auditLog.deleteMany({ where: { id: { in: ctx.cleanup.auditLogs } } });
+        await purgeAuditRows({ where: { id: { in: ctx.cleanup.auditLogs } } });
       }
       if (ctx.cleanup.rfpOrchestrations.length > 0) {
         await prisma.rfpOrchestration.deleteMany({

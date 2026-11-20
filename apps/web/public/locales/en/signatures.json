@@ -36,7 +36,7 @@
     "typedSignature": "Typed signature",
     "drawnSignature": "Drawn signature",
     "typeNamePlaceholder": "Type your full name",
-    "agreed": "I agree that this electronic signature is legally equivalent to my handwritten signature."
+    "agreed": "I understand this electronic signature is an internal approval signature, not a legally binding e-signature."
   },
   "timeline": {
     "title": "Signature history",

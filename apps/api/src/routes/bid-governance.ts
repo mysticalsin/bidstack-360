@@ -17,6 +17,7 @@ import {
   type GateOutcome,
 } from '@bidstack/shared';
 
+import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { notifyUsers } from '../services/notification.service.js';
 
 const IdParam = z.object({ id: z.string().uuid() });
@@ -101,7 +102,10 @@ async function notifyGateRecipients(
   await notifyUsers({
     orgId,
     // notifyUsers de-dupes, so listing the owner alongside the committee is safe.
-    userIds: [...watchers.map((w) => w.userId), ...(opportunity.ownerId ? [opportunity.ownerId] : [])],
+    userIds: [
+      ...watchers.map((w) => w.userId),
+      ...(opportunity.ownerId ? [opportunity.ownerId] : []),
+    ],
     excludeUserId: actorUserId,
     type: 'gate_decision',
     title: `${GATE_LABELS[gate]} ${decided}: ${opportunity.name}`,
@@ -125,7 +129,7 @@ export const bidGovernanceRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { orgId } = req.auth;
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
         select: { id: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
@@ -161,6 +165,11 @@ export const bidGovernanceRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { orgId } = req.auth;
+      const opp = await prisma.opportunity.findFirst({
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
+        select: { id: true },
+      });
+      if (!opp) throw server.httpErrors.notFound('Opportunity not found');
       const rows = await prisma.gateDecision.findMany({
         where: { orgId, opportunityId: req.params.id },
         orderBy: { decidedAt: 'desc' },
@@ -182,7 +191,7 @@ export const bidGovernanceRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { orgId, userId } = req.auth;
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
         select: { id: true, name: true, customer: true, ownerId: true, bidClass: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');

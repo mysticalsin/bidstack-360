@@ -42,8 +42,9 @@ export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
   });
 
   // ─── GET /api/v1/tags ─────────────────────────────────────────────────
-  // List every tag in the tenant. Includes a usageCount via subquery so the
-  // UI can show "this tag is on 12 records" without a second request.
+  // One row past the library page is the probe. It is dropped and is not a
+  // tag total. usageCount is for the drawn tags so the UI can show "this tag
+  // is on 12 records" without a second request.
   server.get(
     '/tags',
     {
@@ -55,7 +56,8 @@ export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const tags = await prisma.tag.findMany({
+      const TAG_LIBRARY_PAGE = 250;
+      const loaded = await prisma.tag.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
@@ -64,8 +66,10 @@ export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
             : {}),
         },
         orderBy: { name: 'asc' },
-        take: 250,
+        take: TAG_LIBRARY_PAGE + 1,
       });
+      const pageContinues = loaded.length > TAG_LIBRARY_PAGE;
+      const tags = pageContinues ? loaded.slice(0, TAG_LIBRARY_PAGE) : loaded;
 
       const usage = await prisma.entityTag.groupBy({
         by: ['tagId'],
@@ -75,6 +79,7 @@ export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
       const usageByTag = new Map(usage.map((u) => [u.tagId, u._count._all]));
 
       return {
+        pageContinues,
         items: tags.map((t) => ({
           id: t.id,
           orgId: t.orgId,

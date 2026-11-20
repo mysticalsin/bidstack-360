@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { formatRecordedDealAmount } from '@/components/dashboard/unspecified-currency';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
@@ -47,6 +47,7 @@ export const PipelineCard = memo(function PipelineCard({
 }: PipelineCardProps) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
+  const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
@@ -88,16 +89,25 @@ export const PipelineCard = memo(function PipelineCard({
         aria-label={
           // Base label + an ", overdue" suffix so the past-due state reaches
           // screen-reader users — color alone fails WCAG 1.4.1 (Use of Color).
-          t(
-            'crm.pipelineCardAriaLabel',
-            '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
-            {
-              code: opp.code,
-              name: opp.name,
-              stage: stageName,
-              value: formatRecordedDealAmount(opp, 'compact'),
-            },
-          ) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
+          // The "use arrows to move" hint only applies when the signed-in
+          // user actually holds opportunities:write.
+          (canWrite
+            ? t(
+                'crm.pipelineCardAriaLabel',
+                '{{code}}: {{name}}, {{stage}}, {{value}}. Use left or right arrows to move stage.',
+                {
+                  code: opp.code,
+                  name: opp.name,
+                  stage: stageName,
+                  value: formatMoney(opp.value, 'EUR'),
+                },
+              )
+            : t('crm.pipelineCardAriaLabelReadOnly', '{{code}}: {{name}}, {{stage}}, {{value}}.', {
+                code: opp.code,
+                name: opp.name,
+                stage: stageName,
+                value: formatMoney(opp.value, 'EUR'),
+              })) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
         className={cn(
           'block rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
@@ -109,11 +119,11 @@ export const PipelineCard = memo(function PipelineCard({
       >
         {/* Company name + value */}
         <div className="flex items-start justify-between gap-2">
-          <span className="text-[11px] font-semibold text-[var(--fg-primary)] truncate">
+          <span className="text-xs font-semibold text-[var(--fg-primary)] truncate">
             {opp.customer}
           </span>
-          <span className="tabular-nums text-[11px] font-bold text-[var(--fg-primary)] shrink-0">
-            {formatRecordedDealAmount(opp, 'compact')}
+          <span className="tabular-nums text-xs font-bold text-[var(--fg-primary)] shrink-0">
+            {formatMoney(opp.value, 'EUR')}
           </span>
         </div>
 
@@ -125,7 +135,7 @@ export const PipelineCard = memo(function PipelineCard({
         {/* Territory badge */}
         {opp.territoryName && (
           <div className="mt-1.5">
-            <Badge tone="teal" className="text-[9px] px-1.5 py-0">
+            <Badge tone="teal" className="text-xs px-1.5 py-0">
               {opp.territoryName}
             </Badge>
           </div>
@@ -134,21 +144,21 @@ export const PipelineCard = memo(function PipelineCard({
         {/* Activity row */}
         <div className="mt-2 flex items-center gap-3 text-[var(--fg-tertiary)]">
           <span
-            className="inline-flex items-center gap-0.5 text-[10px]"
+            className="inline-flex items-center gap-0.5 text-xs"
             title={t('crm.pipelineCardViews', 'Views')}
           >
             <Icon name="eye" size={12} strokeWidth={2} />
             <span className="tabular-nums">{opp.viewCount ?? 0}</span>
           </span>
           <span
-            className="inline-flex items-center gap-0.5 text-[10px]"
+            className="inline-flex items-center gap-0.5 text-xs"
             title={t('crm.pipelineCardComments', 'Comments')}
           >
             <Icon name="messageCircle" size={12} strokeWidth={2} />
             <span className="tabular-nums">{opp.commentCount ?? 0}</span>
           </span>
           <span
-            className="inline-flex items-center gap-0.5 text-[10px]"
+            className="inline-flex items-center gap-0.5 text-xs"
             title={t('crm.pipelineCardTasks', 'Tasks')}
           >
             <Icon name="checkCircle" size={12} strokeWidth={2} />
@@ -161,7 +171,7 @@ export const PipelineCard = memo(function PipelineCard({
             now the card's ONLY overdue signal (icon+text, not aria-hidden —
             WCAG 1.4.1) — a separate static "Overdue" badge used to render
             alongside it, duplicating the same state as two tomato pills. */}
-        <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--fg-tertiary)]">
+        <div className="mt-2 flex items-center justify-between text-xs text-[var(--fg-tertiary)]">
           <DueDateChip dueDate={opp.dueDate} size="sm" />
           <span className="font-mono">{opp.code}</span>
         </div>

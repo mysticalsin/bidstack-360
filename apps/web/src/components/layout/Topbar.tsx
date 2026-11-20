@@ -1,8 +1,10 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Mic } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { Avatar } from '@/components/ui/Avatar';
+import { useJarvisStore } from '@/components/command/jarvisStore';
 import { useHelpDrawer } from '@/components/help/useHelpDrawer';
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -12,6 +14,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useUiStore } from '@/stores/ui';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { CurrencySelector } from './CurrencySelector';
+import { OrgCurrencySync } from './OrgCurrencySync';
 import { SearchBar } from './topbar/TopbarSearch';
 import { NotificationsBell } from './topbar/TopbarNotifications';
 
@@ -85,6 +88,7 @@ export function Topbar() {
   const navigate = useNavigate();
   const { role } = useRole();
   const openHelp = useHelpDrawer((s) => s.setOpen);
+  const openJarvis = useJarvisStore((s) => s.openJarvis);
   const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
   const toggleMobileNav = useUiStore((s) => s.toggleMobileNav);
   const startTour = useOnboardingStore((s) => s.startTour);
@@ -97,10 +101,10 @@ export function Topbar() {
         {t('topbar.skipToContent', 'Skip to content')}
       </a>
 
-      {/* Hamburger — visible only below md breakpoint where sidebar is hidden */}
+      {/* Hamburger: visible only below 56rem, where the sidebar is hidden */}
       <button
         type="button"
-        className="iconbtn md:!hidden"
+        className="iconbtn tb-nav-toggle"
         aria-label={t('nav.openNavigation', 'Open navigation')}
         aria-controls="mobile-nav-drawer"
         aria-expanded={mobileNavOpen}
@@ -120,6 +124,7 @@ export function Topbar() {
             <span
               className={c.here ? 'here' : undefined}
               aria-current={c.here ? 'page' : undefined}
+              title={c.label}
             >
               {c.label}
             </span>
@@ -130,6 +135,17 @@ export function Topbar() {
       <div className="tb-spacer" />
 
       <SearchBar />
+
+      <Tooltip content={`${t('topbar.jarvis', 'Jarvis')} (⌘J)`}>
+        <button
+          type="button"
+          className="iconbtn"
+          aria-label={t('topbar.jarvisAria', 'Open Jarvis')}
+          onClick={() => openJarvis()}
+        >
+          <Mic size={16} aria-hidden />
+        </button>
+      </Tooltip>
 
       <Tooltip content={themeLabel}>
         <button
@@ -146,6 +162,7 @@ export function Topbar() {
       <NotificationsBell />
 
       <CurrencySelector />
+      <OrgCurrencySync />
 
       <Tooltip content={`${t('topbar.help', 'Help & shortcuts')} (?)`}>
         <button

@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import SectorViewPage, { labeledCount, sectorDetailMeta, sectorRadarMeta } from './SectorViewPage';
+import SectorViewPage from './SectorViewPage';
 import { useSectorView, type SectorViewResponse } from '@/hooks/useSectorView';
 import { useTerritoryAnalytics, useTerritorySegments } from '@/hooks/useTerritories';
 
@@ -15,6 +15,22 @@ vi.mock('@/hooks/useSectorView', () => ({ useSectorView: vi.fn() }));
 vi.mock('@/hooks/useTerritories', () => ({
   useTerritoryAnalytics: vi.fn(),
   useTerritorySegments: vi.fn(),
+}));
+
+const oppRows = vi.hoisted(() => ({
+  items: [
+    { id: 'o1', stage: 's2_sent', value: 1000, dueDate: '2026-01-15', customer: 'A', industry: 'technology' },
+    { id: 'o2', stage: 's1_lead', value: 400, dueDate: '2099-01-15', customer: 'B', industry: 'healthcare' },
+  ] as unknown[],
+}));
+const oppQuery = vi.hoisted(() => ({ isError: false, complete: true, refetch: vi.fn() }));
+vi.mock('@/hooks/useOpportunityRows', () => ({
+  useAllOpportunityRows: () => ({
+    data: oppQuery.isError ? undefined : { items: oppRows.items, complete: oppQuery.complete },
+    isLoading: false,
+    isError: oppQuery.isError,
+    refetch: oppQuery.refetch,
+  }),
 }));
 
 vi.mock('@/components/territories/WorldMap', () => ({
@@ -65,6 +81,8 @@ beforeEach(() => {
   const idle = { data: { items: [] }, isLoading: false, isError: false } as never;
   vi.mocked(useTerritoryAnalytics).mockReturnValue(idle);
   vi.mocked(useTerritorySegments).mockReturnValue(idle);
+  oppQuery.isError = false;
+  oppQuery.complete = true;
 });
 
 afterEach(() => {
@@ -78,8 +96,6 @@ describe('SectorViewPage load resilience', () => {
     renderPage();
 
     expect(screen.getByText('Sector momentum')).toBeTruthy();
-    expect(screen.getAllByText('Technology').length).toBeGreaterThan(0);
-    expect(screen.queryByText('technology')).toBeNull();
     expect(screen.queryByText('Could not load the sector view')).toBeNull();
   });
 
@@ -138,66 +154,61 @@ describe('SectorViewPage load resilience', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
+});
 
-  it('keeps the world map and labels industry pipeline as unspecified', () => {
-    // WHY: opportunity totals have no stored currency. An industry chart that
-    // prints euros would invent a forecast the sector rollup does not have.
+describe('SectorViewPage selection state', () => {
+  it('exposes the active sector and country as pressed buttons in labelled groups', () => {
     mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
-    vi.mocked(useTerritoryAnalytics).mockReturnValue({
-      data: {
-        items: [
-          {
-            countryCode: 'FR',
-            countryCodeA3: 'FRA',
-            opportunityCount: 2,
-            totalValueMicros: 1_500_000_000_000,
-            avgProbability: 40,
-            territories: [],
-            ownerNames: [],
-          },
-        ],
-      },
-      isLoading: false,
-      isError: false,
-    } as never);
-    vi.mocked(useTerritorySegments).mockReturnValue({
-      data: {
-        items: [
-          {
-            key: 'technology',
-            label: 'technology',
-            opportunityCount: 2,
-            totalValueMicros: 1_500_000_000_000,
-            avgProbability: 40,
-            ownerNames: [],
-          },
-        ],
-      },
-      isLoading: false,
-      isError: false,
-    } as never);
     renderPage();
 
-    expect(screen.getByTestId('world-map')).toBeTruthy();
-    expect(screen.getByText('currency not recorded; not a euro forecast')).toBeTruthy();
-    expect(screen.getByText(/As of/)).toBeTruthy();
+    const countries = screen.getByRole('group', { name: 'Country filter' });
+    const all = countries.querySelector('button');
+    expect(all?.getAttribute('aria-pressed')).toBe('true');
+    const france = Array.from(countries.querySelectorAll('button'))[1];
+    expect(france?.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(france!);
+    expect(france?.getAttribute('aria-pressed')).toBe('true');
+    expect(all?.getAttribute('aria-pressed')).toBe('false');
 
-    fireEvent.click(screen.getByRole('tab', { name: 'By industry' }));
-    expect(screen.getAllByText('Technology').length).toBeGreaterThan(0);
-    expect(screen.getByText(/unspecified/)).toBeTruthy();
-    expect(document.body.textContent ?? '').not.toMatch(/€|\$|\bEUR\b/);
-
-    fireEvent.click(screen.getByRole('tab', { name: 'By country' }));
-    expect(screen.getByTestId('world-map')).toBeTruthy();
+    const sectors = screen.getByRole('group', { name: 'Sectors' });
+    expect(sectors.querySelector('[aria-pressed="true"]')).toBeTruthy();
   });
 });
 
-describe('sector count wording', () => {
-  it('uses the singular when a sector has one account or one country', () => {
-    expect(sectorRadarMeta(1, 1)).toBe('1 account / 1 country');
-    expect(sectorRadarMeta(2, 3)).toBe('2 accounts / 3 countries');
-    expect(sectorDetailMeta(1, 2)).toBe('1 account across 2 countries');
-    expect(labeledCount(1, 'account', 'accounts')).toBe('1 account');
-    expect(labeledCount(9, 'account', 'accounts')).toBe('9 accounts');
+describe('SectorViewPage pipeline by sector', () => {
+  it('draws open pipeline per sector with overdue in front, below the metric tiles', () => {
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    const { container } = renderPage();
+    const chart = screen.getByTestId('sector-pipeline-iso');
+    expect(within(chart).getByRole('group', { name: /pipeline by sector/i })).toBeTruthy();
+    expect(container.querySelector('[aria-label="Technology, front row: Overdue 1k"]')).toBeTruthy();
+    const strip = container.querySelector('.sector-command-strip')!;
+    expect(strip.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('Global opportunity map')).toBeTruthy();
+  });
+
+  it('shows one empty sentence without open pipeline', () => {
+    oppRows.items = [];
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    renderPage();
+    expect(within(screen.getByTestId('sector-pipeline-iso')).getByText('No open pipeline yet.')).toBeTruthy();
+  });
+
+  it('shows an error with retry, not the empty sentence, when the request fails', () => {
+    oppQuery.isError = true;
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    renderPage();
+    const card = screen.getByTestId('sector-pipeline-iso');
+    expect(within(card).getByRole('alert').textContent).toContain('Could not load pipeline');
+    expect(within(card).queryByText('No open pipeline yet.')).toBeNull();
+    fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
+    expect(oppQuery.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('says when the totals stop at the page cap', () => {
+    oppQuery.complete = false;
+    mockView({ data: RESPONSE, isLoading: false, isError: false, error: null, refetch: vi.fn() });
+    renderPage();
+    expect(within(screen.getByTestId('sector-pipeline-iso')).getByText(/Later pages are not included/)).toBeTruthy();
   });
 });

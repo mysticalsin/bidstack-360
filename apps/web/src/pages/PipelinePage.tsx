@@ -24,11 +24,7 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import {
-  sumRecordedDealMicros,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
-import { PipelineMetricStrip } from '@/components/dashboard/widgets/PipelineMetricStrip';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -39,14 +35,17 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
 import { getStageId } from './pipelineBoard/pipelineUtils';
-import { PipelineOpenChart } from './pipelineBoard/PipelineOpenChart';
+import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const navigate = useNavigate();
-  const { data, isLoading, isError, error } = useOpportunities({ limit: 50 });
+  const { formatMoney } = useFormatMoney();
+  const { data, isLoading, isError, error } = useOpportunities({ limit: PIPELINE_BOARD_LIMIT });
+  const pageContinues = Boolean(data?.nextCursor);
+  const latest = data?.items.length ?? 0;
   const configuredStages = usePipelineStages();
   // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
   // board itself only loads the first 50 cards, so totals/win-rate computed
@@ -106,8 +105,7 @@ export function PipelinePage() {
     [stages],
   );
   const getVisibleStageId = useCallback(
-    (opp: Opportunity) =>
-      stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp),
+    (opp: Opportunity) => stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp),
     [stageIdByBusinessKey],
   );
 
@@ -243,8 +241,9 @@ export function PipelinePage() {
               const filteredStageName = stageFilter
                 ? (stages.find((s) => s.id === stageFilter)?.name ?? '')
                 : '';
-              const label =
-                count === 1
+              const label = pageContinues
+                ? pipelineBoardCaption(count, pageContinues, latest)
+                : count === 1
                   ? t('pipeline.liveRegionCountOne', '{{count}} opportunity', { count })
                   : t('pipeline.liveRegionCountOther', '{{count}} opportunities', { count });
               return stageFilter ? `${label} · ${filteredStageName}` : label;
@@ -252,29 +251,67 @@ export function PipelinePage() {
           : ''}
       </p>
 
-      {!isLoading && data ? (
-        <PipelineMetricStrip
-          stages={report.data?.byStage}
-          loading={report.isLoading}
-          weightedMicros={report.data?.weightedPipelineMicros}
-        />
-      ) : null}
-      {!isLoading && data ? (
-        <p className="text-xs text-[var(--fg-tertiary)]">
-          {t(
-            'pipeline.amountBasis',
-            'These figures are every recorded opportunity, not the cards on this board and not the stage filter. {{basis}}. Open pipeline leaves out closed won and lost. Win rate is closed-won count divided by closed deals.',
-            { basis: UNSPECIFIED_CURRENCY_BASIS },
-          )}
-        </p>
-      ) : null}
-      {!isLoading && report.data ? <PipelineOpenChart stages={report.data.byStage} /> : null}
+      {/* Reserve the KPI row while opportunities load: inserting it above
+          the still-visible stage skeleton pushes the whole board down. */}
+      {(isLoading || data) && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
+          {(() => {
+            const rep = report.data;
+            const byStage = rep?.byStage ?? [];
+            const totalValue = byStage.reduce((acc, s) => acc + s.valueSum, 0);
+            const closedWon = byStage.find((s) => s.stage === 'closed_won')?.count ?? 0;
+            const closedLost = byStage.find((s) => s.stage === 'closed_lost')?.count ?? 0;
+            const closedTotal = closedWon + closedLost;
+            const winRate =
+              closedTotal > 0
+                ? `${Math.round((closedWon / closedTotal) * 100)}%`
+                : t('pipeline.winRateNoClosedBids', 'No closed bids');
+            const loading = isLoading || report.isLoading;
+            return [
+              {
+                label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
+                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
+                tone: 'blue' as const,
+              },
+              {
+                label: t('pipeline.kpiOpenValue', 'Open value'),
+                value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
+                tone: 'jade' as const,
+              },
+              {
+                label: t('pipeline.kpiWinRate', 'Win rate'),
+                value: loading ? '…' : winRate,
+                tone: 'amber' as const,
+              },
+              {
+                label: t('pipeline.kpiActiveDeals', 'Active deals'),
+                value: loading ? '…' : String(rep?.totalOpen ?? 0),
+                tone: 'purple' as const,
+              },
+            ];
+          })().map((kpi) => (
+            <div
+              key={kpi.label}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            >
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                {kpi.label}
+              </div>
+              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
+                {kpi.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {isError ? (
         <ErrorState
           title={t('pipeline.errorTitle', 'Could not load pipeline')}
           message={
-            error instanceof Error ? error.message : t('pipeline.errorMessage', 'Please try again.')
+            error instanceof Error
+              ? error.message
+              : t('pipeline.errorMessage', 'Please try again.')
           }
           action={
             <button
@@ -319,9 +356,24 @@ export function PipelinePage() {
           }
         >
           {visibleStages.map((stage) => {
+            const stageIdx = stages.findIndex((s) => s.id === stage.id);
             const items = byStage.get(stage.id) ?? [];
-            const totalMicros = sumRecordedDealMicros(items).toString();
+            const total = items.reduce((acc, o) => acc + o.value, 0);
             const isHover = hoverStageId === stage.id;
+            // Funnel ratio: how many opps advanced past this stage into any
+            // later one. We exclude closed_lost from the "advanced" pool so
+            // it isn't counted as forward progress — losses are terminal.
+            // The closed_* stages themselves get no chip (no "next" stage).
+            const nextStages = stages.slice(stageIdx + 1).filter((s) => s.name !== 'Closed Lost');
+            const advanced = nextStages.reduce(
+              (acc, s) => acc + (byStage.get(s.id)?.length ?? 0),
+              0,
+            );
+            const totalReached = items.length + advanced;
+            const conversion =
+              stage.name === 'Closed Won' || stage.name === 'Closed Lost' || totalReached === 0
+                ? null
+                : Math.round((advanced / totalReached) * 100);
             return (
               <StageColumn
                 key={stage.id}
@@ -329,7 +381,10 @@ export function PipelinePage() {
                 stageName={stage.name}
                 stageColor={stage.color}
                 items={items}
-                totalMicros={totalMicros}
+                total={total}
+                conversion={conversion}
+                pageContinues={pageContinues}
+                latest={latest}
                 isHoverTarget={isHover}
                 draggingId={draggingId}
                 focusedId={focusedId}

@@ -165,7 +165,7 @@ function ConfidenceBadge({ bps }: { bps: number }) {
   else if (bps >= 4000) color = 'text-[var(--warning)] bg-[var(--warning-tint)]';
   return (
     <span
-      className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${color}`}
+      className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}
     >
       {pct}%
     </span>

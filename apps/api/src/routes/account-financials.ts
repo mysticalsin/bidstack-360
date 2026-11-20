@@ -14,9 +14,12 @@ import {
   SAMPLE_FINANCIAL_PERIODS,
   SAMPLE_FINANCIAL_SIGNALS,
   TrackFinancialsUpdate,
+  filingPeriodPage,
+  financialPeriodTake,
   financialsEligible,
   financialsGate,
   tierLabel,
+  FINANCIAL_SOURCE_LABEL,
   type FinancialPeriod,
 } from '@bidstack/shared';
 
@@ -27,7 +30,7 @@ import { syncAccountFinancialsSchedule } from '../services/account-financials/sc
 /** Who may opt a General account in or out. */
 export const TRACK_FINANCIALS_ROLES = ['Admin', 'Account Executive'];
 
-const SOURCE_NAME: Record<string, string> = { sec_edgar: 'SEC EDGAR', esef: 'ESEF (filings.xbrl.org)' };
+const SOURCE_NAME: Record<string, string> = FINANCIAL_SOURCE_LABEL;
 
 async function canToggle(orgId: string, userId: string, role: string): Promise<boolean> {
   if (role === 'api') return false;
@@ -43,14 +46,16 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
       topAccountRank: true,
       trackFinancials: true,
       financialProfile: true,
-      financialPeriods: { orderBy: [{ periodEnd: 'desc' }], take: 20 },
+      // One row past the twenty the list draws. The extra row is the probe.
+      // It is not a shown period, and it is not a total.
+      financialPeriods: { orderBy: [{ periodEnd: 'desc' }], take: financialPeriodTake() },
     },
   });
   if (!c) throw Object.assign(new Error('Account not found'), { statusCode: 404 });
   const gate = financialsGate(c);
   const p = c.financialProfile;
   const status = !financialsEligible(c) ? 'paused' : (p?.status ?? 'pending');
-  const periods: FinancialPeriod[] = c.financialPeriods.map((r) => {
+  const loaded: FinancialPeriod[] = c.financialPeriods.map((r) => {
     const { _derived, ...metrics } = r.metrics as Record<string, { value: number; concept: string }> & { _derived?: FinancialPeriod['derived'] };
     return {
       periodType: r.periodType === 'Q' ? 'Q' : 'FY',
@@ -65,6 +70,9 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
       derived: { operatingMargin: _derived?.operatingMargin ?? null, netMargin: _derived?.netMargin ?? null, freeCashFlow: _derived?.freeCashFlow ?? null },
     };
   });
+  // The probe is the row past the list. It is not a period to show.
+  const page = filingPeriodPage(loaded);
+  const periods = page.periods;
   const signals = z.array(FinancialSignal).catch([]).parse(p?.signals ?? []);
   // Sample only for tracked accounts still waiting for real filings; General
   // accounts get the plain empty state instead.
@@ -83,6 +91,7 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
     lastPulledAt: p?.lastPulledAt ? p.lastPulledAt.toISOString() : null,
     nextPullAt: p?.nextPullAt && financialsEligible(c) ? p.nextPullAt.toISOString() : null,
     periods: sample ? SAMPLE_FINANCIAL_PERIODS : periods,
+    periodsContinue: sample ? false : page.pageContinues,
     signals: sample ? SAMPLE_FINANCIAL_SIGNALS : signals,
     sample,
   };
@@ -102,7 +111,40 @@ export const accountFinancialsRoutes: FastifyPluginAsyncZod = async (server) => 
       if (!company) throw server.httpErrors.notFound('Account not found');
       const access = await canReadAccount({ orgId, userId, companyId, accountName: company.name });
       if (!access.allowed) throw server.httpErrors.notFound('Account not found');
-      return loadAccountFinancials(orgId, companyId, await canToggle(orgId, userId, role));
+      // Opening Strategic / Top (or an opted-in General) queues the public-filings
+      // pull; General stays paused. Best effort: a schedule miss must not hide the read model.
+      await syncAccountFinancialsSchedule(orgId, companyId).catch((err: unknown) =>
+        req.log.warn({ err: err instanceof Error ? err.message : String(err), companyId }, 'financials schedule sync failed'),
+      );
+      const body = await loadAccountFinancials(orgId, companyId, await canToggle(orgId, userId, role));
+      const actorUserId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        userId,
+      )
+        ? userId
+        : null;
+      await prisma.auditLog
+        .create({
+          data: {
+            orgId,
+            userId: actorUserId,
+            action: 'account.financials.view',
+            targetType: 'company',
+            targetId: companyId,
+            diff: {
+              actorKind: 'user',
+              status: body.status,
+              sample: body.sample,
+              gate: body.gate,
+            },
+          },
+        })
+        .catch((err: unknown) =>
+          req.log.warn(
+            { err: err instanceof Error ? err.message : String(err), companyId },
+            'financials view audit failed',
+          ),
+        );
+      return body;
     },
   );
 

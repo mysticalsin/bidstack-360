@@ -8,7 +8,6 @@
  * schedule timer re-renders only this span, not the whole row.
  */
 import { memo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
@@ -25,9 +24,7 @@ import { useLiveRelativeTime } from '@/hooks/useLiveRelativeTime';
 import type { usePatchOpportunity } from '@/hooks/useOpportunities';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
-import { celebratesWonMove, isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
-import { storedProbabilityLabel } from '@/lib/stored-probability';
-import { formatMicrosAmount } from '@bidstack/shared';
+import { isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
@@ -109,7 +106,6 @@ export const Row = memo(function Row({
   const endSave = (field: 'stage' | 'value' | 'probability' | 'dueDate') =>
     setSaving((s) => ({ ...s, [field]: false }));
 
-  const { t } = useTranslation('crm');
   const savedToast = (field: string) => toast.success(`${field} updated`, { duration: 2200 });
   const errorToast = (err: unknown) =>
     toast.error('Update failed', {
@@ -145,8 +141,8 @@ export const Row = memo(function Row({
         </label>
       </td>
 
-      <td className="px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
-        <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)]">
+      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
+        <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]">
           {opp.code}
         </Link>
       </td>
@@ -154,14 +150,14 @@ export const Row = memo(function Row({
       <td className="px-5 py-3">
         <Link
           to={`/opportunities/${opp.id}`}
-          className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
+          className="font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]"
         >
           {opp.name}
         </Link>
         {opp.bidClass ? (
           <Badge
             tone={ROW_BID_CLASS_TONE[opp.bidClass] ?? 'gray'}
-            className="ml-2 align-middle text-[10px]"
+            className="ml-2 align-middle text-xs"
           >
             {opp.bidClass}
           </Badge>
@@ -205,7 +201,7 @@ export const Row = memo(function Row({
                   flash('stage');
                   // Confetti only on closed_won, never on closed_lost —
                   // no celebration for a lost bid.
-                  if (celebratesWonMove(nextStage)) {
+                  if (nextStage?.isWon) {
                     fireConfetti();
                     toast.success(`Won "${opp.name}"!`, { duration: 5000 });
                   }
@@ -225,7 +221,7 @@ export const Row = memo(function Row({
         <SavedFlash trigger={saved.stage} />
       </td>
 
-      <td className="px-5 py-3 text-right" title={UNSPECIFIED_CURRENCY_BASIS}>
+      <td className="px-5 py-3 text-right">
         <NumberCell
           value={opp.value}
           step={1000}
@@ -233,29 +229,7 @@ export const Row = memo(function Row({
           align="right"
           isSaving={saving.value}
           canEdit={canWrite}
-          format={(v) =>
-            opp.valueMicros
-              ? `${formatMicrosAmount(BigInt(opp.valueMicros))} unspecified`
-              : `${formatUnspecifiedAmount(v)} unspecified`
-          }
-          exactMicros={opp.valueMicros}
-          onSaveMicros={(micros) => {
-            startSave('value');
-            patch.mutate(
-              { id: opp.id, patch: { valueMicros: micros } },
-              {
-                onSuccess: () => {
-                  endSave('value');
-                  savedToast('Value');
-                  flash('value');
-                },
-                onError: (err) => {
-                  endSave('value');
-                  errorToast(err);
-                },
-              },
-            );
-          }}
+          format={(v) => `${formatUnspecifiedAmount(v)} (${UNSPECIFIED_CURRENCY_BASIS})`}
           onSave={(next) => {
             startSave('value');
             patch.mutate(
@@ -277,13 +251,7 @@ export const Row = memo(function Row({
         <SavedFlash trigger={saved.value} />
       </td>
 
-      <td
-        className="px-5 py-3 text-right"
-        title={t(
-          'opportunitiesTableHead.columnProbabilityTitle',
-          'Stored on the deal. A blank is saved as 0 and is not a measured win chance.',
-        )}
-      >
+      <td className="px-5 py-3 text-right">
         <NumberCell
           value={opp.probability}
           min={0}
@@ -292,9 +260,7 @@ export const Row = memo(function Row({
           align="right"
           isSaving={saving.probability}
           canEdit={canWrite}
-          format={(v) =>
-            storedProbabilityLabel(v, t('opportunities.probabilityUnrecorded', 'Not recorded'))
-          }
+          format={(v) => `${v}%`}
           onSave={(next) => {
             startSave('probability');
             patch.mutate(
@@ -302,7 +268,7 @@ export const Row = memo(function Row({
               {
                 onSuccess: () => {
                   endSave('probability');
-                  savedToast(t('opportunitiesTableHead.columnProbability', 'Stored probability'));
+                  savedToast('Probability');
                   flash('probability');
                 },
                 onError: (err) => {
@@ -320,7 +286,7 @@ export const Row = memo(function Row({
         {/* Editable date stays on DateCell; DueDateChip adds the urgency
             signal a bare date never carried — deadline slippage is the #1
             preventable bid loss. */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 whitespace-nowrap">
           <DateCell
             value={opp.dueDate}
             format={(v) => formatDate(v)}

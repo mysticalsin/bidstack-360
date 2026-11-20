@@ -40,6 +40,7 @@ const apiEnv = [
   'BIDSTACK_ALLOW_STUB_ROLE_HEADER=true',
   'API_RATE_LIMIT_MAX=5000',
   'PUBLIC_BOOKING_RATE_LIMIT_MAX=5000',
+  'PUBLIC_SIGN_RATE_LIMIT_MAX=5000',
   e2eRedisUrl ? `REDIS_URL=${e2eRedisUrl}` : null,
 ]
   .filter(Boolean)
@@ -134,7 +135,9 @@ export default defineConfig({
   // must be deterministic. Developers can opt into faster non-gate runs with
   // E2E_WORKERS=2+ when they are not measuring Core Web Vitals.
   workers: workerCount,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  reporter: process.env.CI
+    ? [['list'], ['html', { open: 'never' }], ['blob', { outputDir: 'blob-report' }]]
+    : 'list',
   use: {
     baseURL,
     storageState: useStubAuthStorage

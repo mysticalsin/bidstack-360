@@ -12,7 +12,9 @@ import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
 import SmoothTab from '@/components/kokonutui/smooth-tab';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { PulseOrb } from '@/components/viz/PulseOrb';
-import { HeroArea, QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
+import { QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bklit';
+import { closeMonthLabel, pipelineByCloseMonth } from '@/components/charts/bid-chart-data';
+import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import {
   accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
@@ -26,8 +28,12 @@ import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill }: {
+export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false }: {
   rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
+  /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
+  rowsPending?: boolean;
+  /** Watchdog feed still loading: hold the pulse slot so the figures row does not grow. */
+  feedPending?: boolean;
 }) {
   const fresh = feed?.newAlertCount ?? 0;
   const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
@@ -35,17 +41,22 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
   const pulseText = !feed ? '' : fresh > 0
     ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
     : 'Watchdog: all quiet';
-  const trend = cumulativeWon(rows);
-  const wonTotal = trend.at(-1)?.y ?? 0;
+  const [now] = useState(() => Date.now());
+  const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
+  const months = pipelineByCloseMonth(rows, now);
+  const fullLabels = months.keys.map(closeMonthLabel);
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
       summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
-      table={{ columns: ['Month', 'Won to date'], rows: trend.map((p) => [p.x, fmtCompact(p.y)]) }}
+      table={{
+        columns: ['Month', 'Won', 'Lost', 'Open', 'Overdue'],
+        rows: fullLabels.map((m, i) => [m, fmtCompact(months.won[i]!), fmtCompact(months.lost[i]!), fmtCompact(months.open[i]!), fmtCompact(months.overdue[i]!)]),
+      }}
       className="dash-hero"
-      interactive={Boolean(onDrill)}
+      interactive
     >
       <div className="dash-hero-figs">
         <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
@@ -61,10 +72,32 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
             <PulseOrb tone={pulse} size={96} bold />
             <span className="viz-meta">{pulseText}</span>
           </div>
+        ) : feedPending ? (
+          <div className="dash-hero-pulse" aria-hidden="true" data-testid="dashboard-pulse-placeholder">
+            <span className="dash-hero-pulse-skel" />
+            <span className="viz-meta">{'\u00a0'}</span>
+          </div>
         ) : null}
       </div>
-      <HeroArea data={trend} format={fmtCompact} />
-      <div className="viz-caption">Won value to date, by close month. Select a number to see the bids behind it.</div>
+      {rowsPending && !months.keys.length ? (
+        <div className="dash-hero-chart-skel" aria-hidden="true" data-testid="dashboard-hero-chart-placeholder" />
+      ) : months.keys.length ? (
+        <DivergingBars
+          title="Bids by close month"
+          labels={months.labels}
+          series={[
+            { id: 'won', label: 'Won', values: months.won, color: 'var(--success)' },
+            { id: 'lost', label: 'Lost', values: months.lost, color: 'var(--fg-tertiary)' },
+            { id: 'open', label: 'Open', values: months.open, color: 'var(--brand-deep)' },
+          ]}
+          below={{ id: 'overdue', label: 'Overdue', values: months.overdue }}
+          format={fmtCompact}
+          onActivate={onDrill ? (i) => onDrill({ status: 'all', closeMonth: months.keys[i] }) : undefined}
+        />
+      ) : (
+        <p className="viz-empty">No dated bids yet.</p>
+      )}
+      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
     </ChartCard>
   );
 }
@@ -78,7 +111,11 @@ function HeroFig({ onClick, label, children }: { onClick?: () => void; label: st
   );
 }
 
-export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdueTasks: number; feed?: WatchdogFeed }) {
+export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
+  rows: OppRow[]; overdueTasks: number; feed?: WatchdogFeed;
+  /** Opportunities or feed still loading: late items would insert above earlier ones and push them down. */
+  pending?: boolean;
+}) {
   const [now] = useState(() => Date.now());
   const pastDue = pastDueOpen(rows, now);
   const soon = (feed?.earnings ?? []).filter((e) => new Date(e.expectedAt).getTime() - now < 14 * 86_400_000);
@@ -90,8 +127,12 @@ export function NeedsYou({ rows, overdueTasks, feed }: { rows: OppRow[]; overdue
   ].filter(Boolean) as Array<{ key: string; to: string; title: string; meta: string; kind: string }>;
   return (
     <section className="viz dash-needs" aria-labelledby="dash-needs-t" data-testid="needs-you">
-      <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{items.length}</span></header>
-      {items.length === 0 ? <p className="viz-empty">Nothing waiting. Nice.</p> : (
+      <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{pending ? '\u00a0' : items.length}</span></header>
+      {pending ? (
+        <div className="dash-needs-skel" aria-busy="true" data-testid="needs-you-placeholder">
+          <span /><span /><span />
+        </div>
+      ) : items.length === 0 ? <p className="viz-empty">Nothing waiting. Nice.</p> : (
         <ul className="dash-needs-list">
           {items.map((it, i) => (
             <li key={it.key} style={{ '--i': i } as React.CSSProperties}>

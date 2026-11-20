@@ -158,7 +158,13 @@ export function AuditFilterBar({
         </button>
         <button
           type="button"
-          onClick={() => writeClipboard(window.location.href)}
+          onClick={() =>
+            void writeClipboard(
+              window.location.href,
+              t('auditLogFilters.viewLinkCopied', 'View link copied'),
+              t('auditLogFilters.copyFailed', 'Copy failed'),
+            )
+          }
           className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-tertiary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
         >
           <Icon name="link" className="size-4" />

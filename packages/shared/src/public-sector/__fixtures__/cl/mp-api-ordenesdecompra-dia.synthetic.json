@@ -1,0 +1,94 @@
+{
+  "Cantidad": 3,
+  "FechaCreacion": "2025-07-03T23:00:00.000",
+  "Version": "v1",
+  "Listado": [
+    {
+      "Codigo": "9001-501-SE25",
+      "Nombre": "ORDEN SINTETICA DE INSUMOS",
+      "CodigoEstado": 6,
+      "Estado": "Aceptada",
+      "CodigoLicitacion": "9001-12-LP25",
+      "Descripcion": "Orden sintetica",
+      "CodigoTipo": 8,
+      "Tipo": "SE",
+      "TipoMoneda": "CLP",
+      "CodigoEstadoProveedor": 4,
+      "EstadoProveedor": "Aceptada",
+      "Fechas": {
+        "FechaCreacion": "2025-07-02T10:00:00",
+        "FechaEnvio": "2025-07-03T09:00:00",
+        "FechaAceptacion": "2025-07-03T15:00:00",
+        "FechaUltimaModificacion": "2025-07-03T15:00:00"
+      },
+      "TotalNeto": 117647059,
+      "Impuestos": 22352941,
+      "Total": 140000000,
+      "Comprador": {
+        "CodigoOrganismo": "900",
+        "NombreOrganismo": "ORGANISMO SINTETICO",
+        "RutUnidad": "61.000.001-0",
+        "CodigoUnidad": "9001",
+        "NombreUnidad": "UNIDAD DE COMPRAS SINTETICA",
+        "NombreContacto": "FUNCIONARIA SINTETICA"
+      },
+      "Proveedor": {
+        "Codigo": "50001",
+        "Nombre": "PROVEEDORA SINTETICA SPA",
+        "CodigoSucursal": "50002",
+        "NombreSucursal": "CASA MATRIZ",
+        "RutSucursal": "76.000.002-7"
+      }
+    },
+    {
+      "Codigo": "9001-502-TD25",
+      "Nombre": "ORDEN SINTETICA POR TRATO DIRECTO",
+      "CodigoEstado": 4,
+      "Estado": "Enviada a proveedor",
+      "CodigoLicitacion": "",
+      "CodigoTipo": 16,
+      "Tipo": "TD",
+      "TipoMoneda": "CLP",
+      "Fechas": {
+        "FechaCreacion": "2025-07-03T08:00:00",
+        "FechaEnvio": "2025-07-03T10:00:00",
+        "FechaUltimaModificacion": "2025-07-03T10:00:00"
+      },
+      "Total": 4500000,
+      "Comprador": {
+        "CodigoOrganismo": "900",
+        "RutUnidad": "61.000.001-0",
+        "CodigoUnidad": "9001",
+        "NombreUnidad": "UNIDAD DE COMPRAS SINTETICA"
+      },
+      "Proveedor": {
+        "Codigo": "50003",
+        "Nombre": "SERVICIOS SINTETICOS LIMITADA",
+        "RutSucursal": "76.000.003-5"
+      }
+    },
+    {
+      "Codigo": "9001-503-SE25",
+      "Nombre": "ORDEN SINTETICA CANCELADA",
+      "CodigoEstado": 9,
+      "Estado": "Cancelada",
+      "TipoMoneda": "CLP",
+      "Fechas": {
+        "FechaCreacion": "2025-07-01T08:00:00",
+        "FechaUltimaModificacion": "2025-07-03T11:00:00"
+      },
+      "Total": 900000,
+      "Comprador": {
+        "CodigoOrganismo": "900",
+        "RutUnidad": "61.000.001-0",
+        "CodigoUnidad": "9001",
+        "NombreUnidad": "UNIDAD DE COMPRAS SINTETICA"
+      },
+      "Proveedor": {
+        "Codigo": "50001",
+        "Nombre": "PROVEEDORA SINTETICA SPA",
+        "RutSucursal": "76.000.002-7"
+      }
+    }
+  ]
+}

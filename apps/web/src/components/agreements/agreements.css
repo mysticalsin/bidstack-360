@@ -100,3 +100,51 @@
 .agr-entities li { display: grid; gap: 4px; padding: 16px; border: 1px solid var(--border-subtle); border-radius: 8px; }
 .agr-entities .t { font-weight: 500; color: var(--fg-primary); }
 .agr-unverified { color: var(--tag-amber-fg, #b45309); font-size: 12px; }
+
+/* Whitespace view, "who works with them" and sources (slice 13). */
+.agr-head-link { display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; }
+.agr-who { display: grid; gap: 8px; min-width: 0; }
+.agr-who-title { font-size: 16px; font-weight: 500; margin: 0; color: var(--fg-primary); }
+.agr-who .agr-who-title { font-size: 14px; }
+.agr-who-table td, .agr-who-table th { font-size: 13px; }
+.agr-who-family { margin: 0; font-size: 12px; color: var(--fg-tertiary); }
+.agr-ws-chart { max-width: 640px; }
+.agr-ws-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.agr-ws-row { border-bottom: 1px solid var(--border-subtle); }
+.agr-ws-row:last-child { border-bottom: 0; }
+.agr-ws-summary { display: grid; grid-template-columns: 24px 48px minmax(0, 1fr) auto; gap: 16px; align-items: center; width: 100%; padding: 12px 0; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; }
+.agr-ws-summary:hover .t { color: var(--brand-primary); }
+.agr-ws-summary:focus-visible { outline: 2px solid var(--focus-ring-color, var(--brand-primary)); outline-offset: 2px; border-radius: 8px; }
+.agr-ws-rank { font-size: 12px; color: var(--fg-tertiary); font-variant-numeric: tabular-nums; }
+.agr-ws-score { display: grid; place-items: center; height: 40px; border-radius: 8px; font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 10%, transparent); }
+.agr-ws-main { display: grid; gap: 2px; min-width: 0; }
+.agr-ws-main .t { font-size: 14px; font-weight: 500; color: var(--fg-primary); }
+.agr-ws-lines { font-size: 12px; color: var(--fg-secondary); }
+.agr-ws-detail { padding: 0 0 16px 40px; }
+.agr-ws-detail-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+@media (max-width: 960px) { .agr-ws-detail-grid { grid-template-columns: minmax(0, 1fr); } .agr-ws-detail { padding-left: 0; } }
+@media (max-width: 640px) { .agr-ws-summary { grid-template-columns: 40px minmax(0, 1fr); } .agr-ws-rank, .agr-ws-lines { display: none; } }
+.agr-ws-factors { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.agr-ws-factors > li { display: grid; gap: 4px; }
+.agr-ws-factor-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.agr-ws-factor-head .t { font-weight: 500; color: var(--fg-primary); }
+.agr-ws-points { font-variant-numeric: tabular-nums; color: var(--fg-secondary); }
+.agr-ws-meter { display: block; height: 4px; border-radius: 2px; background: var(--surface-sunken); overflow: hidden; }
+.agr-ws-meter > span { display: block; height: 100%; background: var(--brand-primary); }
+.agr-ws-cites { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; color: var(--fg-secondary); }
+.agr-ws-cites a { color: var(--brand-primary); }
+.agr-ws-excerpt { display: block; color: var(--fg-tertiary); }
+.agr-ws-side { display: grid; gap: 16px; min-width: 0; }
+.agr-ws-links { margin: 0; font-size: 13px; }
+.agr-ws-decisions { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12px; color: var(--fg-secondary); }
+.agr-ws-decide { gap: 12px; }
+.agr-ws-check { display: flex !important; align-items: center; gap: 8px; align-self: end; min-height: 40px; }
+.agr-sources { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.agr-sources li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: 't run btn' 's run btn'; gap: 2px 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-subtle); }
+.agr-sources li:last-child { border-bottom: 0; }
+.agr-sources .t { grid-area: t; font-size: 14px; font-weight: 500; color: var(--fg-primary); }
+.agr-sources .drill-sub { grid-area: s; }
+.agr-sources-run { grid-area: run; font-size: 13px; color: var(--fg-secondary); font-variant-numeric: tabular-nums; }
+.agr-sources-run[data-state='failed'] { color: var(--tag-tomato-fg); }
+.agr-sources li > button { grid-area: btn; }
+@media (max-width: 640px) { .agr-sources li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 't btn' 's btn' 'run run'; } }

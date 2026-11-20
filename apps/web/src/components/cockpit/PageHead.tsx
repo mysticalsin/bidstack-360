@@ -15,24 +15,24 @@ import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { MetricSpark } from '@/components/viz/lazy-bklit';
-import { PulseOrb, toneForBand } from '@/components/viz/PulseOrb';
 import CommandButton from '@/components/kokonutui/command-button';
 import { useOpportunities } from '@/hooks/useOpportunities';
-import { formatDate } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
-import type { AccountCockpitSnapshot } from '@bidstack/shared';
+import type { AccountCockpitMaybeScored, CompanyHealth } from '@bidstack/shared';
 
 import { deriveNextMove } from './CommandCenter';
 import { labelForBand } from './_tokens';
 
 interface Props {
-  cockpit: AccountCockpitSnapshot;
+  cockpit: AccountCockpitMaybeScored;
   accountView: boolean;
   /** Account view: open the bid drill for this account ('open' or closed 'won'/'lost' = all closed). */
   onDrill?: (status: 'open' | 'all') => void;
 }
+
+const UNREAD_HEALTH: CompanyHealth = { score: 0, band: 'critical', counts: {} };
 
 export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }: Props) {
   const { t } = useTranslation('crm');
@@ -73,10 +73,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const favorites = useAccountHistory((s) => s.favorites);
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
-  const subtitle = t('pageHead.dashboardSubtitle', 'Today: {{date}} - {{company}} cockpit', {
-    date: formatDate(new Date().toISOString()),
-    company: cockpit.company.name,
-  });
   const { formatMoney } = useFormatMoney();
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
@@ -86,7 +82,9 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
   const highRisks = openRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
   const winLoss = cockpit.winLoss;
-  const nextMove = deriveNextMove(cockpit, t);
+  // deriveNextMove reads compliance, risks and contacts, never the score, so an
+  // unscored cockpit gets a neutral placeholder that is not shown anywhere.
+  const nextMove = deriveNextMove({ ...cockpit, health: cockpit.health ?? UNREAD_HEALTH }, t);
   const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
   // Sparklines (real rows only): open value accumulated by due date, running
   // win rate across closed bids in close order, open risks by severity.
@@ -119,15 +117,23 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
           <h1 className="page-title">
             {accountView ? cockpit.company.name : t('pageHead.dashboardTitle', 'Dashboard')}
           </h1>
-          {accountView ? null : <div className="page-sub">{subtitle}</div>}
           {accountView ? (
             <p className="acct-health" aria-label={t('pageHead.accountStatusSummaryLabel', 'Account status summary')}>
-              <PulseOrb tone={toneForBand(cockpit.health.band)} size={48} bold />
               <span className="acct-health-body">
                 <span className="acct-health-tags">
-                  <span className="acct-pill" data-band={cockpit.health.band}>
-                    {labelForBand(cockpit.health.band)}
-                  </span>
+                  {cockpit.health ? (
+                    <span className="acct-pill" data-band={cockpit.health.band}>
+                      {labelForBand(cockpit.health.band)}
+                    </span>
+                  ) : (
+                    <span
+                      className="acct-pill"
+                      data-band="unscored"
+                      title={t('pageHead.notScoredTitle', 'Signal coverage needs this account\'s own contacts, deals and tasks')}
+                    >
+                      {t('pageHead.notScored', 'Not scored yet')}
+                    </span>
+                  )}
                   {cockpit.company.domain ? <span className="acct-domain">{cockpit.company.domain}</span> : null}
                 </span>
                 <span className="acct-health-text" title={nextMove}>{nextMove}</span>
@@ -273,7 +279,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
 // Compact data brief shown when hovering the company logo. Picks
 // from whichever fields the CRM data verification surfaced; nullable fields are
 // quietly skipped rather than rendered as "Unknown" placeholders.
-function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
+function CompanyBrief({ cockpit }: { cockpit: AccountCockpitMaybeScored }) {
   const { t } = useTranslation('crm');
   const c = cockpit.company;
   const imageUrl = displayableLogoUrl(c.imageUrl);
@@ -281,12 +287,6 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   if (c.industry) rows.push([t('pageHead.briefIndustry', 'Industry'), c.industry]);
   if (c.employeeCount)
     rows.push([t('pageHead.briefHeadcount', 'Headcount'), c.employeeCount.toLocaleString()]);
-  if (c.publicFacts?.headquarters)
-    rows.push([t('pageHead.briefHeadquarters', 'Headquarters'), c.publicFacts.headquarters]);
-  if (c.publicFacts?.revenueLabel)
-    rows.push([t('pageHead.briefRevenue', 'Revenue'), c.publicFacts.revenueLabel]);
-  if (c.publicFacts?.chiefExecutive)
-    rows.push([t('pageHead.briefChiefExecutive', 'Chief executive'), c.publicFacts.chiefExecutive]);
   if (c.domain) rows.push([t('pageHead.briefDomain', 'Domain'), c.domain]);
   if (c.legalName && c.legalName !== c.name)
     rows.push([t('pageHead.briefLegalName', 'Legal name'), c.legalName]);
@@ -325,11 +325,9 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
         </dl>
       ) : null}
       <div className="mt-3 text-[10px] uppercase tracking-wider text-[var(--fg-tertiary)]">
-        {recordedConfidencePercent(c.confidence) === null
-          ? t('pageHead.confidenceNotScored', 'Confidence not scored')
-          : t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
-              percent: recordedConfidencePercent(c.confidence),
-            })}
+        {t('pageHead.briefConfidence', 'Confidence: {{percent}}%', {
+          percent: Math.round(c.confidence * 100),
+        })}
       </div>
     </div>
   );

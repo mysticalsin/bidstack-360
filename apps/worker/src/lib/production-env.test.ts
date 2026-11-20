@@ -4,7 +4,9 @@ import { validateWorkerProductionEnv } from './production-env.js';
 
 const validProductionEnv = {
   NODE_ENV: 'production',
-  DATABASE_URL: 'postgresql://bidstack:test@postgres:5432/bidstack',
+  DATABASE_URL: 'postgresql://app_role:test@postgres:5432/bidstack',
+  DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
+  DATABASE_URL_OWNER: 'postgresql://bidstack:test@postgres:5432/bidstack',
   REDIS_URL: 'redis://:test@redis:6379',
   INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
   PII_FIELD_ENCRYPTION: 'true',
@@ -21,10 +23,22 @@ describe('worker production env contract', () => {
     expect(validateWorkerProductionEnv({ NODE_ENV: 'development' })).toEqual([]);
   });
 
+  it('refuses to boot when NODE_ENV is missing', () => {
+    // WHY: a missing NODE_ENV used to skip the production contract. Local dev
+    // sets NODE_ENV=development in .env, which dotenv loads before this check,
+    // so development still skips the production secret list.
+    expect(validateWorkerProductionEnv({})).not.toEqual([]);
+    expect(validateWorkerProductionEnv({})).toContain(
+      "NODE_ENV must be exactly 'development', 'production', or 'test'",
+    );
+  });
+
   it('requires the universal production dependencies before queues start', () => {
     expect(validateWorkerProductionEnv({ NODE_ENV: 'production' })).toEqual([
       'DATABASE_URL is required in production',
       'REDIS_URL is required in production',
+      'DATABASE_URL_APP is required in production',
+      'DATABASE_URL_OWNER is required in production',
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string in production',
       'PII_FIELD_ENCRYPTION=true is required in production',
       'PII_ENCRYPTION_MASTER_KEY must be a 64-character hex string in production',
@@ -32,6 +46,54 @@ describe('worker production env contract', () => {
       "BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production",
       'STORAGE_DRIVER=s3 is required in production (or set BIDSTACK_ALLOW_LOCAL_STORAGE=true to launch on ephemeral local disk)',
     ]);
+  });
+
+  it('refuses a lock ttl that does not outlive the refresh', () => {
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        OAUTH_REFRESH_LOCK_TTL_MS: '20000',
+        OAUTH_REFRESH_LOCK_WAIT_MS: '10000',
+        OAUTH_HTTP_TIMEOUT_MS: '20000',
+      }),
+    ).toEqual(['OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_HTTP_TIMEOUT_MS']);
+  });
+
+  it('refuses a refresh-lock wait that is not shorter than the ttl', () => {
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        OAUTH_REFRESH_LOCK_TTL_MS: '30000',
+        OAUTH_REFRESH_LOCK_WAIT_MS: '30000',
+      }),
+    ).toEqual(['OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_REFRESH_LOCK_WAIT_MS']);
+  });
+
+  it('refuses a NODE_ENV that is not exactly production, development, or test', () => {
+    // WHY: 'Production' used to skip the whole production contract, including
+    // the refusal of the refresh-lock opt-out.
+    const errors = validateWorkerProductionEnv({
+      ...validProductionEnv,
+      NODE_ENV: 'Production',
+      OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+    });
+    expect(errors).not.toEqual([]);
+    expect(errors).toContain("NODE_ENV must be exactly 'development', 'production', or 'test'");
+  });
+
+  it('refuses the refresh-lock opt-out in production', () => {
+    expect(
+      validateWorkerProductionEnv({
+        ...validProductionEnv,
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toEqual(['OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false is refused when NODE_ENV=production']);
+    expect(
+      validateWorkerProductionEnv({
+        NODE_ENV: 'development',
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).toEqual([]);
   });
 
   it('requires the tenant-scope guard set to warn or enforce in production', () => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptTechnicalStackSuggestion,
   buildTechnicalStackState,
+  normalizeTechnicalStack,
   suggestionId,
   technicalStackOverrideValue,
 } from './technical-stack.service.js';
@@ -70,6 +71,16 @@ describe('technical stack overrides', () => {
     ]);
   });
 
+  it('keeps Unicode stack names distinct from each other and from the main stack', () => {
+    const stack = normalizeTechnicalStack([
+      { stack: '日本', label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] },
+      { stack: '中国', label: 'Cloud', items: [{ name: 'AWS', source: 'manual', confidence: 1 }] },
+      { label: 'Cloud', items: [{ name: 'GCP', source: 'manual', confidence: 1 }] },
+    ]);
+    expect(stack.map((category) => category.stack ?? '')).toEqual(['日本', '中国', '']);
+    expect(stack.map((category) => category.items[0]?.name)).toEqual(['Azure', 'AWS', 'GCP']);
+  });
+
   it('keeps dismissed provider deltas hidden across refreshes', () => {
     const dismissedId = suggestionId('Security', { name: 'CrowdStrike' });
     const state = buildTechnicalStackState({
@@ -84,5 +95,50 @@ describe('technical stack overrides', () => {
     });
 
     expect(state.suggestions).toEqual([]);
+  });
+
+  it('keeps several named stacks apart when they share a category', () => {
+    const override = technicalStackOverrideValue([
+      { label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] },
+      {
+        stack: 'Oncology R&D',
+        label: 'Cloud',
+        items: [{ name: 'AWS', source: 'manual', confidence: 1 }],
+      },
+      {
+        stack: ' Oncology R&D ',
+        label: 'cloud',
+        items: [{ name: 'Google Cloud', source: 'manual', confidence: 1 }],
+      },
+    ]);
+
+    expect(override.stack).toEqual([
+      { label: 'Cloud', items: [expect.objectContaining({ name: 'Azure' })] },
+      {
+        stack: 'Oncology R&D',
+        label: 'Cloud',
+        items: [
+          expect.objectContaining({ name: 'AWS' }),
+          expect.objectContaining({ name: 'Google Cloud' }),
+        ],
+      },
+    ]);
+  });
+
+  it('treats a blank stack name as the main stack', () => {
+    const override = technicalStackOverrideValue([
+      { stack: '  ', label: 'Data', items: [{ name: 'Snowflake', source: 'manual', confidence: 1 }] },
+      { label: 'Data', items: [{ name: 'Databricks', source: 'manual', confidence: 1 }] },
+    ]);
+
+    expect(override.stack).toEqual([
+      {
+        label: 'Data',
+        items: [
+          expect.objectContaining({ name: 'Snowflake' }),
+          expect.objectContaining({ name: 'Databricks' }),
+        ],
+      },
+    ]);
   });
 });

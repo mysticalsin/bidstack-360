@@ -44,6 +44,7 @@ describe('FinancialHealthSection', () => {
   it('General account: explains why it is not pulled and offers Track financials to Admin / AE', () => {
     state.data = general;
     render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.getByRole('heading', { name: 'Public financials watchdog' })).toBeTruthy();
     expect(screen.getByTestId('fh-empty').textContent).toMatch(/not pulled automatically/);
     const sw = screen.getByRole('switch', { name: /Track financials/ });
     fireEvent.click(sw);

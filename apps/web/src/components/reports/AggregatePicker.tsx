@@ -102,7 +102,7 @@ export function AggregatePicker({ entity, aggregates, onChange }: Props) {
       <button
         onClick={add}
         className={cn(
-          'text-xs text-[var(--brand-primary)] hover:underline',
+          'text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline',
           'focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] rounded px-1',
           'min-h-[44px] px-2',
         )}

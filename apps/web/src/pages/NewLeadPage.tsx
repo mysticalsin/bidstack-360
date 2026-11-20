@@ -134,9 +134,6 @@ export function NewLeadPage() {
           <h1 className="text-xl font-semibold text-[var(--fg-primary)]">
             {t('newLead.heading', 'New lead')}
           </h1>
-          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('newLead.subtitle', 'Add a new prospect to your pipeline.')}
-          </p>
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
@@ -295,9 +292,6 @@ export function NewLeadPage() {
                 className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
               >
                 {t('newLead.labelScore', 'Score')}
-                <span className="mt-0.5 block font-normal text-[var(--fg-tertiary)]">
-                  {t('newLead.scoreHint', 'Leave at 0 if this lead has not been scored')}
-                </span>
               </label>
               <input
                 id="lead-score"

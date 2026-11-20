@@ -20,6 +20,8 @@ import {
   type PortfolioAlert,
   type TimelineItem,
   collapseMarketNotes,
+  timelineEventPage,
+  timelineEventTake,
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
@@ -115,7 +117,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         prisma.accountWatchEvent.findMany({
           where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) },
           orderBy: { occurredAt: 'desc' },
-          take: 300,
+          take: timelineEventTake(),
         }),
         prisma.accountEarningsDate.findMany({ where: { orgId, companyId: { in: ids }, expectedAt: { gte: from, lte: to } }, take: 20 }),
         prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: from } }, select: { postedAt: true }, orderBy: { postedAt: 'desc' }, take: 1000 }),
@@ -202,8 +204,18 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       );
       const tally: Record<string, number> = {};
       for (const i of grouped) tally[i.category] = (tally[i.category] ?? 0) + 1;
-      const shown = (wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped).slice(0, 300);
-      return { companyId: company.id, from: from.toISOString(), to: to.toISOString(), items: shown, counts: tally };
+      // One event past the page the timeline draws. The extra row is the probe.
+      // It is not shown, and it is not a total.
+      const filtered = wanted ? grouped.filter((i) => wanted.has(i.category)) : grouped;
+      const page = timelineEventPage(filtered);
+      return {
+        companyId: company.id,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        items: page.items,
+        counts: tally,
+        timelineContinues: page.pageContinues,
+      };
     },
   );
 
@@ -249,7 +261,9 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const { orgId, userId } = req.auth;
       const scope = await getAccessScope(orgId, userId);
       const now = new Date();
-      const roots = await prisma.company.findMany({
+      // One row past the page the list calls every account. The extra row is
+      // the probe. It is not shown, and it is not a total.
+      const loadedRoots = await prisma.company.findMany({
         where: applyCompanyScope(
           {
             orgId,
@@ -267,8 +281,10 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
         ),
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
-        take: req.query.limit,
+        take: req.query.limit + 1,
       });
+      const accountsContinue = loadedRoots.length > req.query.limit;
+      const roots = accountsContinue ? loadedRoots.slice(0, req.query.limit) : loadedRoots;
       const loaded = await loadMomentumInputs(orgId, scope, roots.map((r) => r.id), now);
       const accounts = roots
         .map((r) => {
@@ -333,7 +349,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       const counts = { gaining: 0, steady: 0, declining: 0 };
       for (const a of accounts) counts[a.trend]++;
-      return { accounts, counts, alerts, computedAt: now.toISOString() };
+      return { accounts, counts, alerts, accountsContinue, computedAt: now.toISOString() };
     },
   );
 };
