@@ -20,14 +20,21 @@ import type { Prisma } from '../../generated/client/index.js';
  *
  * WHY $executeRaw over a middleware-level flag: a flag the purge sets/clears is
  * an ambient, racy escape hatch any caller could reach for; the raw-SQL boundary
- * is explicit, auditable in one place (the retention worker), and can itself be
- * locked down further with a DB role. Keeping the exception OUT of this
- * middleware keeps the rule here unconditional and easy to reason about.
+ * is explicit and can itself be locked down further with a DB role. The
+ * retention worker and test teardown are the callers. Keeping the exception
+ * OUT of this middleware keeps the rule here unconditional.
  *
- * Follow-up (out of scope here): DB-level immutability is stronger than an
- * app-layer guard — a Postgres trigger that raises on UPDATE/DELETE, plus
- * REVOKE UPDATE, DELETE ON audit_log so only the retention role may purge. That
- * needs a migration and is the recommended hardening once this lands.
+ * DB-level layer: migration 20261107070020_audit_log_hash_chain_triggers adds triggers
+ * that hash-chain every insert per org and reject content UPDATE and TRUNCATE
+ * for every writer, raw SQL included. DELETE stays possible for the retention
+ * purge and org cascade; chain verification reports the gap it leaves.
+ * Migration 20261112180000 makes app_role the runtime login and revokes
+ * UPDATE, DELETE, and TRUNCATE on audit_log from that role. The API and worker
+ * connect with DATABASE_URL_APP. Migrations and retention connect with
+ * DATABASE_URL_OWNER, which can still delete. On Polo the container builds
+ * those URLs: the app password is Worker secret POLO_APP_DB_PASSWORD, and the
+ * owner login stays on migrate and retention. Left: this is not deployed until
+ * Tony's go, and deleting an org still cascades to its audit rows.
  */
 
 const AUDIT_MODEL = 'AuditLog';

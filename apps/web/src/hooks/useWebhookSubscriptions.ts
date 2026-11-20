@@ -10,10 +10,18 @@ export interface WebhookSub {
   lastDeliveryAt: string | null;
   lastFailureAt: string | null;
   createdAt: string;
+  /** Per-endpoint delivery timeout. Older API builds omit it. */
+  timeoutMs?: number;
 }
 
 export interface WebhookCreatedSub extends WebhookSub {
   signingSecret: string;
+}
+
+export interface WebhookSubscriptionList {
+  items: WebhookSub[];
+  /** True when one subscription past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
 }
 
 export interface WebhookDeliveryRecord {
@@ -30,7 +38,8 @@ export interface WebhookDeliveryRecord {
 export function useWebhookSubscriptions(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['webhook-subscriptions'],
-    queryFn: ({ signal }) => api<WebhookSub[]>('/api/v1/webhook-subscriptions', { signal }),
+    queryFn: ({ signal }) =>
+      api<WebhookSubscriptionList>('/api/v1/webhook-subscriptions', { signal }),
     enabled: options?.enabled ?? true,
   });
 }
@@ -50,7 +59,7 @@ export function useWebhookDeliveries(subscriptionId: string) {
 export function useCreateWebhookSubscription() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { url: string; events: string[]; active?: boolean }) =>
+    mutationFn: (body: { url: string; events: string[]; active?: boolean; timeoutMs?: number }) =>
       api<WebhookCreatedSub>('/api/v1/webhook-subscriptions', {
         method: 'POST',
         body,
@@ -62,7 +71,7 @@ export function useCreateWebhookSubscription() {
 export function useUpdateWebhookSubscription(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<Pick<WebhookSub, 'url' | 'events' | 'active'>>) =>
+    mutationFn: (body: Partial<Pick<WebhookSub, 'url' | 'events' | 'active' | 'timeoutMs'>>) =>
       api<WebhookSub>(`/api/v1/webhook-subscriptions/${id}`, {
         method: 'PATCH',
         body,

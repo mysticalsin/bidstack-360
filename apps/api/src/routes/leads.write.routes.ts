@@ -8,6 +8,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { prisma, type Prisma, type LeadPriority, type LeadStatus } from '@bidstack/db';
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { pushLeadToDust } from '../lib/dust-push.js';
 import { mintOpportunityTx, withOpportunityCodeRetry } from '../services/opportunities/mint.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
@@ -19,23 +20,6 @@ import {
   LeadDetail,
   LeadPatch,
 } from '@bidstack/shared';
-
-import { resolveLeadCompanyId } from './leads.company-link.js';
-
-/** Stored deal micros for a lead conversion. A digit string keeps a large amount. */
-export function convertOpportunityMicros(value: string | number | undefined): bigint {
-  if (value === undefined) return 0n;
-  if (typeof value === 'string') {
-    if (!/^\d+$/.test(value)) throw new Error('opportunityValueMicros is not an integer amount');
-    return BigInt(value);
-  }
-  if (!Number.isSafeInteger(value)) {
-    throw new Error(
-      'opportunityValueMicros is too large to store as a JSON number; send the micros as text',
-    );
-  }
-  return BigInt(value);
-}
 
 export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
 
@@ -64,10 +48,6 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         });
         if (!owner) throw server.httpErrors.badRequest('Owner must belong to your organization');
       }
-      const linkedCompanyId = await resolveLeadCompanyId(req.auth.orgId, body.companyName);
-      if (linkedCompanyId === 'ambiguous') {
-        throw server.httpErrors.conflict('Company name matches more than one company');
-      }
       const created = await prisma.$transaction(async (tx) => {
         const lead = await tx.lead.create({
           data: {
@@ -77,7 +57,6 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
             email: body.email ?? null,
             phone: body.phone ?? null,
             companyName: body.companyName,
-            companyId: linkedCompanyId,
             title: body.title ?? null,
             source: body.source,
             priority: body.priority,
@@ -128,7 +107,6 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         email: created.email,
         phone: created.phone,
         companyName: created.companyName,
-        companyId: created.companyId,
         title: created.title,
         source: created.source,
         status: created.status,
@@ -168,6 +146,14 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
       if (!existing) throw server.httpErrors.notFound('Lead not found');
 
       const body = req.body;
+      // 'converted' is set only by POST /leads/:id/convert, which also creates
+      // the contact and opportunity; a converted lead keeps that status.
+      if (body.status === 'converted' && existing.status !== 'converted') {
+        throw server.httpErrors.badRequest('Use the convert action to convert a lead');
+      }
+      if (existing.status === 'converted' && body.status !== undefined && body.status !== 'converted') {
+        throw server.httpErrors.conflict('A converted lead cannot change status');
+      }
       // A reassigned owner must belong to the caller's org (no cross-tenant connect).
       if (body.ownerId) {
         const owner = await prisma.user.findFirst({
@@ -176,26 +162,32 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         });
         if (!owner) throw server.httpErrors.badRequest('Owner must belong to your organization');
       }
+      if (body.customFieldValues?.length) {
+        const foreign = await foreignCustomFieldDefinitions(
+          req.auth.orgId,
+          'lead',
+          body.customFieldValues.map((v) => v.definitionId),
+        );
+        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
+      }
 
-      const data: Prisma.LeadUncheckedUpdateInput = {};
+      // updateMany takes scalar columns only, so the owner is set by ownerId
+      // rather than a relation connect.
+      const data: Prisma.LeadUncheckedUpdateManyInput = {};
       if (body.firstName !== undefined) data.firstName = body.firstName;
       if (body.lastName !== undefined) data.lastName = body.lastName;
       if (body.email !== undefined) data.email = body.email;
       if (body.phone !== undefined) data.phone = body.phone;
-      if (body.companyName !== undefined) {
-        const linkedCompanyId = await resolveLeadCompanyId(req.auth.orgId, body.companyName);
-        if (linkedCompanyId === 'ambiguous') {
-          throw server.httpErrors.conflict('Company name matches more than one company');
-        }
-        data.companyName = body.companyName;
-        data.companyId = linkedCompanyId;
-      }
+      if (body.companyName !== undefined) data.companyName = body.companyName;
       if (body.title !== undefined) data.title = body.title;
       if (body.source !== undefined) data.source = body.source;
-      if (body.status !== undefined) data.status = body.status as LeadStatus;
+      if (body.status !== undefined) {
+        data.status = body.status as LeadStatus;
+        if (body.status !== existing.status) data.statusChangedAt = new Date();
+      }
       if (body.priority !== undefined) data.priority = body.priority as LeadPriority;
       if (body.score !== undefined) data.score = body.score;
-      if (body.ownerId !== undefined) data.ownerId = body.ownerId || null;
+      if (body.ownerId !== undefined) data.ownerId = body.ownerId;
       if (body.notes !== undefined) data.notes = body.notes;
       if (body.budget !== undefined) data.budget = body.budget;
       if (body.authority !== undefined) data.authority = body.authority;
@@ -260,7 +252,6 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         email: updated.email,
         phone: updated.phone,
         companyName: updated.companyName,
-        companyId: updated.companyId,
         title: updated.title,
         source: updated.source,
         status: updated.status,
@@ -306,14 +297,6 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
       }
 
       const body = req.body;
-      let valueMicros: bigint;
-      try {
-        valueMicros = convertOpportunityMicros(body.opportunityValueMicros);
-      } catch (err) {
-        throw server.httpErrors.badRequest(
-          err instanceof Error ? err.message : 'opportunityValueMicros is not an amount',
-        );
-      }
       // Bounded retry on (orgId, code) collisions — mintNextCode reads inside
       // the transaction, so a concurrent convert/create can race it; the whole
       // transaction (contact + opportunity + lead flip) rolls back and re-runs.
@@ -324,7 +307,6 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
           data: {
             orgId: req.auth.orgId,
             customer: lead.companyName,
-            companyId: lead.companyId,
             name: `${lead.firstName} ${lead.lastName}`,
             role: lead.title,
             email: lead.email,
@@ -333,25 +315,19 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         });
 
         // 2. Create Opportunity via the shared mint primitive (code mint +
-        //    stage resolution). A stored lead.companyId is the link. When it
-        //    is null, the mint links an existing company only if the name
-        //    matches one. It never creates a company.
+        //    stage resolution). No explicit companyId, so the mint links to an
+        //    EXISTING Company by normalized customer name (link-only; never
+        //    auto-created) so converted opps roll up into the account views (F2).
+        //    See services/opportunities/mint.ts.
         const opp = await mintOpportunityTx(tx, {
           orgId: req.auth.orgId,
           customer: lead.companyName,
-          companyId: lead.companyId,
           name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
-          valueMicros,
+          valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
           ownerId: lead.ownerId,
           pipelineStageId: body.pipelineStageId,
           stageKey: body.stage,
         });
-        if (opp.companyId) {
-          await tx.contact.update({
-            where: { id: contact.id },
-            data: { companyId: opp.companyId },
-          });
-        }
 
         // 3. Mark lead as converted. The status guard makes this flip the
         // concurrency gate: two simultaneous converts both pass the outside-tx
@@ -393,7 +369,9 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/leads/:id',
     {
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      // Leads list bulk delete sends one DELETE per selected row, up to a
+      // 50-row page; a lower cap fails part of a single bulk action.
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 204: z.null() },

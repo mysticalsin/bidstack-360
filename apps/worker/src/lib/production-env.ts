@@ -1,3 +1,6 @@
+import { databaseLogin } from '@bidstack/db';
+import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
+
 type Env = Record<string, string | undefined>;
 
 const REQUIRED_PRODUCTION_KEYS = ['DATABASE_URL', 'REDIS_URL'] as const;
@@ -30,15 +33,40 @@ function redisUrlError(value: string): string | null {
   }
 }
 
+const NODE_ENVS = new Set(['development', 'production', 'test']);
+
 export function validateWorkerProductionEnv(env: Env = process.env): string[] {
-  if (trimmed(env, 'NODE_ENV') !== 'production') {
-    return [];
+  const nodeEnv = env.NODE_ENV ?? '';
+  // Missing is not development. Local dev sets NODE_ENV=development in .env,
+  // and dotenv loads that before this check, so a normal dev boot still skips
+  // the production secret list. An empty value must not.
+  if (!NODE_ENVS.has(nodeEnv)) {
+    return ["NODE_ENV must be exactly 'development', 'production', or 'test'"];
   }
+  if (nodeEnv !== 'production') return [];
 
   const errors: string[] = [];
+  const lockStartup = oauthRefreshLockStartupError(env);
+  if (lockStartup) errors.push(lockStartup);
+  const lockTiming = oauthRefreshLockTimingError(env);
+  if (lockTiming) errors.push(lockTiming);
   for (const key of REQUIRED_PRODUCTION_KEYS) {
     if (!trimmed(env, key)) {
       errors.push(`${key} is required in production`);
+    }
+  }
+
+  const appUrl = trimmed(env, 'DATABASE_URL_APP');
+  const ownerUrl = trimmed(env, 'DATABASE_URL_OWNER');
+  if (!appUrl) errors.push('DATABASE_URL_APP is required in production');
+  if (!ownerUrl) errors.push('DATABASE_URL_OWNER is required in production');
+  if (appUrl && ownerUrl) {
+    const appLogin = databaseLogin(appUrl);
+    const ownerLogin = databaseLogin(ownerUrl);
+    if (!appLogin) errors.push('DATABASE_URL_APP must be a postgres URL with a login');
+    if (!ownerLogin) errors.push('DATABASE_URL_OWNER must be a postgres URL with a login');
+    if (appLogin && ownerLogin && appLogin === ownerLogin) {
+      errors.push('DATABASE_URL_APP must not use the owner login');
     }
   }
 

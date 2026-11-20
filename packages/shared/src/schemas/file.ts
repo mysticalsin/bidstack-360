@@ -22,7 +22,6 @@ export const ALLOWED_FILE_CONTENT_TYPES = [
   'text/markdown',
   'text/x-markdown',
   'text/csv',
-  'text/html',
   'text/xml',
   'text/rtf',
   'text/yaml',
@@ -74,8 +73,6 @@ export const FILE_CONTENT_TYPE_BY_EXTENSION = {
   yaml: 'text/yaml',
   yml: 'text/yaml',
   eml: 'message/rfc822',
-  html: 'text/html',
-  htm: 'text/html',
   rtf: 'application/rtf',
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -176,5 +173,10 @@ export type FileFinalizeRequest = z.infer<typeof FileFinalizeRequest>;
 
 export const FileListResponse = z.object({
   items: z.array(FileAttachment),
+  /**
+   * True when the query read one file past the page and dropped it.
+   * `items` is that page, not every attachment. No attachment total.
+   */
+  itemsContinue: z.boolean().optional(),
 });
 export type FileListResponse = z.infer<typeof FileListResponse>;

@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type onRouteHookHandler } from 'fastify';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -22,7 +22,7 @@ import { redisCachePlugin } from './plugins/redis-cache.js';
 import { sentryPlugin } from './plugins/sentry.js';
 import { securityHeadersPlugin } from './plugins/security-headers.js';
 import { buildAllowedCorsOrigins, isLoopbackOrigin } from './lib/cors-origins.js';
-import { privacyLogHooks, privacyLogSerializers } from './lib/logger.js';
+import { privacyLogHooks, privacyLogSerializers, SENSITIVE_HEADER_REDACT_PATHS } from './lib/logger.js';
 import { registerFrontDoorGuard } from './lib/front-door-guard.js';
 import { parseTrustProxy } from './lib/trust-proxy.js';
 // Wave 7 — Real-time collaboration
@@ -34,8 +34,15 @@ import { rbacPlugin } from './plugins/rbac.js';
 import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
 import { registerRoutes } from './server.routes.js';
+import { installAccountActivityAlerts } from './services/account-events.service.js';
 
-export async function buildServer(): Promise<FastifyInstance> {
+/** Options for {@link buildServer}. */
+export interface BuildServerOptions {
+  /** Observes every route as it registers (route inventory tooling). */
+  onRoute?: onRouteHookHandler;
+}
+
+export async function buildServer(options: BuildServerOptions = {}): Promise<FastifyInstance> {
   const server = Fastify({
     bodyLimit: 10485760, // 10 MiB to allow large Dust AI webhooks
     // Bound per-request and idle-socket lifetimes so a slow query or hung
@@ -52,7 +59,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     genReqId: (req) => {
       const incoming = req.headers['x-request-id'];
-      if (typeof incoming === 'string' && incoming.length >= 8 && incoming.length <= 255) {
+      // The id is echoed in a response header and stamped on every log line,
+      // so only a conservative token charset is trusted from the client.
+      if (typeof incoming === 'string' && /^[A-Za-z0-9._:-]{8,255}$/.test(incoming)) {
         return incoming;
       }
       return crypto.randomUUID();
@@ -64,20 +73,13 @@ export async function buildServer(): Promise<FastifyInstance> {
       // URL-scrubbing layer (see packages/odoo-mcp-client/src/index.ts).
       redact: {
         paths: [
-          'req.headers.authorization',
-          'req.headers.cookie',
-          'req.headers["x-bidstack-sentry-smoke-token"]',
-          'req.headers["x-api-key"]',
-          'req.headers["x-clerk-session"]',
-          'res.headers["set-cookie"]',
+          ...SENSITIVE_HEADER_REDACT_PATHS,
           '*.bearerToken',
           '*.bearer_token',
           '*.apiKey',
           '*.api_key',
           '*.password',
           '*.secret',
-          'err.config.headers.Authorization',
-          'err.config.headers.authorization',
         ],
         remove: true,
       },
@@ -90,6 +92,13 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
     trustProxy: parseTrustProxy(config.TRUSTED_PROXIES),
   }).withTypeProvider<ZodTypeProvider>();
+
+  // One Redis client for the process. CSV import queues through this decorator
+  // so a request built by buildServer() does not depend on a test assigning it.
+  server.decorate('redis', redis);
+
+  if (options.onRoute) server.addHook('onRoute', options.onRoute);
+  installAccountActivityAlerts();
 
   // First hook: drop traffic that bypassed Front Door before any other work.
   registerFrontDoorGuard(server, config.AZURE_FRONT_DOOR_ID);
@@ -208,14 +217,15 @@ export async function buildServer(): Promise<FastifyInstance> {
   const isLowEnv = config.NODE_ENV === 'development' || config.NODE_ENV === 'test';
 
   await server.register(rateLimit, {
-    max: isLowEnv ? 10_000 : config.API_RATE_LIMIT_MAX,
+    // Low envs keep a 10k floor; a larger API_RATE_LIMIT_MAX lifts it for load runs.
+    max: isLowEnv ? Math.max(10_000, config.API_RATE_LIMIT_MAX) : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     redis: rateLimitRedis,
     // Fail OPEN when the store errors (e.g. the Redis provider's request quota
     // is exhausted). Rate limiting is a guard, not a hard dependency — a store
     // outage must never turn every request into a 500. The request is allowed
     // through; the limit simply isn't enforced until the store recovers.
-    skipOnError: true,
+    skipOnError: config.POLO_DATA_MODE !== 'real',
     keyGenerator: (req) => {
       // Registered after auth so authenticated routes get per-user buckets.
       // Fold in orgId so the per-user bucket is partitioned per tenant and keys

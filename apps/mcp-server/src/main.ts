@@ -15,9 +15,10 @@ try {
   process.exit(1);
 }
 
-const [{ prisma }, { buildMcpServer }] = await Promise.all([
+const [{ prisma }, { buildMcpServer }, { startAccountActivityAlertRelay }] = await Promise.all([
   import('@bidstack/db'),
   import('./server.js'),
+  import('./account-activity-alerts.js'),
 ]);
 
 const port = Number(process.env.PORT_MCP ?? 4001);
@@ -33,6 +34,9 @@ try {
   server.log.error(err, 'failed to start mcp-server');
   process.exit(1);
 }
+
+// activities_ingest raises follower alerts; apps/api sends them.
+const stopAlertRelay = startAccountActivityAlertRelay(server.log);
 
 // HTTP health probe for Docker / orchestrators. Probes the DB (every MCP tool
 // uses Prisma), so a pod with a dead DB is taken out of rotation instead of
@@ -73,6 +77,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     void (async () => {
       try {
         await server.close();
+        await stopAlertRelay();
         healthServer.close();
         await prisma.$disconnect();
       } catch (err) {

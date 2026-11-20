@@ -473,7 +473,407 @@ Every list, table, and dashboard widget must have an empty state.
 | Version | Date       | Change                | Agent |
 | ------- | ---------- | --------------------- | ----- |
 | 1.0.0   | 2026-05-22 | Initial seed document | #5    |
+| 3.0.0   | 2026-11-06 | Enterprise upgrade addendum (section 9): TUFFUI token map, motion tokens, components, layout, copy, a11y. Sections 1 to 7 above are stale on tokens; `docs/DESIGN.md` and `apps/web/src/index.css` win. | factory-0 (Cursor) |
 
 ---
 
 _DESIGN.md is a living document. Every design decision must be traceable to a Principle. When taste_profile.json evolves, update the relevant sections here._
+
+---
+
+## 9. v3.0.0 (2026-11-06): Enterprise upgrade addendum
+
+Appended by factory slice 0. Earlier sections are kept as history. Where they disagree with this
+section, this section wins; where this section is silent, `docs/DESIGN.md` (green visual system) and
+the live values in `apps/web/src/index.css` win. Backup of the prior file: `DESIGN.backup-2026-11-06.md`.
+
+Ground truth on `main` (`ad2d0839`):
+
+- Tailwind **4.3.3**, CSS-first via `@tailwindcss/vite`. No `tailwind.config.*`. Tokens are CSS variables
+  in `apps/web/src/index.css` (`:root` / `[data-theme='light']`, `[data-theme='dark']`) bridged into
+  utilities by one `@theme` block. Dark mode is `data-theme`, not `prefers-color-scheme`.
+- Brand is green: `--brand-primary` `#006b4f` (light), `#00805e` (dark fill), `--brand-deep` `#3fbe93`
+  (dark foreground accent). The blue values in sections 1 to 3 and in ADR 0005 are stale.
+- Design law is enforced by ESLint (`packages/eslint-rules/design-law.js`): `no-foreign-token-vocabulary`,
+  `no-arbitrary-geometry`, `no-theme-variant-geometry` (errors), `no-raw-hex-in-classname` (warn).
+  ADR 0002: tokens change value, never name; no second vocabulary.
+- Class merge helper is `@/lib/cn` (clsx + tailwind-merge). There is no `@/lib/utils`.
+
+### 9.1 Tokens: TUFFUI to repo
+
+TUFFUI (MIT, https://github.com/yurigdesigner/tuffui, pinned `378f3eaac693c693d2ec845baf38bf6c0488cb37`)
+ships shadcn-style names. Rewrite every class at import; never add the TUFFUI names to `@theme`.
+
+| TUFFUI class / token | Repo class | Note |
+|---|---|---|
+| `text-foreground` | `text-fg-primary` | |
+| `text-muted-foreground` | `text-fg-secondary` | tertiary copy: `text-fg-tertiary` |
+| `text-foreground/NN`, `bg-foreground/NN` | `text-fg-primary/NN`, `bg-fg-primary/NN` | keep the opacity step |
+| `bg-background` | `bg-surface-page` | |
+| `bg-surface` (outer shell) | `bg-surface-shell` | new token, see below |
+| `bg-surface-inset` (inner panel) | `bg-surface-inset` | new token, see below |
+| `bg-surface-raised` (control) | `bg-surface-hover` | |
+| `bg-brand` | `bg-brand` | |
+| `text-brand`, `fill-brand`, `stroke-brand` | `text-brand-deep`, `fill-brand-deep`, `stroke-brand-deep` | contrast-safe in both themes |
+| `text-brand-foreground` | `text-fg-on-brand` | |
+| `positive` | `success` (+ `success-tint`) | |
+| `negative` | `danger` (+ `danger-tint`) | |
+| `warning` | `warning` (+ `warning-tint`) | |
+| `border-border` | `border-[var(--border-subtle)]` or `border-border-subtle` | strong: `border-border-strong` |
+| `ring` / focus | `--border-focus` | |
+| hex palettes (agent-avatar, diverging-bars, iso-bars) | `var(--chart-1)` .. `var(--chart-8)` | chart palette is an allowed exemption |
+
+New tokens (value-only additions, both themes, added to `:root`, `[data-theme='dark']` and `@theme`):
+
+| Token | Light | Dark | Purpose |
+|---|---|---|---|
+| `--surface-shell` | `#f0f0f0` | `#121214` | outer shell of a dense panel |
+| `--surface-inset` | `#ffffff` | `#0c0c0e` | inner panel inside a shell |
+
+Geometry: shell `rounded-xl` (12px), inset `rounded-lg` (8px), controls and pills `rounded-md` (5px).
+Replace TUFFUI `rounded-[1.375rem]`, `rounded-[1.5rem]`, `p-[2px]` with scale steps. Drop
+`shadow-[...]` and `dark:shadow-[...]`; separation comes from surface steps and `--border-subtle`.
+Fonts stay on the repo system stacks.
+
+### 9.2 Motion tokens
+
+Add to `@theme` (CSS) and vendor `lib/motion-tokens.ts` (TS) with the same values:
+
+| Token | Value | Use |
+|---|---|---|
+| `--ease-ui-out` / `EASE_OUT` | `cubic-bezier(0.23, 1, 0.32, 1)` | enter, hover, press |
+| `--ease-ui-in-out` / `EASE_IN_OUT` | `cubic-bezier(0.77, 0, 0.175, 1)` | move, reorder |
+| `--ease-drawer` | `cubic-bezier(0.32, 0.72, 0, 1)` | drawers and sheets |
+| `--duration-enter` | `210ms` (exists) | TUFFUI `enter` 0.2s maps here |
+| `--duration-exit` | `150ms` (exists) | TUFFUI `exit` 0.14s maps here |
+| `--duration-move` | `400ms` (exists) | layout moves only |
+| `spring` | `{ type: 'spring', duration: 0.3, bounce: 0 }` | `motion` / framer only |
+
+Rules: nothing over 300ms except layout moves; animate transform and opacity only; every animated
+component reads `useReducedMotion()` and falls back to `instant` (`duration: 0`). Keep using
+`apps/web/src/lib/motion.ts`; `motion-tokens.ts` re-exports from it where values match.
+
+### 9.3 Components
+
+Vendor path: `apps/web/src/components/vendor/tuffui/<name>.tsx`, plus `LICENSE` (full MIT text) in that
+folder. Keep each file header verbatim:
+`// TUFFUI (https://tuffui.com) · MIT License · Copyright (c) 2026 TUFFUI contributors`.
+Add one line under it listing the rewrites made (table-kit precedent). Swap Phosphor icons for Lucide
+(section 7).
+
+| Component | Source | Use in Polo |
+|---|---|---|
+| StatusPill, Tag | `registry/status-pill/status-pill.tsx` | delivery status, policy effect, endpoint state |
+| AgentConsole | `registry/agent-console/` (+ run-trace, tool-approval-queue, usage-summary, rate-limits, progress-bar, eval-results, context-window-meter, background-agents) | SERUM agent runs, approvals |
+| DotHistogram | `registry/dot-histogram/` | webhook response-time distribution |
+| RadialDots | `registry/radial-dots/` | success-rate gauge |
+| MatchField | `registry/match-field/` | policy condition builder (When / Except) |
+| RadarChart | `registry/radar-chart/` | bid scoring |
+| DivergingBars | `registry/diverging-bars/` | policy impact preview (gained vs lost access) |
+| IsoBars | `registry/iso-bars/` | volume by event type |
+| HexDensity | `registry/hex-density/` | delivery heatmap |
+
+Reference screens are style input only: dark delivery heatmap with gauge; message log with dot timeline
+and attempts / replay; retry step chart, response-time histogram, endpoint form; light access-policy
+builder with When / Then / Except, impact preview, publish version. Do not copy any third-party product
+names or copy into Polo.
+
+### 9.4 Layout rules
+
+- App frame unchanged: 56px icon rail, `PageShell` `max-w-7xl`, one vertical scroll per page (no nested
+  scroll areas except logs and tables with a fixed header).
+- Dense panels use shell + inset: `bg-surface-shell rounded-xl p-1` wrapping `bg-surface-inset rounded-lg`.
+- Side panels (message detail, policy editor) become a drawer below `56rem` container width, using
+  container queries (native in Tailwind 4: `@container`, `@4xl:`). Drawer closes on Escape and returns
+  focus to the trigger.
+- Collapsible rails: 64px collapsed, 232px expanded.
+- Charts sit in an inset with a one-line title and a value; legends only when there are more than two
+  series.
+
+### 9.5 Copy rules
+
+- Cut taglines, helper text under labels, and secondary labels that repeat the primary. One title, one
+  value, one action per card.
+- Empty states: one sentence, one action.
+- No em dashes in new copy; no banned AI words (vault `Preferences/dont.md`).
+- **Never cut or reword the pinned consent and safety copy below.** Slice agents must add a test that
+  pins these strings (keys in `public/locales/en/*.json` and the inline defaults) before cutting any
+  copy. Captured verbatim from `main` `ad2d0839` (quoted UI text, so original punctuation is kept).
+  The three signature lines were realigned to `main` after #304: the page and the PDF say this is an
+  internal approval signature, not a legally binding e-signature.
+
+```text
+# Signatures (PublicSignPage, signatures.json)
+This is an internal approval signature, not a legally binding e-signature. This page contains no tracking technologies.
+I understand this is an internal approval signature, not a legally binding e-signature, and that it represents my intent to approve this document. I have had the opportunity to review its contents.
+{{senderName}} has been notified. A copy of the signed document will be sent to your email address.
+I understand this electronic signature is an internal approval signature, not a legally binding e-signature.
+
+# SMS (SmsComposerModal)
+This number has requested to stop receiving SMS. Sending is blocked (TCPA compliance).
+This message will be sent as {{count}} segments (billed per segment by Twilio).
+
+# Secrets shown once (ApiKeysSection, WebhooksSection, MeetingSourcesSection)
+Copy the secret now — it will not be shown again.
+You'll see the secret exactly once — copy it before closing.
+Copy your new key now — it won't be shown again.
+Any client using this key will start failing immediately. This cannot be undone.
+Copy the signing secret now
+Store this secret in the receiver for
+It will not be shown again.
+Webhooks are limited to administrators
+Webhook subscriptions can push sensitive platform data to external systems, so only admins can view, create, test, pause, or delete them.
+The endpoint will stop receiving Polo PreSales events immediately. Delivery history is retained.
+Copy this token now. It is shown once and Polo keeps only its fingerprint.
+
+# AI disclosure and review
+AI-assisted draft — review before sending
+These are AI suggestions only. Review before applying to the deal.
+Open-web signal; verify before treating as a Mantu fact.
+{{label}} open-web feed checked at {{fetchedAt}} with {{confidence}}% source confidence. Verify before treating it as a Mantu fact.
+Source: Google News · verify before treating as a Mantu fact.
+Human Review: Pre-Drafting Gate
+Extracted fields applied — review before saving
+Apply extracted fields (review before saving)
+Verify before staging
+
+# Transcripts and data privacy
+Show transcript (shared with consent)
+No transcript stored. Transcripts are kept only when a Métis user opts in.
+No transcript is stored for manual entries.
+Data privacy:
+Model artifacts contain only learned weights — no raw deal data, names, or emails. Each org trains its own isolated model. Scores are cached for 1 hour in Redis and invalidated on record updates.
+Phone numbers and contact leads are not stored
+Secrets stay server-side. Add them to local/production env, then restart worker/API.
+Create read/write keys only for the exact workflow and keep secrets server-side.
+No secrets sent
+Raw API keys, passwords, credentials, and secrets are rejected server-side. Use secretRef fields.
+Enrichment falls back to free open data. The stored key is removed.
+Only admins can manage data-source keys.
+
+# Governance
+Standing decision: an opportunity with a recorded No-Go / No-Bid cannot advance until a positive gate or a justified override is on record.
+
+# Destructive actions
+This permanently removes "{{name}}". This cannot be undone.
+This permanently removes the proposal and all its sections. This cannot be undone.
+This will permanently delete the object definition and all records belonging to it. This action cannot be undone.
+This action cannot be undone.
+Delete all demonstration data? This action cannot be undone.
+"{{name}}" will be removed. This can't be undone.
+{{recordKey}} will be soft-deleted. It can be restored via the API.
+```
+
+### 9.6 Accessibility rules
+
+- WCAG 2.2 AA in both themes. Body text 4.5:1, large text and UI parts 3:1. Use `brand-deep` for
+  brand-coloured text on dark surfaces.
+- Status is never colour alone: StatusPill carries text and an icon; heatmap cells and dots carry an
+  accessible name with value and time.
+- Every chart has a text alternative: a visually hidden summary plus a "View as table" toggle for
+  HexDensity, DotHistogram, DivergingBars and IsoBars.
+- Keyboard: all controls reachable in order; Escape closes drawers and popovers; focus returns to the
+  trigger; visible focus ring from `--border-focus`. MatchField rule rows are reorderable by keyboard.
+- Live regions: delivery replay and policy publish results announce via `aria-live="polite"`.
+- Reduced motion honoured everywhere (9.2). Touch targets at least 44 x 44 px, even when the visible control is smaller.
+- Lighthouse a11y stays at 100 on `/login` and `/dashboard` (baseline in `docs/factory/RECON.md`).
+
+### 9.7 Account direction (slice 12)
+
+One section on the account page, after "What to position": where the company is heading.
+
+- Tabs, in order: Direction (default), Hiring, Financials, News and posts. `role="tablist"`, arrow keys move between tabs.
+- Direction: headline, cited claims, three columns (Investing, Cutting, Next 12 months), then bid relevance rows (offering, pitch, next step).
+- Every line names its basis. Observed and Stated are plain; Inferred carries an "Inferred" tag. Each line links its evidence: source label, year or date, and the excerpt on hover or focus.
+- Hiring: open roles as a big number, 30 and 90 day trend with arrows, a six month bar strip, function mix, top skills, recent postings with source.
+- Financials: one row per fiscal year with source and year on every row; registry facts below; the Apollo range only as a labelled fallback.
+- News and posts: one list, newest first, each item with a kind label (Product, Partnership, Acquisition, Leadership, Results, Layoffs, Expansion) and origin (company or press).
+- Sources strip at the foot of every tab: Job boards, Company posts, Filings, Registries. Each row shows status as text plus icon, last fetched time, the result (new, updated, failed) and a Refresh button (lucide `RefreshCw`) for users with `account-intel:write`. Not configured rows name the env var to set.
+- Sample data carries the "Sample" tag. No taglines or helper text. Tokens: signals `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers.
+
+### 9.8 Slice 1 as built (2026-11-06)
+
+Appended by factory slice 1. Values only; no existing token changed.
+
+- Surfaces: `--surface-shell` and `--surface-inset` in both theme blocks, bridged as
+  `bg-surface-shell` and `bg-surface-inset`.
+- Status aliases: `--color-positive(-tint)` and `--color-negative(-tint)` in `@theme` point at
+  `--success(-tint)` and `--danger(-tint)`; `warning` already existed. They exist so vendored chart
+  fills keep one meaning across themes. New code still writes `success` and `danger`.
+- Motion: `--ease-ui-out`, `--ease-ui-in-out`, `--ease-drawer` in `@theme` (utilities `ease-ui-out`
+  and so on), mirrored in `apps/web/src/lib/motion-tokens.ts` with `enter` (210ms), `exit` (150ms),
+  `spring`, `instant` and `motionFor(reduced, transition)`. A contract test keeps CSS and TS equal.
+- Components: `components/vendor/tuffui/status-pill.tsx` (`StatusPill` with filled lucide glyphs,
+  `Tag`) and `surface.tsx` (`Shell`, `Panel`, `Inset`, `IconTile`, `ShellHeader`), plus `LICENSE`.
+- Lint ratchet: `no-foreign-token-vocabulary` now also bans bare `text-foreground`, `bg-foreground`,
+  `text-background`, `bg-background`, `fill-foreground`, `stroke-foreground`. The last live
+  leftovers (funnel-chart, sankey-node, chart-stat-flow) now use `fg-*` tokens.
+- Copy: the 9.5 list is pinned by `apps/web/src/copy/consent-copy.pinned.test.ts`, which also checks
+  that it matches the block above. The cut list lives in `main-screen-copy-cut.contract.test.ts`.
+
+### 9.16 Technology stack from open data (slice 16)
+
+One technology stack per account, on `/accounts/:accountId` (Technical Stack card) and on
+`/companies/:id` (Technology stack section). Same data, same wall.
+
+- Wall: grouped by category (Cloud, Collaboration, Email security, Identity, CRM and marketing,
+  ITSM, Data and analytics, ERP, Web platform, DevOps, Languages, Other). Category label in
+  uppercase `--fg-tertiary` 12px; items as pills with `TechLogo` (20px), name, a source chip and
+  the confidence as a whole percent in tabular numbers.
+- Source chips, plain words only: DNS, Cert, Website, Jobs, GitHub, Apollo, Manual, Meeting notes,
+  Seamless, Tech intel. Chip uses `--surface-sunken` with `--fg-secondary`; Manual uses
+  `--brand-primary` text. No colour-only meaning: the word is always there.
+- Evidence: each pill is a button that opens a popover (Radix HoverCard on hover, click toggles a
+  pinned popover; Escape closes and focus returns to the pill). Content: source, the record or URL
+  observed (URLs are links, `rel="noreferrer"`), observed date, confidence.
+- Coverage line under the wall: `Coverage: DNS 6, Cert 2, Website 4, Jobs 3. Nothing found in
+  GitHub.` Lanes that failed say `Cert unavailable`. Last checked date on the right, `Checked 7 Nov`.
+  Sample data carries the `Sample` tag next to the coverage line.
+- Empty: `No technology found yet` plus the coverage line when lanes ran. Loading: skeleton rows.
+  Error: `Could not load technology stack` with Retry.
+- Accounts list card: up to three `TechLogo` (16px) with names, in the existing `account-card-tech`
+  row; it truncates with an ellipsis and carries a `title` with the full list. No new row.
+- Layout: no overlap at 1440, 1024 and 390, light and dark; pills wrap; popover stays inside the
+  viewport (collision padding 8px). Hit targets 24 x 24 minimum. Copy: no em dashes, no taglines.
+- Build note: the empty state keeps the existing copy `No technology detected yet` so current tests
+  and screenshots stay valid. Chip and Sample text use 12px (`text-xs`), the audit floor.
+### 9.9 Slice 2 console shell as built (2026-11-07)
+
+Appended by factory slice 2. Refines the existing shell (AppShell, Sidebar, MobileNav, Topbar); the look
+is unchanged. This supersedes the "56px icon rail" line in 9.4.
+
+- Rail: 232px expanded, 64px collapsed, from `--sidebar-w` on `.app-shell`. The grid track eases
+  200ms with `var(--ease-ui-out)`. It is instant for a keyboard toggle (Enter or Space) and under
+  `prefers-reduced-motion`, via `data-motion="instant"` on `.sidebar`. Collapsed items keep an
+  `aria-label` and a tooltip; section flyouts open on hover and on keyboard focus.
+- Breakpoint: `56rem` (`SHELL_WIDE_QUERY` in `components/layout/shellBreakpoint.ts`). Below it the rail
+  is hidden and the topbar "Open navigation" button opens the nav as an in-place drawer inside the
+  shell (left side, `--ease-drawer`, backdrop button "Close navigation"). The drawer is a
+  `role="dialog"` named "Primary navigation"; focus moves in, Tab is trapped, Escape or a link closes
+  it, and focus returns to the hamburger. Body scroll is locked while it is open.
+- One vertical scroll: the document scrolls; the sidebar keeps only its own safety-net overflow.
+- Pinned by `MobileNav.test.tsx`, `Sidebar.console.test.tsx` and `shell-css.contract.test.ts`.
+
+### 9.10 Consulting partners (slice 15)
+
+One section on the account page and the `/accounts/:id` cockpit, after Account direction: which third-party consulting firms work with the client, and how we stand against each one. Our own group entities stay in the MSA "who works with them" panel; this section is outside firms only.
+
+- Partner strip: one tile per firm, strongest first. Tile: monogram (two letters, brand-tinted inset), firm name, relationship tags (Strategic partner, Implementation, Managed services, Audit, Advisory, Engineering), domain chips (IT, Engineering, Digital, Data, SAP, Cloud, Cyber, HEMA / pharma), a three-step strength meter and the evidence count. Selected tile has the accent ring; arrow keys move along the strip (`role="listbox"`).
+- Selected partner, two columns at 1440 and 1024, one column at 390:
+  - Left: radar (repo `charts/PolarCharts.tsx` `RadarChart`, lazy) with two series, Us (accent) and the partner (muted), on Quality, Price, Speed, Domain depth. Below it a score table, one row per dimension including Relationship: us, partner, evidence count. A dimension without evidence shows "No evidence" in muted text and is left off the radar, never drawn as zero.
+  - Right: record line (wins and losses against the firm, years), then 1 to 3 angles. Each angle cites its evidence; an inferred angle carries the "Inferred" tag.
+- Timeline strip under both columns: one dot per evidence item on a time axis, public dots outlined, internal dots filled; hover or focus shows date, source and title.
+- Evidence list (collapsed by default, "Evidence" toggle): source label, date, excerpt, method, link to the URL or the record; "Load more" pages through the API.
+- Header: section title, last fetched time, and Refresh (lucide `RefreshCw`) for users with `account-intel:write`. Not configured status shows the detail text.
+- Loading: skeleton renders immediately (no network wait before first paint); the radar chunk loads after. Empty: one line, "No consulting partners found".
+- Sample data carries the "Sample" tag. No taglines or helper text. Tokens: `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers, lucide icons only. Text truncates with ellipsis and full text in `title`; nothing overlaps at 1440, 1024 or 390.
+
+### 9.11 Account team, follow and alerts (slice 21)
+
+Internal staffing on an account plus alerts when someone else acts on it. Recipients are Polo users only; nothing here messages customers.
+
+- Account team card, on the company page after the activity charts. Header: "Account team" and, for `companies:write`, an "Add member" button (lucide `UserPlus`). The key account owner shows first as "Account lead" with the "Owner of record" tag and no edit controls (edited on the account record, not here). One row per member: avatar initials, name, role label, allocation as a number plus a 64px bar (`--brand-primary` fill, `--surface-sunken` track; red `--danger` fill when the person's total across accounts is over 100%), and dates ("from Nov 1, 2026", "until ..."). Row actions (Edit, Remove, lucide `Pencil` and `Trash2`, 36px hit area) only for `companies:write`. Empty: one line, "No one on the team yet".
+- Add or edit dialog (existing `Dialog`): person (select of workspace users, add only), role, allocation % (0 to 100), start and end dates. Under allocation, the person's total across accounts with this change applied; over 100% shows a warning line ("Ana would be at 120% across accounts") in `--warning`. Over 100% warns, never blocks. End before start blocks with an inline error.
+- Follow button in the company header, before the view toggle. States: "Follow" (lucide `Bell`), "Following" (lucide `BellRing`, accent), "Muted" (lucide `BellOff`). Automatic followers (team, owner, opp owner) see "Following" with a menu offering "Mute"; a muted user sees "Unmute"; an explicit follower sees "Unfollow" and "Mute". `aria-pressed` reflects following; the reason ("You are on the team") is in the button `title`.
+- Toast for a new alert: the existing `Toast` stack, tone info, title from the alert, description is actor and item, one "Open" action that navigates in-app. Motion follows the toast system, which already respects `prefers-reduced-motion`. A coalesced alert refreshes the same toast instead of stacking.
+- Settings, Notifications: below the existing toggles, a "Delivery" grid. Rows: Account activity, Deals, Tasks, Mentions. Columns: In-app, Email, Teams (checkboxes with visible labels for screen readers). A "Daily digest email" toggle under the grid. Teams block: webhook URL field (password-style, never echoed back; shows the saved host), Save, Send test, Remove. Copy explains to paste the URL from a Teams Workflows "post to a chat or channel when a webhook request is received" flow.
+- Tokens: `.sg` variables, both themes, 12px card radius, tabular numbers for percentages, lucide icons only. Nothing overlaps at 1440, 1024 or 390.
+### 9.11 Conversations on the account page (slice 20)
+
+Synced Outlook, Teams and Gmail meetings and emails filed to the account, shown under the activity charts on the account page. Read-only: Polo never sends mail or writes calendars.
+
+- Section "Conversations": header with the count shown and the source line "From your connected Outlook and Google calendars and mailboxes". One row per meeting or email, newest first, 25 rows, "Show more" pages by 25.
+- Row: lucide icon (`Video` for Teams, `CalendarDays` for other meetings, `Mail` for email), subject (truncates, full text in `title`), date and time in the browser zone, participant count, direction for email (Received, Sent).
+- Source chip on every row, so each fact names its source: `Outlook`, `Teams`, `Gmail`, `Google Calendar`; rows logged in Polo or pushed by the ingest API show `Logged in Polo` or the ingest source name.
+- Filing hint after the chip: "Filed automatically" (matched by attendee or domain) or "Filed by you". When the account has more than one open opportunity and none was picked, a "Needs opportunity" tag shows instead of a guess.
+- Re-file: meetings you own get a "File to opportunity" select (open opportunities on this account plus "Account only"). It calls the existing `PATCH /calendar/events/:id`; emails have no re-file route yet, so no control.
+- Cancelled meetings stay in the list with a "Cancelled" tag and struck subject.
+- Empty: one line, "No synced meetings or emails yet." Error: one line plus Retry. Loading: skeleton rows.
+- Tokens: `--fg-*`, `--border-subtle`, `--brand-primary`; `Badge` for chips; both themes; nothing overlaps at 1440, 1024 or 390.
+### 9.12 Teams chats on the account page (slice 26)
+
+A person files Teams messages they choose onto an account. Read-only: Polo reads the chats the signed-in user is in through Microsoft Graph and never posts to Teams.
+
+- Entry: a secondary "Import from Teams" button in the Conversations card header (needs `activities:write`). It opens a right-hand `Sheet` (size `lg`, full width below `sm`) titled "Import from Teams", description "Pick messages to file to {account}. Polo only reads your chats.".
+- Consent first. The sheet asks the API for Teams access before listing anything:
+  - Not connected to Microsoft 365: one line "Connect Microsoft 365 to import Teams chats." plus a primary "Connect Microsoft 365" button.
+  - Connected without `Chat.Read`: an amber notice "Polo needs permission to read your Teams chats. Reconnect Microsoft 365 and accept the Teams permission." plus a primary "Reconnect with Teams access" button. Same notice when a Graph call returns 403 later, so a missing permission never fails silently.
+  - Channel threads need `ChannelMessage.Read.All`, which an admin grants. When the server is not set up for it, the Channels tab shows "Channel threads need an admin to approve Teams channel access." and no list.
+- Step 1, pick a conversation: `Tabs` "Chats" and "Channels". Chats: recent chats, newest activity first, each row shows the chat name (topic, else member names), member count and last activity time. Channels: team name, then channel name, then recent threads (first line of the root message). Search box filters the loaded list by name. Loading: skeleton rows. Empty: "No recent chats." Error: one line plus Retry.
+- Step 2, pick messages: a "Back" link, the chat name, and messages oldest to newest with a checkbox each (author, time, a two-line plain-text preview, attachment names as small chips with a `Paperclip` icon, never their content). "Select all" toggles every loaded message. System messages (member added, call ended) are not listed. Messages already filed show a "Filed" tag and stay unchecked.
+- Account: a select labelled "File to", defaulting to the account the sheet was opened from. Under it, a suggestion line when the participants match another account: "Participants match {name} ({reason})" with a "Use {name}" text button. Reasons: "contact jane@acme.com" or "domain acme.com". When the current account is the match, the line reads "Participants match this account".
+- Keep syncing: a switch "Keep filing new messages from this chat to {account}". When on, the worker files new messages every 10 minutes. Linked chats show in a "Synced chats" list at the top of step 1 with the account name and a "Stop syncing" button.
+- Footer: secondary "Cancel", primary "File {n} messages" (disabled at 0). On success a toast "Filed {n} messages to {account}" and the Conversations list refreshes. Partial results name what was skipped ("2 already filed").
+- Conversations list: Teams messages render with the `MessageSquare` icon and the `Teams` chip, subject is the chat name, the facts line adds author. Each Teams row has an "Open in Teams" link (`ExternalLink` icon, opens the Graph `webUrl` in a new tab, `rel="noopener noreferrer"`).
+- Tokens: `--fg-*`, `--border-subtle`, `--surface-sunken` for message rows, `--brand-primary` focus ring; `Badge` for chips; 44px coarse-pointer targets for checkboxes and buttons; both themes; nothing overlaps at 1440, 1024 or 390.
+### 9.11 Company intel on the Companies page (slice 14)
+
+Where each company is heading, at a glance, on the list and in the account header. Organization-level public signals only; never people.
+
+- List columns, after Company and Domain: Revenue, Revenue growth, Headcount, Headcount growth (6m), Open roles, New roles (30d), Hiring trend, Funding, Signal, Direction. All sortable on the loaded page; filters run on the server.
+- Saved views as a segmented row above the table: Hiring fast (5 or more new postings in 30 days), Revenue over 1B (USD equivalent), Contracting. `aria-pressed` on the active one; one click again clears it. A Direction select sits beside them.
+- Columns button (lucide `Columns3`) opens a checkbox menu; hidden columns persist per browser in `localStorage` key `polo.companies.columns.v1`.
+- Every number names its source, year or as-of date and method in its hover title and accessible label. Derived numbers (revenue growth, filed headcount growth, direction) say "inferred"; growth values render italic when inferred.
+- Empty values render an en dash with the reason on hover: Not connected, Private company, No public data, plus one line of detail.
+- New roles (30d) is the hiring proxy: postings first published in the last 30 days, with the delta against the prior 30 days. It is never called hires.
+- Hiring trend: vendored TUFFUI sparkline (72 x 28), six monthly points, last point dotted; success tone when the 30 day trend is up, danger when down, tertiary when flat.
+- Direction: `StatusPill` sm with lucide `TrendingUp`, `Minus` or `TrendingDown` and the word Growing, Steady or Contracting; reasons in a tooltip ending with "Inferred". Signal: `StatusPill` with the post kind.
+- Import progress: one row above the table while an import's companies are enriched: origin, done of total, then the result counts when complete (with revenue, headcount growth, new roles 30d).
+- Account header: a compact strip under the name with five buttons: Revenue (with FY), Headcount (with 6m growth), Open roles (with 30 day delta), Funding, Direction. Each opens the matching Intel tab (financials, hiring, hiring, financials, direction). A Refresh button (lucide `RefreshCw`) for `account-intel:write` queues every source.
+- Intel tab on the account page mounts the slice 12 section (9.7).
+- Widths: the table scrolls horizontally inside its card; the strip wraps to two rows at 1024 and stacks at 390. No overlapping text at 1440, 1024 and 390.
+- No taglines or helper text. Tokens only, both themes, tabular numbers, sample data tagged.
+### 9.11 Slice 5 as built (2026-11-07)
+
+Appended by factory slice 5 (Settings > Access policies).
+
+- Builder: one card per rule with When, Then, Conditions and Except fieldsets, a plain sentence that
+  reads the rule back, and Move up / Move down / Remove buttons (keyboard reorder). MatchField was not
+  vendored: upstream it is a fit chart, not a form, so the rule rows use native checkboxes and inputs.
+- Impact preview: the shared `DivergingBars` from `components/charts/tuffui` (gains above the line in `--success`, losses below in
+  `--danger`) with a "View as table" toggle; people and example events per side, one sentence when
+  nothing changes.
+- Approvals and versions: `StatusPill` for Pending, Approved and Live; the author sees a sentence
+  instead of Approve; "Publish vN" and "Roll back to vN" announce through `aria-live="polite"`.
+- Review fixes: the author or submitter sees Withdraw instead of Approve; checkbox groups are named
+  groups; hour inputs say UTC. "Roll back to vN" files a pending request that a second admin approves
+  before it can be published. The preview headline counts people, the sub-line counts actions, and
+  two sentences say what it cannot show: changes that depend on the record country (not enforced at
+  route level yet) and reads (not in the audit log). The tab and its API are Admin only.
+### 9.x Hiring detail and source rules (2026-11-07)
+
+- Hiring panel adds detail on top of the existing counts, never in place of them: a hiring focus line, share bars (count and percent) for function, tech, practice area and seniority, and a role list that filters when a share is clicked.
+- Percent bases are stated next to the number: function and tech over every open role; practice area and seniority over the postings listed.
+- Sources: every fact names where it came from. The hiring focus line names the job boards; each role links to its posting. News and posts link to the original and name the site. Items without a source link sit apart behind "Show N without a source link", flagged "No source link". Anything we conclude ourselves (for example "Where we fit") carries the "Inferred" tag.
+
+### 9.12 Account and company page layout rules (factory 23, 2026-11-08)
+
+Fix-only rules for the account cockpit (`/accounts/:id`) and company detail (`/companies/:id`). They hold at 1440, 1024, 768 and 390.
+
+- Grid tracks never size to content: use `minmax(0, 1fr)`, never bare `1fr` or `auto 1fr`, for any track that holds text. Cards and every grid or flex child that holds text get `min-width: 0`.
+- Chips wrap. A chip label may wrap onto a second line; a single long word breaks (`overflow-wrap: anywhere`). If a chip must stay on one line it truncates with an ellipsis and carries the full text in `title`.
+- Clipped text always has a way back: any `text-overflow: ellipsis` or line clamp ships with a `title` (or the same text in an `aria-label`) on the clipped element or its row.
+- Tab strips scroll sideways, they never clip: `overflow-x: auto`, `scroll-snap-type: x proximity`, tabs do not shrink (`flex: none`, `white-space: nowrap`), a fade on the trailing edge while more tabs are hidden, and the selected tab scrolls into view. Every tab stays reachable and clickable at 390.
+- Topbar at 390: breadcrumb segments truncate with an ellipsis and a `title`; they never paint over each other. "Skip to content" is invisible and takes no space until it has keyboard focus.
+- Severity reads as a word (High, Medium, Critical, Low), never a single letter. Compliance rows say "Compliance".
+- One logo per header. A decorative status graphic never sits next to the company logo where it reads as a second, empty logo.
+- Empty data shows a sentence, not empty chrome: a chart with no data shows a zero baseline and "No postings in the last 6 months"; empty lists show one muted line and, when the user can act, the action ("Refresh from job boards").
+- A figure the source did not report shows muted "Not disclosed" with a `title` naming the source checked, never a bare "-".
+- Money uses one compact format everywhere on these pages: currency code first, then the amount (`EUR 29.9bn`, `CAD 935m`), from `formatCompactMoney` in `@bidstack/shared`.
+- Display currency defaults to the workspace currency (Settings, Currency and locale). The browser time zone or location is used only when the user picks "Auto"; an explicit pick always wins.
+- Pinned by `e2e/audit/account-company.layout.audit.spec.ts` (overlap per line box, clipped to overflow ancestors, ignoring runs hidden under an opaque positioned layer) and unit tests next to each component.
+
+### 9.11 Sourced company figures (slice 22, 2026-11-08)
+
+Revenue, employees, industry and registry identifiers on the account page show where each number came from, and the user can correct them. Additive only: no existing section is removed or moved.
+
+- Source chip: every revenue, employees and registry value shows a small visible chip under it, `Label · Year` (for example `SEC EDGAR · FY2025`, `Wikidata · 2024`, `Manual · source`). The chip is a link when a source URL exists (new tab, `rel="noopener noreferrer"`), plain text otherwise. 12px, `--fg-tertiary`, underline on hover and focus.
+- Precedence, one rule everywhere: filed statements, then a manual value that carries a source link, then Wikidata (P2123 with its point in time), then a manual value without a source, then the data provider (Apollo or Seamless), then the account's own CRM record. The tile names whichever won.
+- Edit: a quiet `Edit` text button (24 x 24 minimum hit area) next to the chip opens a small inline form: value, source URL (http or https only), source label. Save and Cancel; Escape closes; focus returns to `Edit`. Revenue has a currency select (EUR default; USD, GBP, CAD, CHF, NOK, SEK, DKK, BRL and more) and is stored and shown in that currency. Saved values are audited and show as `Manual`.
+- Empty states say what is missing ("No filed revenue and no public figure found") and offer two actions: `Refresh from public sources` (queues registry and filings refresh plus the Wikidata lookup) and `Add manually` (opens the same form). Never a bare "No data", "Not known" or "Not verified" where an action is possible.
+- Industry never renders as a bare one or two character code: NACE sections, NAICS sectors and SIC divisions map to their names; an unmapped short code shows as "Not known".
+- Registry block (Financials panel): registration number and jurisdiction rows, each with its source chip and Edit; identifiers already matched (LEI, SIREN, Companies House, Brreg, SEC CIK) link to their public register page.
+- Layout: no overlap or spill at 390, 768, 1024 and 1440. Value and chip containers use `min-width: 0`; long values wrap (`overflow-wrap: anywhere`), chips truncate with the full text in `title`; strips and grids collapse to fewer columns. Pinned by `sourced-figures.contract.test.ts`.
+- CRM record: when nothing else has a figure, the number on the account's own record shows with the chip `CRM record · unverified`, so it is visible and honestly labelled. Wikidata headcount gets the same chip as revenue (`Wikidata · Year`, linked to the entity); with no stated year the chip is `Wikidata`.
+- No placeholder text: a tile with nothing to say about its period omits the period line, and a tile with no source and no period shows no hover tip. The words `n/a` and `None` never render.
+- Touch targets: buttons and fields in the technology stack editor are 44px tall; the chip remove control is 44 x 44.

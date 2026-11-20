@@ -7,6 +7,7 @@ import {
   PUBLIC_PREVIEW_ORIGIN,
   filterCookieHeader,
   filterRequestHeaders,
+  identityHeaders,
   filterResponseHeaders,
   isApiPath,
   rewriteLocalUrl,
@@ -87,6 +88,41 @@ describe('polo-preview header contract', () => {
     expect(headers).toContainEqual(['cookie', 'session=abc']);
   });
 
+  it('drops client identity, relay, and front-door headers and keeps Authorization', () => {
+    // WHY: the preview relay used to forward headers the API treats as
+    // identity or admission. Authorization stays: the demo bearer uses it.
+    const headers = filterRequestHeaders([
+      ['Forwarded', 'for=203.0.113.9'],
+      ['True-Client-IP', '203.0.113.9'],
+      ['x-polo-internal-key', 'secret'],
+      ['x-relay-key', 'secret'],
+      ['cf-access-client-id', 'id'],
+      ['cf-access-client-secret', 'secret'],
+      ['x-bidstack-sentry-smoke-token', 'token'],
+      ['x-azure-fdid', 'front-door'],
+      ['authorization', 'Bearer demo'],
+    ]);
+    const names = headers.map(([name]) => name.toLowerCase());
+    expect(names).toEqual(['authorization']);
+  });
+
+  it('drops the Access email header and reattaches only a verified JWT', () => {
+    // WHY: the API used to trust this header from loopback. The client copy
+    // must not survive, and a code-login session must not invent a JWT.
+    const headers = filterRequestHeaders([
+      ['cf-access-authenticated-user-email', 'ada@mantu.com'],
+      ['cf-access-jwt-assertion', 'client-jwt'],
+    ]);
+    const names = headers.map(([name]) => name.toLowerCase());
+    expect(names).not.toContain('cf-access-authenticated-user-email');
+    expect(names).not.toContain('cf-access-jwt-assertion');
+    expect(identityHeaders({ via: 'access', email: 'ada@mantu.com' }, 'verified-jwt')).toEqual([
+      ['cf-access-jwt-assertion', 'verified-jwt'],
+    ]);
+    expect(identityHeaders({ via: 'code', email: 'ada@mantu.com' }, 'client-jwt')).toEqual([]);
+    expect(identityHeaders({ via: 'access', email: 'ada@mantu.com' }, '')).toEqual([]);
+  });
+
   it('strips hop-by-hop and content-encoding from reconstructed responses', () => {
     // WHY: the relay already decoded the body. Forwarding gzip + a decoded
     // body is the classic "this preview is a blank page" failure.
@@ -129,5 +165,15 @@ describe('worker source stays on the shared contract', () => {
     expect(worker).toContain('rewriteResponseHeaders');
     expect(worker).toContain("idFromName('box')");
     expect(worker).not.toContain('wrangler deploy');
+  });
+
+  it('pins upstream proxy targets to the configured origin', () => {
+    const worker = readFileSync(join(here, 'worker.js'), 'utf8');
+    expect(worker).toContain('const target = targetUrl(url.pathname + url.search, upstream.origin);');
+    expect(worker).not.toMatch(/new URL\(url\.pathname \+ url\.search/);
+    const escaped = new URL('https://polo-preview.example//attacker.example/payload?x=1');
+    const target = targetUrl(escaped.pathname + escaped.search, 'https://upstream.example');
+    expect(target.origin).toBe('https://upstream.example');
+    expect(target.search).toBe('?x=1');
   });
 });

@@ -20,19 +20,24 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import {
+  FILE_ATTACHMENTS_DRAWN,
   FILE_MAX_BYTES,
   FileAttachment,
   FileFinalizeRequest,
   FileListResponse,
   FileUploadUrlRequest,
   FileUploadUrlResponse,
+  fileAttachmentPage,
+  fileAttachmentTake,
   isExtractableForIntel,
 } from '@bidstack/shared';
 
+import { MalwareScanError, resolveUploadScanStatus } from '../lib/malware-scan.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { canReadAccount } from '../lib/account-access.js';
 import { enqueueDocumentExtract } from '../queues/document-extract.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 
 // accountId is a free-text string (not a UUID FK) — different cases of the
 // same brand should resolve to one account. Lowercase + trim at every write
@@ -244,9 +249,23 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
           'Uploaded object content type does not match finalize payload',
         );
       }
-      const scanStatus = process.env.STORAGE_SCAN_REQUIRED === 'true' ? 'pending' : 'not_required';
-      if (scanStatus === 'pending') {
-        throw server.httpErrors.conflict('Uploaded object has not passed malware scan');
+      let scanStatus: 'not_required' | 'passed';
+      try {
+        scanStatus = await resolveUploadScanStatus(() => storage.readBuffer(req.body.storageKey));
+      } catch (err) {
+        if (err instanceof MalwareScanError && err.kind === 'infected') {
+          await storage.delete(req.body.storageKey).catch((deleteErr) => {
+            req.log.warn(
+              { err: deleteErr, key: req.body.storageKey },
+              'failed to delete infected upload',
+            );
+          });
+          throw server.httpErrors.unprocessableEntity(err.message);
+        }
+        if (err instanceof MalwareScanError) {
+          throw server.httpErrors.serviceUnavailable(err.message);
+        }
+        throw err;
       }
 
       const accountId = normalizeAccountId(req.body.accountId);
@@ -290,6 +309,18 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
+
+      if (companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId,
+          kind: 'document_uploaded',
+          actorUserId: req.auth.userId,
+          entityType: 'file_attachment',
+          entityId: fileId,
+          title: (company) => `New document on ${company}: ${req.body.name}`,
+        });
+      }
 
       // Auto-extract: an account-scoped document becomes intelligence the moment
       // it lands, so the user never has to hunt for a separate "Extract" action
@@ -356,7 +387,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         querystring: z.object({
           accountId: z.string().min(1).max(255),
           companyId: z.string().uuid().optional(),
-          limit: z.coerce.number().int().min(1).max(200).default(100),
+          limit: z.coerce.number().int().min(1).max(200).default(FILE_ATTACHMENTS_DRAWN),
         }),
         response: { 200: FileListResponse },
       },
@@ -371,7 +402,9 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       const accountId = normalizeAccountId(req.query.accountId);
       const linkedCompanyId =
         req.query.companyId ?? (ACCOUNT_UUID.test(accountId) ? accountId : undefined);
-      const items = await prisma.fileAttachment.findMany({
+      // One row past the page the list draws. The extra row is the probe.
+      // It is not a shown file, and it is not a total.
+      const loaded = await prisma.fileAttachment.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
@@ -383,9 +416,10 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         include: { uploader: { select: { email: true } } },
         orderBy: { createdAt: 'desc' },
-        take: req.query.limit,
+        take: fileAttachmentTake(req.query.limit),
       });
-      return { items: items.map(serialize) };
+      const page = fileAttachmentPage(loaded, req.query.limit);
+      return { items: page.items.map(serialize), itemsContinue: page.pageContinues };
     },
   );
 
@@ -422,10 +456,11 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       if (dl.kind === 'stream' && dl.stream) {
         // SECURITY: writing to reply.raw bypasses Fastify serialization AND the
         // onSend hooks where helmet/security-headers set CSP + nosniff — so we
-        // MUST emit them here. Without nosniff + attachment, an uploaded text/html
-        // file (an allowed type) would be sniffed and rendered INLINE on the API
-        // origin = stored XSS. Force attachment + nosniff + a locked-down CSP for
-        // all user-uploaded content (local-storage / demo path).
+        // MUST emit them here. Without nosniff + attachment, a leftover
+        // text/html object would be sniffed and rendered INLINE on the API
+        // origin = stored XSS. New HTML uploads are rejected at the schema;
+        // keep attachment + nosniff + a locked-down CSP for every remaining
+        // user-uploaded type (local-storage / demo path).
         reply.hijack();
         reply.raw.writeHead(200, {
           'Content-Type': dl.contentType ?? row.contentType,

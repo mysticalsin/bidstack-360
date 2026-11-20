@@ -8,6 +8,10 @@ export interface ApiKeySummary {
   name: string;
   prefix: string;
   scopes: string[];
+  readOnly: boolean;
+  unrestrictedScope: boolean;
+  companyIds: string[];
+  msaIds: string[];
   lastUsedAt: string | null;
   createdAt: string;
 }
@@ -17,18 +21,27 @@ export interface ApiKeyCreated extends ApiKeySummary {
   secret: string;
 }
 
+export interface ApiKeyList {
+  items: ApiKeySummary[];
+  /** True when one key past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+}
+
 export type ApiKeyScope = PermissionKey | 'read' | 'write' | 'mcp';
 
 interface CreateInput {
   name: string;
   scopes: ApiKeyScope[];
+  readOnly?: boolean;
+  unrestrictedScope?: boolean;
+  companyIds?: string[];
+  msaIds?: string[];
 }
 
 export function useApiKeys(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['api-keys'],
-    queryFn: ({ signal }) =>
-      api<{ items: ApiKeySummary[] }>('/api/integrations/api-keys', { signal }),
+    queryFn: ({ signal }) => api<ApiKeyList>('/api/integrations/api-keys', { signal }),
     enabled: options.enabled ?? true,
   });
 }

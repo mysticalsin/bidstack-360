@@ -91,7 +91,7 @@ export function InlineTaskAdd() {
           <button
             type="submit"
             disabled={create.isPending}
-            className="rounded-md px-2 py-0.5 text-xs font-medium text-[var(--brand-primary)] hover:bg-[var(--brand-primary-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+            className="rounded-md px-2 py-0.5 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:bg-[var(--brand-primary-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
           >
             {t('inlineTaskAdd.submitButton', 'Add')}
           </button>

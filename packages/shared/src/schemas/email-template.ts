@@ -75,6 +75,8 @@ export type EmailTemplatePatch = z.infer<typeof EmailTemplatePatch>;
 
 export const EmailTemplateList = z.object({
   items: z.array(EmailTemplate),
+  /** True when one template past this page was loaded and dropped. Not a total. */
+  pageContinues: z.boolean(),
 });
 export type EmailTemplateList = z.infer<typeof EmailTemplateList>;
 

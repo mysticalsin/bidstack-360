@@ -20,6 +20,8 @@ export interface ApolloEnrichJob {
   companyName: string;
   domain?: string;
   signature?: string;
+  /** Open data fallback: organization fields only, the worker keeps people and executive search off. */
+  orgOnly?: boolean;
 }
 
 let queueSingleton: Queue | null = null;

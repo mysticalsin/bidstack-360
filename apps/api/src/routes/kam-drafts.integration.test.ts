@@ -95,6 +95,7 @@ beforeAll(async () => {
       prefix: API_KEY_RAW.slice(0, 8),
       hashedKey: createHash('sha256').update(API_KEY_RAW).digest('hex'),
       scopes: ['read', 'write'],
+      readOnly: false,
     },
   });
   apiKeyId = apiKey.id;

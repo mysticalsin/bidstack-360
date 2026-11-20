@@ -75,7 +75,7 @@ export function OverrideDialog({
             />
             <p
               id="override-justification-hint"
-              className="mt-1 text-[11px] text-[var(--fg-tertiary)]"
+              className="mt-1 text-xs text-[var(--fg-tertiary)]"
               aria-live="polite"
             >
               {valid

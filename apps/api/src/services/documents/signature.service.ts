@@ -20,10 +20,19 @@
 
 import { createHmac, createSign, randomBytes } from 'node:crypto';
 import type { FastifyError } from 'fastify';
+import pino from 'pino';
 import { prisma, type Prisma } from '@bidstack/db';
-import type { SignatureStatus } from '@bidstack/shared';
+import {
+  isIllegalTransition,
+  signatureFrom,
+  signatureTransition,
+  type SignatureState,
+  type SignatureStatus,
+} from '@bidstack/shared';
 import { htmlToPdf } from './document.service.js';
 import { getEnv } from '../../env.js';
+
+const log = pino({ name: 'signature', level: process.env.LOG_LEVEL ?? 'info' });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -108,7 +117,58 @@ async function getDocuSignAccessToken(): Promise<string> {
   return dsTokenCache.token;
 }
 
+/** INTERNAL signing links stop working this many days after they were sent. */
+export const SIGN_LINK_TTL_DAYS = 30;
+
+const SIGN_LINK_TTL_MS = SIGN_LINK_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+/** Statuses from which an INTERNAL link can still be signed. */
+export const SIGNABLE_STATUSES: SignatureStatus[] = ['SENT', 'VIEWED'];
+
+export function signLinkExpiresAt(request: { sentAt: Date | null; createdAt: Date }): Date {
+  return new Date((request.sentAt ?? request.createdAt).getTime() + SIGN_LINK_TTL_MS);
+}
+
+/**
+ * Why a public link can no longer be signed, or null when it still can. A link
+ * past its expiry is flipped to EXPIRED here so the sender sees the real state.
+ */
+export async function closedSignLinkReason(request: {
+  id: string;
+  status: string;
+  sentAt: Date | null;
+  createdAt: Date;
+}): Promise<string | null> {
+  switch (request.status) {
+    case 'SIGNED':
+      return 'This document has already been signed.';
+    case 'VOIDED':
+      return 'This signing request has been voided.';
+    case 'DECLINED':
+      return 'This signing request was declined.';
+    case 'EXPIRED':
+      return 'This signing link has expired.';
+  }
+  if (!(SIGNABLE_STATUSES as string[]).includes(request.status)) {
+    return 'This signing request is not open for signature.';
+  }
+  if (signLinkExpiresAt(request).getTime() <= Date.now()) {
+    await prisma.signatureRequest.updateMany({
+      where: { id: request.id, status: { in: SIGNABLE_STATUSES } },
+      data: { status: 'EXPIRED' },
+    });
+    return 'This signing link has expired.';
+  }
+  return null;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function gone(msg: string): never {
+  const err = new Error(msg) as FastifyError;
+  err.statusCode = 410;
+  throw err;
+}
 
 function notFound(msg: string): never {
   const err = new Error(msg) as FastifyError;
@@ -329,9 +389,38 @@ export async function handleDocuSignWebhook(
       },
     });
     if (claim.count === 0) {
-      // Already processed / already terminal — duplicate or stale delivery.
-      // No event written; the transaction commits as a no-op and the caller
-      // returns 200 so DocuSign stops retrying.
+      // A void claim holds the row at VOIDED until DocuSign answers. The
+      // completion cannot change that row yet (the claim has to stay first),
+      // but it has to be remembered: if DocuSign then rejects the void, the
+      // completion is the outcome. A void that already wrote its event is
+      // finished, and a late completion stays ignored.
+      if (newStatus === 'SIGNED' || newStatus === 'DECLINED') {
+        const current = await tx.signatureRequest.findFirst({
+          where: { id: request.id },
+          select: { status: true, voidReason: true },
+        });
+        if (current?.status === 'VOIDED' && current.voidReason) {
+          const voided = await tx.signatureEvent.count({
+            where: { signatureRequestId: request.id, type: 'VOIDED' },
+          });
+          const already = await tx.signatureEvent.count({
+            where: { signatureRequestId: request.id, type: eventType },
+          });
+          if (voided === 0 && already === 0) {
+            await tx.signatureEvent.create({
+              data: {
+                signatureRequestId: request.id,
+                type: eventType,
+                recipientEmail: payload.recipients?.signers?.[0]?.email ?? null,
+                occurredAt: new Date(),
+                ipAddress: null,
+                userAgent: null,
+                payload: { ...(payload as object), heldDuringVoid: true },
+              },
+            });
+          }
+        }
+      }
       return;
     }
 
@@ -373,49 +462,128 @@ export async function voidSignatureRequest(params: {
   if (!request) notFound(`Signature request ${requestId} not found`);
   if (request.orgId !== orgId) forbidden('Cannot void a signature request from another org');
 
-  const terminalStatuses: SignatureStatus[] = ['SIGNED', 'DECLINED', 'VOIDED', 'EXPIRED'];
-  if (terminalStatuses.includes(request.status as SignatureStatus)) {
+  if (isIllegalTransition(signatureTransition(request.status as SignatureState, 'void'))) {
+    log.warn(
+      { signatureRequestId: requestId, from: request.status, to: 'VOIDED' },
+      'illegal signature transition',
+    );
     badRequest(`Cannot void a request with status ${request.status}`);
   }
 
-  if (request.provider === 'DOCUSIGN' && request.providerRequestId) {
-    const env = getEnv();
-    const baseUrl = env.DOCUSIGN_BASE_URL || 'https://demo.docusign.net/restapi';
-    const accountId = env.DOCUSIGN_ACCOUNT_ID;
-    if (accountId) {
-      const token = await getDocuSignAccessToken();
-      const res = await fetch(
-        `${baseUrl}/v2.1/accounts/${accountId}/envelopes/${request.providerRequestId}`,
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'voided', voidedReason: reason }),
-        },
-      );
-      if (!res.ok) {
-        const body = await res.text();
-        throw credentialError(`DocuSign void failed: ${res.status} ${body}`);
-      }
-    }
+  // Claim the void before DocuSign. A signature that lands after the read
+  // matches nothing, so the envelope is never voided for a row we do not own.
+  const previousStatus = request.status;
+  const claimed = await prisma.signatureRequest.updateMany({
+    where: {
+      id: requestId,
+      orgId,
+      deletedAt: null,
+      status: { in: [...signatureFrom('void')] },
+    },
+    data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
+  });
+  if (claimed.count !== 1) {
+    const current = await prisma.signatureRequest.findFirst({
+      where: { id: requestId, orgId },
+      select: { status: true },
+    });
+    log.warn(
+      { signatureRequestId: requestId, from: current?.status ?? null, to: 'VOIDED' },
+      'illegal signature transition',
+    );
+    badRequest(`Cannot void a request with status ${current?.status ?? request.status}`);
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.signatureRequest.update({
-      where: { id: requestId },
-      data: { status: 'VOIDED', voidedAt: new Date(), voidReason: reason },
-    });
-    await tx.signatureEvent.create({
+  try {
+    if (request.provider === 'DOCUSIGN' && request.providerRequestId) {
+      const env = getEnv();
+      const baseUrl = env.DOCUSIGN_BASE_URL || 'https://demo.docusign.net/restapi';
+      const accountId = env.DOCUSIGN_ACCOUNT_ID;
+      if (accountId) {
+        const token = await getDocuSignAccessToken();
+        const res = await fetch(
+          `${baseUrl}/v2.1/accounts/${accountId}/envelopes/${request.providerRequestId}`,
+          {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'voided', voidedReason: reason }),
+          },
+        );
+        if (!res.ok) {
+          const body = await res.text();
+          throw credentialError(`DocuSign void failed: ${res.status} ${body}`);
+        }
+      }
+    }
+  } catch (err) {
+    const held = await heldSignatureDuringVoid(requestId);
+    const nextStatus = held?.type === 'SIGNED' || held?.type === 'DECLINED' ? held.type : previousStatus;
+    const restored = await prisma.signatureRequest.updateMany({
+      where: { id: requestId, orgId, deletedAt: null, status: 'VOIDED', voidReason: reason },
       data: {
-        signatureRequestId: requestId,
-        type: 'VOIDED',
-        recipientEmail: null,
-        occurredAt: new Date(),
-        ipAddress: null,
-        userAgent: null,
-        payload: { reason } as object,
+        status: nextStatus,
+        voidedAt: null,
+        voidReason: null,
+        ...(nextStatus === 'SIGNED' ? { completedAt: new Date() } : {}),
       },
     });
+    if (restored.count !== 1) {
+      log.warn(
+        { signatureRequestId: requestId, from: 'VOIDED', to: nextStatus },
+        'illegal signature transition',
+      );
+    }
+    throw err;
+  }
+
+  // The void event is the audit fact. A completion remembered while the
+  // claim was held is removed only after that event exists, so a successful
+  // void does not also stay signed. A rejected void leaves the completion.
+  await prisma.signatureEvent.create({
+    data: {
+      signatureRequestId: requestId,
+      type: 'VOIDED',
+      recipientEmail: null,
+      occurredAt: new Date(),
+      ipAddress: null,
+      userAgent: null,
+      payload: { reason } as object,
+    },
   });
+  const heldIds = (await prisma.signatureEvent.findMany({
+    where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
+    orderBy: { occurredAt: 'desc' },
+    select: { id: true, payload: true },
+    take: 10,
+  }))
+    .filter((event) => isHeldDuringVoid(event.payload))
+    .map((event) => event.id);
+  if (heldIds.length > 0) {
+    await prisma.signatureEvent.deleteMany({ where: { id: { in: heldIds } } });
+  }
+}
+
+function isHeldDuringVoid(payload: unknown): boolean {
+  return (
+    !!payload &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    (payload as { heldDuringVoid?: unknown }).heldDuringVoid === true
+  );
+}
+
+async function heldSignatureDuringVoid(
+  requestId: string,
+): Promise<{ type: 'SIGNED' | 'DECLINED' } | null> {
+  const events = await prisma.signatureEvent.findMany({
+    where: { signatureRequestId: requestId, type: { in: ['SIGNED', 'DECLINED'] } },
+    orderBy: { occurredAt: 'desc' },
+    select: { type: true, payload: true },
+    take: 10,
+  });
+  const held = events.find((event) => isHeldDuringVoid(event.payload));
+  if (held?.type === 'SIGNED' || held?.type === 'DECLINED') return { type: held.type };
+  return null;
 }
 
 // ─── handleInternalSign ───────────────────────────────────────────────────────
@@ -435,25 +603,38 @@ export async function handleInternalSign(params: {
   const { token, typedName, signatureDataUrl, ipAddress, userAgent } = params;
 
   const request = await prisma.signatureRequest.findFirst({
-    where: { providerRequestId: token, provider: 'INTERNAL' },
+    where: { providerRequestId: token, provider: 'INTERNAL', deletedAt: null },
     include: { document: true },
   });
 
-  if (!request) notFound('Signing link not found or expired');
-  if (request.status === 'VOIDED') badRequest('This signing request has been voided');
-  if (request.status === 'SIGNED') badRequest('Document has already been signed');
+  if (!request) notFound('Signing link not found');
+  const closed = await closedSignLinkReason(request);
+  if (closed) gone(closed);
+  // Reject before the claim: an unrenderable image would otherwise be dropped
+  // from the PDF while the request still flips to SIGNED.
+  if (!safeSignatureSrc(signatureDataUrl)) {
+    badRequest('Signature must be a PNG, JPEG, GIF or WebP image');
+  }
 
   // The signed-PDF key is deterministic (orgId + requestId), so winning the
   // transition lets us record it up front and the loser never overwrites it.
   const s3Key = `signed-docs/${request.orgId}/${request.id}/signed.pdf`;
 
   // TOCTOU GATE: claim the SIGNED transition atomically BEFORE the expensive
-  // PDF render + S3 PUT. `notIn: ['SIGNED','VOIDED']` means only one of two
-  // concurrent submits matches; the loser's count===0 aborts here — so we never
-  // render twice, never overwrite the signed PDF, and never record duplicate
-  // SIGNED events on the non-repudiable audit trail.
+  // PDF render + S3 PUT. Only one of two concurrent submits matches the open
+  // statuses; the loser's count===0 aborts here, so we never render twice,
+  // never overwrite the signed PDF, and never record duplicate SIGNED events
+  // on the non-repudiable audit trail.
   const claim = await prisma.signatureRequest.updateMany({
-    where: { id: request.id, status: { notIn: ['SIGNED', 'VOIDED'] } },
+    where: {
+      id: request.id,
+      deletedAt: null,
+      status: { in: SIGNABLE_STATUSES },
+      OR: [
+        { sentAt: { gt: new Date(Date.now() - SIGN_LINK_TTL_MS) } },
+        { sentAt: null, createdAt: { gt: new Date(Date.now() - SIGN_LINK_TTL_MS) } },
+      ],
+    },
     data: {
       status: 'SIGNED',
       completedAt: new Date(),
@@ -463,7 +644,7 @@ export async function handleInternalSign(params: {
   });
   if (claim.count === 0) {
     // Another request won the race (or it was voided between read and claim).
-    badRequest('Document has already been signed');
+    gone('This document has already been signed.');
   }
 
   // Build a minimal signed document HTML

@@ -88,7 +88,7 @@ export function AgentStudioPage() {
     <div className="space-y-6">
       <header className="page-head">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)]">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--brand-primary)] dark:text-[var(--brand-deep)]">
             {t('agentStudio.eyebrow', 'Bids & RFP')}
           </p>
           <h1 className="page-title">{t('agentStudio.title', 'Agent Studio')}</h1>
@@ -226,7 +226,7 @@ function AgentsSection({
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm font-semibold text-[var(--fg-primary)]">{a.role}</span>
                 <span
-                  className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold ${
+                  className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-semibold ${
                     a.isStandard
                       ? 'bg-[var(--tag-blue-bg)] text-[var(--tag-blue-fg)]'
                       : 'bg-[var(--tag-jade-bg)] text-[var(--tag-jade-fg)]'
@@ -396,14 +396,10 @@ function CrewsSection({
         <div className="p-6">
           <EmptyState
             title={t('agentStudio.crewsEmptyTitle', 'No crews yet')}
-            message={t(
-              'agentStudio.crewsEmptyMessage',
-              'Once agents exist, an admin can assemble them into a crew. The standard set ships with a ready-to-run RFP Response Crew.',
-            )}
           />
         </div>
       ) : (
-        <ul className="divide-y divide-[var(--border-subtle)]">
+        <ul data-fab-clear className="divide-y divide-[var(--border-subtle)]">
           {crews.data?.items.map((c) => (
             <li key={c.id}>
               <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -602,7 +598,7 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
                 className={`text-xs font-semibold ${
                   run.data.status === 'partial'
                     ? 'text-[var(--tag-amber-fg)]'
-                    : 'text-[var(--brand-primary)]'
+                    : 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                 }`}
               >
                 {run.data.status === 'partial'

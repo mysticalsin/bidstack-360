@@ -1,5 +1,5 @@
 /**
- * ForecastProjection — the primary, always-populated forecast view: a
+ * ForecastProjection: the primary, always-populated forecast view: a
  * pipeline-weighted projection derived from open opportunities (value × stage
  * win-probability), bucketed by close-date quarter and owner. Self-contained
  * (owns its query + period selection); manual /forecasts rows render below it.
@@ -21,33 +21,29 @@ import {
   TableCell,
   TableScrollArea,
 } from '@/components/ui/Table';
+import { forecastPeriodBars } from '@/components/charts/bid-chart-data';
+import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
+import { fmtCompact } from '@/components/viz/viz-data';
 import { useForecastProjection } from '@/hooks/useForecasts';
-import { unspecifiedMicrosLabel } from '@/components/dashboard/unspecified-currency';
-import { type ForecastProjectionPeriod } from '@bidstack/shared';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
+import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
-type FormatMoney = (micros: number | string) => string;
+type FormatMoney = (micros: number, currency?: string) => string;
 
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
-  const formatMoneyMicros = (micros: number | string) => unspecifiedMicrosLabel(micros);
+  const { formatMoneyMicros } = useFormatMoney();
   const projection = useForecastProjection();
   const [selected, setSelected] = useState<string | null>(null);
 
   const periods = projection.data?.periods ?? [];
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
-  const hasPipeline = periods.some(
-    (p) => BigInt(p.openMicros) > 0n || BigInt(p.wonMicros) > 0n,
-  );
+  const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
+  const bars = forecastPeriodBars(periods);
 
   return (
     <Card>
-      <SectionHeader
-        title={t('forecastProjection.title', 'Weighted pipeline projection')}
-        caption={t(
-          'forecastProjection.caption',
-          'Open opportunities × stored stage probability, by close-date quarter. Currency not recorded; not a euro forecast.',
-        )}
-      />
+      <SectionHeader title={t('forecastProjection.title', 'Weighted pipeline projection')} />
 
       {projection.isError ? (
         <ErrorState
@@ -71,6 +67,17 @@ export function ForecastProjection() {
         />
       ) : (
         <div className="space-y-5 p-5">
+          <DivergingBars
+            title={t('forecastProjection.chartLabel', 'Projection by quarter')}
+            labels={bars.labels}
+            series={[
+              { id: 'won', label: t('forecastProjection.won', 'Closed won'), values: bars.won, color: 'var(--success)' },
+              { id: 'weighted', label: t('forecastProjection.weighted', 'Weighted'), values: bars.weighted, color: 'var(--brand-deep)' },
+              { id: 'unweighted', label: t('forecastProjection.unweighted', 'Unweighted'), values: bars.unweighted, color: 'var(--chart-3)' },
+            ]}
+            format={fmtCompact}
+            onActivate={(i) => setSelected(bars.periods[i]?.period ?? null)}
+          />
           <Tabs value={activePeriod.period} onValueChange={setSelected}>
             <TabsList aria-label={t('forecastProjection.periodLabel', 'Forecast period')}>
               {periods.map((p) => (
@@ -114,22 +121,22 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
           className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
         >
           <div className="flex items-center justify-between">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
               {c.label}
             </div>
             {c.key === 'weighted' && period.manualCommitMicros !== null ? (
               <Badge tone="amber">
                 {t('forecastProjection.override', 'Manual commit')}:{' '}
-                {unspecifiedMicrosLabel(period.manualCommitMicros)}
+                {formatMoneyMicros(period.manualCommitMicros, 'EUR')}
               </Badge>
             ) : null}
           </div>
           <div
             className={`mt-1 text-lg font-bold tabular-nums ${
-              c.accent ? 'text-[var(--brand-primary)]' : 'text-[var(--fg-primary)]'
+              c.accent ? 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]' : 'text-[var(--fg-primary)]'
             }`}
           >
-            {formatMoneyMicros(c.value)}
+            {formatMoneyMicros(c.value, 'EUR')}
           </div>
         </div>
       ))}
@@ -167,13 +174,13 @@ function ProjectionOwnerTable({ period, formatMoneyMicros, t }: SubProps) {
                 <span className="text-sm font-medium text-[var(--fg-primary)]">{o.ownerName}</span>
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.openMicros)}
+                {formatMoneyMicros(o.openMicros, 'EUR')}
               </TableCell>
               <TableCell className="text-right tabular-nums font-semibold text-[var(--fg-primary)]">
-                {formatMoneyMicros(o.weightedMicros)}
+                {formatMoneyMicros(o.weightedMicros, 'EUR')}
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.wonMicros)}
+                {formatMoneyMicros(o.wonMicros, 'EUR')}
               </TableCell>
             </TableRow>
           ))}

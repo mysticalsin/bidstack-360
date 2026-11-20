@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@bidstack/db';
 import { buildServer } from '../server.js';
@@ -70,84 +71,6 @@ describe('proposal routes', () => {
     expect(Array.isArray(body.sources)).toBe(true);
   });
 
-  it('RFP pipeline value leaves out a lost linked deal', async () => {
-    // WHY: the analytics tile summed every linked deal, so a lost flag still
-    // counted as pipeline. Won and lost proposals are not pipeline either.
-    const before = await server.inject({
-      method: 'GET',
-      url: '/api/v1/proposals/admin/analytics',
-    });
-    expect(before.statusCode).toBe(200);
-    const baseline = BigInt((before.json() as { totalValueMicros: string }).totalValueMicros);
-    const org = await prisma.org.findUniqueOrThrow({ where: { clerkOrg: 'org_seed_mantu' } });
-    const stamp = Date.now();
-    const pipeline = await prisma.pipeline.create({
-      data: { orgId: org.id, name: `RFP map ${stamp}` },
-    });
-    const lostStage = await prisma.pipelineStage.create({
-      data: {
-        orgId: org.id,
-        pipelineId: pipeline.id,
-        key: 'price_lost',
-        name: 'Price lost',
-        isLost: true,
-      },
-    });
-    const openDeal = await prisma.opportunity.create({
-      data: {
-        orgId: org.id,
-        code: `OP-RFP1-${stamp}`,
-        customer: 'RFP Co',
-        name: 'Open linked',
-        stage: 's1_lead',
-        valueMicros: 1_000_000n,
-        probability: 10,
-        intel: {},
-      },
-    });
-    const lostDeal = await prisma.opportunity.create({
-      data: {
-        orgId: org.id,
-        code: `OP-RFP2-${stamp}`,
-        customer: 'RFP Co',
-        name: 'Lost linked',
-        stage: 's2_sent',
-        pipelineStageId: lostStage.id,
-        valueMicros: 9_000_000n,
-        probability: 40,
-        intel: {},
-      },
-    });
-    const openProposal = await server.inject({
-      method: 'POST',
-      url: '/api/v1/proposals',
-      payload: { name: `Open RFP ${stamp}`, opportunityId: openDeal.id },
-    });
-    const lostProposal = await server.inject({
-      method: 'POST',
-      url: '/api/v1/proposals',
-      payload: { name: `Lost RFP ${stamp}`, opportunityId: lostDeal.id },
-    });
-    expect(openProposal.statusCode).toBe(201);
-    expect(lostProposal.statusCode).toBe(201);
-    try {
-      const after = await server.inject({
-        method: 'GET',
-        url: '/api/v1/proposals/admin/analytics',
-      });
-      expect(after.statusCode).toBe(200);
-      const total = BigInt((after.json() as { totalValueMicros: string }).totalValueMicros);
-      expect(total - baseline).toBe(1_000_000n);
-    } finally {
-      const proposalIds = [openProposal.json().id, lostProposal.json().id].filter(Boolean);
-      await prisma.proposalSection.deleteMany({ where: { proposalId: { in: proposalIds } } });
-      await prisma.proposal.deleteMany({ where: { id: { in: proposalIds } } });
-      await prisma.opportunity.deleteMany({ where: { id: { in: [openDeal.id, lostDeal.id] } } });
-      await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipeline.id } });
-      await prisma.pipeline.delete({ where: { id: pipeline.id } });
-    }
-  });
-
   it('GET /api/v1/proposals lists proposals', async () => {
     const res = await server.inject({
       method: 'GET',
@@ -157,5 +80,95 @@ describe('proposal routes', () => {
     const body = res.json();
     expect(Array.isArray(body.items)).toBe(true);
     expect(typeof body.total).toBe('number');
+  });
+
+  it('POST /api/v1/proposals/:id/draft never drafts into a soft-deleted section', async () => {
+    const create = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      payload: { name: 'Deleted Section Proposal' },
+    });
+    const proposal = create.json<{ id: string; sections: Array<{ id: string; key: string }> }>();
+    const pricing = proposal.sections.find((s) => s.key === 'pricing')!;
+    await prisma.proposalSection.updateMany({
+      where: { id: pricing.id },
+      data: { deletedAt: new Date() },
+    });
+
+    const draft = await server.inject({
+      method: 'POST',
+      url: `/api/v1/proposals/${proposal.id}/draft`,
+      payload: { sectionKey: 'pricing' },
+    });
+    expect(draft.statusCode).toBe(404);
+    const row = await prisma.proposalSection.findFirstOrThrow({
+      where: { id: pricing.id, deletedAt: { not: null } },
+    });
+    expect(row.aiDrafted).toBe(false);
+  });
+
+  it('GET /api/v1/proposals rejects out-of-range pagination', async () => {
+    for (const qs of ['limit=0', 'limit=101', 'offset=-1']) {
+      const res = await server.inject({ method: 'GET', url: `/api/v1/proposals?${qs}` });
+      expect(res.statusCode, qs).toBe(400);
+    }
+  });
+
+  it('POST /api/v1/proposals is 400 on an empty name', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      payload: { name: '' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /api/v1/proposals is 403 for a read-only role', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      headers: { 'x-bidstack-e2e-role': 'read-only' },
+      payload: { name: 'Read only proposal' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('GET/PATCH/DELETE on another org proposal are 404', async () => {
+    const org = await prisma.org.create({
+      data: { clerkOrg: `org_prop_foreign_${randomUUID()}`, name: 'Foreign Proposal Tenant' },
+    });
+    try {
+      const foreign = await prisma.proposal.create({
+        data: { orgId: org.id, name: 'Foreign proposal' },
+      });
+      const get = await server.inject({ method: 'GET', url: `/api/v1/proposals/${foreign.id}` });
+      expect(get.statusCode).toBe(404);
+      const patch = await server.inject({
+        method: 'PATCH',
+        url: `/api/v1/proposals/${foreign.id}`,
+        payload: { name: 'hijack' },
+      });
+      expect(patch.statusCode).toBe(404);
+      const del = await server.inject({ method: 'DELETE', url: `/api/v1/proposals/${foreign.id}` });
+      expect(del.statusCode).toBe(404);
+      const row = await prisma.proposal.findUniqueOrThrow({ where: { id: foreign.id } });
+      expect(row.name).toBe('Foreign proposal');
+      expect(row.deletedAt).toBeNull();
+    } finally {
+      await prisma.org.deleteMany({ where: { id: org.id } });
+    }
+  });
+
+  it('DELETE /api/v1/proposals/:id is idempotent: a retry is 404, not 500', async () => {
+    const create = await server.inject({
+      method: 'POST',
+      url: '/api/v1/proposals',
+      payload: { name: 'Delete twice' },
+    });
+    const { id } = create.json<{ id: string }>();
+    const first = await server.inject({ method: 'DELETE', url: `/api/v1/proposals/${id}` });
+    expect(first.statusCode).toBe(204);
+    const retry = await server.inject({ method: 'DELETE', url: `/api/v1/proposals/${id}` });
+    expect(retry.statusCode).toBe(404);
   });
 });

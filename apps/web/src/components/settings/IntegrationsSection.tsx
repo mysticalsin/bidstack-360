@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ConnectorsSection } from '@/components/integrations/ConnectorsSection';
 import { DataQualitySection } from '@/components/integrations/DataQualitySection';
 import { ErpConnectorCard } from '@/components/integrations/ErpConnectorCard';
+import { WorkspaceAccountsCard } from '@/components/integrations/WorkspaceAccountsCard';
 import { DataSourceCredentialsCard } from '@/components/settings/DataSourceCredentialsCard';
 import { ProviderHealthSection } from '@/components/integrations/ProviderHealthSection';
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
@@ -12,7 +13,7 @@ import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
+import { SyncNowControl } from '@/components/sync/SyncNowControl';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { useConnectorCatalog } from '@/hooks/useCrmIntegrations';
@@ -32,6 +33,13 @@ import { WebhookEventsCard } from '@/pages/integrations/WebhookEventsCard';
 import { buildIntegrationSummary } from '@/pages/integrations/integration-helpers';
 import { MCP_TOOLS } from '@/pages/integrations/types';
 import type { DustStatus, IntegrationSetupGuide, WebhookEvent } from '@/pages/integrations/types';
+
+/** Events the list draws, plus whether one event past the page was dropped. */
+type WebhookEventPage = {
+  items: WebhookEvent[];
+  /** True when one event past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+};
 import { IntegrationActivityPanel } from './IntegrationActivityPanel';
 
 export function IntegrationsSection() {
@@ -54,9 +62,9 @@ export function IntegrationsSection() {
   });
   const events = useQuery({
     queryKey: ['webhooks'],
-    queryFn: ({ signal }) =>
-      api<{ items: WebhookEvent[] }>('/api/integrations/webhooks', { signal }),
+    queryFn: ({ signal }) => api<WebhookEventPage>('/api/integrations/webhooks', { signal }),
   });
+  const eventsContinue = Boolean(events.data?.pageContinues);
   const connectors = useConnectorCatalog();
   const isError = setupGuide.isError || status.isError || events.isError;
   const summary = useMemo(
@@ -64,16 +72,22 @@ export function IntegrationsSection() {
     [events.data?.items, setupGuide.data, status.data],
   );
 
+  // Both hero actions land on the developer tab; each scrolls to its own section.
+  function openDeveloperSection(id: 'api-keys' | 'webhooks') {
+    setActiveTab('developer');
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
+  }
+
   return (
     <div className="space-y-5">
       <IntegrationHero
         activeTab={activeTab}
         isLoading={setupGuide.isLoading || status.isLoading || events.isLoading}
         summary={summary}
-        onCreateApiKey={() => setActiveTab('developer')}
-        onAddWebhook={() => setActiveTab('developer')}
+        eventsContinue={eventsContinue}
+        onCreateApiKey={() => openDeveloperSection('api-keys')}
+        onAddWebhook={() => openDeveloperSection('webhooks')}
       />
-
 
       {isError ? (
         <ErrorState
@@ -134,7 +148,11 @@ export function IntegrationsSection() {
           <ConnectionTester guide={setupGuide.data} isLoading={setupGuide.isLoading} />
           <ProviderHealthSection />
           <DataSourceCredentialsCard />
-          <WebhookEventsCard events={events.data?.items ?? []} isLoading={events.isLoading} />
+          <WebhookEventsCard
+            events={events.data?.items ?? []}
+            isLoading={events.isLoading}
+            pageContinues={eventsContinue}
+          />
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-6 outline-none">
@@ -159,22 +177,14 @@ export function IntegrationsSection() {
                         : t('integrations.statusUnverified', 'Unverified / not connected')}
                     </Badge>
                   ) : null}
-                  {isAdmin ? (
-                    <LiquidGlassButton
-                      tone="secondary"
-                      size="sm"
-                      onClick={() => {
-                        void api('/api/integrations/dust/resync', { method: 'POST' }).then(() =>
-                          status.refetch(),
-                        );
-                      }}
-                    >
-                      {t('integrations.runSyncNow', 'Run sync now')}
-                    </LiquidGlassButton>
-                  ) : null}
                 </div>
               }
             />
+            {isAdmin ? (
+              <div className="border-b border-[var(--border-subtle)] px-5 py-4">
+                <SyncNowControl source="dust" />
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
               <Stat
                 label={t('integrations.statLastSync', 'Last sync')}
@@ -249,6 +259,7 @@ export function IntegrationsSection() {
         </TabsContent>
 
         <TabsContent value="connectors" className="space-y-6 outline-none">
+          <WorkspaceAccountsCard />
           <ErpConnectorCard />
           <ConnectorsSection />
           <DataQualitySection />
@@ -288,8 +299,6 @@ function ApolloAccountIntelCard({
     'APOLLO_MCP_URL=https://...',
     'APOLLO_MCP_BEARER_TOKEN=...',
     'APOLLO_API_KEY=...',
-    'APOLLO_API_ENABLE_PEOPLE_SEARCH=true',
-    'APOLLO_API_ENABLE_PEOPLE_ENRICHMENT=false',
   ].join('\n');
 
   return (
@@ -298,7 +307,7 @@ function ApolloAccountIntelCard({
         title={t('integrations.apolloTitle', 'Apollo account intelligence')}
         caption={t(
           'integrations.apolloCaption',
-          'Feeds account cockpit fields: industry, employees, revenue, intent, hiring movement, leadership changes, technologies, and last sync freshness.',
+          'Feeds account cockpit fields: industry, employees, revenue, open jobs, intent, hiring movement, technologies, and last sync freshness.',
         )}
         action={
           <div className="flex items-center gap-2">
@@ -328,7 +337,7 @@ function ApolloAccountIntelCard({
           <p className="text-sm text-[var(--fg-secondary)]">
             {t(
               'integrations.apolloDescription',
-              'Connect Apollo MCP first for company search and get-company. Keep REST People Search on for C-level discovery; it is no-credit and does not return email or phone fields. Keep People Enrichment off unless an admin intentionally accepts credit usage.',
+              'Connect Apollo for company search and get-company. Polo stores company revenue and the open-job count. It does not request phone numbers or contact leads.',
             )}
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -337,16 +346,19 @@ function ApolloAccountIntelCard({
                 t('integrations.featureAccountFieldsLabel', 'Account fields'),
                 t(
                   'integrations.featureAccountFieldsValue',
-                  'Industry, employees, revenue, tech stack',
+                  'Industry, employees, revenue, open jobs',
                 ),
               ],
               [
                 t('integrations.featureSignalsLabel', 'Signals'),
-                t('integrations.featureSignalsValue', 'Intent topics, hiring, C-level movement'),
+                t('integrations.featureSignalsValue', 'Intent topics and hiring'),
               ],
               [
                 t('integrations.featureSafetyLabel', 'Safety'),
-                t('integrations.featureSafetyValue', 'Emails and phones stripped before storage'),
+                t(
+                  'integrations.featureSafetyValue',
+                  'Phone numbers and contact leads are not stored',
+                ),
               ],
               [
                 t('integrations.featureFreshnessLabel', 'Freshness'),
@@ -357,9 +369,7 @@ function ApolloAccountIntelCard({
                 key={label}
                 className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2"
               >
-                <div className="text-xs font-medium text-[var(--fg-tertiary)]">
-                  {label}
-                </div>
+                <div className="text-xs font-medium text-[var(--fg-tertiary)]">{label}</div>
                 <div className="mt-1 text-sm font-medium text-[var(--fg-primary)]">{value}</div>
               </div>
             ))}

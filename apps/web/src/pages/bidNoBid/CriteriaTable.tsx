@@ -120,7 +120,7 @@ function ScoreButtons({
             aria-pressed={selected}
             aria-label={`${criterion.label}: ${t(RATING_LABEL[value].key, RATING_LABEL[value].fallback)}`}
             className={cn(
-              'size-6 rounded-sm border text-[11px] font-medium tabular-nums transition-colors',
+              'size-6 rounded-sm border text-xs font-medium tabular-nums transition-colors',
               selected
                 ? 'border-fg-primary bg-fg-primary text-fg-inverted'
                 : 'border-border-subtle text-fg-secondary hover:border-border-strong hover:text-fg-primary',

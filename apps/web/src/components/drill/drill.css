@@ -34,3 +34,7 @@
 .drill-hit:focus-visible { outline: 2px solid var(--focus-ring-color, var(--brand-primary)); outline-offset: 2px; }
 .drill-more { font-size: 13px; font-weight: 500; color: var(--brand-primary); min-height: 32px; padding: 0 8px; border-radius: 6px; }
 .drill-more:hover { text-decoration: underline; }
+[data-theme="dark"] .drill-more,
+[data-theme="dark"] .drill-trail button,
+[data-theme="dark"] .drill-table a:hover,
+[data-theme="dark"] .drill-table button.drill-link:hover { color: var(--brand-deep); }

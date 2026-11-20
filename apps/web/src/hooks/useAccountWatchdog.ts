@@ -54,7 +54,13 @@ export interface AccountWatchdog {
     valueMicros: string;
     closedAt: string;
   }>;
-  history: Array<{ id: string; at: string; type: 'filing' | 'opportunity'; title: string; detail: string }>;
+  history: Array<{
+    id: string;
+    at: string;
+    type: 'filing' | 'opportunity' | 'meeting' | 'msa' | 'signal';
+    title: string;
+    detail: string;
+  }>;
 }
 
 export function useAccountWatchdog(companyId: string | undefined) {

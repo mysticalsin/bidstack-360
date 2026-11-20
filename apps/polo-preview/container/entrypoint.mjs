@@ -1,0 +1,549 @@
+#!/usr/bin/env node
+// Process supervisor and front listener for the Polo Cloudflare Container.
+// :8080 answers at once (a "starting" page while booting), serves the built
+// SPA, proxies API paths to Fastify on :4020, and exposes /__internal/* for
+// the Durable Object only (shared key). Boot waits for the Durable Object to
+// restore the latest R2 snapshot or ask for a fresh seed; if neither arrives
+// it seeds by itself so the app never stays dark.
+import { spawn, spawnSync } from 'node:child_process';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { cpSync, createReadStream, createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import http from 'node:http';
+import { networkInterfaces } from 'node:os';
+import { extname, join, normalize } from 'node:path';
+import { pipeline } from 'node:stream/promises';
+
+import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
+import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
+import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
+import { isApiPath } from '../src/protocol.js';
+
+const APP = '/app';
+const WEB_ROOT = join(APP, 'apps/web/dist');
+const DATA = '/data';
+const PGDATA = join(DATA, 'pg');
+const STORAGE = join(DATA, 'storage');
+const API_PORT = 4020;
+const PORT = 8080;
+const SELF_SEED_AFTER_MS = 120_000;
+const BOOT_ID = randomUUID();
+const INTERNAL_KEY = process.env.POLO_INTERNAL_KEY || '';
+const PG_USER = 'bidstack';
+const DB = 'bidstack';
+const OWNER_URL = ownerDatabaseUrl();
+const REDIS_PASS = randomUUID().replaceAll('-', '');
+let redisHost = 'polo-redis';
+
+let phase = 'booting';
+let servePreviousSchema = false;
+let detail = '';
+let apiChild = null;
+let apiRestarts = 0;
+let workerChild = null;
+let workerRestarts = 0;
+let selfSeeded = false;
+
+// Container stdout is not reachable from outside, so the last lines are kept
+// and returned with a failed state for the Worker to log.
+const recent = [];
+function remember(text) {
+  for (const line of String(text).split('\n')) {
+    if (!line.trim()) continue;
+    recent.push(line.slice(0, 500));
+    if (recent.length > 80) recent.shift();
+  }
+}
+
+function log(message) {
+  const line = `[polo-container] ${new Date().toISOString()} ${message}`;
+  remember(line);
+  process.stdout.write(`${line}\n`);
+}
+
+function setPhase(next, why = '') {
+  phase = next;
+  detail = why;
+  log(`phase ${next}${why ? `: ${why}` : ''}`);
+}
+
+function pgUid() {
+  const out = spawnSync('id', ['-u', 'postgres'], { encoding: 'utf8' });
+  const gid = spawnSync('id', ['-g', 'postgres'], { encoding: 'utf8' });
+  return { uid: Number(out.stdout.trim()), gid: Number(gid.stdout.trim()) };
+}
+
+function runSync(cmd, args, opts = {}) {
+  const res = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
+  if (res.stdout) process.stdout.write(res.stdout);
+  if (res.stderr) process.stderr.write(res.stderr);
+  if (res.status !== 0) {
+    remember(`${res.stdout || ''}\n${res.stderr || ''}`.split('\n').slice(-40).join('\n'));
+    throw new Error(`${cmd} ${args.join(' ')} exited ${res.status}${res.error ? ` (${res.error.message})` : ''}`);
+  }
+}
+
+function runtimeEnv(databaseUrl) {
+  const env = {
+    ...process.env,
+    NODE_ENV: 'production',
+    HOST: '127.0.0.1',
+    PORT: String(API_PORT),
+    PORT_API: String(API_PORT),
+    DATABASE_URL: databaseUrl,
+    DATABASE_URL_UNPOOLED: databaseUrl,
+    REDIS_URL: `redis://:${REDIS_PASS}@${redisHost}:6379`,
+    CF_ACCESS_AUTH: 'true',
+    CF_ACCESS_TEAM_DOMAIN: 'tony-walteur.cloudflareaccess.com',
+    CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'false',
+    POLO_DATA_MODE: 'demo',
+    POLO_REAL_ORG_CLERK: 'org_seed_mantu',
+    STORAGE_DRIVER: 'local',
+    LOCAL_STORAGE_ROOT: STORAGE,
+    BIDSTACK_ALLOW_LOCAL_STORAGE: 'true',
+    PII_FIELD_ENCRYPTION: 'true',
+    BIDSTACK_TENANT_SCOPE_GUARD: 'warn',
+    PUPPETEER_SKIP_DOWNLOAD: 'true',
+    WORKER_HEALTH_PORT: '4030',
+    ACCOUNT_INTEL_AUTO_REFRESH: 'true',
+    // An account page fans out to about 30 API calls, so the API's default 120 per user per minute starves widgets after a few accounts.
+    API_RATE_LIMIT_MAX: process.env.API_RATE_LIMIT_MAX || '1200',
+    ...(process.env.POLO_INTEL_USER_AGENT
+      ? {
+          ACCOUNT_INTEL_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+          SEC_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+          FINANCIALS_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+          BIDSTACK_USER_AGENT: process.env.POLO_INTEL_USER_AGENT,
+        }
+      : {}),
+  };
+  delete env.POLO_APP_DB_PASSWORD;
+  return env;
+}
+
+function migrateEnv() {
+  return { ...runtimeEnv(OWNER_URL), DATABASE_URL_OWNER: OWNER_URL };
+}
+
+function apiEnv() {
+  // The restored database is still the previous schema. Connect as the owner
+  // so the API can answer. The app role belongs to the migration we refused.
+  if (servePreviousSchema) {
+    const env = runtimeEnv(OWNER_URL);
+    env.DATABASE_URL_APP = OWNER_URL;
+    delete env.DATABASE_URL_OWNER;
+    return env;
+  }
+  const app = appDatabaseUrl(process.env.POLO_APP_DB_PASSWORD);
+  const env = runtimeEnv(app);
+  env.DATABASE_URL_APP = app;
+  delete env.DATABASE_URL_OWNER;
+  return env;
+}
+
+function workerEnv() {
+  const env = apiEnv();
+  env.DATABASE_URL_OWNER = OWNER_URL;
+  return env;
+}
+
+function quoteLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function setAppRolePassword() {
+  const password = process.env.POLO_APP_DB_PASSWORD || '';
+  if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
+  // psql must not echo the statement. A failure reports the role, not the secret.
+  const res = spawnSync(
+    'psql',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'],
+    {
+      encoding: 'utf8',
+      input: `ALTER ROLE app_role PASSWORD ${quoteLiteral(password)};\n`,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  );
+  if (res.status !== 0) throw new Error('could not set the app role password');
+}
+
+function startDatabase() {
+  // The API refuses a loopback REDIS_URL in production; Redis is a sidecar in
+  // this same container, reached through a named alias.
+  // Some runtimes lock /etc/hosts; then Redis listens on the private interface.
+  const bind = ['127.0.0.1'];
+  try {
+    writeFileSync('/etc/hosts', '127.0.0.1 polo-redis\n', { flag: 'a' });
+  } catch (err) {
+    const ip = Object.values(networkInterfaces())
+      .flat()
+      .find((a) => a && a.family === 'IPv4' && !a.internal)?.address;
+    if (!ip) throw new Error(`cannot write /etc/hosts (${err.message}) and no private IPv4 for Redis`, { cause: err });
+    redisHost = ip;
+    bind.push(ip);
+    log(`/etc/hosts is read-only; Redis on ${ip}`);
+  }
+  const asRoot = process.getuid?.() === 0;
+  const ids = asRoot ? pgUid() : {};
+  mkdirSync(PGDATA, { recursive: true });
+  mkdirSync(STORAGE, { recursive: true });
+  if (asRoot) runSync('chown', ['-R', 'postgres:postgres', PGDATA]);
+  if (!existsSync(join(PGDATA, 'PG_VERSION'))) {
+    runSync('initdb', ['-D', PGDATA, '-U', PG_USER, '--auth=trust', '-E', 'UTF8'], ids);
+  }
+  const pg = spawn('postgres', ['-D', PGDATA, '-h', '127.0.0.1', '-k', '/tmp', '-c', 'shared_buffers=256MB'], {
+    ...ids,
+    stdio: 'inherit',
+  });
+  pg.on('exit', (code) => {
+    log(`postgres exited ${code}; stopping the container so it restarts clean`);
+    process.exit(1);
+  });
+  const redis = spawn('redis-server', ['--bind', ...bind, '--port', '6379', '--requirepass', REDIS_PASS, '--save', '', '--appendonly', 'no'], {
+    stdio: 'inherit',
+  });
+  redis.on('exit', (code) => {
+    log(`redis exited ${code}; stopping the container`);
+    process.exit(1);
+  });
+  for (let i = 0; i < 60; i++) {
+    const ready = spawnSync('pg_isready', ['-h', '127.0.0.1', '-U', PG_USER]);
+    if (ready.status === 0) break;
+    spawnSync('sleep', ['1']);
+  }
+  const exists = spawnSync('psql', ['-h', '127.0.0.1', '-U', PG_USER, '-d', 'postgres', '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB}'`], { encoding: 'utf8' });
+  if (exists.stdout.trim() !== '1') runSync('createdb', ['-h', '127.0.0.1', '-U', PG_USER, DB]);
+}
+
+function psqlText(sql) {
+  const res = spawnSync(
+    'psql',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-tAc', sql],
+    { encoding: 'utf8' },
+  );
+  if (res.status !== 0) {
+    if (/does not exist/i.test(`${res.stderr || ''}`)) return '';
+    throw new Error('active import precheck failed');
+  }
+  return (res.stdout || '').trim();
+}
+
+function activeImportDuplicates() {
+  const column = psqlText(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'migration_jobs' AND column_name = 'file_hash'",
+  );
+  // The current predicate excludes a null file hash. Until the column exists,
+  // no restored row can match it.
+  if (column !== '1') return [];
+  const raw = psqlText(DUPLICATE_PRECHECK_SQL);
+  if (!raw) return [];
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const [orgId, active] = line.split('|');
+    return { orgId: (orgId || '').trim(), active: Number((active || '').trim()) };
+  });
+}
+
+function stageMigrationsWithoutIndex() {
+  const staging = '/tmp/polo-migrate';
+  rmSync(staging, { recursive: true, force: true });
+  cpSync(join(APP, 'packages/db/prisma'), staging, {
+    recursive: true,
+    filter: (src) => !src.includes(`/${ACTIVE_IMPORT_MIGRATION}`),
+  });
+  return join(staging, 'schema.prisma');
+}
+
+function migrate() {
+  const decision = decideBootMigration(activeImportDuplicates());
+  const plan = planBootMigration(decision);
+  for (const row of decision.log) log(`active import precheck org ${row.orgId} count ${row.active}`);
+  let schema = join(APP, 'packages/db/prisma/schema.prisma');
+  if (plan.skipIndexMigration) {
+    log(`skipping ${ACTIVE_IMPORT_MIGRATION}; duplicate rows are unchanged`);
+    try {
+      schema = stageMigrationsWithoutIndex();
+    } catch {
+      servePreviousSchema = true;
+      log('could not skip the index migration; serving the restored schema');
+      return;
+    }
+  }
+  runSync(join(APP, 'packages/db/node_modules/.bin/prisma'), ['migrate', 'deploy', '--schema', schema], {
+    cwd: APP,
+    env: migrateEnv(),
+  });
+  setAppRolePassword();
+}
+
+function seed() {
+  // The preview is a demo instance: its database holds only the fixture org.
+  // Seed runs as the owner. The API and worker do not.
+  runSync(join(APP, 'packages/db/node_modules/.bin/tsx'), ['src/seed.ts'], {
+    cwd: join(APP, 'packages/db'),
+    env: { ...migrateEnv(), BIDSTACK_ALLOW_FIXTURE_SEED: 'true' },
+  });
+}
+
+function startApi() {
+  apiChild = spawn(process.execPath, ['apps/api/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  apiChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
+  apiChild.stderr.on('data', (chunk) => {
+    process.stderr.write(chunk);
+    remember(chunk);
+  });
+  apiChild.on('exit', (code) => {
+    apiChild = null;
+    if (phase !== 'ready') return;
+    const delay = Math.min(30_000, 1_000 * 2 ** apiRestarts++);
+    log(`api exited ${code}; restarting in ${delay}ms`);
+    setTimeout(startApi, delay);
+  });
+}
+
+// Queued jobs (public registry and filings pulls, imports) run here. A crash
+// never takes the API down; the worker restarts on its own.
+function startWorker() {
+  if (servePreviousSchema) {
+    log('worker not started; active import migration was refused');
+    return;
+  }
+  workerChild = spawn(process.execPath, ['apps/worker/dist/main.js'], { cwd: APP, env: workerEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  workerChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
+  workerChild.stderr.on('data', (chunk) => {
+    process.stderr.write(chunk);
+    remember(chunk);
+  });
+  workerChild.on('exit', (code) => {
+    workerChild = null;
+    const delay = Math.min(60_000, 2_000 * 2 ** Math.min(workerRestarts++, 5));
+    log(`worker exited ${code}; restarting in ${delay}ms`);
+    setTimeout(startWorker, delay);
+  });
+}
+
+async function waitForApi() {
+  for (let i = 0; i < 120; i++) {
+    const ok = await new Promise((resolve) => {
+      const req = http.get({ host: '127.0.0.1', port: API_PORT, path: '/livez', timeout: 2000 }, (res) => {
+        res.resume();
+        resolve(res.statusCode < 500);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+    if (ok) return;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error('api did not answer /livez');
+}
+
+async function finishBoot(how) {
+  try {
+    if (how === 'seed') {
+      setPhase('seeding');
+      migrate();
+      seed();
+    } else {
+      setPhase('migrating', 'after restore');
+      migrate();
+    }
+    startApi();
+    await waitForApi();
+    apiRestarts = 0;
+    startWorker();
+    setPhase('ready', how);
+  } catch (err) {
+    setPhase('failed', String(err));
+  }
+}
+
+function changeCounter() {
+  const out = spawnSync(
+    'psql',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-tAc', 'SELECT coalesce(sum(n_tup_ins + n_tup_upd + n_tup_del), 0) FROM pg_stat_user_tables'],
+    { encoding: 'utf8' },
+  );
+  return Number(out.stdout.trim() || 0);
+}
+
+function snapshotFile() {
+  const dir = '/tmp/snapshot';
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  runSync('pg_dump', ['-h', '127.0.0.1', '-U', PG_USER, '-Fc', '-f', join(dir, 'db.dump'), DB]);
+  writeFileSync(join(dir, 'meta.json'), JSON.stringify({ at: new Date().toISOString(), bootId: BOOT_ID }));
+  const out = '/tmp/snapshot.tgz';
+  runSync('tar', ['-czf', out, '-C', dir, 'db.dump', 'meta.json', '-C', DATA, 'storage']);
+  return out;
+}
+
+async function restoreFrom(req) {
+  const dir = '/tmp/restore';
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'snapshot.tgz');
+  await pipeline(req, createWriteStream(file));
+  runSync('tar', ['-xzf', file, '-C', dir]);
+  // The database is fresh on every boot, so restore without --clean. pg_restore
+  // exits 1 on harmless warnings; the row check below is the real verdict.
+  spawnSync('pg_restore', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')], { stdio: 'inherit' });
+  const orgs = spawnSync('psql', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-tAc', 'SELECT count(*) FROM orgs'], { encoding: 'utf8' });
+  if (!(Number(orgs.stdout.trim()) > 0)) throw new Error('restored database has no orgs');
+  if (existsSync(join(dir, 'storage'))) {
+    rmSync(STORAGE, { recursive: true, force: true });
+    runSync('cp', ['-a', join(dir, 'storage'), STORAGE]);
+  }
+}
+
+function authorized(req) {
+  const given = Buffer.from(String(req.headers['x-polo-internal-key'] || ''));
+  const want = Buffer.from(INTERNAL_KEY);
+  return INTERNAL_KEY.length > 0 && given.length === want.length && timingSafeEqual(given, want);
+}
+
+function sendJson(res, status, body, extra = {}) {
+  res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...extra });
+  res.end(JSON.stringify(body));
+}
+
+async function handleInternal(req, res, url) {
+  if (!authorized(req)) return sendJson(res, 404, { error: 'not_found' });
+  if (url.pathname === '/__internal/state') {
+    return sendJson(res, 200, {
+      phase,
+      detail,
+      bootId: BOOT_ID,
+      apiUp: Boolean(apiChild),
+      workerUp: Boolean(workerChild),
+      ...(phase === 'failed' ? { recent: recent.slice(-40) } : {}),
+    });
+  }
+  if (url.pathname === '/__internal/restore' && req.method === 'PUT') {
+    if (phase !== 'awaiting-data') return sendJson(res, 409, { phase });
+    setPhase('restoring');
+    try {
+      await restoreFrom(req);
+    } catch (err) {
+      setPhase('failed', `restore: ${String(err)}`);
+      return sendJson(res, 500, { phase, detail });
+    }
+    sendJson(res, 202, { phase: 'migrating' });
+    void finishBoot('restore');
+    return;
+  }
+  if (url.pathname === '/__internal/seed' && req.method === 'POST') {
+    if (phase !== 'awaiting-data') return sendJson(res, 409, { phase });
+    sendJson(res, 202, { phase: 'seeding' });
+    void finishBoot('seed');
+    return;
+  }
+  if (url.pathname === '/__internal/snapshot') {
+    if (phase !== 'ready') return sendJson(res, 409, { phase });
+    if (selfSeeded) return sendJson(res, 409, { phase, detail: 'self-seeded; keeping the R2 snapshot' });
+    const counter = changeCounter();
+    const since = Number(url.searchParams.get('since'));
+    if (Number.isFinite(since) && since === counter) {
+      res.writeHead(204);
+      return res.end();
+    }
+    const file = snapshotFile();
+    res.writeHead(200, {
+      'content-type': 'application/gzip',
+      'content-length': String(statSync(file).size),
+      'x-polo-change-counter': String(counter),
+    });
+    createReadStream(file).pipe(res);
+    return;
+  }
+  sendJson(res, 404, { error: 'not_found' });
+}
+
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
+  '.map': 'application/json',
+};
+
+function serveStatic(req, res, pathname) {
+  const safe = normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
+  let file = join(WEB_ROOT, safe);
+  let isFile;
+  try {
+    isFile = file.startsWith(WEB_ROOT) && statSync(file).isFile();
+  } catch {
+    isFile = false;
+  }
+  if (!isFile) file = join(WEB_ROOT, 'index.html');
+  const type = TYPES[extname(file)] || 'application/octet-stream';
+  const immutable = isFile && pathname.startsWith('/assets/');
+  res.writeHead(200, {
+    'content-type': type,
+    'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+  });
+  if (req.method === 'HEAD') return res.end();
+  createReadStream(file).pipe(res);
+}
+
+const proxyApi = makeApiProxy({ port: API_PORT });
+
+function startingPage(req, res, pathname) {
+  const accept = String(req.headers.accept || '');
+  if (isApiPath(pathname) || !accept.includes('text/html')) {
+    return sendJson(res, 503, { error: 'polo_starting', phase, retryAfterSeconds: 5 }, { 'retry-after': '5' });
+  }
+  res.writeHead(503, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '5' });
+  res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="5"><title>Polo is starting</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 system-ui,sans-serif;background:#f6f7f9;color:#1f2430}p{color:#5b6270}</style></head>
+<body><div><h1>Polo is starting</h1><p>Loading your data. This page reloads by itself.</p></div></body></html>`);
+}
+
+http
+  .createServer((req, res) => {
+    const url = new URL(req.url || '/', 'http://polo.internal');
+    if (url.pathname.startsWith('/__internal/')) {
+      handleInternal(req, res, url).catch((err) => sendJson(res, 500, { error: String(err) }));
+      return;
+    }
+    if (phase !== 'ready') return startingPage(req, res, url.pathname);
+    if (isApiPath(url.pathname)) return proxyApi(req, res);
+    return serveStatic(req, res, url.pathname);
+  })
+  .on('upgrade', rejectUpgrade)
+  .listen(PORT, '0.0.0.0', () => log(`listening on ${PORT}, boot ${BOOT_ID}`));
+
+try {
+  startDatabase();
+  setPhase('awaiting-data');
+  setTimeout(() => {
+    if (phase === 'awaiting-data') {
+      log('no restore or seed request arrived; seeding by itself');
+      selfSeeded = true;
+      void finishBoot('seed');
+    }
+  }, SELF_SEED_AFTER_MS);
+} catch (err) {
+  setPhase('failed', String(err));
+}
+
+process.on('SIGTERM', () => {
+  log('SIGTERM: stopping');
+  apiChild?.kill('SIGTERM');
+  workerChild?.kill('SIGTERM');
+  process.exit(0);
+});

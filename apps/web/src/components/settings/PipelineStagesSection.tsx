@@ -11,6 +11,7 @@ import {
   usePipelineStages,
   type PipelineStageSettings,
 } from '@/hooks/usePipelineStages';
+import { stageListCaption } from './stage-list-caption';
 
 export function PipelineStagesSection() {
   const { t } = useTranslation('settings');
@@ -21,10 +22,17 @@ export function PipelineStagesSection() {
     <Card>
       <SectionHeader
         title={t('pipelineStages.sectionTitle', 'Pipeline stages')}
-        caption={t(
-          'pipelineStages.sectionCaption',
-          'Tenant-scoped stages used by opportunities, pipeline boards, reports, and forecasts.',
-        )}
+        caption={
+          stages.data?.pageContinues
+            ? `${t(
+                'pipelineStages.sectionCaption',
+                'Tenant-scoped stages used by opportunities, pipeline boards, reports, and forecasts.',
+              )} ${stageListCaption(stages.data.items.length, true)}`
+            : t(
+                'pipelineStages.sectionCaption',
+                'Tenant-scoped stages used by opportunities, pipeline boards, reports, and forecasts.',
+              )
+        }
       />
       <div className="p-5">
         {stages.isLoading ? (

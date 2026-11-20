@@ -7,12 +7,24 @@ export * from './utils/index.js';
 export * from './calendar/index.js';
 export * from './rfp-crew.js';
 export * from './competitor-intel/index.js';
+export * from './company-intel/index.js';
+export * from './company-figures/index.js';
+export * from './tech-stack/index.js';
 export * from './bid-classification/index.js';
 export * from './stage-transitions/index.js';
+export * from './state-machines/index.js';
+// OAuth refresh lock uses node:crypto. It stays behind '@bidstack/shared/server'
+// and must never enter the web bundle.
 export * from './document-category.js';
 export * from './workflow-engine.js';
 // Provider catalogue only (pure data). The LLM wire client stays behind the
 // '@bidstack/shared/llm' subpath and must never enter the web bundle.
 export * from './llm-catalog/index.js';
-export * from './intel/present-opportunity-intel.js';
 export * from './msa/index.js';
+export * from './list-page.js';
+export * from './comms/index.js';
+// ChileCompra attribution strings only (pure data). Adapters stay behind the
+// server-only '@bidstack/shared/public-sector' subpath.
+export * from './public-sector/attribution.js';
+export * from './consulting-partners/index.js';
+export * from './account-alerts/index.js';

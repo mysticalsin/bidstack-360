@@ -7,13 +7,9 @@
 import { prisma } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 
-import { excludeClosedOutcome, wonOutcomeWhere } from './opportunities.helpers.js';
-
 export interface AccountStats {
   totalValue: number;
-  totalValueMicros: string;
   wonValue: number;
-  wonValueMicros: string;
   openDeals: number;
   opportunityCount: number;
   contactCount: number;
@@ -21,22 +17,11 @@ export interface AccountStats {
 
 const EMPTY_STATS: AccountStats = {
   totalValue: 0,
-  totalValueMicros: '0',
   wonValue: 0,
-  wonValueMicros: '0',
   openDeals: 0,
   opportunityCount: 0,
   contactCount: 0,
 };
-
-/** Digit string for a Postgres bigint sum. A non-integer never becomes a pipeline total. */
-function microsDigits(value: bigint | number | null | undefined): string {
-  if (typeof value === 'bigint') return value >= 0n ? value.toString() : '0';
-  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
-    return BigInt(Math.trunc(value)).toString();
-  }
-  return '0';
-}
 
 /**
  * Aggregates pipeline value, won value, open-deal/opportunity counts and
@@ -56,17 +41,17 @@ export async function fetchAccountStats(
     prisma.opportunity.groupBy({
       by: ['companyId'],
       where,
+      _sum: { valueMicros: true },
       _count: { _all: true },
     }),
     prisma.opportunity.groupBy({
       by: ['companyId'],
-      where: { ...where, ...wonOutcomeWhere() },
+      where: { ...where, stage: 'closed_won' },
       _sum: { valueMicros: true },
     }),
     prisma.opportunity.groupBy({
       by: ['companyId'],
-      where: { ...where, ...excludeClosedOutcome() },
-      _sum: { valueMicros: true },
+      where: { ...where, stage: { notIn: ['closed_won', 'closed_lost'] } },
       _count: { _all: true },
     }),
     prisma.contact.groupBy({
@@ -87,24 +72,21 @@ export async function fetchAccountStats(
 
   for (const row of totals) {
     if (!row.companyId) continue;
-    statsFor(row.companyId).opportunityCount = row._count._all;
+    const s = statsFor(row.companyId);
+    // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds
+    // the BigInt→Number conversion before dividing, corrupting totals past
+    // ~$9.007B. Postgres already summed exactly via groupBy; don't reintroduce
+    // float error converting the result.
+    s.totalValue = microsToUnits(row._sum.valueMicros ?? 0);
+    s.opportunityCount = row._count._all;
   }
   for (const row of won) {
     if (!row.companyId) continue;
-    const wonMicros = microsDigits(row._sum.valueMicros);
-    const wonStats = statsFor(row.companyId);
-    wonStats.wonValueMicros = wonMicros;
-    wonStats.wonValue = microsToUnits(BigInt(wonMicros));
+    statsFor(row.companyId).wonValue = microsToUnits(row._sum.valueMicros ?? 0);
   }
   for (const row of open) {
     if (!row.companyId) continue;
-    const s = statsFor(row.companyId);
-    // Pipeline on the account list is the open book. Lost and won stay out.
-    // The digit string is the total. The unit number is only for older readers.
-    const openMicros = microsDigits(row._sum.valueMicros);
-    s.totalValueMicros = openMicros;
-    s.totalValue = microsToUnits(BigInt(openMicros));
-    s.openDeals = row._count._all;
+    statsFor(row.companyId).openDeals = row._count._all;
   }
   for (const c of contacts) {
     if (!c.companyId) continue;

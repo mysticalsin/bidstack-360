@@ -36,7 +36,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
       response_type: 'code',
       redirect_uri: redirectUri,
       response_mode: 'query',
-      scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.ReadWrite https://graph.microsoft.com/User.Read offline_access',
+      scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.Read https://graph.microsoft.com/User.Read offline_access',
       state,
     });
     return `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize?${params.toString()}`;
@@ -121,7 +121,7 @@ export class MicrosoftPlugin implements IntegrationPlugin {
         client_secret: clientSecret,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
-        scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.ReadWrite https://graph.microsoft.com/User.Read offline_access',
+        scope: 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Calendars.Read https://graph.microsoft.com/User.Read offline_access',
       }),
     });
 
@@ -168,35 +168,6 @@ export class MicrosoftPlugin implements IntegrationPlugin {
           });
           if (!res.ok) throw new Error(`Microsoft Graph error: ${res.status}`);
           return res.json();
-        },
-      },
-      {
-        name: 'microsoft_send_email',
-        description: 'Send an email via Microsoft 365.',
-        parameters: {
-          to: { type: 'string', description: 'Recipient email', required: true },
-          subject: { type: 'string', description: 'Email subject', required: true },
-          body: { type: 'string', description: 'Email body (HTML)', required: true },
-        },
-        execute: async (args, context) => {
-          const accessToken = context.config.credentials?.accessToken as string | undefined;
-          if (!accessToken) throw new Error('Microsoft not connected');
-          const res = await fetchWithTimeout('https://graph.microsoft.com/v1.0/me/sendMail', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: {
-                subject: args.subject,
-                body: { contentType: 'HTML', content: args.body },
-                toRecipients: [{ emailAddress: { address: args.to } }],
-              },
-            }),
-          });
-          if (!res.ok) throw new Error(`Microsoft send failed: ${res.status}`);
-          return { sent: true };
         },
       },
     ];

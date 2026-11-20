@@ -13,6 +13,10 @@ import {
   WinLossReasonCode,
 } from '@bidstack/shared';
 
+import { visibleOpportunityRelation, visibleOpportunityWhere } from '../lib/visible-opportunity.js';
+
+import { salesCycleDays } from './win-loss.helpers.js';
+
 interface DbRow {
   id: string;
   opportunityId: string;
@@ -73,6 +77,8 @@ const WinLossAnalysis = z.object({
   quarters: z.array(OutcomeCounts.extend({ quarter: z.string() })),
   reasons: z.array(OutcomeCounts.extend({ reason: WinLossReasonCode })),
   competitors: z.array(OutcomeCounts.extend({ competitor: z.string() })),
+  /** Days from opening each scanned bid to its recorded outcome (sales cycle). */
+  cycleDays: z.array(z.number().int().nonnegative()),
   recent: z.array(
     z.object({
       opportunityId: z.string().uuid(),
@@ -102,6 +108,7 @@ interface AnalysisScanRow {
     customer: string;
     valueMicros: bigint;
     ownerId: string | null;
+    createdAt: Date;
     owner: { name: string | null; email: string } | null;
   };
 }
@@ -136,9 +143,12 @@ function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLoss
   const quarters = new Map<string, { won: number; lost: number }>();
   const reasons = new Map<string, { won: number; lost: number }>();
   const competitors = new Map<string, { won: number; lost: number }>();
+  const cycleDays: number[] = [];
   let totalWon = 0;
   let totalLost = 0;
   for (const r of rows) {
+    const cycle = salesCycleDays(r.opportunity.createdAt, r.createdAt);
+    if (cycle !== null) cycleDays.push(cycle);
     const won = r.outcome === 'won';
     if (won) totalWon += 1;
     else totalLost += 1;
@@ -165,6 +175,7 @@ function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLoss
       .map(([competitor, counts]) => ({ competitor, ...counts }))
       .sort(byLostDesc)
       .slice(0, 10),
+    cycleDays,
     recent: rows.slice(0, ANALYSIS_RECENT_LIMIT).map(serializeRecent),
   };
 }
@@ -191,9 +202,11 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { response: { 200: WinLossPatterns } },
     },
     async (req) => {
+      const scoped = await visibleOpportunityRelation(req.auth);
       const grouped = await prisma.winLossRecord.groupBy({
         by: ['outcome', 'reason'],
-        where: { orgId: req.auth.orgId },
+        // Same population as /analysis: live deals the caller can see.
+        where: { orgId: req.auth.orgId, opportunity: { AND: [{ deletedAt: null }, scoped ?? {}] } },
         _count: { _all: true },
       });
       const rows = grouped.map((g) => ({
@@ -221,12 +234,8 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { from, to, ownerId } = req.query;
-      // PERF: this filters `{ orgId, createdAt gte/lte }` and sorts by createdAt,
-      // but WinLossRecord has no (orgId, createdAt) index (only
-      // (orgId, outcome, reason) and (orgId, opportunityId) — see
-      // packages/db/prisma/schema.prisma). Postgres can prefix on orgId only,
-      // then sorts every matching row before the take. Follow-up migration:
-      // add @@index([orgId, createdAt]) to match this query shape.
+      const scoped = await visibleOpportunityRelation(req.auth);
+      // Backed by win_loss_records_org_created_idx (orgId, createdAt desc).
       const rows = await prisma.winLossRecord.findMany({
         where: {
           orgId: req.auth.orgId,
@@ -239,7 +248,7 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
               }
             : {}),
           // Owner lives on the opportunity; the join also hides soft-deleted opps.
-          opportunity: { deletedAt: null, ...(ownerId ? { ownerId } : {}) },
+          opportunity: { AND: [{ deletedAt: null, ...(ownerId ? { ownerId } : {}) }, scoped ?? {}] },
         },
         orderBy: { createdAt: 'desc' },
         take: ANALYSIS_SCAN_CAP,
@@ -255,6 +264,7 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
               customer: true,
               valueMicros: true,
               ownerId: true,
+              createdAt: true,
               owner: { select: { name: true, email: true } },
             },
           },
@@ -271,6 +281,11 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { params: OppParam, response: { 200: WinLossRecord.nullable() } },
     },
     async (req) => {
+      const opp = await prisma.opportunity.findFirst({
+        where: await visibleOpportunityWhere(req.auth, req.params.opportunityId),
+        select: { id: true },
+      });
+      if (!opp) throw server.httpErrors.notFound('Opportunity not found');
       const row = await prisma.winLossRecord.findFirst({
         where: { orgId: req.auth.orgId, opportunityId: req.params.opportunityId },
         select: SELECT,
@@ -288,7 +303,7 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       // The opportunity must belong to the caller's org (tenant guard).
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.opportunityId, orgId: req.auth.orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.opportunityId),
         select: { id: true },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');

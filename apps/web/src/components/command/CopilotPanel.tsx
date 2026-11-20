@@ -9,6 +9,7 @@
  * entity id renders disabled with a hint instead of firing a doomed request.
  */
 import type { TFunction } from 'i18next';
+import { Mic } from 'lucide-react';
 import { useEffect, useMemo, useState, type KeyboardEvent, type MutableRefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -31,6 +32,7 @@ import {
   type CopilotActionKind,
 } from './copilotActions';
 import type { Item } from './commandPaletteUtils';
+import { useJarvisStore } from './jarvisStore';
 
 export type CopilotKeyHandler = (e: KeyboardEvent<HTMLInputElement>) => boolean;
 
@@ -257,6 +259,7 @@ export function CopilotPanel({
     ? dashboard.data?.companies?.find((c) => c.id === ctx.accountId)?.name
     : undefined;
 
+  const openJarvis = useJarvisStore((s) => s.openJarvis);
   const actions = useMemo(() => buildCopilotActions(ctx, prompt), [ctx, prompt]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [result, setResult] = useState<CopilotResultData | null>(null);
@@ -353,6 +356,21 @@ export function CopilotPanel({
           {t('copilot.badge', 'Copilot')}
         </span>
         <span className="truncate text-[10px] text-[var(--fg-tertiary)]">{contextLabel}</span>
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            openJarvis(prompt);
+          }}
+          className={cn(
+            'ml-auto inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-[var(--brand-primary)]',
+            'hover:bg-[var(--surface-hover)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
+          )}
+        >
+          <Mic size={14} aria-hidden />
+          {t('jarvis.askButton', 'Ask Jarvis')}
+        </button>
       </div>
 
       <div

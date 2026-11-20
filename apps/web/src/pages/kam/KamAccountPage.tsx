@@ -43,9 +43,6 @@ export default function KamAccountPage() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-lg font-semibold text-[var(--fg-primary)]">Key Account Management</h1>
-          <p className="mt-0.5 text-sm text-[var(--fg-secondary)]">
-            Capture workshop initiatives, track them to a qualified opportunity, and hand off to OM.
-          </p>
         </div>
         {accounts.length > 0 && (
           <Button variant="secondary" size="sm" onClick={() => setDesignateOpen(true)}>

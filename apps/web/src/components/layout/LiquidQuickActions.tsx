@@ -11,7 +11,7 @@ import type { IconName } from '@/components/ui/Icon';
 // the three core moves (new account / opportunity / task) from anywhere.
 type QuickAction = { key: string; icon: IconName; to: string; label: string; y: number };
 
-const FAB = 52; // px — the round button diameter
+const FAB = 52; // px — keep in lockstep with --fab-size in index.css
 
 export function LiquidQuickActions() {
   const [open, setOpen] = useState(false);
@@ -31,8 +31,16 @@ export function LiquidQuickActions() {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-40 print:hidden"
-      style={{ width: FAB, height: FAB }}
+      className="fixed z-40 print:hidden"
+      style={{
+        width: FAB,
+        height: FAB,
+        /* Same 1.5rem inset as Tailwind bottom-6 / right-6, plus the
+           home-indicator / notch safe area so the disc never sits on the
+           pagination bar on a notched phone. */
+        bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+        right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
+      }}
       aria-hidden={undefined}
     >
       <Liquid blur={7} contrast={22} fill="var(--brand-primary)" shadow="0 10px 26px rgba(0,0,0,0.30)">

@@ -196,7 +196,7 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
                       {f.label}
                     </span>
                     {f.required && (
-                      <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+                      <span className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
                         {t('fields.requiredBadge', 'Required')}
                       </span>
                     )}

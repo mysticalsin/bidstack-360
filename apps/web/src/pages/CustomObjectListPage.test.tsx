@@ -107,3 +107,26 @@ describe('CustomObjectListPage — customObjects:write gating', () => {
     expect(screen.queryByRole('button', { name: /New Vendor/i })).toBeNull();
   });
 });
+
+describe('CustomObjectListPage — load failure', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('shows the error alone, not the empty state as well', () => {
+    vi.mocked(useCustomObjectDefs).mockReturnValue({
+      data: { items: [def] },
+      isLoading: false,
+    } as ReturnType<typeof useCustomObjectDefs>);
+    vi.mocked(useCustomObjectRecords).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    } as unknown as ReturnType<typeof useCustomObjectRecords>);
+
+    renderPage();
+
+    expect(screen.getByRole('alert').textContent).toContain('Failed to load records.');
+    expect(screen.queryByText('No vendors yet')).toBeNull();
+  });
+});

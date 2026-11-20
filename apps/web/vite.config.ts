@@ -1,8 +1,47 @@
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, loadEnv, type PluginOption } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
 import { visualizer } from 'rollup-plugin-visualizer';
+
+import { isServerOnlySpecifier } from './src/lib/server-only-specifiers';
+
+function rejectNodeBuiltins(): Plugin {
+  return {
+    name: 'reject-node-builtins',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (!importer) return null;
+      if (isServerOnlySpecifier(source) && importer.includes('/apps/web/')) {
+        this.error(
+          `Server-only module ${source} reached the web bundle from ${importer}. Import it from the API or the worker.`,
+        );
+      }
+      if (!source.startsWith('node:')) return null;
+      const appCode =
+        importer.includes('/packages/shared/') ||
+        importer.includes('/apps/web/src/') ||
+        importer.includes('@bidstack/shared');
+      if (!appCode) return null;
+      this.error(
+        `Node built-in ${source} reached the web bundle from ${importer}. Keep server-only code off the shared root entry.`,
+      );
+    },
+    generateBundle(_options, bundle) {
+      for (const [fileName, item] of Object.entries(bundle)) {
+        if (item.type !== 'chunk') continue;
+        const marker = item.code.includes('__vite-browser-external')
+          ? '__vite-browser-external'
+          : item.code.match(/from["']node:[^"']+["']/)?.[0];
+        if (marker) {
+          this.error(
+            `Node built-in reached web chunk ${fileName} (${marker}). Keep server-only code off the shared root entry.`,
+          );
+        }
+      }
+    },
+  };
+}
 
 export default defineConfig(({ command, mode }) => {
   // Belt-and-suspenders: @vitejs/plugin-react gates its dev/prod JSX transform
@@ -19,6 +58,7 @@ export default defineConfig(({ command, mode }) => {
     // Clerk key. Otherwise require stub+flag (local/test) or a real Clerk key.
     const keylessOk =
       authMode === 'demo' ||
+      authMode === 'cf-access' ||
       (authMode === 'stub' && process.env.BIDSTACK_ALLOW_STUB_AUTH === 'true');
     if (!keylessOk) {
       throw new Error(
@@ -39,6 +79,7 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [
+      rejectNodeBuiltins(),
       react(),
       tailwindcss(),
       analyze &&
@@ -60,9 +101,6 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
-      // One React for the app and for Radix. A prebundled menu that inlines
-      // its own React calls useMemo on a null dispatcher and crashes the page.
-      dedupe: ['react', 'react-dom'],
     },
     server: {
       port: 38081,
@@ -76,7 +114,6 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     optimizeDeps: {
-      exclude: ['@radix-ui/react-dropdown-menu'],
       esbuildOptions: {
         // Dev dependency optimization does not inherit build.target. Keep
         // modern route-only deps on native syntax during local prebundling.

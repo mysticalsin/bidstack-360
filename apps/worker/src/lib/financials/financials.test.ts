@@ -321,5 +321,26 @@ describe('tier gating', () => {
     expect(s.pulled[0]).toMatchObject({ status: 'mismatch', periods: 0 });
     expect(f.periods).toHaveLength(0);
     expect(f.profiles[0]).toMatchObject({ status: 'mismatch' });
+    // The CIK is not handed on for annual report text: it names another company.
+    expect(s.pulled[0]!.secCik).toBeNull();
+  });
+
+  it('hands on the CIK only after its EDGAR filer name matched', async () => {
+    const f = fakeDb(companies().filter((c) => c.id === 'top'), [{ companyId: 'top', secCik: '0001829948', lei: null }]);
+    const fetchImpl: FinFetch = async () => ({ ok: true, status: 200, json: async () => companyFacts });
+    const s = await runFinancialsScan({ db: f.db, now, fetchImpl, env: { SEC_USER_AGENT: 'Polo test (ops@example.test)' }, sleep: async () => {} });
+    expect(s.pulled[0]).toMatchObject({ status: 'ok', secCik: '0001829948' });
+  });
+
+  it('accepts ACCOUNT_INTEL_USER_AGENT as the SEC contact', async () => {
+    const agents: string[] = [];
+    const fetchImpl: FinFetch = async (_url, init) => {
+      agents.push(String((init?.headers as Record<string, string> | undefined)?.['User-Agent'] ?? ''));
+      return { ok: true, status: 200, json: async () => companyFacts };
+    };
+    const f = fakeDb(companies().filter((c) => c.id === 'top'), [{ companyId: 'top', secCik: '0001829948', lei: null }]);
+    const s = await runFinancialsScan({ db: f.db, now, fetchImpl, env: { ACCOUNT_INTEL_USER_AGENT: 'Polo intel (ops@example.test)' }, sleep: async () => {} });
+    expect(s.pulled[0]).toMatchObject({ status: 'ok', source: 'sec_edgar' });
+    expect(agents.every((a) => a === 'Polo intel (ops@example.test)')).toBe(true);
   });
 });
