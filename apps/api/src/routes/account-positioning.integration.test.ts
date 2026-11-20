@@ -311,4 +311,63 @@ describe('GET /accounts/:id/key-numbers', () => {
     });
     expect(margin.missing).toBeNull();
   });
+
+  async function seedFixtureYear(name: string) {
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name, tier: 'key' } })).id;
+    const revenue = 85_300_000_000;
+    const operatingIncome = 51_000_000_000;
+    await prisma.accountFinancialPeriod.create({
+      data: {
+        orgId: orgA.orgId,
+        companyId: id,
+        source: 'fixture',
+        entityId: 'sample',
+        periodType: 'FY',
+        fiscalYear: 2025,
+        periodStart: new Date('2025-01-01'),
+        periodEnd: new Date('2025-12-31'),
+        currency: 'NOK',
+        sourceUrl: 'https://www.dnb.no/',
+        metrics: {
+          revenue: { value: revenue, concept: 'sample:Revenue' },
+          operatingIncome: { value: operatingIncome, concept: 'sample:OperatingIncome' },
+        },
+      },
+    });
+    return { id, revenue, operatingIncome, margin: Math.round((operatingIncome / revenue) * 1000) / 10 };
+  }
+
+  it('flags a fixture margin as sample in demo mode', async () => {
+    // WHY: demo may show the fixture margin, but it has to be marked sample
+    // so it is not read as a filing. Revenue from that same fixture is marked too.
+    const prev = process.env.POLO_DATA_MODE;
+    delete process.env.POLO_DATA_MODE;
+    try {
+      const seeded = await seedFixtureYear(`${TAG} DemoSample`);
+      const items = (await get(`/accounts/${seeded.id}/key-numbers`)).json<AccountKeyNumbers>().items;
+      const margin = items.find((i) => i.id === 'margin')!;
+      const revenue = items.find((i) => i.id === 'revenue')!;
+      expect(margin).toMatchObject({ label: 'Operating margin', value: seeded.margin, sample: true });
+      expect(revenue).toMatchObject({ value: seeded.revenue, sample: true });
+    } finally {
+      if (prev === undefined) delete process.env.POLO_DATA_MODE;
+      else process.env.POLO_DATA_MODE = prev;
+    }
+  });
+
+  it('ignores the same fixture margin in real mode', async () => {
+    // WHY: real mode must not surface sample filings. Deriving the margin
+    // does not make the fixture number a filing.
+    const prev = process.env.POLO_DATA_MODE;
+    process.env.POLO_DATA_MODE = 'real';
+    try {
+      const seeded = await seedFixtureYear(`${TAG} RealSample`);
+      const margin = (await get(`/accounts/${seeded.id}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'margin')!;
+      expect(margin.value).toBeNull();
+      expect(margin.sample).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.POLO_DATA_MODE;
+      else process.env.POLO_DATA_MODE = prev;
+    }
+  });
 });
