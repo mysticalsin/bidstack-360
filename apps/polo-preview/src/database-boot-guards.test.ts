@@ -48,9 +48,9 @@ function atDrill(): Boot {
 }
 
 describe('database boot guards', () => {
-  it('does not skip or xfail', () => {
-    expect(self).not.toMatch(/\b(?:it|test|describe)\.skip\b/);
-    expect(self).not.toMatch(/\b(?:xit|xtest|xdescribe|xfail)\b/);
+  it('does not skip or mark a case expected to fail', () => {
+    const banned = [`.${'skip'}(`, `x${'it'}(`, `x${'test'}(`, `x${'describe'}(`, `x${'fail'}`];
+    for (const part of banned) expect(self.includes(part)).toBe(false);
   });
 
   it('refuses to leave Init until the cluster is actually ready', () => {

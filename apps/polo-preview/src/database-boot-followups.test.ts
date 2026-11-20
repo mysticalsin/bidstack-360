@@ -48,16 +48,14 @@ function assignsDrillFlag(source: string): boolean {
 }
 
 describe('database boot follow-ups', () => {
-  it('does not skip or xfail', () => {
-    expect(self).not.toMatch(/\b(?:it|test|describe)\.skip\b/);
-    expect(self).not.toMatch(/\b(?:xit|xtest|xdescribe|xfail)\b/);
+  it('does not skip or mark a case expected to fail', () => {
+    const banned = [`.${'skip'}(`, `x${'it'}(`, `x${'test'}(`, `x${'describe'}(`, `x${'fail'}`];
+    for (const part of banned) expect(self.includes(part)).toBe(false);
   });
 
   it('pins the full 42P06 public schema text', () => {
     // WHY: SQLSTATE 42P06 is any duplicate schema. Only schema public, which
     // createdb already made, is the one notice a fresh cluster is allowed to print.
-    expect(databaseBoot.DUPLICATE_PUBLIC_SCHEMA).toBe(FULL);
-    expect(databaseBoot.restoreFailure(1, PUBLIC_NOTICE)).toBeNull();
     const other =
       'pg_restore: error: could not execute query: ERROR:  42P06: schema "audit" already exists';
     const prefix = 'pg_restore: error: could not execute query: ERROR:  42P06:';
@@ -65,10 +63,13 @@ describe('database boot follow-ups', () => {
       'pg_restore: error: could not execute query: ERROR: 42P06: schema "public" already exists';
     const publicExtra =
       'pg_restore: error: could not execute query: ERROR:  42P06: schema "public_extra" already exists';
+    // A SQLSTATE-only match still accepts schema audit. The full sentence does not.
     expect(databaseBoot.restoreFailure(1, other)).not.toBeNull();
     expect(databaseBoot.restoreFailure(1, prefix)).not.toBeNull();
     expect(databaseBoot.restoreFailure(1, oneSpace)).not.toBeNull();
     expect(databaseBoot.restoreFailure(1, publicExtra)).not.toBeNull();
+    expect(databaseBoot.DUPLICATE_PUBLIC_SCHEMA).toBe(FULL);
+    expect(databaseBoot.restoreFailure(1, PUBLIC_NOTICE)).toBeNull();
     expect(databaseBoot.restoreFailure(0, PUBLIC_NOTICE)).not.toBeNull();
     expect(databaseBoot.restoreFailure(1, `${PUBLIC_NOTICE}\n${PUBLIC_NOTICE}`)).not.toBeNull();
     expect(databaseBoot.restoreFailure(2, PUBLIC_NOTICE)).not.toBeNull();
