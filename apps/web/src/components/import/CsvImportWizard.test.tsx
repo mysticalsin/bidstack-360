@@ -411,6 +411,30 @@ describe('CsvImportWizard', () => {
     expect(await screen.findByText('Choose a CSV or Excel file')).toBeTruthy();
   });
 
+  it('a cancel that finds the import already finished shows Import complete', async () => {
+    // WHY: every row was committed before cancel was applied. The job is
+    // complete. The wizard must not say the import was cancelled or that
+    // the click failed.
+    stubHooks();
+    hookMocks.useCancelMigration.mockReturnValue({
+      mutate: hookMocks.cancelMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('This import already finished.', 409, { code: 'IMPORT_FINISHED' }),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'COMPLETE',
+      totalRows: 1,
+      processedRows: 1,
+      errorRows: 0,
+      errorSummary: [],
+    });
+    expect(await screen.findByText('Import complete')).toBeTruthy();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+    expect(screen.queryByText('Import cancelled')).toBeNull();
+  });
+
   it('disables Cancel when the polled job already has cancelRequested and nobody clicked', async () => {
     // WHY: cancelRequested lived only in this tab's React state. A reload or
     // a second tab polled a job that was already pending cancel and still
