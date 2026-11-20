@@ -93,6 +93,26 @@ Owner of each residual: Devin (Polo interim owner).
 
 N-1 (cancel-requested state, one mark per attempt), the first half of N-3 (losing retry is not an error, second tap is not Cancel), and N-4 (select width at 768 and 900) are in this change. A second chunk of the same attempt does not write `migration.cancel.lost` after the first chunk's `migration.cancel`. A retry that finds the job already `RUNNING` or `COMPLETE` returns `409` with `code: RETRY_LOST`, and the wizard shows no red text. A running job is never answered `Cannot cancel a job with status RUNNING`.
 
+## Start rate limit
+
+`POST /migrations/start-csv` allows 10 starts a minute. The key is `u:<orgId>:<userId>` when the request has a user, and `ip:<req.ip>` when it does not. One person in an org must not spend the bucket of another person in that org. The route requires `settings:write`, so a signed-in start uses the user key. The IP form is only the fallback for a request that has no user id.
+
+`req.ip` is Fastify's client address. `apps/api/src/server.ts` sets `trustProxy` from `parseTrustProxy(TRUSTED_PROXIES)`. Unset, that is `false`: `X-Forwarded-For` is ignored and `req.ip` is the socket peer. Production sets `TRUSTED_PROXIES=2`, which trusts a hop only when the immediate peer is an internal address, and never more than two hops. A client that connects from a public address cannot spoof `X-Forwarded-For`. `TRUSTED_PROXIES=true` would trust every hop. This change does not alter that parser. An authenticated user cannot consume another user's start quota, because the key includes the user id.
+
+The queue suite used to bump a generation counter inside this file so each case got a fresh bucket. That counter, `advanceCsvStartRateLimitForTests`, and the `NODE_ENV === 'test'` branch are gone. Each queue case builds its own server, and the test store is in memory on that server.
+
+## Cancel pending on the polled job
+
+`cancelRequested` is derived on GET list and GET detail when the live attempt has a `migration.cancel.requested` mark. The wizard disables Cancel from that field or from the click in this tab. A reload does not depend on React state alone.
+
+## Retry clock
+
+Retry sets `startedAt` with `SELECT NOW()` inside the same transaction as the status change. The cancel mark's `at` is the database clock. Using `new Date()` let an API clock that was a few seconds ahead make `mark.at` older than `startedAt`, and the chunk then ignored a cancel that had already returned 202. Dropping the `started_at` bound in the worker would also hide the skew, and it would touch every mark check. The database clock on this one write is the smaller change. The cancel lock path is unchanged.
+
+A cancel that times out while start still holds the row records a mark with no attempt id, because start has not published one yet. Start then writes the attempt. That mark is for the job, not for a missing attempt: the worker applies it to an attempt whose `started_at` is at or after the mark. A mark that names an attempt still requires `mark.at >= started_at`, which is why the retry clock and this rule do not undo each other. The retry clock keeps a mark written after the attempt. The unbound mark covers a cancel written before the attempt existed. A later attempt, including a retry, is still covered until that mark is applied, so the 202 cannot end as a silent `COMPLETE`. Teaching start to swallow the mark inside its own update would miss a start that had already committed the attempt id. The worker is the place that still sees the row.
+
+`migration.start` records `diff.attemptId` with the same value the PENDING to RUNNING claim writes on `meta.attemptId`. The diff does not carry row data. A cancel or a later mark can be tied to that attempt from the audit log.
+
 ## Backlog
 
 Owner: Devin (Polo interim owner). Not in this round.
@@ -103,6 +123,7 @@ Owner: Devin (Polo interim owner). Not in this round.
 | L-series Lows | Deferred. L-1 and L-2 were the gate defects and are fixed here. |
 | T-1 | Deferred. |
 | I-6 | Deferred. |
+| I-8 | The progress bar can read 99% next to "Import complete". That math predates this PR. Not changed. |
 
 ## What did not change
 

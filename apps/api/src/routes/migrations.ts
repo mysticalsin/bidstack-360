@@ -70,27 +70,52 @@ function stalledFlag(job: {
   });
 }
 
+/** Jobs whose live attempt still has a cancel mark the chunk has not applied. */
+async function jobsWithPendingCancel(orgId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT job.id::text AS id
+    FROM migration_jobs AS job
+    WHERE job.org_id = ${orgId}::uuid
+      AND job.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
+      AND job.status::text IN ('PENDING', 'RUNNING')
+      AND EXISTS (
+        SELECT 1
+        FROM audit_log AS mark
+        WHERE mark.org_id = job.org_id
+          AND mark.target_id = job.id::text
+          AND mark.target_type = 'MigrationJob'
+          AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+          AND mark.deleted_at IS NULL
+          AND (
+            (
+              (
+                ((job.meta->>'attemptId') IS NULL AND (mark.diff->>'attemptId') IS NULL)
+                OR mark.diff->>'attemptId' = job.meta->>'attemptId'
+              )
+              AND mark.at >= COALESCE(job.started_at, '-infinity'::timestamptz)
+            )
+            OR (
+              (mark.diff->>'attemptId') IS NULL
+              AND (job.meta->>'attemptId') IS NOT NULL
+              AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
+            )
+          )
+      )
+  `;
+  return new Set(rows.map((row) => row.id));
+}
+
 const ACTIVE_IMPORT_MESSAGE = 'This import is already running.';
 
 /** How long Cancel waits for the job-row lock a chunk holds with FOR UPDATE. */
 const CANCEL_LOCK_TIMEOUT = '2s';
 
-/**
- * Test isolation for POST /migrations/start-csv. That route allows 10 starts
- * per minute per user. The queue suite issues more than that in one process,
- * so each case gets its own bucket. Production does not read this counter.
- */
-let csvStartLimitGeneration = 0;
-
-export function advanceCsvStartRateLimitForTests(): void {
-  csvStartLimitGeneration += 1;
-}
-
+/** One bucket per signed-in user. A request with no user falls back to the socket address. */
 function csvStartRateKey(req: { auth?: { userId?: string; orgId?: string }; ip: string }): string {
   const auth = req.auth;
-  const base = auth?.userId ? `u:${auth.orgId ?? 'no-org'}:${auth.userId}` : `ip:${req.ip}`;
-  if (process.env.NODE_ENV === 'test') return `${base}:g${csvStartLimitGeneration}`;
-  return base;
+  if (auth?.userId) return `u:${auth.orgId ?? 'no-org'}:${auth.userId}`;
+  return `ip:${req.ip}`;
 }
 
 const LOCK_TIMEOUT_CODE = /PostgresError \{\s*code:\s*"55P03"/;
@@ -372,7 +397,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: { createdAt: 'desc' },
         take: limit,
       });
-      return { items: jobs.map((job) => ({ ...serializeJob(job), stalled: stalledFlag(job) })) };
+      const pending = await jobsWithPendingCancel(orgId, jobs.map((job) => job.id));
+      return {
+        items: jobs.map((job) => ({
+          ...serializeJob(job),
+          stalled: stalledFlag(job),
+          ...(pending.has(job.id) ? { cancelRequested: true as const } : {}),
+        })),
+      };
     },
   );
 
@@ -393,9 +425,15 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      // Read-only. The worker persists RUNNING → FAILED. This flag is derived
-      // so a poll can show the stall before that write lands.
-      return { ...serializeJob(job), stalled: stalledFlag(job) };
+      // Read-only. The worker persists RUNNING → FAILED. These flags are derived
+      // so a poll can show the stall, or a cancel that is still waiting on the
+      // chunk, before that write lands. A second tab has no local click.
+      const pending = await jobsWithPendingCancel(orgId, [job.id]);
+      return {
+        ...serializeJob(job),
+        stalled: stalledFlag(job),
+        ...(pending.has(job.id) ? { cancelRequested: true as const } : {}),
+      };
     },
   );
 
@@ -515,7 +553,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
               action: 'migration.start',
               targetType: 'MigrationJob',
               targetId: job.id,
-              diff: { source, entityType, totalRows: rows.length },
+              diff: { source, entityType, totalRows: rows.length, attemptId },
             },
           });
         } catch (err) {
@@ -713,11 +751,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       let claimed: number;
       try {
         claimed = await prisma.$transaction(async (tx) => {
+          // The cancel mark is stamped by the database. startedAt has to be
+          // that same clock, or an API clock that is ahead drops the mark.
+          const [clock] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT NOW() AS now`;
           const moved = await tx.migrationJob.updateMany({
             where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
             data: {
               status: 'RUNNING',
-              startedAt: new Date(),
+              startedAt: clock?.now ?? new Date(),
               completedAt: null,
               errorSummary: [],
               meta: fresh as Prisma.InputJsonValue,

@@ -65,8 +65,9 @@ export const MigrationJobResponse = z.object({
   /** Derived on GET list and GET detail. Not a stored status. Absent on write responses. */
   stalled: z.boolean().optional(),
   /**
-   * Present only when Cancel could not take the job-row lock. The job is still
-   * RUNNING. The chunk applies the mark. Absent on the fast path.
+   * True when a cancel mark is waiting on the chunk. Set on the 202 from
+   * Cancel, and derived on GET list and GET detail so another tab sees it.
+   * Absent when no mark is pending.
    */
   cancelRequested: z.boolean().optional(),
 });

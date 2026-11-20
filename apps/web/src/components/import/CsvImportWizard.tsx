@@ -658,6 +658,9 @@ function ImportProgress({
   }
 
   const done = job.status === 'COMPLETE' || job.status === 'FAILED' || job.status === 'CANCELLED';
+  // Local state covers the click in this tab. The polled job covers a reload
+  // or a second tab, which never saw that click.
+  const cancelling = cancelPending || cancelRequested || job.cancelRequested === true;
   const failure = importErrorCopy(
     t,
     job.status === 'FAILED'
@@ -728,10 +731,10 @@ function ImportProgress({
         <button
           type="button"
           className="btn btn-secondary"
-          disabled={cancelPending || cancelRequested}
+          disabled={cancelling}
           onClick={onCancel}
         >
-          {cancelPending || cancelRequested
+          {cancelling
             ? t('csvImport.progress.cancelling', 'Cancelling…')
             : t('csvImport.progress.cancel', 'Cancel import')}
         </button>

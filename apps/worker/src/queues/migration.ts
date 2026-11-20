@@ -239,10 +239,19 @@ async function cancelWasRequested(
       AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
       AND mark.deleted_at IS NULL
       AND job.status::text IN ('PENDING', 'RUNNING')
-      AND mark.at >= COALESCE(job.started_at, '-infinity'::timestamptz)
       AND (
-        (${attemptId}::text IS NULL AND (mark.diff->>'attemptId') IS NULL)
-        OR mark.diff->>'attemptId' = ${attemptId}
+        (
+          (
+            (${attemptId}::text IS NULL AND (mark.diff->>'attemptId') IS NULL)
+            OR mark.diff->>'attemptId' = ${attemptId}
+          )
+          AND mark.at >= COALESCE(job.started_at, '-infinity'::timestamptz)
+        )
+        OR (
+          (mark.diff->>'attemptId') IS NULL
+          AND ${attemptId}::text IS NOT NULL
+          AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
+        )
       )
     LIMIT 1
   `;
@@ -894,10 +903,19 @@ export async function maybeComplete(
           AND mark.target_type = 'MigrationJob'
           AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
           AND mark.deleted_at IS NULL
-          AND mark.at >= COALESCE(migration_jobs.started_at, '-infinity'::timestamptz)
           AND (
-            (${attemptId}::text IS NULL AND (mark.diff->>'attemptId') IS NULL)
-            OR mark.diff->>'attemptId' = ${attemptId}
+            (
+              (
+                (${attemptId}::text IS NULL AND (mark.diff->>'attemptId') IS NULL)
+                OR mark.diff->>'attemptId' = ${attemptId}
+              )
+              AND mark.at >= COALESCE(migration_jobs.started_at, '-infinity'::timestamptz)
+            )
+            OR (
+              (mark.diff->>'attemptId') IS NULL
+              AND ${attemptId}::text IS NOT NULL
+              AND COALESCE(migration_jobs.started_at, '-infinity'::timestamptz) >= mark.at
+            )
           )
       )
   `;
