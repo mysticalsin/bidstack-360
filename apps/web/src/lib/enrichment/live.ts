@@ -80,7 +80,7 @@ export const REGION_LABEL: Record<string, string> = {
 
 const label = (m: Record<string, string>, k: string) => m[k] ?? k;
 
-/** Statuses with no provider data behind them: the page falls back to Sample data. */
+/** Statuses with no provider data behind them. The page shows the empty state, not an invented figure. */
 export function isSampleStatus(f: Pick<Firmographics, 'status' | 'providers'>): boolean {
   if (f.status === 'not_configured' || f.status === 'not_enriched') return true;
   const runs = Object.values(f.providers ?? {});
@@ -88,8 +88,8 @@ export function isSampleStatus(f: Pick<Firmographics, 'status' | 'providers'>): 
 }
 
 const NOTICE: Record<string, string> = {
-  not_configured: 'Company enrichment is not configured (no provider key), so this is sample data.',
-  not_enriched: 'This account has not been enriched yet, so this is sample data.',
+  not_configured: 'Company enrichment is not configured (no provider key).',
+  not_enriched: 'This account has not been enriched yet.',
   pending: 'Enrichment is still running; some fields may fill in on the next run.',
   partial: 'Some fields were not returned by the providers.',
   budget_exceeded:

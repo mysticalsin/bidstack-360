@@ -365,6 +365,26 @@ describe('GET /accounts/:id/key-numbers', () => {
       const margin = (await get(`/accounts/${seeded.id}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'margin')!;
       expect(margin.value).toBeNull();
       expect(margin.sample).toBe(false);
+      const filedId = (await prisma.company.create({ data: { orgId: orgA.orgId, name: `${TAG} RealFiled`, tier: 'key' } })).id;
+      await prisma.accountFinancialPeriod.create({
+        data: {
+          orgId: orgA.orgId,
+          companyId: filedId,
+          source: 'esef',
+          entityId: 'lei',
+          periodType: 'FY',
+          fiscalYear: 2025,
+          periodEnd: new Date('2025-12-31'),
+          currency: 'EUR',
+          sourceUrl: 'https://filings.xbrl.org/x',
+          metrics: {
+            revenue: { value: 1000, concept: 'ifrs-full:Revenue' },
+            operatingIncome: { value: 150, concept: 'ifrs-full:ProfitLossFromOperatingActivities' },
+          },
+        },
+      });
+      const filed = (await get(`/accounts/${filedId}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'margin')!;
+      expect(filed).toMatchObject({ label: 'Operating margin', value: 15, sample: false });
     } finally {
       if (prev === undefined) delete process.env.POLO_DATA_MODE;
       else process.env.POLO_DATA_MODE = prev;

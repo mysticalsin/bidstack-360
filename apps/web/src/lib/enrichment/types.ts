@@ -1,7 +1,6 @@
 // Company enrichment as the account page shows it (firmographics, hiring,
 // inferred projects). The API shape (packages/shared account-enrichment) is
-// mapped onto this in ./live.ts; ./mock.ts builds the same shape as Sample
-// data when no provider is configured. Every value is Sourced: it says where
+// mapped onto this in ./live.ts. Every value is Sourced: it says where
 // it came from and as of when.
 
 export interface Sourced<T> {
