@@ -45,27 +45,21 @@ This monorepo ships the standalone build of BidStack 360°. A future migration p
 
 ## Quick start
 
+The install that was checked on a fresh clone is [`docs/INSTALL-AND-RUN.md`](./docs/INSTALL-AND-RUN.md). It is the guide for real mode, tests, and the Cloudflare Worker plus Container. A production deploy needs Tony's approval.
+
 ```bash
-# Prerequisites: Node 24, pnpm 10, Docker (for Postgres + Redis)
+# Node 24, pnpm 10.27.0, Docker. See the guide for versions and every variable.
 
-# 1. Install
-pnpm install
-
-# 2. Spin up Postgres + Redis
-docker compose up -d
-
-# 3. Configure environment
+pnpm install --frozen-lockfile
+docker compose up -d postgres redis
 cp .env.example .env
-# Edit .env: fill in DATABASE_URL, REDIS_URL, CLERK_SECRET_KEY at minimum.
-# Leave CLERK_* blank for local dev — stub auth mints a single-user session.
-
-# 4. Migrate database + seed fixtures
-pnpm db:migrate
-pnpm db:seed
-
-# 5. Start all services
-pnpm dev
+set -a && source .env && set +a
+pnpm db:generate
+pnpm --filter @bidstack/shared build
+pnpm db:migrate:deploy
 ```
+
+`pnpm db:migrate` is `prisma migrate dev`. It refuses a non-interactive shell. `pnpm db:seed` loads fixture rows and refuses when `POLO_DATA_MODE=real`. Real mode uses `pnpm db:seed:prod` after the shared package is built.
 
 Open:
 - Web: http://localhost:5173
@@ -139,6 +133,7 @@ Full diagram and module documentation: [`docs/ARCHITECTURE.md`](./docs/ARCHITECT
 | [`CLAUDE.md`](./CLAUDE.md)                      | 14 conduct rules + architecture conventions     |
 | [`PROGRESS.md`](./PROGRESS.md)                  | Sprint log + quality scores                     |
 | [`CHANGELOG.md`](./CHANGELOG.md)                | Feature changelog (Keep a Changelog format)     |
+| [`docs/INSTALL-AND-RUN.md`](./docs/INSTALL-AND-RUN.md) | Install, real mode, tests, Cloudflare deploy |
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)| Architecture overview + module boundaries       |
 | [`docs/RUNBOOK.md`](./docs/RUNBOOK.md)          | Operations: deploy, rollback, rotate keys       |
 | [`docs/security/pii-field-encryption.md`](./docs/security/pii-field-encryption.md) | PII encryption runbook |
