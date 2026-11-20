@@ -23,13 +23,29 @@ describe('polo app role boot', () => {
     expect(ENSURE_APP_ROLE_SQL).toMatch(/IF NOT EXISTS/);
     expect(ENSURE_APP_ROLE_SQL).toMatch(/CREATE ROLE app_role WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT/);
     expect(ENSURE_APP_ROLE_SQL).toMatch(/ALTER ROLE app_role WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT/);
+    // WHY: NOSUPERUSER is the server default, so the drill still passes if
+    // the word is deleted. The source has to name it.
+    expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOSUPERUSER\b/);
     expect(ENSURE_APP_ROLE_SQL).not.toMatch(/\bSUPERUSER\b/);
     expect(ENSURE_APP_ROLE_SQL).not.toMatch(/PASSWORD/i);
   });
 
   it('fails a restore on errors that matter and lets the public schema notice pass', () => {
+    const tolerated = 'pg_restore: error: could not execute query: ERROR:  schema "public" already exists';
     expect(restoreFailure(0, '')).toBeNull();
-    expect(restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  schema "public" already exists')).toBeNull();
+    expect(restoreFailure(1, tolerated)).toBeNull();
+
+    // WHY: a substring match treats a line that also carries a real failure
+    // as the public-schema notice. Only that one exact line is harmless.
+    const mixed = `${tolerated}; permission denied for table audit_log`;
+    const both = restoreFailure(1, mixed);
+    expect(both).not.toBeNull();
+    expect(both).toMatch(/permission denied/);
+
+    // WHY: widening the matcher to /already exists/ would hide this.
+    const other = restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  relation "audit_log" already exists');
+    expect(other).toMatch(/^pg_restore failed/);
+    expect(other).toMatch(/relation "audit_log" already exists/);
 
     const missing = restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  role "app_role" does not exist');
     expect(missing).toMatch(/^pg_restore failed/);
@@ -74,5 +90,20 @@ describe('polo app role boot', () => {
     expect(entry).toContain("configuredPort('POLO_PG_PORT', 5432)");
     expect(entry).toContain("configuredPort('POLO_REDIS_PORT', 6379)");
     expect(entry).toContain('process.env.POLO_REDIS_HOST');
+    expect(entry).toContain("process.env.POLO_MIGRATE_STAGING || '/tmp/polo-migrate'");
+    expect(entry).toContain("process.env.POLO_SNAPSHOT_DIR || '/tmp/snapshot'");
+    expect(entry).toContain("process.env.POLO_SNAPSHOT_TGZ || '/tmp/snapshot.tgz'");
+    expect(entry).toContain("process.env.POLO_RESTORE_DIR || '/tmp/restore'");
+  });
+
+  it('binds the app role password and records only the SQLSTATE when that fails', () => {
+    const body = functionBody(entry, 'setAppRolePassword');
+    // WHY: splicing the secret into the statement puts it in argv, logs, and
+    // a failed ALTER's error text. psql :'var' quotes a bound value.
+    expect(body).toContain(":'app_db_password'");
+    expect(body).not.toMatch(/\$\{/);
+    expect(body).not.toContain('quoteLiteral');
+    expect(body).toContain('appRolePasswordError(');
+    expect(body).not.toContain('remember(');
   });
 });

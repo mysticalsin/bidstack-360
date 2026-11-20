@@ -29,7 +29,7 @@ import { describe, expect, it } from 'vitest';
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = realpathSync(join(here, '../../..'));
 const pgBin = '/usr/lib/postgresql/16/bin';
-const FIXTURE_PASSWORD = 'fixture-app-role-password';
+const FIXTURE_PASSWORD = "fix'ture\\pass";
 const INTERNAL_KEY = 'fixture-internal-key';
 const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const CLERK_ORG = 'org_fixture_restore';
@@ -143,7 +143,7 @@ function childPids(pid: number): number[] {
     .filter((value) => Number.isInteger(value) && value > 0);
 }
 
-type Boot = { child: ChildProcess; layout: Layout; logs: () => string };
+type Boot = { child: ChildProcess; layout: Layout; rawLogs: () => string; logs: () => string };
 
 function trackedPids(boot: Boot): number[] {
   const pids = new Set<number>();
@@ -190,6 +190,10 @@ function startEntrypoint(layout: Layout): Boot {
       POLO_PG_SOCKET: layout.root,
       POLO_API_ENTRY: layout.apiEntry,
       POLO_WORKER_ENTRY: layout.workerEntry,
+      POLO_MIGRATE_STAGING: join(layout.root, 'polo-migrate'),
+      POLO_SNAPSHOT_DIR: join(layout.root, 'snapshot'),
+      POLO_SNAPSHOT_TGZ: join(layout.root, 'snapshot.tgz'),
+      POLO_RESTORE_DIR: join(layout.root, 'restore'),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -202,6 +206,7 @@ function startEntrypoint(layout: Layout): Boot {
   return {
     child,
     layout,
+    rawLogs: () => logs,
     logs: () => logs.split(FIXTURE_PASSWORD).join('[redacted]').split(INTERNAL_KEY).join('[redacted]'),
   };
 }
@@ -384,6 +389,13 @@ function roleFacts(port: number): string {
   );
 }
 
+function expectPasswordUnlogged(boot: Boot | null): void {
+  // WHY: redacted logs hide a mutant that prints the secret. The raw stream
+  // is what the container wrote.
+  if (!boot) return;
+  expect(boot.rawLogs()).not.toContain(FIXTURE_PASSWORD);
+}
+
 function login(port: number): { status: number; stdout: string; stderr: string } {
   return run(
     'psql',
@@ -436,6 +448,7 @@ describe('restored polo snapshot', () => {
       expect(deleted.stderr).toMatch(/permission denied/);
       expect(psqlOwner(layout.pgPort, `SELECT count(*) FROM audit_log WHERE action = '${AUDIT_ACTION}'`)).toBe('1');
     } finally {
+      expectPasswordUnlogged(boot);
       stopBoot(boot);
       if (boot) rmSync(boot.layout.root, { recursive: true, force: true });
       stopSource(source, true);
@@ -468,6 +481,7 @@ describe('restored polo snapshot', () => {
       expect(state.phase).toBe('failed');
       expect(state.detail).toMatch(/pg_restore failed/);
     } finally {
+      expectPasswordUnlogged(boot);
       stopBoot(boot);
       if (boot) rmSync(boot.layout.root, { recursive: true, force: true });
       rmSync(dir, { recursive: true, force: true });
@@ -508,6 +522,7 @@ describe('restored polo snapshot', () => {
       expect(secondLogin.status, secondLogin.stderr).toBe(0);
       expect(secondLogin.stdout.trim()).toBe('app_role');
     } finally {
+      expectPasswordUnlogged(boot);
       stopBoot(boot);
       rmSync(layout.root, { recursive: true, force: true });
     }
