@@ -52,6 +52,7 @@ import { analyticsDashboardsRoutes } from './routes/analytics-dashboards.js';
 // Team workload / capacity view (per-owner open-bid + task aggregates)
 import { analyticsWorkloadRoutes } from './routes/analytics-workload.js';
 import { configFeaturesRoutes } from './routes/config-features.js';
+import { identityRoutes } from './routes/identity.js';
 import { serumRoutes } from './routes/serum.js';
 import { salesToolkitsRoutes } from './routes/sales-toolkits.js';
 import { sectorViewRoutes } from './routes/sector-view.js';
@@ -61,11 +62,15 @@ import { crossSellRoutes } from './routes/cross-sell.js';
 import { contractAgreementRoutes } from './routes/contract-agreements.js';
 import { msaRoutes } from './routes/msa.js';
 import { msaIntakeRoutes } from './routes/msa-intake.js';
+import { agreementIngestRoutes } from './routes/agreement-ingest.js';
 import { msaLeverageRoutes } from './routes/msa-leverage.js';
+import { msaWhitespaceRoutes } from './routes/msa-whitespace.js';
 import { signingEntityRoutes } from './routes/signing-entities.js';
 import { meetingIntelRoutes } from './routes/meeting-intel.js';
 import { marsRoutes } from './routes/mars.js';
 import { accountEnrichmentRoutes } from './routes/account-enrichment.js';
+import { companyIntelRoutes } from './routes/company-intel.js';
+import { consultingPartnersRoutes } from './routes/consulting-partners.js';
 import orgChartRoutes from './routes/org-chart.js';
 import orgChartFileRoutes from './routes/org-chart-files.js';
 import { accountWatchdogRoutes } from './routes/account-watchdog.js';
@@ -88,8 +93,11 @@ import { leadRotRoutes } from './routes/lead-rot.js';
 import { savedViewsRoutes } from './routes/saved-views.js';
 import { pluginRoutes } from './routes/plugins.js';
 import { usersRoutes } from './routes/users.js';
+import { webhookMessagesRoutes } from './routes/webhook-messages.js';
+import { accessPoliciesRoutes } from './routes/access-policies.js';
 import { webhookSubscriptionsRoutes } from './routes/webhook-subscriptions.js';
 import { companiesRoutes } from './routes/companies.js';
+import { accountTeamRoutes } from './routes/account-team.js';
 import { accountPeopleRoutes } from './routes/account-people.js';
 import { duplicatesRoutes } from './routes/duplicates.js';
 import { customFieldsRoutes } from './routes/custom-fields.js';
@@ -106,6 +114,8 @@ import { proposalRoutes } from './routes/proposals.js';
 import { crewAgentRoutes } from './routes/crew-agents.js';
 import { crewRoutes } from './routes/crews.js';
 import { activityRoutes } from './routes/activities.js';
+import { activityIngestRoutes } from './routes/activity-ingest.js';
+import { syncNowRoutes } from './routes/sync-now.js';
 import { bidWorkspaceRoutes } from './routes/bid-workspace.js';
 import { bidWorkspaceRequirementRoutes } from './routes/bid-workspace-requirements.js';
 import { bidWorkspaceRfpRoutes } from './routes/bid-workspace-rfp.js';
@@ -115,6 +125,7 @@ import { bookingsRoutes } from './routes/bookings.js';
 // NocoBase RFP integration
 // Wave 4 — AI assistant
 import { aiAssistantRoutes } from './routes/ai-assistant.js';
+import { jarvisRoutes } from './routes/jarvis.js';
 import { documentTemplatesRoutes } from './routes/document-templates.js';
 import { signaturesRoutes } from './routes/signatures.js';
 import { publicSignRoutes } from './routes/public-sign.js';
@@ -122,6 +133,8 @@ import { publicSignRoutes } from './routes/public-sign.js';
 import { gmailOAuthRoutes } from './routes/integrations/gmail.js';
 import { microsoftMailOAuthRoutes } from './routes/integrations/microsoft-mail.js';
 import { emailRoutes } from './routes/integrations/email.js';
+import { workspaceRoutes } from './routes/integrations/workspace.js';
+import { teamsImportRoutes } from './routes/integrations/teams.js';
 import { microsoftWebhookRoutes } from './routes/integrations/microsoft-webhook.js';
 import { slackOAuthRoutes } from './routes/integrations/slack.js';
 import { slackCommandsPlugin } from './routes/integrations/slack-commands.js';
@@ -162,6 +175,10 @@ import { demoRoutes } from './routes/demo.js';
 import { tenantExportRoutes } from './routes/tenant-export.js';
 // GDPR Art. 17 — per-data-subject erasure (anonymization)
 import { erasureRoutes } from './routes/erasure.js';
+// GDPR data subject export / erase requests (worker-run, dry run by default)
+import { dataSubjectRequestRoutes } from './routes/data-subject-requests.js';
+// Retention report per data class (dry run)
+import { complianceRetentionRoutes } from './routes/compliance-retention.js';
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(opportunityRoutes, { prefix: '/api/v1' });
@@ -174,6 +191,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(analyticsDashboardsRoutes, { prefix: '/api/v1' });
   await server.register(analyticsWorkloadRoutes, { prefix: '/api/v1' });
   await server.register(configFeaturesRoutes, { prefix: '/api/v1' });
+  await server.register(identityRoutes, { prefix: '/api/v1' });
   await server.register(serumRoutes, { prefix: '/api/v1' });
   await server.register(salesToolkitsRoutes, { prefix: '/api/v1' });
   await server.register(sectorViewRoutes, { prefix: '/api/v1' });
@@ -182,7 +200,9 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(crossSellRoutes, { prefix: '/api/v1' });
   await server.register(contractAgreementRoutes, { prefix: '/api/v1' });
   await server.register(msaIntakeRoutes, { prefix: '/api/v1' });
+await server.register(agreementIngestRoutes, { prefix: '/api/v1' });
   await server.register(msaLeverageRoutes, { prefix: '/api/v1' });
+await server.register(msaWhitespaceRoutes, { prefix: '/api/v1' });
   await server.register(signingEntityRoutes, { prefix: '/api/v1' });
   await server.register(msaRoutes, { prefix: '/api/v1' });
   await server.register(meetingIntelRoutes, { prefix: '/api/v1' });
@@ -192,6 +212,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(orgChartFileRoutes, { prefix: '/api/v1' });
   await server.register(accountWatchdogRoutes, { prefix: '/api/v1' });
   await server.register(accountFinancialsRoutes, { prefix: '/api/v1' });
+  await server.register(companyIntelRoutes, { prefix: '/api/v1' });
+await server.register(consultingPartnersRoutes, { prefix: '/api/v1' });
   await server.register(accountSignalsRoutes, { prefix: '/api/v1' });
   await server.register(winLossRoutes, { prefix: '/api/v1' });
   await server.register(governanceRoutes, { prefix: '/api/v1' });
@@ -237,6 +259,14 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
       const target = req.url.replace('/odoo/', '/erp/');
       return reply.redirect(target, 307);
     });
+  } else {
+    // Only the status probe answers, so the settings card can say "not
+    // configured" instead of logging a 404 for every visitor.
+    server.get(
+      '/api/v1/integrations/erp/status',
+      { preHandler: server.requirePermission('integrations:read') },
+      async () => ({ configured: false, url: null, database: null, reachable: false, toolCount: null, lastError: null }),
+    );
   }
 
   await server.register(webhooksRoutes, { prefix: '/webhooks' });
@@ -259,7 +289,10 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(pluginRoutes, { prefix: '/api/v1' });
   await server.register(usersRoutes, { prefix: '/api/v1' });
   await server.register(webhookSubscriptionsRoutes, { prefix: '/api/v1' });
+  await server.register(webhookMessagesRoutes, { prefix: '/api/v1' });
+  await server.register(accessPoliciesRoutes, { prefix: '/api/v1' });
   await server.register(companiesRoutes, { prefix: '/api/v1' });
+  await server.register(accountTeamRoutes, { prefix: '/api/v1' });
   await server.register(accountPeopleRoutes, { prefix: '/api/v1' });
   await server.register(duplicatesRoutes, { prefix: '/api/v1' });
   await server.register(customFieldsRoutes, { prefix: '/api/v1' });
@@ -275,6 +308,10 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(crewAgentRoutes, { prefix: '/api/v1' });
   await server.register(crewRoutes, { prefix: '/api/v1' });
   await server.register(activityRoutes, { prefix: '/api/v1' });
+  // Inbound activity API (Dust, external CRMs) + account activity summary
+  await server.register(activityIngestRoutes, { prefix: '/api/v1' });
+  // Sync now (Dust poll, HubSpot import): start, poll, last synced
+  await server.register(syncNowRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRequirementRoutes, { prefix: '/api/v1' });
   await server.register(bidWorkspaceRfpRoutes, { prefix: '/api/v1' });
@@ -289,6 +326,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 4 — AI Assistant
   await server.register(aiAssistantRoutes, { prefix: '/api/v1' });
+  await server.register(jarvisRoutes, { prefix: '/api/v1' });
   await server.register(documentTemplatesRoutes, { prefix: '/api/v1' });
   await server.register(signaturesRoutes, { prefix: '/api/v1' });
   await server.register(publicSignRoutes, { prefix: '/api/v1' });
@@ -299,6 +337,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // OAuth redirect_uri and the web client pointing at 404s.)
   await server.register(gmailOAuthRoutes, { prefix: '/api/v1' });
   await server.register(microsoftMailOAuthRoutes, { prefix: '/api/v1' });
+  await server.register(workspaceRoutes, { prefix: '/api/v1' });
+  await server.register(teamsImportRoutes, { prefix: '/api/v1' });
   await server.register(slackOAuthRoutes, { prefix: '/api/v1' });
   await server.register(slackCommandsPlugin, { prefix: '/api/v1' });
   await server.register(emailRoutes, { prefix: '/api/v1' });
@@ -322,7 +362,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // Wave 7 — Real-time collaboration REST endpoints (lock + presence snapshot)
   // WHY /api/v1: consistent with other authenticated endpoints.
-  // The WebSocket endpoint /api/realtime is registered by the realtimePlugin above.
+  // The WebSocket endpoint /api/v1/realtime is registered by the realtimePlugin above.
   await server.register(realtimeRoutes, { prefix: '/api/v1' });
 
   // Wave 8 — Voice + Video calls
@@ -363,6 +403,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
 
   // GDPR Art. 17 — per-data-subject erasure / anonymization (admin-gated, org-scoped)
   await server.register(erasureRoutes, { prefix: '/api/v1' });
+  await server.register(dataSubjectRequestRoutes, { prefix: '/api/v1' });
+  await server.register(complianceRetentionRoutes, { prefix: '/api/v1' });
 
   // Public demo door — POST /api/v1/demo/session + GET /api/v1/demo/status.
   // Self-gates on DEMO_MODE; registering it unconditionally is safe.

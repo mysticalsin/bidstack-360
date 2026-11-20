@@ -164,7 +164,7 @@ function DataSourceRow({ item, isAdmin }: { item: DataProviderSummary; isAdmin: 
             href={item.docsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1 inline-block text-xs text-[var(--brand-primary)] hover:underline"
+            className="mt-1 inline-block text-xs text-[var(--fg-primary)] underline underline-offset-2 hover:text-[var(--fg-secondary)]"
           >
             {t('dataSourceCredentials.getApiKey', 'Get an API key →')}
           </a>

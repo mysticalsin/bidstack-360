@@ -15,12 +15,14 @@
  *
  * Imported by:
  *   apps/api/src/routes/integrations/email.ts
- *   apps/api/src/routes/bookings.helpers.ts
- *   apps/api/src/services/cs/nps.service.ts
+ *
+ * System transactional mail (booking confirmations, NPS) does not come here;
+ * it uses transactional-email.service.ts so it never depends on mailbox scopes.
  */
 
 import { randomBytes } from 'node:crypto';
 import { prisma, IntegrationProvider, EmailProvider } from '@bidstack/db';
+import { maySendMail } from '@bidstack/shared';
 import {
   getAccessToken,
   type SendEmailParams,
@@ -60,6 +62,14 @@ export async function sendEmail(
   if (!token) {
     throw new Error('No active email integration found. Connect Gmail or Outlook first.');
   }
+
+  // Polo never sends, even on a legacy grant that still carries a send scope.
+  if (!maySendMail(token.scope ?? [])) {
+    throw Object.assign(new Error('This mailbox is connected read-only. Save a draft instead.'), {
+      statusCode: 409,
+    });
+  }
+
 
   const pixelToken = randomBytes(24).toString('base64url');
   const isGmail = token.provider === 'gmail';

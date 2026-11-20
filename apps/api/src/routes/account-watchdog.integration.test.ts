@@ -152,6 +152,49 @@ describe('GET /accounts/:companyId/watchdog', () => {
     expect([...ats].sort().reverse()).toEqual(ats);
   });
 
+  skipIfNoDb('related history includes meetings, MSAs and non-filing signals', async () => {
+    const company = await prisma.company.create({ data: { orgId: orgId!, name: `Hist Co ${Date.now()}` } });
+    const admin = await prisma.user.findFirstOrThrow({ where: { orgId: orgId! }, select: { id: true } });
+    const meeting = await prisma.meetingIntel.create({
+      data: {
+        orgId: orgId!,
+        companyId: company.id,
+        title: 'QBR with finance',
+        heldAt: new Date('2026-10-20T14:00:00Z'),
+        summary: 'Hiring freeze',
+        visibility: 'org',
+        dedupeKey: `hist-qbr-${company.id}`.slice(0, 64),
+      },
+    });
+    const msa = await prisma.contractAgreement.create({
+      data: {
+        orgId: orgId!,
+        accountKey: company.name,
+        companyId: company.id,
+        kind: 'msa',
+        reference: 'MSA-2026-001',
+        title: 'Master services',
+        status: 'active',
+        effectiveDate: new Date('2026-01-01'),
+        createdById: admin.id,
+      },
+    });
+    await prisma.accountWatchEvent.create({
+      data: ev(orgId!, company.id, `NEWS-${company.id}`, '2026-09-15T00:00:00Z', {
+        source: 'gdelt',
+        kind: 'FUNDING_ROUND',
+        title: 'Series B announced',
+        implication: 'OPPORTUNITY',
+      }),
+    });
+    const body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${company.id}/watchdog` })).json();
+    const byId = Object.fromEntries((body.history as Array<{ id: string; type: string; title: string; detail: string }>).map((h) => [h.id, h]));
+    expect(byId[`mt:${meeting.id}`]).toMatchObject({ type: 'meeting', title: 'QBR with finance', detail: 'Hiring freeze' });
+    expect(byId[`msa:${msa.id}`]).toMatchObject({ type: 'msa', title: 'Master services', detail: 'msa · active' });
+    expect(body.history.some((h: { type: string; title: string }) => h.type === 'signal' && h.title === 'Series B announced')).toBe(true);
+    expect(body.history.some((h: { type: string; title: string }) => h.type === 'filing' && h.title.startsWith('Filing'))).toBe(false);
+  });
+
   skipIfNoDb("returns 404 for another org's account and its events never leak into the feed", async () => {
     const foreign = await prisma.company.create({ data: { orgId: otherOrgId!, name: 'Foreign Co' } });
     await prisma.accountWatchEvent.create({ data: ev(otherOrgId!, foreign.id, 'FOREIGN', '2026-10-30T00:00:00Z', { implication: 'RISK', severity: 5 }) });

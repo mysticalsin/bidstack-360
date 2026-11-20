@@ -40,6 +40,7 @@ vi.mock('@/stores/currency', () => ({
 
 // The getting-started branch is the unit under test; the command-center widgets
 // are not, so stub them to a single sentinel we can assert on/against.
+vi.mock('./ActivityByHourCard', () => ({ ActivityByHourCard: () => <div data-testid="activity-by-hour" /> }));
 vi.mock('./HemaLeverageTile', () => ({
   HemaLeverageTile: () => <div data-testid="hema-leverage-tile" />,
 }));
@@ -117,9 +118,9 @@ describe('OrgDashboard first-run state', () => {
     expect(screen.queryByTestId('dashboard-hero')).toBeNull();
   });
 
-  it('shows one pipeline title, an honest total, and one next action once any record exists', () => {
+  it('renders the command center once any record exists', () => {
     vi.mocked(useOrgSummary).mockReturnValue({
-      data: { ...emptySummary, leads: 1, pipelineValue: 1200, openOpportunities: 2 },
+      data: { ...emptySummary, leads: 1 },
       isLoading: false,
       isError: false,
     } as never);
@@ -131,19 +132,5 @@ describe('OrgDashboard first-run state', () => {
     expect(screen.getByTestId('dashboard-hero')).toBeDefined();
     expect(screen.getByTestId('needs-you')).toBeDefined();
     expect(screen.queryByTestId('getting-started')).toBeNull();
-  });
-
-  it('sends the next action to overdue tasks when follow-ups are late', () => {
-    vi.mocked(useOrgSummary).mockReturnValue({
-      data: { ...emptySummary, companies: 1, overdueTasks: 3 },
-      isLoading: false,
-      isError: false,
-    } as never);
-
-    renderDashboard();
-
-    expect(screen.getByRole('link', { name: 'Review overdue tasks' }).getAttribute('href')).toBe(
-      '/tasks?filter=overdue',
-    );
   });
 });

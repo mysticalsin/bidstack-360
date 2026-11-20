@@ -59,6 +59,13 @@ describe('account financials', () => {
     expect(body.periods.length).toBeGreaterThan(0);
     expect(body.periods.every((p: { source: string }) => p.source === 'sample')).toBe(true);
     expect(body.signals.every((s: { sample: boolean; title: string }) => s.sample && s.title.startsWith('Sample:'))).toBe(true);
+    // Viewing a Strategic / Top account queues the public-filings pull.
+    expect(await prisma.accountFinancialProfile.findUnique({ where: { companyId: c.id } })).toMatchObject({ status: 'pending' });
+    expect(
+      await prisma.auditLog.findFirst({
+        where: { orgId: orgId!, action: 'account.financials.view', targetId: c.id },
+      }),
+    ).toMatchObject({ targetType: 'company' });
   });
 
   skipIfNoDb('stored periods come back with source, period and derived margin; no sample mixed in', async () => {

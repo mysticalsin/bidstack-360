@@ -15,6 +15,7 @@ import type { CellRef } from '@/lib/meeting-intel/people';
 
 import { CoverageMap } from './CoverageMap';
 import { LogMeetingDialog } from './LogMeetingDialog';
+import { meetingChallengeLabel, shownMeetingChallenges } from './meeting-challenge-caption';
 import { PeopleDrill } from './PeopleDrill';
 
 const TOP_CHALLENGES = 3;
@@ -36,7 +37,11 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
   const meetings = recent.data?.items ?? [];
   const hasAny = people > 0 || meetings.length > 0;
   const senior = cov?.cells.filter((c) => SENIOR_LEVELS.has(c.seniority)).reduce((n, c) => n + c.people, 0) ?? 0;
-  const items = challenges.data?.items ?? [];
+  const challengePage = shownMeetingChallenges(
+    challenges.data?.items ?? [],
+    challenges.data?.challengesContinue,
+  );
+  const items = challengePage.items;
   const maxMentions = Math.max(1, ...items.map((c) => c.mentions));
 
   return (
@@ -94,9 +99,9 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
                       </li>
                     ))}
                   </ul>
-                  {items.length > TOP_CHALLENGES ? (
+                  {items.length > TOP_CHALLENGES || challengePage.pageContinues ? (
                     <button type="button" className="mi-link" aria-expanded={allChallenges} onClick={() => setAllChallenges((v) => !v)}>
-                      {allChallenges ? 'Show fewer' : `Show all ${items.length}`}
+                      {meetingChallengeLabel(items.length, challengePage.pageContinues, allChallenges)}
                     </button>
                   ) : null}
                 </>

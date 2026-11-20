@@ -1,0 +1,46 @@
+{
+  "name": "Acme Industrial",
+  "description": null,
+  "jobs": [
+    {
+      "title": "Senior SAP S/4HANA Finance Consultant",
+      "shortcode": "A1B2C3D4E5",
+      "code": "",
+      "employment_type": "Full-time",
+      "telecommuting": false,
+      "department": "Finance Systems",
+      "url": "https://apply.workable.com/j/A1B2C3D4E5",
+      "shortlink": "https://apply.workable.com/j/A1B2C3D4E5",
+      "application_url": "https://apply.workable.com/j/A1B2C3D4E5/apply",
+      "published_on": "2026-10-20",
+      "created_at": "2026-10-19",
+      "country": "Germany",
+      "city": "Stuttgart",
+      "state": "Baden-Württemberg",
+      "education": "",
+      "experience": "Mid-Senior level",
+      "function": "Information Technology",
+      "industry": "Automotive"
+    },
+    {
+      "title": "Data Platform Engineer (Databricks)",
+      "shortcode": "F6G7H8J9K0",
+      "code": "",
+      "employment_type": "Full-time",
+      "telecommuting": true,
+      "department": "Data and Analytics",
+      "url": "https://apply.workable.com/j/F6G7H8J9K0",
+      "shortlink": "https://apply.workable.com/j/F6G7H8J9K0",
+      "application_url": "https://apply.workable.com/j/F6G7H8J9K0/apply",
+      "published_on": "2026-09-02",
+      "created_at": "2026-09-01",
+      "country": "Portugal",
+      "city": "Lisbon",
+      "state": "",
+      "education": "",
+      "experience": "Associate",
+      "function": "Engineering",
+      "industry": "Automotive"
+    }
+  ]
+}

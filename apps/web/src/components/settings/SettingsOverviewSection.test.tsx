@@ -6,7 +6,7 @@ const authMocks = vi.hoisted(() => ({
 }));
 
 const hookMocks = vi.hoisted(() => ({
-  useUsers: vi.fn(),
+  useUsersPage: vi.fn(),
   useRoles: vi.fn(),
   useTags: vi.fn(),
   useEmailTemplates: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('@/lib/auth', () => ({
   useIsAdmin: () => authMocks.isAdmin,
 }));
 
-vi.mock('@/hooks/useUsers', () => ({ useUsers: hookMocks.useUsers }));
+vi.mock('@/hooks/useUsers', () => ({ useUsersPage: hookMocks.useUsersPage }));
 vi.mock('@/hooks/useRoles', () => ({ useRoles: hookMocks.useRoles }));
 vi.mock('@/hooks/useTags', () => ({ useTags: hookMocks.useTags }));
 vi.mock('@/hooks/useEmailTemplates', () => ({
@@ -47,6 +47,7 @@ vi.mock('@/hooks/useWebhookSubscriptions', () => ({
 }));
 
 import { SettingsOverviewSection } from './SettingsOverviewSection';
+import { USER_OVERVIEW_PAGE } from './user-overview-caption';
 
 function emptyQuery() {
   return { data: undefined, isError: false, isLoading: false };
@@ -66,7 +67,10 @@ describe('SettingsOverviewSection', () => {
 
     expect(screen.getByText('Personal settings')).toBeTruthy();
     expect(screen.queryByText('Developer access')).toBeNull();
-    expect(hookMocks.useUsers).toHaveBeenCalledWith({ enabled: false });
+    expect(hookMocks.useUsersPage).toHaveBeenCalledWith({
+      limit: USER_OVERVIEW_PAGE,
+      enabled: false,
+    });
     expect(hookMocks.useRoles).toHaveBeenCalledWith({ enabled: false });
     expect(hookMocks.useTags).toHaveBeenCalledWith(undefined, { enabled: false });
     expect(hookMocks.useEmailTemplates).toHaveBeenCalledWith({ enabled: false });

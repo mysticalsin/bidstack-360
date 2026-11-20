@@ -1,8 +1,7 @@
-// Contacts routes — CRUD over the people / decision-unit table. `companyId`
-// is the company link. `customer` is the label. Changing that label relinks
-// when the name matches one company, clears the link when it matches none,
-// and refuses when it matches two. A name, role, or sentiment edit leaves
-// the stored link alone.
+// Contacts routes — CRUD over the people / decision-unit table. The
+// `customer` field is a free-text customer-account tag (same convention as
+// Notes / Files) so contacts can attach to accounts that aren't yet
+// first-class CrmCompany rows.
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -17,13 +16,28 @@ import {
   type ContactLinkState,
 } from '@bidstack/shared';
 
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
-import { resolveLeadCompanyId } from './leads.company-link.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 
 function linkStateFor(companyId: string | null): ContactLinkState {
   // Reads do not invent a link. A historical row with a null companyId stays
   // needs_review even if a unique company name would match today.
   return companyId ? 'linked' : 'needs_review';
+}
+
+async function resolveCompanyIdByName(
+  tx: Prisma.TransactionClient,
+  orgId: string,
+  customer: string,
+): Promise<string | null> {
+  const matches = await tx.company.findMany({
+    where: { orgId, deletedAt: null, name: { equals: customer, mode: 'insensitive' } },
+    select: { id: true },
+    take: 2,
+  });
+  // One exact name is safe to link. Zero or many stay needs_review.
+  return matches.length === 1 ? matches[0]!.id : null;
 }
 
 function serializeContact(c: {
@@ -149,17 +163,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
           if (!company) throw server.httpErrors.notFound('Company not found');
           companyId = company.id;
         } else {
-          const matches = await tx.company.findMany({
-            where: {
-              orgId: req.auth.orgId,
-              deletedAt: null,
-              name: { equals: req.body.customer, mode: 'insensitive' },
-            },
-            select: { id: true },
-            take: 2,
-          });
-          // One exact name is safe to link. Zero or many stay needs_review.
-          companyId = matches.length === 1 ? matches[0]!.id : null;
+          companyId = await resolveCompanyIdByName(tx, req.auth.orgId, req.body.customer);
         }
         const contact = await tx.contact.create({
           data: {
@@ -181,7 +185,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'contact.create',
             targetType: 'contact',
             targetId: contact.id,
-            diff: { customer: contact.customer, name: contact.name },
+            diff: { customer: contact.customer },
           },
         });
         return contact;
@@ -192,6 +196,18 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
         name: created.name,
         customer: created.customer,
       });
+      if (created.companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId: created.companyId,
+          kind: 'contact_added',
+          actorUserId: req.auth.userId,
+          entityType: 'contact',
+          entityId: created.id,
+          title: (company) => `New contact on ${company}: ${created.name}`,
+          sourceUrl: `/contacts/${created.id}`,
+        });
+      }
       return reply.code(201).send(serializeContact(created));
     },
   );
@@ -215,24 +231,27 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, customer: true },
       });
       if (!existing) throw server.httpErrors.notFound('Contact not found');
-
-      // Same string is not a reassignment. A dialog that resends the label
-      // must not drop a link whose label does not match a company name.
-      let companyIdUpdate: string | null | undefined;
-      if (req.body.customer !== undefined && req.body.customer !== existing.customer) {
-        const linkedCompanyId = await resolveLeadCompanyId(req.auth.orgId, req.body.customer);
-        if (linkedCompanyId === 'ambiguous') {
-          throw server.httpErrors.conflict('Company name matches more than one company');
-        }
-        companyIdUpdate = linkedCompanyId;
+      if (req.body.customFieldValues?.length) {
+        const foreign = await foreignCustomFieldDefinitions(
+          req.auth.orgId,
+          'contact',
+          req.body.customFieldValues.map((v) => v.definitionId),
+        );
+        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
       }
 
       const updated = await prisma.$transaction(async (tx) => {
+        // Moving a contact to another customer drops the old company link and
+        // re-resolves it the same way create does.
+        const relink =
+          req.body.customer !== undefined && req.body.customer !== existing.customer
+            ? { companyId: await resolveCompanyIdByName(tx, req.auth.orgId, req.body.customer) }
+            : {};
         const contact = await tx.contact.update({
           where: { id: existing.id },
           data: {
+            ...relink,
             ...(req.body.customer !== undefined ? { customer: req.body.customer } : {}),
-            ...(companyIdUpdate !== undefined ? { companyId: companyIdUpdate } : {}),
             ...(req.body.name !== undefined ? { name: req.body.name } : {}),
             ...(req.body.role !== undefined ? { role: req.body.role } : {}),
             ...(req.body.email !== undefined ? { email: req.body.email } : {}),
@@ -314,7 +333,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
             action: 'contact.delete',
             targetType: 'contact',
             targetId: existing.id,
-            diff: { customer: existing.customer, name: existing.name },
+            diff: { customer: existing.customer },
           },
         }),
       ]);

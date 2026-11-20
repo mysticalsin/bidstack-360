@@ -14,13 +14,7 @@ import { KeyAccountBadge, TopAccountBadge } from '@/components/company/AccountTi
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useTopAccounts } from '@/hooks/useTopAccounts';
 import { useAccountIndustries } from '@/hooks/useKeyAccounts';
-import {
-  compareMicros,
-  formatUnspecifiedCompactMicros,
-  microsSharePercent,
-  recordedMicros,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
@@ -33,6 +27,7 @@ export function AccountsTopSegment() {
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
+  const { formatMoney } = useFormatMoney();
 
   const industries = useAccountIndustries();
   const accounts = useTopAccounts({
@@ -48,22 +43,11 @@ export function AccountsTopSegment() {
   const source = accounts.data?.source ?? 'auto';
   const accountError = accounts.error instanceof Error ? accounts.error.message : undefined;
   const industryError = industries.error instanceof Error ? industries.error.message : undefined;
-  const totalPipelineMicros = useMemo(
-    () =>
-      items.reduce(
-        (sum, account) => sum + recordedMicros(account.totalValue, account.totalValueMicros),
-        0n,
-      ),
+  const totalPipeline = useMemo(
+    () => items.reduce((sum, account) => sum + account.totalValue, 0),
     [items],
   );
-  const wonPipelineMicros = useMemo(
-    () =>
-      items.reduce(
-        (sum, account) => sum + recordedMicros(account.wonValue, account.wonValueMicros),
-        0n,
-      ),
-    [items],
-  );
+  const wonPipeline = useMemo(() => items.reduce((sum, account) => sum + account.wonValue, 0), [items]);
   const openDeals = useMemo(() => items.reduce((sum, account) => sum + account.openDeals, 0), [items]);
   const contactCount = useMemo(
     () => items.reduce((sum, account) => sum + account.contactCount, 0),
@@ -71,30 +55,24 @@ export function AccountsTopSegment() {
   );
   const industryBreakdown = useMemo(() => {
     const unclassifiedIndustry = t('topAccounts.unclassifiedIndustry', 'Unclassified');
-    const byIndustry = new Map<
-      string,
-      { count: number; pipelineMicros: bigint; filterValue: string | null }
-    >();
+    const byIndustry = new Map<string, { count: number; pipeline: number; filterValue: string | null }>();
     for (const account of items) {
       const key = account.industry || unclassifiedIndustry;
       const current = byIndustry.get(key) ?? {
         count: 0,
-        pipelineMicros: 0n,
+        pipeline: 0,
         filterValue: account.industry,
       };
       current.count += 1;
-      current.pipelineMicros += recordedMicros(account.totalValue, account.totalValueMicros);
+      current.pipeline += account.totalValue;
       byIndustry.set(key, current);
     }
     return [...byIndustry.entries()]
       .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => compareMicros(b.pipelineMicros, a.pipelineMicros) || b.count - a.count)
+      .sort((a, b) => b.pipeline - a.pipeline || b.count - a.count)
       .slice(0, 5);
   }, [items, t]);
-  const maxIndustryMicros = industryBreakdown.reduce(
-    (max, item) => (compareMicros(item.pipelineMicros, max) > 0 ? item.pipelineMicros : max),
-    0n,
-  );
+  const maxIndustryPipeline = Math.max(1, ...industryBreakdown.map((item) => item.pipeline));
   const leader = items[0] ?? null;
 
   return (
@@ -196,9 +174,7 @@ export function AccountsTopSegment() {
             sub={
               leader
                 ? t('topAccounts.leaderDetail', '{{pipeline}} pipeline / {{deals}} open deals', {
-                    pipeline: formatUnspecifiedCompactMicros(
-                      recordedMicros(leader.totalValue, leader.totalValueMicros),
-                    ),
+                    pipeline: formatMoney(leader.totalValue, 'EUR'),
                     deals: leader.openDeals,
                   })
                 : t('topAccounts.leaderEmpty', 'Add opportunity value to create a ranking.')
@@ -213,16 +189,8 @@ export function AccountsTopSegment() {
             }
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatTile
-                label={t('topAccounts.statPipeline', 'Pipeline')}
-                value={formatUnspecifiedCompactMicros(totalPipelineMicros)}
-                sublabel={UNSPECIFIED_CURRENCY_BASIS}
-              />
-              <StatTile
-                label={t('topAccounts.statWon', 'Won')}
-                value={formatUnspecifiedCompactMicros(wonPipelineMicros)}
-                sublabel={UNSPECIFIED_CURRENCY_BASIS}
-              />
+              <StatTile label={t('topAccounts.statPipeline', 'Pipeline')} value={formatMoney(totalPipeline, 'EUR')} />
+              <StatTile label={t('topAccounts.statWon', 'Won')} value={formatMoney(wonPipeline, 'EUR')} />
               <StatTile label={t('topAccounts.statOpenDeals', 'Open deals')} value={openDeals.toLocaleString()} />
               <StatTile label={t('topAccounts.statContacts', 'Contacts')} value={contactCount.toLocaleString()} />
             </div>
@@ -233,13 +201,6 @@ export function AccountsTopSegment() {
             heading={t('topAccounts.industryMixTitle', 'Pipeline by industry')}
             aside={industry ? <Badge tone="blue">{industry}</Badge> : null}
           >
-            <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
-              {t(
-                'topAccounts.industryBarBasis',
-                'Bar length is this industry’s share of unspecified pipeline on the loaded top accounts. {{basis}}',
-                { basis: UNSPECIFIED_CURRENCY_BASIS },
-              )}
-            </p>
             <div className="space-y-2">
               {industryBreakdown.map((item) => (
                 <button
@@ -262,24 +223,13 @@ export function AccountsTopSegment() {
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
-                    <span className="font-medium tabular-nums text-[var(--fg-secondary)]">
-                      {formatUnspecifiedCompactMicros(item.pipelineMicros)}
-                    </span>
+                    <span className="font-medium text-[var(--fg-tertiary)]">{formatMoney(item.pipeline, 'EUR')}</span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
                     <motion.span
                       className="block h-full rounded-full bg-[var(--brand-primary)]"
                       initial={reducedMotion ? false : { width: 0 }}
-                      animate={{
-                        width: `${Math.max(
-                          8,
-                          Math.round(
-                            maxIndustryMicros > 0n
-                              ? microsSharePercent(item.pipelineMicros, maxIndustryMicros)
-                              : 0,
-                          ),
-                        )}%`,
-                      }}
+                      animate={{ width: `${Math.max(8, Math.round((item.pipeline / maxIndustryPipeline) * 100))}%` }}
                       transition={springSoft}
                     />
                   </div>
@@ -400,18 +350,14 @@ export function AccountsTopSegment() {
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--fg-secondary)]">
                       <span>
                         <span className="font-medium text-[var(--fg-primary)]">
-                          {formatUnspecifiedCompactMicros(
-                            recordedMicros(account.totalValue, account.totalValueMicros),
-                          )}
+                          {formatMoney(account.totalValue, 'EUR')}
                         </span>{' '}
                         {t('topAccounts.totalPipeline', 'total pipeline')}
                       </span>
                       <span>·</span>
                       <span>
                         <span className="font-medium text-[var(--fg-primary)]">
-                          {formatUnspecifiedCompactMicros(
-                            recordedMicros(account.wonValue, account.wonValueMicros),
-                          )}
+                          {formatMoney(account.wonValue, 'EUR')}
                         </span>{' '}
                         {t('topAccounts.won', 'won')}
                       </span>
@@ -434,18 +380,7 @@ export function AccountsTopSegment() {
                       <div
                         className="h-full rounded-full bg-[var(--brand-primary)]"
                         style={{
-                          width: `${
-                            items[0] &&
-                            recordedMicros(items[0].totalValue, items[0].totalValueMicros) > 0n
-                              ? Math.min(
-                                  100,
-                                  microsSharePercent(
-                                    recordedMicros(account.totalValue, account.totalValueMicros),
-                                    recordedMicros(items[0].totalValue, items[0].totalValueMicros),
-                                  ),
-                                )
-                              : 0
-                          }%`,
+                          width: `${items[0]?.totalValue ? Math.min(100, (account.totalValue / items[0].totalValue) * 100) : 0}%`,
                         }}
                       />
                     </div>

@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { useCapabilities } from '@/hooks/useCapabilities';
+import { useIsAdmin } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Sentry } from '@/lib/sentry';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
@@ -27,10 +27,7 @@ interface ApprovePayload {
 
 export function ApprovalGate() {
   const { t } = useTranslation('rfp');
-  const capabilities = useCapabilities();
-  const canApprovePermission = Boolean(
-    capabilities.data?.permissions.includes('proposals:approve'),
-  );
+  const isAdmin = useIsAdmin();
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
   const stage = useRfpPipelineStore((s) => s.stage);
   const applyEvent = useRfpPipelineStore((s) => s.applyEvent);
@@ -47,7 +44,7 @@ export function ApprovalGate() {
   const isAwaitingApproval = stage === 'awaiting_approval';
 
   // WHY: canApprove requires all conditions; UI makes each blocking reason explicit
-  const canApprove = isAwaitingApproval && allChecked && canApprovePermission && !!proposalId;
+  const canApprove = isAwaitingApproval && allChecked && isAdmin && !!proposalId;
 
   const approveMutation = useMutation({
     mutationFn: (payload: ApprovePayload) =>
@@ -90,15 +87,12 @@ export function ApprovalGate() {
       <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{t('approval.title')}</h2>
 
       {/* Role gate warning */}
-      {capabilities.data && !canApprovePermission && (
+      {!isAdmin && (
         <div
           role="alert"
           className="rounded-lg border border-[var(--tag-amber-bg)] bg-[var(--tag-amber-bg)]/20 p-3 text-xs text-[var(--tag-amber-fg)]"
         >
-          {t(
-            'approval.requiresApprover',
-            'Approval requires the proposals approve permission. Admin access is not enough.',
-          )}
+          {t('approval.requiresAdmin')}
         </div>
       )}
 
@@ -187,11 +181,8 @@ export function ApprovalGate() {
         variant="primary"
         className="w-full"
         title={
-          !canApprovePermission
-            ? t(
-                'approval.requiresApprover',
-                'Approval requires the proposals approve permission. Admin access is not enough.',
-              )
+          !isAdmin
+            ? t('approval.requiresAdmin')
             : !allChecked
               ? t('approval.checklistIncomplete')
               : !isAwaitingApproval

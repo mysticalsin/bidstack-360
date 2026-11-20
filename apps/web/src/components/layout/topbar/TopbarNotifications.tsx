@@ -13,6 +13,7 @@ import {
   useNotifications,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
+  useNotificationStream,
   type NotificationType,
 } from '@/hooks/useNotifications';
 
@@ -24,6 +25,7 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   stage_change: 'growth',
   task_due: 'clock',
   system: 'info',
+  account_activity: 'building',
 };
 
 export function NotificationsBell() {
@@ -34,6 +36,7 @@ export function NotificationsBell() {
   // Always poll for the badge; only fetch eagerly while the tray is open is
   // unnecessary since the list is small (top 30) and cheap.
   const notifications = useNotifications();
+  useNotificationStream();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
   const items = notifications.data?.items ?? [];

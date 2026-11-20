@@ -31,12 +31,13 @@
 /* ---------- Light theme (default) ---------- */
 :root,
 [data-theme='light'] {
-  /* Brand — Mantu purple. Fills carry white type. Ratios measured. */
-  --brand-primary: #6600ae; /* 9.65:1 white on fill and fill on white */
-  --brand-primary-hover: #52008c;
-  --brand-primary-press: #3d0068;
-  --brand-primary-tint: #f3e8fa; /* #6600ae on this tint = 8.15:1 */
-  --brand-deep: #3d0068;
+  /* Brand — deep green, one accent for the whole product (see docs/DESIGN.md §1).
+     Fills always carry #ffffff on top. Ratios measured, not assumed. */
+  --brand-primary: #006b4f; /* 6.53:1 on white ✅; white on it = 6.53:1 ✅ */
+  --brand-primary-hover: #005a42; /* darker than base → ratio only rises */
+  --brand-primary-press: #004a37;
+  --brand-primary-tint: #e3f2ec; /* brand-primary on this tint = 5.65:1 ✅ */
+  --brand-deep: #00402f;
 
   /* SERUM Glass system */
   --serum-bg: #f7f9fc;
@@ -55,28 +56,33 @@
      inherited from the old blue accent; with a green accent that cast reads as
      dirt, and the reference's calm comes from neutrals that are actually
      neutral. Lightness is preserved step for step, only the hue is removed. */
-  --surface-page: #f6f3ee;
+  --surface-page: #fafafa;
   --surface-card: #ffffff;
-  --surface-sidebar: #fbfaf7;
-  --surface-sunken: #efebe4;
-  --surface-overlay: rgba(5, 7, 26, 0.32);
-  --surface-soft: #f7f4ef;
-  --surface-hover: #f3efe8;
+  --surface-sidebar: #f7f7f7;
+  --surface-sunken: #f0f0f0;
+  --surface-overlay: rgba(0, 0, 0, 0.32);
+  --surface-soft: #f8f8f8;
+  --surface-hover: #f2f2f2;
   --surface-raised: #ffffff;
+  /* Dense panels (DESIGN.md 9.1): a shell holds insets; layers separate by
+     background step, not by border or shadow. */
+  --surface-shell: #f0f0f0;
+  --surface-inset: #ffffff;
 
-  /* Foreground — Mantu black pearl on the warm canvas */
-  --fg-primary: #05071a; /* 18:1 on the page */
-  --fg-secondary: #5c534a; /* 7.52:1 on white */
-  --fg-tertiary: #6a6158; /* 5.48:1 on the page */
-  --fg-muted: #6a6158;
+  /* Foreground */
+  --fg-primary: #171717; /* 16.9:1 on white ✅ */
+  --fg-secondary: #5c5c5c; /* 7.0:1 on white ✅ (was #5a6478, 6.3:1) */
+  /* fg-tertiary must clear WCAG 1.4.3 normal text on white; #6b6b6b = 5.3:1. */
+  --fg-tertiary: #6b6b6b;
+  --fg-muted: #6b6b6b; /* 5.3:1 on white ✅ */
   --fg-inverted: #ffffff;
   --fg-on-brand: #ffffff;
 
   /* Borders */
-  --border-subtle: #efeae3;
-  --border-default: #e4ddd4;
-  --border-strong: #cfc6bb;
-  --border-focus: #6600ae;
+  --border-subtle: #efefef;
+  --border-default: #e2e2e2;
+  --border-strong: #c7c7c7;
+  --border-focus: #006b4f; /* 6.53:1 on white — clears the 3:1 UI floor ✅ */
 
   /* Semantic — all foreground values verified ≥ 4.5:1 on white AND on their tint. */
   --success: #177048; /* was #1f8a5b (4.33:1); now 6.09:1 on white, 5.35:1 on tint */
@@ -103,7 +109,7 @@
   --sidebar-fg: #6b6b6b; /* = --fg-tertiary; 5.3:1 on the sidebar surface ✅ */
   --sidebar-fg-active: #171717; /* = --fg-primary */
   --sidebar-hover: rgba(0, 0, 0, 0.04);
-  --sidebar-active: rgba(102, 0, 174, 0.08);
+  --sidebar-active: rgba(0, 107, 79, 0.08);
 
   /* Component tokens — surfaces, shadows, code, inputs */
   --surface-subtle: #f7f7f7; /* between card and sunken */
@@ -114,22 +120,32 @@
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.06);
   --code-bg: #f2f2f2;
   --code-fg: #262626; /* 12.4:1 on code-bg ✅ */
-  --ring: rgba(102, 0, 174, 0.35);
-  --sidebar-badge-bg: rgba(102, 0, 174, 0.1);
-  --sidebar-badge-fg: #6600ae;
+  --ring: rgba(0, 107, 79, 0.35); /* = --focus-ring-color */
+  --sidebar-badge-bg: rgba(0, 107, 79, 0.1);
+  --sidebar-badge-fg: #006b4f; /* = --brand-primary; 6.53:1 on white ✅ */
 
   /* Brand shorthands (alias to primary) */
-  --brand: #6600ae;
-  --brand-hover: #52008c;
-  --brand-muted: #f3e8fa;
+  --brand: #006b4f;
+  --brand-hover: #005a42;
+  --brand-muted: #e3f2ec;
+
+  /* Quick-actions FAB is 52px, pinned with Tailwind bottom-6 / right-6.
+     Lists, pagers, and scroll-into-view targets must stay above that disc
+     (plus a 16px gap and the iOS home-indicator inset) or Next is untappable.
+     Keep --fab-size in lockstep with `FAB` in LiquidQuickActions.tsx. */
+  --fab-size: 52px;
+  --fab-inset: 1.5rem;
+  --fab-clearance: calc(
+    var(--fab-size) + var(--fab-inset) + 16px + env(safe-area-inset-bottom, 0px)
+  );
 
   /* Legacy token aliases — AuditLog & older components */
-  --text-primary: #05071a;
-  --text-secondary: #5c534a;
-  --text-muted: #6a6158;
+  --text-primary: #171717; /* = --fg-primary */
+  --text-secondary: #5c5c5c; /* = --fg-secondary */
+  --text-muted: #6b6b6b; /* = --fg-muted */
   --surface-primary: #ffffff; /* = --surface-card */
   --surface-secondary: #f0f0f0; /* = --surface-sunken */
-  --accent-primary: #6600ae;
+  --accent-primary: #006b4f; /* = --brand-primary; 6.53:1 on white ✅ */
 
   /* Tag palette */
   --tag-blue-bg: #e5ecff;
@@ -152,7 +168,7 @@
   /* Chart palette — sequential, accessible, dark-mode ready.
      Slot 1 carries the brand so the primary series matches the accent; the blue
      it displaced moves to slot 2 (which was a green that now collides). */
-  --chart-1: #6600ae;
+  --chart-1: #006b4f;
   --chart-2: #2c4bff;
   --chart-3: #d08a00;
   --chart-4: #8b5cf6;
@@ -166,13 +182,13 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.09), 0 4px 12px rgba(0, 0, 0, 0.04);
-  --focus-ring: 0 0 0 3px rgba(102, 0, 174, 0.16);
-  --focus-ring-color: rgba(102, 0, 174, 0.35);
+  --focus-ring: 0 0 0 3px rgba(0, 107, 79, 0.14);
+  --focus-ring-color: rgba(0, 107, 79, 0.35);
 
   /* Glassmorphism tokens */
   --surface-glass: rgba(255, 255, 255, 0.72);
-  --border-glow: rgba(102, 0, 174, 0.08);
-  --border-glow-strong: rgba(102, 0, 174, 0.16);
+  --border-glow: rgba(0, 107, 79, 0.08);
+  --border-glow-strong: rgba(0, 107, 79, 0.16);
 
   /* Button variant tokens — theme-relative tints (P1 #23) */
   --btn-success-border: color-mix(in srgb, var(--success) 35%, transparent);
@@ -188,8 +204,8 @@
   --row-hover-tint: transparent;
 
   /* Gradient text tokens — needed by .gradient-text in both themes */
-  --brand-gradient-start: #6600ae;
-  --brand-gradient-end: #3d0068;
+  --brand-gradient-start: #006b4f;
+  --brand-gradient-end: #00402f;
 }
 
 /* ---------- Dark theme — MDM ROI Navigator purple-black aesthetic ---------- */
@@ -198,14 +214,14 @@
      cannot both sit on the page AND carry white text, so fill and foreground
      split here (docs/DESIGN.md §1). The reference ships #006b4f unchanged in
      dark; that only works because it never uses it as a foreground. */
-  --brand-primary: #7c3aed; /* white on this fill ≈ 5.7:1 */
-  --brand-primary-hover: #8b5cf6;
-  --brand-primary-press: #6d28d9;
-  --brand-primary-tint: rgba(167, 139, 250, 0.18);
-  --brand-deep: #d4b4ff; /* text accent on near-black */
-  --brand-gradient-start: #7c3aed;
-  --brand-gradient-end: #d4b4ff;
-  --brand-gradient: linear-gradient(135deg, #7c3aed 0%, #d4b4ff 100%);
+  --brand-primary: #00805e; /* fill: white on it 4.94:1 ✅, vs page 3.95:1 ✅ */
+  --brand-primary-hover: #009a71;
+  --brand-primary-press: #006b4f;
+  --brand-primary-tint: rgba(63, 190, 147, 0.18);
+  --brand-deep: #3fbe93; /* foreground accent: 8.38:1 on near-black ✅ */
+  --brand-gradient-start: #00805e;
+  --brand-gradient-end: #3fbe93;
+  --brand-gradient: linear-gradient(135deg, #00805e 0%, #3fbe93 100%);
 
   /* SERUM Glass system */
   --serum-bg: #05070d;
@@ -221,15 +237,17 @@
   --serum-shadow-md: 0 28px 64px rgba(0, 0, 0, 0.42);
 
   /* Surface — deep void black */
-  --surface-page: #0c0a12;
-  --surface-card: #16131e;
-  --surface-sidebar: #100e16;
+  --surface-page: #010102;
+  --surface-card: #0c0c0e;
+  --surface-sidebar: #09090b;
   --surface-sunken: #070708;
   --surface-overlay: rgba(0, 0, 0, 0.85);
   --surface-glass: rgba(12, 12, 14, 0.72);
   --surface-soft: #121214;
   --surface-hover: #18181b;
   --surface-raised: #1c1c1e;
+  --surface-shell: #121214;
+  --surface-inset: #0c0c0e;
 
   /* Foreground — crisp cool whites */
   --fg-primary: #f8fafc;
@@ -243,9 +261,9 @@
   --border-subtle: #22242a;
   --border-default: #2d3039;
   --border-strong: #3e424f;
-  --border-focus: #d4b4ff;
-  --border-glow: rgba(167, 139, 250, 0.18);
-  --border-glow-strong: rgba(167, 139, 250, 0.32);
+  --border-focus: #3fbe93; /* foreground accent — 8.38:1 on near-black, clears the 3:1 UI floor ✅ */
+  --border-glow: rgba(63, 190, 147, 0.15);
+  --border-glow-strong: rgba(63, 190, 147, 0.3);
 
   /* Semantic — harmonized with the clean look */
   --success: #34d399;
@@ -272,7 +290,7 @@
   --sidebar-fg: #a1a1aa; /* = --fg-secondary dark */
   --sidebar-fg-active: #f8fafc; /* = --fg-primary dark */
   --sidebar-hover: rgba(255, 255, 255, 0.05);
-  --sidebar-active: rgba(167, 139, 250, 0.18);
+  --sidebar-active: rgba(63, 190, 147, 0.18);
 
   /* Component tokens — surfaces, shadows, code, inputs */
   --surface-subtle: #121214; /* = --surface-soft dark */
@@ -283,14 +301,14 @@
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.4);
   --code-bg: #111113;
   --code-fg: #c0caf5; /* muted violet — readable on near-black ✅ */
-  --ring: rgba(212, 180, 255, 0.45);
-  --sidebar-badge-bg: rgba(167, 139, 250, 0.18);
-  --sidebar-badge-fg: #d4b4ff;
+  --ring: rgba(63, 190, 147, 0.45); /* = --focus-ring-color dark */
+  --sidebar-badge-bg: rgba(63, 190, 147, 0.18);
+  --sidebar-badge-fg: #3fbe93; /* = --brand-deep dark; 8.38:1 on near-black ✅ */
 
   /* Brand shorthands (alias to primary) */
-  --brand: #7c3aed;
-  --brand-hover: #8b5cf6;
-  --brand-muted: rgba(167, 139, 250, 0.18);
+  --brand: #00805e;
+  --brand-hover: #009a71;
+  --brand-muted: rgba(63, 190, 147, 0.18);
 
   /* Legacy token aliases — AuditLog & older components */
   --text-primary: #f8fafc; /* = --fg-primary dark */
@@ -298,7 +316,7 @@
   --text-muted: #8b8b94; /* = --fg-muted dark */
   --surface-primary: #0c0c0e; /* = --surface-card dark */
   --surface-secondary: #070708; /* = --surface-sunken dark */
-  --accent-primary: #d4b4ff;
+  --accent-primary: #3fbe93; /* foreground accent, not the fill — 8.38:1 ✅ */
 
   /* Tag palette — vibrant against near-black, contrast verified */
   --tag-blue-bg: rgba(101, 132, 255, 0.18);
@@ -322,7 +340,7 @@
 
   /* Chart palette — vivid neons against near-black. Slot 1 = brand foreground
      accent, matching light mode; the displaced green becomes a blue. */
-  --chart-1: #c084fc;
+  --chart-1: #3fbe93;
   --chart-2: #6584ff;
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
@@ -336,8 +354,8 @@
   --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 30px rgba(0, 0, 0, 0.5);
-  --focus-ring: 0 0 0 3px rgba(167, 139, 250, 0.28);
-  --focus-ring-color: rgba(212, 180, 255, 0.45);
+  --focus-ring: 0 0 0 3px rgba(63, 190, 147, 0.22);
+  --focus-ring-color: rgba(63, 190, 147, 0.45);
 
   /* Button variant tokens — theme-relative tints (P1 #23) */
   --btn-brand-glow: color-mix(in srgb, var(--brand-primary) 25%, transparent);
@@ -375,6 +393,8 @@
   --color-surface-soft: var(--surface-soft);
   --color-surface-hover: var(--surface-hover);
   --color-surface-raised: var(--surface-raised);
+  --color-surface-shell: var(--surface-shell);
+  --color-surface-inset: var(--surface-inset);
 
   --color-fg-primary: var(--fg-primary);
   --color-fg-secondary: var(--fg-secondary);
@@ -395,6 +415,11 @@
   --color-warning-tint: var(--warning-tint);
   --color-danger: var(--danger);
   --color-danger-tint: var(--danger-tint);
+  /* Status aliases for vendored components: values only, no new colours. */
+  --color-positive: var(--success);
+  --color-positive-tint: var(--success-tint);
+  --color-negative: var(--danger);
+  --color-negative-tint: var(--danger-tint);
   --color-info: var(--info);
   --color-info-tint: var(--info-tint);
 
@@ -447,6 +472,11 @@
   --radius-lg: 8px;
   --radius-xl: 12px;
 
+  /* UI easing (DESIGN.md 9.2), mirrored in src/lib/motion-tokens.ts. */
+  --ease-ui-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-ui-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
@@ -481,6 +511,7 @@ body {
   transition:
     background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  scroll-padding-bottom: var(--fab-clearance);
 }
 
 /* Display headings get tighter tracking still — matches SF Pro Display's
@@ -728,49 +759,6 @@ select:focus-visible {
   }
 }
 
-.thinking-mark {
-  align-items: center;
-  color: var(--fg-secondary);
-  display: inline-flex;
-  font-size: 14px;
-  gap: 8px;
-}
-.thinking-mark span {
-  display: inline-flex;
-  gap: 4px;
-}
-.thinking-mark i {
-  animation: thinking-mark 1.4s ease-in-out infinite;
-  background: var(--brand-primary);
-  border-radius: 999px;
-  display: block;
-  height: 6px;
-  width: 6px;
-}
-.thinking-mark i:nth-child(2) {
-  animation-delay: 0.16s;
-}
-.thinking-mark i:nth-child(3) {
-  animation-delay: 0.32s;
-}
-@keyframes thinking-mark {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .thinking-mark i {
-    animation: none;
-    opacity: 1;
-  }
-}
-
 @keyframes spin-slow {
   0% {
     transform: rotate(0deg);
@@ -871,10 +859,11 @@ select:focus-visible {
      modal/overlay layer (z-40+) so dialogs still cover the sidebar. */
   z-index: 20;
   overflow-y: auto;
-  /* Width comes from the parent grid (--sidebar-w on .app-shell). We claim
-     the full track width so collapse can never produce a stale gutter. */
+  /* While the track eases wider, labels are already back at full width;
+     clip them instead of flashing a horizontal scrollbar. */
+  overflow-x: hidden;
   /* Width is driven solely by the parent grid track (--sidebar-w on
-     .app-shell): 220px expanded, 56px collapsed. We fill that track at 100%.
+     .app-shell): 232px expanded, 64px collapsed. We fill that track at 100%.
      DO NOT hard-code a px width here — a second width declaration overrides
      this 100% and pins the element at one size inside a resizing track, which
      produced the broken "220px sidebar jammed into a 56px rail" regression. */
@@ -888,11 +877,11 @@ select:focus-visible {
    take over labeling on hover/focus. The actual width comes from the
    parent grid via --sidebar-w (set by .app-shell.has-collapsed-sidebar). */
 .sidebar.is-collapsed {
-  /* 5px, not 8 — see the --sidebar-w note on .app-shell: at a 56px rail this is
-     what keeps the icon buttons ≥44px wide for coarse pointers. */
-  padding-left: 5px;
-  padding-right: 5px;
-  /* Let the section hover-flyouts escape the 56px rail as popovers. With
+  /* 64 - 0.5 border - 16 padding leaves 47.5px items, above the 44px
+     coarse-pointer touch target. */
+  padding-left: 8px;
+  padding-right: 8px;
+  /* Let the section hover-flyouts escape the 64px rail as popovers. With
      overflow-y:auto the browser also computes overflow-x:auto, so the absolute
      flyouts (left:100%, 180px wide) extended the rail's scroll width to ~251px
      and produced a stray horizontal scrollbar + a scrollable second column.
@@ -924,11 +913,11 @@ select:focus-visible {
 }
 
 .sb-group-title {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--fg-tertiary);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-secondary);
   padding: 4px 12px 6px;
   opacity: 1;
   max-width: 200px;
@@ -945,8 +934,8 @@ select:focus-visible {
   visibility: hidden;
 }
 
-/* Collapsible section header. Shares .sb-group-title typography (sentence
-   case, 12px, tertiary) but is a real button with a disclosure caret. The caret
+/* Collapsible section header. Shares .sb-group-title typography (uppercase,
+   10.5px, tertiary) but is a real button with a disclosure caret. The caret
    stays hidden until hover/focus — or whenever the section is collapsed, so a
    collapsed section always advertises that it can be reopened. */
 .sb-group-toggle {
@@ -1135,18 +1124,22 @@ select:focus-visible {
 .sb-mark {
   width: 34px;
   height: 34px;
-  /* Transparent lockup. The compass pin sits on the sidebar surface itself:
-     no gradient chip, no navy plate. */
-  background: transparent;
-  color: currentColor;
+  /* Navy plate from the Polo brand (#071422, the lockup field) so the
+     full-color compass pin reads exactly as in the brand assets. A hairline
+     ring and soft lift keep it distinct on both light and dark rails. */
+  background: #071422;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 212, 227, 0.18),
+    0 4px 12px -6px rgba(7, 20, 34, 0.6);
 }
 .sb-mark svg {
-  width: 22px;
-  height: 22px;
+  width: auto;
+  height: 24px;
 }
 .sb-name {
   font-weight: 700;
@@ -1157,7 +1150,9 @@ select:focus-visible {
 }
 .sb-tag {
   font-size: 10.5px;
-  color: var(--fg-tertiary);
+  /* Secondary, not tertiary: 10.5px on the rail must clear 4.5:1 even when
+     a parent uses color-mix / backdrop-filter (axe samples the pre-composite). */
+  color: var(--fg-secondary);
   margin-top: 2px;
 }
 
@@ -1171,7 +1166,7 @@ select:focus-visible {
   gap: 10px;
   padding: 8px 12px;
   margin: 1px 0;
-  border-radius: 12px;
+  border-radius: 8px;
   color: var(--fg-secondary);
   cursor: pointer;
   font-size: 13px;
@@ -1287,7 +1282,8 @@ select:focus-visible {
   left: -8px;
   width: 8px;
 }
-.sb-parent-container:hover .sb-flyout {
+.sb-parent-container:hover .sb-flyout,
+.sb-parent-container:focus-within .sb-flyout {
   opacity: 1;
   visibility: visible;
 }
@@ -1395,8 +1391,8 @@ select:focus-visible {
   color: white;
 }
 [data-theme='dark'] .sb-group-title {
-  color: var(--fg-muted);
-  letter-spacing: 0;
+  color: var(--fg-secondary);
+  letter-spacing: 0.1em;
 }
 
 /* ---------- Topbar ---------- */
@@ -1408,7 +1404,7 @@ select:focus-visible {
   padding: 0 28px;
   min-width: 0;
   border-bottom: 1px solid var(--border-default);
-  background: color-mix(in srgb, var(--surface-card) 88%, var(--surface-page));
+  background: var(--surface-card);
   position: sticky;
   top: 0;
   z-index: 40;
@@ -1598,6 +1594,44 @@ select:focus-visible {
   align-items: center;
   gap: 6px;
 }
+/* Horizontally scrollable tab strip (DESIGN.md 9.11). useScrollableTabs sets
+   the fade attributes while tabs are hidden past an edge. */
+.tab-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+.tab-scroll > [role='tab'] {
+  flex: none;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+.tab-scroll[data-fade-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+.tab-scroll[data-fade-start] {
+  mask-image: linear-gradient(to right, transparent, #000 32px);
+}
+.tab-scroll[data-fade-start][data-fade-end] {
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+.crumbs-seg > .sep {
+  flex: none;
+}
+.crumbs-seg > span:not(.sep) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* CRM-style inline-edit trigger. Read-mode button looks like static
    text until hovered/focused, then reveals a subtle 1px outline + tinted
@@ -1730,11 +1764,17 @@ select:focus-visible {
   font-size: 13px;
   font-weight: 600;
   z-index: 100;
-  transition: transform 0.14s ease-out;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.14s ease-out,
+    opacity 0.14s ease-out;
 }
 .skip-link:focus,
 .skip-link:focus-visible {
   transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
@@ -1810,7 +1850,9 @@ select:focus-visible {
   background: var(--border-subtle);
 }
 .account-heading-cluster > span:first-child {
-  box-shadow: none;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent),
+    0 14px 34px color-mix(in srgb, var(--brand-primary) 18%, transparent);
 }
 .account-meta-chips {
   display: flex;
@@ -1819,30 +1861,30 @@ select:focus-visible {
   margin-top: 8px;
 }
 .account-meta-chips span {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-card) 78%, transparent);
   color: var(--fg-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.4;
-  padding: 0;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  padding: 5px 8px;
 }
 .account-meta-chips span[data-tone='health'],
 .account-meta-chips span[data-tone='linked'] {
-  background: transparent;
-  border: 0;
-  color: var(--fg-primary);
+  background: color-mix(in srgb, var(--success) 10%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border-subtle));
+  color: var(--tag-jade-fg);
 }
 .account-meta-chips span[data-tone='confidence'] {
-  background: transparent;
-  border: 0;
-  color: var(--fg-secondary);
+  background: color-mix(in srgb, var(--brand-primary) 9%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--brand-primary) 24%, var(--border-subtle));
+  color: var(--brand-deep);
 }
 .account-meta-chips span[data-tone='warning'] {
-  background: transparent;
-  border: 0;
-  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-card));
+  border-color: color-mix(in srgb, var(--warning) 32%, var(--border-subtle));
+  color: color-mix(in srgb, var(--warning) 82%, var(--fg-primary));
 }
 .account-meta-chips span[data-tone='muted'] {
   color: var(--fg-tertiary);
@@ -2140,7 +2182,7 @@ select:focus-visible {
 /* ---------- Cards ---------- */
 .card {
   background: var(--surface-card);
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid var(--border-default);
   overflow: hidden;
   transition:
@@ -2348,15 +2390,15 @@ select:focus-visible {
   }
 }
 
-/* ---------- Frosted glass sidebar (upgrade) ---------- */
+/* Sidebar stays opaque. A translucent color-mix + backdrop-filter made
+   10.5px rail labels fail WCAG 1.4.3 (axe composites the tint, not the
+   page behind it). Frost the topbar only. */
 @supports (backdrop-filter: blur(20px)) {
   .sidebar {
-    background: color-mix(in srgb, var(--surface-card) 85%, transparent);
-    backdrop-filter: blur(24px) saturate(1.3);
-    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    background: var(--surface-sidebar);
   }
   [data-theme='dark'] .sidebar {
-    background: color-mix(in srgb, var(--surface-card) 72%, transparent);
+    background: var(--surface-sidebar);
   }
 }
 
@@ -2557,24 +2599,24 @@ select:focus-visible {
 
 /* ---------- App shell ---------- */
 .app-shell {
-  /* WHY a CSS var: the sidebar itself is 220px (or 56px collapsed) — driving
+  /* WHY a CSS var: the sidebar itself is 232px (or 64px collapsed); driving
      both the grid AND the sidebar width from one variable keeps them in sync
      so a collapsed icon rail can't leave a stale gutter beside the content. */
-  --sidebar-w: 220px;
+  --sidebar-w: 232px;
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
-  /* Do not animate the grid track: it reflows the full CRM dashboard during
-     sidebar toggles and pushes INP over the enterprise performance budget. */
+  /* Keep this at or under 250ms: every frame reflows the page column. The
+     toggle handler only flips a class, so the click itself stays cheap. */
+  transition: grid-template-columns 200ms var(--ease-ui-out);
+}
+.app-shell:has(> .sidebar[data-motion='instant']) {
   transition: none;
 }
 .app-shell.has-collapsed-sidebar,
 [data-sidebar-collapsed='true'] .app-shell {
-  /* 56px = the reference's w-14 rail. The rail's own 0.5px right border eats
-     into that, so the collapsed padding is 5px per side, not 8: 56 − 0.5 − 10
-     leaves items 45.5px wide, which clears the 44px coarse-pointer touch-target
-     floor. Widening the padding drops below it — measured, not guessed. */
-  --sidebar-w: 56px;
+  /* DESIGN.md 9.4: 64px collapsed rail (see the .sidebar.is-collapsed padding). */
+  --sidebar-w: 64px;
 }
 .app-shell .main {
   min-width: 0;
@@ -2604,12 +2646,42 @@ select:focus-visible {
   position: relative;
   z-index: 1;
 }
+/* A pager at the end of a list sat under Quick actions: 60px / 48px page
+   padding is shorter than the 76px+ FAB stack. Only pages that actually
+   paginate grow the bottom safe area, including the mobile breakpoint. */
+/* Same for a list whose last row ends in a right-aligned action: opt in with
+   `data-fab-clear` on the list. The gooey layer around the disc catches clicks
+   about one disc above it, so these rows clear an extra --fab-size. */
+.app-shell .page:has([data-slot='pagination']) {
+  padding-bottom: var(--fab-clearance);
+}
+.app-shell .page:has([data-fab-clear]) {
+  padding-bottom: calc(var(--fab-clearance) + var(--fab-size));
+}
 /* Escape hatch for surfaces that genuinely own the whole viewport — a kanban
    board that scrolls sideways, a calendar grid, a canvas. The page opts in by
    rendering a `.page-bleed` element as its direct child; no prop plumbing
    through the shell, and the constraint stays the default. */
 .app-shell .page:has(> .page-bleed) {
   max-width: none;
+}
+/* Playwright click() and keyboard focus scroll the control itself, not the
+   page — so page padding alone is not enough. The pager and its buttons keep
+   a FAB-sized scroll margin on every breakpoint.
+   A DataTable with min-h-[24rem] parks Next at the FAB's height on a short
+   list; extra page padding is below the card and cannot lift that button.
+   Reserve the FAB's column on the right so Next stays tappable. */
+[data-slot='pagination'],
+[data-slot='pagination'] button {
+  scroll-margin-bottom: var(--fab-clearance);
+}
+[data-fab-clear] button {
+  scroll-margin-bottom: calc(var(--fab-clearance) + var(--fab-size));
+}
+[data-slot='pagination'] {
+  padding-right: calc(
+    var(--fab-size) + var(--fab-inset) + env(safe-area-inset-right, 0px)
+  );
 }
 @media (min-width: 768px) and (max-width: 900px) {
   .topbar {
@@ -2630,16 +2702,31 @@ select:focus-visible {
     min-width: 0;
   }
 }
-@media (max-width: 767px) {
+/* Console shell breakpoint (shellBreakpoint.ts): below 56rem the rail is
+   replaced by the in-place drawer, so the grid drops to one column. */
+@media (max-width: 55.99rem) {
   .app-shell {
     grid-template-columns: 1fr;
   }
+  .sidebar {
+    display: none;
+  }
+}
+@media (min-width: 56rem) {
+  .tb-nav-toggle {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
   .app-shell .page {
     gap: 16px;
     padding: 16px 14px 48px;
   }
-  .sidebar {
-    display: none;
+  .app-shell .page:has([data-slot='pagination']) {
+    padding-bottom: var(--fab-clearance);
+  }
+  .app-shell .page:has([data-fab-clear]) {
+    padding-bottom: calc(var(--fab-clearance) + var(--fab-size));
   }
   .topbar {
     gap: 6px;
@@ -2678,20 +2765,41 @@ select:focus-visible {
   }
 }
 
-/* ---------- Mobile navigation ---------- */
-.mobile-nav-backdrop {
+/* ---------- Navigation drawer (below 56rem) ---------- */
+/* Always mounted below 56rem; closed = hidden after the slide-out finishes
+   (visibility waits out the exit transition, then drops it from the
+   accessibility tree and the tab order). */
+.mobile-nav-root {
   position: fixed;
   inset: 0;
   z-index: 50;
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s linear 220ms;
+}
+.mobile-nav-root[data-state='open'] {
+  visibility: visible;
+  pointer-events: auto;
+  transition: none;
+}
+.mobile-nav-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  cursor: default;
   background: var(--surface-overlay);
   backdrop-filter: blur(4px);
-  animation: mobile-nav-fade-in 180ms ease-out;
+  opacity: 0;
+  transition: opacity 150ms var(--ease-ui-out);
 }
-.mobile-nav-backdrop[data-state='closed'] {
-  animation: mobile-nav-fade-out 140ms ease-in;
+.mobile-nav-root[data-state='open'] .mobile-nav-backdrop {
+  opacity: 1;
+  transition-duration: 210ms;
 }
 .mobile-nav-drawer {
-  position: fixed;
+  position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
@@ -2700,56 +2808,31 @@ select:focus-visible {
   background: var(--surface-card);
   border-right: 1px solid var(--border-default);
   box-shadow: var(--shadow-lg);
-  z-index: 51;
   display: flex;
   flex-direction: column;
-  /* Clip at the drawer edge so only the inner <nav> scrolls (vertically) — no
+  /* Clip at the drawer edge so only the inner <nav> scrolls (vertically): no
      drawer-level horizontal/vertical overflow or rubber-band. */
   overflow: hidden;
   overscroll-behavior: contain;
-  animation: mobile-nav-slide-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  outline: none;
+  transform: translateX(-105%);
+  transition: transform 220ms var(--ease-drawer);
 }
-.mobile-nav-drawer[data-state='closed'] {
-  animation: mobile-nav-slide-out 180ms cubic-bezier(0.4, 0, 0.2, 1);
+.mobile-nav-root[data-state='open'] .mobile-nav-drawer {
+  transform: none;
+  transition-duration: 320ms;
 }
-@keyframes mobile-nav-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes mobile-nav-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-@keyframes mobile-nav-slide-in {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-@keyframes mobile-nav-slide-out {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-100%);
-  }
+.mobile-nav-root[data-motion='instant'],
+.mobile-nav-root[data-motion='instant'] * {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
 }
 @media (prefers-reduced-motion: reduce) {
-  .mobile-nav-backdrop,
-  .mobile-nav-backdrop[data-state='closed'],
-  .mobile-nav-drawer,
-  .mobile-nav-drawer[data-state='closed'] {
-    animation-duration: 1ms;
+  .app-shell,
+  .mobile-nav-root,
+  .mobile-nav-root * {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
   }
 }
 
@@ -2996,87 +3079,67 @@ select:focus-visible {
   gap: 14px;
   margin: 0 0 16px;
 }
-.command-center-graphic {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.command-center-next {
-  margin: 2px 4px 0;
-  color: var(--fg-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.45;
-}
-.command-center-graphic .command-center-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.command-center-graphic .command-signal {
-  min-height: 0;
-  padding: 12px 14px;
-}
-.command-signal-detail {
-  display: block;
-  margin-top: 8px;
-  color: var(--fg-tertiary);
-  font-size: 12px;
-  line-height: 1.35;
-}
-.kpi-grid-compact {
-  gap: 8px;
-}
-.kpi-chip {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 0;
-  padding: 10px 12px;
-}
-.kpi-chip-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--fg-secondary);
-  font-size: 12px;
-}
-.kpi-chip .kpi-value {
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 1.2;
-}
 .command-center-hero {
-  background: var(--surface-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  min-height: 0;
+  background:
+    radial-gradient(
+      circle at 18% 12%,
+      color-mix(in srgb, var(--tag-purple-bg) 78%, transparent),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 88% 86%,
+      color-mix(in srgb, var(--tag-jade-bg) 64%, transparent),
+      transparent 30%
+    ),
+    linear-gradient(135deg, var(--surface-card), var(--surface-page));
+  border: 1px solid var(--border-default);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  min-height: 212px;
   overflow: hidden;
   padding: 20px;
   position: relative;
 }
 .command-center-orbit {
-  display: none;
+  inset: 22px 28px 18px auto;
+  position: absolute;
+  width: 150px;
+}
+.command-center-orbit span {
+  animation: bs-orbit 24s linear infinite;
+  border: 0.5px solid color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  border-radius: 999px;
+  inset: var(--command-orbit, 0);
+  position: absolute;
+}
+.command-center-orbit span:nth-child(2) {
+  --command-orbit: 22px;
+  animation-duration: 36s;
+  animation-direction: reverse;
+}
+.command-center-orbit span:nth-child(3) {
+  --command-orbit: 44px;
+  animation-duration: 48s;
 }
 .command-center-kicker {
   align-items: center;
-  color: var(--fg-secondary);
+  color: var(--brand-primary);
   display: inline-flex;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   position: relative;
-  text-transform: none;
+  text-transform: uppercase;
   z-index: 1;
 }
 .command-center h2 {
   color: var(--fg-primary);
   font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1.25;
-  margin: 8px 0 0;
-  max-width: 36rem;
+  font-size: clamp(26px, 3vw, 42px);
+  line-height: 1;
+  margin: 18px 0 0;
+  max-width: 520px;
   position: relative;
   z-index: 1;
 }
@@ -3105,19 +3168,10 @@ select:focus-visible {
 .command-signal {
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  box-shadow: 0 10px 28px rgba(5, 7, 26, 0.05);
+  border-radius: 14px;
+  box-shadow: var(--shadow-xs);
   min-height: 100px;
-  padding: 16px 18px;
-}
-.command-signal[data-tone='amber'] .command-progress span {
-  background: var(--warning);
-}
-.command-signal[data-tone='tomato'] .command-progress span {
-  background: var(--danger);
-}
-.command-signal[data-tone='jade'] .command-progress span {
-  background: var(--success);
+  padding: 14px;
 }
 .command-signal-head {
   align-items: flex-start;
@@ -3127,21 +3181,19 @@ select:focus-visible {
   justify-content: space-between;
 }
 .command-signal-head > span {
-  color: var(--fg-secondary);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
+  color: var(--fg-tertiary);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .command-signal strong {
   color: var(--fg-primary);
   display: block;
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-  margin-top: 8px;
+  font-size: 29px;
+  line-height: 1.05;
+  margin-top: 12px;
 }
 .command-progress {
   background: var(--surface-sunken);
@@ -3152,8 +3204,9 @@ select:focus-visible {
   overflow: hidden;
 }
 .command-progress span {
-  background: var(--brand-primary);
+  background: linear-gradient(90deg, var(--brand-primary), var(--success));
   border-radius: inherit;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--brand-primary) 22%, transparent);
   display: block;
   height: 100%;
 }
@@ -3171,12 +3224,11 @@ select:focus-visible {
   min-width: 0;
 }
 .command-center-footer span {
-  color: var(--fg-secondary);
+  color: var(--fg-tertiary);
   display: block;
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 .command-center-footer strong {
   color: var(--fg-primary);
@@ -3187,39 +3239,17 @@ select:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Org dashboard only. Account cockpit keeps the shared command-center rules. */
-.command-center-quiet .command-center-hero {
-  background: var(--surface-card);
-  box-shadow: none;
-}
-.command-center-quiet .command-center-kicker,
-.command-center-quiet .command-signal-head > span,
-.command-center-quiet .command-center-footer span {
-  color: var(--fg-tertiary);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-}
-.command-center-quiet h2,
-.command-center-quiet .command-signal strong {
-  font-weight: 500;
-}
-.command-center-quiet .command-progress span {
-  background: var(--brand-primary);
-  box-shadow: none;
-}
 .section-kicker {
   align-items: baseline;
   color: var(--fg-primary);
   display: flex;
   flex-wrap: wrap;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 800;
   gap: 8px;
-  letter-spacing: 0;
-  margin-bottom: 8px;
-  text-transform: none;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  text-transform: uppercase;
 }
 .section-kicker span {
   color: var(--fg-tertiary);
@@ -3325,7 +3355,7 @@ select:focus-visible {
 .account-source-stat > small {
   display: block;
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3340,7 +3370,7 @@ select:focus-visible {
 }
 .account-source-stat small {
   margin-top: 7px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -3359,17 +3389,12 @@ select:focus-visible {
   animation: bs-chip-pop 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .smart-company-dialog {
-  overflow-x: clip;
   width: min(880px, 94vw);
 }
 .smart-company-shell {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1.22fr);
-}
-.smart-company-shell > *,
-.smart-field-grid > * {
-  min-width: 0;
 }
 .smart-company-preview {
   align-items: center;
@@ -3437,27 +3462,6 @@ select:focus-visible {
   font-size: 34px;
   font-weight: 850;
 }
-.smart-company-blurb {
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  color: var(--fg-secondary);
-  display: -webkit-box;
-  font-size: 13px;
-  line-height: 1.45;
-  margin: 0;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-}
-.smart-fact-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  position: relative;
-  width: 100%;
-  z-index: 1;
-}
 .smart-company-preview strong {
   color: var(--fg-primary);
   display: block;
@@ -3475,34 +3479,21 @@ select:focus-visible {
   position: relative;
   z-index: 1;
 }
-.smart-company-preview > .smart-fact-row > span {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: 999px;
-  color: var(--fg-secondary);
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.2;
-  margin-top: 0;
-  padding: 6px 10px;
-}
 .smart-confidence {
   align-items: center;
   background: color-mix(in srgb, var(--surface-card) 82%, transparent);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   display: flex;
-  gap: 12px;
   justify-content: space-between;
-  min-width: 0;
+  min-width: 176px;
   padding: 10px 12px;
   position: relative;
   z-index: 1;
 }
 .smart-confidence span {
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .smart-confidence strong {
@@ -3519,7 +3510,7 @@ select:focus-visible {
 .smart-field > span {
   color: var(--fg-tertiary);
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
   margin-bottom: 6px;
   text-transform: uppercase;
@@ -3569,7 +3560,7 @@ select:focus-visible {
 }
 .smart-intel-head span {
   color: var(--fg-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -3580,13 +3571,11 @@ select:focus-visible {
   margin-top: 3px;
 }
 .smart-live-dot {
-  background: var(--fg-tertiary);
+  background: var(--success);
   border-radius: 999px;
+  box-shadow: 0 0 0 4px var(--tag-jade-bg);
   height: 9px;
   width: 9px;
-}
-.smart-live-dot.is-busy {
-  background: var(--fg-secondary);
 }
 .smart-source-pills,
 .smart-alternatives {
@@ -3603,7 +3592,7 @@ select:focus-visible {
   border-radius: 999px;
   color: var(--fg-secondary);
   display: inline-flex;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   min-height: 26px;
   padding: 4px 9px;
@@ -3636,11 +3625,11 @@ select:focus-visible {
 }
 .smart-autofill-map strong {
   color: var(--fg-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .smart-autofill-map em {
   color: var(--fg-tertiary);
-  font-size: 10.5px;
+  font-size: 12px;
   margin-top: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3867,7 +3856,7 @@ select:focus-visible {
 .account-experience-copy p,
 .account-experience-copy span {
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -4005,8 +3994,7 @@ select:focus-visible {
   color: var(--tag-jade-fg);
 }
 .rail-node-degraded,
-.rail-node-disabled,
-.rail-node-unverified {
+.rail-node-disabled {
   border-color: color-mix(in srgb, var(--warning) 28%, var(--border-subtle));
   color: var(--tag-amber-fg);
 }
@@ -4105,7 +4093,7 @@ select:focus-visible {
 }
 .account-card-shell {
   height: 100%;
-  border-radius: 20px;
+  border-radius: 16px;
 }
 .account-card {
   display: flex;
@@ -4114,7 +4102,7 @@ select:focus-visible {
   padding: 20px;
   background: var(--surface-card);
   border: 0.5px solid var(--border-default);
-  border-radius: 20px;
+  border-radius: 16px;
   text-decoration: none;
   color: inherit;
   transition:
@@ -4186,7 +4174,7 @@ select:focus-visible {
   border-radius: 999px;
   background: var(--surface-sunken);
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
 }
@@ -4198,7 +4186,8 @@ select:focus-visible {
   overflow: hidden;
   color: var(--brand-primary);
 }
-.account-card-tech span {
+.account-card-tech > span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4207,13 +4196,26 @@ select:focus-visible {
   background: color-mix(in srgb, var(--brand-primary) 8%, var(--surface-card));
   padding: 3px 8px;
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .account-card-tech.is-empty {
   color: var(--fg-tertiary);
 }
-.account-card-tech.is-empty span {
+.account-card-tech > .account-card-tech-item {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 3px;
+}
+.account-card-tech-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-card-tech.is-empty > span {
   border-color: var(--border-subtle);
   background: var(--surface-sunken);
   color: var(--fg-tertiary);
@@ -4230,7 +4232,7 @@ select:focus-visible {
   min-width: 0;
 }
 .account-card-stats dt {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4256,7 +4258,7 @@ select:focus-visible {
   justify-content: space-between;
   gap: 12px;
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -4269,7 +4271,7 @@ select:focus-visible {
 .account-card-coverage {
   min-width: 0;
   color: var(--fg-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4310,7 +4312,7 @@ select:focus-visible {
   border-radius: 12px;
   background: color-mix(in srgb, var(--warning) 8%, var(--surface-card));
   color: var(--fg-secondary);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: 0;
@@ -4328,7 +4330,7 @@ select:focus-visible {
 .strategic-signal-insight strong {
   grid-column: 2;
   color: var(--fg-primary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .strategic-signal-insight.is-complete {
   border-color: color-mix(in srgb, var(--success) 22%, var(--border-subtle));
@@ -4353,7 +4355,7 @@ select:focus-visible {
   border-radius: 12px;
   background: color-mix(in srgb, var(--warning) 8%, var(--surface-card));
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -4370,7 +4372,7 @@ select:focus-visible {
 .account-card-insight strong {
   grid-column: 2;
   color: var(--fg-primary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .account-card-insight.is-complete {
   border-color: color-mix(in srgb, var(--success) 22%, var(--border-subtle));
@@ -4388,6 +4390,9 @@ select:focus-visible {
   color: var(--brand-primary);
   margin-top: auto;
   padding-top: 4px;
+}
+[data-theme='dark'] .account-card-foot {
+  color: var(--brand-deep);
 }
 .account-card:hover .account-card-foot {
   text-decoration: underline;
@@ -4774,9 +4779,6 @@ select:focus-visible {
   .command-center {
     grid-template-columns: 1fr;
   }
-  .command-center-graphic .command-center-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 
   .account-dashboard-strip {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4810,7 +4812,7 @@ select:focus-visible {
   }
 
   .command-center h2 {
-    font-size: 20px;
+    font-size: 28px;
   }
 
   .smart-company-shell,
@@ -4873,7 +4875,6 @@ select:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .smart-company-orbit span,
   .rail-track::before,
   .rail-node {
     animation: none;
@@ -5191,7 +5192,7 @@ select:focus-visible {
 .sales-country-map {
   align-items: center;
   background:
-    radial-gradient(circle at 18% 28%, rgba(102, 0, 174, 0.12), transparent 22%),
+    radial-gradient(circle at 18% 28%, rgba(0, 107, 79, 0.12), transparent 22%),
     radial-gradient(circle at 74% 34%, rgba(44, 75, 255, 0.1), transparent 26%),
     linear-gradient(180deg, var(--surface-page), var(--surface-card));
   border: 1px solid var(--border-subtle);

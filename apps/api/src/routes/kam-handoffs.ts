@@ -18,8 +18,6 @@ import {
   type KamHandoffPayload,
 } from '@bidstack/shared';
 
-import { handoffValueFields } from './kam-handoff-value.js';
-
 import { assertCompanyVisible } from './kam-access.js';
 
 type HandoffRow = Prisma.KamHandoffGetPayload<Record<string, never>>;
@@ -92,8 +90,8 @@ export const kamHandoffRoutes: FastifyPluginAsyncZod = async (server) => {
         ? {
             id: opportunity.id,
             code: opportunity.code,
-            ...handoffValueFields(opportunity.valueMicros),
-            currency: 'unspecified',
+            valueMicros: Number(opportunity.valueMicros),
+            currency: 'EUR',
           }
         : null,
     };

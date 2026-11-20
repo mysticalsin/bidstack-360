@@ -22,6 +22,9 @@
 .en-fact-sm { font-size: 14px; font-weight: 500; color: var(--fg-primary); overflow-wrap: anywhere; }
 .en-delta { font-size: 13px; font-weight: 400; color: var(--success, #177048); }
 .en-delta[data-down='true'] { color: var(--tag-amber-fg); }
+/* Slice 22: long figures and chips wrap inside their column instead of spilling into the next one. */
+.en-fact { min-width: 0; overflow-wrap: anywhere; }
+.en-strip dd > * { min-width: 0; max-width: 100%; }
 @media (max-width: 900px) {
   .en-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
   .en-strip > div:nth-child(3) { padding-left: 0; border-left: 0; }

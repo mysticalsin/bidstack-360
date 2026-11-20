@@ -38,7 +38,6 @@ export interface IntegrationSetupGuide {
     configured: boolean;
     workspaceId: string | null;
     dataSourceConfigured: boolean;
-    spaceConfigured: boolean;
     webhookReceiverUrl: string;
   };
   mcp: {
@@ -105,11 +104,7 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
     name: 'crm_update_deal',
     desc: 'Patch deal fields and write an audit log entry.',
   },
-  {
-    group: 'crm',
-    name: 'crm_list_activities',
-    desc: 'List tasks and logged events linked to one company or deal.',
-  },
+  { group: 'crm', name: 'crm_list_activities', desc: 'List activities for a company or deal.' },
   {
     group: 'crm',
     name: 'crm_create_activity',
@@ -120,18 +115,14 @@ export const MCP_TOOLS: ReadonlyArray<McpToolEntry> = [
     name: 'crm_generate_insights',
     desc: 'Generate draft insights from available CRM data for a deal or account.',
   },
-  {
-    group: 'legacy',
-    name: 'opportunities.list',
-    desc: 'List opportunities. A company id is the account filter; search matches text.',
-  },
+  { group: 'legacy', name: 'opportunities.list', desc: 'List opportunities matching filters.' },
   {
     group: 'legacy',
     name: 'opportunities.get',
-    desc: 'Fetch one opportunity by company id. The amount has no recorded currency.',
+    desc: 'Fetch one opportunity with related CRM context.',
   },
   { group: 'legacy', name: 'opportunity.update', desc: 'Patch fields and write audit log.' },
-  { group: 'legacy', name: 'contacts.list', desc: 'List people linked to one company by company id.' },
+  { group: 'legacy', name: 'contacts.list', desc: 'List decision-unit contacts by customer.' },
   { group: 'legacy', name: 'tasks.create', desc: 'Create a follow-up task on an opportunity.' },
   {
     group: 'legacy',

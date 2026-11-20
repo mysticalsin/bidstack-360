@@ -22,7 +22,14 @@ const TableKitPlayground = import.meta.env.DEV
   ? lazy(() => import('@/pages/dev/TableKitPlayground'))
   : null;
 
+const TuffuiSpecimen = import.meta.env.DEV ? lazy(() => import('@/pages/dev/TuffuiSpecimen')) : null;
+
 export function devRouteElements() {
-  if (!TableKitPlayground) return null;
-  return <Route path="/dev/table-kit" element={<TableKitPlayground />} />;
+  if (!TableKitPlayground || !TuffuiSpecimen) return null;
+  return (
+    <>
+      <Route path="/dev/table-kit" element={<TableKitPlayground />} />
+      <Route path="/dev/tuffui" element={<TuffuiSpecimen />} />
+    </>
+  );
 }

@@ -26,7 +26,7 @@ export function UserRolesManager({ userId, userName }: Props) {
 
   const assigned = assignedQuery.data ?? [];
   const assignedIds = new Set(assigned.map((r) => r.roleId));
-  const assignable = (allRoles.data ?? []).filter((r) => !assignedIds.has(r.id));
+  const assignable = (allRoles.data?.items ?? []).filter((r) => !assignedIds.has(r.id));
 
   function onAssign() {
     if (!pickerValue) return;

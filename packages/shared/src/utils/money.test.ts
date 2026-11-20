@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  formatMicrosAmount,
-  microsToSafeNumber,
-  microsToUnits,
-  microsToUnitsText,
-  sumMicros,
-  unitsTextToMicros,
-  unitsToMicros,
-} from './money.js';
+import { formatMicrosDecimal, microsToUnits, sumMicros, unitsToMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -37,33 +29,6 @@ describe('microsToUnits', () => {
     expect(naive).not.toBe(9_007_199_254.740993); // demonstrates the bug exists
 
     expect(microsToUnits(micros)).toBe(9_007_199_254.740993);
-  });
-
-  it('prints a large amount on the exact cent without a float', () => {
-    expect(formatMicrosAmount(8_598_204_328_457_184_962n)).toBe('8,598,204,328,457.18');
-    expect(formatMicrosAmount(2_500_000_000_000n)).toBe('2,500,000');
-    expect(formatMicrosAmount(0n)).toBe('0');
-  });
-
-  it('round-trips a large amount through unit text without a float', () => {
-    // WHY: the deal editor used to save Number(text) * 1e6 and drop this remainder.
-    const micros = 8_598_204_328_457_184_962n;
-    const text = microsToUnitsText(micros);
-    expect(text).toBe('8598204328457.184962');
-    expect(unitsTextToMicros(text)).toBe(micros);
-    expect(unitsTextToMicros('8598204328457.18')).toBe(8_598_204_328_457_180_000n);
-    expect(unitsTextToMicros('8,598,204,328,457.184962')).toBe(micros);
-    expect(unitsTextToMicros('nope')).toBeNull();
-  });
-
-  it('stores a safe unit amount as integer micros without multiplying a float', () => {
-    // WHY: Math.round(54_857_000_000 * 1e6) is not a safe integer, so the public
-    // revenue claim was dropped instead of stored.
-    expect(unitsToMicros(54_857_000_000)).toBe(54_857_000_000_000_000n);
-    expect(unitsToMicros('+54857000000')).toBe(54_857_000_000_000_000n);
-    expect(unitsToMicros('8598204328457.184962')).toBe(8_598_204_328_457_184_962n);
-    expect(microsToSafeNumber(54_857_000_000_000_000n)).toBeNull();
-    expect(microsToSafeNumber(1_200_000_000_000_000n)).toBe(1_200_000_000_000_000);
   });
 
   it('reconstructs negative amounts exactly, including the fractional remainder', () => {
@@ -105,5 +70,63 @@ describe('sumMicros', () => {
 
   it('returns 0n for an empty list (e.g. a company with no opportunities)', () => {
     expect(sumMicros([])).toBe(0n);
+  });
+});
+
+describe('unitsToMicros', () => {
+  it('converts everyday unit amounts to exact micros', () => {
+    // WHY: opportunity create/patch used `BigInt(Math.round(value * 1e6))`.
+    // Everyday deals must still land on the same micros the UI already shows.
+    expect(unitsToMicros(1.5)).toBe(1_500_000n);
+    expect(unitsToMicros('1.5')).toBe(1_500_000n);
+    expect(unitsToMicros(0)).toBe(0n);
+  });
+
+  it('keeps micros exact where float multiply loses the safe-integer product', () => {
+    // 9,007,199,254.740993 units × 1e6 = 2^53 + 2 micros. The IEEE product
+    // is not a safe integer, so Math.round(units * 1e6) cannot recover it.
+    // A decimal string must.
+    const units = '9007199254.740993';
+    const micros = 9_007_199_254_740_993n;
+
+    const naive = BigInt(Math.round(Number(units) * 1_000_000));
+    expect(naive).not.toBe(micros);
+
+    expect(unitsToMicros(units)).toBe(micros);
+    expect(microsToUnits(unitsToMicros(units))).toBe(9_007_199_254.740993);
+  });
+
+  it('reconstructs negative credits without a double-counted sign', () => {
+    expect(unitsToMicros(-1.5)).toBe(-1_500_000n);
+    expect(unitsToMicros('-1.234567')).toBe(-1_234_567n);
+  });
+
+  it('rejects malformed unit strings instead of coercing them to 0', () => {
+    // Fail loud: a typo must not silently store a $0 opportunity.
+    expect(() => unitsToMicros('')).toThrow(/Invalid money units/);
+    expect(() => unitsToMicros('1.2345678')).toThrow(/Invalid money units/);
+    expect(() => unitsToMicros('1e6')).toThrow(/Invalid money units/);
+    expect(() => unitsToMicros(Number.NaN)).toThrow(/Invalid money units/);
+  });
+});
+
+describe('formatMicrosDecimal', () => {
+  it('keeps fractional cents that Number(micros)/1e6.toString() would drop', () => {
+    // 1.23 units and 1.234567 units are everyday quote leftovers. A float
+    // toString can already be wrong; the formatter must emit the stored digits.
+    expect(formatMicrosDecimal(1_230_000n)).toBe('1.23');
+    expect(formatMicrosDecimal(1_234_567n)).toBe('1.234567');
+  });
+
+  it('keeps a large value exact where Number(micros)/1e6 changes the digits', () => {
+    const micros = 9_007_199_254_740_993n;
+    expect((Number(micros) / 1_000_000).toString()).not.toBe('9007199254.740993');
+    expect(formatMicrosDecimal(micros)).toBe('9007199254.740993');
+  });
+
+  it('formats whole units and credits without a trailing decimal', () => {
+    expect(formatMicrosDecimal(2_000_000n)).toBe('2');
+    expect(formatMicrosDecimal(-1_500_000n)).toBe('-1.5');
+    expect(formatMicrosDecimal(0n)).toBe('0');
   });
 });

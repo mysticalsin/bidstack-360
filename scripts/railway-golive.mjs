@@ -17,6 +17,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { pinnedDeployCli } from './pinned-deploy-cli.mjs';
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENV_FILE = join(REPO, '.env.production.local');
 const PROJECT = 'bidstack-360-demo';
@@ -43,7 +45,7 @@ const missing = REQUIRED.filter((k) => blank(env[k]));
 if (missing.length) die(`fill these in .env.production.local first:\n    ${missing.join('\n    ')}`);
 
 function railway(args, opts = {}) {
-  const res = spawnSync('railway', args, {
+  const res = spawnSync(pinnedDeployCli('railway'), args, {
     cwd: REPO, encoding: 'utf8', shell: process.platform === 'win32', ...opts,
   });
   return { ok: res.status === 0, out: `${res.stdout ?? ''}${res.stderr ?? ''}` };

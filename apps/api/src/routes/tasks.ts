@@ -6,19 +6,9 @@ import type { Prisma } from '@bidstack/db';
 import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '@bidstack/shared';
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
+import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
-type TaskSummaryCacheEntry = {
-  expiresAt: number;
-  promise: Promise<TaskSummaryPayload>;
-};
-
-const TASK_SUMMARY_CACHE_TTL_MS = 15_000;
-const taskSummaryCache = new Map<string, TaskSummaryCacheEntry>();
-
-function clearTaskSummaryCache(orgId: string): void {
-  taskSummaryCache.delete(orgId);
-}
 
 async function buildTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
   const today = new Date().toISOString().slice(0, 10);
@@ -40,21 +30,6 @@ async function buildTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
   return rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 };
 }
 
-async function cachedTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
-  const now = Date.now();
-  const cached = taskSummaryCache.get(orgId);
-  if (cached && cached.expiresAt > now) return cached.promise;
-
-  const promise = buildTaskSummary(orgId);
-  taskSummaryCache.set(orgId, { expiresAt: now + TASK_SUMMARY_CACHE_TTL_MS, promise });
-  try {
-    return await promise;
-  } catch (err) {
-    taskSummaryCache.delete(orgId);
-    throw err;
-  }
-}
-
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/tasks',
@@ -74,7 +49,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(oppId ? { oppId } : {}),
           ...(status ? { status } : {}),
         },
-        include: { assignee: true },
+        include: { assignee: { select: { email: true } } },
         orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
         take: limit + 1,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -106,10 +81,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      return req.cache(() => cachedTaskSummary(req.auth.orgId), {
-        ttlSeconds: 30,
-        tags: ['task-summary'],
-      });
+      // Tasks are also created by kam, opportunity transitions, and the
+      // worker. A process cache or a tagged response cache kept the badge
+      // behind the uncached list. The count is one query.
+      return buildTaskSummary(req.auth.orgId);
     },
   );
 
@@ -186,12 +161,17 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         include: { assignee: true },
       });
       // Fan-out webhook event — fire-and-forget (fail-open).
-      clearTaskSummaryCache(req.auth.orgId);
       void fanOutWebhookEvent(req.auth.orgId, 'task.created', {
         id: created.id,
         title: created.title,
         status: created.status,
         oppId: created.oppId,
+      });
+      emitTaskAccountEventSafe({
+        orgId: req.auth.orgId,
+        taskId: created.id,
+        kind: 'task_created',
+        actorUserId: req.auth.userId,
       });
       return reply.code(201).send({
         id: created.id,
@@ -220,7 +200,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       // only matches a unique key; we need orgId in the filter too).
       const existing = await prisma.task.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, assigneeId: true },
+        select: { id: true, assigneeId: true, status: true },
       });
       if (!existing) throw server.httpErrors.notFound('Task not found');
 
@@ -279,7 +259,14 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         include: { assignee: true },
       });
-      clearTaskSummaryCache(req.auth.orgId);
+      if (existing.status !== 'done' && updated.status === 'done') {
+        emitTaskAccountEventSafe({
+          orgId: req.auth.orgId,
+          taskId: updated.id,
+          kind: 'task_completed',
+          actorUserId: req.auth.userId,
+        });
+      }
       await prisma.auditLog.create({
         data: {
           orgId: req.auth.orgId,
@@ -390,7 +377,6 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           },
         }),
       ]);
-      clearTaskSummaryCache(req.auth.orgId);
       return reply.code(204).send(null);
     },
   );

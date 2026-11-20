@@ -12,6 +12,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -39,18 +40,18 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const id of createdWidgetIds) {
-    await prisma.auditLog.deleteMany({ where: { targetType: 'analytics_widget', targetId: id } });
+    await purgeAuditRows({ where: { targetType: 'analytics_widget', targetId: id } });
     await prisma.analyticsDashboardWidget.deleteMany({ where: { id } });
   }
   for (const id of createdDashboardIds) {
-    await prisma.auditLog.deleteMany({
+    await purgeAuditRows({
       where: { targetType: 'analytics_dashboard', targetId: id },
     });
     await prisma.analyticsDashboardWidget.deleteMany({ where: { dashboardId: id } });
     await prisma.analyticsDashboard.deleteMany({ where: { id } });
   }
   for (const id of createdReportIds) {
-    await prisma.auditLog.deleteMany({ where: { targetType: 'analytics_report', targetId: id } });
+    await purgeAuditRows({ where: { targetType: 'analytics_report', targetId: id } });
     await prisma.analyticsReportRun.deleteMany({ where: { reportId: id } });
     await prisma.analyticsReport.deleteMany({ where: { id } });
   }

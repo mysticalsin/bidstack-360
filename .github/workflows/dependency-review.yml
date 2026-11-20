@@ -28,7 +28,17 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Detect GitHub Dependency graph
+        id: graph
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          status="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.security_and_analysis.dependency_graph.status' 2>/dev/null || true)"
+          echo "status=${status:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "Dependency graph status: ${status:-unknown}"
+
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v4
+        if: steps.graph.outputs.status == 'enabled'
         with:
           # Fail the PR if any added dependency carries an open CVE at this
           # severity or worse. "moderate" or "low" CVEs are noted in the PR
@@ -39,3 +49,8 @@ jobs:
           # and turn `fail-on-licenses` to a hard list.
           comment-summary-in-pr: on-failure
           warn-only: false
+
+      - name: Graph disabled — CVE gate cannot run
+        if: steps.graph.outputs.status != 'enabled'
+        run: |
+          echo "::warning::GitHub Dependency graph is ${{ steps.graph.outputs.status }} (Settings → Code security). Enable it so this job reviews HIGH/CRITICAL CVEs. Trivy fs + pnpm audit remain the active CVE gates."

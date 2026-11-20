@@ -134,7 +134,9 @@ test.describe('Settings page', () => {
         .getByRole('searchbox', { name: 'Search companies to add to the top accounts' })
         .fill(company.name);
       await page
-        .getByRole('button', { name: new RegExp(company.name) })
+        .getByRole('button', {
+          name: new RegExp(company.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        })
         .first()
         .click();
       await expect(page.getByLabel('Curated top accounts, in rank order')).toContainText(

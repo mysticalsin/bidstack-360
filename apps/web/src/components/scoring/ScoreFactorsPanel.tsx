@@ -163,24 +163,6 @@ function FactorTable({ factors }: { factors: ScoreFactor[] }) {
 
 // ─── Panel ────────────────────────────────────────────────────────────────
 
-function modelFooter(modelVersion: string, t: TFunc): string {
-  if (modelVersion === 'fallback-v0') {
-    return t('scoreFactors.footerUnscored', 'No trained model. This is not a forecast.');
-  }
-  if (modelVersion.includes('+xgb')) {
-    return t(
-      'scoreFactors.footerBoosted',
-      'Model {{modelVersion}} · gradient boosted · cached for one hour',
-      { modelVersion },
-    );
-  }
-  return t(
-    'scoreFactors.footer',
-    'Model {{modelVersion}} · logistic regression · cached for one hour',
-    { modelVersion },
-  );
-}
-
 function PanelContent({
   score,
   factors,
@@ -188,25 +170,13 @@ function PanelContent({
   modelVersion,
   label,
 }: {
-  score: number | null;
+  score: number;
   factors: ScoreFactor[];
   recommendation?: string;
   modelVersion: string;
   label: string;
 }) {
   const { t } = useTranslation('crm');
-  if (score === null) {
-    return (
-      <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4">
-        <h3 className="font-semibold text-sm text-[var(--fg-primary)]">
-          {t('scoreFactors.titleUnscored', 'Score')}
-        </h3>
-        <p className="mt-2 text-sm text-[var(--fg-secondary)]">
-          {t('scoreFactors.footerUnscored', 'No trained model. This is not a forecast.')}
-        </p>
-      </section>
-    );
-  }
   const top5 = factors.slice(0, 5);
   const maxAbs = top5.reduce((m, f) => Math.max(m, Math.abs(f.contribution)), 0.01);
 
@@ -250,7 +220,9 @@ function PanelContent({
 
       {/* Footer */}
       <p className="mt-3 text-[10px] text-[var(--fg-muted)] text-right">
-        {modelFooter(modelVersion, t)}
+        {t('scoreFactors.footer', 'Model v{{modelVersion}} · Logistic regression · Updated hourly', {
+          modelVersion,
+        })}
       </p>
     </section>
   );

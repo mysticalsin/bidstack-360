@@ -36,7 +36,7 @@
     "typedSignature": "Signature tapée",
     "drawnSignature": "Signature dessinée",
     "typeNamePlaceholder": "Tapez votre nom complet",
-    "agreed": "J'accepte que cette signature électronique soit légalement équivalente à ma signature manuscrite."
+    "agreed": "Je comprends que cette signature électronique est une signature d'approbation interne, et non une signature électronique juridiquement contraignante."
   },
   "timeline": {
     "title": "Historique des signatures",

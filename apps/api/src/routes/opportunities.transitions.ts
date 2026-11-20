@@ -20,9 +20,11 @@ import {
 } from '@bidstack/shared';
 import { config } from '../env.js';
 import { pushOpportunityToDust } from '../lib/dust-push.js';
+import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { createNotification } from '../services/notification.service.js';
+import { emitOpportunityAccountEventSafe } from '../services/account-events.service.js';
 import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
 
 /** Task.type marker for the Stage-10 debrief, so it can be found and deduped. */
@@ -80,7 +82,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
     },
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
@@ -254,7 +256,6 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
                 color: true,
                 isWon: true,
                 isLost: true,
-                deletedAt: true,
               },
             },
           },
@@ -415,6 +416,21 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
         });
       }
 
+      if (stageChanged) {
+        const stageName = toStage?.name ?? nextStage;
+        emitOpportunityAccountEventSafe({
+          orgId: req.auth.orgId,
+          opportunityId: updated.id,
+          kind: 'opportunity_stage_changed',
+          actorUserId: req.auth.userId,
+          entityType: 'opportunity',
+          entityId: updated.id,
+          title: ({ companyName, opportunityName }) => `Stage moved to ${stageName} on ${companyName}: ${opportunityName}`,
+          sourceUrl: `/opportunities/${updated.id}`,
+          excludeUserIds: updated.ownerId && updated.ownerId !== req.auth.userId ? [updated.ownerId] : [],
+        });
+      }
+
       return {
         id: updated.id,
         pipelineStageId: updated.pipelineStageId,
@@ -446,15 +462,19 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
     },
     async (req) => {
       const opp = await prisma.opportunity.findFirst({
-        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        include: {
-          pipelineStage: { select: { name: true, isWon: true, isLost: true, deletedAt: true } },
-        },
+        where: await visibleOpportunityWhere(req.auth, req.params.id),
+        include: { pipelineStage: { select: { name: true } } },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
 
-      // A matching customer string is not a link. People and notes enter the
-      // brief only through the opportunity's company id.
+      const contactFilters = [
+        { customer: opp.customer },
+        ...(opp.companyId ? [{ companyId: opp.companyId }] : []),
+      ];
+      const noteFilters = [
+        { accountId: opp.customer },
+        ...(opp.companyId ? [{ companyId: opp.companyId }] : []),
+      ];
       const [tasks, contacts, notes] = await Promise.all([
         prisma.task.findMany({
           where: { orgId: req.auth.orgId, oppId: opp.id, deletedAt: null },
@@ -462,28 +482,24 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           take: 8,
           select: { title: true, status: true, dueDate: true },
         }),
-        opp.companyId
-          ? prisma.contact.findMany({
-              where: { orgId: req.auth.orgId, deletedAt: null, companyId: opp.companyId },
-              orderBy: [{ influence: { sort: 'desc', nulls: 'last' } }, { name: 'asc' }],
-              take: 8,
-              select: {
-                name: true,
-                role: true,
-                influence: true,
-                sentiment: true,
-                aiOptOut: true,
-              },
-            })
-          : Promise.resolve([]),
-        opp.companyId
-          ? prisma.note.findMany({
-              where: { orgId: req.auth.orgId, deletedAt: null, companyId: opp.companyId },
-              orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-              take: 5,
-              select: { title: true, bodyMd: true, pinned: true, updatedAt: true },
-            })
-          : Promise.resolve([]),
+        prisma.contact.findMany({
+          where: { orgId: req.auth.orgId, deletedAt: null, OR: contactFilters },
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+          select: {
+            name: true,
+            role: true,
+            influence: true,
+            sentiment: true,
+            aiOptOut: true,
+          },
+        }),
+        prisma.note.findMany({
+          where: { orgId: req.auth.orgId, deletedAt: null, OR: noteFilters },
+          orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+          take: 5,
+          select: { title: true, bodyMd: true, pinned: true, updatedAt: true },
+        }),
       ]);
 
       const brief = buildOpportunityBrief({
@@ -493,7 +509,6 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           name: opp.name,
           stage: opp.stage,
           pipelineStageName: opp.pipelineStage?.name ?? null,
-          pipelineStage: opp.pipelineStage,
           valueMicros: opp.valueMicros,
           probability: opp.probability,
           dueDate: opp.dueDate,

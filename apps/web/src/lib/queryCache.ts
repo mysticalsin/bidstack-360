@@ -119,6 +119,9 @@ function shouldPersistQueryKey(key: unknown[]): boolean {
   if (key[0] === 'crm-dashboard' && typeof key[1] === 'string' && key[1] !== 'default') {
     return false;
   }
+  // The nav badge is a live count. Restoring it after reload shows the
+  // previous overdue total while the task list has already moved on.
+  if (key[0] === 'tasks' && key[1] === 'summary') return false;
   return true;
 }
 
@@ -214,7 +217,11 @@ export function watchAuthForCacheClear(queryClient: QueryClient): () => void {
     const nextFingerprint = currentAuthFingerprint();
     if (previousFingerprint !== null && previousFingerprint !== nextFingerprint) {
       clearPersistedCache();
-      queryClient.clear();
+      // Not queryClient.clear(): mounted observers would stay subscribed to the
+      // destroyed queries, so a page whose fetch was in flight keeps its
+      // skeleton forever. Reset drops the old identity's data and refetches.
+      queryClient.removeQueries({ type: 'inactive' });
+      void queryClient.resetQueries({ type: 'active' });
     }
     sessionStorage.setItem(AUTH_FINGERPRINT_KEY, nextFingerprint);
   };

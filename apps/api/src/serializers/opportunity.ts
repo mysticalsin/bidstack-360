@@ -4,7 +4,6 @@
 import type { Task, Document, OpportunityStage } from '@bidstack/db';
 import {
   microsToUnits,
-  presentOpportunityIntel,
   type Opportunity as ApiOpportunity,
   type OpportunityFull as ApiOpportunityFull,
 } from '@bidstack/shared';
@@ -22,11 +21,10 @@ type SerializedOpportunity = {
   id: string;
   code: string;
   customer: string;
-  companyId?: string | null;
   name: string;
   stage: OpportunityStage;
   pipelineStageId: string | null;
-  pipelineStage: { id: string; name: string; probability: number | unknown; color: string | null; isWon?: boolean; isLost?: boolean; deletedAt?: Date | null } | null;
+  pipelineStage: { id: string; name: string; probability: number | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null;
   valueMicros: bigint | number;
   probability: number;
   dueDate: Date | null;
@@ -57,10 +55,9 @@ export interface OpportunityCounts {
 }
 
 function serializePipelineStage(
-  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean; deletedAt?: Date | null } | null | undefined,
+  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null | undefined,
 ): SerializedPipelineStage | null {
-  // A removed stage does not keep its name or its won/lost flags on the deal.
-  if (!ps || ps.deletedAt) return null;
+  if (!ps) return null;
   return {
     id: ps.id,
     name: ps.name,
@@ -75,23 +72,18 @@ export function serializeOpportunity(
   o: WithOwner & { territory?: { name: string } | null },
   counts?: OpportunityCounts,
 ): ApiOpportunity {
-  const liveStage = serializePipelineStage(o.pipelineStage);
-  // The stored id can still point at a removed stage. The read must not.
-  const stageRemoved = Boolean(o.pipelineStage?.deletedAt);
   return {
     id: o.id,
     code: o.code,
     customer: o.customer,
-    companyId: o.companyId ?? null,
     name: o.name,
-    stage: liveStage?.name ?? o.stage ?? null,
-    pipelineStageId: stageRemoved ? null : (o.pipelineStageId ?? null),
-    pipelineStage: liveStage,
+    stage: o.pipelineStage?.name ?? o.stage ?? null,
+    pipelineStageId: o.pipelineStageId ?? null,
+    pipelineStage: serializePipelineStage(o.pipelineStage),
+    // WHY microsToUnits (not Number(x) / 1_000_000): the naive form rounds
+    // BigInt→Number before dividing, so a deal past ~$9.007B silently
+    // corrupts on the wire. Storage stays micros.
     value: microsToUnits(o.valueMicros),
-    valueMicros:
-      typeof o.valueMicros === 'bigint'
-        ? o.valueMicros.toString()
-        : BigInt(Math.trunc(o.valueMicros)).toString(),
     probability: o.probability,
     dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
     owner: o.owner?.email ?? null,
@@ -114,7 +106,7 @@ export function serializeOpportunity(
 export function serializeOpportunityFull(o: Full): ApiOpportunityFull {
   return {
     ...serializeOpportunity(o),
-    intel: presentOpportunityIntel(o.intel),
+    intel: o.intel as ApiOpportunityFull['intel'],
     tasks: o.tasks.map((t) => ({
       id: t.id,
       title: t.title,

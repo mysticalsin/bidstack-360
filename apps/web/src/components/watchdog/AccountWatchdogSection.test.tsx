@@ -38,6 +38,40 @@ describe('AccountWatchdogSection', () => {
     expect(screen.getByText('Nothing new in public filings')).toBeTruthy();
     expect(screen.getByText(/SEC CIK 0000320193/)).toBeTruthy();
     expect(screen.getByText('No results dates announced')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Previous projects with us' })).toBeTruthy();
+    expect(screen.getByText('No closed projects yet')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Related history' })).toBeTruthy();
+    expect(screen.getByText('No related history yet')).toBeTruthy();
+  });
+
+  it('always shows previous projects and related history, even before the watchdog loads', () => {
+    state.data = undefined;
+    state.isLoading = true;
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.getByRole('heading', { name: 'Previous projects with us' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Related history' })).toBeTruthy();
+    expect(screen.getByText('No closed projects yet')).toBeTruthy();
+    expect(screen.getByText('No related history yet')).toBeTruthy();
+    state.isLoading = false;
+  });
+
+  it('lists meetings, MSAs and signals in related history', () => {
+    state.data = {
+      ...base,
+      history: [
+        { id: 'mt:1', at: '2026-10-20T14:00:00Z', type: 'meeting', title: 'QBR with finance', detail: 'Hiring freeze' },
+        { id: 'msa:1', at: '2026-01-01T00:00:00Z', type: 'msa', title: 'MSA-2026-001', detail: 'msa · active' },
+        { id: 'ev:1', at: '2026-09-01T00:00:00Z', type: 'signal', title: 'Series B announced', detail: 'gdelt · opportunity' },
+      ],
+    };
+    render(<AccountWatchdogSection companyId="c1" />);
+    const meta = (title: string) => screen.getByText(title).parentElement!.querySelector('.wd-row-meta')!.textContent;
+    expect(meta('QBR with finance')).toMatch(/Meeting/);
+    expect(meta('QBR with finance')).toMatch(/Hiring freeze/);
+    expect(meta('MSA-2026-001')).toMatch(/MSA/);
+    expect(meta('MSA-2026-001')).toMatch(/msa · active/);
+    expect(meta('Series B announced')).toMatch(/Signal/);
+    expect(meta('Series B announced')).toMatch(/gdelt · opportunity/);
   });
 
   it('says what to add when the account has no website or ticker for news (v22)', () => {

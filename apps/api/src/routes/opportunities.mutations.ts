@@ -19,16 +19,17 @@ import {
   OpportunityCreate,
   OpportunityImport,
   OpportunityImportResult,
+  unitsToMicros,
 } from '@bidstack/shared';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
+import { emitAccountEventSafe } from '../services/account-events.service.js';
 import { serializeOpportunity } from '../serializers/opportunity.js';
 import {
   isUniqueViolation,
   loadCompanyNameIndex,
   mintNextCode,
   mintNextCodes,
-  patchedValueMicros,
   resolveCompanyIdByName,
 } from './opportunities.helpers.js';
 
@@ -132,7 +133,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                 name: body.name,
                 stage: stageKey,
                 pipelineStageId,
-                valueMicros: patchedValueMicros(body) ?? 0n,
+                valueMicros: unitsToMicros(body.value),
                 probability: body.probability,
                 dueDate: body.dueDate ? new Date(body.dueDate) : null,
                 industry: body.industry,
@@ -188,7 +189,6 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
               color: true,
               isWon: true,
               isLost: true,
-              deletedAt: true,
             },
           },
         },
@@ -208,6 +208,18 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         stage: created.stage,
         ownerId: created.ownerId,
       });
+      if (created.companyId) {
+        emitAccountEventSafe({
+          orgId: req.auth.orgId,
+          companyId: created.companyId,
+          kind: 'opportunity_created',
+          actorUserId: req.auth.userId,
+          entityType: 'opportunity',
+          entityId: created.id,
+          title: (company) => `New opportunity on ${company}: ${created.name}`,
+          sourceUrl: `/opportunities/${created.id}`,
+        });
+      }
       return reply.code(201).send(serializeOpportunity(created));
     },
   );
@@ -375,7 +387,7 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
                     name: vr.row.name,
                     stage: vr.stageKey,
                     pipelineStageId: vr.pipelineStageId ?? undefined,
-                    valueMicros: patchedValueMicros(vr.row) ?? 0n,
+                    valueMicros: unitsToMicros(vr.row.value),
                     probability: vr.row.probability,
                     dueDate: vr.row.dueDate ? new Date(vr.row.dueDate) : null,
                     industry: vr.row.industry ?? null,
