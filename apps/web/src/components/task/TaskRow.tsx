@@ -45,7 +45,29 @@ export const TaskRow = memo(function TaskRow({
   const { t } = useTranslation('crm');
   const update = useUpdateTask();
   const d = daysUntil(task.dueDate);
-  const overdue = d !== null && d < 0;
+  // The date is the date. A second line ("Due …", "in 3d", "Overdue: 3d late")
+  // made every row a sentence. Urgency stays on the date itself: a filled
+  // diamond when it is late, an outline diamond when it is today. Shape, not
+  // hue alone, so the two states are not color-only.
+  const dueUrgency: 'none' | 'overdue' | 'today' | 'future' | 'done' =
+    !task.dueDate || d === null
+      ? 'none'
+      : task.status === 'done'
+        ? 'done'
+        : d < 0
+          ? 'overdue'
+          : d === 0
+            ? 'today'
+            : 'future';
+  const dueText = formatDate(task.dueDate);
+  const dueAria =
+    dueUrgency === 'none'
+      ? t('taskRow.noDueDate', 'No due date')
+      : dueUrgency === 'overdue'
+        ? t('taskRow.dueOverdue', '{{date}}, overdue', { date: dueText })
+        : dueUrgency === 'today'
+          ? t('taskRow.dueToday', '{{date}}, due today', { date: dueText })
+          : dueText;
   const readOnlyHint = t('taskRow.readOnlyHint', 'You need task write access to edit this task.');
 
   const [snoozeOpen, setSnoozeOpen] = useState(false);
@@ -236,42 +258,44 @@ export const TaskRow = memo(function TaskRow({
           collapsed to a 36px column, wrapping one character per line. A real
           basis plus flex-wrap on the row makes the actions wrap instead. */}
       <div className="min-w-0 flex-1 basis-56">
-        <div
+        <Link
+          to={`/tasks/${task.id}`}
+          title={task.title}
           className={cn(
-            'text-sm font-medium text-[var(--fg-primary)]',
+            'block truncate text-sm font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]',
             // Strike-through completed tasks — visual confirmation that
             // matches Reminders.app.
             task.status === 'done' && 'line-through text-[var(--fg-tertiary)]',
           )}
         >
-          <Link to={`/tasks/${task.id}`} className="hover:text-[var(--brand-primary)]">
-            {task.title}
-          </Link>
-        </div>
-        <div className="text-xs text-[var(--fg-tertiary)]">
-          {t('taskRow.due', 'Due {{date}}', { date: formatDate(task.dueDate) })}
-          {d !== null && task.status !== 'done' ? (
-            <span
-              className={
-                overdue
-                  ? 'text-[var(--danger)] ml-2 inline-flex items-center gap-1 font-semibold'
-                  : 'ml-2'
-              }
-            >
-              {overdue ? (
-                <>
-                  <span role="img" aria-label={t('taskRow.warning', 'warning')}>
-                    ⚠️
-                  </span>
-                  {t('taskRow.overdue', 'Overdue: {{count}}d late', { count: Math.abs(d) })}
-                </>
-              ) : (
-                t('taskRow.dueIn', 'in {{count}}d', { count: d })
-              )}
-            </span>
-          ) : null}
-        </div>
+          {task.title}
+        </Link>
       </div>
+      <time
+        dateTime={task.dueDate ?? undefined}
+        data-testid="task-due"
+        data-urgency={dueUrgency}
+        aria-label={dueAria}
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1.5 text-xs tabular-nums',
+          dueUrgency === 'overdue' && 'font-semibold text-[var(--danger)]',
+          dueUrgency === 'today' && 'font-semibold text-[var(--warning)]',
+          dueUrgency !== 'overdue' && dueUrgency !== 'today' && 'text-[var(--fg-tertiary)]',
+        )}
+      >
+        {dueUrgency === 'overdue' || dueUrgency === 'today' ? (
+          <span
+            aria-hidden="true"
+            data-testid="task-due-mark"
+            data-mark={dueUrgency === 'overdue' ? 'filled' : 'outline'}
+            className={cn(
+              'inline-block h-1.5 w-1.5 shrink-0 rotate-45 border border-current',
+              dueUrgency === 'overdue' && 'bg-current',
+            )}
+          />
+        ) : null}
+        {dueText}
+      </time>
       <div className="flex items-center gap-1.5">
         {task.status !== 'done' ? (
           <div ref={snoozeRef} className="relative">

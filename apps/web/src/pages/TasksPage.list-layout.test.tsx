@@ -153,8 +153,9 @@ describe('Tasks list — one date, no due sentence', () => {
     expect(due.textContent).toBe(formatDate(FUTURE.dueDate));
     expect(due.getAttribute('data-urgency')).toBe('future');
     expect(due.querySelector('[data-testid="task-due-mark"]')).toBeNull();
-    expect(screen.queryByText(/Due /)).toBeNull();
-    expect(screen.queryByText(/\bin \d+d\b/)).toBeNull();
+    const row = screen.getByRole('link', { name: FUTURE.title }).closest('[role="listitem"]');
+    expect(row?.textContent).not.toMatch(/Due /);
+    expect(row?.textContent).not.toMatch(/\bin \d+d\b/);
     expect(screen.getByRole('button', { name: /Snooze Workshop with Logistec CISO/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Status: open/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeTruthy();
@@ -234,9 +235,7 @@ describe('Tasks list — one date, no due sentence', () => {
     expect(done.textContent).toBe(formatDate(DONE.dueDate));
     expect(done.className).not.toContain('text-[var(--danger)]');
     expect(done.querySelector('[data-testid="task-due-mark"]')).toBeNull();
-    expect(screen.getByRole('link', { name: DONE.title }).parentElement?.className).toContain(
-      'line-through',
-    );
+    expect(screen.getByRole('link', { name: DONE.title }).className).toContain('line-through');
 
     const undated = dueOf(UNDATED.title);
     expect(undated.getAttribute('data-urgency')).toBe('none');
