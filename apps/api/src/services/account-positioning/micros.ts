@@ -12,6 +12,23 @@ export function capDealSample<T>(
   return { rows: rows.slice(0, limit), capped: true };
 }
 
+/**
+ * Reference wins. Lost wins when the enum or a live stage says lost.
+ * A soft-deleted stage row does not close the deal. Same shape as the
+ * removed `wonOutcomeWhere` helper.
+ */
+export function referenceWinWhere() {
+  return {
+    NOT: {
+      OR: [{ stage: 'closed_lost' as const }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
+    },
+    OR: [
+      { stage: 'closed_won' as const },
+      { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
+    ],
+  };
+}
+
 const SAFE = BigInt(Number.MAX_SAFE_INTEGER);
 
 /** Sum integer micros. Null when the total cannot be a JavaScript number without drifting. */

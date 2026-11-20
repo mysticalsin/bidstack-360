@@ -2,7 +2,7 @@
 // risks, and the key-numbers strip. Read only, built from data already held.
 // Nothing is estimated: a number with no source comes back as null.
 import { prisma } from '@bidstack/db';
-import { capDealSample, POSITIONING_DEAL_SAMPLE, sumMicrosAsNumber } from './micros.js';
+import { capDealSample, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros.js';
 import {
   buildGaps,
   buildPlays,
@@ -162,14 +162,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
         orgId,
         deletedAt: null,
         valueMicros: { gt: 0n },
-        // Lost wins. A live won stage counts. Main no longer exports wonOutcomeWhere.
-        NOT: {
-          OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
-        },
-        OR: [
-          { stage: 'closed_won' },
-          { pipelineStage: { is: { deletedAt: null, isWon: true, isLost: false } } },
-        ],
+        ...referenceWinWhere(),
       },
       select: { name: true, valueMicros: true, companyId: true },
       orderBy: { closedAt: 'desc' },
