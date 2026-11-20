@@ -21,6 +21,27 @@ describe('positioningDealOutcome', () => {
     ).toBe('lost');
   });
 
+  it('leaves a plain open stage open', () => {
+    // WHY: a mutant that returns lost for every live row still passed the lost-only cases.
+    expect(positioningDealOutcome({ stage: 's3_technical_iteration', pipelineStage: null })).toBe('open');
+    expect(
+      positioningDealOutcome({
+        stage: 's1_lead',
+        pipelineStage: { isWon: false, isLost: false, deletedAt: null },
+      }),
+    ).toBe('open');
+  });
+
+  it('counts a plain won stage as won', () => {
+    expect(positioningDealOutcome({ stage: 'closed_won', pipelineStage: null })).toBe('won');
+    expect(
+      positioningDealOutcome({
+        stage: 'closed_won',
+        pipelineStage: { isWon: true, isLost: false, deletedAt: null },
+      }),
+    ).toBe('won');
+  });
+
   it('does not close a deal whose stage row was deleted', () => {
     expect(
       positioningDealOutcome({
