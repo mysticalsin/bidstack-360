@@ -16,7 +16,7 @@ Polo has two switches that used to be one.
 | `apps/api/src/server.ts` rate limit | Fail-open unless the variable was exactly `real`. | Fail-closed in real mode, which is now the default. Demo stays fail-open. |
 | `apps/api/src/plugins/auth.ts` stub | Looked up `org_seed_mantu` and 503'd with "run pnpm db:seed" when the org or user was missing. | In real mode, first local sign-in creates an empty workspace, the system roles, and one admin user. No companies. |
 | `packages/db/src/seed.ts` | Refused the fixture seed only when the variable was exactly `real`. Unset still loaded Mantu, CI Financial, and the rest. | Refuses unless the variable is exactly `demo` (or `BIDSTACK_ALLOW_FIXTURE_SEED=true`). |
-| `apps/polo-preview/container/entrypoint.mjs` | Sets `POLO_DATA_MODE=demo` on purpose. | Unchanged. That file is in open PR #353. The preview still opts into demo. The org switch still starts off, so sample numbers stay hidden until an admin turns them on. |
+| `apps/polo-preview/container/entrypoint.mjs` | Copied the environment, then set `POLO_DATA_MODE` to `demo`, so the operator could not choose. | That assignment is gone. Unset stays unset and the API default is real. An explicit `demo` in the environment is kept. The org switch is not set here. Preview identity stays Cloudflare Access, which this file already turns on. |
 | `apps/web` identity banner and Settings → Identity | Reads `dataMode` from `GET /api/v1/identity`. | Shows Real when the variable is unset. |
 | `.env.example` | Set `POLO_DATA_MODE=demo`. | The line is commented. Copying the example no longer opts into demo. |
 | `docs/enterprise-readiness.md` | Said the default stays demo. | The two sentences that said that now point here. |

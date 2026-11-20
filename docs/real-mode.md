@@ -91,6 +91,14 @@ Two switches, both required:
 
 Either switch alone is not enough. The seed will not run without the process switch. The numbers will not show without the org switch.
 
+## Preview
+
+The preview container does not set `POLO_DATA_MODE`. If the variable is unset, the API default is real. If the environment passes `demo`, that explicit opt-in is kept. The org Demo data switch is stored in the database and the entrypoint does not touch it.
+
+Real mode on the preview uses Cloudflare Access. The entrypoint already sets `CF_ACCESS_AUTH=true` and `CF_ACCESS_TEAM_DOMAIN`. The worker already passes `CF_ACCESS_AUD` and `POLO_ALLOWED_USERS`. This change does not add Clerk, and it does not add another identity provider.
+
+PR #353 also edits `apps/polo-preview/container/entrypoint.mjs` and is merging first. It still assigns `POLO_DATA_MODE: 'demo'` inside `runtimeEnv` (line 156 on that branch, line 98 on current main). This PR deletes that assignment and nothing else in the file. Rebase onto `main` after #353 merges and drop the assignment again if the rebase keeps it.
+
 ## Not connected
 
 Enrichment, public financials, foreign exchange, and the release score need a provider or a recorded row. With nothing linked they say Not connected. They do not invent a revenue, a headcount, or a score.

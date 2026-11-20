@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { TeamSection } from '@/components/settings/TeamSection';
+import { useOrgDemoData, useUpdateOrgDemoData } from '@/hooks/useOrgDemoData';
 import { useAuth, useIsAdmin } from '@/lib/auth';
 import { usePoloMe, usePoloPublicIdentity } from '@/hooks/usePoloIdentity';
 
@@ -13,6 +14,8 @@ export function IdentitySection() {
   const isAdmin = useIsAdmin();
   const publicId = usePoloPublicIdentity();
   const me = usePoloMe(isSignedIn);
+  const demo = useOrgDemoData();
+  const updateDemo = useUpdateOrgDemoData();
 
   return (
     <div className="space-y-6">
@@ -29,13 +32,18 @@ export function IdentitySection() {
             <LoadingSkeleton rows={3} />
           ) : (
             <>
-              <Row label={t('identity.dataMode', 'Data mode')}>
-                <Badge tone={publicId.data?.dataMode === 'real' ? 'jade' : 'amber'}>
-                  {publicId.data?.dataMode === 'real'
-                    ? t('identity.modeReal', 'Real')
-                    : t('identity.modeDemo', 'Demo')}
-                </Badge>
-              </Row>
+              {isAdmin ? (
+                <Row label={t('identity.demoData', 'Demo data')}>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    aria-label={t('identity.demoData', 'Demo data')}
+                    checked={demo.data?.demoData === true}
+                    disabled={updateDemo.isPending || demo.isLoading}
+                    onChange={(event) => updateDemo.mutate(event.target.checked)}
+                  />
+                </Row>
+              ) : null}
               <Row label={t('identity.provider', 'Auth provider')}>
                 {providerLabel(publicId.data?.authProvider ?? me.data?.authProvider, t)}
               </Row>
