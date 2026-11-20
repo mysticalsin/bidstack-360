@@ -116,6 +116,9 @@ describe('open pipeline total', () => {
     expect(pipeline).toMatchObject({ value: Number(OLD_OPEN_MICROS), unit: 'money_micros', missing: null });
     expect(pipeline?.sub).toBe('1 open deal');
     expect(pipeline?.sub).not.toContain('latest');
+    // A capped book must not draw a sparkline from the page. The page is not the book.
+    expect(pipeline?.series).toEqual([]);
+    expect(pipeline?.delta).toBeNull();
   });
 
   it('shows a 10bn open total on the tile, the same figure the brief already says', async () => {
@@ -135,5 +138,34 @@ describe('open pipeline total', () => {
       currency: 'EUR',
       missing: null,
     });
+  });
+
+  it('returns 200 and an honest too-large state when the open sum exceeds int64 micros', async () => {
+    // WHY: Postgres SUM(bigint) throws past 2^63-1 (~EUR 9.2tn). The aggregate
+    // then 500s. Base summed in JavaScript and still returned 200.
+    const id = (await prisma.company.create({ data: { orgId: org.orgId, name: `${TAG} Overflow` } })).id;
+    const cap = 9_223_372_036_854_775_807n;
+    await prisma.opportunity.createMany({
+      data: [0, 1].map((index) => ({
+        orgId: org.orgId,
+        companyId: id,
+        code: `${TAG}-cap${index}`,
+        customer: `${TAG} Overflow`,
+        name: `Cap deal ${index}`,
+        stage: 's2_sent' as const,
+        valueMicros: cap,
+      })),
+    });
+    const positioning = await get(`/accounts/${id}/positioning`);
+    expect(positioning.statusCode, positioning.body).toBe(200);
+    const pos = positioning.json<AccountPositioning>();
+    expect(pos.brief.pipeline.openCount).toBe(2);
+    expect(spoken(pos.brief)).toContain('too large');
+    expect(spoken(pos.brief)).not.toContain('worth');
+
+    const numbers = await get(`/accounts/${id}/key-numbers`);
+    expect(numbers.statusCode, numbers.body).toBe(200);
+    const pipeline = numbers.json<AccountKeyNumbers>().items.find((item) => item.id === 'pipeline');
+    expect(pipeline).toMatchObject({ value: null, missing: 'Open pipeline is too large to show' });
   });
 });
