@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatMicrosAmount } from '@bidstack/shared';
-
 import { formatExtractedMicros } from './IntakeReviewPage';
 
 describe('formatExtractedMicros', () => {
   it('prints a large safe micros amount from the integer, not the float', () => {
     // WHY: dividing this micros value by 1e6 in JS prints 8,598,204,328.457.
     const micros = 8_598_204_328_457_184;
-    expect(formatExtractedMicros(micros, 'usd')).toBe(
-      `${formatMicrosAmount(BigInt(micros))} USD`,
-    );
+    expect(formatExtractedMicros(micros, 'usd')).toBe('8,598,204,328.46 USD');
     expect(formatExtractedMicros(micros, 'usd')).not.toContain('328.457');
   });
 
