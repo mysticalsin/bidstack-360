@@ -18,7 +18,9 @@ import { mockMatchMedia } from '@/test/matchMedia';
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (_key: string, fallback?: string) => fallback ?? _key }),
 }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: undefined, isLoading: false }) }));
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({ data: undefined, isLoading: false }),
+}));
 vi.mock('@/hooks/useOpportunities', () => ({ useOpportunityCount: () => ({ data: undefined }) }));
 vi.mock('@/hooks/useTasks', () => ({ useTaskSummary: () => ({ data: undefined }) }));
 vi.mock('@/hooks/useAppModules', () => ({ useAppModules: () => ({ data: {} }) }));
@@ -34,7 +36,9 @@ const TAGLINES = LOCALES.map((locale) => {
   return json.app.tagline;
 });
 
-const LONG_TAGLINE = TAGLINES.reduce((longest, line) => (line.length > longest.length ? line : longest));
+const LONG_TAGLINE = TAGLINES.reduce((longest, line) =>
+  line.length > longest.length ? line : longest,
+);
 
 function renderRail(path: string) {
   return render(

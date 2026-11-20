@@ -181,14 +181,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
           <div className="sb-mark" aria-hidden>
             <PoloPreSalesLogo variant="mark" title="" className="h-6 w-auto" />
           </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-[var(--fg-primary)] leading-tight">
-              Polo PreSales
-            </span>
-            <span className="text-[10px] text-[var(--fg-tertiary)] font-normal leading-tight">
-              Mantu · Bid &amp; presales
-            </span>
-          </div>
+          <span className="font-semibold text-[var(--fg-primary)] leading-tight">Polo PreSales</span>
         </div>
         <button type="button" onClick={onClose} className="iconbtn" aria-label={t('actions.close', 'Close')}>
           <Icon name="close" size={18} ariaHidden />
