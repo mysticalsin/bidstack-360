@@ -1,7 +1,8 @@
 // Account positioning (v24): what to position, account brief facts, gaps and
-// risks, and the key-numbers strip. Read only, built from data already held.
+// risks, and the key-numbers strip. Built from data already held.
 // Nothing is estimated: a number with no source comes back as null.
-import { prisma } from '@bidstack/db';
+// In explicit demo mode the key-numbers read projects fixture dates. It does not write.
+import { demoFixtureShifts, prisma, projectKeyNumberPostings } from '@bidstack/db';
 import { capDealSample, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros.js';
 import {
   buildGaps,
@@ -310,6 +311,9 @@ function monthly(dates: Date[], now: Date, n: number): number[] {
 export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyId: string, now = new Date()): Promise<AccountKeyNumbers> {
   const c: Ctx = { orgId, scope, companyId, now };
   const ids = (await groupMap(orgId, [companyId])).get(companyId) ?? [companyId];
+  // Null unless POLO_DATA_MODE is exactly demo and this is the fixture org.
+  // The stored rows are not updated.
+  const postingShifts = await demoFixtureShifts(prisma, orgId, ids, now);
   const live = await companiesWithLiveSignals(orgId, ids);
   const d90 = new Date(now.getTime() - 90 * DAY);
   const d180 = new Date(now.getTime() - 180 * DAY);
@@ -317,7 +321,9 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
-    prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
+    postingShifts
+      ? projectKeyNumberPostings(prisma, orgId, ids, now, postingShifts)
+      : prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
     prisma.opportunity.findMany({
       where: { orgId, companyId: { in: ids }, deletedAt: null },
       select: {
