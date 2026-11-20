@@ -10,7 +10,7 @@
 // two systems coexist — framer drives the visual spring/inertia, HTML5
 // drives the data hand-off.
 
-import { useCallback, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 
 import { useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +36,7 @@ import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch'
 
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
+import { pipelineColumnWidth } from './pipelineBoard/pipeline-board-track';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
@@ -185,6 +186,30 @@ export function PipelinePage() {
   };
 
   const visibleStages = stageFilter ? stages.filter((s) => s.id === stageFilter) : stages;
+  const showBoard =
+    !isError &&
+    !isLoading &&
+    !(configuredStages.isLoading && configuredStageOptions.length === 0) &&
+    (data?.items.length ?? 0) > 0;
+  // Whole columns for the visible board. A 280px track at 1280 leaves the
+  // next stage sliced, so its value sits past the viewport. Measured before
+  // paint so the first frame is already the fitted width.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [columnPx, setColumnPx] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (stageFilter || !showBoard) return;
+    const el = boardRef.current;
+    if (!el) return;
+    const apply = () => {
+      const width = el.clientWidth;
+      if (width > 0) setColumnPx(pipelineColumnWidth(width));
+    };
+    apply();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [showBoard, stageFilter]);
 
   return (
     <div className="space-y-6">
@@ -344,15 +369,19 @@ export function PipelinePage() {
         />
       ) : (
         <div
+          ref={boardRef}
           className={
-            // When filtered to one stage, collapse to a single column so it
-            // dominates the screen — the "focus mode" affordance. Otherwise
-            // keep a horizontal kanban rail with the design-contract minimum
-            // column width; cramped columns make stage labels and cards hard
-            // to scan on ordinary laptop widths.
+            // One stage fills the screen. Otherwise the rail snaps to whole
+            // columns: the minimum 280px track stays as the fallback until
+            // the measured width replaces it.
             stageFilter
               ? 'grid gap-3 grid-cols-1'
-              : 'grid grid-flow-col auto-cols-[minmax(280px,1fr)] gap-3 overflow-x-auto pb-3'
+              : 'grid grid-flow-col auto-cols-[minmax(280px,1fr)] snap-x snap-mandatory gap-3 overflow-x-auto pb-3'
+          }
+          style={
+            !stageFilter && columnPx != null
+              ? { gridAutoColumns: `${columnPx}px` }
+              : undefined
           }
         >
           {visibleStages.map((stage) => {
