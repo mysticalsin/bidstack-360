@@ -10,11 +10,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { WidgetConfigModal } from './WidgetConfigModal';
 
-vi.mock('@/hooks/useAnalyticsReports', () => ({
-  useAnalyticsReportsList: vi.fn(() => ({ data: [] })),
+const reportMocks = vi.hoisted(() => ({
+  useAnalyticsReportsList: vi.fn(() => ({ data: [] as Array<{ id: string; name: string }> })),
 }));
 
-afterEach(cleanup);
+vi.mock('@/hooks/useAnalyticsReports', () => ({
+  useAnalyticsReportsList: reportMocks.useAnalyticsReportsList,
+}));
+
+afterEach(() => {
+  cleanup();
+  reportMocks.useAnalyticsReportsList.mockReset();
+  reportMocks.useAnalyticsReportsList.mockReturnValue({ data: [] });
+});
 
 describe('WidgetConfigModal', () => {
   it('closes only after onSave resolves', async () => {
@@ -58,5 +66,41 @@ describe('WidgetConfigModal', () => {
       ).toBe(true),
     );
     resolveSave();
+  });
+
+  it('does not call the empty report choice a static demo', () => {
+    reportMocks.useAnalyticsReportsList.mockReturnValue({
+      data: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Open pipeline' }],
+    });
+    render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={vi.fn()} />);
+
+    expect(screen.queryByText(/static demo/i)).toBeNull();
+  });
+
+  it('does not save a widget when no report is selected', async () => {
+    reportMocks.useAnalyticsReportsList.mockReturnValue({
+      data: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Open pipeline' }],
+    });
+    const onSave = vi.fn();
+    render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={onSave} />);
+
+    screen.getByRole('button', { name: 'Save widget' }).click();
+    await Promise.resolve();
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent ?? '').toMatch(/report/i);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('does not save when the org has no reports', async () => {
+    reportMocks.useAnalyticsReportsList.mockReturnValue({ data: [] });
+    const onSave = vi.fn();
+    render(<WidgetConfigModal open onOpenChange={vi.fn()} onSave={onSave} />);
+
+    screen.getByRole('button', { name: 'Save widget' }).click();
+    await Promise.resolve();
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent ?? '').toMatch(/report/i);
   });
 });
