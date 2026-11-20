@@ -597,7 +597,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
                   AND org_id = ${orgId}::uuid
                   AND status::text = 'PENDING'
               `;
-              if (Number(touched) !== 1) return [];
+              if (Number(touched) !== 1) return 'lost' as const;
               const pre = await tx.$queryRaw<Array<{ id: string }>>`
                 SELECT mark.id::text AS id
                 FROM audit_log AS mark
@@ -619,37 +619,38 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
                   )
                 LIMIT 1
               `;
-              const status = pre.length === 1 ? 'CANCELLED' : 'RUNNING';
-              await tx.$executeRaw`
-                UPDATE migration_jobs
-                SET status = ${status}::migration_status,
-                    started_at = ${startedAt},
-                    completed_at = CASE WHEN ${status} = 'CANCELLED' THEN NOW() ELSE completed_at END,
-                    meta = ${JSON.stringify(meta)}::jsonb,
-                    updated_at = NOW()
-                WHERE id = ${job.id}::uuid
-              `;
-              return [{ status }];
+              return pre.length === 1 ? ('cancelled' as const) : ('running' as const);
             },
             { maxWait: 5_000, timeout: 20_000 },
           );
-          const status = updated[0]?.status;
-          if (status === 'CANCELLED') {
-            await prisma.auditLog.create({
-              data: {
-                orgId,
-                userId,
-                action: 'migration.cancel',
-                targetType: 'MigrationJob',
-                targetId: job.id,
-                diff: { attemptId },
-              },
-            });
-            claimed = 'cancelled';
-          } else if (status === 'RUNNING') {
-            claimed = 'running';
-          } else {
+          if (updated === 'lost') {
             claimed = 'lost';
+          } else if (updated === 'cancelled') {
+            const wrote = await prisma.migrationJob.updateMany({
+              where: { id: job.id, orgId, status: 'PENDING' },
+              data: { status: 'CANCELLED', startedAt, completedAt: new Date(), meta },
+            });
+            if (wrote.count !== 1) {
+              claimed = 'lost';
+            } else {
+              await prisma.auditLog.create({
+                data: {
+                  orgId,
+                  userId,
+                  action: 'migration.cancel',
+                  targetType: 'MigrationJob',
+                  targetId: job.id,
+                  diff: { attemptId },
+                },
+              });
+              claimed = 'cancelled';
+            }
+          } else {
+            const wrote = await prisma.migrationJob.updateMany({
+              where: { id: job.id, orgId, status: 'PENDING' },
+              data: { status: 'RUNNING', startedAt, meta },
+            });
+            claimed = wrote.count === 1 ? 'running' : 'lost';
           }
         } catch (err) {
           await releaseUnclaimedStart({ jobId: job.id, orgId, log: req.log });

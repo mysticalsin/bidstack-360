@@ -295,22 +295,6 @@ export async function applyMarkedCancel(
     select: { userId: true, diff: true },
   });
   if (!mark?.userId) return;
-  const currentJob = await prisma.migrationJob.findFirst({
-    where: { id: jobId, orgId },
-    select: { totalRows: true, processedRows: true, errorRows: true, status: true },
-  });
-  if (
-    currentJob &&
-    currentJob.totalRows > 0 &&
-    currentJob.processedRows + currentJob.errorRows >= currentJob.totalRows &&
-    (currentJob.status === 'RUNNING' || currentJob.status === 'PENDING')
-  ) {
-    await prisma.migrationJob.updateMany({
-      where: { id: jobId, orgId, status: { in: ['PENDING', 'RUNNING'] } },
-      data: { status: 'COMPLETE', completedAt: new Date() },
-    });
-    return;
-  }
   const moved = await prisma.migrationJob.updateMany({
     where: { id: jobId, orgId, status: { in: [...migrationFrom('cancel')] } },
     data: { status: 'CANCELLED', completedAt: new Date() },
