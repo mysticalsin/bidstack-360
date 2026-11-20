@@ -11,11 +11,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  COMMAND_CENTER_REPORTS,
-  COMMAND_CENTER_WIDGETS,
-  seedAnalyticsCommandCenter,
-} from './seed-analytics-dashboard.js';
+import { commandCenterPlan, seedAnalyticsCommandCenter } from './seed-analytics-dashboard.js';
 
 const COMMAND_CENTER_NAMESPACE = '6f0e2a14-9c3b-4d5e-8f71-0a1b2c3d4e5f';
 
@@ -45,7 +41,8 @@ describe('command center seed plan', () => {
   });
 
   it('attaches a pipeline-sum report and a deal-count report to the two widgets', () => {
-    const byName = new Map(COMMAND_CENTER_REPORTS.map((report) => [report.name, report]));
+    const plan = commandCenterPlan('11111111-1111-4111-8111-111111111111');
+    const byName = new Map(plan.reports.map((report) => [report.name, report]));
     const pipeline = byName.get('Open pipeline');
     const byStage = byName.get('Deals by stage');
     expect(pipeline?.query.entity).toBe('opportunity');
@@ -60,7 +57,7 @@ describe('command center seed plan', () => {
       expect.arrayContaining([expect.objectContaining({ field: 'stage' })]),
     );
 
-    const widgets = new Map(COMMAND_CENTER_WIDGETS.map((widget) => [widget.title, widget]));
+    const widgets = new Map(plan.widgets.map((widget) => [widget.title, widget]));
     expect(widgets.get('Weighted Pipeline')?.reportId).toBe(pipeline?.id);
     expect(widgets.get('Pipeline by Stage')?.reportId).toBe(byStage?.id);
     expect(widgets.get('Pipeline by Stage')?.config.xKey).toBe('stage');

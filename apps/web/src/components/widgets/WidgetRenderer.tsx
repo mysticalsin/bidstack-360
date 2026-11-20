@@ -28,6 +28,7 @@ import {
 } from '@/components/charts/charts';
 import { KpiCard } from '@/components/charts/KpiCard';
 import type { DashboardWidget } from '@/hooks/useDashboards';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useReportRun, useRunReport, type ReportRun } from '@/hooks/useAnalyticsReports';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
@@ -218,11 +219,12 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   const startedFor = useRef<string | null>(null);
   const [autoRunError, setAutoRunError] = useState<string | null>(null);
   const latestRunId = (widget.config as { latestRunId?: string }).latestRunId ?? '';
+  const canRunReport = useHasPermission('reports:write');
 
-  // A saved widget has no stored run until something executes the report.
-  // Kick that off once; the dashboard refetch then fills config.latestRunId.
+  // A saved widget has no stored run until someone who may write reports
+  // executes it. Viewing must not persist a run or an audit row.
   useEffect(() => {
-    if (!widget.reportId || latestRunId) return;
+    if (!canRunReport || !widget.reportId || latestRunId) return;
     if (startedFor.current === widget.reportId) return;
     startedFor.current = widget.reportId;
     void runMutation.mutateAsync({ id: widget.reportId }).then(
@@ -235,7 +237,7 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
         );
       },
     );
-  }, [widget.reportId, latestRunId, widget.dashboardId, qc, runMutation]);
+  }, [canRunReport, widget.reportId, latestRunId, widget.dashboardId, qc, runMutation]);
 
   const { data: run, isLoading, error } = useReportRun(widget.reportId ?? '', latestRunId);
 
@@ -287,7 +289,7 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   const data: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
   const needsReport = !widget.reportId;
   const runError = error instanceof Error ? error.message : autoRunError;
-  const waitingForRun = Boolean(widget.reportId) && !latestRunId && !runError;
+  const waitingForRun = canRunReport && Boolean(widget.reportId) && !latestRunId && !runError;
   const empty = !needsReport && !isLoading && !runError && data.length === 0;
 
   return (

@@ -56,6 +56,11 @@ export function serializeWidget(w: DbWidget, latestRunId?: string): AnalyticsWid
   };
 }
 
+/** Owner or org admin. Shared by the canEdit field and requireDashboardEditor. */
+export function canEditDashboard(ownerId: string, userId: string, isAdmin: boolean): boolean {
+  return ownerId === userId || isAdmin;
+}
+
 export function serializeDashboard(
   d: DbDashboard,
   widgets: DbWidget[] | undefined,

@@ -21,6 +21,7 @@ import {
 } from '@bidstack/shared';
 
 import {
+  canEditDashboard,
   latestRunIds,
   serializeDashboard,
   serializeWidget,
@@ -40,7 +41,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
         // the org. Same omission as lib/rbac-decision-cache.ts had.
         deletedAt: null,
         user: { orgId: req.auth.orgId, deletedAt: null },
-        role: { orgId: req.auth.orgId, name: 'Admin', deletedAt: null },
+        role: { orgId: req.auth.orgId, name: 'Admin', isSystem: true, deletedAt: null },
       },
     });
     return adminRoleCount > 0;
@@ -61,7 +62,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
 
   /** Same predicate as requireDashboardEditor. Exposed on the payload as canEdit. */
   async function callerCanEdit(req: FastifyRequest, dashboard: DbDashboard): Promise<boolean> {
-    return dashboard.ownerId === req.auth.userId || (await isOrgAdmin(req));
+    return canEditDashboard(dashboard.ownerId, req.auth.userId, await isOrgAdmin(req));
   }
 
   /** Owner-or-admin gate shared by dashboard PATCH/DELETE and ALL widget mutations. */
@@ -90,7 +91,12 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
       const allWidgets = dashboards.flatMap((d) => d.widgets);
       const latest = await latestRunIds(req.auth.orgId, allWidgets);
       return dashboards.map((d) =>
-        serializeDashboard(d, d.widgets, latest, d.ownerId === req.auth.userId || admin),
+        serializeDashboard(
+          d,
+          d.widgets,
+          latest,
+          canEditDashboard(d.ownerId, req.auth.userId, admin),
+        ),
       );
     },
   );
@@ -121,7 +127,16 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
           diff: { name: created.name, isShared: created.isShared },
         },
       });
-      return reply.code(201).send(serializeDashboard(created, [], undefined, true));
+      return reply
+        .code(201)
+        .send(
+          serializeDashboard(
+            created,
+            [],
+            undefined,
+            canEditDashboard(created.ownerId, req.auth.userId, false),
+          ),
+        );
     },
   );
 
