@@ -78,23 +78,31 @@ export const StageColumn = memo(function StageColumn({
       data-testid="pipeline-column"
       data-stage-id={stageId}
       data-stage-name={stageName}
-      className="min-w-0"
+      className="min-w-0 snap-start"
     >
-      <div className="flex items-center justify-between mb-2 px-1">
-        <div className="flex items-center gap-1.5">
-          <Badge tone={stageTone(stageName)}>{stageName}</Badge>
+      <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 px-1">
+        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+          <Badge tone={stageTone(stageName)} className="min-w-0 max-w-full">
+            <span className="block truncate" title={stageName}>{stageName}</span>
+          </Badge>
           {conversion !== null ? (
             <span
               title={`${conversion}% of opps in this stage or later have advanced past it`}
               aria-label={`Conversion rate: ${conversion}%`}
-              className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[var(--fg-secondary)]"
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[var(--fg-secondary)]"
             >
               <span aria-hidden>→</span>
               {conversion}%
             </span>
           ) : null}
         </div>
-        <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
+        <span
+          className={
+            pageContinues
+              ? 'min-w-0 max-w-full basis-full text-right text-xs text-[var(--fg-tertiary)] tabular-nums'
+              : 'shrink-0 text-right text-xs text-[var(--fg-tertiary)] tabular-nums'
+          }
+        >
           {pageContinues ? countLabel : <AnimatedNumber value={items.length} duration={0.6} />}
           {' · '}
           <AnimatedNumber
