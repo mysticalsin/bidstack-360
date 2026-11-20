@@ -11,15 +11,15 @@
 // flex-layout, so the test reads the flex basis and max width the row actually
 // sets and checks that those minima fit in 992px.
 
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { FilterRow, FilterSelect } from './AccountsChrome';
 
-/** 13rem. Real basis — `flex: 1 1 0%` would let the field collapse. */
-const SEARCH_BASIS_PX = 208;
-/** 9rem. Narrow enough that four selects still sit beside search at 1280. */
-const SELECT_BASIS_PX = 144;
+/** 9rem. Real basis — `flex: 1 1 0%` would let the field collapse. Grows into leftover space. */
+const SEARCH_BASIS_PX = 144;
+/** 11rem. Wide enough for "Sort: pipeline value" once Reset takes 84px on the same row. */
+const SELECT_BASIS_PX = 176;
 /** 14rem. A long industry name cannot grow the closed control past this. */
 const SELECT_MAX_PX = 224;
 const GAP_PX = 12;
@@ -53,7 +53,7 @@ function renderFilters(labels: string[], showReset = false) {
 
 function basisPx(el: HTMLElement | null): number {
   const flex = el?.style.flex ?? '';
-  const match = /^1 1 (\d+)px$/.exec(flex);
+  const match = /^\d+ 1 (\d+)px$/.exec(flex);
   return match ? Number(match[1]) : 0;
 }
 
@@ -86,6 +86,8 @@ function controlsOnFirstRow(bases: number[], content: number): number {
 }
 
 describe('account filter row at 1280px', () => {
+  afterEach(cleanup);
+
   it('keeps a real basis on the search field when there are no selects', () => {
     renderFilters([]);
 
@@ -122,10 +124,10 @@ describe('account filter row at 1280px', () => {
       SELECT_BASIS_PX,
     ]);
     expect(controlsOnFirstRow(bases, CONTENT_AT_1280_PX)).toBe(5);
-    // Reset stays in the same row. 80px is the measured floor of the labelled
-    // button (icon + "Reset" + padding), plus the gap before it.
+    // Reset stays in the same row. 84px is the measured width of the labelled
+    // button (icon + "Reset" + padding) at 1280px, plus the gap before it.
     const rowMin =
-      bases.reduce((sum, basis) => sum + basis, 0) + GAP_PX * bases.length + 80;
+      bases.reduce((sum, basis) => sum + basis, 0) + GAP_PX * bases.length + 84;
     expect(rowMin).toBeLessThanOrEqual(CONTENT_AT_1280_PX);
     expect(screen.getByRole('button', { name: 'Reset' })).toBeTruthy();
   });
