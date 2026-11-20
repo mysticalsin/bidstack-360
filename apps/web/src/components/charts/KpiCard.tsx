@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
 import { Sparkline } from './Sparkline';
-import { formatKpiCountFrame, formatKpiValue } from './kpi-value';
+import { formatKpiValue } from './kpi-value';
 
 interface Props {
   title: string;
@@ -58,10 +58,7 @@ export function KpiCard({
       const progress = Math.min(elapsed / duration, 1);
       // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      const counting = progress < 1;
-      el.textContent = counting && format === formatKpiValue
-        ? formatKpiCountFrame(value * eased)
-        : format(counting ? value * eased : value);
+      el.textContent = format(value * eased);
       if (progress < 1) rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
