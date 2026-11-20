@@ -1,7 +1,7 @@
 // Synthetic reports for the seeded Pre-sales Command Center.
 // Two opportunity queries only: open-pipeline value, and a deal count by stage.
 // Idempotent on stable ids so a re-seed attaches the reports to the existing cards.
-import type { Prisma, PrismaClient } from '../generated/client/index.js';
+import type { PrismaClient } from '../generated/client/index.js';
 
 const DASHBOARD_ID = 'da5b0000-0000-4000-8000-000000000001';
 const PIPELINE_REPORT_ID = 'da5b0000-0000-4000-8000-000000000021';
@@ -22,35 +22,53 @@ const stageQuery = {
   groupBy: [{ field: 'stage' }],
 } as const;
 
+/** What the fixture seed writes. The no-database unit job asserts these directly. */
+export const COMMAND_CENTER_REPORTS = [
+  {
+    id: PIPELINE_REPORT_ID,
+    name: 'Open pipeline',
+    description: 'Synthetic sum of open opportunity value. Excludes closed won and closed lost.',
+    chartType: 'gauge',
+    query: pipelineQuery,
+  },
+  {
+    id: STAGE_REPORT_ID,
+    name: 'Deals by stage',
+    description: 'Synthetic count of opportunities grouped by stage.',
+    chartType: 'bar',
+    query: stageQuery,
+  },
+] as const;
+
+export const COMMAND_CENTER_WIDGETS = [
+  {
+    id: 'da5b0000-0000-4000-8000-000000000011',
+    title: 'Weighted Pipeline',
+    type: 'kpi',
+    reportId: PIPELINE_REPORT_ID,
+    config: { format: 'currency', subtitle: 'Sum of open opportunity value' },
+    position: { x: 0, y: 0, w: 3, h: 2 },
+  },
+  {
+    id: 'da5b0000-0000-4000-8000-000000000012',
+    title: 'Pipeline by Stage',
+    type: 'bar',
+    reportId: STAGE_REPORT_ID,
+    config: {
+      subtitle: 'Opportunity count grouped by stage',
+      xKey: 'stage',
+      yKey: 'value',
+    },
+    position: { x: 3, y: 0, w: 6, h: 4 },
+  },
+] as const;
+
 export async function seedAnalyticsCommandCenter(
   prisma: PrismaClient,
   orgId: string,
   ownerId: string,
 ): Promise<number> {
-  const reports: Array<{
-    id: string;
-    name: string;
-    description: string;
-    chartType: string;
-    query: Prisma.InputJsonValue;
-  }> = [
-    {
-      id: PIPELINE_REPORT_ID,
-      name: 'Open pipeline',
-      description: 'Synthetic sum of open opportunity value. Excludes closed won and closed lost.',
-      chartType: 'gauge',
-      query: pipelineQuery,
-    },
-    {
-      id: STAGE_REPORT_ID,
-      name: 'Deals by stage',
-      description: 'Synthetic count of opportunities grouped by stage.',
-      chartType: 'bar',
-      query: stageQuery,
-    },
-  ];
-
-  for (const report of reports) {
+  for (const report of COMMAND_CENTER_REPORTS) {
     await prisma.analyticsReport.upsert({
       where: { id: report.id },
       create: {
@@ -90,37 +108,7 @@ export async function seedAnalyticsCommandCenter(
     },
   });
 
-  const widgets: Array<{
-    id: string;
-    title: string;
-    type: string;
-    reportId: string;
-    config: Prisma.InputJsonValue;
-    position: Prisma.InputJsonValue;
-  }> = [
-    {
-      id: 'da5b0000-0000-4000-8000-000000000011',
-      title: 'Weighted Pipeline',
-      type: 'kpi',
-      reportId: PIPELINE_REPORT_ID,
-      config: { format: 'currency', subtitle: 'Sum of open opportunity value' },
-      position: { x: 0, y: 0, w: 3, h: 2 },
-    },
-    {
-      id: 'da5b0000-0000-4000-8000-000000000012',
-      title: 'Pipeline by Stage',
-      type: 'bar',
-      reportId: STAGE_REPORT_ID,
-      config: {
-        subtitle: 'Opportunity count grouped by stage',
-        xKey: 'stage',
-        yKey: 'value',
-      },
-      position: { x: 3, y: 0, w: 6, h: 4 },
-    },
-  ];
-
-  for (const widget of widgets) {
+  for (const widget of COMMAND_CENTER_WIDGETS) {
     await prisma.analyticsDashboardWidget.upsert({
       where: { id: widget.id },
       create: {
@@ -143,5 +131,5 @@ export async function seedAnalyticsCommandCenter(
     });
   }
 
-  return widgets.length;
+  return COMMAND_CENTER_WIDGETS.length;
 }

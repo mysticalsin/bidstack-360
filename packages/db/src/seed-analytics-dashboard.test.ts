@@ -1,79 +1,39 @@
 // The fixture seed opens /analytics with two widgets and no reports, so every
 // card renders empty. The command center must attach two synthetic opportunity
 // reports: a pipeline sum, and a deal count grouped by stage.
+//
+// seedAnalyticsCommandCenter writes COMMAND_CENTER_REPORTS and
+// COMMAND_CENTER_WIDGETS. The unit job has no Postgres, and those rows use
+// stable ids, so this asserts the plan the seed writes instead of inserting
+// a second copy.
 
-import { randomUUID } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import {
+  COMMAND_CENTER_REPORTS,
+  COMMAND_CENTER_WIDGETS,
+} from './seed-analytics-dashboard.js';
 
-import { PrismaClient } from '../generated/client/index.js';
-
-const prisma = new PrismaClient();
-
-afterAll(async () => {
-  await prisma.$disconnect();
-});
-
-describe('seeded analytics command center', () => {
-  it('attaches a pipeline-sum report and a deal-count report to the two widgets', async () => {
-    const mod = await import('./seed-analytics-dashboard.js').catch(() => null);
-    expect(mod?.seedAnalyticsCommandCenter, 'seed must export seedAnalyticsCommandCenter').toEqual(
-      expect.any(Function),
+describe('command center seed plan', () => {
+  it('attaches a pipeline-sum report and a deal-count report to the two widgets', () => {
+    const byName = new Map(COMMAND_CENTER_REPORTS.map((report) => [report.name, report]));
+    const pipeline = byName.get('Open pipeline');
+    const byStage = byName.get('Deals by stage');
+    expect(pipeline?.query.entity).toBe('opportunity');
+    expect(pipeline?.query.aggregates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ fn: 'SUM', field: 'valueMicros' })]),
+    );
+    expect(byStage?.query.entity).toBe('opportunity');
+    expect(byStage?.query.aggregates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ fn: 'COUNT' })]),
+    );
+    expect(byStage?.query.groupBy).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'stage' })]),
     );
 
-    const stamp = randomUUID().slice(0, 8);
-    const org = await prisma.org.create({
-      data: { clerkOrg: `org_analytics_seed_${stamp}`, name: `Analytics seed ${stamp}` },
-    });
-    const user = await prisma.user.create({
-      data: {
-        orgId: org.id,
-        clerkUser: `seed_analytics_${stamp}`,
-        email: `analytics-seed-${stamp}@test.local`,
-        name: 'Analytics Seed',
-        role: 'admin',
-      },
-    });
-    try {
-      await mod!.seedAnalyticsCommandCenter(prisma, org.id, user.id);
-      const widgets = await prisma.analyticsDashboardWidget.findMany({
-        where: { orgId: org.id },
-        include: { report: true },
-        orderBy: { title: 'asc' },
-      });
-      const byTitle = new Map(widgets.map((widget) => [widget.title, widget]));
-      const pipeline = byTitle.get('Weighted Pipeline');
-      const byStage = byTitle.get('Pipeline by Stage');
-      expect(pipeline?.reportId, 'Weighted Pipeline has no report').toEqual(expect.any(String));
-      expect(byStage?.reportId, 'Pipeline by Stage has no report').toEqual(expect.any(String));
-
-      const pipelineQuery = pipeline?.report?.query as {
-        entity?: string;
-        aggregates?: Array<{ fn?: string; field?: string }>;
-      };
-      const stageQuery = byStage?.report?.query as {
-        entity?: string;
-        aggregates?: Array<{ fn?: string; field?: string }>;
-        groupBy?: Array<{ field?: string }>;
-      };
-      expect(pipelineQuery.entity).toBe('opportunity');
-      expect(pipelineQuery.aggregates).toEqual(
-        expect.arrayContaining([expect.objectContaining({ fn: 'SUM', field: 'valueMicros' })]),
-      );
-      expect(stageQuery.entity).toBe('opportunity');
-      expect(stageQuery.aggregates).toEqual(
-        expect.arrayContaining([expect.objectContaining({ fn: 'COUNT' })]),
-      );
-      expect(stageQuery.groupBy).toEqual(
-        expect.arrayContaining([expect.objectContaining({ field: 'stage' })]),
-      );
-      expect((byStage?.config as { xKey?: string }).xKey).toBe('stage');
-    } finally {
-      await prisma.analyticsDashboardWidget.deleteMany({ where: { orgId: org.id } });
-      await prisma.analyticsReport.deleteMany({ where: { orgId: org.id } });
-      await prisma.analyticsDashboard.deleteMany({ where: { orgId: org.id } });
-      await prisma.user.deleteMany({ where: { id: user.id } });
-      await prisma.org.deleteMany({ where: { id: org.id } });
-    }
+    const widgets = new Map(COMMAND_CENTER_WIDGETS.map((widget) => [widget.title, widget]));
+    expect(widgets.get('Weighted Pipeline')?.reportId).toBe(pipeline?.id);
+    expect(widgets.get('Pipeline by Stage')?.reportId).toBe(byStage?.id);
+    expect(widgets.get('Pipeline by Stage')?.config.xKey).toBe('stage');
   });
 });
