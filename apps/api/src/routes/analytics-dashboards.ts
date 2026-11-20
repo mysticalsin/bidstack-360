@@ -21,6 +21,7 @@ import {
 } from '@bidstack/shared';
 
 import {
+  canEditDashboard,
   latestRunIds,
   serializeDashboard,
   serializeWidget,
@@ -40,7 +41,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
         // the org. Same omission as lib/rbac-decision-cache.ts had.
         deletedAt: null,
         user: { orgId: req.auth.orgId, deletedAt: null },
-        role: { orgId: req.auth.orgId, name: 'Admin', deletedAt: null },
+        role: { orgId: req.auth.orgId, name: 'Admin', isSystem: true, deletedAt: null },
       },
     });
     return adminRoleCount > 0;
@@ -59,9 +60,14 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
     return dashboard;
   }
 
+  /** Same predicate as requireDashboardEditor. Exposed on the payload as canEdit. */
+  async function callerCanEdit(req: FastifyRequest, dashboard: DbDashboard): Promise<boolean> {
+    return canEditDashboard(dashboard.ownerId, req.auth.userId, await isOrgAdmin(req));
+  }
+
   /** Owner-or-admin gate shared by dashboard PATCH/DELETE and ALL widget mutations. */
   async function requireDashboardEditor(req: FastifyRequest, dashboard: DbDashboard): Promise<void> {
-    if (dashboard.ownerId !== req.auth.userId && !(await isOrgAdmin(req))) {
+    if (!(await callerCanEdit(req, dashboard))) {
       throw server.httpErrors.forbidden('Only the owner or an admin can modify this dashboard');
     }
   }
@@ -84,7 +90,14 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
       });
       const allWidgets = dashboards.flatMap((d) => d.widgets);
       const latest = await latestRunIds(req.auth.orgId, allWidgets);
-      return dashboards.map((d) => serializeDashboard(d, d.widgets, latest));
+      return dashboards.map((d) =>
+        serializeDashboard(
+          d,
+          d.widgets,
+          latest,
+          canEditDashboard(d.ownerId, req.auth.userId, admin),
+        ),
+      );
     },
   );
 
@@ -114,7 +127,16 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
           diff: { name: created.name, isShared: created.isShared },
         },
       });
-      return reply.code(201).send(serializeDashboard(created, []));
+      return reply
+        .code(201)
+        .send(
+          serializeDashboard(
+            created,
+            [],
+            undefined,
+            canEditDashboard(created.ownerId, req.auth.userId, false),
+          ),
+        );
     },
   );
 
@@ -129,7 +151,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
         take: 200,
       });
       const latest = await latestRunIds(req.auth.orgId, widgets);
-      return serializeDashboard(dashboard, widgets, latest);
+      return serializeDashboard(dashboard, widgets, latest, await callerCanEdit(req, dashboard));
     },
   );
 
@@ -165,7 +187,7 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
         },
       });
       const latest = await latestRunIds(req.auth.orgId, updated.widgets);
-      return serializeDashboard(updated, updated.widgets, latest);
+      return serializeDashboard(updated, updated.widgets, latest, await callerCanEdit(req, updated));
     },
   );
 
@@ -224,18 +246,17 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
     async (req, reply) => {
       const dashboard = await findVisibleDashboard(req, req.params.id);
       await requireDashboardEditor(req, dashboard);
-      if (req.body.reportId) {
-        const report = await prisma.analyticsReport.findFirst({
-          where: { id: req.body.reportId, orgId: req.auth.orgId, deletedAt: null },
-          select: { id: true },
-        });
-        if (!report) throw server.httpErrors.badRequest('Report not found in this org');
-      }
+      if (!req.body.reportId) throw server.httpErrors.badRequest('A widget requires a report');
+      const report = await prisma.analyticsReport.findFirst({
+        where: { id: req.body.reportId, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!report) throw server.httpErrors.badRequest('Report not found in this org');
       const created = await prisma.analyticsDashboardWidget.create({
         data: {
           orgId: req.auth.orgId,
           dashboardId: dashboard.id,
-          reportId: req.body.reportId ?? null,
+          reportId: req.body.reportId,
           title: req.body.title,
           type: req.body.type,
           config: req.body.config as object,

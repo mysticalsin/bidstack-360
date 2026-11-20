@@ -1,9 +1,9 @@
 // Integration tests for analytics dashboards + widgets.
 // Pattern: tasks.integration.test.ts - buildServer + inject against a
 // throwaway isolated stub org; fixtures cleaned up in afterAll.
-import { afterAll, beforeAll, describe, expect } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { prisma } from '@bidstack/db';
+import { commandCenterPlan, prisma, seedAnalyticsCommandCenter } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
 import {
@@ -62,6 +62,22 @@ afterAll(async () => {
 });
 
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
+
+async function createBackingReport(name: string): Promise<string> {
+  const res = await server.inject({
+    method: 'POST',
+    url: '/api/reports',
+    payload: {
+      name,
+      query: { entity: 'task', aggregates: [{ fn: 'COUNT', field: '*' }] },
+      chartType: 'gauge',
+    },
+  });
+  expect(res.statusCode).toBe(201);
+  const id = (res.json() as { id: string }).id;
+  createdReportIds.push(id);
+  return id;
+}
 
 describe('analytics dashboards routes', () => {
   skipIfNoDb('POST /api/dashboards creates a dashboard', async () => {
@@ -193,6 +209,30 @@ describe('analytics dashboards routes', () => {
     expect((gone.json() as Array<{ id: string }>).some((w) => w.id === widget.id)).toBe(false);
   });
 
+  skipIfNoDb('POST /api/dashboards/:id/widgets without a reportId is rejected', async () => {
+    // The modal already refuses a widget with no report. The API still created
+    // one, so a client that skips the modal stored an empty card.
+    const board = await server.inject({
+      method: 'POST',
+      url: '/api/dashboards',
+      payload: { name: 'Report required board', isShared: true },
+    });
+    expect(board.statusCode).toBe(201);
+    const dashboardId = (board.json() as { id: string }).id;
+    createdDashboardIds.push(dashboardId);
+
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/dashboards/${dashboardId}/widgets`,
+      payload: { title: 'No report', type: 'kpi' },
+    });
+    expect(res.statusCode).toBe(400);
+    const stored = await prisma.analyticsDashboardWidget.findFirst({
+      where: { orgId: orgId!, title: 'No report' },
+    });
+    expect(stored).toBeNull();
+  });
+
   skipIfNoDb('DELETE /api/dashboards/:id soft-deletes and audit rows exist', async () => {
     const res = await server.inject({
       method: 'DELETE',
@@ -215,4 +255,588 @@ describe('analytics dashboards routes', () => {
     });
     expect(audit).not.toBeNull();
   });
+
+  skipIfNoDb(
+    'a non-owner sales manager is forbidden from adding a widget to a shared dashboard',
+    async () => {
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const created = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          payload: { name: 'Owner shared board', isShared: true },
+        });
+        expect(created.statusCode).toBe(201);
+        const dashboardId = (created.json() as { id: string; ownerId: string }).id;
+        createdDashboardIds.push(dashboardId);
+
+        const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
+        const forbidden = 'Only the owner or an admin can modify this dashboard';
+        const reportId = await createBackingReport('Owner widget report');
+        const ownerWidget = await server.inject({
+          method: 'POST',
+          url: `/api/dashboards/${dashboardId}/widgets`,
+          payload: { reportId, title: 'Owner widget', type: 'kpi' },
+        });
+        expect(ownerWidget.statusCode).toBe(201);
+        const widgetId = (ownerWidget.json() as { id: string }).id;
+        createdWidgetIds.push(widgetId);
+
+        const deniedMutations = [
+          server.inject({
+            method: 'PATCH',
+            url: `/api/dashboards/${dashboardId}`,
+            headers: salesManager,
+            payload: { name: 'Taken over' },
+          }),
+          server.inject({
+            method: 'DELETE',
+            url: `/api/dashboards/${dashboardId}`,
+            headers: salesManager,
+          }),
+          server.inject({
+            method: 'POST',
+            url: `/api/dashboards/${dashboardId}/widgets`,
+            headers: salesManager,
+            payload: { reportId, title: 'Teammate widget', type: 'kpi' },
+          }),
+          server.inject({
+            method: 'PATCH',
+            url: `/api/dashboards/${dashboardId}/widgets/${widgetId}`,
+            headers: salesManager,
+            payload: { title: 'Taken over' },
+          }),
+          server.inject({
+            method: 'DELETE',
+            url: `/api/dashboards/${dashboardId}/widgets/${widgetId}`,
+            headers: salesManager,
+          }),
+        ];
+        for (const pending of deniedMutations) {
+          const denied = await pending;
+          expect(denied.statusCode).toBe(403);
+          expect((denied.json() as { message: string }).message).toBe(forbidden);
+        }
+
+        const widgets = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${dashboardId}/widgets`,
+          headers: salesManager,
+        });
+        expect(widgets.statusCode).toBe(200);
+        const listed = widgets.json() as Array<{ id: string; title: string }>;
+        expect(listed.map((widget) => widget.id)).toEqual([widgetId]);
+        expect(listed[0]?.title).toBe('Owner widget');
+        const stillThere = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${dashboardId}`,
+        });
+        expect(stillThere.statusCode).toBe(200);
+        expect((stillThere.json() as { name: string }).name).toBe('Owner shared board');
+      } finally {
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
+
+  skipIfNoDb(
+    'an org admin who does not own a shared dashboard can still add a widget',
+    async () => {
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
+        const ownedByManager = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          headers: salesManager,
+          payload: { name: 'Manager shared board', isShared: true },
+        });
+        expect(ownedByManager.statusCode).toBe(201);
+        const managerDashboardId = (ownedByManager.json() as { id: string }).id;
+        createdDashboardIds.push(managerDashboardId);
+
+        const reportId = await createBackingReport('Admin widget report');
+        const adminWidget = await server.inject({
+          method: 'POST',
+          url: `/api/dashboards/${managerDashboardId}/widgets`,
+          payload: { reportId, title: 'Admin widget', type: 'kpi' },
+        });
+        expect(adminWidget.statusCode).toBe(201);
+        const widgetId = (adminWidget.json() as { id: string }).id;
+        createdWidgetIds.push(widgetId);
+
+        const widgets = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${managerDashboardId}/widgets`,
+        });
+        expect(widgets.statusCode).toBe(200);
+        expect((widgets.json() as Array<{ id: string }>).some((w) => w.id === widgetId)).toBe(true);
+      } finally {
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
+
+  skipIfNoDb(
+    'canEdit is true for the owner and for an admin, and false for any other reports:write user',
+    async () => {
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      try {
+        const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
+        const ownedByManager = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          headers: salesManager,
+          payload: { name: 'Manager flag board', isShared: true },
+        });
+        expect(ownedByManager.statusCode).toBe(201);
+        const managerDashboardId = (ownedByManager.json() as { id: string }).id;
+        createdDashboardIds.push(managerDashboardId);
+
+        const managerDetail = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${managerDashboardId}`,
+          headers: salesManager,
+        });
+        expect(managerDetail.statusCode).toBe(200);
+        expect((managerDetail.json() as { canEdit?: boolean }).canEdit).toBe(true);
+
+        const adminDetail = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${managerDashboardId}`,
+        });
+        expect(adminDetail.statusCode).toBe(200);
+        expect((adminDetail.json() as { canEdit?: boolean }).canEdit).toBe(true);
+
+        const ownedByAdmin = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          payload: { name: 'Admin flag board', isShared: true },
+        });
+        expect(ownedByAdmin.statusCode).toBe(201);
+        const adminDashboardId = (ownedByAdmin.json() as { id: string }).id;
+        createdDashboardIds.push(adminDashboardId);
+
+        const teammateDetail = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${adminDashboardId}`,
+          headers: salesManager,
+        });
+        expect(teammateDetail.statusCode).toBe(200);
+        expect((teammateDetail.json() as { canEdit?: boolean }).canEdit).toBe(false);
+      } finally {
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
+
+  skipIfNoDb(
+    'a role named Admin that is not a system role does not get canEdit',
+    async () => {
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      const adminRole = await prisma.role.findFirstOrThrow({
+        where: { orgId: orgId!, name: 'Admin', deletedAt: null },
+      });
+      const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
+      try {
+        const owned = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          headers: salesManager,
+          payload: { name: 'Owned by a sales manager', isShared: true },
+        });
+        expect(owned.statusCode).toBe(201);
+        const dashboardId = (owned.json() as { id: string }).id;
+        createdDashboardIds.push(dashboardId);
+
+        await prisma.role.update({ where: { id: adminRole.id }, data: { isSystem: false } });
+        const demoted = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${dashboardId}`,
+        });
+        expect(demoted.statusCode).toBe(200);
+        expect((demoted.json() as { canEdit: boolean }).canEdit).toBe(false);
+      } finally {
+        await prisma.role.update({ where: { id: adminRole.id }, data: { isSystem: true } });
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
+
+  skipIfNoDb('two orgs keep separate seeded command centers, each with a run', async () => {
+    const fixture = await prisma.analyticsDashboard.findUnique({
+      where: { id: 'da5b0000-0000-4000-8000-000000000001' },
+      select: { orgId: true, ownerId: true },
+    });
+    const stamp = `${Date.now()}`;
+    const orgA = await prisma.org.create({
+      data: { clerkOrg: `org_cc_api_a_${stamp}`, name: `API command center A ${stamp}` },
+    });
+    const orgB = await prisma.org.create({
+      data: { clerkOrg: `org_cc_api_b_${stamp}`, name: `API command center B ${stamp}` },
+    });
+    const userA = await prisma.user.create({
+      data: {
+        orgId: orgA.id,
+        clerkUser: `cc_api_a_${stamp}`,
+        email: `cc-api-a-${stamp}@test.local`,
+        name: 'API Owner A',
+        role: 'admin',
+      },
+    });
+    const userB = await prisma.user.create({
+      data: {
+        orgId: orgB.id,
+        clerkUser: `cc_api_b_${stamp}`,
+        email: `cc-api-b-${stamp}@test.local`,
+        name: 'API Owner B',
+        role: 'admin',
+      },
+    });
+    try {
+      await seedAnalyticsCommandCenter(prisma, orgA.id, userA.id);
+      await seedAnalyticsCommandCenter(prisma, orgB.id, userB.id);
+      for (const [org, user] of [
+        [orgA, userA],
+        [orgB, userB],
+      ] as const) {
+        const widgets = await prisma.analyticsDashboardWidget.findMany({
+          where: { orgId: org.id },
+          include: { report: { include: { runs: true } }, dashboard: true },
+        });
+        expect(widgets, org.name).toHaveLength(2);
+        expect(widgets.every((widget) => widget.dashboard.orgId === org.id)).toBe(true);
+        expect(widgets.every((widget) => widget.report?.orgId === org.id)).toBe(true);
+        expect(widgets.every((widget) => widget.report?.ownerId === user.id)).toBe(true);
+        expect(widgets.every((widget) => (widget.report?.runs.length ?? 0) >= 1)).toBe(true);
+      }
+      const idsA = new Set(
+        (
+          await prisma.analyticsDashboardWidget.findMany({
+            where: { orgId: orgA.id },
+            select: { id: true },
+          })
+        ).map((widget) => widget.id),
+      );
+      const idsB = await prisma.analyticsDashboardWidget.findMany({
+        where: { orgId: orgB.id },
+        select: { id: true },
+      });
+      expect(idsB.every((widget) => !idsA.has(widget.id))).toBe(true);
+    } finally {
+      for (const orgId of [orgA.id, orgB.id]) {
+        await prisma.analyticsReportRun.deleteMany({ where: { orgId } });
+        await prisma.analyticsDashboardWidget.deleteMany({ where: { orgId } });
+        await prisma.analyticsReport.deleteMany({ where: { orgId } });
+        await prisma.analyticsDashboard.deleteMany({ where: { orgId } });
+        await prisma.user.deleteMany({ where: { orgId } });
+        await prisma.org.deleteMany({ where: { id: orgId } });
+      }
+      if (fixture) await seedAnalyticsCommandCenter(prisma, fixture.orgId, fixture.ownerId);
+    }
+  });
+
+  skipIfNoDb(
+    'refuses to re-parent a command-center id that already belongs to another org',
+    async () => {
+      const stamp = `${Date.now()}`;
+      const orgA = await prisma.org.create({
+        data: { clerkOrg: `org_cc_hold_a_${stamp}`, name: `Hold A ${stamp}` },
+      });
+      const orgB = await prisma.org.create({
+        data: { clerkOrg: `org_cc_hold_b_${stamp}`, name: `Hold B ${stamp}` },
+      });
+      const userA = await prisma.user.create({
+        data: {
+          orgId: orgA.id,
+          clerkUser: `cc_hold_a_${stamp}`,
+          email: `cc-hold-a-${stamp}@test.local`,
+          name: 'Seeder A',
+          role: 'admin',
+        },
+      });
+      const userB = await prisma.user.create({
+        data: {
+          orgId: orgB.id,
+          clerkUser: `cc_hold_b_${stamp}`,
+          email: `cc-hold-b-${stamp}@test.local`,
+          name: 'Holder B',
+          role: 'admin',
+        },
+      });
+      const plan = commandCenterPlan(orgA.id);
+      const reportId = plan.reports[0]!.id;
+      const widgetId = plan.widgets[0]!.id;
+      try {
+        await prisma.analyticsReport.create({
+          data: {
+            id: reportId,
+            orgId: orgB.id,
+            ownerId: userB.id,
+            name: 'foreign-held-report',
+            query: { entity: 'opportunity' },
+            chartType: 'table',
+          },
+        });
+        await prisma.analyticsDashboard.create({
+          data: {
+            id: plan.dashboardId,
+            orgId: orgB.id,
+            ownerId: userB.id,
+            name: 'foreign-held-dashboard',
+            isShared: false,
+          },
+        });
+        await prisma.analyticsDashboardWidget.create({
+          data: {
+            id: widgetId,
+            orgId: orgB.id,
+            dashboardId: plan.dashboardId,
+            reportId,
+            title: 'foreign-held-widget',
+            type: 'kpi',
+          },
+        });
+
+        await expect(seedAnalyticsCommandCenter(prisma, orgA.id, userA.id)).rejects.toThrow(
+          /another org/,
+        );
+
+        const report = await prisma.analyticsReport.findUniqueOrThrow({ where: { id: reportId } });
+        const dashboard = await prisma.analyticsDashboard.findUniqueOrThrow({
+          where: { id: plan.dashboardId },
+        });
+        const widget = await prisma.analyticsDashboardWidget.findUniqueOrThrow({
+          where: { id: widgetId },
+        });
+        expect(report.orgId).toBe(orgB.id);
+        expect(report.ownerId).toBe(userB.id);
+        expect(report.name).toBe('foreign-held-report');
+        expect(dashboard.orgId).toBe(orgB.id);
+        expect(dashboard.ownerId).toBe(userB.id);
+        expect(dashboard.name).toBe('foreign-held-dashboard');
+        expect(widget.orgId).toBe(orgB.id);
+        expect(widget.title).toBe('foreign-held-widget');
+      } finally {
+        await prisma.analyticsReportRun.deleteMany({
+          where: { reportId: { in: plan.reports.map((report) => report.id) } },
+        });
+        await prisma.analyticsDashboardWidget.deleteMany({
+          where: { id: { in: plan.widgets.map((widget) => widget.id) } },
+        });
+        await prisma.analyticsReport.deleteMany({
+          where: { id: { in: plan.reports.map((report) => report.id) } },
+        });
+        await prisma.analyticsDashboard.deleteMany({ where: { id: plan.dashboardId } });
+        for (const id of [orgA.id, orgB.id]) {
+          await prisma.analyticsReportRun.deleteMany({ where: { orgId: id } });
+          await prisma.analyticsDashboardWidget.deleteMany({ where: { orgId: id } });
+          await prisma.analyticsReport.deleteMany({ where: { orgId: id } });
+          await prisma.analyticsDashboard.deleteMany({ where: { orgId: id } });
+          await prisma.user.deleteMany({ where: { orgId: id } });
+          await prisma.org.deleteMany({ where: { id } });
+        }
+      }
+    },
+  );
+
+  it('mutation routes return 2xx only when canEdit, 403 otherwise, and 404 for a hidden private dashboard', async () => {
+    if (!dbReachable || !orgId) throw new Error('[skip] DATABASE_URL not reachable');
+    const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+    process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+    const roles = [
+      'admin',
+      'manager',
+      'sales-manager',
+      'approver',
+      'account-executive',
+      'presales',
+      'sdr',
+      'customer-success',
+      'read-only',
+      'viewer',
+    ] as const;
+    try {
+      const ownerHeaders = { 'x-bidstack-e2e-role': 'sales-manager' };
+      const ownerCaps = await server.inject({
+        method: 'GET',
+        url: '/api/me/capabilities',
+        headers: ownerHeaders,
+      });
+      expect(ownerCaps.statusCode).toBe(200);
+      const ownerId = (ownerCaps.json() as { userId: string }).userId;
+
+      const sharedRes = await server.inject({
+        method: 'POST',
+        url: '/api/dashboards',
+        headers: ownerHeaders,
+        payload: { name: 'Role matrix shared', isShared: true },
+      });
+      expect(sharedRes.statusCode).toBe(201);
+      const sharedId = (sharedRes.json() as { id: string }).id;
+      createdDashboardIds.push(sharedId);
+      const reportId = await createBackingReport('Role matrix report');
+      const sharedWidgetRes = await server.inject({
+        method: 'POST',
+        url: `/api/dashboards/${sharedId}/widgets`,
+        headers: ownerHeaders,
+        payload: { reportId, title: 'Shared widget', type: 'kpi' },
+      });
+      expect(sharedWidgetRes.statusCode).toBe(201);
+      const sharedWidgetId = (sharedWidgetRes.json() as { id: string }).id;
+      createdWidgetIds.push(sharedWidgetId);
+
+      const privateRes = await server.inject({
+        method: 'POST',
+        url: '/api/dashboards',
+        headers: ownerHeaders,
+        payload: { name: 'Role matrix private', isShared: false },
+      });
+      expect(privateRes.statusCode).toBe(201);
+      const privateId = (privateRes.json() as { id: string }).id;
+      createdDashboardIds.push(privateId);
+      const privateWidgetRes = await server.inject({
+        method: 'POST',
+        url: `/api/dashboards/${privateId}/widgets`,
+        headers: ownerHeaders,
+        payload: { reportId, title: 'Private widget', type: 'kpi' },
+      });
+      expect(privateWidgetRes.statusCode).toBe(201);
+      const privateWidgetId = (privateWidgetRes.json() as { id: string }).id;
+      createdWidgetIds.push(privateWidgetId);
+
+      for (const role of roles) {
+        const headers = { 'x-bidstack-e2e-role': role };
+        const capsRes = await server.inject({
+          method: 'GET',
+          url: '/api/me/capabilities',
+          headers,
+        });
+        expect(capsRes.statusCode, role).toBe(200);
+        const caps = capsRes.json() as { userId: string; permissions: string[] };
+        const systemAdmin = await prisma.userRole.count({
+          where: {
+            userId: caps.userId,
+            orgId: orgId!,
+            deletedAt: null,
+            role: { orgId: orgId!, name: 'Admin', isSystem: true, deletedAt: null },
+          },
+        });
+        const canEdit = caps.userId === ownerId || systemAdmin > 0;
+        const canWrite = caps.permissions.includes('reports:write');
+
+        for (const board of [
+          { id: sharedId, widgetId: sharedWidgetId, isPrivate: false, name: 'Role matrix shared' },
+          { id: privateId, widgetId: privateWidgetId, isPrivate: true, name: 'Role matrix private' },
+        ]) {
+          const expected = !canWrite ? 403 : board.isPrivate && !canEdit ? 404 : !canEdit ? 403 : 0;
+          const label = `${role} ${board.isPrivate ? 'private' : 'shared'}`;
+
+          if (expected !== 0) {
+            const patch = await server.inject({
+              method: 'PATCH',
+              url: `/api/dashboards/${board.id}`,
+              headers,
+              payload: { name: 'Taken over' },
+            });
+            expect(patch.statusCode, `${label} PATCH dashboard`).toBe(expected);
+            const add = await server.inject({
+              method: 'POST',
+              url: `/api/dashboards/${board.id}/widgets`,
+              headers,
+              payload: { reportId, title: 'Extra', type: 'kpi' },
+            });
+            expect(add.statusCode, `${label} POST widget`).toBe(expected);
+            const edit = await server.inject({
+              method: 'PATCH',
+              url: `/api/dashboards/${board.id}/widgets/${board.widgetId}`,
+              headers,
+              payload: { title: 'Taken over' },
+            });
+            expect(edit.statusCode, `${label} PATCH widget`).toBe(expected);
+            const dropWidget = await server.inject({
+              method: 'DELETE',
+              url: `/api/dashboards/${board.id}/widgets/${board.widgetId}`,
+              headers,
+            });
+            expect(dropWidget.statusCode, `${label} DELETE widget`).toBe(expected);
+            const dropBoard = await server.inject({
+              method: 'DELETE',
+              url: `/api/dashboards/${board.id}`,
+              headers,
+            });
+            expect(dropBoard.statusCode, `${label} DELETE dashboard`).toBe(expected);
+            continue;
+          }
+
+          const renamed = await server.inject({
+            method: 'PATCH',
+            url: `/api/dashboards/${board.id}`,
+            headers,
+            payload: { name: `${board.name} edited` },
+          });
+          expect(renamed.statusCode, `${label} PATCH dashboard`).toBe(200);
+          const restored = await server.inject({
+            method: 'PATCH',
+            url: `/api/dashboards/${board.id}`,
+            headers,
+            payload: { name: board.name },
+          });
+          expect(restored.statusCode).toBe(200);
+
+          const added = await server.inject({
+            method: 'POST',
+            url: `/api/dashboards/${board.id}/widgets`,
+            headers,
+            payload: { reportId, title: `${role} widget`, type: 'kpi' },
+          });
+          expect(added.statusCode, `${label} POST widget`).toBe(201);
+          const addedId = (added.json() as { id: string }).id;
+          createdWidgetIds.push(addedId);
+
+          const edited = await server.inject({
+            method: 'PATCH',
+            url: `/api/dashboards/${board.id}/widgets/${board.widgetId}`,
+            headers,
+            payload: { title: 'Shared widget' },
+          });
+          expect(edited.statusCode, `${label} PATCH widget`).toBe(200);
+
+          const removed = await server.inject({
+            method: 'DELETE',
+            url: `/api/dashboards/${board.id}/widgets/${addedId}`,
+            headers,
+          });
+          expect(removed.statusCode, `${label} DELETE widget`).toBe(204);
+
+          const disposable = await server.inject({
+            method: 'POST',
+            url: '/api/dashboards',
+            headers: ownerHeaders,
+            payload: { name: `Disposable ${role} ${board.name}`, isShared: !board.isPrivate },
+          });
+          expect(disposable.statusCode).toBe(201);
+          const disposableId = (disposable.json() as { id: string }).id;
+          createdDashboardIds.push(disposableId);
+          const discarded = await server.inject({
+            method: 'DELETE',
+            url: `/api/dashboards/${disposableId}`,
+            headers,
+          });
+          expect(discarded.statusCode, `${label} DELETE dashboard`).toBe(204);
+        }
+      }
+    } finally {
+      if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+    }
+  }, 60_000);
 });

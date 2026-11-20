@@ -54,10 +54,15 @@ export function AnalyticsDashboardPage() {
     };
   }, [dropdownOpen]);
   const [addingWidget, setAddingWidget] = useState(false);
-  // Add/delete widget both persist through POST/DELETE
-  // /api/dashboards/:id/widgets*, gated server-side behind reports:write
-  // (apps/api/src/routes/analytics-dashboards.ts:94,139) — hide the write
-  // affordances rather than let a read-only role 403.
+  const addWidgetTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const openAddWidget = (event: { currentTarget: HTMLButtonElement }) => {
+    addWidgetTriggerRef.current = event.currentTarget;
+    setAddingWidget(true);
+  };
+  // Mutations stay owner-or-admin on the server (requireDashboardEditor).
+  // canEdit is that same answer on the dashboard payload. reports:write alone
+  // is not enough: a Sales Manager can open a shared dashboard and still be
+  // refused. The Sales role has no reports:write, so it never sees the button.
   const canWrite = useHasPermission('reports:write');
 
   // Resolve the active dashboard (default to first). Fall back to the first
@@ -65,6 +70,7 @@ export function AnalyticsDashboardPage() {
   // shows a real dashboard instead of the false "No dashboards" empty state.
   const activeDash =
     (activeDashId ? dashboards.find((d) => d.id === activeDashId) : undefined) ?? dashboards[0];
+  const canEditDashboard = canWrite && activeDash?.canEdit === true;
 
   const {
     data: rawWidgets = [],
@@ -205,9 +211,9 @@ export function AnalyticsDashboardPage() {
           >
             {t('analyticsDashboard.newReportLink', 'New report')}
           </Link>
-          {activeDash && canWrite && (
+          {activeDash && canEditDashboard && (
             <button
-              onClick={() => setAddingWidget(true)}
+              onClick={openAddWidget}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white',
                 'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors',
@@ -276,14 +282,21 @@ export function AnalyticsDashboardPage() {
         ) : widgets.length === 0 ? (
           <EmptyState
             title={t('analyticsDashboard.emptyDashboardTitle', 'Empty dashboard')}
-            message={t(
-              'analyticsDashboard.emptyDashboardMessage',
-              'Add your first widget to start visualising data.',
-            )}
+            message={
+              canEditDashboard
+                ? t(
+                    'analyticsDashboard.emptyDashboardMessage',
+                    'Add your first widget to start visualising data.',
+                  )
+                : t(
+                    'analyticsDashboard.emptyDashboardReadOnly',
+                    'This dashboard has no widgets yet.',
+                  )
+            }
             action={
-              canWrite ? (
+              canEditDashboard ? (
                 <button
-                  onClick={() => setAddingWidget(true)}
+                  onClick={openAddWidget}
                   className={cn(
                     'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white',
                     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] min-h-[44px]',
@@ -316,7 +329,7 @@ export function AnalyticsDashboardPage() {
                     action isn't rendered. Re-add when editing is implemented. */}
                 <WidgetRenderer
                   widget={w}
-                  onDelete={canWrite ? () => handleDeleteWidget(w.id) : undefined}
+                  onDelete={canEditDashboard ? () => handleDeleteWidget(w.id) : undefined}
                 />
               </Reorder.Item>
             ))}
@@ -325,11 +338,12 @@ export function AnalyticsDashboardPage() {
       </div>
 
       {/* Add widget modal */}
-      {activeDash && canWrite && (
+      {activeDash && canEditDashboard && (
         <WidgetConfigModal
           open={addingWidget}
           onOpenChange={setAddingWidget}
           onSave={handleAddWidget}
+          triggerRef={addWidgetTriggerRef}
         />
       )}
     </div>

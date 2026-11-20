@@ -5,13 +5,14 @@
 // An internal ErrorBoundary catches chart render failures so one bad widget
 // cannot crash the entire dashboard.
 
-import { Component, type ReactNode, useCallback } from 'react';
+import { Component, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Settings, Copy, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { csvCell } from '@/lib/csv';
+import { formatMoney } from '@/lib/format';
 import { ChartContainer } from '@/components/charts/ChartContainer';
 import {
   AreaChart,
@@ -27,7 +28,9 @@ import {
   TableChart,
 } from '@/components/charts/charts';
 import { KpiCard } from '@/components/charts/KpiCard';
+import { formatKpiValue } from '@/components/charts/kpi-value';
 import type { DashboardWidget } from '@/hooks/useDashboards';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useReportRun, useRunReport, type ReportRun } from '@/hooks/useAnalyticsReports';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
@@ -82,6 +85,21 @@ class ChartErrorBoundary extends Component<
 
 type DataRow = Record<string, unknown>;
 
+const MICROS_PER_UNIT = 1_000_000n;
+
+/** Currency widgets carry integer micros. Split before Number() so a large sum stays exact. */
+function unitsFromMicros(micros: number): number {
+  if (!Number.isFinite(micros)) return micros;
+  const value = BigInt(Math.trunc(micros));
+  return Number(value / MICROS_PER_UNIT) + Number(value % MICROS_PER_UNIT) / 1_000_000;
+}
+
+function kpiPresentation(format: string | undefined, raw: number): { value: number; format: (n: number) => string } {
+  if (format === 'currency') return { value: unitsFromMicros(raw), format: (n) => formatMoney(n) };
+  if (format === 'percent') return { value: raw, format: (n) => `${formatKpiValue(n)}%` };
+  return { value: raw, format: formatKpiValue };
+}
+
 function ChartBody({
   widget,
   data,
@@ -98,6 +116,7 @@ function ChartBody({
     gaugeValue?: number;
     gaugeLabel?: string;
     columns?: number;
+    format?: string;
   };
 
   const xKey = cfg.xKey ?? 'name';
@@ -106,11 +125,13 @@ function ChartBody({
   switch (widget.type) {
     case 'kpi': {
       const rows = data as { value?: number; current?: number }[];
-      const val = Number(rows[0]?.value ?? rows[0]?.current ?? 0);
+      const raw = Number(rows[0]?.value ?? rows[0]?.current ?? 0);
+      const presented = kpiPresentation(cfg.format, raw);
       return (
         <KpiCard
           title={widget.title}
-          value={val}
+          value={presented.value}
+          format={presented.format}
           aria-label={widget.title}
         />
       );
@@ -215,12 +236,30 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   const { t } = useTranslation('crm');
   const qc = useQueryClient();
   const runMutation = useRunReport();
+  const startedFor = useRef<string | null>(null);
+  const [autoRunError, setAutoRunError] = useState<string | null>(null);
+  const latestRunId = (widget.config as { latestRunId?: string }).latestRunId ?? '';
+  const canRunReport = useHasPermission('reports:write');
 
-  // If the widget has a reportId, poll the latest run
-  const { data: run, isLoading, error } = useReportRun(
-    widget.reportId ?? '',
-    (widget.config as { latestRunId?: string }).latestRunId ?? '',
-  );
+  // A saved widget has no stored run until someone who may write reports
+  // executes it. Viewing must not persist a run or an audit row.
+  useEffect(() => {
+    if (!canRunReport || !widget.reportId || latestRunId) return;
+    if (startedFor.current === widget.reportId) return;
+    startedFor.current = widget.reportId;
+    void runMutation.mutateAsync({ id: widget.reportId }).then(
+      () => {
+        void qc.invalidateQueries({ queryKey: ['dashboards', 'widgets', widget.dashboardId] });
+      },
+      (err: unknown) => {
+        setAutoRunError(
+          err instanceof Error && err.message ? err.message : 'Could not run this report.',
+        );
+      },
+    );
+  }, [canRunReport, widget.reportId, latestRunId, widget.dashboardId, qc, runMutation]);
+
+  const { data: run, isLoading, error } = useReportRun(widget.reportId ?? '', latestRunId);
 
   const handleRefresh = useCallback(async () => {
     if (!widget.reportId) return;
@@ -268,14 +307,22 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   ];
 
   const data: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
-  const empty = !isLoading && !error && data.length === 0;
+  const needsReport = !widget.reportId;
+  const runError = error instanceof Error ? error.message : autoRunError;
+  const waitingForRun = canRunReport && Boolean(widget.reportId) && !latestRunId && !runError;
+  const empty = !needsReport && !isLoading && !runError && data.length === 0;
 
   return (
     <ChartContainer
       title={widget.type !== 'kpi' ? widget.title : undefined}
-      loading={isLoading}
-      error={error instanceof Error ? error.message : null}
-      empty={empty}
+      loading={isLoading || waitingForRun}
+      error={runError}
+      empty={needsReport || empty}
+      emptyMessage={
+        needsReport
+          ? t('widgetRenderer.needsReport', 'This widget needs a report.')
+          : undefined
+      }
       onRefresh={widget.reportId ? handleRefresh : undefined}
       actions={actions}
       aria-label={widget.title}
