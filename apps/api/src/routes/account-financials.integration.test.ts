@@ -17,6 +17,8 @@ let previousStubRoleHeader: string | undefined;
 beforeAll(async () => {
   previousStubRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
   process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+  process.env.POLO_DATA_MODE = 'demo';
+  process.env.POLO_DEPLOYMENT_ENV = 'local';
   try {
     await prisma.$queryRaw`SELECT 1`;
     dbReachable = true;
@@ -42,6 +44,14 @@ afterAll(async () => {
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable && !!orgId);
 const mk = (name: string, tier: 'key' | 'top' | 'standard') => prisma.company.create({ data: { orgId: orgId!, name: `${name} ${Date.now()}`, tier } });
 
+async function setDemoFixture(on: boolean) {
+  await prisma.orgSettings.upsert({
+    where: { orgId: orgId! },
+    create: { orgId: orgId!, demoData: on },
+    update: { demoData: on, deletedAt: null },
+  });
+}
+
 describe('account financials', () => {
   skipIfNoDb('General account: empty state, no sample, not scheduled', async () => {
     const c = await mk('General Co', 'standard');
@@ -52,10 +62,14 @@ describe('account financials', () => {
     expect(await prisma.accountFinancialProfile.count({ where: { companyId: c.id } })).toBe(0);
   });
 
-  skipIfNoDb('Strategic account with no filings stays Not connected until the provider is approved', async () => {
+  skipIfNoDb('Strategic account with no filings shows the labelled sample when the demo-data fixture is on', async () => {
+    await setDemoFixture(true);
     const c = await mk('Strategic Co', 'key');
     const body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${c.id}/financials` })).json();
-    expect(body).toMatchObject({ tierLabel: 'Strategic', gate: 'tier', sample: false, periods: [], signals: [], statusCopy: 'Not connected' });
+    expect(body).toMatchObject({ tierLabel: 'Strategic', gate: 'tier', sample: true });
+    expect(body.periods.length).toBeGreaterThan(0);
+    expect(body.periods.every((p: { source: string }) => p.source === 'sample')).toBe(true);
+    expect(body.signals.every((s: { sample: boolean; title: string }) => s.sample && s.title.startsWith('Sample:'))).toBe(true);
     // Viewing a Strategic / Top account queues the public-filings pull.
     expect(await prisma.accountFinancialProfile.findUnique({ where: { companyId: c.id } })).toMatchObject({ status: 'pending' });
     expect(
@@ -63,6 +77,21 @@ describe('account financials', () => {
         where: { orgId: orgId!, action: 'account.financials.view', targetId: c.id },
       }),
     ).toMatchObject({ targetType: 'company' });
+  });
+
+  skipIfNoDb('Strategic account with no filings stays Not connected in real mode', async () => {
+    await setDemoFixture(false);
+    const c = await mk('Strategic Real', 'key');
+    const body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${c.id}/financials` })).json();
+    expect(body).toMatchObject({
+      tierLabel: 'Strategic',
+      gate: 'tier',
+      sample: false,
+      periods: [],
+      signals: [],
+      statusCopy: 'Not connected',
+    });
+    expect(await prisma.accountFinancialProfile.findUnique({ where: { companyId: c.id } })).toMatchObject({ status: 'pending' });
   });
 
   skipIfNoDb('stored periods come back with source, period and derived margin; no sample mixed in', async () => {
@@ -88,7 +117,24 @@ describe('account financials', () => {
     expect(body.signals[0].title).toBe('Operating margin down 5.9 pts');
   });
 
+  skipIfNoDb('Track financials shows the labelled sample when the demo-data fixture is on', async () => {
+    await setDemoFixture(true);
+    const c = await mk('Optin Demo', 'standard');
+    const on = await server.inject({
+      method: 'PATCH',
+      url: `/api/v1/accounts/${c.id}/financials/track`,
+      headers: { 'x-bidstack-e2e-role': 'account-executive' },
+      payload: { trackFinancials: true },
+    });
+    expect(on.statusCode).toBe(200);
+    const body = on.json();
+    expect(body).toMatchObject({ gate: 'opt_in', trackFinancials: true, status: 'pending', sample: true });
+    expect(body.periods.every((p: { source: string }) => p.source === 'sample')).toBe(true);
+    expect(body.signals.every((s: { sample: boolean; title: string }) => s.sample && s.title.startsWith('Sample:'))).toBe(true);
+  });
+
   skipIfNoDb('Track financials: AE opts a General account in and out; schedule follows', async () => {
+    await setDemoFixture(false);
     const c = await mk('Optin Co', 'standard');
     const on = await server.inject({ method: 'PATCH', url: `/api/v1/accounts/${c.id}/financials/track`, headers: { 'x-bidstack-e2e-role': 'account-executive' }, payload: { trackFinancials: true } });
     expect(on.statusCode).toBe(200);

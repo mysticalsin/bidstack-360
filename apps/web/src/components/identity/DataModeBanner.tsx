@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { usePoloPublicIdentity, type PoloPublicIdentity } from '@/hooks/usePoloIdentity';
+import { usePoloMe, usePoloPublicIdentity, type PoloPublicIdentity } from '@/hooks/usePoloIdentity';
+import { useAuth } from '@/lib/auth';
 
 const LAST_MODE_KEY = 'polo:last-data-mode';
 
@@ -29,8 +30,10 @@ const DEMO_CLASS =
 
 export function DataModeBanner() {
   const { t } = useTranslation('settings');
+  const { isSignedIn } = useAuth();
   const identity = usePoloPublicIdentity();
-  const data = identity.data;
+  const me = usePoloMe(isSignedIn);
+  const data = (isSignedIn ? me.data : undefined) ?? identity.data;
   const mode = data?.dataMode;
   useEffect(() => {
     if (mode) rememberMode(mode);

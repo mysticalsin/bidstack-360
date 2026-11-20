@@ -25,6 +25,7 @@ import {
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { showsDemoNumbers } from '../lib/runtime-request.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
 import {
@@ -106,6 +107,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const to = new Date(now.getTime() + 90 * DAY);
       const ids = (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
       const live = await companiesWithLiveSignals(orgId, ids);
+      const demo = await showsDemoNumbers(orgId);
+      const sampleGate = demo ? hideSampleWhere(live) : { sample: false as const };
       const wanted = req.query.categories
         ? new Set(req.query.categories.split(',').map((c) => c.trim()).filter((c) => SignalCategory.safeParse(c).success))
         : null;
@@ -123,7 +126,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 100,
         }),
         prisma.accountWatchEvent.findMany({
-          where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...hideSampleWhere(live) },
+          where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, occurredAt: { gte: from, lte: to }, ...sampleGate },
           orderBy: { occurredAt: 'desc' },
           take: timelineEventTake(),
         }),
@@ -319,6 +322,8 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
       const owner = new Map<string, string>();
       for (const [root, members] of groups) for (const m of members) owner.set(m, root);
       const live = await companiesWithLiveSignals(orgId, [...owner.keys()]);
+      const demo = await showsDemoNumbers(orgId);
+      const sampleGate = demo ? hideSampleWhere(live) : { sample: false as const };
       const rows = owner.size
         ? await prisma.accountWatchEvent.findMany({
             where: {
@@ -326,7 +331,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
               companyId: { in: [...owner.keys()] },
               status: 'NEW',
               occurredAt: { gte: new Date(now.getTime() - 45 * DAY), lte: now },
-              ...hideSampleWhere(live),
+              ...sampleGate,
               OR: [{ importance: { gte: 60 } }, { importance: 0, severity: { gte: 3 } }],
             },
             orderBy: [{ importance: 'desc' }, { occurredAt: 'desc' }],

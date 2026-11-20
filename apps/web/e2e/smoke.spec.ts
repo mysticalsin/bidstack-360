@@ -79,6 +79,9 @@ test('account view shows public financials, previous projects and related histor
 });
 
 test('enterprise readiness surfaces are reachable in demo mode', async ({ page, gotoAndWait }) => {
+  const api = process.env.E2E_API_URL ?? 'http://localhost:4010';
+  const armed = await page.request.put(`${api}/api/v1/org-settings/demo-data`, { data: { demoData: true } });
+  expect(armed.ok(), await armed.text()).toBeTruthy();
   await gotoAndWait('/dashboard');
   await expect(page.getByRole('status').filter({ hasText: /DEMO MODE/i })).toBeVisible({
     timeout: 10_000,

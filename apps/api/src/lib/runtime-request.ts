@@ -12,6 +12,8 @@ import {
   applyOrgOverride,
   connectProvider,
   providerApprovalFromEnv,
+  resolveProcessData,
+  type RuntimeEnv,
   type RuntimeMode,
   type ToggleActor,
 } from '@bidstack/shared';
@@ -31,6 +33,12 @@ export async function demoDataActor(req: FastifyRequest): Promise<ToggleActor> {
   if (adminRoleCount > 0) return 'admin';
   if (await canOverrideOwnership(req)) return 'owner';
   return 'member';
+}
+
+/** Effective demo: the process is demo and this org's switch is on. Otherwise reads are real. */
+export async function showsDemoNumbers(orgId: string): Promise<boolean> {
+  const enabled = await orgDemoDataEnabled(orgId);
+  return applyOrgOverride(resolveProcessData(process.env as unknown as RuntimeEnv), enabled).effectiveData === 'demo';
 }
 
 export async function orgDemoDataEnabled(orgId: string): Promise<boolean> {
