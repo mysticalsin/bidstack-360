@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
 import { Sparkline } from './Sparkline';
+import { formatKpiValue } from './kpi-value';
 
 interface Props {
   title: string;
@@ -22,25 +23,6 @@ interface Props {
   format?: (n: number) => string;
   loading?: boolean;
   className?: string;
-}
-
-function compactKeepsUnits(units: number): boolean {
-  const abs = Math.abs(units);
-  for (const div of [1e9, 1e6, 1e3]) {
-    if (abs < div) continue;
-    for (let digits = 0; digits <= 2; digits += 1) {
-      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
-    }
-    return false;
-  }
-  return false;
-}
-
-export function formatKpiValue(n: number): string {
-  if (!Number.isFinite(n)) return '—';
-  if (!Number.isSafeInteger(n)) return n.toLocaleString('en-GB', { maximumFractionDigits: 1 });
-  if (!compactKeepsUnits(n)) return n.toLocaleString('en-GB');
-  return new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 2 }).format(n);
 }
 
 export function KpiCard({

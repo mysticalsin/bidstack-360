@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatKpiValue } from './KpiCard';
+import { formatKpiValue } from './kpi-value';
 
 describe('formatKpiValue', () => {
   it('does not turn 7.86 million into 7.9 million', () => {
