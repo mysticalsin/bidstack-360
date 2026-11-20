@@ -139,7 +139,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
     const t = at(o.companyId);
     if (!t) continue;
     t.data.opps.push(toMomentumOpp(o));
-    if (o.stage !== 'closed_won' && o.stage !== 'closed_lost') t.openPipelineMicros += o.valueMicros;
+    if (recordedOutcome(o) === 'open') t.openPipelineMicros += o.valueMicros;
   }
   for (const m of meetings) at(m.companyId)?.data.meetings.push(m.heldAt);
   for (const p of postings) if (p.postedAt) at(p.companyId)?.data.postings.push(p.postedAt);

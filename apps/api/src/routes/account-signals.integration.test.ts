@@ -146,6 +146,42 @@ describe('GET /accounts/:id/initiatives', () => {
 });
 
 describe('GET /portfolio/momentum', () => {
+  it('leaves a live lost stage out of open pipeline and keeps a deleted lost stage in it', async () => {
+    // WHY: a stage marked Lost was still added to openPipelineMicros, so the
+    // momentum API reported that book as open. A deleted stage does not close
+    // the deal. Red-first.
+    const o = orgA.orgId;
+    const company = await prisma.company.create({ data: { orgId: o, name: `${TAG} Lost Book`, countryCode: 'BR' } });
+    const pipeline = await prisma.pipeline.create({ data: { orgId: o, name: `${TAG} pipeline` } });
+    const liveLost = await prisma.pipelineStage.create({
+      data: { orgId: o, pipelineId: pipeline.id, key: `${TAG}-lost`, name: 'Lost', orderIndex: 9, isLost: true },
+    });
+    const deletedLost = await prisma.pipelineStage.create({
+      data: { orgId: o, pipelineId: pipeline.id, key: `${TAG}-gone`, name: 'Old lost', orderIndex: 10, isLost: true, deletedAt: new Date('2026-01-01T00:00:00.000Z') },
+    });
+    const deal = (code: string, stageId: string | null, value: bigint) =>
+      prisma.opportunity.create({
+        data: {
+          orgId: o,
+          code: `${TAG}-${code}`,
+          customer: `${TAG} Lost Book`,
+          name: `${TAG} ${code}`,
+          stage: 's1_lead',
+          valueMicros: value,
+          companyId: company.id,
+          pipelineStageId: stageId,
+          createdAt: ago(10),
+        },
+      });
+    await deal('live-lost', liveLost.id, 5_000_000n);
+    await deal('deleted-lost', deletedLost.id, 2_000_000n);
+    await deal('still-open', null, 1_000_000n);
+    const res = await get('/portfolio/momentum');
+    expect(res.statusCode).toBe(200);
+    const row = res.json().accounts.find((a: { companyName: string }) => a.companyName === `${TAG} Lost Book`);
+    expect(row.openPipelineMicros).toBe('3000000');
+  });
+
   it('ranks readable root accounts and lists top alerts', async () => {
     const res = await get('/portfolio/momentum');
     expect(res.statusCode).toBe(200);
