@@ -10,9 +10,7 @@ export interface TopAccount {
   tier: string;
   topAccountRank: number | null;
   totalValue: number;
-  totalValueMicros?: string;
   wonValue: number;
-  wonValueMicros?: string;
   openDeals: number;
   contactCount: number;
   opportunityCount: number;

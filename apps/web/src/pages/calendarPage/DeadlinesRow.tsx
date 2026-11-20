@@ -9,6 +9,7 @@
  * record. Urgency follows DueDateChip semantics so every surface agrees on
  * the bid clock: overdue = danger, due today = amber emphasis.
  */
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -19,8 +20,13 @@ import { formatDate } from '@/lib/format';
 
 import { toLocalIsoDate } from './dateUtils';
 
+const LANE_GRID = 'grid border-b border-[var(--border-subtle)]';
+
 // Same column template as the calendar grid so lane cells align with day columns.
-const LANE_GRID = 'grid grid-cols-[56px_repeat(7,1fr)] border-b border-[var(--border-subtle)]';
+function laneColumns(count: number): CSSProperties {
+  return { gridTemplateColumns: `56px repeat(${count}, minmax(0, 1fr))` };
+}
+const FULL_ROW: CSSProperties = { gridColumn: '2 / -1' };
 
 interface ChipTone {
   className: string;
@@ -88,7 +94,7 @@ function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
       }
       className={cn(
         // min-h-[44px] keeps the tap target compliant even in the dense lane.
-        'flex min-h-[44px] w-full items-center gap-1.5 rounded-md border bg-transparent px-1.5 text-[11px] font-medium leading-tight',
+        'flex min-h-[44px] w-full items-center gap-1.5 rounded-md border bg-transparent px-1.5 text-xs font-medium leading-tight',
         'hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]',
         className,
       )}
@@ -116,7 +122,7 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
   const { data, isLoading, isError, refetch } = useCalendarDeadlines(from, to);
 
   const laneLabel = (
-    <div className="flex items-start justify-end pr-2 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+    <div className="flex items-start justify-end pr-2 pt-2 text-xs font-semibold text-[var(--fg-tertiary)]">
       {t('calendar.deadlinesLane', 'Due')}
     </div>
   );
@@ -125,6 +131,7 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
     return (
       <div
         className={LANE_GRID}
+        style={laneColumns(days.length)}
         role="status"
         aria-label={t('calendar.deadlinesLoading', 'Loading deadlines…')}
       >
@@ -140,9 +147,9 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
 
   if (isError) {
     return (
-      <div className={LANE_GRID}>
+      <div className={LANE_GRID} style={laneColumns(days.length)}>
         {laneLabel}
-        <div role="alert" className="col-span-7 flex items-center gap-3 px-2 py-1">
+        <div role="alert" style={FULL_ROW} className="flex items-center gap-3 px-2 py-1">
           <span className="text-xs text-[var(--danger)]">
             {t('calendar.deadlinesError', 'Could not load deadlines.')}
           </span>
@@ -162,11 +169,11 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
 
   if (items.length === 0) {
     return (
-      <div className={LANE_GRID}>
+      <div className={LANE_GRID} style={laneColumns(days.length)}>
         {laneLabel}
-        <div className="col-span-7 flex items-center px-2 py-2">
+        <div style={FULL_ROW} className="flex items-center px-2 py-2">
           <span className="text-xs text-[var(--fg-muted)]">
-            {t('calendar.deadlinesEmpty', 'No bid or proposal deadlines this week.')}
+            {t('calendar.deadlinesEmptyRange', 'No deadlines')}
           </span>
         </div>
       </div>
@@ -174,7 +181,7 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
   }
 
   return (
-    <div className={LANE_GRID}>
+    <div className={LANE_GRID} style={laneColumns(days.length)}>
       {laneLabel}
       {days.map((day) => {
         const iso = toLocalIsoDate(day);

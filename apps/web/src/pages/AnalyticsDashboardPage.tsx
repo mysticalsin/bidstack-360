@@ -4,7 +4,7 @@
 // Uses a CSS grid + drag-to-reorder via mouse events (no external dep beyond
 // what's already in the bundle: framer-motion handles smooth reordering).
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, Reorder } from 'framer-motion';
@@ -27,11 +27,32 @@ import {
 export function AnalyticsDashboardPage() {
   const { t } = useTranslation('crm');
   const [searchParams] = useSearchParams();
-  const { data: dashboards = [], isLoading: dashLoading } = useDashboards();
+  const {
+    data: dashboards = [],
+    isLoading: dashLoading,
+    isError: dashError,
+    refetch: refetchDashboards,
+  } = useDashboards();
   // Initialise from ?id= so deep-links and the Dashboards list (which links
   // to /analytics?id=<id>) open the chosen dashboard instead of always the first.
   const [activeDashId, setActiveDashId] = useState<string>(searchParams.get('id') ?? '');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDropdownOpen(false);
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (!switcherRef.current?.contains(e.target as Node)) setDropdownOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [dropdownOpen]);
   const [addingWidget, setAddingWidget] = useState(false);
   // Add/delete widget both persist through POST/DELETE
   // /api/dashboards/:id/widgets*, gated server-side behind reports:write
@@ -106,11 +127,11 @@ export function AnalyticsDashboardPage() {
     <div className="flex flex-col h-full">
       {/* Topbar */}
       <div className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--surface-card)] dark:bg-[var(--surface-glass)]">
-        <BarChart2 size={18} className="text-[var(--brand-primary)]" aria-hidden />
+        <BarChart2 size={18} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" aria-hidden />
         <h1 className="text-sm font-semibold text-[var(--fg-primary)]">{t('analyticsDashboard.title', 'Analytics')}</h1>
 
         {/* Dashboard switcher */}
-        <div className="relative ml-2">
+        <div ref={switcherRef} className="relative ml-2">
           <button
             onClick={() => setDropdownOpen((p) => !p)}
             aria-haspopup="listbox"
@@ -150,7 +171,7 @@ export function AnalyticsDashboardPage() {
                   className={cn(
                     'flex w-full items-center px-3 py-2 text-sm min-h-[44px]',
                     d.id === activeDash?.id
-                      ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+                      ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                       : 'text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
                   )}
                 >
@@ -202,7 +223,20 @@ export function AnalyticsDashboardPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {!activeDash ? (
+        {dashError && dashboards.length === 0 ? (
+          <ErrorState
+            title={t('analyticsDashboard.loadDashboardsError', 'Could not load dashboards')}
+            action={
+              <button
+                type="button"
+                onClick={() => void refetchDashboards()}
+                className="min-h-[44px] rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]"
+              >
+                {t('analyticsDashboard.retry', 'Retry')}
+              </button>
+            }
+          />
+        ) : !activeDash ? (
           <EmptyState
             title={t('analyticsDashboard.noDashboardsTitle', 'No dashboards')}
             message={t(
@@ -226,7 +260,20 @@ export function AnalyticsDashboardPage() {
             title={t('analyticsDashboard.loadWidgetsError', 'Failed to load widgets')}
             message={(widgetsError as Error).message}
           />
-        ) : !widgetsLoading && widgets.length === 0 ? (
+        ) : widgetsLoading && widgets.length === 0 ? (
+          <div
+            data-testid="widgets-loading"
+            aria-busy="true"
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+          >
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-52 animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)]"
+              />
+            ))}
+          </div>
+        ) : widgets.length === 0 ? (
           <EmptyState
             title={t('analyticsDashboard.emptyDashboardTitle', 'Empty dashboard')}
             message={t(

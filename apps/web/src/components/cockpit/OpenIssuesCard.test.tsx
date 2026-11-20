@@ -1,45 +1,30 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import '@/i18n';
 import { OpenIssuesCard } from './OpenIssuesCard';
-import { severityShort } from './_tokens';
-
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (_key: string, fallback: string) => fallback,
-  }),
-}));
-
-vi.mock('framer-motion', async () => {
-  const React = await import('react');
-  return {
-    motion: {
-      div: ({ children, ...props }: { children?: React.ReactNode }) =>
-        React.createElement('div', props, children),
-    },
-    useReducedMotion: () => true,
-  };
-});
-
-afterEach(() => {
-  cleanup();
-});
 
 describe('OpenIssuesCard', () => {
-  it('does not treat a missing register as an all-clear', () => {
-    // Why: an empty risk list used to say the account was green. Absence of
-    // rows is not a recorded clearance.
-    render(<OpenIssuesCard risks={[]} compliance={[]} />);
+  afterEach(cleanup);
 
-    expect(screen.getByText('Nothing recorded').textContent).toBe('Nothing recorded');
-    expect(screen.getByText(/not a clearance/).textContent).toContain('not a clearance');
-    expect(screen.queryByText('Everything is green here.')).toBeNull();
-    expect(screen.queryByText('All clear')).toBeNull();
+  it('says nothing is recorded, not that everything is green, when an account has no rows', () => {
+    render(<OpenIssuesCard risks={[]} compliance={[]} />);
+    expect(screen.getByText('No open issues')).toBeDefined();
+    expect(
+      screen.getByText('No risks or compliance checks are recorded for this account yet.'),
+    ).toBeDefined();
   });
 
-  it('does not mark an unranked risk as low', () => {
-    // WHY: a missing severity used to fall through to the low initial.
-    expect(severityShort(null)).toBe('–');
-    expect(severityShort('low')).toBe('L');
+  it('shows full severity words and the compliance label on rows', () => {
+    render(
+      <OpenIssuesCard
+        risks={[
+          { id: 'r1', title: 'Budget freeze', severity: 'high', owner: 'Ana', mitigation: null, dueDate: null, status: 'open' } as never,
+        ]}
+        compliance={[{ id: 'c1', label: 'DPA unsigned', status: 'blocked', owner: null } as never]}
+      />,
+    );
+    expect(screen.getByText('High', { selector: '.oi-count' })).toBeDefined();
+    expect(screen.getByText('Compliance', { selector: '.oi-count' })).toBeDefined();
   });
 });

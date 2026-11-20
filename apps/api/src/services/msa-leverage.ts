@@ -1,5 +1,4 @@
 import {
-  detectBusinessLines,
   evaluateLeverage,
   isHemaPharmaLines,
   type AccountActivity,
@@ -7,7 +6,7 @@ import {
   type MsaCitation,
   type MsaLeverageFlag,
 } from '@bidstack/shared';
-import { prisma } from '@bidstack/db';
+import { loadAccountActivityLines, prisma } from '@bidstack/db';
 
 import { applyCompanyScope, type AccessScope } from '../lib/access-scope.js';
 
@@ -22,51 +21,8 @@ function asCitation(value: unknown): MsaCitation | null {
   };
 }
 
-function linesFrom(text: string | null | undefined): string[] {
-  return text ? detectBusinessLines(text) : [];
-}
-
 export async function loadAccountActivity(orgId: string, companyIds: string[]): Promise<Map<string, AccountActivity>> {
-  const out = new Map<string, AccountActivity>();
-  for (const id of companyIds) out.set(id, { opportunityLines: [], projectLines: [], revenueLines: [] });
-  if (companyIds.length === 0) return out;
-
-  const [opps, projects, subscriptions] = await Promise.all([
-    prisma.opportunity.findMany({
-      where: { orgId, companyId: { in: companyIds }, deletedAt: null, stage: { not: 'closed_lost' } },
-      select: { companyId: true, name: true, industry: true },
-      take: 1000,
-    }),
-    prisma.projectReference.findMany({
-      where: { orgId, companyId: { in: companyIds }, deletedAt: null },
-      select: { companyId: true, title: true, technicalSummary: true, businessSummary: true },
-      take: 1000,
-    }),
-    prisma.subscription.findMany({
-      where: { orgId, accountId: { in: companyIds }, deletedAt: null },
-      select: { accountId: true, planTier: true },
-      take: 1000,
-    }),
-  ]);
-
-  for (const opp of opps) {
-    if (!opp.companyId) continue;
-    const row = out.get(opp.companyId);
-    if (!row) continue;
-    row.opportunityLines.push(...linesFrom(`${opp.name} ${opp.industry ?? ''}`));
-  }
-  for (const project of projects) {
-    if (!project.companyId) continue;
-    const row = out.get(project.companyId);
-    if (!row) continue;
-    row.projectLines.push(...linesFrom(`${project.title} ${project.technicalSummary ?? ''} ${project.businessSummary ?? ''}`));
-  }
-  for (const sub of subscriptions) {
-    const row = out.get(sub.accountId);
-    if (!row) continue;
-    row.revenueLines.push(...linesFrom(sub.planTier));
-  }
-  return out;
+  return loadAccountActivityLines(prisma, orgId, companyIds);
 }
 
 export async function listLeverageFlags(orgId: string, scope: AccessScope, companyId?: string): Promise<MsaLeverageFlag[]> {

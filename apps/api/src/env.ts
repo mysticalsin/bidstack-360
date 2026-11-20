@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import { databaseLogin } from '@bidstack/db';
+import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
+
+import { parseAllowedUsers } from './lib/allowed-users.js';
+
 /**
  * Boot-time environment validation.
  * Fails fast with a clear message if any required variable is missing.
@@ -13,6 +18,8 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
   DATABASE_URL: z.string().min(1),
+  DATABASE_URL_APP: z.string().min(1).optional().or(z.literal('')),
+  DATABASE_URL_OWNER: z.string().min(1).optional().or(z.literal('')),
   SHADOW_DATABASE_URL: z.string().optional(),
   REDIS_URL: z.string().min(1).default('redis://localhost:6380'),
 
@@ -28,12 +35,23 @@ export const envSchema = z.object({
 
   SSO_ALLOWED_EMAIL_DOMAINS: z.string().optional().or(z.literal('')),
 
-  // Official sign-in is Microsoft. Google, including Gmail, stays available
-  // in this version. Unset means shown; only "false" hides a button.
-  VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('true'),
+  // ─── Polo data mode + Cloudflare Access identity ──────────────────────
+  // Default stays demo so main/preview keep fixture data. Real mode refuses
+  // the shared stub Jane Smith session and requires Clerk or CF Access.
+  POLO_DATA_MODE: z.enum(['demo', 'real']).default('demo'),
+  POLO_ALLOWED_USERS: z.string().optional().or(z.literal('')),
+  POLO_REAL_ORG_CLERK: z.string().min(1).default('org_polo_real'),
+  CF_ACCESS_AUTH: z.enum(['true', 'false']).default('false'),
+  CF_ACCESS_TEAM_DOMAIN: z.string().optional().or(z.literal('')),
+  CF_ACCESS_AUD: z.string().optional().or(z.literal('')),
+  CF_ACCESS_TRUST_LOOPBACK_EMAIL: z.enum(['true', 'false']).default('false'),
+  // Account-file document intelligence (LLM/Dust). Off in real mode unless
+  // the operator explicitly enables it. MSA library extract stays local.
+  DOCUMENT_LLM_EXTRACT_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Microsoft SSO
+  VITE_SSO_MICROSOFT_ENABLED: z.enum(['true', 'false']).default('false'),
   VITE_SSO_MICROSOFT_LABEL: z.string().optional(),
-  VITE_SSO_GOOGLE_ENABLED: z.enum(['true', 'false']).default('true'),
-  VITE_SSO_GOOGLE_LABEL: z.string().optional(),
 
   // ─── Demo mode (public passwordless "try the demo" door) ──────────────
   // DEMO_MODE=true arms a PUBLIC sign-in: any email → its own freshly-seeded
@@ -53,8 +71,6 @@ export const envSchema = z.object({
   DUST_API_KEY: z.string().min(1).optional().or(z.literal('')),
   DUST_WORKSPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_DATA_SOURCE_ID: z.string().min(1).optional().or(z.literal('')),
-  // Space sId that owns the data source. Not the space display name.
-  DUST_SPACE_ID: z.string().min(1).optional().or(z.literal('')),
   DUST_AGENT_EXEC_BRIEF: z.string().optional(),
   DUST_WEBHOOK_SECRET: z.string().min(1).optional().or(z.literal('')),
   DUST_BASE_URL: z.string().url().optional().or(z.literal('')),
@@ -98,6 +114,8 @@ export const envSchema = z.object({
     .positive()
     .default(50 * 1024 * 1024),
   STORAGE_SCAN_REQUIRED: z.enum(['true', 'false']).default('false'),
+  CLAMAV_HOST: z.string().min(1).optional().or(z.literal('')),
+  CLAMAV_PORT: z.string().optional().or(z.literal('')),
 
   TRUSTED_PROXIES: z.string().optional().or(z.literal('')),
   // Azure Front Door profile id; when set, requests without a matching
@@ -181,8 +199,9 @@ export const envSchema = z.object({
   TWILIO_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   TWILIO_RECORDING_DOWNLOAD_TIMEOUT_MS: z.coerce.number().int().positive().default(45_000),
 
-  // OAuth refresh single-flight. Redis is required in production so concurrent
-  // refreshes across API replicas do not race a rotating provider refresh token.
+  // OAuth refresh single-flight. Redis is required in every mode until
+  // OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false. Production refuses to start
+  // when that opt-out is set. The API and the worker share the same check.
   OAUTH_REFRESH_LOCK_REDIS_REQUIRED: z.enum(['true', 'false']).default('true'),
   OAUTH_REFRESH_LOCK_TTL_MS: z.coerce.number().int().positive().default(30_000),
   OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(10_000),
@@ -298,6 +317,14 @@ export const envSchema = z.object({
   DOCUSIGN_ACCOUNT_ID: z.string().min(1).optional().or(z.literal('')),
   DOCUSIGN_BASE_URL: z.string().url().optional().or(z.literal('')),
   DOCUSIGN_WEBHOOK_HMAC_KEY: z.string().min(1).optional().or(z.literal('')),
+  // JWT audience host for the agreement pull: account-d.docusign.com (demo)
+  // or account.docusign.com (production). Defaults to the demo host.
+  DOCUSIGN_OAUTH_HOST: z.string().min(1).optional().or(z.literal('')),
+  // Agreement pull: the DocuSign app secret for each org's account OAuth.
+  DOCUSIGN_CLIENT_SECRET: z.string().min(1).optional().or(z.literal('')),
+  // Agreement pull: 'true' only when the deployment serves one organization;
+  // then sources may use the env tenant / JWT user without an org connection.
+  AGREEMENT_SOURCES_SINGLE_TENANT: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -363,6 +390,14 @@ export function getEnv(): Env {
   }
   const env = parsed.data;
   const semanticErrors: string[] = [];
+  const lockStartup = oauthRefreshLockStartupError(env);
+  if (lockStartup) semanticErrors.push(lockStartup);
+  const lockTiming = oauthRefreshLockTimingError({
+    OAUTH_REFRESH_LOCK_TTL_MS: env.OAUTH_REFRESH_LOCK_TTL_MS,
+    OAUTH_REFRESH_LOCK_WAIT_MS: env.OAUTH_REFRESH_LOCK_WAIT_MS,
+    OAUTH_HTTP_TIMEOUT_MS: env.OAUTH_HTTP_TIMEOUT_MS,
+  });
+  if (lockTiming) semanticErrors.push(lockTiming);
 
   if (env.NODE_ENV === 'production') {
     const publicBaseUrl = new URL(env.PUBLIC_BASE_URL);
@@ -375,6 +410,15 @@ export function getEnv(): Env {
       semanticErrors.push(
         'PUBLIC_BASE_URL must be set to the public web origin in production (cannot be loopback)',
       );
+    }
+
+    if (!env.DATABASE_URL_APP?.trim()) {
+      semanticErrors.push('DATABASE_URL_APP is required in production');
+    } else if (!databaseLogin(env.DATABASE_URL_APP)) {
+      semanticErrors.push('DATABASE_URL_APP must be a postgres URL with a login');
+    }
+    if (env.DATABASE_URL_OWNER?.trim()) {
+      semanticErrors.push('DATABASE_URL_OWNER must not be set on the API');
     }
 
     const rawRedisUrl = process.env.REDIS_URL?.trim() ?? '';
@@ -443,15 +487,6 @@ export function getEnv(): Env {
   // mcp-server) against a `where` missing orgId compiling to an all-tenants
   // query. Off by default so an existing deployment isn't broken by a config
   // oversight, but production must run at least 'warn'.
-  const rfpQuotaFailClosed = (process.env.RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED ?? '')
-    .trim()
-    .toLowerCase();
-  if (
-    env.NODE_ENV === 'production' &&
-    (rfpQuotaFailClosed === 'false' || rfpQuotaFailClosed === '0')
-  ) {
-    semanticErrors.push('RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED cannot be false in production');
-  }
   if (env.NODE_ENV === 'production' && env.BIDSTACK_TENANT_SCOPE_GUARD === 'off') {
     semanticErrors.push(
       "BIDSTACK_TENANT_SCOPE_GUARD must be 'warn' or 'enforce' in production (recommend 'enforce')",
@@ -485,6 +520,43 @@ export function getEnv(): Env {
   }
   if (env.SERUM_DEMO_MODE_ENABLED === 'true' && env.NODE_ENV === 'production') {
     semanticErrors.push('SERUM_DEMO_MODE_ENABLED=true is not allowed in production');
+  }
+  if (env.POLO_DATA_MODE === 'real' && env.DEMO_MODE === 'true') {
+    semanticErrors.push('POLO_DATA_MODE=real cannot run with DEMO_MODE=true');
+  }
+  if (env.POLO_DATA_MODE === 'real' && !env.CLERK_SECRET_KEY && env.CF_ACCESS_AUTH !== 'true') {
+    semanticErrors.push(
+      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true (shared stub identity is disabled)',
+    );
+  }
+  if (env.CF_ACCESS_AUTH === 'true') {
+    if (env.DEMO_MODE === 'true') {
+      semanticErrors.push('CF_ACCESS_AUTH=true is mutually exclusive with DEMO_MODE=true');
+    }
+    if (env.CLERK_SECRET_KEY) {
+      semanticErrors.push('CF_ACCESS_AUTH=true is mutually exclusive with CLERK_SECRET_KEY');
+    }
+    if (!env.POLO_ALLOWED_USERS?.trim()) {
+      semanticErrors.push('POLO_ALLOWED_USERS is required when CF_ACCESS_AUTH=true');
+    } else {
+      try {
+        const users = parseAllowedUsers(env.POLO_ALLOWED_USERS);
+        if (users.length === 0) {
+          semanticErrors.push('POLO_ALLOWED_USERS is required when CF_ACCESS_AUTH=true');
+        }
+      } catch (err) {
+        semanticErrors.push(err instanceof Error ? err.message : 'POLO_ALLOWED_USERS is invalid');
+      }
+    }
+    if (env.NODE_ENV === 'production' && !env.CF_ACCESS_TEAM_DOMAIN?.trim()) {
+      semanticErrors.push('CF_ACCESS_TEAM_DOMAIN is required when CF_ACCESS_AUTH=true in production');
+    }
+    if (env.NODE_ENV === 'production' && !env.CF_ACCESS_AUD?.trim()) {
+      semanticErrors.push('CF_ACCESS_AUD is required when CF_ACCESS_AUTH=true in production');
+    }
+  }
+  if (env.NODE_ENV === 'production' && env.CF_ACCESS_TRUST_LOOPBACK_EMAIL === 'true') {
+    semanticErrors.push('CF_ACCESS_TRUST_LOOPBACK_EMAIL=true is not allowed in production');
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);

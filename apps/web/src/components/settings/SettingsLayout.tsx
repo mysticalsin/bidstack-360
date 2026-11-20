@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useIsAdmin } from '@/lib/auth';
 
 export type SettingsSection =
@@ -18,6 +19,7 @@ export type SettingsSection =
   | 'data-import'
   | 'top-accounts'
   | 'groups'
+  | 'access-policies'
   | 'opportunity-filters'
   | 'rfp-analytics'
   | 'modules'
@@ -26,11 +28,19 @@ export type SettingsSection =
   | 'meeting-sources'
   | 'webhooks'
   | 'audit-log'
+  | 'identity'
   | 'developer';
 
 interface Group {
   label: string;
-  items: { id: SettingsSection; label: string; icon: IconName; admin?: boolean }[];
+  items: {
+    id: SettingsSection;
+    label: string;
+    icon: IconName;
+    admin?: boolean;
+    /** Shown when the user holds this permission even without settings:write. */
+    permission?: string;
+  }[];
 }
 
 const GROUPS: Group[] = [
@@ -56,10 +66,12 @@ const GROUPS: Group[] = [
     label: 'Workspace',
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
+      { id: 'identity', label: 'Identity & roles', icon: 'contacts', admin: true },
       { id: 'crm', label: 'Data configuration', icon: 'sliders', admin: true },
       { id: 'data-import', label: 'Data import', icon: 'upload', admin: true },
       { id: 'top-accounts', label: 'Top accounts', icon: 'star', admin: true },
       { id: 'groups', label: 'Access groups', icon: 'contacts', admin: true },
+      { id: 'access-policies', label: 'Access policies', icon: 'shield', admin: true },
       { id: 'opportunity-filters', label: 'Opportunity filters', icon: 'sliders', admin: true },
       { id: 'rfp-analytics', label: 'RFP Analytics', icon: 'trophy', admin: true },
       { id: 'modules', label: 'Modules', icon: 'package', admin: true },
@@ -73,7 +85,7 @@ const GROUPS: Group[] = [
       { id: 'integrations', label: 'Integrations', icon: 'link' },
       { id: 'webhooks', label: 'Webhooks', icon: 'webhook', admin: true },
       { id: 'developer', label: 'Developer access', icon: 'zap', admin: true },
-      { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true },
+      { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true, permission: 'audit-log:read' },
     ],
   },
 ];
@@ -86,6 +98,7 @@ interface Props {
 export function SettingsLayout({ active, children }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
+  const canReadAudit = useHasPermission('audit-log:read');
   const [menuOpen, setMenuOpen] = useState(false);
   const navId = 'settings-section-nav';
 
@@ -118,6 +131,8 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemSecurity', 'Profile & Security');
       case 'workspace':
         return t('settingsLayout.itemWorkspace', 'Workspace');
+      case 'identity':
+        return t('settingsLayout.itemIdentity', 'Identity & roles');
       case 'crm':
         return t('settingsLayout.itemCrm', 'Data configuration');
       case 'data-import':
@@ -126,6 +141,8 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemTopAccounts', 'Top accounts');
       case 'groups':
         return t('settingsLayout.itemGroups', 'Access groups');
+      case 'access-policies':
+        return t('settingsLayout.itemAccessPolicies', 'Access policies');
       case 'opportunity-filters':
         return t('settingsLayout.itemOpportunityFilters', 'Opportunity filters');
       case 'rfp-analytics':
@@ -172,12 +189,16 @@ export function SettingsLayout({ active, children }: Props) {
           <nav className="sticky top-0 px-3 py-4">
             {GROUPS.map((group) => (
               <div key={group.label} className="mb-5">
-                <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                <span className="px-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                   {groupLabel(group.label)}
                 </span>
                 <ul className="mt-1 space-y-0.5">
                   {group.items
-                    .filter((item) => !item.admin || isAdmin)
+                    .filter((item) => {
+                      if (!item.admin) return true;
+                      if (isAdmin) return true;
+                      return item.permission === 'audit-log:read' && canReadAudit;
+                    })
                     .map((item) => (
                       <li key={item.id}>
                         <Link

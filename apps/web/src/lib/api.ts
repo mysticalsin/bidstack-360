@@ -5,6 +5,8 @@ interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
+  /** Extra request headers, e.g. Idempotency-Key. Auth headers always win. */
+  headers?: Record<string, string>;
 }
 
 interface ApiTokenOptions {
@@ -96,8 +98,7 @@ function buildHeaders(
 }
 
 async function parseJsonResponse(res: Response): Promise<unknown> {
-  const raw = await res.text();
-  const text = raw.replace(/^\uFEFF/, '').trim();
+  const text = await res.text();
   try {
     return text ? JSON.parse(text) : null;
   } catch {
@@ -199,7 +200,9 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     const token = await getApiToken(forceRefresh ? { forceRefresh: true } : undefined);
     return fetch(buildApiUrl(resolvedPath), {
       method: opts.method ?? 'GET',
-      headers: buildHeaders(token, Boolean(body)),
+      headers: opts.headers
+        ? { ...opts.headers, ...buildHeaders(token, Boolean(body)) }
+        : buildHeaders(token, Boolean(body)),
       body,
       signal: opts.signal,
       credentials: 'include',

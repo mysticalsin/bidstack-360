@@ -36,16 +36,27 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('settings:read'), server.requireRole('admin')],
-      schema: { response: { 200: z.object({ items: z.array(RoleSchema) }) } },
+      schema: {
+        response: {
+          200: z.object({
+            items: z.array(RoleSchema),
+            pageContinues: z.boolean(),
+          }),
+        },
+      },
     },
     async (req) => {
-      const roles = await prisma.role.findMany({
+      const ROLE_LIST_PAGE = 500;
+      const loaded = await prisma.role.findMany({
         where: { orgId: req.auth.orgId, deletedAt: null },
         include: ROLE_WITH_PERMISSIONS,
         orderBy: { createdAt: 'asc' },
-        take: 500,
+        take: ROLE_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > ROLE_LIST_PAGE;
+      const roles = pageContinues ? loaded.slice(0, ROLE_LIST_PAGE) : loaded;
       return {
+        pageContinues,
         items: roles.map(serializeRole),
       };
     },

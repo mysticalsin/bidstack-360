@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll } from 'vitest';
+import { afterAll, beforeAll, beforeEach } from 'vitest';
 
 import { prisma } from '@bidstack/db';
 import type { FastifyInstance } from 'fastify';
@@ -26,6 +26,18 @@ type Cleanup = {
   leadIds: string[];
   foreignOrgIds: string[];
 };
+
+/** A finished import frees the one-active-import slot for the next test. */
+export async function retireActiveImports(orgId: string): Promise<void> {
+  await prisma.migrationJob.updateMany({
+    where: {
+      orgId,
+      source: { in: ['CSV', 'SALESFORCE_CSV'] },
+      status: { in: ['PENDING', 'RUNNING'] },
+    },
+    data: { status: 'COMPLETE', completedAt: new Date() },
+  });
+}
 
 export type MigrationsTestCtx = {
   server: FastifyInstance;
@@ -50,6 +62,11 @@ export function makeMigrationsTestContext() {
       foreignOrgIds: [],
     },
   };
+
+  beforeEach(async () => {
+    if (!ctx.dbReachable || !ctx.seedOrgId) return;
+    await retireActiveImports(ctx.seedOrgId);
+  });
 
   beforeAll(async () => {
     try {

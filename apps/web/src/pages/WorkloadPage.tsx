@@ -3,7 +3,7 @@
  * section). One glance answers: whose desk is over capacity, who can take the
  * next RFP, which bids are ownerless, and where the week's deadlines land.
  * Data comes from GET /analytics/workload (per-owner aggregates over existing
- * opportunities + tasks). Amounts are micros with no stored currency.
+ * opportunities + tasks); money arrives in micros and is formatted here.
  */
 import { useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -16,10 +16,7 @@ import {
   ErrorState,
   LoadingSkeleton,
 } from '@/components/ui/StateMessages';
-import {
-  unspecifiedMicrosLabel,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useWorkload } from '@/hooks/useWorkload';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
@@ -29,6 +26,7 @@ import { WorkloadTable } from './workload/WorkloadTable';
 export function WorkloadPage() {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
+  const { formatMoneyMicros } = useFormatMoney();
   const workload = useWorkload();
 
   const owners = useMemo(() => workload.data?.owners ?? [], [workload.data]);
@@ -45,7 +43,7 @@ export function WorkloadPage() {
     {
       key: 'weighted',
       label: t('workload.totalWeighted', 'Weighted pipeline'),
-      value: unspecifiedMicrosLabel(totals.weightedValueMicros),
+      value: formatMoneyMicros(totals.weightedValueMicros.toString()),
       alert: false,
     },
     {
@@ -73,12 +71,6 @@ export function WorkloadPage() {
         <h1 className="text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
           {t('workload.title', 'Team Workload')}
         </h1>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--fg-secondary)]">
-          {t(
-            'workload.subtitle',
-            "Who's carrying the book into this week — live bids per desk, weighted pipeline, and the deadlines landing in the next seven days.",
-          )}
-        </p>
       </motion.header>
 
       <motion.div
@@ -91,7 +83,7 @@ export function WorkloadPage() {
             key={tile.key}
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
           >
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
               {tile.label}
             </div>
             <div
@@ -102,17 +94,8 @@ export function WorkloadPage() {
             >
               {tile.value}
             </div>
-            {tile.key === 'weighted' ? (
-              <p className="mt-1 text-[10px] text-[var(--fg-tertiary)]">
-                {t(
-                  'workload.weightedBasis',
-                  'Weighted open pipeline across these desks. {{basis}}',
-                  { basis: UNSPECIFIED_CURRENCY_BASIS },
-                )}
-              </p>
-            ) : null}
           </div>
-      ))}
+        ))}
       </motion.div>
 
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
@@ -132,10 +115,6 @@ export function WorkloadPage() {
           <EmptyState
             icon="briefcase"
             title={t('workload.emptyTitle', 'No live bids on any desk')}
-            message={t(
-              'workload.emptyMessage',
-              "Once opportunities have owners, this becomes your Monday-morning triage: who's over capacity, who can take the next RFP, and which bids sit ownerless.",
-            )}
             secondary={
               <EmptyStateLink to="/opportunities">
                 {t('workload.emptyCta', 'Open the pipeline and assign owners')}
@@ -143,7 +122,7 @@ export function WorkloadPage() {
             }
           />
         ) : (
-          <WorkloadTable owners={owners} />
+          <WorkloadTable owners={owners} formatMoneyMicros={formatMoneyMicros} />
         )}
       </motion.div>
     </motion.div>

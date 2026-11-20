@@ -1,7 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
-import { Workflow, WorkflowRun, WorkflowCreate, runWorkflowActions } from '@bidstack/shared';
+import {
+  QueryBoolean,
+  Workflow,
+  WorkflowRun,
+  WorkflowCreate,
+  runWorkflowActions,
+} from '@bidstack/shared';
 import type { WorkflowActionKind, WorkflowTriggerKind } from '@bidstack/shared';
 
 import { apiWorkflowEffects } from '../services/workflows/workflow-engine.service.js';
@@ -20,14 +26,22 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          active: z.coerce.boolean().optional(),
+          active: QueryBoolean.optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
         }),
-        response: { 200: z.object({ items: z.array(Workflow) }) },
+        response: {
+          200: z.object({
+            items: z.array(Workflow),
+            /** True when one workflow past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
+          }),
+        },
       },
     },
     async (req) => {
-      const rows = await prisma.workflow.findMany({
+      // One row past the page is the probe. It is dropped and is not a workflow total.
+      const WORKFLOW_LIST_PAGE = req.query.limit;
+      const loaded = await prisma.workflow.findMany({
         where: {
           orgId: req.auth.orgId,
           deletedAt: null,
@@ -35,9 +49,11 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         include: { actions: { orderBy: { sortOrder: 'asc' } } },
         orderBy: { updatedAt: 'desc' },
-        take: req.query.limit,
+        take: WORKFLOW_LIST_PAGE + 1,
       });
-      return { items: rows.map(serializeWorkflow) };
+      const pageContinues = loaded.length > WORKFLOW_LIST_PAGE;
+      const rows = pageContinues ? loaded.slice(0, WORKFLOW_LIST_PAGE) : loaded;
+      return { pageContinues, items: rows.map(serializeWorkflow) };
     },
   );
 
@@ -300,6 +316,11 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      const wf = await prisma.workflow.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!wf) throw server.httpErrors.notFound('Workflow not found');
       const rows = await prisma.workflowRun.findMany({
         where: { workflowId: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         orderBy: { startedAt: 'desc' },

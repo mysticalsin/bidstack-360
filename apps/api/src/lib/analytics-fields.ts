@@ -172,6 +172,7 @@ const ACTIVITY_FIELDS: AnalyticsFieldSpec[] = [
       'cadence_started',
       'cadence_completed',
       'custom',
+      'teams_message',
     ],
   },
   { key: 'subject', label: 'Subject', type: 'string', column: 'subject' },

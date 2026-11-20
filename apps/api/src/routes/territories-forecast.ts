@@ -25,21 +25,32 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           period: z.string().max(10).optional(),
           ownerId: z.string().uuid().optional(),
         }),
-        response: { 200: z.object({ items: z.array(Forecast) }) },
+        response: {
+          200: z.object({
+            items: z.array(Forecast),
+            /** True when one forecast past this page was loaded and dropped. Not a total. */
+            pageContinues: z.boolean(),
+          }),
+        },
       },
     },
     async (req) => {
-      const rows = await prisma.forecast.findMany({
+      // One row past the page is the probe. It is dropped and is not a forecast total.
+      const FORECAST_LIST_PAGE = 500;
+      const loaded = await prisma.forecast.findMany({
         where: {
           orgId: req.auth.orgId,
           ...(req.query.period ? { period: req.query.period } : {}),
           ...(req.query.ownerId ? { ownerId: req.query.ownerId } : {}),
         },
         include: { owner: { select: { name: true } } },
-        orderBy: { period: 'desc' },
-        take: 500,
+        orderBy: [{ period: 'desc' }, { id: 'asc' }],
+        take: FORECAST_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > FORECAST_LIST_PAGE;
+      const rows = pageContinues ? loaded.slice(0, FORECAST_LIST_PAGE) : loaded;
       return {
+        pageContinues,
         items: rows.map((r) => ({
           id: r.id,
           orgId: r.orgId,
@@ -47,7 +58,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           ownerName: r.owner.name,
           period: r.period,
           category: r.category as Forecast['category'],
-          amountMicros: r.amountMicros.toString(),
+          amountMicros: Number(r.amountMicros),
           currency: r.currency,
           note: r.note,
           createdAt: r.createdAt.toISOString(),
@@ -66,7 +77,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         body: z.object({
           period: z.string().min(1).max(50),
           category: z.enum(['pipeline', 'best_case', 'commit', 'closed']),
-          amountMicros: z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]),
+          amountMicros: z.number().int().nonnegative().max(1_000_000_000_000_000),
           currency: z.string().length(3).default('XXX'),
           note: z.string().max(2000).optional(),
           // The Forecasts grid lists every owner's rows and edits them inline,
@@ -96,30 +107,38 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           );
         }
       }
-      const created = await prisma.forecast.upsert({
-        where: {
-          orgId_ownerId_period_category: {
+      const upsert = () =>
+        prisma.forecast.upsert({
+          where: {
+            orgId_ownerId_period_category: {
+              orgId: req.auth.orgId,
+              ownerId: targetOwnerId,
+              period: req.body.period,
+              category: req.body.category,
+            },
+          },
+          create: {
             orgId: req.auth.orgId,
             ownerId: targetOwnerId,
             period: req.body.period,
             category: req.body.category,
+            amountMicros: BigInt(req.body.amountMicros),
+            currency: req.body.currency,
+            note: req.body.note ?? null,
           },
-        },
-        create: {
-          orgId: req.auth.orgId,
-          ownerId: targetOwnerId,
-          period: req.body.period,
-          category: req.body.category,
-          amountMicros: BigInt(req.body.amountMicros),
-          currency: req.body.currency,
-          note: req.body.note ?? null,
-        },
-        update: {
-          amountMicros: BigInt(req.body.amountMicros),
-          currency: req.body.currency,
-          note: req.body.note ?? null,
-        },
-        include: { owner: { select: { name: true } } },
+          update: {
+            amountMicros: BigInt(req.body.amountMicros),
+            currency: req.body.currency,
+            note: req.body.note ?? null,
+          },
+          include: { owner: { select: { name: true } } },
+        });
+      // Concurrent saves of one cell race between the upsert's read and its
+      // insert; the loser's retry finds the winner's row and updates it.
+      const created = await upsert().catch((err: unknown) => {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')
+          return upsert();
+        throw err;
       });
       return reply.code(201).send({
         id: created.id,
@@ -128,7 +147,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
         ownerName: created.owner.name,
         period: created.period,
         category: created.category as Forecast['category'],
-        amountMicros: created.amountMicros.toString(),
+        amountMicros: Number(created.amountMicros),
         currency: created.currency,
         note: created.note,
         createdAt: created.createdAt.toISOString(),
@@ -275,9 +294,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       const totalValueMicros = sumMicros(rows.map((r) => BigInt(r.totalValueMicros))).toString();
       const totalProbability = rows.reduce((s, r) => s + r.sumProbability, 0);
       const avgProbability =
-        totalOpportunities > 0
-          ? Math.round((totalProbability / totalOpportunities) * 10) / 10
-          : 0;
+        totalOpportunities > 0 ? Math.round((totalProbability / totalOpportunities) * 10) / 10 : 0;
 
       return {
         items,

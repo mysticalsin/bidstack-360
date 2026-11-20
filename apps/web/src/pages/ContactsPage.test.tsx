@@ -96,6 +96,14 @@ describe('ContactsPage — contacts:write gating', () => {
     expect(del.title).toBeFalsy();
   });
 
+  it('does not present the loaded page size as the contact total', () => {
+    vi.mocked(useHasPermission).mockReturnValue(true);
+
+    renderWithProviders(<ContactsPage />);
+
+    expect(screen.queryByText(/people in the decision unit/i)).toBeNull();
+  });
+
   it('hides the bulk-action-bar Delete selected control without contacts:write', () => {
     vi.mocked(useHasPermission).mockReturnValue(false);
 

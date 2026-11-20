@@ -194,7 +194,7 @@ function DataQualityStat({
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium text-[var(--fg-tertiary)]">
+        <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
           {label}
         </span>
         <span className="grid size-8 place-items-center rounded-xl bg-[var(--surface-primary)] text-[var(--text-secondary)]">
@@ -227,7 +227,7 @@ function IssueRow({ issue }: { issue: DataQualityIssue }) {
           <p className="mt-0.5 text-xs text-[var(--fg-secondary)]">{issue.detail}</p>
         ) : null}
         {issue.companyName ? (
-          <p className="mt-1 text-[11px] text-[var(--fg-tertiary)]">
+          <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
             {t('dataQuality.issue.company', 'Company: {{name}}', { name: issue.companyName })}
           </p>
         ) : null}
@@ -251,7 +251,7 @@ function KindStat({
   const isHot = count > 0 && (kind === 'duplicate_company' || kind === 'missing_owner');
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3">
-      <div className="text-xs font-medium text-[var(--fg-tertiary)]">
+      <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
         {label}
       </div>
       <div

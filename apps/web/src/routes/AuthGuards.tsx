@@ -7,6 +7,7 @@
  */
 import { Navigate } from 'react-router-dom';
 
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAuth, useOrgAdminStatus } from '@/lib/auth';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 
@@ -39,6 +40,28 @@ export function RequireAdmin({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
   if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+}
+
+/** /audit-log is for audit-log:read holders, not only settings:write admins. */
+export function RequireAuditLogRead({ children }: { children: React.ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { isAdmin, isLoading: adminLoading } = useOrgAdminStatus();
+  const caps = useCapabilities();
+  const canRead = isAdmin || Boolean(caps.data?.permissions.includes('audit-log:read'));
+  if (!isLoaded || (isSignedIn && (adminLoading || caps.isLoading))) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <LoadingSkeleton rows={3} />
+      </div>
+    );
+  }
+  if (!isSignedIn) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!canRead) {
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;

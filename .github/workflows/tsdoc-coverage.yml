@@ -37,10 +37,12 @@ jobs:
       # Capture baseline from the target branch (main/develop)
       - name: Compute base branch coverage
         id: base
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch origin ${{ github.base_ref }} --depth=1
+          git fetch origin "$BASE_REF" --depth=1
           git stash
-          git checkout origin/${{ github.base_ref }} -- scripts/audit-tsdoc.mjs 2>/dev/null || true
+          git checkout "origin/$BASE_REF" -- scripts/audit-tsdoc.mjs 2>/dev/null || true
           BASE_JSON=$(node scripts/audit-tsdoc.mjs --json 2>/dev/null || echo '{"overallCoverage":0}')
           echo "coverage=$(echo $BASE_JSON | node -e "const d=require('fs').readFileSync('/dev/stdin','utf-8');console.log(JSON.parse(d).overallCoverage)")" >> $GITHUB_OUTPUT
           git checkout HEAD -- scripts/audit-tsdoc.mjs 2>/dev/null || true

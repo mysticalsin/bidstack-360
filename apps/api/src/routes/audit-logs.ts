@@ -19,6 +19,8 @@ import {
   type AuditLogEntry,
 } from '@bidstack/shared';
 
+import { verifyAuditChain } from '../lib/audit-chain.js';
+
 const SCAN_MULTIPLIER = 4; // overscan when applying account JSON-path filters
 const EXPORT_BATCH_SIZE = 1_000;
 const MAX_EXPORT_SCAN_ROWS = 10_000;
@@ -76,6 +78,7 @@ const SECURITY_TERMS = [
 const DESTRUCTIVE_TERMS = ['delete', 'remove', 'revoke', 'cancel', 'disable', 'void', 'archive'];
 const SYSTEM_TERMS = ['worker', 'sync', 'import', 'export', 'job', 'queue', 'automation', 'system'];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const QUERY_PREFIX_KEYS = new Set(['q', 'query', 'search', 'prefix']);
 const RELATED_ID_KEYS = [
   'accountId',
   'companyId',
@@ -103,7 +106,8 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req, reply) => {
       const filter = req.query;
       const where = auditLogWhere(req.auth.orgId, filter);
-      const collected = await collectExportRows(where, filter);
+      const revealActorEmail = await server.hasPermission(req, 'settings:write');
+      const collected = await collectExportRows(where, filter, revealActorEmail);
       const rows = collected.items;
       const exportedAt = new Date();
       const actorUserId = UUID_RE.test(req.auth.userId) ? req.auth.userId : null;
@@ -158,6 +162,32 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 
   server.get(
+    '/audit-logs/verify-chain',
+    {
+      config: { rateLimit: { max: 6, timeWindow: '1 minute' } },
+      preHandler: server.requirePermission('audit-log:read'),
+      schema: {
+        response: {
+          200: z.object({
+            checked: z.number().int(),
+            firstSeq: z.string().nullable(),
+            lastSeq: z.string().nullable(),
+            ok: z.boolean(),
+            breaks: z.array(
+              z.object({
+                id: z.string(),
+                chainSeq: z.string(),
+                reason: z.enum(['hash_mismatch', 'link_mismatch', 'sequence_gap']),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async (req) => verifyAuditChain(req.auth.orgId),
+  );
+
+  server.get(
     '/audit-logs',
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
@@ -170,6 +200,7 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { accountId, cursor, limit } = req.query;
       const where = auditLogWhere(req.auth.orgId, req.query);
+      const revealActorEmail = await server.hasPermission(req, 'settings:write');
 
       const take = (accountId ? limit * SCAN_MULTIPLIER : limit) + 1;
       const rows = await prisma.auditLog.findMany({
@@ -184,7 +215,7 @@ export const auditLogsRoutes: FastifyPluginAsyncZod = async (server) => {
       const hasMore = rows.length > limit;
 
       return {
-        items: trimmed.map(serializeAuditRow),
+        items: trimmed.map((row) => serializeAuditRow(row, revealActorEmail)),
         nextCursor: hasMore ? (trimmed[trimmed.length - 1]?.id.toString() ?? null) : null,
       };
     },
@@ -221,6 +252,7 @@ function accountIdClauses(accountId: string): Prisma.AuditLogWhereInput[] {
 async function collectExportRows(
   where: Prisma.AuditLogWhereInput,
   filter: AuditLogExportFilter,
+  revealActorEmail: boolean,
 ): Promise<{ items: AuditLogEntry[]; scanned: number; truncated: boolean }> {
   const items: AuditLogEntry[] = [];
   let cursor: bigint | undefined;
@@ -242,7 +274,7 @@ async function collectExportRows(
     for (let index = 0; index < batch.length; index++) {
       const row = batch[index];
       if (!row) continue;
-      const item = serializeAuditRow(row);
+      const item = serializeAuditRow(row, revealActorEmail);
       if (!rowMatchesExportCategory(item, filter.category)) continue;
       if (!rowMatchesExportSearch(item, filter.q)) continue;
       items.push(item);
@@ -271,7 +303,7 @@ async function collectExportRows(
   return { items, scanned, truncated };
 }
 
-function serializeAuditRow(row: AuditLogRow): AuditLogEntry {
+function serializeAuditRow(row: AuditLogRow, revealActorEmail: boolean): AuditLogEntry {
   return {
     id: row.id.toString(),
     action: row.action,
@@ -279,10 +311,20 @@ function serializeAuditRow(row: AuditLogRow): AuditLogEntry {
     targetId: row.targetId,
     userId: row.userId,
     userName: row.user?.name ?? null,
-    userEmail: row.user?.email ?? null,
-    diff: row.diff ?? null,
+    userEmail: revealActorEmail ? (row.user?.email ?? null) : null,
+    diff: redactQueryPrefixes(row.diff ?? null),
     createdAt: row.at.toISOString(),
   };
+}
+
+function redactQueryPrefixes(diff: unknown): unknown {
+  if (!diff || typeof diff !== 'object' || Array.isArray(diff)) return diff;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(diff as Record<string, unknown>)) {
+    if (QUERY_PREFIX_KEYS.has(key)) continue;
+    out[key] = redactQueryPrefixes(value);
+  }
+  return out;
 }
 
 function rowMatchesExportSearch(row: AuditLogEntry, rawQuery: string | undefined): boolean {
@@ -527,7 +569,7 @@ function exportFilterSummary(filter: AuditLogExportFilter): Prisma.InputJsonObje
     action: filter.action ?? null,
     targetType: filter.targetType ?? null,
     since: filter.since ?? null,
-    q: filter.q ?? null,
+    qPresent: Boolean(filter.q?.trim()),
     category: filter.category,
     limit: filter.limit,
   };

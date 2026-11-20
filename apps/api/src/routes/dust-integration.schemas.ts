@@ -35,8 +35,21 @@ export const ApiKeySummary = z.object({
   name: z.string(),
   prefix: z.string(),
   scopes: z.array(z.string()),
+  readOnly: z.boolean(),
+  unrestrictedScope: z.boolean(),
+  companyIds: z.array(z.string().uuid()),
+  msaIds: z.array(z.string().uuid()),
   lastUsedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+});
+
+export const ApiKeyCreateBody = z.object({
+  name: z.string().min(1).max(80),
+  scopes: z.array(z.string().trim().min(1)).min(1),
+  readOnly: z.boolean().optional().default(true),
+  unrestrictedScope: z.boolean().optional().default(false),
+  companyIds: z.array(z.string().uuid()).optional().default([]),
+  msaIds: z.array(z.string().uuid()).optional().default([]),
 });
 
 export const IntegrationSetupGuide = z.object({
@@ -45,8 +58,6 @@ export const IntegrationSetupGuide = z.object({
     configured: z.boolean(),
     workspaceId: z.string().nullable(),
     dataSourceConfigured: z.boolean(),
-    /** True when DUST_SPACE_ID is set. Document upserts need the space sId. */
-    spaceConfigured: z.boolean(),
     webhookReceiverUrl: z.string(),
   }),
   mcp: z.object({

@@ -7,6 +7,7 @@ import { ProfileSection } from '@/components/settings/ProfileSection';
 import { AppearanceSection } from '@/components/settings/AppearanceSection';
 import { NotificationPrefsSection } from '@/components/settings/NotificationPrefsSection';
 import { SecuritySection } from '@/components/settings/SecuritySection';
+import { IdentitySection } from '@/components/settings/IdentitySection';
 import { WorkspaceSection } from '@/components/settings/WorkspaceSection';
 import { CrmConfigurationSection } from '@/components/settings/CrmConfigurationSection';
 import { DataImportSection } from '@/components/settings/DataImportSection';
@@ -19,11 +20,14 @@ import { WebhooksSection } from '@/components/settings/WebhooksSection';
 import { AuditLogSection } from '@/components/settings/AuditLogSection';
 import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
 import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
+import { AccessPoliciesSection } from '@/components/settings/AccessPoliciesSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
 import { SigningEntitiesSection } from '@/components/settings/SigningEntitiesSection';
-import { useIsAdmin } from '@/lib/auth';
+import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
+import { useOrgAdminStatus } from '@/lib/auth';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
 // The English default is passed to t() so the UI never shows a raw key.
@@ -36,10 +40,12 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   notifications: ['sectionNotifications', 'Notifications'],
   security: ['sectionSecurity', 'Profile & Security'],
   workspace: ['sectionWorkspace', 'Workspace'],
+  identity: ['sectionIdentity', 'Identity & roles'],
   crm: ['sectionCrm', 'Data configuration'],
   'data-import': ['sectionDataImport', 'Data import'],
   'top-accounts': ['sectionTopAccounts', 'Top accounts'],
   groups: ['sectionGroups', 'Access groups'],
+  'access-policies': ['sectionAccessPolicies', 'Access policies'],
   'opportunity-filters': ['sectionOpportunityFilters', 'Opportunity filters'],
   'rfp-analytics': ['sectionRfpAnalytics', 'RFP Analytics'],
   modules: ['sectionModules', 'Modules'],
@@ -57,10 +63,12 @@ const SETTINGS_SECTIONS = new Set<SettingsSection>(
 
 const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'serum',
+  'identity',
   'crm',
   'data-import',
   'top-accounts',
   'groups',
+  'access-policies',
   'opportunity-filters',
   'rfp-analytics',
   'modules',
@@ -70,9 +78,14 @@ const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'developer',
 ]);
 
-function resolveSettingsTab(tab: string | null, isAdmin: boolean): SettingsSection {
+function resolveSettingsTab(
+  tab: string | null,
+  isAdmin: boolean,
+  canReadAudit: boolean,
+): SettingsSection {
   const candidate =
     tab && SETTINGS_SECTIONS.has(tab as SettingsSection) ? (tab as SettingsSection) : 'overview';
+  if (candidate === 'audit-log' && canReadAudit) return candidate;
   if (!isAdmin && ADMIN_SETTINGS_SECTIONS.has(candidate)) return 'overview';
   return candidate;
 }
@@ -80,15 +93,21 @@ function resolveSettingsTab(tab: string | null, isAdmin: boolean): SettingsSecti
 export function SettingsPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
-  const isAdmin = useIsAdmin();
+  const { isAdmin, isLoading: adminLoading } = useOrgAdminStatus();
+  const capabilitiesLoading = useCapabilities().isLoading;
+  const canReadAudit = useHasPermission('audit-log:read');
   const requestedTab = searchParams.get('tab');
-  const activeTab = resolveSettingsTab(requestedTab, isAdmin);
+  // Until the capability manifest arrives every gated tab resolves to
+  // overview, so a deep link must not be rewritten (or rendered) yet.
+  const accessPending = adminLoading || capabilitiesLoading;
+  const activeTab = resolveSettingsTab(requestedTab, isAdmin, canReadAudit);
 
   useEffect(() => {
+    if (accessPending) return;
     if (requestedTab && requestedTab !== activeTab) {
       setSearchParams({ tab: activeTab }, { replace: true });
     }
-  }, [activeTab, requestedTab, setSearchParams]);
+  }, [accessPending, activeTab, requestedTab, setSearchParams]);
 
   const setActive = (tab: SettingsSection) => {
     setSearchParams({ tab });
@@ -116,10 +135,12 @@ export function SettingsPage() {
       </div>
     ),
     workspace: <WorkspaceSection />,
+    identity: <IdentitySection />,
     crm: <CrmConfigurationSection />,
     'data-import': <DataImportSection />,
     'top-accounts': <TopAccountsSection />,
     groups: <AccessGroupsSection />,
+    'access-policies': <AccessPoliciesSection />,
     'opportunity-filters': <OpportunityFiltersSection />,
     'rfp-analytics': <RfpAnalyticsSection />,
     modules: <ModulesSection />,
@@ -151,7 +172,11 @@ export function SettingsPage() {
             {t(`settings.${SECTION_TITLES[activeTab][0]}`, SECTION_TITLES[activeTab][1])}
           </h2>
         </div>
-        {sections[activeTab]}
+        {accessPending && requestedTab && requestedTab !== activeTab ? (
+          <LoadingSkeleton rows={4} />
+        ) : (
+          sections[activeTab]
+        )}
       </SettingsLayout>
     </div>
   );

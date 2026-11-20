@@ -80,7 +80,7 @@ export function InsightsBar({
   return (
     <GlassCard padding="sm" hoverable={false} className="insights-bar">
       <div className="flex items-center gap-2 mb-2">
-        <Icon name="zap" size={14} className="text-[var(--brand-primary)]" />
+        <Icon name="zap" size={14} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
         <span className="text-xs font-semibold text-[var(--fg-primary)]">
           {t('insightsBar.heading', 'Priority signals')}
         </span>

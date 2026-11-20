@@ -1,6 +1,7 @@
-import { microsToUnits, unitsToMicros } from '@bidstack/shared';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+
+import { ORG_LOCALE_DEFAULT } from '@bidstack/shared';
 
 import { buildApiUrl } from '@/lib/api';
 
@@ -34,18 +35,23 @@ interface ExchangeRates {
 
 interface CurrencyStore {
   currency: CurrencyCode;
+  /** True only after the user picked "Auto" (browser location, then time zone). */
   autoDetect: boolean;
+  /** True until the user picks a currency or "Auto": display follows the workspace currency. */
+  followOrg: boolean;
+  /** Last workspace currency seen from Settings, Currency and locale. */
+  orgCurrency: CurrencyCode | null;
   rates: ExchangeRates | null;
   ratesLoading: boolean;
   ratesError: string | null;
   setCurrency: (c: CurrencyCode) => void;
   enableAutoDetect: () => Promise<void>;
+  /** Record the workspace currency; applied when the display follows it. */
+  applyOrgCurrency: (code: string) => void;
+  /** Go back to following the workspace currency. */
+  followOrgDefault: () => void;
   fetchRates: () => Promise<void>;
   convert: (amount: number, from: string) => number;
-  /** Converted unit amount in integer micros. Null when the amount is not finite. */
-  convertAmountMicros: (amount: number, from: string) => bigint | null;
-  /** FX in integer micros. An identity rate returns the stored integer. */
-  convertMicros: (micros: bigint, from: string) => bigint;
 }
 
 let inflightRatesRequest: Promise<void> | null = null;
@@ -55,85 +61,34 @@ function normalizeCurrencyCode(code: string | null | undefined): string {
   return (code ?? '').trim().toUpperCase();
 }
 
+function asSupportedCurrency(code: string | null | undefined): CurrencyCode | null {
+  const c = normalizeCurrencyCode(code);
+  return SUPPORTED_CURRENCIES.some((s) => s.code === c) ? (c as CurrencyCode) : null;
+}
+
+/** Workspace default until the org setting loads; never the browser time zone. */
+const INITIAL_CURRENCY: CurrencyCode = asSupportedCurrency(ORG_LOCALE_DEFAULT.currency) ?? 'EUR';
+
+type PersistedCurrency = Partial<Pick<CurrencyStore, 'currency' | 'autoDetect' | 'followOrg' | 'orgCurrency'>>;
+
+/**
+ * Older builds persisted only { currency, autoDetect } with autoDetect true by
+ * default, so a time-zone guess (R$ for a UTC-3 browser) stuck. Without an
+ * explicit pick, follow the workspace currency instead.
+ */
+export function migratePersistedCurrency(persisted: PersistedCurrency): PersistedCurrency {
+  if (persisted.followOrg !== undefined) return persisted;
+  const picked = persisted.autoDetect === false;
+  return {
+    ...persisted,
+    autoDetect: false,
+    followOrg: !picked,
+    ...(picked ? {} : { currency: persisted.orgCurrency ?? INITIAL_CURRENCY }),
+  };
+}
+
 function isUsableRate(rate: unknown): rate is number {
   return typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
-}
-
-/** Exact numerator and denominator of a positive finite rate. A decimal scale is not the rate. */
-function rateRatio(rate: number): { num: bigint; den: bigint } | null {
-  if (!Number.isFinite(rate) || rate <= 0) return null;
-  const bytes = new ArrayBuffer(8);
-  const view = new DataView(bytes);
-  view.setFloat64(0, rate);
-  const hi = view.getUint32(0);
-  const lo = view.getUint32(4);
-  const exponent = (hi >>> 20) & 0x7ff;
-  const fraction = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
-  let mantissa = fraction;
-  let exp: number;
-  if (exponent === 0) {
-    exp = -1022 - 52;
-  } else {
-    mantissa |= 1n << 52n;
-    exp = exponent - 1023 - 52;
-  }
-  if (mantissa === 0n) return null;
-  let num = mantissa;
-  let den = 1n;
-  if (exp >= 0) num <<= BigInt(exp);
-  else den <<= BigInt(-exp);
-  return { num, den };
-}
-
-/**
- * Micros from the significant digits a number still has. Used when multiplying
- * by 1e6 is no longer a safe integer.
- */
-function digitsToMicros(amount: number): bigint | null {
-  const match = /^(\d)\.(\d+)e([+-]?\d+)$/i.exec(amount.toExponential(15));
-  if (!match) return null;
-  const digits = (match[1] + match[2]).replace(/0+$/, '') || '0';
-  const exp = Number(match[3]);
-  if (!Number.isSafeInteger(exp)) return null;
-  const shift = exp - (digits.length - 1) + 6;
-  let micros = BigInt(digits);
-  if (shift >= 0) micros *= 10n ** BigInt(shift);
-  else {
-    const divisor = 10n ** BigInt(-shift);
-    micros = (micros + divisor / 2n) / divisor;
-  }
-  return micros;
-}
-
-/**
- * Micros for a unit number. A safe conversion wins. Past that range, an integer
- * uses BigInt and a fraction uses the digits the number still has.
- */
-function unitAmountToMicros(amount: number): bigint | null {
-  const exact = unitsToMicros(amount);
-  if (exact != null) return exact;
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  if (Number.isInteger(amount)) {
-    try {
-      return BigInt(amount) * 1_000_000n;
-    } catch {
-      return null;
-    }
-  }
-  return digitsToMicros(amount);
-}
-
-/** Nearest micros after FX. Equal rates keep every digit, including the cent. */
-export function convertMicrosByRates(micros: bigint, fromRate: number, toRate: number): bigint | null {
-  const from = rateRatio(fromRate);
-  const to = rateRatio(toRate);
-  if (!from || !to) return null;
-  const negative = micros < 0n;
-  const abs = negative ? -micros : micros;
-  const numerator = abs * to.num * from.den;
-  const denominator = to.den * from.num;
-  const rounded = (numerator + denominator / 2n) / denominator;
-  return negative ? -rounded : rounded;
 }
 
 const REGION_TO_CURRENCY: Partial<Record<string, CurrencyCode>> = {
@@ -358,20 +313,29 @@ function loadCachedRates(): ExchangeRates | null {
 export const useCurrencyStore = create<CurrencyStore>()(
   persist(
     (set, get) => ({
-      currency: detectLocalCurrency(),
-      autoDetect: true,
+      currency: INITIAL_CURRENCY,
+      autoDetect: false,
+      followOrg: true,
+      orgCurrency: null,
       rates: loadCachedRates(),
       ratesLoading: false,
       ratesError: null,
 
-      setCurrency: (currency) => set({ currency, autoDetect: false }),
+      setCurrency: (currency) => set({ currency, autoDetect: false, followOrg: false }),
       enableAutoDetect: async () => {
-        set({ autoDetect: true, currency: detectLocalCurrency() });
+        set({ autoDetect: true, followOrg: false, currency: detectLocalCurrency() });
         const preciseCurrency = await detectCurrencyFromGeolocation();
         if (preciseCurrency && get().autoDetect) {
           set({ currency: preciseCurrency });
         }
       },
+      applyOrgCurrency: (code) => {
+        const orgCurrency = asSupportedCurrency(code);
+        if (!orgCurrency) return;
+        set(get().followOrg ? { orgCurrency, currency: orgCurrency } : { orgCurrency });
+      },
+      followOrgDefault: () =>
+        set({ followOrg: true, autoDetect: false, currency: get().orgCurrency ?? INITIAL_CURRENCY }),
 
       fetchRates: async () => {
         const currentRatesTs = Number(localStorage.getItem(RATES_TS_KEY));
@@ -441,23 +405,6 @@ export const useCurrencyStore = create<CurrencyStore>()(
         return inflightRatesRequest;
       },
 
-      convertAmountMicros: (amount, from) => {
-        if (!Number.isFinite(amount)) return null;
-        const source = normalizeCurrencyCode(from);
-        if (!source) return null;
-        const negative = amount < 0;
-        const micros = unitAmountToMicros(negative ? -amount : amount);
-        if (micros == null) return null;
-        const signed = negative ? -micros : micros;
-        const { currency: to, rates } = get();
-        if (!rates?.rates || source === to) return signed;
-        const base = normalizeCurrencyCode(rates.base);
-        const fromRate = source === base ? 1 : rates.rates[source];
-        const toRate = to === base ? 1 : rates.rates[to];
-        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return signed;
-        return convertMicrosByRates(signed, fromRate, toRate);
-      },
-
       convert: (amount, from) => {
         const { currency: to, rates } = get();
         const source = normalizeCurrencyCode(from);
@@ -468,26 +415,22 @@ export const useCurrencyStore = create<CurrencyStore>()(
         const fromRate = source === base ? 1.0 : rates.rates[source];
         const toRate = to === base ? 1.0 : rates.rates[to];
         if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return amount;
-        const converted = get().convertAmountMicros(amount, from);
-        if (converted == null) return amount;
-        return microsToUnits(converted);
-      },
-
-      convertMicros: (micros, from) => {
-        const { currency: to, rates } = get();
-        const source = normalizeCurrencyCode(from);
-        if (!rates || !rates.rates || !source) return micros;
-        if (source === to) return micros;
-        const base = normalizeCurrencyCode(rates.base);
-        const fromRate = source === base ? 1 : rates.rates[source];
-        const toRate = to === base ? 1 : rates.rates[to];
-        if (!isUsableRate(fromRate) || !isUsableRate(toRate)) return micros;
-        return convertMicrosByRates(micros, fromRate, toRate) ?? micros;
+        // Convert through the provider base: amount / fromRate * toRate.
+        return (amount / fromRate) * toRate;
       },
     }),
     {
       name: 'bidstack:currency-locale',
-      partialize: (state) => ({ currency: state.currency, autoDetect: state.autoDetect }),
+      partialize: (state) => ({
+        currency: state.currency,
+        autoDetect: state.autoDetect,
+        followOrg: state.followOrg,
+        orgCurrency: state.orgCurrency,
+      }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...migratePersistedCurrency((persisted ?? {}) as PersistedCurrency),
+      }),
     },
   ),
 );

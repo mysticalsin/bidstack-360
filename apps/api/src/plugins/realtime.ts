@@ -114,8 +114,9 @@ const realtimePluginImpl: FastifyPluginAsync = async (server) => {
     },
   });
 
+  // rewriteUrl maps /api/* to /api/v1/*, so the socket must live under /api/v1.
   server.get(
-    '/api/realtime',
+    '/api/v1/realtime',
     {
       websocket: true,
       config: { public: false }, // Auth plugin's onRequest hook still fires for WS upgrades.

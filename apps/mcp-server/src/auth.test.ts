@@ -156,7 +156,7 @@ describeDb('mcpAuth', () => {
 
     // Cleanup so we don't pollute later test runs.
     if (latest) {
-      await prisma.auditLog.deleteMany({ where: { id: latest.id } });
+      await prisma.$executeRaw`DELETE FROM audit_log WHERE id = ${latest.id}`;
     }
   });
 

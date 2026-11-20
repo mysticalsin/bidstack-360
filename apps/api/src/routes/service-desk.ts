@@ -160,7 +160,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Case not found');
 
-      const data: Prisma.ServiceCaseUpdateInput = {};
+      const data: Prisma.ServiceCaseUncheckedUpdateManyInput = {};
       if (req.body.subject !== undefined) data.subject = req.body.subject;
       if (req.body.description !== undefined) data.description = req.body.description;
       if (req.body.priority !== undefined) data.priority = req.body.priority;
@@ -173,12 +173,12 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       }
       if (req.body.ownerId !== undefined) {
-        if (req.body.ownerId === null) {
-          data.owner = { disconnect: true };
-        } else {
+        // updateMany only takes scalar columns; relation connect/disconnect
+        // made every owner change fail.
+        if (req.body.ownerId !== null) {
           await validateServiceCaseLinks(req.auth.orgId, { ownerId: req.body.ownerId });
-          data.owner = { connect: { id: req.body.ownerId } };
         }
+        data.ownerId = req.body.ownerId;
       }
       if (req.body.satisfaction !== undefined) data.satisfaction = req.body.satisfaction;
 
@@ -263,14 +263,16 @@ function serializeCase(row: {
 }
 
 async function mintCaseNumber(tx: Prisma.TransactionClient, orgId: string): Promise<string> {
-  const last = await tx.serviceCase.findFirst({
-    where: { orgId, number: { startsWith: 'CS-' }, deletedAt: null },
-    orderBy: { number: 'desc' },
-    select: { number: true },
-  });
-  if (!last) return 'CS-10001';
-  const n = Number(last.number.slice(3));
-  return `CS-${(n + 1).toString().padStart(5, '0')}`;
+  // Soft-deleted cases still hold their number under the (orgId, number)
+  // unique key, and string order breaks past CS-99999, so take the numeric
+  // max over every row.
+  const [row] = await tx.$queryRaw<Array<{ max: bigint | null }>>`
+    SELECT MAX(CAST(SUBSTRING(number FROM 4) AS BIGINT)) AS max
+    FROM service_cases
+    WHERE org_id = ${orgId}::uuid AND number ~ '^CS-[0-9]{1,18}$'`;
+  const last = row?.max ?? null;
+  if (last === null) return 'CS-10001';
+  return `CS-${(BigInt(last) + 1n).toString().padStart(5, '0')}`;
 }
 
 function isUniqueViolation(err: unknown): boolean {

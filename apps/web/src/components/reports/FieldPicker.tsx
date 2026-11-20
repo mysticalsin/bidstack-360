@@ -173,7 +173,7 @@ export function FieldPicker({ entity, value, onChange, onResolve, placeholder, c
               className={cn(
                 'flex w-full items-center justify-between px-3 py-2 text-sm transition-colors min-h-[40px]',
                 f.key === value
-                  ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)]'
+                  ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-primary)] dark:text-[var(--brand-deep)]'
                   : 'text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]',
               )}
             >

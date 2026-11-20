@@ -212,20 +212,45 @@ export function metricsAccessAllowed(
 
 // ── Health probe helpers ────────────────────────────────────────────────────
 
+/** Default cap per dependency probe; HEALTH_PROBE_TIMEOUT_MS overrides it. */
+const DEFAULT_PROBE_TIMEOUT_MS = 2_000;
+
+function probeTimeoutMs(): number {
+  const raw = Number(process.env.HEALTH_PROBE_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_PROBE_TIMEOUT_MS;
+}
+
+/**
+ * Resolve to the probe result, or false once `timeoutMs` passes. A dependency
+ * that accepts the connection but never answers must read as down, not hang
+ * the probe until the request timeout.
+ */
+export async function boundedProbe(probe: () => Promise<boolean>, timeoutMs: number): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([probe().catch(() => false), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function probeCoreHealth(
   headers: FastifyRequest['headers'],
 ): Promise<z.infer<typeof CoreHealthSchema>> {
-  let db: boolean;
-  try {
-    const t0 = Date.now();
-    await prisma.$queryRaw`SELECT 1`;
-    dbQueryDuration.observe({ operation: 'ping' }, (Date.now() - t0) / 1000);
-    db = true;
-  } catch {
-    db = false;
-  }
-
-  const redisOk = await pingRedis();
+  const timeoutMs = probeTimeoutMs();
+  const [db, redisOk] = await Promise.all([
+    boundedProbe(async () => {
+      const t0 = Date.now();
+      await prisma.$queryRaw`SELECT 1`;
+      dbQueryDuration.observe({ operation: 'ping' }, (Date.now() - t0) / 1000);
+      return true;
+    }, timeoutMs),
+    boundedProbe(pingRedis, timeoutMs),
+  ]);
 
   return { ok: db && redisOk, db, redis: redisOk, release: releaseMetadataForCaller(headers) };
 }

@@ -34,6 +34,8 @@ import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { pinnedDeployCli } from './pinned-deploy-cli.mjs';
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const API_PORT = Number(process.env.PORT_API ?? 4100);
 const DEMO_ORIGIN = 'https://bidstack-demo.vercel.app';
@@ -205,8 +207,9 @@ if (process.argv.includes('--no-deploy')) {
 
 // ── 4. Rebuild + redeploy the SPA against the new origin ───────────────────
 log('updating VITE_API_URL on Vercel');
-run('vercel', ['env', 'rm', 'VITE_API_URL', 'production', '--yes'], { quiet: true });
-const added = run('vercel', ['env', 'add', 'VITE_API_URL', 'production'], {
+const vercel = pinnedDeployCli('vercel');
+run(vercel, ['env', 'rm', 'VITE_API_URL', 'production', '--yes'], { quiet: true });
+const added = run(vercel, ['env', 'add', 'VITE_API_URL', 'production'], {
   input: apiOrigin,
   quiet: true,
 });
@@ -219,12 +222,12 @@ rmSync(join(REPO, '.vercel', 'output'), { recursive: true, force: true });
 log('building the SPA');
 // Trap 1: exported explicitly, because the Vercel variable is sensitive and
 // cannot be pulled back down for a local build.
-if (run('vercel', ['build', '--prod', '--yes'], { env: { ...process.env, VITE_API_URL: apiOrigin } }).status !== 0) {
+if (run(vercel, ['build', '--prod', '--yes'], { env: { ...process.env, VITE_API_URL: apiOrigin } }).status !== 0) {
   die('vercel build');
 }
 
 log('deploying');
-if (run('vercel', ['deploy', '--prebuilt', '--prod', '--yes']).status !== 0) die('vercel deploy');
+if (run(vercel, ['deploy', '--prebuilt', '--prod', '--yes']).status !== 0) die('vercel deploy');
 
 await waitFor('demo origin', () => ok(DEMO_ORIGIN), { timeoutMs: 60_000 });
 log(`done — ${DEMO_ORIGIN} is served by ${apiOrigin}`);

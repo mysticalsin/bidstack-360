@@ -1,0 +1,39 @@
+import { illegalTransition, type IllegalTransition } from './illegal-transition.js';
+
+/** The provider no longer honours this grant, or its status refuses a refresh. */
+export class GrantRevokedError extends Error {
+  override readonly name = 'GrantRevokedError';
+}
+
+export const TOKEN_STATES = ['active', 'expired', 'revoked', 'error'] as const;
+export type TokenState = (typeof TOKEN_STATES)[number];
+
+export const TOKEN_EVENTS = ['refresh_ok', 'refresh_fail', 'revoke'] as const;
+export type TokenEvent = (typeof TOKEN_EVENTS)[number];
+
+const FROM: Record<TokenEvent, readonly TokenState[]> = {
+  refresh_ok: ['active', 'error'],
+  refresh_fail: ['active', 'error'],
+  revoke: ['active', 'error'],
+};
+
+const TO: Record<TokenEvent, TokenState> = {
+  refresh_ok: 'active',
+  refresh_fail: 'error',
+  revoke: 'revoked',
+};
+
+/** Statuses a refresh or revoke may match. `expired` has no writer. `revoked` is not rewritten. */
+export function tokenFrom(event: TokenEvent): readonly TokenState[] {
+  return FROM[event];
+}
+
+export function tokenTransition(from: TokenState, event: TokenEvent): TokenState | IllegalTransition {
+  if (!FROM[event].includes(from)) return illegalTransition();
+  return TO[event];
+}
+
+/** A tombstone is not a refresh source. */
+export function tokenRefreshAllowed(deletedAt: Date | null): boolean {
+  return deletedAt === null;
+}

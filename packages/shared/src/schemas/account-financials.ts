@@ -60,6 +60,8 @@ export const FINANCIAL_METRICS = [
   'acquisitions',
   'restructuring',
   'impairment',
+  'intangibles',
+  'debtIssued',
 ] as const;
 export const FinancialMetric = z.enum(FINANCIAL_METRICS);
 export type FinancialMetric = z.infer<typeof FinancialMetric>;
@@ -80,6 +82,8 @@ export const METRIC_LABEL: Record<FinancialMetric | 'operatingMargin' | 'netMarg
   acquisitions: 'Acquisitions paid',
   restructuring: 'Restructuring charges',
   impairment: 'Impairments',
+  intangibles: 'Software and intangibles',
+  debtIssued: 'Debt raised',
   operatingMargin: 'Operating margin',
   netMargin: 'Net margin',
   freeCashFlow: 'Free cash flow',
@@ -153,6 +157,11 @@ export const AccountFinancials = z.object({
   lastPulledAt: z.string().nullable(),
   nextPullAt: z.string().nullable(),
   periods: z.array(FinancialPeriod),
+  /**
+   * True when the query read one filing past the page and dropped it.
+   * `periods` is that page, not every filing. No filing total.
+   */
+  periodsContinue: z.boolean().optional(),
   signals: z.array(FinancialSignal),
   /** True when the section shows the built-in example instead of filings. */
   sample: z.boolean(),

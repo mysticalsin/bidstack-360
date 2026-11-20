@@ -10,10 +10,14 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
-import type { Company } from '@bidstack/shared';
+import type { CompanyListItem } from '@/hooks/useCompanies';
+
+import { INTEL_COLUMNS, IntelCellFor } from './IntelCells';
+
+const DASH = '\u2013';
 
 interface CompanyRowProps {
-  company: Company;
+  company: CompanyListItem;
   selected: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
@@ -22,6 +26,7 @@ interface CompanyRowProps {
   // canWrite, sourced from useHasAdminPermission('companies:write')).
   canDelete: boolean;
   query: string;
+  isVisible: (key: string) => boolean;
 }
 
 export const CompanyRow = memo(function CompanyRow({
@@ -31,6 +36,7 @@ export const CompanyRow = memo(function CompanyRow({
   onDelete,
   canDelete,
   query,
+  isVisible,
 }: CompanyRowProps) {
   const { t } = useTranslation('crm');
   return (
@@ -56,7 +62,12 @@ export const CompanyRow = memo(function CompanyRow({
       </td>
       <td>
         <div className="flex min-w-[220px] items-center gap-3">
-          <CompanyLogo name={company.name} companyId={company.id} domain={company.domain} size={36} />
+          <CompanyLogo
+            name={company.name}
+            companyId={company.id}
+            domain={company.domain}
+            size={36}
+          />
           <div className="min-w-0">
             <Link
               to={`/companies/${company.id}`}
@@ -70,26 +81,38 @@ export const CompanyRow = memo(function CompanyRow({
           </div>
         </div>
       </td>
-      <td className="text-[var(--fg-secondary)]">
-        {company.domain ? (
-          <a
-            href={`https://${company.domain}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-          >
-            <Icon name="globe" size={13} ariaHidden />
-            {company.domain}
-          </a>
-        ) : (
-          '—'
-        )}
-      </td>
-      <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.industry ?? '—'}</td>
-      <td className="tabular-nums text-[var(--fg-secondary)]">
-        {company.employeeCount?.toLocaleString() ?? '—'}
-      </td>
-      <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.countryCode ?? '—'}</td>
+      {isVisible('domain') && (
+        <td className="text-[var(--fg-secondary)]">
+          {company.domain ? (
+            <a
+              href={`https://${company.domain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+            >
+              <Icon name="globe" size={13} ariaHidden />
+              {company.domain}
+            </a>
+          ) : (
+            DASH
+          )}
+        </td>
+      )}
+      {isVisible('industry') && (
+        <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.industry ?? DASH}</td>
+      )}
+      {isVisible('countryCode') && (
+        <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.countryCode ?? DASH}</td>
+      )}
+      {INTEL_COLUMNS.filter((c) => isVisible(c.key)).map((c) => (
+        <td key={c.key} className="whitespace-nowrap px-3 py-3 text-[var(--fg-secondary)]">
+          <IntelCellFor
+            column={c.key}
+            summary={company.intel ?? null}
+            crmEmployees={company.employeeCount ?? null}
+          />
+        </td>
+      ))}
       <td className="text-right">
         <div className="inline-flex items-center gap-1">
           <Link

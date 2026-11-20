@@ -86,13 +86,10 @@ const PALETTE_ONLY_TARGETS: NavTarget[] = [
 ];
 
 // Palette-only routes that are ALSO permission-gated — mirrors SettingsLayout's
-// `admin: true` GROUPS entries and the `RequireAdmin` wrapper around
-// /audit-log in AdminRoutes.tsx. WHY separate from PALETTE_ONLY_TARGETS: that
-// list is spliced into every user's target set unconditionally, which would
-// let a non-admin ⌘K-search-and-jump at an admin-only destination — leaking
-// its existence/reachability through search even though RequireAdmin bounces
-// them back to /dashboard on arrival. Kept isolated so it's obvious at a
-// glance which palette-only routes still need a permission check.
+// audit-log:read tab and RequireAuditLogRead around /audit-log. WHY separate
+// from PALETTE_ONLY_TARGETS: that list is spliced into every user's target set
+// unconditionally, which would let a user without audit-log:read jump at a
+// destination that bounces them to /dashboard.
 const PALETTE_ONLY_ADMIN_TARGETS: NavTarget[] = [
   { to: '/audit-log', label: 'Go to Audit log', hint: '' },
 ];
@@ -105,14 +102,13 @@ const PALETTE_ONLY_ADMIN_TARGETS: NavTarget[] = [
  * it unconditionally listed "Go to Agent Studio" even though that route is
  * featureKey-gated (org module flag), so an org with the module OFF could
  * still search-and-jump straight to it from ⌘K. Routing every section
- * through `isNavItemVisible` closes the module-flag leak; `isAdmin` closes
- * the matching permission leak for the one hand-added admin-only route
- * (/audit-log) that lives outside NAV_SECTIONS entirely.
+ * through `isNavItemVisible` closes the module-flag leak; `canReadAuditLog`
+ * closes the matching permission leak for /audit-log.
  */
 export function buildNavTargets(
   sections: NavSection[],
   flags: NavModuleFlags | undefined,
-  isAdmin: boolean,
+  canReadAuditLog: boolean,
 ): NavTarget[] {
   const fromSections: NavTarget[] = sections.flatMap((section) =>
     section.items
@@ -126,7 +122,7 @@ export function buildNavTargets(
   return [
     ...fromSections,
     ...PALETTE_ONLY_TARGETS,
-    ...(isAdmin ? PALETTE_ONLY_ADMIN_TARGETS : []),
+    ...(canReadAuditLog ? PALETTE_ONLY_ADMIN_TARGETS : []),
   ];
 }
 

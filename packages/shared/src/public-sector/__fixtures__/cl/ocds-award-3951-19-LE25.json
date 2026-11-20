@@ -1,0 +1,65 @@
+{
+  "uri": "https://api.mercadopublico.cl/APISOCDS/OCDS/award/3951-19-LE25",
+  "version": "1.1",
+  "extensions": [
+    "https://chilecompracl.visualstudio.com/a6a3f587-5f23-42f6-9255-ac5852fae1e7/_apis/git/repositories/fb91c43b-011b-434b-901d-9d36ec50c586/items?path=%2Fextension.json&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0",
+    "https://raw.githubusercontent.com/open-contracting-extensions/ocds_techniques_extension/master/extension.json"
+  ],
+  "publishedDate": "2025-07-23T12:52:45Z",
+  "releases": [
+    {
+      "ocid": "ocds-70d2nz-3951-19-LE25",
+      "id": "efe79ab7-9564064",
+      "tag": [
+        "award"
+      ],
+      "initiationType": "tender",
+      "parties": [
+        {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871",
+          "identifier": {
+            "id": "619747003",
+            "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+            "scheme": "CL-RUT"
+          },
+          "address": {
+            "streetAddress": "Los Aromos Esq. Alejandro Gutierrez",
+            "region": "Región Aysén del General Carlos Ibáñez del Campo",
+            "countryName": "Chile"
+          },
+          "contactPoint": {
+            "name": "CONTACTO INSTITUCIONAL"
+          },
+          "roles": [
+            "procuringEntity",
+            "buyer"
+          ],
+          "additionalIdentifiers": [
+            {
+              "id": "4871",
+              "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+              "scheme": "CL-MP",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Comprador/Unidad/4871"
+            }
+          ]
+        }
+      ],
+      "awards": [
+        {
+          "id": "9564064",
+          "title": "COMPRA DE SERVICIO CVDS AÑO 2025",
+          "description": "El consultorio Víctor Domingo Silva, solicita presentar ofertas de los interesados en participar del proceso de Licitación Públcia para la compra de servicio para las Unidades Clínicas y Administrativas del Consultorio Víctor Domingo Silva.",
+          "status": "cancelled",
+          "statusDetails": "15-Revocada"
+        }
+      ],
+      "language": "es"
+    }
+  ],
+  "publisher": {
+    "name": "Dirección de Compras y Contratación Pública"
+  },
+  "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "publicationPolicy": "http://api.mercadopublico.cl/APISOCDS/Utilidades/Politicas/Actualizacion"
+}

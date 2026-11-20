@@ -17,13 +17,16 @@ export interface Role {
   permissions: Permission[];
 }
 
+export interface RoleList {
+  items: Role[];
+  /** True when one role past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+}
+
 export function useRoles(options: { enabled?: boolean } = {}) {
-  return useQuery<Role[]>({
+  return useQuery<RoleList>({
     queryKey: ['roles'],
-    queryFn: async () => {
-      const data = await api<{ items: Role[] }>('/api/roles');
-      return data.items;
-    },
+    queryFn: () => api<RoleList>('/api/roles'),
     enabled: options.enabled ?? true,
   });
 }

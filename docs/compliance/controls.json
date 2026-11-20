@@ -1,0 +1,537 @@
+{
+  "$comment": "Control register. CONTROL-MAP.md is the readable view; scripts/write-compliance-evidence.mjs checks every path, CI job and assertion here and writes one evidence file per control. status: implemented | partial | gap.",
+  "controls": [
+    {
+      "id": "SOC2-CC6.1-RBAC",
+      "framework": "SOC 2 TSC",
+      "title": "Logical access is role based and checked on every route",
+      "status": "implemented",
+      "code": ["apps/api/src/plugins/rbac.ts", "packages/shared/src/types/permissions.ts"],
+      "tests": [
+        "apps/api/src/__tests__/rbac-matrix.test.ts",
+        "apps/api/src/security/rbac-matrix-routes.integration.test.ts",
+        "apps/api/src/security/route-authz-census.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration"],
+      "assertions": [{ "file": "apps/api/src/plugins/rbac.ts", "contains": "requirePermission" }],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.1-TENANT",
+      "framework": "SOC 2 TSC",
+      "title": "Tenant isolation: every query is scoped to the caller's org",
+      "status": "implemented",
+      "code": ["apps/api/src/test-support/isolated-org.ts"],
+      "tests": [
+        "apps/api/src/security/tenant-isolation-sweep.integration.test.ts",
+        "apps/api/src/security/rbac-side-doors.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.2-AUTH",
+      "framework": "SOC 2 TSC",
+      "title": "Authentication and sign-in events are audited",
+      "status": "implemented",
+      "code": ["apps/api/src/plugins/auth.ts", "apps/api/src/plugins/auth-audit.ts"],
+      "tests": ["apps/api/src/plugins/auth.test.ts", "apps/api/src/plugins/auth-audit.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.3-ROLES",
+      "framework": "SOC 2 TSC",
+      "title": "Role changes are admin only and revoke cached decisions",
+      "status": "implemented",
+      "code": ["apps/api/src/lib/rbac-decision-cache.ts"],
+      "tests": [
+        "apps/api/src/routes/users.roles.integration.test.ts",
+        "apps/api/src/lib/rbac-decision-cache.revocation.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.6-BOUNDARY",
+      "framework": "SOC 2 TSC",
+      "title": "Boundary protection: security headers, CORS allowlist, unbounded query guard",
+      "status": "implemented",
+      "code": [
+        "apps/api/src/plugins/security-headers.ts",
+        "apps/api/src/lib/cors-origins.ts",
+        "apps/api/src/plugins/query-guard.ts"
+      ],
+      "tests": [
+        "apps/api/src/plugins/security-headers.test.ts",
+        "apps/api/src/lib/cors-origins.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.7-ENCRYPTION",
+      "framework": "SOC 2 TSC",
+      "title": "Contact and lead email and phone are encrypted at rest (PII_MAP)",
+      "status": "implemented",
+      "code": ["packages/db/src/middleware/pii-encryption.ts"],
+      "tests": [
+        "packages/db/src/middleware/pii-encryption.test.ts",
+        "packages/db/src/pii-field-encryption.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit"],
+      "assertions": [
+        { "file": "packages/db/src/middleware/pii-encryption.ts", "contains": "PII_MAP" }
+      ],
+      "evidenceScript": "scripts/write-pii-ciphertext-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.7-WEBHOOK-SECRETS",
+      "framework": "SOC 2 TSC",
+      "title": "Webhook signing secrets are stored as ciphertext",
+      "status": "implemented",
+      "code": ["scripts/encrypt-webhook-secrets.ts"],
+      "tests": ["apps/api/src/security/penetration.webhook.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-webhook-secret-ciphertext-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.8-SUPPLY-CHAIN",
+      "framework": "SOC 2 TSC",
+      "title": "Dependencies are audited and scanned before merge",
+      "status": "implemented",
+      "code": [".github/workflows/supply-chain.yml", ".github/workflows/dependency-review.yml"],
+      "tests": [],
+      "ciJobs": [
+        "ci.yml#unit",
+        "supply-chain.yml#vuln-scan",
+        "supply-chain.yml#iac-scan",
+        "dependency-review.yml#dependency-review"
+      ],
+      "assertions": [
+        { "file": ".github/workflows/ci.yml", "contains": "pnpm audit --audit-level high" }
+      ],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC7.1-VULN",
+      "framework": "SOC 2 TSC",
+      "title": "Static analysis and penetration style tests run on every PR",
+      "status": "implemented",
+      "code": [".github/workflows/semgrep.yml"],
+      "tests": [
+        "apps/api/src/security/penetration.access-control.test.ts",
+        "apps/api/src/security/penetration.injection-upload.test.ts"
+      ],
+      "ciJobs": ["semgrep.yml#semgrep", "ci.yml#unit"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC7.2-MONITORING",
+      "framework": "SOC 2 TSC",
+      "title": "Errors are monitored with PII scrubbed before they leave the process",
+      "status": "implemented",
+      "code": ["apps/api/src/plugins/sentry.ts", "apps/api/src/lib/sentry-privacy.ts"],
+      "tests": ["apps/api/src/lib/sentry-privacy.test.ts", "apps/api/src/plugins/sentry.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-sentry-smoke-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC7.4-INCIDENT",
+      "framework": "SOC 2 TSC",
+      "title": "Incident response and recovery runbooks",
+      "status": "partial",
+      "code": [
+        "production-readiness/DISASTER_RECOVERY_PLAN.md",
+        "production-readiness/ROLLBACK_RUNBOOK.md"
+      ],
+      "tests": [],
+      "ciJobs": [],
+      "gap": "Runbooks exist; no tabletop exercise record and no breach notification procedure (GDPR Art 33, 72 hours) in the repo.",
+      "evidenceScript": "scripts/write-operational-readiness-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC8.1-CHANGE",
+      "framework": "SOC 2 TSC",
+      "title": "Changes go through PR review and the CI gate list",
+      "status": "implemented",
+      "code": [".github/workflows/ci.yml"],
+      "tests": [],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration", "ci.yml#e2e"],
+      "evidenceScript": "scripts/write-source-control-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC4.1-AUDIT-CHAIN",
+      "framework": "SOC 2 TSC",
+      "title": "Audit log is append only and hash chained; the chain is verifiable per org",
+      "status": "implemented",
+      "code": [
+        "apps/api/src/lib/audit-chain.ts",
+        "packages/db/src/middleware/audit-immutability.ts"
+      ],
+      "tests": [
+        "apps/api/src/security/audit-chain.integration.test.ts",
+        "packages/db/src/middleware/audit-immutability.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration"],
+      "assertions": [{ "file": "apps/api/src/lib/audit-chain.ts", "contains": "verifyAuditChain" }],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-A1.2-BACKUP",
+      "framework": "SOC 2 TSC",
+      "title": "Database backups with a restore self test",
+      "status": "partial",
+      "code": ["scripts/backup-postgres.sh", "scripts/backup-restore-selftest.sh"],
+      "tests": [],
+      "ciJobs": [],
+      "gap": "Restore self test is a script, not a scheduled CI job; restore evidence depends on the hosting environment.",
+      "evidenceScript": "scripts/write-operational-readiness-evidence.mjs"
+    },
+    {
+      "id": "SOC2-C1.1-CLASSIFY",
+      "framework": "SOC 2 TSC",
+      "title": "Every table holding personal data is classified; new ones fail CI until mapped",
+      "status": "implemented",
+      "code": ["packages/db/src/compliance/personal-data-map.ts"],
+      "tests": ["packages/db/src/compliance/personal-data-map.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "assertions": [
+        { "file": "packages/db/src/compliance/personal-data-map.ts", "contains": "SUBJECT_STORES" }
+      ],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-C1.2-DISPOSAL",
+      "framework": "SOC 2 TSC",
+      "title": "Confidential data is disposed of on a schedule per data class",
+      "status": "implemented",
+      "code": [
+        "packages/db/src/compliance/retention.ts",
+        "apps/worker/src/queues/retention-sweep.ts"
+      ],
+      "tests": [
+        "packages/db/src/compliance/retention.test.ts",
+        "apps/worker/src/queues/retention-sweep.test.ts",
+        "apps/api/src/routes/compliance-retention.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration"],
+      "assertions": [{ "file": ".env.example", "contains": "RETENTION_MODE" }],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-P5.1-ACCESS",
+      "framework": "SOC 2 TSC",
+      "title": "Data subject access: export of everything held about one person",
+      "status": "implemented",
+      "code": [
+        "packages/db/src/compliance/data-subject.ts",
+        "apps/api/src/routes/data-subject-requests.ts",
+        "apps/worker/src/queues/data-subject.ts"
+      ],
+      "tests": [
+        "apps/api/src/routes/data-subject-requests.integration.test.ts",
+        "apps/worker/src/queues/data-subject.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-P4.3-ERASE",
+      "framework": "SOC 2 TSC",
+      "title": "Data subject erasure across every store, audit rows pseudonymised",
+      "status": "implemented",
+      "code": [
+        "packages/db/src/compliance/data-subject.ts",
+        "apps/api/src/routes/erasure.ts",
+        "apps/api/src/routes/data-subject-requests.ts"
+      ],
+      "tests": [
+        "apps/api/src/routes/data-subject-requests.integration.test.ts",
+        "apps/api/src/routes/erasure.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#integration"],
+      "gap": "Audit diffs written before this pack may hold raw values; they are counted and the subject row is tombstoned, but the diff text itself cannot change without breaking the chain.",
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-PI1.2-INPUT",
+      "framework": "SOC 2 TSC",
+      "title": "Every write route declares a validated body schema",
+      "status": "implemented",
+      "code": ["apps/api/src/security/route-authz-allowlist.ts"],
+      "tests": ["apps/api/src/security/route-contract-ratchet.integration.test.ts"],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "SOC2-CC6.1-SECRETS",
+      "framework": "SOC 2 TSC",
+      "title": "No secrets in the repository",
+      "status": "implemented",
+      "code": ["scripts/check-secrets.sh", ".github/workflows/gitleaks.yml"],
+      "tests": [],
+      "ciJobs": ["ci.yml#secrets-full-scan", "gitleaks.yml#gitleaks"],
+      "evidenceScript": "scripts/write-secret-scan-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.5.12-CLASSIFICATION",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Classification of information: personal data map with legal basis for retained fields",
+      "status": "implemented",
+      "code": ["packages/db/src/compliance/personal-data-map.ts"],
+      "tests": ["packages/db/src/compliance/personal-data-map.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.5.15-ACCESS-CONTROL",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Access control policy enforced as a role matrix",
+      "status": "implemented",
+      "code": [
+        "packages/shared/src/types/permissions.ts",
+        "production-readiness/AUTHORIZATION_MATRIX.md"
+      ],
+      "tests": ["apps/api/src/__tests__/rbac-matrix.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.5.18-ACCESS-RIGHTS",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Access rights are granted and removed by admins and audited",
+      "status": "implemented",
+      "code": ["apps/api/src/lib/rbac-decision-cache.ts"],
+      "tests": ["apps/api/src/routes/users.roles.integration.test.ts"],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.5.23-CLOUD-RESIDENCY",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Cloud services: per org data region tag",
+      "status": "partial",
+      "code": [
+        "packages/shared/src/schemas/compliance.ts",
+        "apps/api/src/routes/org-settings.ts",
+        "apps/api/src/storage/index.ts",
+        "apps/worker/src/lib/tenant-export-storage.ts",
+        "apps/web/src/components/settings/DataResidencySection.tsx"
+      ],
+      "tests": [
+        "packages/shared/src/schemas/compliance.test.ts",
+        "apps/api/src/routes/data-residency.integration.test.ts",
+        "apps/web/src/components/settings/DataResidencySection.test.tsx"
+      ],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration"],
+      "assertions": [
+        { "file": "packages/shared/src/schemas/compliance.ts", "contains": "resolveRegionalBucket" }
+      ],
+      "gap": "Enforced for tenant exports only. File uploads, call recordings, the primary database and LLM providers follow the deployment configuration.",
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.5.33-RECORDS",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Protection of records: tamper evident audit log",
+      "status": "implemented",
+      "code": ["apps/api/src/lib/audit-chain.ts"],
+      "tests": ["apps/api/src/security/audit-chain.integration.test.ts"],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.5.34-PII",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Privacy and protection of PII: export, erase, retention, residency",
+      "status": "implemented",
+      "code": [
+        "packages/db/src/compliance/data-subject.ts",
+        "packages/db/src/compliance/retention.ts",
+        "docs/compliance/AI-ACT-DPIA.md"
+      ],
+      "tests": [
+        "apps/api/src/routes/data-subject-requests.integration.test.ts",
+        "apps/api/src/routes/compliance-retention.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.5.24-INCIDENT",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Incident management planning",
+      "status": "gap",
+      "code": ["production-readiness/DISASTER_RECOVERY_PLAN.md"],
+      "tests": [],
+      "ciJobs": [],
+      "gap": "No security incident procedure with roles, severity and notification timelines in the repo.",
+      "evidenceScript": "scripts/write-operational-readiness-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.3-ACCESS-RESTRICTION",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Information access restriction: tenant and record level scoping",
+      "status": "implemented",
+      "code": ["apps/api/src/meeting-intel/access.ts", "apps/api/src/org-chart/access.ts"],
+      "tests": [
+        "apps/api/src/security/tenant-isolation-sweep.integration.test.ts",
+        "apps/api/src/meeting-intel/meeting-permissions.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.8-VULNERABILITIES",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Management of technical vulnerabilities",
+      "status": "implemented",
+      "code": [".github/workflows/supply-chain.yml"],
+      "tests": [],
+      "ciJobs": ["ci.yml#unit", "supply-chain.yml#vuln-scan"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.10-DELETION",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Information deletion: subject erasure and scheduled retention",
+      "status": "implemented",
+      "code": [
+        "packages/db/src/compliance/data-subject.ts",
+        "packages/db/src/compliance/retention.ts"
+      ],
+      "tests": [
+        "apps/api/src/routes/data-subject-requests.integration.test.ts",
+        "apps/api/src/routes/compliance-retention.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.11-MASKING",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Data masking: log and error redaction, public sector identifier redaction, AI prompt hashing",
+      "status": "implemented",
+      "code": [
+        "apps/api/src/lib/logger.ts",
+        "apps/api/src/lib/sentry-privacy.ts",
+        "packages/shared/src/public-sector/cl/common.ts",
+        "apps/api/src/lib/ai-audit.ts"
+      ],
+      "tests": [
+        "apps/api/src/lib/logger.test.ts",
+        "apps/api/src/lib/sentry-privacy.test.ts",
+        "packages/shared/src/public-sector/cl/ocds-api.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.12-LEAKAGE",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Data leakage prevention: secret scanning and owner only unfiled mail",
+      "status": "partial",
+      "code": ["scripts/check-secrets.sh"],
+      "tests": [],
+      "ciJobs": ["ci.yml#secrets-full-scan", "gitleaks.yml#gitleaks"],
+      "gap": "Owner only visibility for unfiled captured mail lands with the email capture slice (PR 306, not on main yet).",
+      "evidenceScript": "scripts/write-secret-scan-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.13-BACKUP",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Information backup",
+      "status": "partial",
+      "code": ["scripts/backup-postgres.sh", "production-readiness/BACKUP_RESTORE_REPORT.md"],
+      "tests": [],
+      "ciJobs": [],
+      "gap": "Same as SOC2-A1.2-BACKUP.",
+      "evidenceScript": "scripts/write-operational-readiness-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.15-LOGGING",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Logging: mutation audit, AI invocation log, GDPR request events",
+      "status": "implemented",
+      "code": [
+        "apps/api/src/plugins/mutation-audit.ts",
+        "apps/api/src/lib/ai-audit.ts",
+        "apps/worker/src/queues/ai-audit-retention.ts"
+      ],
+      "tests": [
+        "apps/api/src/plugins/mutation-audit.test.ts",
+        "apps/worker/src/queues/ai-audit-retention.test.ts"
+      ],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.16-MONITORING",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Monitoring activities",
+      "status": "implemented",
+      "code": ["apps/api/src/plugins/sentry.ts", "apps/api/src/routes/health.ts"],
+      "tests": ["apps/api/src/routes/health.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-sentry-smoke-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.24-CRYPTO",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Use of cryptography: field encryption and keyed hashes",
+      "status": "implemented",
+      "code": [
+        "packages/db/src/middleware/pii-encryption.ts",
+        "docs/security/pii-field-encryption.md"
+      ],
+      "tests": ["packages/db/src/middleware/pii-encryption.test.ts"],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-pii-ciphertext-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.25-SDLC",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Secure development life cycle: lint, typecheck, tests, build on every PR",
+      "status": "implemented",
+      "code": [".github/workflows/ci.yml"],
+      "tests": [],
+      "ciJobs": ["ci.yml#unit", "ci.yml#integration", "ci.yml#e2e"],
+      "assertions": [{ "file": ".github/workflows/ci.yml", "contains": "pnpm typecheck" }],
+      "evidenceScript": "scripts/write-ci-repeat-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.26-APPSEC",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Application security requirements: route contract and authorization census",
+      "status": "implemented",
+      "code": ["apps/api/src/security/route-authz-allowlist.ts"],
+      "tests": [
+        "apps/api/src/security/route-contract-ratchet.integration.test.ts",
+        "apps/api/src/security/route-authz-census.integration.test.ts"
+      ],
+      "ciJobs": ["ci.yml#integration"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.28-SECURE-CODING",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Secure coding: semgrep rules and injection tests",
+      "status": "implemented",
+      "code": [".github/workflows/semgrep.yml"],
+      "tests": ["apps/api/src/security/penetration.injection-upload.test.ts"],
+      "ciJobs": ["semgrep.yml#semgrep"],
+      "evidenceScript": "scripts/write-compliance-evidence.mjs"
+    },
+    {
+      "id": "ISO-A.8.32-CHANGE",
+      "framework": "ISO 27001:2022 Annex A",
+      "title": "Change management",
+      "status": "implemented",
+      "code": [".github/workflows/ci.yml"],
+      "tests": [],
+      "ciJobs": ["ci.yml#unit"],
+      "evidenceScript": "scripts/write-source-control-evidence.mjs"
+    }
+  ]
+}
