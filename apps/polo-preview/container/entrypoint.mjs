@@ -118,11 +118,14 @@ function setPhase(next, why = '') {
 }
 
 function pgUid() {
-  const out = spawnSync('id', ['-u', 'postgres'], { encoding: 'utf8' });
-  const gid = spawnSync('id', ['-g', 'postgres'], { encoding: 'utf8' });
+  const out = spawnSync('id', ['-u', 'postgres'], { encoding: 'utf8', env: childEnv() });
+  const gid = spawnSync('id', ['-g', 'postgres'], { encoding: 'utf8', env: childEnv() });
   return { uid: Number(out.stdout.trim()), gid: Number(gid.stdout.trim()) };
 }
 
+// Every child gets this. POLO_APP_DB_PASSWORD and POLO_INTERNAL_KEY are
+// removed. The API and the worker still receive DATABASE_URL, which holds
+// the app password, because that is how they connect. Nothing else does.
 function childEnv(extra = {}) {
   return scrubChildEnv({ ...process.env, ...extra });
 }
@@ -215,6 +218,9 @@ function passwordRole() {
 }
 
 function setAppRolePassword() {
+  if (process.env.POLO_RESTORE_DRILL === '1' && process.env.POLO_DROP_APP_ROLE === '1') {
+    runSync('psql', pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-c', 'DROP OWNED BY app_role; DROP ROLE app_role']));
+  }
   const password = process.env.POLO_APP_DB_PASSWORD || '';
   if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
   // Node computes the SCRAM verifier. psql and the server see that string,
@@ -226,7 +232,7 @@ function setAppRolePassword() {
     {
       encoding: 'utf8',
       input: alterRolePasswordSql(passwordRole(), verifier),
-      env: { PATH: process.env.PATH || '', HOME: process.env.HOME || '', LC_ALL: 'C', LANG: 'C' },
+      env: childEnv({ PATH: process.env.PATH || '', HOME: process.env.HOME || '', LC_ALL: 'C', LANG: 'C' }),
       stdio: ['pipe', 'pipe', 'pipe'],
     },
   );
@@ -243,8 +249,11 @@ function lockAppRole() {
 }
 
 function assertAppRoleGate() {
-  if (process.env.POLO_RESTORE_DRILL === '1' && process.env.POLO_GATE_BREAK === 'audit-trigger') {
+  const gateBreak = process.env.POLO_RESTORE_DRILL === '1' ? process.env.POLO_GATE_BREAK : '';
+  if (gateBreak === 'audit-trigger') {
     runSync('psql', pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-c', 'ALTER TABLE public.audit_log DISABLE TRIGGER audit_log_append_only']));
+  } else if (gateBreak === 'audit-trigger-replica') {
+    runSync('psql', pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-c', 'ALTER TABLE public.audit_log ENABLE REPLICA TRIGGER audit_log_append_only']));
   }
   const res = spawnSync(
     'psql',
@@ -310,11 +319,11 @@ function startDatabase() {
     process.exit(1);
   });
   for (let i = 0; i < 60; i++) {
-    const ready = spawnSync('pg_isready', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER]);
+    const ready = spawnSync('pg_isready', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER], { env: childEnv() });
     if (ready.status === 0) break;
-    spawnSync('sleep', ['1']);
+    spawnSync('sleep', ['1'], { env: childEnv() });
   }
-  const exists = spawnSync('psql', pgCli(['-d', 'postgres', '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB}'`]), { encoding: 'utf8' });
+  const exists = spawnSync('psql', pgCli(['-d', 'postgres', '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB}'`]), { encoding: 'utf8', env: childEnv() });
   if (exists.stdout.trim() !== '1') runSync('createdb', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, DB]);
 }
 
@@ -322,7 +331,7 @@ function psqlText(sql) {
   const res = spawnSync(
     'psql',
     pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-tAc', sql]),
-    { encoding: 'utf8' },
+    { encoding: 'utf8', env: childEnv() },
   );
   if (res.status !== 0) {
     if (/does not exist/i.test(`${res.stderr || ''}`)) return '';
@@ -407,7 +416,7 @@ function seed() {
 }
 
 function startApi() {
-  apiChild = spawn(process.execPath, [API_ENTRY], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  apiChild = spawn(process.execPath, [API_ENTRY], { cwd: APP, env: childEnv(apiEnv()), stdio: ['ignore', 'pipe', 'pipe'] });
   apiChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   apiChild.stderr.on('data', (chunk) => {
     process.stderr.write(chunk);
@@ -429,7 +438,7 @@ function startWorker() {
     log('worker not started; active import migration was refused');
     return;
   }
-  workerChild = spawn(process.execPath, [WORKER_ENTRY], { cwd: APP, env: workerEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  workerChild = spawn(process.execPath, [WORKER_ENTRY], { cwd: APP, env: childEnv(workerEnv()), stdio: ['ignore', 'pipe', 'pipe'] });
   workerChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   workerChild.stderr.on('data', (chunk) => {
     process.stderr.write(chunk);
@@ -487,7 +496,7 @@ function changeCounter() {
   const out = spawnSync(
     'psql',
     pgCli(['-d', DB, '-tAc', 'SELECT coalesce(sum(n_tup_ins + n_tup_upd + n_tup_del), 0) FROM pg_stat_user_tables']),
-    { encoding: 'utf8' },
+    { encoding: 'utf8', env: childEnv() },
   );
   return Number(out.stdout.trim() || 0);
 }
@@ -517,7 +526,7 @@ async function restoreFrom(req) {
   const restored = spawnSync(
     'pg_restore',
     ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, '-d', DB, '--no-owner', '--no-privileges', join(dir, 'db.dump')],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: childEnv({ LC_ALL: 'C', LANG: 'C' }) },
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: childEnv({ LC_ALL: 'C', LANG: 'C', PGVERBOSITY: 'verbose' }) },
   );
   if (restored.stdout) process.stdout.write(restored.stdout);
   if (restored.stderr) process.stderr.write(restored.stderr);
@@ -526,7 +535,7 @@ async function restoreFrom(req) {
     remember(failure);
     throw new Error(failure);
   }
-  const orgs = spawnSync('psql', pgCli(['-d', DB, '-tAc', 'SELECT count(*) FROM orgs']), { encoding: 'utf8' });
+  const orgs = spawnSync('psql', pgCli(['-d', DB, '-tAc', 'SELECT count(*) FROM orgs']), { encoding: 'utf8', env: childEnv() });
   if (!(Number(orgs.stdout.trim()) > 0)) throw new Error('restored database has no orgs');
   if (existsSync(join(dir, 'storage'))) {
     rmSync(STORAGE, { recursive: true, force: true });

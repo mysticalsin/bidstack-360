@@ -392,11 +392,20 @@ function roleFacts(port: number): string {
   );
 }
 
+function secretKind(text: string): 'clean' | 'plaintext' | 'verifier' {
+  if (text.includes(FIXTURE_PASSWORD)) return 'plaintext';
+  if (text.includes('SCRAM-SHA-256$')) return 'verifier';
+  return 'clean';
+}
+
+function expectClean(text: string): void {
+  // A failure prints clean/plaintext/verifier, not the fixture password.
+  expect(secretKind(text)).toBe('clean');
+}
+
 function expectPasswordUnlogged(boot: Boot | null): void {
-  // WHY: redacted logs hide a mutant that prints the secret. The raw stream
-  // is what the container wrote.
   if (!boot) return;
-  expect(boot.rawLogs()).not.toContain(FIXTURE_PASSWORD);
+  expectClean(boot.rawLogs());
 }
 
 function login(port: number): { status: number; stdout: string; stderr: string } {
@@ -495,6 +504,7 @@ describe('restored polo snapshot', () => {
     if (!guard(ctx)) return;
     const layout = await makeLayout();
     let boot: Boot | null = null;
+    let firstLog = '';
     try {
       boot = startEntrypoint(layout);
       const awaiting = await waitForPhase(layout.httpPort, (state) => state.phase === 'awaiting-data' || state.phase === 'failed', 30_000);
@@ -506,6 +516,8 @@ describe('restored polo snapshot', () => {
       const firstLogin = login(layout.pgPort);
       expect(firstLogin.status, firstLogin.stderr).toBe(0);
       expect(firstLogin.stdout.trim()).toBe('app_role');
+      firstLog = boot.rawLogs();
+      expectClean(firstLog);
 
       // WHY: once _prisma_migrations lists the role migrations, a later boot
       // will not run them. Dropping the role is that case: the data directory
@@ -525,6 +537,7 @@ describe('restored polo snapshot', () => {
       expect(secondLogin.status, secondLogin.stderr).toBe(0);
       expect(secondLogin.stdout.trim()).toBe('app_role');
     } finally {
+      expectClean(firstLog);
       expectPasswordUnlogged(boot);
       stopBoot(boot);
       rmSync(layout.root, { recursive: true, force: true });
@@ -576,22 +589,21 @@ describe('restored polo snapshot', () => {
     const layout = await makeLayout();
     let boot: Boot | null = null;
     try {
-      boot = startEntrypoint(layout, { POLO_PASSWORD_TARGET_ROLE: 'no_such_role' });
+      boot = startEntrypoint(layout, { POLO_DROP_APP_ROLE: '1' });
       const awaiting = await waitForPhase(layout.httpPort, (state) => state.phase === 'awaiting-data' || state.phase === 'failed', 30_000);
       expect(awaiting.phase).toBe('awaiting-data');
       const seeded = await postSeed(layout.httpPort);
       expect(seeded.status, seeded.body).toBe(202);
       const state = await waitForPhase(layout.httpPort, (next) => next.phase === 'ready' || next.phase === 'failed', 180_000);
       expect(state.phase).toBe('failed');
-      expect(boot.rawLogs()).not.toContain(FIXTURE_PASSWORD);
-      expect(boot.rawLogs()).not.toContain('SCRAM-SHA-256$');
+      expect(state.detail).toMatch(/could not set the app role password/);
+      expectClean(boot.rawLogs());
       const serverLog = join(layout.dataDir, 'pg', 'log');
-      if (existsSync(serverLog)) {
-        for (const name of readdirSync(serverLog)) {
-          const text = readFileSync(join(serverLog, name), 'utf8');
-          expect(text).not.toContain(FIXTURE_PASSWORD);
-          expect(text).not.toContain('SCRAM-SHA-256$');
-        }
+      expect(existsSync(serverLog)).toBe(true);
+      const files = readdirSync(serverLog);
+      expect(files.length).toBeGreaterThan(0);
+      for (const name of files) {
+        expectClean(readFileSync(join(serverLog, name), 'utf8'));
       }
     } finally {
       expectPasswordUnlogged(boot);

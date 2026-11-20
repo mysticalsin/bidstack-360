@@ -116,8 +116,16 @@ describe('polo app role boot', () => {
 
   it('binds the app role password and records only the SQLSTATE when that fails', () => {
     const body = functionBody(entry, 'setAppRolePassword');
+    const secret = "fix'ture\\pass";
     // WHY: splicing the secret into the statement puts it in argv, logs, and
     // a failed ALTER's error text. psql :'var' quotes a bound value.
+    const spawnAt = body.indexOf('spawnSync');
+    const spawnCall = callBody(body, body.indexOf('(', spawnAt));
+    // WHY: the verifier is stdin SQL. argv must not carry it or the cleartext.
+    expect(spawnCall).not.toMatch(/app_db_password=/);
+    expect(spawnCall).not.toContain('SCRAM-SHA-256$');
+    expect(spawnCall).not.toContain(secret);
+    expect(spawnCall).toContain('input:');
     expect(body).toContain('scramSha256Verifier(');
     expect(body).not.toContain(":'app_db_password'");
     expect(body).not.toMatch(/\$\{/);
@@ -129,7 +137,6 @@ describe('polo app role boot', () => {
     expect(appRolePasswordError(leaked)).not.toContain('fix');
     expect(appRolePasswordError(leaked)).not.toContain('ALTER ROLE');
     expect(appRolePasswordError('')).toBe('could not set the app role password (unknown)');
-    const secret = "fix'ture\\pass";
     const sql = alterRolePasswordSql('no_such_role', scramSha256Verifier(secret));
     expect(sql).toContain('SCRAM-SHA-256$');
     expect(sql).not.toContain(secret);
@@ -156,7 +163,8 @@ function spawnCallsMissingChildEnv(source: string): string[] {
   while ((match = re.exec(source))) {
     const open = source.indexOf('(', match.index);
     const body = callBody(source, open);
-    if (!body.includes('childEnv(')) missing.push(body.split('\n')[0].trim());
+    const first = body.split('\n')[0] ?? '';
+    if (!body.includes('childEnv(')) missing.push(first.trim());
   }
   return missing;
 }

@@ -97,14 +97,14 @@ SELECT CASE
     WHERE tgrelid = 'public.audit_log'::regclass
       AND NOT tgisinternal
       AND tgname IN ('audit_log_chain', 'audit_log_append_only', 'audit_log_no_truncate')
-      AND tgenabled = 'D'
+      AND tgenabled NOT IN ('O', 'A')
   ) THEN (
     SELECT 'audit trigger disabled: ' || tgname
     FROM pg_trigger
     WHERE tgrelid = 'public.audit_log'::regclass
       AND NOT tgisinternal
       AND tgname IN ('audit_log_chain', 'audit_log_append_only', 'audit_log_no_truncate')
-      AND tgenabled = 'D'
+      AND tgenabled NOT IN ('O', 'A')
     LIMIT 1
   )
   WHEN (
@@ -112,6 +112,7 @@ SELECT CASE
     WHERE tgrelid = 'public.audit_log'::regclass
       AND NOT tgisinternal
       AND tgname IN ('audit_log_chain', 'audit_log_append_only', 'audit_log_no_truncate')
+      AND tgenabled IN ('O', 'A')
   ) < 3 THEN 'audit trigger disabled'
   WHEN has_table_privilege('app_role', 'public._prisma_migrations', 'INSERT')
     OR has_table_privilege('app_role', 'public._prisma_migrations', 'UPDATE')
@@ -122,11 +123,6 @@ SELECT CASE
 END;
 `;
 
-// createdb already made schema public. This is the only pg_restore line that
-// is not data loss. A longer line that merely contains the phrase is not it.
-export const HARMLESS_RESTORE_ERROR_LINE =
-  'pg_restore: error: could not execute query: ERROR:  schema "public" already exists';
-
 function lines(text) {
   return String(text || '')
     .split('\n')
@@ -134,24 +130,20 @@ function lines(text) {
     .filter(Boolean);
 }
 
-function isHarmlessRestoreError(line) {
-  return line === HARMLESS_RESTORE_ERROR_LINE;
-}
+// PGVERBOSITY=verbose and LC_ALL=C make pg_restore print this once when
+// createdb already made schema public. Any other error, or a zero exit
+// that still printed it, fails the boot.
+const DUPLICATE_SCHEMA = 'ERROR:  42P06:';
 
-export function restoreErrorsThatMatter(text) {
-  return lines(text).filter((line) => /^pg_restore: error:/i.test(line) && !isHarmlessRestoreError(line));
-}
-
-// Null means the restore can proceed. Any other non-zero exit, or an error
-// line that is not the one public-schema notice, must fail the boot.
 export function restoreFailure(status, text) {
-  const matter = restoreErrorsThatMatter(text);
-  if (matter.length === 0 && status === 0) return null;
-  const errors = lines(text).filter((line) => /^pg_restore: error:/i.test(line));
-  const duplicateSchema = (String(text || '').match(/\b42P06\b/g) || []).length;
-  if (duplicateSchema > 1) return `pg_restore failed (${status ?? 'error'}): SQLSTATE 42P06 repeated`;
-  if (matter.length === 0 && errors.length === 1 && errors.every(isHarmlessRestoreError)) return null;
-  const sample = (matter.length > 0 ? matter : lines(text)).slice(0, 5).join(' | ').slice(0, 500);
+  const body = String(text || '');
+  const marks = body.split(DUPLICATE_SCHEMA).length - 1;
+  const errors = lines(body).filter((line) => /^pg_restore: error:/i.test(line));
+  if (status === 0 && errors.length === 0 && marks === 0) return null;
+  if (status === 1 && marks === 1 && errors.length > 0 && errors.every((line) => line.includes(DUPLICATE_SCHEMA))) {
+    return null;
+  }
+  const sample = (errors.length > 0 ? errors : lines(body)).slice(0, 5).join(' | ').slice(0, 500);
   return `pg_restore failed (${status ?? 'error'})${sample ? `: ${sample}` : ''}`;
 }
 
@@ -179,7 +171,8 @@ export function alterRolePasswordSql(role, verifier) {
   if (!/^SCRAM-SHA-256\$\d+:[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/.test(verifier)) {
     throw new Error('app role verifier is not a SCRAM secret');
   }
-  return `ALTER ROLE ${role} PASSWORD '${verifier}';\n`;
+  // panic is above ERROR, so a failed ALTER is not written to the server log.
+  return `SET log_statement = 'none';\nSET log_min_error_statement = 'panic';\nALTER ROLE ${role} PASSWORD '${verifier}';\n`;
 }
 
 export function scrubChildEnv(env) {
