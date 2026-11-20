@@ -326,7 +326,10 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
   // Demo data is off until an owner or a system Admin turns it on.
   server.get(
     '/org-settings/demo-data',
-    { schema: { response: { 200: OrgDemoDataSettings } } },
+    {
+      config: { permission: 'settings:write' },
+      schema: { response: { 200: OrgDemoDataSettings } },
+    },
     async (req) => {
       if (!(await canEditDemoData(req))) {
         throw server.httpErrors.forbidden('Only the owner or an admin can change demo data');
@@ -337,7 +340,10 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.put(
     '/org-settings/demo-data',
-    { schema: { body: OrgDemoDataSettingsUpdate, response: { 200: OrgDemoDataSettings } } },
+    {
+      config: { permission: 'settings:write' },
+      schema: { body: OrgDemoDataSettingsUpdate, response: { 200: OrgDemoDataSettings } },
+    },
     async (req) => {
       if (!(await canEditDemoData(req))) {
         throw server.httpErrors.forbidden('Only the owner or an admin can change demo data');
