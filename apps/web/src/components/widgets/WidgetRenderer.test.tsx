@@ -21,6 +21,11 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+const permissionMocks = vi.hoisted(() => ({ reportsWrite: true }));
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasPermission: (key: string) => key === 'reports:write' && permissionMocks.reportsWrite,
+}));
+
 import { WidgetRenderer } from './WidgetRenderer';
 
 const widgetBase: DashboardWidget = {
@@ -47,6 +52,7 @@ function renderWidget(widget: DashboardWidget) {
 
 afterEach(() => {
   vi.mocked(api).mockReset();
+  permissionMocks.reportsWrite = true;
 });
 
 describe('WidgetRenderer report binding', () => {
@@ -80,6 +86,29 @@ describe('WidgetRenderer report binding', () => {
         expect.objectContaining({ queryKey: ['dashboards', 'widgets', widgetBase.dashboardId] }),
       ),
     );
+  });
+
+  it('does not POST /reports/:id/run when the viewer lacks reports:write', async () => {
+    permissionMocks.reportsWrite = false;
+    const reportId = '22222222-2222-4222-8222-222222222222';
+    vi.mocked(api).mockResolvedValue({
+      id: '33333333-3333-4333-8333-333333333333',
+      reportId,
+      status: 'done',
+      result: [{ value: 1 }],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    renderWidget({ ...widgetBase, reportId, config: {} });
+
+    await Promise.resolve();
+    const posted = vi.mocked(api).mock.calls.some((call) => {
+      const [path, opts] = call;
+      return (
+        String(path) === `/api/reports/${reportId}/run` &&
+        (opts as { method?: string } | undefined)?.method === 'POST'
+      );
+    });
+    expect(posted).toBe(false);
   });
 
   it('does not run a report that already has a latestRunId', async () => {

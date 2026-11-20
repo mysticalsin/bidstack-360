@@ -7,7 +7,7 @@
 // stable ids, so this asserts the plan the seed writes instead of inserting
 // a second copy.
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
@@ -17,7 +17,33 @@ import {
   seedAnalyticsCommandCenter,
 } from './seed-analytics-dashboard.js';
 
+const COMMAND_CENTER_NAMESPACE = '6f0e2a14-9c3b-4d5e-8f71-0a1b2c3d4e5f';
+
+function uuidV5(name: string, namespace: string): string {
+  const ns = Buffer.from(namespace.replace(/-/g, ''), 'hex');
+  const hash = createHash('sha1').update(ns).update(name, 'utf8').digest();
+  const bytes = Buffer.from(hash.subarray(0, 16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x50;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 describe('command center seed plan', () => {
+  it('derives a uuid v5 id from the org id and a stable key', async () => {
+    const mod = await import('./seed-analytics-dashboard.js');
+    const orgId = '11111111-1111-4111-8111-111111111111';
+    const plan = mod.commandCenterPlan(orgId);
+    expect(plan.dashboardId).toBe(uuidV5(`${orgId}:dashboard`, COMMAND_CENTER_NAMESPACE));
+    expect(plan.reports.find((report) => report.name === 'Open pipeline')?.id).toBe(
+      uuidV5(`${orgId}:report:open-pipeline`, COMMAND_CENTER_NAMESPACE),
+    );
+    expect(plan.widgets.find((widget) => widget.title === 'Weighted Pipeline')?.id).toBe(
+      uuidV5(`${orgId}:widget:weighted-pipeline`, COMMAND_CENTER_NAMESPACE),
+    );
+    expect(plan.dashboardId).not.toBe(mod.commandCenterPlan(`${orgId}-other`).dashboardId);
+  });
+
   it('attaches a pipeline-sum report and a deal-count report to the two widgets', () => {
     const byName = new Map(COMMAND_CENTER_REPORTS.map((report) => [report.name, report]));
     const pipeline = byName.get('Open pipeline');
