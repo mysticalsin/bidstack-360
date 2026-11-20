@@ -1,9 +1,13 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { prisma, type Prisma } from '@bidstack/db';
+import { prisma, readCompanyIntelSummaries, type Prisma } from '@bidstack/db';
 import {
   Company,
+  COMPANY_INTEL_VIEWS,
+  CompanyIntelSummary,
+  CompanyIntelView,
+  IntelDirection,
   CompanyCreate,
   CompanyDetail,
   CompanyPatch,
@@ -11,12 +15,39 @@ import {
   type CompanyHierarchyNode,
 } from '@bidstack/shared';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
+import { queueFirstAccountIntel } from '../queues/account-intel.js';
+import { queueCompanyTechDetect } from '../queues/company-tech-detect.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
-import { invalidateDashboardSnapshotCache } from './crm/dashboard.js';
 
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
+
+/** A list row: the company plus its stored intel summary (null until the first refresh). */
+const CompanyListItem = Company.extend({ intel: CompanyIntelSummary.nullable() });
+
+/** Saved views and filters on the stored summary columns. */
+function intelFilter(q: {
+  view?: CompanyIntelView;
+  direction?: IntelDirection;
+  minRevenueUsd?: number;
+  minNewRoles30d?: number;
+}): Prisma.CompanyWhereInput {
+  const v = q.view ? COMPANY_INTEL_VIEWS[q.view] : null;
+  const minRevenue = q.minRevenueUsd ?? (v && 'minRevenueUsd' in v ? v.minRevenueUsd : undefined);
+  const minNew = q.minNewRoles30d ?? (v && 'minNewRoles30d' in v ? v.minNewRoles30d : undefined);
+  const direction = q.direction ?? (v && 'direction' in v ? v.direction : undefined);
+  const where: Prisma.CompanyIntelSummaryWhereInput = {
+    ...(minRevenue !== undefined ? { revenueUsdApprox: { gte: minRevenue } } : {}),
+    ...(minNew !== undefined ? { newRoles30d: { gte: minNew } } : {}),
+    ...(direction ? { direction } : {}),
+  };
+  return Object.keys(where).length ? { intelSummary: { is: where } } : {};
+}
+
+/** Per-relation row cap on GET /companies/:id; the full lists have their own paginated routes. */
+const COMPANY_DETAIL_RELATED_CAP = 200;
 
 export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -29,9 +60,16 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           industry: z.string().max(100).optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
           cursor: z.string().uuid().optional(),
+          view: CompanyIntelView.optional(),
+          direction: IntelDirection.optional(),
+          minRevenueUsd: z.coerce.number().min(0).optional(),
+          minNewRoles30d: z.coerce.number().int().min(0).optional(),
         }),
         response: {
-          200: z.object({ items: z.array(Company), nextCursor: z.string().uuid().optional() }),
+          200: z.object({
+            items: z.array(CompanyListItem),
+            nextCursor: z.string().uuid().optional(),
+          }),
         },
       },
     },
@@ -41,12 +79,14 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       // /crm/companies/search: a restricted user must not list or search
       // companies outside their access groups through this older route.
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const canIntel = await server.hasPermission(req, 'account-intel:read');
       const items = await prisma.company.findMany({
         where: applyCompanyScope(
           {
             orgId: req.auth.orgId,
             deletedAt: null,
             ...(req.query.industry ? { industry: req.query.industry } : {}),
+            ...(canIntel ? intelFilter(req.query) : {}),
             ...(s
               ? {
                   OR: [
@@ -89,8 +129,18 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       const hasMore = items.length > req.query.limit;
       const sliced = hasMore ? items.slice(0, -1) : items;
       const nextCursor = hasMore ? sliced[sliced.length - 1]?.id : undefined;
+      const intel = canIntel
+        ? await readCompanyIntelSummaries(
+            prisma,
+            req.auth.orgId,
+            sliced.map((c) => c.id),
+          )
+        : new Map<string, never>();
 
-      return { items: sliced.map(serializeCompany), nextCursor };
+      return {
+        items: sliced.map((c) => ({ ...serializeCompany(c), intel: intel.get(c.id) ?? null })),
+        nextCursor,
+      };
     },
   );
 
@@ -106,16 +156,28 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const c = await prisma.company.findFirst({
-        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
+        where: applyCompanyScope(
+          { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          scope,
+        ),
         include: {
           parent: { select: { id: true, name: true } },
-          children: { where: { deletedAt: null }, select: { id: true, name: true } },
+          children: {
+            where: { deletedAt: null },
+            select: { id: true, name: true },
+            orderBy: { name: 'asc' },
+            take: COMPANY_DETAIL_RELATED_CAP,
+          },
           contacts: {
             where: { deletedAt: null },
             select: { id: true, name: true, role: true, email: true, phone: true },
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+            take: COMPANY_DETAIL_RELATED_CAP,
           },
           opportunities: {
             where: { deletedAt: null },
+            orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+            take: COMPANY_DETAIL_RELATED_CAP,
             select: {
               id: true,
               code: true,
@@ -129,6 +191,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           serviceCases: {
             where: { deletedAt: null, status: { not: 'closed' } },
             select: { id: true, number: true, subject: true, status: true, priority: true },
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+            take: COMPANY_DETAIL_RELATED_CAP,
           },
           notes: {
             where: { deletedAt: null },
@@ -179,8 +243,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           parentId: body.parentId,
           orgId: req.auth.orgId,
           source: 'manual',
-          // The column cannot be null. 0 means not scored. A typed name is not a 100% match.
-          confidence: 0,
+          confidence: 1,
         },
       });
       await prisma.auditLog.create({
@@ -192,6 +255,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           targetId: c.id,
         },
       });
+      queueCompanyTechDetect([{ kind: 'refresh', orgId: req.auth.orgId, companyId: c.id, reason: 'create' }]);
+      await queueFirstAccountIntel(prisma, { orgId: req.auth.orgId, companyId: c.id, requestedBy: req.auth.userId });
       reply.status(201);
       return serializeCompany(c);
     },
@@ -220,18 +285,31 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           select: { id: true },
         });
         if (!parent) throw server.httpErrors.badRequest('Parent company not found');
-        // Prevent circular reference
+        // Prevent circular reference. The visited set also stops the walk on an
+        // existing corrupt cycle above the new parent (parentId has no DB-level
+        // acyclicity constraint), which would otherwise loop forever.
         let currentId: string | null = patch.parentId;
+        const visited = new Set<string>();
         while (currentId) {
-          if (currentId === req.params.id) {
+          if (currentId === req.params.id || visited.has(currentId)) {
             throw server.httpErrors.badRequest('Circular reference detected');
           }
+          visited.add(currentId);
           const row: { parentId: string | null } | null = await prisma.company.findFirst({
             where: { id: currentId, orgId: req.auth.orgId, deletedAt: null },
             select: { parentId: true },
           });
           currentId = row?.parentId ?? null;
         }
+      }
+      if (patch.customFieldValues?.length) {
+        const foreign = await foreignCustomFieldDefinitions(
+          req.auth.orgId,
+          'company',
+          patch.customFieldValues.map((v) => v.definitionId),
+        );
+        if (foreign.length > 0)
+          throw server.httpErrors.badRequest('Unknown custom field definition');
       }
       // CF upserts included in the same transaction so a CF failure rolls back
       // the company update — prevents partial-update / data corruption (P0 #5).
@@ -281,10 +359,8 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       ]);
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
       // v23: a tier change starts or stops the financials schedule right away.
-      if (patch.tier !== undefined && patch.tier !== null) {
+      if (patch.tier !== undefined && patch.tier !== null)
         await syncAccountFinancialsSchedule(req.auth.orgId, req.params.id);
-      }
-      if (patch.legalName !== undefined) invalidateDashboardSnapshotCache(req.auth.orgId);
 
       const changedFields: string[] = [];
       const changes: Record<string, unknown> = {};
@@ -327,7 +403,10 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await getAccessScope(req.auth.orgId, req.auth.userId);
       const root = await prisma.company.findFirst({
-        where: applyCompanyScope({ id: req.params.id, orgId: req.auth.orgId, deletedAt: null }, scope),
+        where: applyCompanyScope(
+          { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+          scope,
+        ),
         select: { id: true, name: true, parentId: true },
       });
       if (!root) throw server.httpErrors.notFound('Company not found');

@@ -21,6 +21,8 @@ import {
   type FileAttachment,
 } from '@bidstack/shared';
 
+import { fileAttachmentCaption, shownFileAttachments } from './file-attachment-caption';
+
 interface FilesPanelProps {
   accountId: string;
 }
@@ -37,8 +39,12 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
 
   // Organize the flat file list into library categories (MSA, rate card,
   // win/loss, …) computed from the filename — no schema column needed.
+  const page = useMemo(
+    () => shownFileAttachments(list.data?.items ?? [], list.data?.itemsContinue),
+    [list.data],
+  );
   const grouped = useMemo(() => {
-    const items = list.data?.items ?? [];
+    const items = page.items;
     const byCategory = new Map<DocumentCategory, FileAttachment[]>();
     for (const file of items) {
       const category = classifyDocument(file.name, file.contentType);
@@ -50,7 +56,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
       category,
       files: byCategory.get(category) ?? [],
     }));
-  }, [list.data]);
+  }, [page]);
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -95,9 +101,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
         title={t('files.heading', 'Files')}
         caption={
           list.data
-            ? t('files.attachmentCountScoped', '{{count}} attachment(s) - access follows account groups', {
-                count: list.data.items.length,
-              })
+            ? fileAttachmentCaption(page.items.length, page.pageContinues)
             : t('files.accessScoped', 'Access follows account groups')
         }
         action={
@@ -167,7 +171,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
           title={t('files.loadErrorTitle', "Couldn't load files")}
           message={list.error?.message ?? t('files.unknownError', 'Unknown error')}
         />
-      ) : list.data && list.data.items.length === 0 ? (
+      ) : list.data && page.items.length === 0 ? (
         <p className="px-4 py-8 text-sm text-[var(--fg-secondary)]">
           {t('files.emptyTitle', 'No files yet')}
           {'. '}

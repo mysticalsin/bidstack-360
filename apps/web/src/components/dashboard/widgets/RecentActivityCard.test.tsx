@@ -1,51 +1,56 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import { RecentActivityCard, activitySubtitle } from './RecentActivityCard';
+import { RecentActivityCard } from './RecentActivityCard';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (_key: string, fallback: string) => fallback,
-  }),
-}));
-
-vi.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...rest }: { children?: React.ReactNode }) => <div {...rest}>{children}</div>,
-  },
-}));
-
-describe('activitySubtitle', () => {
-  it('turns a stored stage key into words', () => {
-    // WHY: the dashboard was showing closed_lost as a raw key next to the deal.
-    expect(activitySubtitle('closed_lost')).toBe('Closed Lost');
-    expect(activitySubtitle('s3_technical_iteration')).toBe('S3 Technical Iteration');
-    expect(activitySubtitle('in_progress')).toBe('In Progress');
-  });
-});
+afterEach(cleanup);
 
 describe('RecentActivityCard', () => {
-  afterEach(cleanup);
-
-  it('does not print the raw stage key', () => {
+  it('shows stage and status codes as readable labels', () => {
     render(
       <MemoryRouter>
         <RecentActivityCard
           activity={[
             {
               type: 'opportunity',
-              title: 'Workspace consolidation',
-              subtitle: 'closed_lost',
-              date: '2026-10-31T12:00:00.000Z',
-              url: '/opportunities/1',
+              title: 'Core banking renewal',
+              subtitle: 's4_negotiation',
+              date: new Date().toISOString(),
+              url: '/opportunities/opp-1',
+            },
+            {
+              type: 'task',
+              title: 'Send pricing annex',
+              subtitle: 'in_progress',
+              date: new Date().toISOString(),
+              url: null,
             },
           ]}
         />
       </MemoryRouter>,
     );
+    expect(screen.getByText('S4 Negotiation')).toBeTruthy();
+    expect(screen.getByText('In Progress')).toBeTruthy();
+    expect(screen.queryByText('s4_negotiation')).toBeNull();
+  });
 
-    expect(screen.getByText('Closed Lost')).toBeTruthy();
-    expect(screen.queryByText('closed_lost')).toBeNull();
+  it('does not link to a page that does not exist', () => {
+    // WHY: /activities is not a route. A "view all" link lands on Page not found.
+    const activity = Array.from({ length: 9 }, (_, index) => ({
+      type: 'opportunity',
+      title: `Deal ${index}`,
+      subtitle: null,
+      date: new Date(Date.UTC(2026, 10, 12, index)).toISOString(),
+      url: `/opportunities/opp-${index}`,
+    }));
+    render(
+      <MemoryRouter>
+        <RecentActivityCard activity={activity} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: /view all/i })).toBeNull();
+    expect(document.querySelector('a[href="/activities"]')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Deal 0' })).toBeTruthy();
   });
 });

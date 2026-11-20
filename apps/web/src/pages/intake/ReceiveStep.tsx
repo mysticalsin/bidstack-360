@@ -123,7 +123,7 @@ export function ReceiveStep({
         <p className="mt-1 text-xs text-[var(--fg-secondary)]">
           {t('crm.receiveStep.dragDropPrefix', 'Drag & drop files here or')}{' '}
           <label
-            className={`text-[var(--brand-primary)] ${
+            className={`text-[var(--brand-primary)] dark:text-[var(--brand-deep)] ${
               canUpload ? 'cursor-pointer hover:underline' : 'cursor-not-allowed opacity-60'
             }`}
           >
@@ -138,13 +138,13 @@ export function ReceiveStep({
             />
           </label>
         </p>
-        <p className="text-[10px] text-[var(--fg-secondary)]">
+        <p className="text-xs text-[var(--fg-secondary)]">
           {t(
             'crm.receiveStep.supportedFormats',
             'PDF, Word, PowerPoint, Excel, text/data, images, audio, and video - up to 50 MB',
           )}
         </p>
-        <p className="text-[10px] text-[var(--fg-secondary)]">
+        <p className="text-xs text-[var(--fg-secondary)]">
           {t(
             'crm.receiveStep.omniparseNote',
             'Omniparse upgrades scans, HEIC images, audio, and video when the worker sidecar is enabled.',
@@ -216,7 +216,7 @@ export function ReceiveStep({
                 <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
                   {f.name}
                 </div>
-                <div className="text-[10px] text-[var(--fg-tertiary)]">
+                <div className="text-xs text-[var(--fg-tertiary)]">
                   {t('crm.receiveStep.fileMeta', '{{type}} - {{size}} KB', {
                     type: f.contentType,
                     size: (f.bytes / 1024).toFixed(0),

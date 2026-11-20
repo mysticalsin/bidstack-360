@@ -19,6 +19,8 @@ export function CurrencySelector() {
     setCurrency,
     enableAutoDetect,
     autoDetect,
+    followOrg,
+    followOrgDefault,
     fetchRates,
     rates,
     ratesLoading,
@@ -124,11 +126,9 @@ export function CurrencySelector() {
             ? t('currencySelector.tooltipRatesUnavailable', 'Rates unavailable: {{error}}', {
                 error: ratesError,
               })
-            : t(
-                'currencySelector.tooltipCurrency',
-                '{{name}} applies only when an amount records a currency. Unspecified amounts stay unspecified.',
-                { name: selected?.name ?? currency },
-              )
+            : t('currencySelector.tooltipCurrency', 'Currency: {{name}}', {
+                name: selected?.name ?? currency,
+              })
         }
       >
         <button
@@ -143,12 +143,12 @@ export function CurrencySelector() {
           aria-haspopup="listbox"
           aria-expanded={open}
         >
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--surface-card)] text-sm text-[var(--fg-primary)] ring-1 ring-[var(--border-subtle)]">
+          <span className="grid h-6 min-w-6 place-items-center whitespace-nowrap rounded-full px-1 bg-[var(--surface-card)] text-sm text-[var(--fg-primary)] ring-1 ring-[var(--border-subtle)]">
             {selected?.symbol ?? currency}
           </span>
           <span className="tb-currency-code leading-none">
             <span className="block text-[10px] font-medium text-[var(--fg-tertiary)]">
-              {t('currencySelector.triggerLabel', 'Display')}
+              {t('currencySelector.triggerLabel', 'Currency')}
             </span>
             <span className="block text-xs font-semibold text-[var(--fg-primary)]">{currency}</span>
           </span>
@@ -184,13 +184,28 @@ export function CurrencySelector() {
                   {selected?.name ?? currency}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{statusText}</p>
-                <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-                  {t(
-                    'currencySelector.unspecifiedNote',
-                    'Does not apply to amounts whose currency was not recorded.',
-                  )}
-                </p>
               </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                title={t(
+                  'currencySelector.workspaceButtonTitle',
+                  'Use the workspace currency from Settings',
+                )}
+                aria-pressed={followOrg}
+                onClick={() => {
+                  followOrgDefault();
+                  setOpen(false);
+                  triggerRef.current?.focus();
+                }}
+                className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${
+                  followOrg
+                    ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]'
+                    : 'border-[var(--border-subtle)] bg-[var(--surface-sunken)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]'
+                }`}
+              >
+                {t('currencySelector.workspaceButton', 'Workspace')}
+              </button>
               <button
                 type="button"
                 title={t(
@@ -211,6 +226,7 @@ export function CurrencySelector() {
                 <Icon name="globe" size={13} ariaHidden />
                 {t('currencySelector.autoButton', 'Auto')}
               </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               {SUPPORTED_CURRENCIES.map((c, index) => {

@@ -31,7 +31,7 @@ import {
 } from 'react';
 
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
+import { api, ApiError, setApiTokenProvider, setAuthInvalidHandler } from '@/lib/api';
 
 const ORG_ADMIN_PERMISSION = 'settings:write';
 import { AUTH_FINGERPRINT_EVENT } from '@/lib/queryCache';
@@ -195,6 +195,8 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
 // The visitor is always an org admin in their demo workspace.
 export const DEMO_TOKEN_KEY = 'bidstack:demo-token';
 export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
+/** Set by an explicit sign-out so /login does not re-enter from the edge identity. */
+export const DEMO_SIGNED_OUT_KEY = 'bidstack:demo-signed-out';
 
 function DemoAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
@@ -251,8 +253,17 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback((cb?: () => void) => {
     localStorage.removeItem(DEMO_TOKEN_KEY);
     localStorage.removeItem(DEMO_EMAIL_KEY);
+    localStorage.setItem(DEMO_SIGNED_OUT_KEY, '1');
     setSignedIn(false);
     writeSessionMarker(null);
+    // Behind the polo-preview Worker this clears the Polo session cookie. An
+    // Access session outlives it, which is what DEMO_SIGNED_OUT_KEY covers.
+    void fetch('/__auth/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: '{}',
+    }).catch(() => undefined);
     cb?.();
   }, []);
 
@@ -456,6 +467,125 @@ class ClerkErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
   }
 }
 
+interface MeIdentity {
+  id: string;
+  email: string | null;
+  name: string | null;
+  role: string;
+}
+
+export interface CfAccessFailure {
+  status: number | null;
+  message: string;
+}
+
+const CfAccessStatusContext = createContext<{
+  failure: CfAccessFailure | null;
+  retry: () => void;
+}>({ failure: null, retry: () => undefined });
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useCfAccessStatus() {
+  return useContext(CfAccessStatusContext);
+}
+
+// The box can be waking up or restoring its snapshot; only 401/403 are final.
+const CF_ACCESS_RETRY_DELAYS_MS = [1000, 2000, 3000, 5000, 8000, 10000, 15000, 15000];
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function isTransientMeFailure(status: number | null): boolean {
+  return status === null || status === 0 || status === 408 || status === 429 || status >= 500;
+}
+
+function CfAccessAuthProvider({ children }: { children: ReactNode }) {
+  const [loaded, setLoaded] = useState(false);
+  const [me, setMe] = useState<MeIdentity | null>(null);
+  const [failure, setFailure] = useState<CfAccessFailure | null>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  useState(() => {
+    setApiTokenProvider(null);
+    return null;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      for (let i = 0; ; i++) {
+        try {
+          const body = await api<MeIdentity>('/api/v1/me');
+          if (cancelled) return;
+          setMe(body);
+          setFailure(null);
+          break;
+        } catch (err) {
+          if (cancelled) return;
+          const status = err instanceof ApiError ? err.status : null;
+          const message = err instanceof Error ? err.message : String(err);
+          if (isTransientMeFailure(status) && i < CF_ACCESS_RETRY_DELAYS_MS.length) {
+            await new Promise((r) => setTimeout(r, CF_ACCESS_RETRY_DELAYS_MS[i]));
+            if (cancelled) return;
+            continue;
+          }
+          setMe(null);
+          setFailure({ status, message });
+          break;
+        }
+      }
+      if (!cancelled) setLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt]);
+
+  const retry = useCallback(() => {
+    setLoaded(false);
+    setFailure(null);
+    setAttempt((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    if (me) writeSessionMarker(`cf-access:${me.id}`);
+  }, [me]);
+
+  const signIn = useCallback((cb?: () => void) => {
+    cb?.();
+  }, []);
+  const signOut = useCallback((cb?: () => void) => {
+    writeSessionMarker(null);
+    setMe(null);
+    cb?.();
+  }, []);
+
+  const fullName = me?.name ?? null;
+  const [firstName, ...rest] = (fullName ?? '').split(' ');
+  const user: AuthUser | null = me
+    ? {
+        id: me.id,
+        firstName: firstName || null,
+        lastName: rest.join(' ') || null,
+        fullName,
+        primaryEmailAddress: me.email ? { emailAddress: me.email } : null,
+      }
+    : null;
+
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoaded: loaded,
+        isSignedIn: Boolean(me),
+        user,
+        role: me?.role ?? null,
+        signIn,
+        signOut,
+      }}
+    >
+      <CfAccessStatusContext.Provider value={{ failure, retry }}>{children}</CfAccessStatusContext.Provider>
+    </AuthContext.Provider>
+  );
+}
+
 export function AuthProvider({
   publishableKey,
   children,
@@ -468,6 +598,9 @@ export function AuthProvider({
   // Public demo deployment: no Clerk, no stub — a per-visitor passwordless door.
   if (authMode === 'demo') {
     return <DemoAuthProvider>{children}</DemoAuthProvider>;
+  }
+  if (authMode === 'cf-access') {
+    return <CfAccessAuthProvider>{children}</CfAccessAuthProvider>;
   }
   const forceClerkAuth = authMode === 'clerk';
   if (!hasKey) {

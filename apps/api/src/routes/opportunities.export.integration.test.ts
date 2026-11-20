@@ -191,7 +191,7 @@ describe('GET /opportunities/export', () => {
     const csv = await fetchExportCsv();
     const cells = csvRowCells(csv, MONEY_CODE);
     expect(cells).not.toBeNull();
-    // Column order: Code, Name, Customer, Stage, Value (currency not recorded), ...
+    // Column order: Code, Name, Customer, Stage, Value (EUR), ...
     const valueCell = cells![4];
     expect(valueCell).toBe(MONEY_EXPECTED_CENTS);
     // Guard the exact regression: the naive Number(bigint)/1e6 form would emit

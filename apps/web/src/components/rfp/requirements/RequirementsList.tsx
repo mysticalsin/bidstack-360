@@ -4,12 +4,14 @@ import { Card } from '@/components/ui/Card';
 import { LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
 import { useRfpRequirements } from '@/hooks/rfp/useRfpRequirements';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
+import { extractedRequirementCaption, shownExtractedRequirements } from './requirement-caption';
 import { RequirementRow } from './RequirementRow';
 
 export function RequirementsList() {
   const { t } = useTranslation('rfp');
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
   const { data, isLoading, isError, error } = useRfpRequirements(bidWorkspaceId);
+  const page = shownExtractedRequirements(data?.items ?? [], data?.requirementsContinue);
 
   return (
     <Card>
@@ -20,7 +22,7 @@ export function RequirementsList() {
           </h2>
           {data && (
             <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-              {t('requirements.count', { count: data.total })}
+              {extractedRequirementCaption(page.items.length, page.pageContinues)}
             </p>
           )}
         </div>
@@ -40,7 +42,7 @@ export function RequirementsList() {
         </div>
       )}
 
-      {!isLoading && !isError && (!data || data.items.length === 0) && (
+      {!isLoading && !isError && (!data || page.items.length === 0) && (
         <div className="p-6">
           <EmptyState
             title={t('requirements.emptyTitle')}
@@ -49,9 +51,9 @@ export function RequirementsList() {
         </div>
       )}
 
-      {data && data.items.length > 0 && (
+      {data && page.items.length > 0 && (
         <ul aria-label={t('requirements.listLabel')} role="list">
-          {data.items.map((req) => (
+          {page.items.map((req) => (
             <RequirementRow key={req.id} requirement={req} />
           ))}
         </ul>

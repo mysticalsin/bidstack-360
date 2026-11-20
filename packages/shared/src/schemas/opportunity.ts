@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CustomFieldValueLite, CustomFieldValueInput } from './custom-fields.js';
 import { IntelPayload } from './intel.js';
+import { QueryBoolean } from './query-boolean.js';
 
 /** @deprecated Use PipelineStage table instead of enum. Kept for seed-data and UI transition. */
 export const OpportunityStage = z.enum([
@@ -58,14 +59,11 @@ export const Opportunity = z.object({
   // schemas below still enforce the canonical OP-NNNN format for supplied codes.
   code: OpportunityCode,
   customer: z.string().min(1).max(255),
-  companyId: z.string().uuid().nullable(),
   name: z.string().min(1).max(255),
   stage: z.string().nullable(),
   pipelineStageId: z.string().uuid().nullable(),
   pipelineStage: PipelineStage.nullable(),
   value: z.number().nonnegative().max(1_000_000_000_000),
-  /** Integer micros. The unit number cannot keep a cent past a safe integer. */
-  valueMicros: z.string().regex(/^\d+$/).optional(),
   probability: z.number().int().min(0).max(100),
   dueDate: z.string().date().nullable(),
   owner: z.string().email().nullable(),
@@ -93,7 +91,6 @@ export type Opportunity = z.infer<typeof Opportunity>;
 
 export const OpportunityCreate = Opportunity.omit({
   id: true,
-  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,
@@ -103,19 +100,16 @@ export const OpportunityCreate = Opportunity.omit({
   bidClass: true,
   fteEstimate: true,
   commitmentLevel: true,
-  valueMicros: true,
 }).extend({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
   pipelineStageId: z.string().uuid().optional().nullable(),
-  valueMicros: z.string().regex(/^\d+$/).optional(),
 });
 export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 
 export const OpportunityPatch = Opportunity.partial().omit({
   id: true,
   code: true,
-  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,
@@ -125,9 +119,7 @@ export const OpportunityPatch = Opportunity.partial().omit({
   bidClass: true,
   fteEstimate: true,
   commitmentLevel: true,
-  valueMicros: true,
 }).extend({
-  valueMicros: z.string().regex(/^\d+$/).optional(),
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and
   // the API 409s when the row changed since — without it, concurrent
@@ -161,6 +153,7 @@ export const OpportunityFilter = z.object({
   stage: OpportunityStage.optional(),
   owner: z.string().optional(),
   industry: Industry.optional(),
+  companyId: z.string().uuid().optional(),
   search: z.string().max(100).optional(),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -169,10 +162,7 @@ export const OpportunityFilter = z.object({
   // (the UI only ever sends one) but the route does not enforce that — both
   // can be combined by a caller if that's ever useful.
   dueWithinDays: z.coerce.number().int().min(0).max(365).optional(),
-  overdue: z.coerce.boolean().optional(),
-  // Closing-this-week asks for open deals only. A date window without this
-  // flag still returns decided deals, which is the Due ≤ 7d list chip.
-  excludeClosed: z.coerce.boolean().optional(),
+  overdue: QueryBoolean.optional(),
 });
 export type OpportunityFilter = z.infer<typeof OpportunityFilter>;
 
@@ -202,6 +192,11 @@ export const OpportunityFull = Opportunity.extend({
       createdAt: z.string().datetime(),
     }),
   ),
+  /**
+   * True when the query read one file past the page and dropped it.
+   * `documents` is that page, not every file. No file total.
+   */
+  documentsContinue: z.boolean().optional(),
   timeline: z.array(z.record(z.unknown())).default([]),
   customFieldValues: z.array(CustomFieldValueLite).optional(),
 });

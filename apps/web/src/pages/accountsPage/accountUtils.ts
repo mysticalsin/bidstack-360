@@ -3,16 +3,13 @@
 // filter labels) and AccountCard (healthTone, healthLabel, sourcePillsFor).
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
-import { compareMicros } from '@/components/dashboard/unspecified-currency';
-
 export type SortKey = 'name' | 'pipeline' | 'health' | 'industry' | 'coverage';
 export type AccountSegmentKey = 'all' | 'enriched' | 'with_tech' | 'needs_data' | 'watch';
 
 export interface AccountRow {
   company: CrmCompany;
   openDeals: number;
-  openDealsMissingProbability: number;
-  pipelineMicros: string;
+  pipelineMicros: number;
   totalDeals: number;
   // Coarse health proxy until real data enhancement lands: weighted-pipeline / open-deals
   // banded into 4 buckets. Real CompanyHealth lives in cockpit; per-account here
@@ -37,25 +34,22 @@ const COVERAGE_NEXT_ACTIONS: Record<string, string> = {
 };
 
 export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow {
-  const matched = deals.filter((d) => d.companyId === company.id);
+  const matched = deals.filter(
+    (d) =>
+      d.companyId === company.id || d.companyName?.toLowerCase() === company.name.toLowerCase(),
+  );
   const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
-  let openDealsMissingProbability = 0;
-  const pipeline = open.reduce((acc, deal) => {
-    // A blank probability is stored as 0. It adds nothing and is not a measured chance.
-    if (deal.probability == null || deal.probability === 0) {
-      openDealsMissingProbability += 1;
-      return acc;
-    }
-    return acc + (BigInt(deal.amountMicros) * BigInt(deal.probability)) / 100n;
-  }, 0n);
-  const pipelineMicros = pipeline.toString();
+  const pipelineMicros = open.reduce(
+    (acc, d) => acc + Math.round(d.amountMicros * ((d.probability ?? 50) / 100)),
+    0,
+  );
   // Health proxy: 0 → critical, <250k → needs_attention, <2M → good, ≥2M → strong.
   const health: AccountRow['health'] =
-    pipeline === 0n
+    pipelineMicros === 0
       ? 'critical'
-      : pipeline < 250_000_000_000n
+      : pipelineMicros < 250_000_000_000
         ? 'needs_attention'
-        : pipeline < 2_000_000_000_000n
+        : pipelineMicros < 2_000_000_000_000
           ? 'good'
           : 'strong';
   const coverageFields = [
@@ -84,7 +78,6 @@ export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow
   return {
     company,
     openDeals: open.length,
-    openDealsMissingProbability,
     pipelineMicros,
     totalDeals: matched.length,
     health,
@@ -97,7 +90,7 @@ export function sortRows(a: AccountRow, b: AccountRow, key: SortKey): number {
     case 'name':
       return a.company.name.localeCompare(b.company.name);
     case 'pipeline':
-      return compareMicros(b.pipelineMicros, a.pipelineMicros);
+      return b.pipelineMicros - a.pipelineMicros;
     case 'health': {
       const order = { strong: 0, good: 1, needs_attention: 2, critical: 3 };
       return order[a.health] - order[b.health];
@@ -105,7 +98,7 @@ export function sortRows(a: AccountRow, b: AccountRow, key: SortKey): number {
     case 'industry':
       return (a.company.industry ?? '').localeCompare(b.company.industry ?? '');
     case 'coverage':
-      return b.coverage.score - a.coverage.score || compareMicros(b.pipelineMicros, a.pipelineMicros);
+      return b.coverage.score - a.coverage.score || b.pipelineMicros - a.pipelineMicros;
   }
 }
 
@@ -135,14 +128,13 @@ export function healthTone(h: AccountRow['health']) {
 }
 
 export function healthLabel(h: AccountRow['health']) {
-  // Pipeline size is not a health score. The word proxy has to travel with the label.
   return h === 'strong'
-    ? 'Strong, proxy'
+    ? 'Strong'
     : h === 'good'
-      ? 'Good, proxy'
+      ? 'Good'
       : h === 'needs_attention'
-        ? 'Watch, proxy'
-        : 'At risk, proxy';
+        ? 'Watch'
+        : 'At risk';
 }
 
 export function titleCase(s: string): string {
@@ -172,6 +164,30 @@ export function techStackPillsFor(company: CrmCompany): string[] {
     return firstItem ? [`${category.label}: ${firstItem}`] : [category.label];
   }) ?? [];
   return items.slice(0, 3);
+}
+
+/** Every technology once, most confident first; the card shows the first three. */
+export function rankedTechFor(company: CrmCompany): Array<{ name: string; category: string }> {
+  const best = new Map<string, { name: string; category: string; confidence: number; order: number }>();
+  let order = 0;
+  for (const category of company.technicalStack ?? []) {
+    for (const item of category.items) {
+      const key = item.name.trim().toLowerCase();
+      if (!key) continue;
+      const prev = best.get(key);
+      if (!prev || item.confidence > prev.confidence) {
+        best.set(key, { name: item.name, category: category.label, confidence: item.confidence, order: prev?.order ?? order });
+      }
+      order++;
+    }
+  }
+  return [...best.values()]
+    .sort((a, b) => b.confidence - a.confidence || a.order - b.order)
+    .map(({ name, category }) => ({ name, category }));
+}
+
+export function topTechFor(company: CrmCompany, max = 3): Array<{ name: string; category: string }> {
+  return rankedTechFor(company).slice(0, max);
 }
 
 export function sourceLabel(source: string): string {

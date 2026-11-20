@@ -25,6 +25,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -215,7 +216,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (dbReachable && orgId) {
     if (groupId) {
-      await prisma.auditLog.deleteMany({ where: { targetType: 'user_group', targetId: groupId } });
+      await purgeAuditRows({ where: { targetType: 'user_group', targetId: groupId } });
       await prisma.userGroupMember.deleteMany({ where: { groupId } });
       await prisma.userGroup.deleteMany({ where: { id: groupId } });
     }

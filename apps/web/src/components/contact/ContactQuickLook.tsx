@@ -119,7 +119,7 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                     ) : null}
                   </dl>
                 </div>
-                <footer className="flex justify-between border-t border-[var(--border-subtle)] px-5 py-2 text-[10px] text-[var(--fg-tertiary)]">
+                <footer className="flex justify-between border-t border-[var(--border-subtle)] px-5 py-2 text-xs text-[var(--fg-tertiary)]">
                   <span>
                     {t('contactQuickLook.footerPress', 'Press')}{' '}
                     <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-sunken)] px-1 py-0.5 font-mono">

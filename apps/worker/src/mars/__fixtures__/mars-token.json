@@ -1,0 +1,5 @@
+{
+  "access_token": "mars-fixture-token",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}

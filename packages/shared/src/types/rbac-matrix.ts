@@ -30,6 +30,7 @@ export type SystemRoleName = (typeof SYSTEM_ROLE_NAMES)[number];
 
 /** All read permissions (resources ending in :read) */
 const ALL_READ: PermissionKey[] = [
+  'account-intel:read',
   'accounts:read',
   'activities:read',
   'agents:read',
@@ -64,6 +65,8 @@ const ALL_READ: PermissionKey[] = [
 ];
 
 const ALL_WRITE: PermissionKey[] = [
+  'access-policies:write',
+  'account-intel:write',
   'accounts:write',
   'activities:write',
   'agents:write',
@@ -107,12 +110,26 @@ function write(...res: string[]): PermissionKey[] {
  * Each entry lists the permissions granted to that role.
  */
 export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> = {
-  // msa:admin (archive MSAs and file versions, edit any MSA) is Admin-only.
-  Admin: [...ALL_READ, ...ALL_WRITE, 'msa:admin'],
+  // msa:admin (archive MSAs and file versions, edit any MSA),
+  // webhooks:replay (re-send a stored payload to an endpoint) and
+  // ingest:write (bulk activity import by API key) are Admin-only.
+  // access-policies:* is Admin-only: the rule set shows how access is
+  // restricted. The API refuses self-approval, so publishing a policy always
+  // takes two admins.
+  Admin: [
+    ...ALL_READ,
+    ...ALL_WRITE,
+    'msa:admin',
+    'webhooks:replay',
+    'ingest:write',
+    'access-policies:read',
+    'access-policies:approve',
+  ],
 
   'Sales Manager': [
     ...ALL_READ,
     ...write(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -132,6 +149,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
   'Account Executive': [
     ...read(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -152,6 +170,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
       'territories',
     ),
     ...write(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -169,6 +188,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
   SDR: [
     ...read(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -187,6 +207,7 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
   'Customer Success': [
     ...read(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -218,6 +239,9 @@ export const RBAC_MATRIX: Record<SystemRoleName, ReadonlyArray<PermissionKey>> =
 
 /** Resources that appear in the permission matrix (for matrix display) */
 export const MATRIX_RESOURCES = [
+  'access-policies',
+  // Account intelligence: hiring, posts, financials and direction (slice 12).
+  'account-intel',
   'accounts',
   'activities',
   'agents',
@@ -228,6 +252,8 @@ export const MATRIX_RESOURCES = [
   'contacts',
   'documents',
   'files',
+  // Inbound activity API (ingest:write, slice 9).
+  'ingest',
   'integrations',
   'invoices',
   'kam',

@@ -11,16 +11,21 @@ import { useContact } from '@/hooks/useContacts';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useTasks } from '@/hooks/useTasks';
 import { useNotes } from '@/hooks/useNotes';
+import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
-import { storedProbabilityLabel } from '@/lib/stored-probability';
 
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
   const contact = useContact(id);
-  const allOpps = useOpportunities({ limit: 100 });
+  // Server-side search narrows to this customer's deals; the exact-name filter
+  // below drops substring matches such as "Globex Labs" for "Globex".
+  const allOpps = useOpportunities({
+    search: contact.data?.customer.slice(0, 100),
+    limit: 200,
+  });
   const allTasks = useTasks();
   const allNotes = useNotes(contact.data?.customer);
 
@@ -88,7 +93,7 @@ export function ContactDetailPage() {
                   {' · '}
                   <Link
                     to={`/companies?search=${encodeURIComponent(c.customer)}`}
-                    className="text-[var(--brand-primary)] hover:underline"
+                    className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                   >
                     {c.customer}
                   </Link>
@@ -119,7 +124,7 @@ export function ContactDetailPage() {
               ) : null}
               {c.sentiment ? (
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                  className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${
                     c.sentiment === 'hot'
                       ? 'bg-[var(--danger-tint)] text-[var(--danger)]'
                       : c.sentiment === 'warm'
@@ -135,7 +140,7 @@ export function ContactDetailPage() {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-wider text-[var(--fg-tertiary)]">
+            <div className="text-xs uppercase tracking-wider text-[var(--fg-tertiary)]">
               {t('contactDetail.added', 'Added')}
             </div>
             <div className="text-sm text-[var(--fg-primary)]">{formatDate(c.createdAt)}</div>
@@ -165,21 +170,16 @@ export function ContactDetailPage() {
                 <li key={o.id} className="px-5 py-3">
                   <Link
                     to={`/opportunities/${o.id}`}
-                    className="text-sm font-medium text-[var(--brand-primary)] hover:underline"
+                    className="text-sm font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
                   >
                     {o.code}
                   </Link>
                   <div className="text-xs text-[var(--fg-secondary)]">{o.name}</div>
-                  <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--fg-tertiary)]">
+                  <div className="mt-1 flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
                     <span className="rounded bg-[var(--surface-subtle)] px-1.5 py-0.5">
                       {o.stage}
                     </span>
-                    <span>
-                      {storedProbabilityLabel(
-                        o.probability,
-                        t('opportunities.probabilityUnrecorded', 'Not recorded'),
-                      )}
-                    </span>
+                    <span>{o.probability}%</span>
                   </div>
                 </li>
               ))}
@@ -215,7 +215,7 @@ export function ContactDetailPage() {
                     </div>
                   </div>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${
                       task.status === 'done'
                         ? 'bg-[var(--success-tint)] text-[var(--success)]'
                         : task.status === 'in_progress'
@@ -261,6 +261,7 @@ export function ContactDetailPage() {
         </Card>
       </div>
 
+      <EmailPanel filter={{ contactId: c.id }} defaultTo={c.email ?? undefined} />
       <CustomFieldValuesSection entityType="contact" entityId={id!} />
 
       {/* Wave 8 — Collaborative scratch-pad: real-time CRDT rich-text. */}

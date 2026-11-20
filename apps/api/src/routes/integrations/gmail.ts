@@ -1,19 +1,14 @@
 /**
- * Gmail OAuth 2.0 routes.
- *
- * WHY: Gmail requires its own OAuth dance separate from Google Calendar
- * because the scopes differ (gmail.send + gmail.readonly vs. calendar scopes).
- * A user may have Google Calendar connected without Gmail and vice-versa.
+ * Google Workspace OAuth 2.0 routes (Gmail + Google Calendar, read-only).
  *
  * Flow:
- *  1. GET /integrations/gmail/oauth/start  — redirect to Google consent
- *  2. GET /integrations/gmail/oauth/callback — exchange code, store token, schedule pull
+ *  1. GET /integrations/gmail/oauth/start    — consent URL (same as
+ *     POST /integrations/workspace/google/connect)
+ *  2. GET /integrations/gmail/oauth/callback — exchange code, store the
+ *     encrypted grant on the `gmail` row
  *
- * Scopes:
- *  - https://www.googleapis.com/auth/gmail.send     — send on behalf of user
- *  - https://www.googleapis.com/auth/gmail.readonly — read inbox (incremental pull)
- *  WHY not gmail.modify: readonly + send is the least-privilege combination for
- *  send+log. We never need to write labels or delete messages.
+ * Scopes (WORKSPACE_READ_SCOPES.google): openid, email, gmail.readonly,
+ * calendar.readonly. Polo never sends or edits mail or events on this grant.
  *
  * State parameter: sealed by lib/oauth-state.ts (org, user, nonce, expiry);
  * the callback is public and single-use.
@@ -23,40 +18,36 @@ import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
+import { readOnlyScopes } from '@bidstack/shared';
 import { encryptToken } from '@bidstack/shared/token-crypto';
+import {
+  NotConfigured,
+  WorkspaceNotConfiguredError,
+  buildConnectUrl,
+  disconnectWorkspace,
+  notConfiguredBody,
+  googleRedirectUri,
+} from '../../services/workspace-connect.service.js';
 import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
 import {
   consumeOAuthState,
-  issueOAuthState,
   OAuthStateError,
   oauthStateHttpStatus,
 } from '../../lib/oauth-state.js';
 import { recordSerumConnectorTestSuccess } from '../../lib/serum-connector-policy.js';
 
-const GMAIL_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-const GMAIL_SCOPES = [
-  'https://www.googleapis.com/auth/gmail.send',
-  'https://www.googleapis.com/auth/gmail.readonly',
-].join(' ');
-
 function clientId(): string {
-  const v = process.env.GMAIL_CLIENT_ID;
+  const v = process.env.GMAIL_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID;
   if (!v) throw new Error('GMAIL_CLIENT_ID is not set');
   return v;
 }
 function clientSecret(): string {
-  const v = process.env.GMAIL_CLIENT_SECRET;
+  const v = process.env.GMAIL_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET;
   if (!v) throw new Error('GMAIL_CLIENT_SECRET is not set');
   return v;
-}
-function redirectUri(): string {
-  return (
-    process.env.GMAIL_REDIRECT_URI ??
-    `${process.env.PUBLIC_API_URL ?? 'http://localhost:4000'}/api/v1/integrations/gmail/oauth/callback`
-  );
 }
 
 export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
@@ -68,46 +59,16 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
     schema: {
       response: {
         200: z.object({ authUrl: z.string().url() }),
+        503: NotConfigured,
       },
     },
     handler: async (req, reply) => {
-      const { userId, orgId } = req.auth;
-
-      // Sealed state (org, user, nonce, expiry); the nonce is stored below so
-      // the public callback can bind it to this user and use it only once.
-      const { state, nonce } = issueOAuthState('gmail', { orgId, userId });
-
-      // Store the raw state payload so callback can verify
-      await prisma.integrationToken.upsert({
-        where: {
-          orgId_userId_provider: { orgId, userId, provider: IntegrationProvider.gmail },
-        },
-        create: {
-          orgId,
-          userId,
-
-          provider: IntegrationProvider.gmail,
-          accessTokenEncrypted: encryptToken('pending'),
-          status: 'revoked',
-          deltaState: { oauthNonce: nonce },
-        },
-        update: {
-          deltaState: { oauthNonce: nonce },
-          status: 'revoked',
-        },
-      });
-
-      const params = new URLSearchParams({
-        client_id: clientId(),
-        redirect_uri: redirectUri(),
-        response_type: 'code',
-        scope: GMAIL_SCOPES,
-        access_type: 'offline',
-        prompt: 'consent',
-        state,
-      });
-
-      return reply.send({ authUrl: `${GMAIL_AUTH_BASE}?${params.toString()}` });
+      try {
+        return reply.send({ authUrl: await buildConnectUrl('google', req.auth.orgId, req.auth.userId) });
+      } catch (err) {
+        if (err instanceof WorkspaceNotConfiguredError) return reply.status(503).send(notConfiguredBody(err));
+        throw err;
+      }
     },
   });
 
@@ -173,7 +134,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
           code,
           client_id: clientId(),
           client_secret: clientSecret(),
-          redirect_uri: redirectUri(),
+          redirect_uri: googleRedirectUri(),
           grant_type: 'authorization_code',
         }).toString(),
       });
@@ -254,9 +215,10 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
           refreshTokenEncrypted: tokens.refresh_token
             ? encryptToken(tokens.refresh_token)
             : undefined,
-          scope: tokens.scope?.split(' ') ?? [],
+          scope: readOnlyScopes(tokens.scope?.split(' ') ?? []),
           expiresAt,
           status: 'active',
+          errorMessage: null,
           externalAccountEmail: externalEmail,
           deltaState: {},
           lastRefreshedAt: new Date(),
@@ -294,16 +256,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
       response: { 204: z.null() },
     },
     handler: async (req, reply) => {
-      const { userId, orgId } = req.auth;
-      await prisma.integrationToken.updateMany({
-        where: {
-          orgId,
-          userId,
-
-          provider: IntegrationProvider.gmail,
-        },
-        data: { status: 'revoked', deletedAt: new Date() },
-      });
+      await disconnectWorkspace('google', req.auth.orgId, req.auth.userId, req.log);
       return reply.status(204).send(null);
     },
   });

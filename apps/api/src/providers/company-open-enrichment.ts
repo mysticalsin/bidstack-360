@@ -12,21 +12,12 @@ import {
 
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
-interface OpenCompanyInput {
+export interface OpenCompanyInput {
   name: string;
   domain?: string | null;
   website?: string | null;
   now?: Date;
   fetchImpl?: FetchLike;
-}
-
-export interface PublicCompanyFacts {
-  description: string | null;
-  headquarters: string | null;
-  chiefExecutive: string | null;
-  stockExchange: string | null;
-  revenueLabel: string | null;
-  revenueCurrency: string | null;
 }
 
 export interface OpenCompanyProfile {
@@ -41,16 +32,94 @@ export interface OpenCompanyProfile {
   employeeCount: number | null;
   incorporationDate: string | null;
   industryLabels: string[];
-  /** Major-unit revenue from a public claim. Currency is set only for a known unit. */
-  revenueAmount: number | null;
-  /** Original decimal text, so a large claim is not rounded before it is stored. */
-  revenueAmountText: string | null;
-  revenueCurrency: string | null;
-  publicFacts: PublicCompanyFacts;
+  /** Wikidata P2123 total revenue, latest point in time. Absent for Seamless profiles. */
+  revenue?: OpenRevenue | null;
+  /** Wikidata P1128 employees, with the year it states when it has one. Absent for Seamless profiles. */
+  employees?: OpenEmployees | null;
   confidenceBps: number;
   sourceAttribution: SourceAttribution[];
   providerMetadata: Record<string, unknown>;
 }
+
+/** A public revenue figure with the link that proves it. Amount in major units of `currency`. */
+export interface OpenRevenue {
+  amount: number;
+  currency: string;
+  /** As precise as Wikidata states it: YYYY, YYYY-MM or YYYY-MM-DD. */
+  pointInTime: string;
+  year: number;
+  sourceUrl: string;
+  sourceLabel: 'Wikidata';
+}
+
+/** A public headcount with the link that proves it. `year` is null when Wikidata gives no point in time. */
+export interface OpenEmployees {
+  count: number;
+  pointInTime: string | null;
+  year: number | null;
+  sourceUrl: string;
+  sourceLabel: 'Wikidata';
+}
+
+/**
+ * The Wikidata facts Polo keeps whichever profile provider wins the profile.
+ * Seamless replaces the profile, never these.
+ */
+export interface WikidataFacts {
+  wikidataId: string | null;
+  revenue: OpenRevenue | null;
+  employees: OpenEmployees | null;
+}
+
+export function wikidataFactsOf(profile: OpenCompanyProfile | null | undefined): WikidataFacts | null {
+  if (!profile || profile.providerMetadata.openDataProvider !== 'wikidata_wikimedia') return null;
+  const id = profile.providerMetadata.wikidataId;
+  return { wikidataId: typeof id === 'string' ? id : null, revenue: profile.revenue ?? null, employees: profile.employees ?? null };
+}
+
+/**
+ * Wikidata facts for the profile that won. When Seamless won the profile, the
+ * keyless Wikidata lookup still runs (unless `enabled` is false) so a public,
+ * linked revenue figure is not lost. A failed lookup returns null and the
+ * caller keeps what it stored before.
+ */
+export async function resolveWikidataFacts({
+  profile,
+  seamlessWon,
+  enabled,
+  input,
+  fetchOpen = fetchOpenCompanyProfile,
+}: {
+  profile: OpenCompanyProfile | null;
+  seamlessWon: boolean;
+  enabled: boolean;
+  input: OpenCompanyInput;
+  fetchOpen?: (input: OpenCompanyInput) => Promise<OpenCompanyProfile | null>;
+}): Promise<WikidataFacts | null> {
+  if (!seamlessWon) return wikidataFactsOf(profile);
+  if (!enabled) return null;
+  return wikidataFactsOf(await fetchOpen(input).catch(() => null));
+}
+
+/** Wikidata currency items for the currencies Polo formats. Unknown units are dropped, never guessed. */
+const CURRENCY_QID: Record<string, string> = {
+  Q4917: 'USD',
+  Q4916: 'EUR',
+  Q25224: 'GBP',
+  Q25344: 'CHF',
+  Q8146: 'JPY',
+  Q132643: 'NOK',
+  Q122922: 'SEK',
+  Q25417: 'DKK',
+  Q1104069: 'CAD',
+  Q259502: 'AUD',
+  Q39099: 'CNY',
+  Q80524: 'INR',
+  Q173117: 'BRL',
+  Q202040: 'KRW',
+  Q4730: 'MXN',
+  Q123213: 'PLN',
+};
 
 interface WikidataSearchResult {
   id?: string;
@@ -59,7 +128,7 @@ interface WikidataSearchResult {
   concepturi?: string;
 }
 
-interface WikidataEntity {
+export interface WikidataEntity {
   id?: string;
   labels?: Record<string, { value?: string }>;
   descriptions?: Record<string, { value?: string }>;
@@ -85,50 +154,9 @@ const PROPERTY = {
   inception: 'P571',
   employeeCount: 'P1128',
   industry: 'P452',
-  officialName: 'P1448',
-  revenue: 'P2139',
-  headquarters: 'P159',
-  country: 'P17',
-  chiefExecutive: 'P169',
-  stockExchange: 'P414',
+  totalRevenue: 'P2123',
+  pointInTime: 'P585',
 } as const;
-
-/** Wikidata currency items whose ISO code is not a guess. */
-const CURRENCY_CODE: Record<string, string> = {
-  Q4917: 'USD',
-  Q4916: 'EUR',
-  Q25224: 'GBP',
-  Q132643: 'NOK',
-};
-
-export function toPublicPreview(profile: OpenCompanyProfile | null): {
-  name: string;
-  legalName: string | null;
-  domain: string | null;
-  website: string | null;
-  description: string | null;
-  headquarters: string | null;
-  employeeCount: number | null;
-  revenueLabel: string | null;
-  industry: string | null;
-} | null {
-  if (!profile) return null;
-  const name = profile.tradeName?.trim() || profile.legalName?.trim() || '';
-  if (!name && !profile.domain) return null;
-  const count = profile.employeeCount;
-  const employeeCount = count !== null && Number.isInteger(count) && count >= 0 ? count : null;
-  return {
-    name: name || profile.domain || '',
-    legalName: profile.legalName,
-    domain: profile.domain,
-    website: profile.website,
-    description: profile.description,
-    headquarters: profile.publicFacts.headquarters,
-    employeeCount,
-    revenueLabel: profile.publicFacts.revenueLabel,
-    industry: profile.industryLabels[0] ?? null,
-  };
-}
 
 export async function fetchOpenCompanyProfile({
   name,
@@ -167,61 +195,36 @@ export async function fetchOpenCompanyProfile({
   const imageFile = claimString(entity, PROPERTY.image);
   const logoUrl = logoFile ? commonsFileUrl(logoFile) : null;
   const wikimediaImageUrl = imageFile ? commonsFileUrl(imageFile) : null;
-  const employeeCount = claimQuantity(entity, PROPERTY.employeeCount)?.amount ?? null;
-  const revenue = claimQuantity(entity, PROPERTY.revenue);
+  const employeeCount = claimQuantity(entity, PROPERTY.employeeCount);
   const incorporationDate = claimDate(entity, PROPERTY.inception);
   const wikipediaTitle = entity.sitelinks?.enwiki?.title ?? null;
   const summary = wikipediaTitle ? await fetchWikipediaSummary(wikipediaTitle, fetchImpl) : null;
   const imageUrl =
     wikimediaImageUrl ?? summary?.thumbnail?.source ?? summary?.originalimage?.source ?? null;
   const pageUrl = summary?.content_urls?.desktop?.page ?? entity.sitelinks?.enwiki?.url ?? null;
-  const placeIds = [
-    ...claimEntityIds(entity, PROPERTY.industry),
-    ...claimEntityIds(entity, PROPERTY.headquarters),
-    ...claimEntityIds(entity, PROPERTY.country),
-    ...claimEntityIds(entity, PROPERTY.chiefExecutive),
-    ...claimEntityIds(entity, PROPERTY.stockExchange),
-    ...(revenue?.unitId ? [revenue.unitId] : []),
-  ];
-  const labels = await entityLabels(placeIds, fetchImpl);
-  const industryLabels = claimEntityIds(entity, PROPERTY.industry)
-    .map((id) => labels.get(id))
-    .filter((item): item is string => Boolean(item));
-  const headquartersPlace =
-    labels.get(claimEntityIds(entity, PROPERTY.headquarters)[0] ?? '') ?? null;
-  const country = labels.get(claimEntityIds(entity, PROPERTY.country)[0] ?? '') ?? null;
-  const headquarters = [headquartersPlace, country].filter(Boolean).join(', ') || null;
-  const revenueCurrency = revenue?.unitId ? (CURRENCY_CODE[revenue.unitId] ?? null) : null;
-  const revenueUnit = revenue?.unitId ? (labels.get(revenue.unitId) ?? null) : null;
-  const revenueLabel = revenue
-    ? `${formatPublicAmount(revenue.amountText)} ${revenueCurrency ?? revenueUnit ?? ''}`.trim()
-    : null;
-  const publicFacts: PublicCompanyFacts = {
-    description: clipText(summary?.extract ?? description),
-    headquarters,
-    chiefExecutive: labels.get(claimEntityIds(entity, PROPERTY.chiefExecutive)[0] ?? '') ?? null,
-    stockExchange: labels.get(claimEntityIds(entity, PROPERTY.stockExchange)[0] ?? '') ?? null,
-    revenueLabel,
-    revenueCurrency,
-  };
+  const industryLabels = claimEntityIds(entity, PROPERTY.industry);
+  const revenue = latestWikidataRevenue(entity);
+  const employees = latestWikidataEmployees(entity);
+  const confidence = Math.min(0.94, Math.max(0.68, best.score));
 
   return {
-    legalName: claimText(entity, PROPERTY.officialName),
+    legalName: label,
     tradeName: label,
     domain: resolvedDomain,
     website: resolvedWebsite,
-    description: publicFacts.description,
+    description: summary?.extract ?? description,
     logoUrl,
     logoSource: logoUrl ? 'wikimedia' : null,
     imageUrl,
     employeeCount,
     incorporationDate,
-    industryLabels,
-    revenueAmount: revenue?.amount ?? null,
-    revenueAmountText: revenue?.amountText ?? null,
-    revenueCurrency,
-    publicFacts,
-    confidenceBps: 0,
+    industryLabels: [
+      ...(description ? [description] : []),
+      ...industryLabels.map((id) => `Wikidata industry ${id}`),
+    ].slice(0, 6),
+    revenue,
+    employees,
+    confidenceBps: Math.round(confidence * 10_000),
     sourceAttribution: [
       attribution({
         source: 'wikidata',
@@ -229,7 +232,7 @@ export async function fetchOpenCompanyProfile({
         sourceUrl:
           best.result.concepturi ?? `https://www.wikidata.org/wiki/${entity.id ?? best.result.id}`,
         fetchedAt: now,
-        confidence: null,
+        confidence,
         providerMetadata: {
           wikidataId: entity.id ?? best.result.id ?? null,
           matchedLabel: label,
@@ -244,8 +247,8 @@ export async function fetchOpenCompanyProfile({
               label: 'Wikipedia summary and media',
               sourceUrl: pageUrl,
               fetchedAt: now,
-              confidence: null,
-              providerMetadata: { wikipediaTitle, confidenceBasis: 'not_scored' },
+              confidence: Math.max(0.6, confidence - 0.08),
+              providerMetadata: { wikipediaTitle },
             }),
           ]
         : []),
@@ -257,13 +260,68 @@ export async function fetchOpenCompanyProfile({
       wikipediaTitle,
       wikipediaUrl: pageUrl,
       wikipediaExtract: summary?.extract ?? null,
-      publicFacts,
       logoFile,
       imageFile,
       companyImageUrl: imageUrl,
+      revenue,
+      employees,
       openDataProvider: 'wikidata_wikimedia',
     },
   };
+}
+
+/** Latest non-deprecated P2123 statement that has a point in time and a known currency. */
+export function latestWikidataRevenue(entity: WikidataEntity): OpenRevenue | null {
+  const id = entity.id;
+  if (!id) return null;
+  let best: { raw: string; preferred: boolean; value: OpenRevenue } | null = null;
+  for (const claim of entity.claims?.[PROPERTY.totalRevenue] ?? []) {
+    if (!isRecord(claim) || claim.rank === 'deprecated') continue;
+    const value = isRecord(claim.mainsnak) && isRecord(claim.mainsnak.datavalue) ? claim.mainsnak.datavalue.value : null;
+    if (!isRecord(value) || typeof value.amount !== 'string' || typeof value.unit !== 'string') continue;
+    const amount = Number(value.amount);
+    const currency = CURRENCY_QID[value.unit.split('/').pop() ?? ''];
+    if (!Number.isFinite(amount) || amount <= 0 || !currency) continue;
+    const raw = qualifierTime(claim, PROPERTY.pointInTime);
+    const match = raw?.match(/^\+?(\d{4})-(\d{2})-(\d{2})/);
+    if (!raw || !match) continue;
+    const [, y, m, d] = match;
+    const pointInTime = m === '00' ? y! : d === '00' ? `${y}-${m}` : `${y}-${m}-${d}`;
+    const preferred = claim.rank === 'preferred';
+    const candidate = { raw, preferred, value: { amount, currency, pointInTime, year: Number(y), sourceUrl: `https://www.wikidata.org/wiki/${id}#${PROPERTY.totalRevenue}`, sourceLabel: 'Wikidata' as const } };
+    if (!best || raw > best.raw || (raw === best.raw && preferred && !best.preferred)) best = candidate;
+  }
+  return best?.value ?? null;
+}
+
+/** Latest non-deprecated P1128 statement: dated ones by point in time, an undated one only when nothing is dated. */
+export function latestWikidataEmployees(entity: WikidataEntity): OpenEmployees | null {
+  const id = entity.id;
+  if (!id) return null;
+  let best: { raw: string; preferred: boolean; value: OpenEmployees } | null = null;
+  for (const claim of entity.claims?.[PROPERTY.employeeCount] ?? []) {
+    if (!isRecord(claim) || claim.rank === 'deprecated') continue;
+    const value = isRecord(claim.mainsnak) && isRecord(claim.mainsnak.datavalue) ? claim.mainsnak.datavalue.value : null;
+    if (!isRecord(value) || typeof value.amount !== 'string') continue;
+    const amount = Number(value.amount);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const raw = qualifierTime(claim, PROPERTY.pointInTime);
+    const match = raw?.match(/^\+?(\d{4})-(\d{2})-(\d{2})/);
+    const preferred = claim.rank === 'preferred';
+    const [, y, m, d] = match ?? [];
+    const pointInTime = !match ? null : m === '00' ? y! : d === '00' ? `${y}-${m}` : `${y}-${m}-${d}`;
+    const sortKey = match ? raw! : '';
+    const candidate = { raw: sortKey, preferred, value: { count: Math.trunc(amount), pointInTime, year: match ? Number(y) : null, sourceUrl: `https://www.wikidata.org/wiki/${id}#${PROPERTY.employeeCount}`, sourceLabel: 'Wikidata' as const } };
+    if (!best || sortKey > best.raw || (sortKey === best.raw && preferred && !best.preferred)) best = candidate;
+  }
+  return best?.value ?? null;
+}
+
+function qualifierTime(claim: Record<string, unknown>, property: string): string | null {
+  const q = isRecord(claim.qualifiers) ? claim.qualifiers[property] : null;
+  const first = Array.isArray(q) ? q[0] : null;
+  const dv = isRecord(first) && isRecord(first.datavalue) ? first.datavalue.value : null;
+  return isRecord(dv) && typeof dv.time === 'string' ? dv.time : null;
 }
 
 export function faviconProfile({
@@ -295,8 +353,8 @@ export function faviconProfile({
             label: `${name} website favicon fallback`,
             sourceUrl: resolvedWebsite ?? `https://${resolvedDomain}/`,
             fetchedAt: now,
-            confidence: null,
-            providerMetadata: { domain: resolvedDomain, confidenceBasis: 'not_scored' },
+            confidence: 0.58,
+            providerMetadata: { domain: resolvedDomain },
           }),
         ]
       : [],
@@ -385,26 +443,11 @@ function claimString(entity: WikidataEntity, property: string): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function claimText(entity: WikidataEntity, property: string): string | null {
-  const value = claimValue(entity, property);
-  if (typeof value === 'string' && value.trim()) return value.trim();
-  if (isRecord(value) && typeof value.text === 'string' && value.text.trim())
-    return value.text.trim();
-  return null;
-}
-
-function claimQuantity(
-  entity: WikidataEntity,
-  property: string,
-): { amount: number; amountText: string; unitId: string | null } | null {
+function claimQuantity(entity: WikidataEntity, property: string): number | null {
   const value = claimValue(entity, property);
   if (!isRecord(value) || typeof value.amount !== 'string') return null;
-  const amountText = value.amount.trim().replace(/^\+/, '');
-  if (!/^\d+(\.\d+)?$/.test(amountText)) return null;
-  const parsed = Number(amountText);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  const unit = typeof value.unit === 'string' ? (value.unit.split('/').pop() ?? null) : null;
-  return { amount: parsed, amountText, unitId: unit && unit !== '1' ? unit : null };
+  const parsed = Number(value.amount);
+  return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : null;
 }
 
 function claimDate(entity: WikidataEntity, property: string): string | null {
@@ -419,18 +462,8 @@ function claimDate(entity: WikidataEntity, property: string): string | null {
     : candidate;
 }
 
-function rankedClaims(entity: WikidataEntity, property: string): unknown[] {
-  const claims = entity.claims?.[property] ?? [];
-  const rank = (claim: unknown) => {
-    if (!isRecord(claim)) return 0;
-    if (claim.rank === 'deprecated') return 0;
-    return claim.rank === 'preferred' ? 2 : 1;
-  };
-  return claims.filter((claim) => rank(claim) > 0).sort((a, b) => rank(b) - rank(a));
-}
-
 function claimEntityIds(entity: WikidataEntity, property: string): string[] {
-  const claims = rankedClaims(entity, property);
+  const claims = entity.claims?.[property] ?? [];
   return claims
     .map((claim) => {
       if (!isRecord(claim)) return null;
@@ -445,50 +478,8 @@ function claimEntityIds(entity: WikidataEntity, property: string): string[] {
     .filter((id): id is string => id !== null);
 }
 
-async function entityLabels(ids: string[], fetchImpl: FetchLike): Promise<Map<string, string>> {
-  const unique = [...new Set(ids.filter(Boolean))].slice(0, 50);
-  const labels = new Map<string, string>();
-  if (unique.length === 0) return labels;
-  const url = new URL(WIKIDATA_API);
-  url.searchParams.set('action', 'wbgetentities');
-  url.searchParams.set('ids', unique.join('|'));
-  url.searchParams.set('props', 'labels');
-  url.searchParams.set('languages', 'en');
-  url.searchParams.set('format', 'json');
-  url.searchParams.set('origin', '*');
-  try {
-    const json = await fetchJson<{ entities?: Record<string, WikidataEntity> }>(
-      url,
-      fetchImpl,
-      'Wikidata labels',
-    );
-    for (const [id, entity] of Object.entries(json.entities ?? {})) {
-      const label = entity.labels?.en?.value?.trim();
-      if (label) labels.set(id, label);
-    }
-  } catch {
-    return labels;
-  }
-  return labels;
-}
-
-function formatPublicAmount(amountText: string): string {
-  const [whole = '0', frac = ''] = amountText.split('.');
-  const body = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const trimmedFrac = frac.replace(/0+$/, '');
-  return trimmedFrac ? `${body}.${trimmedFrac}` : body;
-}
-
-function clipText(value: string | null): string | null {
-  if (!value) return null;
-  const clean = value.replace(/\s+/g, ' ').trim();
-  if (clean.length <= 360) return clean;
-  const clipped = clean.slice(0, 357).replace(/\s+\S*$/, '');
-  return `${clipped}…`;
-}
-
 function claimValue(entity: WikidataEntity, property: string): unknown {
-  const claim = rankedClaims(entity, property)[0];
+  const claim = entity.claims?.[property]?.[0];
   if (!isRecord(claim)) return null;
   const mainsnak = claim.mainsnak;
   if (!isRecord(mainsnak)) return null;

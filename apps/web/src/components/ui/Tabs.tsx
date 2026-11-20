@@ -38,7 +38,7 @@ export const TabsTrigger = forwardRef<HTMLButtonElement, ComponentProps<typeof R
           // P1 #20: explicit focus ring so keyboard users always have a visible indicator
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1',
           'active:scale-[0.97]',
-          'data-[state=active]:text-[var(--brand-primary)]',
+          'data-[state=active]:text-[var(--brand-primary)] dark:data-[state=active]:text-[var(--brand-deep)]',
           'data-[disabled]:opacity-50 data-[disabled]:pointer-events-none',
           // Active underline: gradient in dark mode, solid in light
           'data-[state=active]:after:content-[""] data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-[var(--brand-primary)] data-[state=active]:after:rounded-full dark:data-[state=active]:after:bg-gradient-to-r dark:data-[state=active]:after:from-[var(--brand-gradient-start)] dark:data-[state=active]:after:to-[var(--brand-gradient-end)]',

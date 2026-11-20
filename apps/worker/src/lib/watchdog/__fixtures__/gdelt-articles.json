@@ -1,0 +1,16 @@
+{
+  "articles": [
+    {
+      "url": "https://news.example/acme-series-c",
+      "title": "Acme Corp (NYSE: ACME) raises $40M Series C led by Atomico",
+      "seendate": "20261029T101500Z",
+      "domain": "news.example"
+    },
+    {
+      "url": "https://other.example/acme-follow",
+      "title": "Series C: Acme Corp raises $40M, led by Atomico",
+      "seendate": "20261029T121500Z",
+      "domain": "other.example"
+    }
+  ]
+}

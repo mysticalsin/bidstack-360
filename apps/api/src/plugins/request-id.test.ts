@@ -46,6 +46,25 @@ describe('request-id correlation', () => {
     await server.close();
   });
 
+  it.each([
+    'has spaces in it',
+    '"quoted","x":1',
+    '<script>alert(1)</script>',
+    'abc12345;rm -rf',
+  ])('replaces an incoming request id with unsafe characters (%s)', async (unsafe) => {
+    const server = await buildServer();
+    server.get('/test-req-id', async (req) => ({ id: req.id }));
+
+    const res = await server.inject({
+      url: '/test-req-id',
+      headers: { 'X-Request-Id': unsafe },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-request-id']).not.toBe(unsafe);
+    expect(res.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/i);
+    await server.close();
+  });
+
   it('ignores too-long incoming request ids and generates a new one', async () => {
     const server = await buildServer();
     server.get('/test-req-id', async (req) => ({ id: req.id }));

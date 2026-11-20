@@ -40,6 +40,8 @@ test.describe('Navigation accessibility', () => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await gotoAndWait('/dashboard');
 
+    // Below 56rem the rail is replaced by the in-place drawer.
+    await page.getByRole('button', { name: 'Open navigation' }).click();
     await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
   });
 

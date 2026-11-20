@@ -46,8 +46,8 @@ function CardPerson({ n, cov }: { n: OrgNode; cov: NodeCov | undefined }) {
   return (
     <span className="oc-card-p">
       <span className="oc-ava" data-ring={cov?.met ? 'met' : 'gap'} aria-hidden="true"><OrgPhoto url={n.photoUrl} name={n.name} /></span>
-      <span className="n">{n.name}</span>
-      <span className="t">{n.title}</span>
+      <span className="n" title={n.name}>{n.name}</span>
+      <span className="t" title={n.title ?? undefined}>{n.title}</span>
     </span>
   );
 }

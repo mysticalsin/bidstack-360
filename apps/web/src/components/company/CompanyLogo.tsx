@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { HoverCard } from '@/components/ui/HoverCard';
 import { buildApiUrl } from '@/lib/api';
+import { cn } from '@/lib/cn';
 import type { CrmLogo } from '@bidstack/shared';
 
 import { displayableLogoUrl } from './logoUrlSafety';
@@ -55,7 +56,7 @@ export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(functio
   const glyph = (
     <span
       ref={ref}
-      className={className}
+      className={cn('text-[var(--brand-primary)] dark:text-[var(--brand-deep)]', className)}
       style={{
         width: size,
         height: size,
@@ -66,9 +67,8 @@ export const CompanyLogo = forwardRef<HTMLSpanElement, CompanyLogoProps>(functio
         overflow: 'hidden',
         flexShrink: 0,
         background: 'var(--brand-primary-tint)',
-        color: 'var(--brand-primary)',
         border: '1px solid var(--border-default)',
-        fontSize: Math.max(11, Math.round(size * 0.3)),
+        fontSize: Math.max(12, Math.round(size * 0.3)),
         fontWeight: 700,
       }}
       title={logo?.attribution?.label ?? t('companyLogo.ariaLabel', '{{name}} logo', { name })}

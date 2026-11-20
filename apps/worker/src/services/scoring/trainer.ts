@@ -7,8 +7,8 @@
  *   - Logistic regression is sufficient for the CRM scoring signal quality (< 1M
  *     samples per org); gradient boosting adds complexity without meaningful gain
  *     at this scale.
- *   - Each org with at least 50 closed records gets its own model.
- *     Fewer closed records stores no model. Synthetic rows are not a substitute.
+ *   - Each org with ≥ 50 closed deals gets its own per-org model.
+ *     Orgs below that threshold use a global baseline trained on synthetic data.
  *
  * Model artifact format:
  *   { weights: number[], bias: number, featureNames: string[], version: string,
@@ -38,6 +38,8 @@ import {
   normaliseColumns,
   computeMetrics,
   MIN_SAMPLES,
+  buildSyntheticLeadSamples,
+  buildSyntheticOppSamples,
 } from './trainer.helpers.js';
 
 // Re-export types so callers (predictive-retrain.ts) get them from this file
@@ -99,8 +101,8 @@ export async function trainOrgModel(
   log.info({ orgId, entityType }, 'starting model training');
 
   // ── Collect closed entities for labeling ──────────────────────────────────
-  const X: number[][] = [];
-  const y: number[] = [];
+  let X: number[][] = [];
+  let y: number[] = [];
   let featureNames: string[] = [];
   let sampleCount: number;
 
@@ -126,8 +128,12 @@ export async function trainOrgModel(
     sampleCount = X.length;
 
     if (sampleCount < MIN_SAMPLES) {
-      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — no model stored');
-      return null;
+      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — using synthetic baseline');
+      const syn = buildSyntheticLeadSamples(featureNames.length || 24);
+      X = syn.X;
+      y = syn.y;
+      featureNames =
+        featureNames.length > 0 ? featureNames : Array.from({ length: 24 }, (_, i) => `f${i}`);
     }
   } else {
     // opportunity
@@ -136,35 +142,31 @@ export async function trainOrgModel(
         orgId,
         deletedAt: null,
         updatedAt: { gte: twelveMonthsAgo },
-        OR: [
-          { stage: 'closed_won' },
-          { stage: 'closed_lost' },
-          { pipelineStage: { deletedAt: null, OR: [{ isWon: true }, { isLost: true }] } },
-        ],
+        pipelineStage: { OR: [{ isWon: true }, { isLost: true }] },
       },
       select: {
         id: true,
-        stage: true,
-        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+        pipelineStage: { select: { isWon: true, isLost: true } },
       },
     });
 
     for (const opp of closedOpps) {
       const fv = await extractOpportunityFeatures(opp.id, orgId, db);
       if (!fv) continue;
-      const live = opp.pipelineStage?.deletedAt ? null : opp.pipelineStage;
-      const lost = opp.stage === 'closed_lost' || live?.isLost === true;
-      const won = !lost && (opp.stage === 'closed_won' || live?.isWon === true);
       X.push(fv.values);
-      y.push(won ? 1 : 0);
+      y.push(opp.pipelineStage?.isWon ? 1 : 0);
       if (featureNames.length === 0) featureNames = fv.names;
     }
 
     sampleCount = X.length;
 
     if (sampleCount < MIN_SAMPLES) {
-      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — no model stored');
-      return null;
+      log.info({ orgId, sampleCount }, 'below MIN_SAMPLES — using synthetic baseline');
+      const syn = buildSyntheticOppSamples(featureNames.length || 12);
+      X = syn.X;
+      y = syn.y;
+      featureNames =
+        featureNames.length > 0 ? featureNames : Array.from({ length: 12 }, (_, i) => `f${i}`);
     }
   }
 

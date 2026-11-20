@@ -3,6 +3,7 @@ import { prisma } from '@bidstack/db';
 import {
   categoryForKind,
   cleanText,
+  initiativeEvidencePage,
   OFFERING_HOOKS,
   stripSamplePrefix,
   themeForText,
@@ -207,11 +208,15 @@ export async function loadInitiatives(
     .map((it) => {
       const kinds = new Set(it.evidence.map((e) => e.kind));
       const score = Math.min(0.95, it.confidenceScore + (kinds.size >= 2 ? 0.1 : 0));
+      const rankedEvidence = it.evidence.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
+      // The extra row only says another evidence item exists. It is not shown.
+      const evidencePage = initiativeEvidencePage(rankedEvidence);
       return {
         ...it,
         confidenceScore: Math.round(score * 100) / 100,
         confidence: label(score),
-        evidence: it.evidence.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? '')).slice(0, 8),
+        evidence: evidencePage.items,
+        evidenceContinues: evidencePage.pageContinues,
       };
     })
     .sort(

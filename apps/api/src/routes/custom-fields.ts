@@ -39,7 +39,9 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const items = await prisma.customFieldDefinition.findMany({
+      // One row past the page is the probe. It is dropped and is not a field total.
+      const CUSTOM_FIELD_LIST_PAGE = 500;
+      const loaded = await prisma.customFieldDefinition.findMany({
         where: {
           orgId: req.auth.orgId,
           entityType: req.query.entityType,
@@ -47,10 +49,13 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           deletedAt: null,
         },
         orderBy: { orderIndex: 'asc' },
-        take: 500,
+        take: CUSTOM_FIELD_LIST_PAGE + 1,
       });
+      const pageContinues = loaded.length > CUSTOM_FIELD_LIST_PAGE;
+      const definitions = pageContinues ? loaded.slice(0, CUSTOM_FIELD_LIST_PAGE) : loaded;
       return {
-        items: items.map((d) => ({
+        pageContinues,
+        items: definitions.map((d) => ({
           id: d.id,
           orgId: d.orgId,
           entityType: d.entityType as EntityTypeEnum,

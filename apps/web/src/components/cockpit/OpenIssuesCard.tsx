@@ -10,7 +10,7 @@ import { springSoft } from '@/lib/motion';
 
 import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
 
-import { severityBg, severityShort, severityTone } from './_tokens';
+import { severityBg, severityTone } from './_tokens';
 
 interface Props {
   risks: RiskItem[];
@@ -27,7 +27,6 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
   );
   const total = openRisks.length + openCompliance.length;
-  const recorded = risks.length + compliance.length;
   // Severity buckets are computed against the full risk list (not just open)
   // so the bar reflects the registry total rather than "what's left today".
   const buckets = [
@@ -56,27 +55,27 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
       tone: 'gray',
     },
   ] as const;
+  const severityLabel: Record<RiskItem['severity'], string> = {
+    critical: buckets[0].labelText,
+    high: buckets[1].labelText,
+    medium: buckets[2].labelText,
+    low: buckets[3].labelText,
+  };
 
   return (
     <Card role="region" aria-label={t('openIssues.regionLabel', 'Open issues by severity')}>
       <SectionHeader
         title={t('openIssues.title', 'Open issues')}
         caption={
-          recorded === 0
-            ? t(
-                'openIssues.captionNoneRecorded',
-                'No risks or compliance checks recorded on this account',
-              )
-            : total === 0
-              ? t('openIssues.captionNoneOpen', 'No open items in the recorded register')
-              : t('openIssues.captionItemsToAction', '{{count}} open item{{plural}}', {
-                  count: total,
-                  plural: total === 1 ? '' : 's',
-                })
+          total === 0
+            ? t('openIssues.captionAllClear', 'All clear')
+            : t('openIssues.captionItemsToAction', '{{count}} item{{plural}} to action', {
+                count: total,
+                plural: total === 1 ? '' : 's',
+              })
         }
       />
       <div style={{ padding: '8px 18px 14px' }}>
-        {recorded > 0 ? (
         <div className="issue-buckets" aria-label={t('openIssues.bucketsLabel', 'Severity buckets')}>
           {buckets.map((bucket, index) => (
             <motion.div
@@ -93,26 +92,10 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
             </motion.div>
           ))}
         </div>
-        ) : null}
         {total === 0 ? (
           <EmptyState
-            icon="warning"
-            title={
-              recorded === 0
-                ? t('openIssues.emptyTitle', 'Nothing recorded')
-                : t('openIssues.noneOpenTitle', 'No open items')
-            }
-            message={
-              recorded === 0
-                ? t(
-                    'openIssues.emptyMessage',
-                    'This account has no risk or compliance rows. That is not a clearance.',
-                  )
-                : t(
-                    'openIssues.noneOpenMessage',
-                    'The recorded register has no open risks or compliance checks.',
-                  )
-            }
+            title={t('openIssues.emptyTitle', 'No open issues')}
+            message={t('openIssues.emptyMessage', 'No risks or compliance checks are recorded for this account yet.')}
           />
         ) : (
           <ul className="open-issues">
@@ -124,9 +107,9 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                 transition={{ ...springSoft, delay: reducedMotion ? 0 : index * 0.04 }}
               >
                 <span className="oi-count" style={{ background: severityBg(r.severity) }}>
-                  {severityShort(r.severity)}
+                  {severityLabel[r.severity]}
                 </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="oi-body">
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
                     {r.title}
                   </div>
@@ -135,9 +118,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                     {r.dueDate ? t('openIssues.dueSuffix', ' - due {{dueDate}}', { dueDate: r.dueDate }) : ''}
                   </div>
                 </div>
-                <Badge tone={severityTone(r.severity)}>
-                  {r.severity ?? t('openIssues.severityUnspecified', 'Unspecified')}
-                </Badge>
+                <Badge tone={severityTone(r.severity)}>{r.status.replace('_', ' ')}</Badge>
               </motion.li>
             ))}
             {openCompliance.slice(0, 2).map((c, index) => (
@@ -151,9 +132,9 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                 }}
               >
                 <span className="oi-count" style={{ background: 'var(--tag-amber-bg)' }}>
-                  C
+                  {t('openIssues.kindCompliance', 'Compliance')}
                 </span>
-                <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="oi-body">
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
                     {c.label}
                   </div>
@@ -161,10 +142,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                     {c.owner ?? t('openIssues.noOwner', 'No owner')}
                   </div>
                 </div>
-                <Badge tone="amber">
-                  {c.status?.replace('_', ' ') ??
-                    t('openIssues.statusUnspecified', 'Unspecified')}
-                </Badge>
+                <Badge tone="amber">{c.status.replace('_', ' ')}</Badge>
               </motion.li>
             ))}
           </ul>

@@ -36,7 +36,7 @@
     "typedSignature": "Firma escrita",
     "drawnSignature": "Firma dibujada",
     "typeNamePlaceholder": "Escribe tu nombre completo",
-    "agreed": "Acepto que esta firma electrónica tiene el mismo valor legal que mi firma manuscrita."
+    "agreed": "Entiendo que esta firma electrónica es una firma de aprobación interna, no una firma electrónica legalmente vinculante."
   },
   "timeline": {
     "title": "Historial de firmas",

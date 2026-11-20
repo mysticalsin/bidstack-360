@@ -36,7 +36,7 @@
     "typedSignature": "Assinatura digitada",
     "drawnSignature": "Assinatura desenhada",
     "typeNamePlaceholder": "Escreva o seu nome completo",
-    "agreed": "Concordo que esta assinatura eletrónica é juridicamente equivalente à minha assinatura manuscrita."
+    "agreed": "Entendo que esta assinatura eletrônica é uma assinatura de aprovação interna, não uma assinatura eletrônica juridicamente vinculativa."
   },
   "timeline": {
     "title": "Histórico de assinaturas",

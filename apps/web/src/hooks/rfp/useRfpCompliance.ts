@@ -22,6 +22,8 @@ interface ComplianceResult {
   total: number;
   compliantCount: number;
   pendingCount: number;
+  /** True when one matrix row past this page was loaded and dropped. */
+  matrixContinues?: boolean;
 }
 
 export function useRfpCompliance(bidWorkspaceId: string | null) {

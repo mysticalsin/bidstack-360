@@ -196,7 +196,7 @@ function DebriefForm({
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <span className="text-xs font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
             {outcome === 'won'
               ? t('lessonsLearned.winFactor', 'Deciding win factor')
               : t('lessonsLearned.lossFactor', 'Deciding loss factor')}
@@ -215,7 +215,7 @@ function DebriefForm({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
+          <span className="text-xs font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
             {t('lessonsLearned.competitorLabel', 'Competitor')}
           </span>
           <input
@@ -228,7 +228,7 @@ function DebriefForm({
         </label>
       </div>
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
+        <span className="text-xs font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
           {t('lessonsLearned.noteLabel', 'Debrief notes')}
         </span>
         <textarea

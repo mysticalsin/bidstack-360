@@ -62,7 +62,12 @@ export function IntakeAccountPicker({ onSelect }: IntakeAccountPickerProps) {
                 className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-[var(--surface-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
               >
                 <CompanyLogo name={c.name} companyId={c.id} domain={c.domain} size={28} />
-                <span className="min-w-0 flex-1 truncate text-sm text-[var(--fg-primary)]">{c.name}</span>
+                <span
+                  className="min-w-0 flex-1 truncate text-sm text-[var(--fg-primary)]"
+                  title={c.name}
+                >
+                  {c.name}
+                </span>
                 {c.industry && <span className="shrink-0 text-xs text-[var(--fg-tertiary)]">{c.industry}</span>}
               </button>
             </li>
