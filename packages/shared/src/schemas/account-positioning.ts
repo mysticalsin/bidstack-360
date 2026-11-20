@@ -479,9 +479,10 @@ export function composeBrief(f: BriefFacts, fmtMoney: MoneyFmt, fmtMicros: Micro
     s.push(`Momentum is ${dir} at ${f.momentum.score}/100 (${f.momentum.delta >= 0 ? '+' : ''}${f.momentum.delta} in 4 weeks${f.momentum.sample ? ', partly sample signals' : ''}).`);
   }
   const p = f.pipeline;
-  const hist = p.won24m || p.lost24m ? `; ${p.won24m} won and ${p.lost24m} lost in the last 24 months` : '';
-  const sample = p.latest ? ` among the latest ${p.latest} deals` : '';
-  s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${fmtMicros(p.openMicros)}${hist}${sample}.` : `We have no open deals${hist}${sample}.`);
+  const sampleLead = p.latest ? `among the latest ${p.latest} deals, ` : '';
+  const hist = p.won24m || p.lost24m ? `; ${sampleLead}${p.won24m} won and ${p.lost24m} lost in the last 24 months` : '';
+  const sampleTail = p.latest && !hist ? ` among the latest ${p.latest} deals` : '';
+  s.push(p.openCount ? `We have ${p.openCount} open deal${p.openCount > 1 ? 's' : ''} worth ${fmtMicros(p.openMicros)}${sampleTail}${hist}.` : `We have no open deals${sampleTail}${hist}.`);
   const pe = f.people;
   if (pe.known) {
     const last = pe.lastMeeting ? `, last meeting on ${pe.lastMeeting.at.slice(0, 10)} (${pe.lastMeeting.title})` : ', no meeting logged';
