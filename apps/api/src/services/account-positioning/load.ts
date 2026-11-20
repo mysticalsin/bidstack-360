@@ -30,12 +30,19 @@ import type { AccessScope } from '../../lib/access-scope.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
 import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
-import { groupMap, loadMomentumInputs, momentumFor } from '../account-signals/load.js';
+import { groupMap, loadMomentumInputs, momentumFor, recordedOutcome } from '../account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../account-signals/live-signals.js';
 import { loadSourcedExtras, manualOrigin, manualProvenance, providerLabel } from './sourced-figures.js';
 
+/** Same outcome as account momentum. Lost wins, and a deleted stage stays open. */
+export function positioningDealOutcome(o: {
+  stage: string;
+  pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
+}): 'won' | 'lost' | 'open' {
+  return recordedOutcome(o);
+}
+
 const DAY = 86_400_000;
-const OPEN: string[] = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'];
 const RISK_KINDS = ['RESTRUCTURING', 'LAYOFFS', 'LEADERSHIP_CHANGE', 'INSOLVENCY', 'GUIDANCE_CHANGE'] as const;
 const SEN_ORDER: Seniority[] = ['c_level', 'vp', 'director', 'manager', 'ic', 'unknown'];
 const SOURCE_LABEL: Record<string, string> = {
@@ -134,7 +141,20 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     loadInitiatives(orgId, scope, { id: companyId }, now),
     loadAccountFinancials(orgId, companyId, false),
     loadPeople(c, ids),
-    prisma.opportunity.findMany({ where: { orgId, companyId: { in: ids }, deletedAt: null }, select: { id: true, name: true, stage: true, valueMicros: true, closedAt: true, updatedAt: true }, take: 500 }),
+    prisma.opportunity.findMany({
+      where: { orgId, companyId: { in: ids }, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        stage: true,
+        valueMicros: true,
+        createdAt: true,
+        closedAt: true,
+        updatedAt: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
+      take: 500,
+    }),
     prisma.opportunity.findMany({ where: { orgId, deletedAt: null, stage: 'closed_won', valueMicros: { gt: 0n } }, select: { name: true, valueMicros: true, companyId: true }, orderBy: { closedAt: 'desc' }, take: 1000 }),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, kind: { in: [...RISK_KINDS] }, occurredAt: { gte: new Date(now.getTime() - 365 * DAY) }, ...hideSampleWhere(live) },
@@ -171,8 +191,11 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const won: WonDeal[] = wonOrg.map((o) => ({ name: o.name, valueMicros: o.valueMicros ?? 0n, here: !!o.companyId && ids.includes(o.companyId) }));
   const plays = buildPlays({ initiatives, financialSignals: finSignals, financialSource: finSource, people, won, themeOf: themeForText, now });
 
-  const open = opps.filter((o) => OPEN.includes(o.stage));
-  const closed24 = opps.filter((o) => (o.closedAt ?? o.updatedAt) >= since24);
+  const open = opps.filter((o) => positioningDealOutcome(o) === 'open');
+  const closed24 = opps.filter((o) => {
+    if (positioningDealOutcome(o) === 'open') return false;
+    return (o.closedAt ?? o.updatedAt) >= since24;
+  });
   const seniorPeople = people.filter((p) => SENIOR.has(p.seniority));
   const employees = firmo?.employeeCount
     ? { value: firmo.employeeCount, source: 'Enrichment cache' }
@@ -204,8 +227,8 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     pipeline: {
       openCount: open.length,
       openMicros: open.reduce((s, o) => s + (o.valueMicros ?? 0n), 0n).toString(),
-      won24m: closed24.filter((o) => o.stage === 'closed_won').length,
-      lost24m: closed24.filter((o) => o.stage === 'closed_lost').length,
+      won24m: closed24.filter((o) => positioningDealOutcome(o) === 'won').length,
+      lost24m: closed24.filter((o) => positioningDealOutcome(o) === 'lost').length,
     },
     people: {
       known: people.length,
@@ -279,7 +302,18 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
     prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
-    prisma.opportunity.findMany({ where: { orgId, companyId: { in: ids }, deletedAt: null }, select: { stage: true, valueMicros: true, createdAt: true, closedAt: true, updatedAt: true }, take: 500 }),
+    prisma.opportunity.findMany({
+      where: { orgId, companyId: { in: ids }, deletedAt: null },
+      select: {
+        stage: true,
+        valueMicros: true,
+        createdAt: true,
+        closedAt: true,
+        updatedAt: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
+      take: 500,
+    }),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, sentiment: { not: null }, occurredAt: { gte: d180, lte: now }, ...hideSampleWhere(live) },
       select: { sentiment: true, occurredAt: true, sample: true, source: true },
@@ -396,12 +430,15 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   } else items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', goodWhen: 'down', source: 'Meeting intel and logged meetings', period: 'Last 24 months', missing: 'No meeting logged' }));
 
   // Pipeline value and trend: open value now vs reconstructed 90 days ago.
+  const open = opps.filter((o) => positioningDealOutcome(o) === 'open');
   const openAt = (t: Date) =>
-    opps.filter((o) => o.createdAt <= t && (OPEN.includes(o.stage) ? true : (o.closedAt ?? o.updatedAt) > t)).reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
-  const nowOpen = opps.filter((o) => OPEN.includes(o.stage)).reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
+    opps
+      .filter((o) => o.createdAt <= t && (positioningDealOutcome(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
+      .reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
+  const nowOpen = open.reduce((s, o) => s + Number(o.valueMicros ?? 0n), 0);
   const series = [150, 120, 90, 60, 30].map((d) => openAt(new Date(now.getTime() - d * DAY))).concat(nowOpen);
   const ago = series[2]!;
-  items.push(base({ id: 'pipeline', group: 'health', label: 'Open pipeline', unit: 'money_micros', value: nowOpen, delta: pctChange(nowOpen, ago), deltaUnit: 'pct', series, sub: `${opps.filter((o) => OPEN.includes(o.stage)).length} open deals`, source: 'Polo pipeline', period: 'Now, change vs 90 days ago', anchor: 'deals' }));
+  items.push(base({ id: 'pipeline', group: 'health', label: 'Open pipeline', unit: 'money_micros', value: nowOpen, delta: pctChange(nowOpen, ago), deltaUnit: 'pct', series, sub: `${open.length} open deals`, source: 'Polo pipeline', period: 'Now, change vs 90 days ago', anchor: 'deals' }));
 
   // Financial warnings.
   const warnings = fin.sample ? [] : fin.signals.filter((s) => s.implication === 'RISK' && !s.sample);
