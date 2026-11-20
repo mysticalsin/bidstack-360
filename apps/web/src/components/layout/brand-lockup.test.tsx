@@ -138,6 +138,31 @@ describe('shell brand lockup', () => {
     expect(within(dialog).getByRole('link', { name: 'Settings' })).toBeTruthy();
   });
 
+  it('pins font-semibold on the drawer product name', () => {
+    // WHY: dropping or swapping font-semibold on MobileNav.tsx:184 still left
+    // the lockup tests green. The weight is part of the lockup, so the class
+    // that renders has to be this one.
+    mockMatchMedia({ [SHELL_WIDE_QUERY]: false });
+    useUiStore.setState({ mobileNavOpen: true });
+    const drawer = render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <MobileNav />
+      </MemoryRouter>,
+    );
+    const dialog = drawer.getByRole('dialog', { name: 'Primary navigation' });
+    const name = within(dialog).getByText(PRODUCT);
+    const classes = name.className.split(/\s+/).filter(Boolean);
+
+    expect(name.tagName).toBe('SPAN');
+    expect(name.textContent).toBe(PRODUCT);
+    expect(classes).toContain('font-semibold');
+    for (const other of ['font-bold', 'font-medium', 'font-normal', 'font-light']) {
+      expect(classes).not.toContain(other);
+    }
+    expect(dialog.textContent ?? '').not.toContain('Mantu');
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeTruthy();
+  });
+
   it('at 1280px the expanded rail is the product name beside the collapse control', () => {
     // 1280 is above 56rem (896px), so the sidebar is the 232px rail. The
     // tagline is the line that gets ellipsized under the collapse control.
