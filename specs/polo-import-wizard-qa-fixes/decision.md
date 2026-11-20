@@ -75,11 +75,11 @@ The Maps-to select has a minimum width so the chosen field is not clipped from t
 
 A request that does not send `x-bidstack-e2e-role` is the seeded Admin only on the local and test stub.
 
-The path is `resolveStubAuth` in `apps/api/src/plugins/auth.ts`. When `readStubRoleOverride` returns null (no header, lines 194–197 and 339–342), the function loads the oldest user in the seed org (`createdAt` ascending, lines 344–357) and returns that row's `role`. The fixture seed creates Jane Smith first with `role: 'admin'` (`packages/db/src/seed-data.ts` line 16, `packages/db/src/seed.ts` lines 90–102) and grants the system role Admin (`packages/db/src/seed.rbac.ts` lines 488–489 and 638–644).
+The path is `resolveStubAuth` in `apps/api/src/plugins/auth.ts`. When `readStubRoleOverride` returns null (no header, lines 194–197 and 339–342), the function loads the oldest admin in the org (`role: 'admin'`, `createdAt` ascending, lines 347–351) and returns that row's `role`. If the org has no admin it falls back to the oldest user (lines 352–355). The fixture seed creates Jane Smith first with `role: 'admin'` (`packages/db/src/seed-data.ts` line 16, `packages/db/src/seed.ts` lines 90–102) and grants the system role Admin (`packages/db/src/seed.rbac.ts` lines 488–489 and 638–644).
 
-That function runs only from the auth hook's final branch (`apps/api/src/plugins/auth.ts` lines 725–732): no `CLERK_SECRET_KEY`, Cloudflare Access off, demo mode off. `assertPoloAuthBoot` (`apps/api/src/lib/polo-mode.ts` lines 69–71) refuses to boot that branch unless `NODE_ENV` is `development` or `test`. Production compose sets `NODE_ENV=production` and requires `CLERK_SECRET_KEY` (`docker-compose.prod.yml`). The public preview sets `DEMO_MODE` (`deploy/vercel-demo/README.md`, `DEPLOY.md`) and uses `resolveDemoAuth`, not the stub. `resolveStubAuth` also rejects any remote address that is not loopback (lines 317–324).
+That function runs only from the auth hook's final branch (`apps/api/src/plugins/auth.ts` lines 733–740): no `CLERK_SECRET_KEY`, Cloudflare Access off, demo mode off. `assertPoloAuthBoot` (`apps/api/src/lib/polo-mode.ts` lines 49–50 and 69–71) refuses to boot that branch unless `NODE_ENV` is `development` or `test`. Production compose sets `NODE_ENV=production` and requires `CLERK_SECRET_KEY` (`docker-compose.prod.yml` lines 81 and 87). The public preview sets `DEMO_MODE` (`deploy/vercel-demo/README.md`, `DEPLOY.md`) and uses `resolveDemoAuth`, not the stub. `resolveStubAuth` also rejects any remote address that is not loopback (lines 317–324).
 
-This is not reachable on preview or production. It is not a merge-blocking finding. No code change.
+This is not reachable on preview or production. Choosing the oldest admin is a privilege change on that stub. It is the open addendum in `plan-debate.md`.
 
 ## Residuals
 

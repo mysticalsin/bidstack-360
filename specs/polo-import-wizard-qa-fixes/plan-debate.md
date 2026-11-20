@@ -52,3 +52,26 @@ Devin took these out of this round. They are named in `decision.md` under Backlo
 - I-6
 
 CONSENSUS: AGREED
+
+## Addendum — stub default is the oldest admin
+
+The agreement line above does not cover this. Line 19 excluded the stub-auth note from the eleven items. The change landed afterwards, in `3ae96a4e004671f3c7fa7d0a80b10d41c7e4d634`, and it changes who a header-less stub request is.
+
+**Change.** `resolveStubAuth` used to load the oldest user in the org (`createdAt` ascending) and take that row's role. It now loads the oldest user whose `role` is `admin` (`apps/api/src/plugins/auth.ts` lines 347–351). If the org has no admin, it still falls back to the oldest user (lines 352–355).
+
+**Why.** Red `c1859148d132d3ee038af9ef72f3ea285839f46f`. A read-only override user created earlier keeps that `createdAt` when `x-bidstack-e2e-role` moves them into the current org. The next request with no header then resolved to that user. `settings:write` returned 403, including an unknown-subject call that should have been 404, and the T-1 undo returned 403. Fix `3ae96a4e004671f3c7fa7d0a80b10d41c7e4d634`. Restoring the oldest-row lookup made the red test 403 again.
+
+**Risk.** This is a privilege change on the stub. A header-less request is an admin even when an older non-admin exists. The previous rule could have resolved to a lesser role. The fallback still does, when the org has no admin.
+
+**Containment.** The stub does not boot outside local development and test.
+
+- `apps/api/src/lib/polo-mode.ts` lines 49–50: `allowStub` is true only when `NODE_ENV` is `development` or `test`.
+- `apps/api/src/lib/polo-mode.ts` lines 64–70: real data mode refuses to boot without Clerk or Cloudflare Access, and any other boot without Clerk, Cloudflare Access, or demo mode throws `CLERK_SECRET_KEY required in production`.
+- `apps/api/src/plugins/auth.ts` lines 559–560: with Clerk configured, a request that has no bearer throws 401 `Missing Authorization header`. `apps/api/src/plugins/auth.test.ts` lines 246–263 set `NODE_ENV` to `production` and expect that 401 on plain HTTP.
+- `apps/api/src/plugins/auth.ts` lines 733–740: the request hook calls `resolveStubAuth` only in the last branch, after Clerk, Cloudflare Access, and `resolveDemoAuth`.
+- `docker-compose.prod.yml` line 81 sets `NODE_ENV: production` on the api service, and line 87 requires `CLERK_SECRET_KEY`.
+- The public preview sets `DEMO_MODE` (`deploy/vercel-demo/README.md` lines 19 and 25) and the hook uses `resolveDemoAuth` (`auth.ts` line 738), not the stub.
+
+**Alternatives considered.** An explicit stub user id from the environment (a named fixture, not "whoever is the oldest admin"). Bumping `createdAt` when the role header moves a user, so the override cannot become the oldest row and the lookup can stay "oldest user". Excluding the `e2e-*` override emails from the default lookup. None of those is what shipped. The oldest-admin lookup is the change under challenge.
+
+CHALLENGE: pending independent challenger (Devin gate)
