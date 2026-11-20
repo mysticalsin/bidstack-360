@@ -20,4 +20,14 @@ describe('fmtMoneyMicros', () => {
   it('does not invent a currency when the code is blank', () => {
     expect(fmtMoneyMicros(1_500_000_000_000, '')).toBe('1,500,000 unspecified');
   });
+
+  it('keeps a fractional unit instead of dropping the micros remainder', () => {
+    // WHY: dividing by 1_000_000 in integer arithmetic turns 1.50 into 1.00.
+    expect(fmtMoneyMicros(1_500_000, 'GBP')).toBe('£1.50');
+    expect(fmtMoneyMicros(1, 'GBP')).toBe('£0.00');
+    expect(fmtMoneyMicros(999_999, 'GBP')).toBe('£1.00');
+    expect(fmtMoneyMicros(-1_500_000, 'GBP')).toBe('-£1.50');
+    expect(fmtMoneyMicros(-1, 'GBP')).toBe('-£0.00');
+    expect(fmtMoneyMicros(-999_999, 'GBP')).toBe('-£1.00');
+  });
 });
