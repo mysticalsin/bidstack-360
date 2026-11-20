@@ -15,4 +15,12 @@ describe('describeSparkline', () => {
   it('keeps an exact million compact', () => {
     expect(describeSparkline([1_500_000, 2_000_000])).toMatch(/1\.5/);
   });
+
+  it('keeps the minus sign on a negative amount', () => {
+    // WHY: Math.abs before compact still passed every positive case and spoke a loss as a gain.
+    const summary = describeSparkline([-7_900_000, -12_015_000]);
+    expect(summary).toContain('-7.9M');
+    expect(summary).toContain('-12,015,000');
+    expect(summary).not.toContain('7.86');
+  });
 });
