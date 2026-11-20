@@ -73,6 +73,56 @@ function selectBoxes(): HTMLElement[] {
   });
 }
 
+/** Below 56rem the rail is a drawer. Below 768px the page padding is 14px, not 28px. */
+function contentWidth(viewport: number): number {
+  const rail = viewport >= 896 ? 232 : 0;
+  const pad = viewport <= 767 ? 14 * 2 : 28 * 2;
+  return viewport - rail - pad;
+}
+
+/** Grow factor. A missing longhand is 0, so `flex-grow: 0` cannot hide in the basis. */
+function growOf(el: HTMLElement): number {
+  if (el.style.flexGrow !== '') return Number(el.style.flexGrow);
+  const match = /^(\d+(?:\.\d+)?)\s/.exec(el.style.flex);
+  return match ? Number(match[1]) : 0;
+}
+
+/**
+ * Width the search field actually occupies. Selects do not grow. If the search
+ * input's flex-grow is 0 it stays at its basis and leaves a gap; if it is 1 it
+ * takes the free space on its line. happy-dom does not flex-layout, so this is
+ * the same arithmetic the row's inline flex values produce.
+ */
+function searchUsedWidth(
+  content: number,
+  search: { grow: number; basis: number },
+  selects: Array<{ grow: number; basis: number }>,
+): number {
+  const items = [search, ...selects];
+  const lines: number[][] = [];
+  let line: number[] = [];
+  let used = 0;
+  items.forEach((item, index) => {
+    const next = line.length === 0 ? item.basis : used + GAP_PX + item.basis;
+    if (line.length > 0 && next > content) {
+      lines.push(line);
+      line = [index];
+      used = item.basis;
+    } else {
+      used = next;
+      line.push(index);
+    }
+  });
+  if (line.length > 0) lines.push(line);
+  const searchLine = lines.find((indexes) => indexes.includes(0)) ?? [0];
+  const lineItems = searchLine.map((index) => items[index]!);
+  const base = lineItems.reduce((sum, item) => sum + item.basis, 0) + GAP_PX * (lineItems.length - 1);
+  const free = content - base;
+  const grow = lineItems.reduce((sum, item) => sum + item.grow, 0);
+  if (grow <= 0 || free <= 0) return search.basis;
+  return search.basis + free * (search.grow / grow);
+}
+
 function controlsOnFirstRow(bases: number[], content: number): number {
   let used = 0;
   let count = 0;
@@ -140,6 +190,31 @@ describe('account filter row at 1280px', () => {
     expect(box.style.maxWidth).toBe(`${SELECT_MAX_PX}px`);
     expect(SELECT_MAX_PX).toBeLessThan(LONG_INDUSTRY.length * 7);
     expect(basisPx(box)).toBe(SELECT_BASIS_PX);
+  });
+
+  it('grows the search input to the leftover width at 1280 and at 390', () => {
+    // WHY: the basis regex accepts `0 1 144px`. A flex-grow: 0 mutant on the
+    // search input then still passes, and the field stays 144px while the row
+    // has empty space beside it.
+    renderFilters(['Industry', 'Technology', 'MSA leverage', 'Sort']);
+    const input = screen.getByRole('searchbox', { name: 'Search' });
+    const wrapper = input.parentElement;
+    expect(wrapper, 'search input sits in the growing row item').toBeTruthy();
+    const search = { grow: growOf(input), basis: basisPx(wrapper) };
+    const selects = selectBoxes().map((box) => ({ grow: growOf(box), basis: basisPx(box) }));
+    expect(selects).toHaveLength(4);
+
+    const at1280 = searchUsedWidth(contentWidth(1280), search, selects);
+    const at390 = searchUsedWidth(contentWidth(390), search, selects);
+    expect(contentWidth(1280)).toBe(992);
+    expect(contentWidth(390)).toBe(362);
+    // 992 − 4×176 − 4×12 = 240. At 390 one 176px select fits beside search:
+    // 362 − 176 − 12 = 174. flex-grow 0 would leave both at the 144px basis.
+    expect(at1280).toBe(240);
+    expect(at390).toBe(174);
+    expect(search.grow).toBe(1);
+    // The input only grows into that leftover when its wrapper is a flex box.
+    expect(wrapper?.style.display).toBe('flex');
   });
 
   it('fits search plus four selects inside the 1280px page column', () => {
