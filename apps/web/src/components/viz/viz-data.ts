@@ -1,6 +1,5 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
-import { headlineMicrosLabel } from '@/components/dashboard/unspecified-currency';
 import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -145,11 +144,26 @@ export function cumulativeOpen(rows: OppRow[]) {
   return [0, ...open.map((o) => (run += o.value ?? 0))];
 }
 
+const chartCompact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 2 });
+
+/** Compact only when two fraction digits still name this unit count. */
+function compactKeepsUnits(units: number): boolean {
+  const abs = Math.abs(units);
+  for (const div of [1e9, 1e6, 1e3]) {
+    if (abs < div) continue;
+    for (let digits = 0; digits <= 2; digits += 1) {
+      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 /** Currency-free amount. Compact only when that label names the same unit. */
 export function fmtCompact(v: number): string {
   if (!Number.isFinite(v)) return '—';
-  if (!Number.isSafeInteger(v)) return v.toLocaleString('en-GB');
-  return headlineMicrosLabel(BigInt(v) * 1_000_000n, 'en-GB');
+  if (!Number.isSafeInteger(v) || !compactKeepsUnits(v)) return v.toLocaleString('en-GB');
+  return chartCompact.format(v);
 }
 
 export type OppStatus = 'open' | 'won' | 'lost';

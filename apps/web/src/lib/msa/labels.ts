@@ -1,8 +1,5 @@
 // Plain-language labels and tones for the Agreements screens.
 import type { BadgeTone } from '@/components/ui/Badge';
-import { formatConvertedMicros } from '@/lib/format';
-
-import { formatMicrosAmount } from '@bidstack/shared';
 
 import type { MsaKind, MsaStatus } from './types';
 
@@ -37,12 +34,39 @@ export function fmtBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function groupedUnits(micros: bigint): string {
+  const units = micros / 1_000_000n;
+  return units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/** Compact in en-GB only when two fraction digits still name this unit count. */
+function compactKeepsUnits(units: number): boolean {
+  const abs = Math.abs(units);
+  for (const div of [1e9, 1e6, 1e3]) {
+    if (abs < div) continue;
+    for (let digits = 0; digits <= 2; digits += 1) {
+      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 export function fmtMoneyMicros(amountMicros: number, currency: string): string {
   if (!Number.isSafeInteger(amountMicros) || amountMicros < 0) return 'amount not readable';
-  if (!/^[A-Za-z]{3}$/.test(currency)) {
-    return `${formatMicrosAmount(BigInt(amountMicros))} unspecified`;
+  const micros = BigInt(amountMicros);
+  if (!/^[A-Za-z]{3}$/.test(currency)) return `${groupedUnits(micros)} unspecified`;
+  const units = Number(micros / 1_000_000n);
+  const code = currency.toUpperCase();
+  if (!compactKeepsUnits(units)) {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: code, maximumFractionDigits: 2 }).format(units);
   }
-  return formatConvertedMicros(BigInt(amountMicros), currency.toUpperCase());
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: code,
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(units);
 }
 
 /** Deadline urgency for the expiring-soon strip and the list. */
