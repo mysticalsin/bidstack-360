@@ -3,7 +3,7 @@ import '@/components/agreements/agreements.css';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { formatMicrosAmount, LOW_CONFIDENCE_BPS, type MsaExtractedField } from '@bidstack/shared';
+import { LOW_CONFIDENCE_BPS, type MsaExtractedField } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -11,10 +11,19 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useConfirmMsaIntake, useMsaIntakeDraft } from '@/hooks/useMsaIntake';
 import { useSigningEntities } from '@/hooks/useSigningEntities';
 
+/** Grouped cents from integer micros. The shared cent formatter is gone on main. */
+function centsFromIntegerMicros(micros: bigint): string {
+  const cents = (micros + 5_000n) / 10_000n;
+  const units = cents / 100n;
+  const frac = cents % 100n;
+  const body = units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac === 0n ? body : `${body}.${frac.toString().padStart(2, '0')}`;
+}
+
 /** Integer micros. A missing currency stays unspecified instead of becoming a euro amount. */
 export function formatExtractedMicros(micros: number, currency?: string | null): string {
   if (!Number.isSafeInteger(micros) || micros < 0) return 'amount not readable';
-  const amount = formatMicrosAmount(BigInt(micros));
+  const amount = centsFromIntegerMicros(BigInt(micros));
   if (currency && /^[A-Za-z]{3}$/.test(currency)) return `${amount} ${currency.toUpperCase()}`;
   return `${amount} unspecified`;
 }
