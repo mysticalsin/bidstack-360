@@ -16,7 +16,6 @@ import {
   type Prisma,
   loadCompanyIntel,
   prisma,
-  rebaseDemoFixturePostings,
   readCompanyIntelSummaries,
   readImportBatches,
 } from '@bidstack/db';
@@ -89,9 +88,7 @@ export const companyIntelRoutes: FastifyPluginAsyncZod = async (server) => {
   async function composed(req: FastifyRequest, id: string, view: string) {
     const company = await loadCompany(req, id);
     if (!company) throw server.httpErrors.notFound('Company not found');
-    const now = new Date();
-    await rebaseDemoFixturePostings(prisma, { orgId: req.auth.orgId, now });
-    const snapshot = await loadCompanyIntel(prisma, req.auth.orgId, company.id, now);
+    const snapshot = await loadCompanyIntel(prisma, req.auth.orgId, company.id, new Date());
     if (!snapshot) throw server.httpErrors.notFound('Company not found');
     if (shouldAuditRead(`${req.auth.orgId}:${req.auth.userId}:${company.id}:${view}`))
       await audit(req, `intel.${view}.view`, company.id);
