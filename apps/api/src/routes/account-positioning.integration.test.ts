@@ -276,4 +276,39 @@ describe('GET /accounts/:id/key-numbers', () => {
     expect(by.revenue!.missing).toContain('No public revenue figure found yet');
     expect(by.employees).toMatchObject({ value: null, editKey: 'employeeCount' });
   });
+
+  it('derives operating margin when a fixture year has revenue and operating income but no _derived', async () => {
+    // WHY: a real pull stores metrics._derived. Fixture filings store the two
+    // inputs and nothing else, so the strip was reading only _derived and
+    // saying "No margin in the filed numbers".
+    const name = `${TAG} FixtureMargin`;
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name, tier: 'key' } })).id;
+    const revenue = 85_300_000_000;
+    const operatingIncome = 51_000_000_000;
+    await prisma.accountFinancialPeriod.create({
+      data: {
+        orgId: orgA.orgId,
+        companyId: id,
+        source: 'fixture',
+        entityId: 'sample',
+        periodType: 'FY',
+        fiscalYear: 2025,
+        periodStart: new Date('2025-01-01'),
+        periodEnd: new Date('2025-12-31'),
+        currency: 'NOK',
+        sourceUrl: 'https://www.dnb.no/',
+        metrics: {
+          revenue: { value: revenue, concept: 'sample:Revenue' },
+          operatingIncome: { value: operatingIncome, concept: 'sample:OperatingIncome' },
+        },
+      },
+    });
+    const margin = (await get(`/accounts/${id}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'margin')!;
+    expect(margin).toMatchObject({
+      label: 'Operating margin',
+      unit: 'pct',
+      value: Math.round((operatingIncome / revenue) * 1000) / 10,
+    });
+    expect(margin.missing).toBeNull();
+  });
 });
