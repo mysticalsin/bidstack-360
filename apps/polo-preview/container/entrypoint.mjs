@@ -9,13 +9,13 @@ import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { cpSync, createReadStream, createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
-import { networkInterfaces } from 'node:os';
-import { extname, join, normalize } from 'node:path';
+import { networkInterfaces, tmpdir } from 'node:os';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
-import { appRolePasswordError, ENSURE_APP_ROLE_SQL, restoreFailure } from '../src/database-boot.js';
+import { alterRolePasswordSql, appRolePasswordError, APP_ROLE_GATE_SQL, APP_ROLE_LOCK_SQL, ENSURE_APP_ROLE_SQL, restoreFailure, scramSha256Verifier, scrubChildEnv } from '../src/database-boot.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
@@ -33,20 +33,41 @@ function entryFile(value) {
   return value.startsWith('/') ? value : join(APP, value);
 }
 
-const APP = process.env.POLO_APP_ROOT || '/app';
+// Path and Redis host overrides exist for the drill. Production ignores them.
+// A drill path has to stay inside a subdirectory of the temp directory so a
+// later rmSync cannot walk up to the host.
+function insideTemp(name, raw, tempOnly) {
+  if (raw.includes('\0')) throw new Error(`${name} is not a path`);
+  const resolved = resolve(raw);
+  const root = resolve(tmpdir());
+  if (resolved === '/' || resolved === root) throw new Error(`${name} is too broad`);
+  if (tempOnly && !resolved.startsWith(root + sep)) {
+    throw new Error(`${name} must be a subdirectory of the temp directory`);
+  }
+  return resolved;
+}
+
+function overrideInDrill(name, fallback, tempOnly) {
+  if (process.env.POLO_RESTORE_DRILL !== '1') return fallback;
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  return insideTemp(name, raw, tempOnly);
+}
+
+const APP = overrideInDrill('POLO_APP_ROOT', '/app', false);
 const WEB_ROOT = join(APP, 'apps/web/dist');
-const DATA = process.env.POLO_DATA_DIR || '/data';
+const DATA = overrideInDrill('POLO_DATA_DIR', '/data', true);
 const PGDATA = join(DATA, 'pg');
 const STORAGE = join(DATA, 'storage');
 const API_PORT = configuredPort('POLO_API_PORT', 4020);
 const PORT = configuredPort('POLO_HTTP_PORT', 8080);
 const PG_PORT = configuredPort('POLO_PG_PORT', 5432);
 const REDIS_PORT = configuredPort('POLO_REDIS_PORT', 6379);
-const PG_SOCKET = process.env.POLO_PG_SOCKET || '/tmp';
-const MIGRATE_STAGING = process.env.POLO_MIGRATE_STAGING || '/tmp/polo-migrate';
-const SNAPSHOT_DIR = process.env.POLO_SNAPSHOT_DIR || '/tmp/snapshot';
-const SNAPSHOT_TGZ = process.env.POLO_SNAPSHOT_TGZ || '/tmp/snapshot.tgz';
-const RESTORE_DIR = process.env.POLO_RESTORE_DIR || '/tmp/restore';
+const PG_SOCKET = overrideInDrill('POLO_PG_SOCKET', '/tmp', true);
+const MIGRATE_STAGING = overrideInDrill('POLO_MIGRATE_STAGING', '/tmp/polo-migrate', true);
+const SNAPSHOT_DIR = overrideInDrill('POLO_SNAPSHOT_DIR', '/tmp/snapshot', true);
+const SNAPSHOT_TGZ = overrideInDrill('POLO_SNAPSHOT_TGZ', '/tmp/snapshot.tgz', true);
+const RESTORE_DIR = overrideInDrill('POLO_RESTORE_DIR', '/tmp/restore', true);
 const API_ENTRY = entryFile(process.env.POLO_API_ENTRY || 'apps/api/dist/main.js');
 const WORKER_ENTRY = entryFile(process.env.POLO_WORKER_ENTRY || 'apps/worker/dist/main.js');
 const SELF_SEED_AFTER_MS = 120_000;
@@ -102,8 +123,12 @@ function pgUid() {
   return { uid: Number(out.stdout.trim()), gid: Number(gid.stdout.trim()) };
 }
 
+function childEnv(extra = {}) {
+  return scrubChildEnv({ ...process.env, ...extra });
+}
+
 function runSync(cmd, args, opts = {}) {
-  const res = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts, stdio: ['ignore', 'pipe', 'pipe'] });
+  const res = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts, env: childEnv(opts.env), stdio: ['ignore', 'pipe', 'pipe'] });
   if (res.stdout) process.stdout.write(res.stdout);
   if (res.stderr) process.stderr.write(res.stderr);
   if (res.status !== 0) {
@@ -147,6 +172,7 @@ function runtimeEnv(databaseUrl) {
       : {}),
   };
   delete env.POLO_APP_DB_PASSWORD;
+  delete env.POLO_INTERNAL_KEY;
   return env;
 }
 
@@ -180,20 +206,54 @@ function pgCli(args) {
   return ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, ...args];
 }
 
+function passwordRole() {
+  if (process.env.POLO_RESTORE_DRILL !== '1') return 'app_role';
+  const raw = process.env.POLO_PASSWORD_TARGET_ROLE;
+  if (!raw) return 'app_role';
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(raw)) throw new Error('POLO_PASSWORD_TARGET_ROLE is not a role name');
+  return raw;
+}
+
 function setAppRolePassword() {
-  if (!process.env.POLO_APP_DB_PASSWORD) throw new Error('POLO_APP_DB_PASSWORD is required');
-  // The value stays in the environment. psql :'var' quotes it. A failure
-  // keeps the SQLSTATE only, never the statement.
+  const password = process.env.POLO_APP_DB_PASSWORD || '';
+  if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
+  // Node computes the SCRAM verifier. psql and the server see that string,
+  // not the cleartext, and psql's environment does not carry the secret.
+  const verifier = scramSha256Verifier(password);
   const res = spawnSync(
     'psql',
     pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q']),
     {
       encoding: 'utf8',
-      input: "\\set VERBOSITY verbose\n\\getenv app_db_password POLO_APP_DB_PASSWORD\nALTER ROLE app_role PASSWORD :'app_db_password';\n",
+      input: alterRolePasswordSql(passwordRole(), verifier),
+      env: { PATH: process.env.PATH || '', HOME: process.env.HOME || '', LC_ALL: 'C', LANG: 'C' },
       stdio: ['pipe', 'pipe', 'pipe'],
     },
   );
   if (res.status !== 0) throw new Error(appRolePasswordError(res.stderr));
+}
+
+function lockAppRole() {
+  const res = spawnSync(
+    'psql',
+    pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q']),
+    { encoding: 'utf8', input: APP_ROLE_LOCK_SQL, env: childEnv(), stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  if (res.status !== 0) throw new Error('could not lock the app role');
+}
+
+function assertAppRoleGate() {
+  if (process.env.POLO_RESTORE_DRILL === '1' && process.env.POLO_GATE_BREAK === 'audit-trigger') {
+    runSync('psql', pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-c', 'ALTER TABLE public.audit_log DISABLE TRIGGER audit_log_append_only']));
+  }
+  const res = spawnSync(
+    'psql',
+    pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-tAc', APP_ROLE_GATE_SQL]),
+    { encoding: 'utf8', env: childEnv() },
+  );
+  if (res.status !== 0) throw new Error('could not check the app role');
+  const verdict = (res.stdout || '').trim();
+  if (verdict !== 'ok') throw new Error(`app role gate failed: ${verdict || 'unknown'}`);
 }
 
 function startDatabase() {
@@ -202,8 +262,10 @@ function startDatabase() {
   // Some runtimes lock /etc/hosts; then Redis listens on the private interface.
   // POLO_REDIS_HOST skips the hosts file (the drill sets 127.0.0.1).
   const bind = ['127.0.0.1'];
-  if (process.env.POLO_REDIS_HOST) {
-    redisHost = process.env.POLO_REDIS_HOST;
+  const redisOverride = process.env.POLO_RESTORE_DRILL === '1' ? process.env.POLO_REDIS_HOST || '' : '';
+  if (redisOverride && redisOverride !== '127.0.0.1') throw new Error('POLO_REDIS_HOST must be 127.0.0.1');
+  if (redisOverride) {
+    redisHost = redisOverride;
   } else {
     try {
       writeFileSync('/etc/hosts', '127.0.0.1 polo-redis\n', { flag: 'a' });
@@ -225,8 +287,14 @@ function startDatabase() {
   if (!existsSync(join(PGDATA, 'PG_VERSION'))) {
     runSync('initdb', ['-D', PGDATA, '-U', PG_USER, '--auth=trust', '-E', 'UTF8'], ids);
   }
-  const pg = spawn('postgres', ['-D', PGDATA, '-h', '127.0.0.1', '-p', String(PG_PORT), '-k', PG_SOCKET, '-c', 'shared_buffers=256MB'], {
+  const pgArgs = ['-D', PGDATA, '-h', '127.0.0.1', '-p', String(PG_PORT), '-k', PG_SOCKET, '-c', 'shared_buffers=256MB'];
+  if (process.env.POLO_RESTORE_DRILL === '1') {
+    mkdirSync(join(PGDATA, 'log'), { recursive: true });
+    pgArgs.push('-c', 'logging_collector=on', '-c', 'log_directory=log', '-c', 'log_filename=postgresql.log', '-c', 'log_min_error_statement=error');
+  }
+  const pg = spawn('postgres', pgArgs, {
     ...ids,
+    env: childEnv(),
     stdio: 'inherit',
   });
   pg.on('exit', (code) => {
@@ -234,6 +302,7 @@ function startDatabase() {
     process.exit(1);
   });
   const redis = spawn('redis-server', ['--bind', ...bind, '--port', String(REDIS_PORT), '--requirepass', REDIS_PASS, '--save', '', '--appendonly', 'no'], {
+    env: childEnv(),
     stdio: 'inherit',
   });
   redis.on('exit', (code) => {
@@ -293,7 +362,7 @@ function ensureAppRole() {
   const res = spawnSync(
     'psql',
     pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q']),
-    { encoding: 'utf8', input: ENSURE_APP_ROLE_SQL, stdio: ['pipe', 'pipe', 'pipe'] },
+    { encoding: 'utf8', input: ENSURE_APP_ROLE_SQL, env: childEnv(), stdio: ['pipe', 'pipe', 'pipe'] },
   );
   if (res.status !== 0) {
     remember(`${res.stderr || ''}`.split('\n').slice(-20).join('\n'));
@@ -314,6 +383,7 @@ function migrate() {
     } catch {
       servePreviousSchema = true;
       log('could not skip the index migration; serving the restored schema');
+      lockAppRole();
       return;
     }
   }
@@ -321,6 +391,9 @@ function migrate() {
     cwd: APP,
     env: migrateEnv(),
   });
+  // The role migration sets INHERIT and broad grants. This is the last writer.
+  ensureAppRole();
+  lockAppRole();
   setAppRolePassword();
 }
 
@@ -399,6 +472,7 @@ async function finishBoot(how) {
       setPhase('migrating', 'after restore');
       migrate();
     }
+    assertAppRoleGate();
     startApi();
     await waitForApi();
     apiRestarts = 0;
@@ -442,8 +516,8 @@ async function restoreFrom(req) {
   ensureAppRole();
   const restored = spawnSync(
     'pg_restore',
-    ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+    ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, '-d', DB, '--no-owner', '--no-privileges', join(dir, 'db.dump')],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: childEnv({ LC_ALL: 'C', LANG: 'C' }) },
   );
   if (restored.stdout) process.stdout.write(restored.stdout);
   if (restored.stderr) process.stderr.write(restored.stderr);
@@ -458,6 +532,7 @@ async function restoreFrom(req) {
     rmSync(STORAGE, { recursive: true, force: true });
     runSync('cp', ['-a', join(dir, 'storage'), STORAGE]);
   }
+  lockAppRole();
 }
 
 function authorized(req) {

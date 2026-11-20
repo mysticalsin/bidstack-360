@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { appRolePasswordError, ENSURE_APP_ROLE_SQL, restoreFailure } from './database-boot.js';
+import { alterRolePasswordSql, appRolePasswordError, ENSURE_APP_ROLE_SQL, restoreFailure, scramSha256Verifier } from './database-boot.js';
 
 const entry = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../container/entrypoint.mjs'), 'utf8');
 
@@ -21,8 +21,8 @@ function functionBody(source: string, name: string): string {
 describe('polo app role boot', () => {
   it('creates a least-privilege login that is safe to run again', () => {
     expect(ENSURE_APP_ROLE_SQL).toMatch(/IF NOT EXISTS/);
-    expect(ENSURE_APP_ROLE_SQL).toMatch(/CREATE ROLE app_role WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT/);
-    expect(ENSURE_APP_ROLE_SQL).toMatch(/ALTER ROLE app_role WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT/);
+    expect(ENSURE_APP_ROLE_SQL).toMatch(/CREATE ROLE app_role WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT CONNECTION LIMIT 100/);
+    expect(ENSURE_APP_ROLE_SQL).toMatch(/ALTER ROLE app_role WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT CONNECTION LIMIT 100/);
     // WHY: NOSUPERUSER is the server default, so the drill still passes if
     // the word is deleted. The source has to name it.
     expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOSUPERUSER\b/);
@@ -92,17 +92,17 @@ describe('polo app role boot', () => {
   });
 
   it('keeps the production paths and ports when the drill does not override them', () => {
-    expect(entry).toContain("process.env.POLO_APP_ROOT || '/app'");
-    expect(entry).toContain("process.env.POLO_DATA_DIR || '/data'");
+    expect(entry).toContain("overrideInDrill('POLO_APP_ROOT', '/app', false)");
+    expect(entry).toContain("overrideInDrill('POLO_DATA_DIR', '/data', true)");
     expect(entry).toContain("configuredPort('POLO_HTTP_PORT', 8080)");
     expect(entry).toContain("configuredPort('POLO_API_PORT', 4020)");
     expect(entry).toContain("configuredPort('POLO_PG_PORT', 5432)");
     expect(entry).toContain("configuredPort('POLO_REDIS_PORT', 6379)");
     expect(entry).toContain('process.env.POLO_REDIS_HOST');
-    expect(entry).toContain("process.env.POLO_MIGRATE_STAGING || '/tmp/polo-migrate'");
-    expect(entry).toContain("process.env.POLO_SNAPSHOT_DIR || '/tmp/snapshot'");
-    expect(entry).toContain("process.env.POLO_SNAPSHOT_TGZ || '/tmp/snapshot.tgz'");
-    expect(entry).toContain("process.env.POLO_RESTORE_DIR || '/tmp/restore'");
+    expect(entry).toContain("overrideInDrill('POLO_MIGRATE_STAGING', '/tmp/polo-migrate', true)");
+    expect(entry).toContain("overrideInDrill('POLO_SNAPSHOT_DIR', '/tmp/snapshot', true)");
+    expect(entry).toContain("overrideInDrill('POLO_SNAPSHOT_TGZ', '/tmp/snapshot.tgz', true)");
+    expect(entry).toContain("overrideInDrill('POLO_RESTORE_DIR', '/tmp/restore', true)");
     expect(functionBody(entry, 'restoreFrom')).toContain('--no-privileges');
     expect(functionBody(entry, 'restoreFrom')).toContain('LC_ALL');
     expect(entry).toContain("process.env.POLO_RESTORE_DRILL !== '1'");
@@ -123,5 +123,11 @@ describe('polo app role boot', () => {
     expect(appRolePasswordError(leaked)).not.toContain('fix');
     expect(appRolePasswordError(leaked)).not.toContain('ALTER ROLE');
     expect(appRolePasswordError('')).toBe('could not set the app role password (unknown)');
+    const secret = "fix'ture\\pass";
+    const sql = alterRolePasswordSql('no_such_role', scramSha256Verifier(secret));
+    expect(sql).toContain('SCRAM-SHA-256$');
+    expect(sql).not.toContain(secret);
+    const image = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../container/Dockerfile'), 'utf8');
+    expect(image).toContain('pgvector/pgvector:pg16');
   });
 });
