@@ -102,19 +102,19 @@ function renderCard(row = deriveAccount(company(), [])) {
 }
 
 describe('AccountCard coverage explainability', () => {
-  it('shows the reason and next action for sparse signal coverage', () => {
-    renderCard();
+  it('keeps the coverage score and moves the reason onto the meter title', () => {
+    const view = renderCard();
 
-    expect(screen.getByText('Missing Industry, Domain, and Logo.')).toBeTruthy();
-    expect(screen.getByText('Next: Assign an industry to unlock sector routing.')).toBeTruthy();
-    expect(
-      screen.getByLabelText(
-        'Acme coverage insight: Missing Industry, Domain, and Logo. Next: Assign an industry to unlock sector routing.',
-      ),
-    ).toBeTruthy();
+    expect(screen.queryByText('Missing Industry, Domain, and Logo.')).toBeNull();
+    expect(screen.queryByText('Next: Assign an industry to unlock sector routing.')).toBeNull();
+    expect(screen.getByText('0%')).toBeTruthy();
+    expect(view.container.querySelector('.account-card-coverage')?.getAttribute('title')).toBe(
+      'Missing Industry, Domain, and Logo. Next: Assign an industry to unlock sector routing.',
+    );
+    expect(screen.getByRole('link', { name: 'Open Acme customer cockpit' })).toBeTruthy();
   });
 
-  it('shows a complete signal message when every list signal is present', () => {
+  it('keeps a complete signal on the meter title when every list signal is present', () => {
     const row = deriveAccount(
       company({
         industry: 'Manufacturing',
@@ -131,10 +131,14 @@ describe('AccountCard coverage explainability', () => {
       [deal()],
     );
 
-    renderCard(row);
+    const view = renderCard(row);
 
-    expect(screen.getByText('All account list signals are present.')).toBeTruthy();
-    expect(screen.getByText('Next: Open the cockpit to review strategy and activity.')).toBeTruthy();
+    expect(screen.queryByText('All account list signals are present.')).toBeNull();
+    expect(screen.queryByText('Next: Open the cockpit to review strategy and activity.')).toBeNull();
+    expect(screen.getByText('100%')).toBeTruthy();
+    expect(view.container.querySelector('.account-card-coverage')?.getAttribute('title')).toBe(
+      'All account list signals are present. Next: Open the cockpit to review strategy and activity.',
+    );
   });
 });
 

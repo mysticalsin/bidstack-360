@@ -75,6 +75,11 @@ export const PipelineCard = memo(function PipelineCard({
         data-testid="pipeline-card"
         data-opportunity-id={opp.id}
         draggable={canWrite}
+        title={
+          canWrite
+            ? t('crm.pipelineCardMoveTitle', 'Drag, or use ← / → to move stage')
+            : undefined
+        }
         onDragStart={(e) => {
           if (!canWrite) return;
           e.dataTransfer.setData('text/plain', opp.id);

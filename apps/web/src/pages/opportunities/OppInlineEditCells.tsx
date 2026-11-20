@@ -39,6 +39,9 @@ export function StageCell({
     return <Badge tone={stageTone(stage?.name ?? '')}>{stageName}</Badge>;
   }
   if (!editing) {
+    const stageLabel = t('oppInlineEditCells.stageTriggerAria', 'Stage: {{stage}}. Click to change.', {
+      stage: stageName,
+    });
     return (
       <button
         type="button"
@@ -49,9 +52,8 @@ export function StageCell({
           'inline-edit-trigger',
           isSaving && 'opacity-50 cursor-wait pointer-events-none',
         )}
-        aria-label={t('oppInlineEditCells.stageTriggerAria', 'Stage: {{stage}}. Click to change.', {
-          stage: stageName,
-        })}
+        aria-label={stageLabel}
+        title={stageLabel}
       >
         {/* Key on `value` so the badge remounts when the stage changes —
             the spring plays from scale 0.85 → 1, signalling the update.
@@ -144,6 +146,9 @@ export function NumberCell({
     );
   }
   if (!editing) {
+    const numberLabel = t('oppInlineEditCells.numberTriggerAria', '{{value}}. Click to edit.', {
+      value: format(value),
+    });
     return (
       <button
         type="button"
@@ -158,9 +163,8 @@ export function NumberCell({
           align === 'right' && 'text-right',
           isSaving && 'opacity-50 cursor-wait pointer-events-none',
         )}
-        aria-label={t('oppInlineEditCells.numberTriggerAria', '{{value}}. Click to edit.', {
-          value: format(value),
-        })}
+        aria-label={numberLabel}
+        title={numberLabel}
       >
         {format(value)}
       </button>
@@ -225,6 +229,9 @@ export function DateCell({
     return <span className="text-[var(--fg-secondary)]">{format(value)}</span>;
   }
   if (!editing) {
+    const dateLabel = t('oppInlineEditCells.dateTriggerAria', 'Due {{date}}. Click to edit.', {
+      date: format(value),
+    });
     return (
       <button
         type="button"
@@ -238,9 +245,8 @@ export function DateCell({
           'inline-edit-trigger text-[var(--fg-secondary)]',
           isSaving && 'opacity-50 cursor-wait pointer-events-none',
         )}
-        aria-label={t('oppInlineEditCells.dateTriggerAria', 'Due {{date}}. Click to edit.', {
-          date: format(value),
-        })}
+        aria-label={dateLabel}
+        title={dateLabel}
       >
         {format(value)}
       </button>

@@ -2189,7 +2189,7 @@
     "clear": "effacer",
     "stageOpportunities": "opportunités {{stage}}",
     "clearFilter": "effacer le filtre",
-    "bidsInFlight": "{{count}} offres en cours · cliquez sur une cellule pour modifier en ligne.",
+    "bidsInFlight": "{{count}} offres en cours",
     "exportingLabel": "Exportation des opportunités…",
     "exportLabel": "Exporter les opportunités visibles au format CSV",
     "exporting": "Exportation…",
