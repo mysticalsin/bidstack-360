@@ -63,6 +63,13 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-20 LINT: Boot property test dropped the caught error
+
+- **What went wrong:** `pnpm -r lint` failed on `database-boot-transitions.test.ts` because a timeout was rethrown as `new Error(...)` with no `cause`.
+- **Root cause:** The property runner wrapped a caught error in a new infrastructure error and did not pass `{ cause }`. The same `preserve-caught-error` rule is already in this ledger for the OCR helper.
+- **Prevention rule:** Any `throw new Error` inside a `catch` must pass `{ cause: error }`. Rethrowing the original error needs no wrapper.
+- **Files affected:** `apps/polo-preview/src/database-boot-transitions.test.ts`.
+
 ### 2026-11-20 TESTING: Polo restore drill rewrote the host
 
 - **What went wrong:** The restore drill ran under plain `pnpm test` whenever Postgres tools were installed, created `/data` and `/app` with sudo, appended `/etc/hosts`, used fixed ports, and `pkill`ed every redis-server.

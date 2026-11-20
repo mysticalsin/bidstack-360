@@ -273,7 +273,7 @@ describe('database boot transitions', () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (Date.now() - started > 8_000 || /timeout/i.test(message)) {
-        throw new Error(`infrastructure: ${message}`);
+        throw new Error(`infrastructure: ${message}`, { cause: error });
       }
       throw error;
     }
