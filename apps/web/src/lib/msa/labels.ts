@@ -34,8 +34,49 @@ export function fmtBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function groupedUnits(micros: bigint): string {
+  const units = micros / 1_000_000n;
+  return units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/** Compact in en-GB only when two fraction digits still name this unit count. */
+function compactKeepsUnits(units: number): boolean {
+  const abs = Math.abs(units);
+  for (const div of [1e9, 1e6, 1e3]) {
+    if (abs < div) continue;
+    for (let digits = 0; digits <= 2; digits += 1) {
+      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+/** Whole units plus the micros remainder. Integer division alone turns 1.50 into 1. */
+function unitsFromMicros(micros: bigint): number {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const whole = abs / 1_000_000n;
+  const remainder = abs % 1_000_000n;
+  const units = Number(whole) + Number(remainder) / 1_000_000;
+  return negative ? -units : units;
+}
+
 export function fmtMoneyMicros(amountMicros: number, currency: string): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(amountMicros / 1e6);
+  if (!Number.isSafeInteger(amountMicros)) return 'amount not readable';
+  const micros = BigInt(amountMicros);
+  if (!/^[A-Za-z]{3}$/.test(currency)) return `${groupedUnits(micros)} unspecified`;
+  const units = unitsFromMicros(micros);
+  const code = currency.toUpperCase();
+  if (!compactKeepsUnits(units)) {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: code, maximumFractionDigits: 2 }).format(units);
+  }
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: code,
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(units);
 }
 
 /** Deadline urgency for the expiring-soon strip and the list. */
