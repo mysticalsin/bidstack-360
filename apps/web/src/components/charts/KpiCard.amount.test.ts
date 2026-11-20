@@ -16,4 +16,12 @@ describe('formatKpiValue', () => {
   it('keeps an exact million compact', () => {
     expect(formatKpiValue(1_500_000)).toMatch(/1\.5/);
   });
+
+  it('keeps the sign on a negative amount', () => {
+    // WHY: Math.abs on the way into the compact check would show a loss as a gain.
+    expect(formatKpiValue(-7_860_000)).toBe('-7.86m');
+    expect(formatKpiValue(-7_860_000)).not.toBe(formatKpiValue(7_860_000));
+    expect(formatKpiValue(-12_015_000)).toBe('-12,015,000');
+    expect(formatKpiValue(-1_500_000)).toBe('-1.5m');
+  });
 });
