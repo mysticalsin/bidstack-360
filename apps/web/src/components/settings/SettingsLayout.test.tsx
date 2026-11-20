@@ -15,6 +15,14 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/lib/auth', () => ({
   useIsAdmin: () => authMocks.isAdmin,
+  useAuth: () => ({ isSignedIn: true }),
+}));
+
+vi.mock('@/hooks/usePoloIdentity', () => ({
+  usePoloMe: () => ({
+    data: { toggleActor: authMocks.isAdmin ? 'admin' : 'member' },
+    isLoading: false,
+  }),
 }));
 
 vi.mock('@/hooks/useCapabilities', () => ({

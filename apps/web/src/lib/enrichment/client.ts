@@ -4,14 +4,17 @@ import type { Firmographics } from '@bidstack/shared';
 
 import { api } from '@/lib/api';
 
-import { fromApi, isSampleStatus, type ApiHiring, type ApiProjects } from './live';
+import { fromApi, isSampleStatus, noticeFor, type ApiHiring, type ApiProjects } from './live';
+import { mockEnrichment } from './mock';
 import type { CompanyEnrichment } from './types';
 
 const base = (companyId: string) => `/api/companies/${encodeURIComponent(companyId)}/enrichment`;
 
 export async function fetchEnrichment(companyId: string, signal?: AbortSignal): Promise<CompanyEnrichment> {
   const f = await api<Firmographics>(base(companyId), { signal });
-  if (isSampleStatus(f)) {
+  // Real mode says not_connected and must not invent figures. Demo still
+  // substitutes the labelled sample when the API says not configured.
+  if (f.status === 'not_connected') {
     return {
       companyId,
       sample: false,
@@ -22,6 +25,14 @@ export async function fetchEnrichment(companyId: string, signal?: AbortSignal): 
       firmographics: { revenue: null, headcount: null, industry: null, locations: null },
       hiring: { source: 'Not connected', asOf: '', roles: [], total: 0 },
       projects: [],
+    };
+  }
+  if (isSampleStatus(f)) {
+    return {
+      ...mockEnrichment(companyId),
+      status: f.status,
+      notice: noticeFor(f.status) ?? noticeFor('not_configured'),
+      stale: f.stale,
     };
   }
   const [h, p] = await Promise.all([

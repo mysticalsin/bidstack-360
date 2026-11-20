@@ -31,6 +31,10 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto(route, { waitUntil: 'load' });
       await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
       await page.waitForTimeout(300); // Let CSS vars settle
+      // Arrive animations start at opacity 0. Finish them so axe measures the resting color.
+      await page.evaluate(() => {
+        for (const animation of document.getAnimations()) animation.finish();
+      });
 
       const results = await new AxeBuilder({ page })
         .withRules(['color-contrast'])

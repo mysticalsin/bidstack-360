@@ -215,9 +215,32 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && !disableServiceWorke
   } else {
     window.addEventListener('load', registerServiceWorker, { once: true });
   }
+
+  // Identity resolves after load, and the dashboard chunk's modulepreload
+  // links land after that. Re-warm when those links appear so the offline
+  // shell includes every asset the document is actually using.
+  let warmTimer = 0;
+  const scheduleWarm = () => {
+    window.clearTimeout(warmTimer);
+    warmTimer = window.setTimeout(() => {
+      void warmAppShellCache();
+    }, 200);
+  };
+  new MutationObserver(scheduleWarm).observe(document.head, { childList: true, subtree: true });
 }
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
+
+const RUNTIME_IDENTITY_KEY = 'polo:runtime-identity';
+
+function readStoredRuntime(): PoloPublicIdentity | null {
+  try {
+    const raw = sessionStorage.getItem(RUNTIME_IDENTITY_KEY);
+    return raw ? (JSON.parse(raw) as PoloPublicIdentity) : null;
+  } catch {
+    return null;
+  }
+}
 
 function RuntimeAuthRoot({ children }: { children: React.ReactNode }) {
   const [runtime, setRuntime] = React.useState<PoloPublicIdentity | null>(null);
@@ -231,28 +254,39 @@ function RuntimeAuthRoot({ children }: { children: React.ReactNode }) {
         return (await response.json()) as PoloPublicIdentity;
       })
       .then((body) => {
+        sessionStorage.setItem(RUNTIME_IDENTITY_KEY, JSON.stringify(body));
         if (!cancelled) setRuntime(body);
       })
       .catch(() => {
-        if (!cancelled) setFailed(true);
+        if (cancelled) return;
+        const stored = readStoredRuntime();
+        if (stored) setRuntime(stored);
+        else setFailed(true);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (failed) {
+  if (!runtime && !failed) {
     return (
-      <p role="alert" style={{ padding: 24 }}>
-        Polo could not read its runtime mode.
+      <p role="status" style={{ padding: 24, color: '#171717', background: '#ffffff' }}>
+        Loading Polo…
       </p>
     );
   }
   if (!runtime) {
+    // Identity is unreachable (static preview, offline reload). Keep the
+    // sign-in usable, and paint the notice with a pair that clears 4.5:1.
     return (
-      <p role="status" style={{ padding: 24 }}>
-        Loading Polo…
-      </p>
+      <div style={{ color: '#171717', background: '#ffffff' }}>
+        <p role="alert" style={{ padding: 24 }}>
+          Polo could not read its runtime mode.
+        </p>
+        <AuthProvider publishableKey={clerkKey} runtime={{ auth: 'stub', publicDemoDoor: false }}>
+          {children}
+        </AuthProvider>
+      </div>
     );
   }
   return (

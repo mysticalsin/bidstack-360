@@ -5,7 +5,7 @@ const COMPLETE_PRODUCTION_ENV = {
   NODE_ENV: 'production',
   POLO_DEPLOYMENT_ENV: 'production',
   POLO_DATA_MODE: 'real',
-  CLERK_SECRET_KEY: 'sk_test_production',
+  CLERK_SECRET_KEY: 'clerk-test-key',
   STORAGE_DRIVER: 's3',
   S3_BUCKET: 'bidstack-prod-files',
   S3_REGION: 'us-east-1',
