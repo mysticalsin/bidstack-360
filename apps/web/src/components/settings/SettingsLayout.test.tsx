@@ -70,4 +70,18 @@ describe('SettingsLayout', () => {
     expect(screen.getByRole('link', { name: 'Audit log' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Top accounts' })).toBeNull();
   });
+
+  it('shows Demo data to an owner or system Admin and hides it from everyone else', () => {
+    // WHY: fixture numbers are an admin decision. A seller must not be able
+    // to turn sample revenue back on, and must not see the control.
+    renderLayout();
+    expect(screen.getByRole('link', { name: 'Demo data' }).getAttribute('href')).toBe(
+      '/settings?tab=demo-data',
+    );
+
+    cleanup();
+    authMocks.isAdmin = false;
+    renderLayout();
+    expect(screen.queryByRole('link', { name: 'Demo data' })).toBeNull();
+  });
 });
