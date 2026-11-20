@@ -232,16 +232,51 @@ describe('analytics dashboards routes', () => {
         createdDashboardIds.push(dashboardId);
 
         const salesManager = { 'x-bidstack-e2e-role': 'sales-manager' };
-        const denied = await server.inject({
+        const forbidden = 'Only the owner or an admin can modify this dashboard';
+        const ownerWidget = await server.inject({
           method: 'POST',
           url: `/api/dashboards/${dashboardId}/widgets`,
-          headers: salesManager,
-          payload: { title: 'Teammate widget', type: 'kpi' },
+          payload: { title: 'Owner widget', type: 'kpi' },
         });
-        expect(denied.statusCode).toBe(403);
-        expect((denied.json() as { message: string }).message).toBe(
-          'Only the owner or an admin can modify this dashboard',
-        );
+        expect(ownerWidget.statusCode).toBe(201);
+        const widgetId = (ownerWidget.json() as { id: string }).id;
+        createdWidgetIds.push(widgetId);
+
+        const deniedMutations = [
+          server.inject({
+            method: 'PATCH',
+            url: `/api/dashboards/${dashboardId}`,
+            headers: salesManager,
+            payload: { name: 'Taken over' },
+          }),
+          server.inject({
+            method: 'DELETE',
+            url: `/api/dashboards/${dashboardId}`,
+            headers: salesManager,
+          }),
+          server.inject({
+            method: 'POST',
+            url: `/api/dashboards/${dashboardId}/widgets`,
+            headers: salesManager,
+            payload: { title: 'Teammate widget', type: 'kpi' },
+          }),
+          server.inject({
+            method: 'PATCH',
+            url: `/api/dashboards/${dashboardId}/widgets/${widgetId}`,
+            headers: salesManager,
+            payload: { title: 'Taken over' },
+          }),
+          server.inject({
+            method: 'DELETE',
+            url: `/api/dashboards/${dashboardId}/widgets/${widgetId}`,
+            headers: salesManager,
+          }),
+        ];
+        for (const pending of deniedMutations) {
+          const denied = await pending;
+          expect(denied.statusCode).toBe(403);
+          expect((denied.json() as { message: string }).message).toBe(forbidden);
+        }
 
         const widgets = await server.inject({
           method: 'GET',
@@ -249,7 +284,15 @@ describe('analytics dashboards routes', () => {
           headers: salesManager,
         });
         expect(widgets.statusCode).toBe(200);
-        expect(widgets.json()).toEqual([]);
+        const listed = widgets.json() as Array<{ id: string; title: string }>;
+        expect(listed.map((widget) => widget.id)).toEqual([widgetId]);
+        expect(listed[0]?.title).toBe('Owner widget');
+        const stillThere = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${dashboardId}`,
+        });
+        expect(stillThere.statusCode).toBe(200);
+        expect((stillThere.json() as { name: string }).name).toBe('Owner shared board');
       } finally {
         if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
         else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
@@ -313,21 +356,20 @@ describe('analytics dashboards routes', () => {
         const managerDashboardId = (ownedByManager.json() as { id: string }).id;
         createdDashboardIds.push(managerDashboardId);
 
-        const managerList = await server.inject({
+        const managerDetail = await server.inject({
           method: 'GET',
-          url: '/api/dashboards',
+          url: `/api/dashboards/${managerDashboardId}`,
           headers: salesManager,
         });
-        const managerRow = (
-          managerList.json() as Array<{ id: string; canEdit?: boolean }>
-        ).find((d) => d.id === managerDashboardId);
-        expect(managerRow?.canEdit).toBe(true);
+        expect(managerDetail.statusCode).toBe(200);
+        expect((managerDetail.json() as { canEdit?: boolean }).canEdit).toBe(true);
 
-        const adminList = await server.inject({ method: 'GET', url: '/api/dashboards' });
-        const adminRow = (adminList.json() as Array<{ id: string; canEdit?: boolean }>).find(
-          (d) => d.id === managerDashboardId,
-        );
-        expect(adminRow?.canEdit).toBe(true);
+        const adminDetail = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${managerDashboardId}`,
+        });
+        expect(adminDetail.statusCode).toBe(200);
+        expect((adminDetail.json() as { canEdit?: boolean }).canEdit).toBe(true);
 
         const ownedByAdmin = await server.inject({
           method: 'POST',
@@ -338,15 +380,13 @@ describe('analytics dashboards routes', () => {
         const adminDashboardId = (ownedByAdmin.json() as { id: string }).id;
         createdDashboardIds.push(adminDashboardId);
 
-        const teammateList = await server.inject({
+        const teammateDetail = await server.inject({
           method: 'GET',
-          url: '/api/dashboards',
+          url: `/api/dashboards/${adminDashboardId}`,
           headers: salesManager,
         });
-        const teammateRow = (
-          teammateList.json() as Array<{ id: string; canEdit?: boolean }>
-        ).find((d) => d.id === adminDashboardId);
-        expect(teammateRow?.canEdit).toBe(false);
+        expect(teammateDetail.statusCode).toBe(200);
+        expect((teammateDetail.json() as { canEdit?: boolean }).canEdit).toBe(false);
       } finally {
         if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
         else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
