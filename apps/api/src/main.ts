@@ -18,7 +18,7 @@ initSentry();
 const { initTelemetry, shutdownTelemetry } = await import('./otel.js');
 initTelemetry();
 
-const { prisma } = await import('@bidstack/db');
+const { prisma, rebaseDemoFixturePostings } = await import('@bidstack/db');
 const { buildServer } = await import('./server.js');
 const { getEnv } = await import('./env.js');
 const { redis } = await import('./redis.js');
@@ -73,6 +73,10 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 try {
+  // The preview restores a snapshot instead of reseeding. Move fixture job
+  // postings forward before the first request so Open jobs is not zero.
+  // Real mode returns without a write.
+  await rebaseDemoFixturePostings(prisma);
   await server.listen({ port, host });
   await startAgreementIngestConsumer();
   await startAccountActivityAlertsConsumer();

@@ -142,8 +142,11 @@ function emptyModel() {
   };
 }
 
-vi.mock('@bidstack/db', () => ({
-  prisma: new Proxy(
+vi.mock('@bidstack/db', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    prisma: new Proxy(
     {},
     {
       get(_target, model: string) {
@@ -189,8 +192,9 @@ vi.mock('@bidstack/db', () => ({
         return emptyModel();
       },
     },
-  ),
-}));
+    ),
+  };
+});
 
 /** Same shape the seed writes: last seen one day before the seed clock, posted `daysAgo` before it. */
 function seedPosting(orgId: string, companyId: string, source: string, daysAgo: number, seededAt: Date, id: string): Posting {

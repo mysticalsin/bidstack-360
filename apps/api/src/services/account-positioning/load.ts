@@ -1,7 +1,8 @@
 // Account positioning (v24): what to position, account brief facts, gaps and
-// risks, and the key-numbers strip. Read only, built from data already held.
+// risks, and the key-numbers strip. Built from data already held.
 // Nothing is estimated: a number with no source comes back as null.
-import { prisma } from '@bidstack/db';
+// In demo mode the key-numbers read first moves fixture job postings forward.
+import { prisma, rebaseDemoFixturePostings } from '@bidstack/db';
 import { capDealSample, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros.js';
 import {
   buildGaps,
@@ -308,6 +309,10 @@ function monthly(dates: Date[], now: Date, n: number): number[] {
 }
 
 export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyId: string, now = new Date()): Promise<AccountKeyNumbers> {
+  // DEMO fixture rows are dated at seed time. Rebase them before the 45-day
+  // window, or a restored snapshot reports zero open jobs. Real mode and any
+  // other org return without a write.
+  await rebaseDemoFixturePostings(prisma, { orgId, now });
   const c: Ctx = { orgId, scope, companyId, now };
   const ids = (await groupMap(orgId, [companyId])).get(companyId) ?? [companyId];
   const live = await companiesWithLiveSignals(orgId, ids);
