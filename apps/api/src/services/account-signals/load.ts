@@ -27,20 +27,49 @@ export interface OppRow {
   createdAt: Date;
   updatedAt: Date;
   closedAt?: Date | null;
+  pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
+}
+
+/**
+ * Lost wins when the enum or a live stage says lost. A soft-deleted stage
+ * does not close the deal.
+ */
+export function recordedOutcome(o: {
+  stage: string;
+  pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
+}): 'won' | 'lost' | 'open' {
+  const live = o.pipelineStage?.deletedAt ? null : o.pipelineStage;
+  if (o.stage === 'closed_lost' || live?.isLost) return 'lost';
+  if (o.stage === 'closed_won' || live?.isWon) return 'won';
+  return 'open';
 }
 
 /** When a deal closed: closedAt, or the last update for deals closed before closedAt existed. */
 export function closedAtOf(o: OppRow): Date | null {
-  if (o.stage !== 'closed_won' && o.stage !== 'closed_lost') return null;
+  if (recordedOutcome(o) === 'open') return null;
   return o.closedAt ?? o.updatedAt;
 }
 
 export function toMomentumOpp(o: OppRow): MomentumOpp {
-  const outcome = o.stage === 'closed_won' ? 'won' : o.stage === 'closed_lost' ? 'lost' : 'open';
-  return { createdAt: o.createdAt, closedAt: closedAtOf(o), outcome, valueMicros: o.valueMicros };
+  return {
+    createdAt: o.createdAt,
+    closedAt: closedAtOf(o),
+    outcome: recordedOutcome(o),
+    valueMicros: o.valueMicros,
+  };
 }
 
-export const OPP_SELECT = { id: true, companyId: true, name: true, stage: true, valueMicros: true, createdAt: true, updatedAt: true, closedAt: true } as const;
+export const OPP_SELECT = {
+  id: true,
+  companyId: true,
+  name: true,
+  stage: true,
+  valueMicros: true,
+  createdAt: true,
+  updatedAt: true,
+  closedAt: true,
+  pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+} as const;
 
 /** Root account plus its direct children (one level: subsidiaries roll up). */
 export async function groupMap(orgId: string, rootIds: string[]): Promise<Map<string, string[]>> {
@@ -110,7 +139,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
     const t = at(o.companyId);
     if (!t) continue;
     t.data.opps.push(toMomentumOpp(o));
-    if (o.stage !== 'closed_won' && o.stage !== 'closed_lost') t.openPipelineMicros += o.valueMicros;
+    if (recordedOutcome(o) === 'open') t.openPipelineMicros += o.valueMicros;
   }
   for (const m of meetings) at(m.companyId)?.data.meetings.push(m.heldAt);
   for (const p of postings) if (p.postedAt) at(p.companyId)?.data.postings.push(p.postedAt);
