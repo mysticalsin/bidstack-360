@@ -81,5 +81,47 @@ it('a HubSpot start keeps startedAt on the database clock when the API clock is 
     WHERE org_id = ${org.id}::uuid AND source = 'HUBSPOT_OAUTH'
   `;
   expect(rows[0]?.skew ?? 99).toBeLessThan(2);
+  const stored = await prisma.migrationJob.findFirstOrThrow({
+    where: { orgId: org.id, source: 'HUBSPOT_OAUTH' },
+  });
+  const attemptId = (stored.meta as { attemptId?: string }).attemptId ?? '';
+  await prisma.auditLog.create({
+    data: {
+      orgId: org.id,
+      userId: user.id,
+      action: 'migration.cancel.requested',
+      targetType: 'MigrationJob',
+      targetId: stored.id,
+      diff: { attemptId },
+    },
+  });
+  const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
+  await processMigrationChunk(
+    {
+      migrationJobId: stored.id,
+      orgId: org.id,
+      userId: user.id,
+      source: 'CSV',
+      entityType: 'companies',
+      chunkOffset: 0,
+      chunkSize: 100,
+      totalRows: 1,
+      redisKey: 'rows',
+      mappings: { Name: 'company.name' },
+      dedupStrategy: 'skip',
+      attemptId,
+      hubspotAfter: undefined,
+    },
+    {
+      readRows: async () => JSON.stringify([{ Name: 'HubSpot Clock Co' }]),
+      enqueueChunk: async () => undefined,
+      enqueueIntel: async () => undefined,
+      env: {},
+    },
+    { info: () => undefined, warn: () => undefined },
+  );
+  const after = await prisma.migrationJob.findUniqueOrThrow({ where: { id: stored.id } });
+  expect(after.status).toBe('CANCELLED');
+  expect(await prisma.company.count({ where: { orgId: org.id, name: 'HubSpot Clock Co' } })).toBe(0);
   await prisma.org.delete({ where: { id: org.id } });
 });

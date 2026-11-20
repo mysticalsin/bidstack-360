@@ -111,6 +111,7 @@ skipIfNoDb('a finished null-attempt mark does not cancel the next attempt', asyn
 skipIfNoDb('a null mark at the same instant as started_at still cancels that attempt', async () => {
   // WHY: the null-mark check is started_at >= mark.at. An equal timestamp
   // is still the same attempt. Changing >= to > lets this attempt finish.
+  const name = `Equal Clock ${randomUUID().slice(0, 8)}`;
   const job = await createJob({ status: 'RUNNING' });
   const attemptId = randomUUID();
   await prisma.migrationJob.update({
@@ -155,7 +156,7 @@ skipIfNoDb('a null mark at the same instant as started_at still cancels that att
       attemptId,
     },
     {
-      readRows: async () => JSON.stringify([{ Name: 'Equal Clock Co' }]),
+      readRows: async () => JSON.stringify([{ Name: name }]),
       enqueueChunk: async () => undefined,
       enqueueIntel: async () => undefined,
       env: {},
@@ -164,7 +165,8 @@ skipIfNoDb('a null mark at the same instant as started_at still cancels that att
   );
   const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
   expect(stored.status).toBe('CANCELLED');
-  expect(await prisma.company.count({ where: { orgId: job.orgId, name: 'Equal Clock Co' } })).toBe(0);
+  expect(await prisma.company.count({ where: { orgId: job.orgId, name } })).toBe(0);
+  await prisma.company.deleteMany({ where: { orgId: job.orgId, name } });
   await purgeAuditRows({
     where: { targetId: job.id, action: { in: ['migration.cancel.requested', 'migration.cancel'] } },
   });

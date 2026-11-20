@@ -97,6 +97,7 @@ async function jobsWithPendingCancel(orgId: string, ids: string[]): Promise<Set<
             OR (
               (mark.diff->>'attemptId') IS NULL
               AND (job.meta->>'attemptId') IS NOT NULL
+              AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
             )
           )
           AND NOT EXISTS (
@@ -643,6 +644,16 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
                   diff: { attemptId },
                 },
               });
+              await prisma.auditLog.create({
+                data: {
+                  orgId,
+                  userId,
+                  action: 'migration.cancel.resolved',
+                  targetType: 'MigrationJob',
+                  targetId: job.id,
+                  diff: { reason: 'cancelled' },
+                },
+              });
               claimed = 'cancelled';
             }
           } else {
@@ -1081,6 +1092,18 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
                 action: 'migration.cancel',
                 targetType: 'MigrationJob',
                 targetId: job.id,
+              },
+            });
+            // The attempt this mark applied to is over. A later attempt on
+            // the same job must not inherit it.
+            await tx.auditLog.create({
+              data: {
+                orgId,
+                userId,
+                action: 'migration.cancel.resolved',
+                targetType: 'MigrationJob',
+                targetId: job.id,
+                diff: { reason: 'cancelled' },
               },
             });
             return 'cancelled';

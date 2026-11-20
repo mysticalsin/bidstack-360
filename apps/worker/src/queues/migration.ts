@@ -252,6 +252,7 @@ async function cancelWasRequested(
           ${preStart}::boolean
           AND (mark.diff->>'attemptId') IS NULL
           AND ${attemptId}::text IS NOT NULL
+          AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
         )
       )
       AND NOT EXISTS (
@@ -334,6 +335,16 @@ export async function applyMarkedCancel(
       targetType: 'MigrationJob',
       targetId: jobId,
       diff: { via: MIGRATION_CANCEL_REQUESTED },
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      userId: mark.userId,
+      action: 'migration.cancel.resolved',
+      targetType: 'MigrationJob',
+      targetId: jobId,
+      diff: { reason: 'cancelled' },
     },
   });
 }
@@ -926,6 +937,7 @@ export async function maybeComplete(
             OR (
               (mark.diff->>'attemptId') IS NULL
               AND ${attemptId}::text IS NOT NULL
+              AND COALESCE(migration_jobs.started_at, '-infinity'::timestamptz) >= mark.at
             )
           )
           AND NOT EXISTS (
