@@ -6,6 +6,8 @@
 // other org, must keep the dates that were stored.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fixturePostingShiftMs } from '@bidstack/db';
+
 import type { AccessScope } from '../../lib/access-scope.js';
 import { loadKeyNumbers } from './load.js';
 
@@ -53,6 +55,7 @@ const scope: AccessScope = {
 
 const postings: Posting[] = [];
 const writes: string[] = [];
+const orgLookups: string[] = [];
 
 function stamp(rows: Posting[]) {
   return rows.map((row) => ({
@@ -172,6 +175,7 @@ vi.mock('@bidstack/db', async (importOriginal) => {
         if (model === 'org') {
           return {
             findUnique: async ({ where }: { where: { id: string } }) => {
+              orgLookups.push(where.id);
               if (where.id === FIXTURE_ORG) return { clerkOrg: FIXTURE_CLERK };
               if (where.id === OTHER_ORG) return { clerkOrg: 'org_live_other' };
               return null;
@@ -211,17 +215,24 @@ function seedPosting(orgId: string, companyId: string, source: string, daysAgo: 
   };
 }
 
-function openJobs(orgId: string, companyId: string) {
-  return loadKeyNumbers(orgId, scope, companyId, NOW).then((body) => {
+function openJobs(orgId: string, companyId: string, now = NOW) {
+  return loadKeyNumbers(orgId, scope, companyId, now).then((body) => {
     const item = body.items.find((entry) => entry.id === 'open_jobs');
     return item?.value ?? 0;
   });
+}
+
+/** Seen time the open-jobs window must use: the cohort anchor moved to now minus one day. */
+function projectedSeen(rows: Posting[], now: Date): number {
+  const anchor = rows[0]!.lastSeenAt.getTime();
+  return anchor + fixturePostingShiftMs(rows, now);
 }
 
 describe('demo fixture open jobs', () => {
   beforeEach(() => {
     postings.length = 0;
     writes.length = 0;
+    orgLookups.length = 0;
     const aged = new Date(NOW.getTime() - 80 * DAY);
     const ancient = new Date(NOW.getTime() - 400 * DAY);
     postings.push(
@@ -270,5 +281,35 @@ describe('demo fixture open jobs', () => {
     expect(await openJobs(FIXTURE_ORG, FIXTURE_CO)).toBe(fresh);
     expect(await openJobs(FIXTURE_ORG, ANCIENT_CO)).toBe(ancientOpen);
     expect(stamp(postings)).toEqual(afterFirst);
+  });
+
+  it('reads an explicit demo clock, never writes, and leaves another org fixture row at its stored time', async () => {
+    const aged = new Date(NOW.getTime() - 80 * DAY);
+    postings.push(seedPosting(OTHER_ORG, OTHER_CO, 'fixture', 5, aged, 'other-fixture'));
+    const original = stamp(postings);
+    const cohort = postings.filter((row) => row.companyId === FIXTURE_CO && row.source === 'fixture');
+    const later = new Date('2027-06-15T00:00:00.000Z');
+
+    // WHY: lag 0, lag 2d, and a shift of plus or minus one day still look "open".
+    // The seen stamp has to land on now minus one day at every clock.
+    expect(projectedSeen(cohort, NOW)).toBe(NOW.getTime() - DAY);
+    expect(projectedSeen(cohort, later)).toBe(later.getTime() - DAY);
+
+    delete process.env.POLO_DATA_MODE;
+    orgLookups.length = 0;
+    writes.length = 0;
+    expect(await openJobs(FIXTURE_ORG, FIXTURE_CO)).toBe(0);
+    expect(writes).toEqual([]);
+    expect(orgLookups).toEqual([]);
+    expect(stamp(postings)).toEqual(original);
+
+    vi.stubEnv('POLO_DATA_MODE', 'demo');
+    writes.length = 0;
+    expect(await openJobs(FIXTURE_ORG, FIXTURE_CO)).toBe(3);
+    expect(await openJobs(FIXTURE_ORG, FIXTURE_CO, later)).toBe(3);
+    expect(await openJobs(OTHER_ORG, OTHER_CO)).toBe(0);
+    expect(writes).toEqual([]);
+    expect(stamp(postings.filter((row) => row.id === 'other-fixture'))).toEqual(original.filter((row) => row.id === 'other-fixture'));
+    expect(stamp(postings)).toEqual(original);
   });
 });
