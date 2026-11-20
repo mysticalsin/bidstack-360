@@ -226,6 +226,7 @@ async function cancelWasRequested(
   orgId: string,
   jobId: string,
   attemptId: string | null,
+  preStart = true,
 ): Promise<boolean> {
   const rows = await db.$queryRaw<Array<{ ok: number }>>`
     SELECT 1 AS ok
@@ -248,9 +249,9 @@ async function cancelWasRequested(
           AND mark.at >= COALESCE(job.started_at, '-infinity'::timestamptz)
         )
         OR (
-          (mark.diff->>'attemptId') IS NULL
+          ${preStart}::boolean
+          AND (mark.diff->>'attemptId') IS NULL
           AND ${attemptId}::text IS NOT NULL
-          AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
         )
       )
       AND NOT EXISTS (
@@ -273,8 +274,9 @@ async function pendingCancelForAttempt(
   orgId: string,
   jobId: string,
   attemptId: string | null,
+  preStart = true,
 ): Promise<boolean> {
-  return cancelWasRequested(prisma, orgId, jobId, attemptId);
+  return cancelWasRequested(prisma, orgId, jobId, attemptId, preStart);
 }
 
 export async function applyMarkedCancel(
@@ -293,6 +295,22 @@ export async function applyMarkedCancel(
     select: { userId: true, diff: true },
   });
   if (!mark?.userId) return;
+  const currentJob = await prisma.migrationJob.findFirst({
+    where: { id: jobId, orgId },
+    select: { totalRows: true, processedRows: true, errorRows: true, status: true },
+  });
+  if (
+    currentJob &&
+    currentJob.totalRows > 0 &&
+    currentJob.processedRows + currentJob.errorRows >= currentJob.totalRows &&
+    (currentJob.status === 'RUNNING' || currentJob.status === 'PENDING')
+  ) {
+    await prisma.migrationJob.updateMany({
+      where: { id: jobId, orgId, status: { in: ['PENDING', 'RUNNING'] } },
+      data: { status: 'COMPLETE', completedAt: new Date() },
+    });
+    return;
+  }
   const moved = await prisma.migrationJob.updateMany({
     where: { id: jobId, orgId, status: { in: [...migrationFrom('cancel')] } },
     data: { status: 'CANCELLED', completedAt: new Date() },
@@ -924,7 +942,6 @@ export async function maybeComplete(
             OR (
               (mark.diff->>'attemptId') IS NULL
               AND ${attemptId}::text IS NOT NULL
-              AND COALESCE(migration_jobs.started_at, '-infinity'::timestamptz) >= mark.at
             )
           )
           AND NOT EXISTS (
@@ -1401,7 +1418,10 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
     // The worker died after Cancel had already been accepted. Failing the job
     // offers Retry, and the pending mark would then cancel that attempt.
     if (
-      await pendingCancelForAttempt(job.orgId, job.id, migrationAttemptId(job.meta))
+      // A pre-start mark is not this attempt. Failing the job leaves it
+      // retryable. The retry claim clears that mark. Binding it here would
+      // cancel the retry the sweep just made possible.
+      await pendingCancelForAttempt(job.orgId, job.id, migrationAttemptId(job.meta), false)
     ) {
       await applyMarkedCancel(job.orgId, job.id, { info() {} });
       const stored = await prisma.migrationJob.findUnique({

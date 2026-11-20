@@ -156,6 +156,16 @@ function retryConflictSettled(error: unknown): boolean {
   );
 }
 
+function importAlreadyFinished(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 409) return false;
+  const body = error.body;
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === 'IMPORT_FINISHED'
+  );
+}
+
 function retryConflictCopy(
   t: (key: string, fallback: string) => string,
   error: unknown,
@@ -625,8 +635,8 @@ export function CsvImportWizard() {
             // A double-tap on Retry can land on Cancel once the job flips to
             // RUNNING and the button swaps. That tap is not a cancel.
             if (Date.now() - retryTapAt.current < 750) return;
-            if (!jobId || cancel.isPending) return;
-            cancel.mutate(jobId, {
+            if (!candidateId || cancel.isPending) return;
+            cancel.mutate(candidateId, {
               onSuccess: (updated) => {
                 if (updated.cancelRequested) setCancelRequested(true);
               },
@@ -645,7 +655,7 @@ export function CsvImportWizard() {
           cancelPending={cancel.isPending}
           cancelRequested={cancelRequested}
           retryPending={retry.isPending}
-          actionFailed={cancel.isError || retry.isError}
+          actionFailed={(cancel.isError && !importAlreadyFinished(cancel.error)) || retry.isError}
           retryError={retry.error}
         />
       )}
