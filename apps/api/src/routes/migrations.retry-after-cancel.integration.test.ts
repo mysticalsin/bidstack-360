@@ -1,6 +1,12 @@
 // WHY: a cancel mark with no attempt id binds to every later attempt. A
 // retry after that cancel is cancelled at 0 rows. The retry is a new
 // intent and has to run.
+//
+// I-9: that binding is the null-attempt branch in the worker
+// (migration.ts cancelWasRequested and maybeComplete, the OR that matches
+// a mark with no attempt id when the attempt started at or after the mark).
+// The retry claim resolves those marks first, so this later attempt is not
+// the start the mark was for.
 
 import { randomUUID } from 'node:crypto';
 
