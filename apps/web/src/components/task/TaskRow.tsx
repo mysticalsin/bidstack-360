@@ -12,7 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/cn';
-import { daysUntil, formatDate } from '@/lib/format';
+import { daysUntil, formatDate, isLateDueDay } from '@/lib/format';
 
 import type { Task } from '@bidstack/shared';
 
@@ -54,7 +54,7 @@ export const TaskRow = memo(function TaskRow({
       ? 'none'
       : task.status === 'done'
         ? 'done'
-        : d < 0
+        : isLateDueDay(d)
           ? 'overdue'
           : d === 0
             ? 'today'
