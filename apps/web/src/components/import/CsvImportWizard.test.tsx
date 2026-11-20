@@ -289,6 +289,25 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
   });
 
+  it('disables Cancel when the polled job already has cancelRequested and nobody clicked', async () => {
+    // WHY: cancelRequested lived only in this tab's React state. A reload or
+    // a second tab polled a job that was already pending cancel and still
+    // offered Cancel.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'RUNNING',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [],
+      cancelRequested: true,
+    });
+    const button = await screen.findByRole('button', { name: 'Cancelling…' });
+    expect(button).toHaveProperty('disabled', true);
+    expect(hookMocks.cancelMutate).not.toHaveBeenCalled();
+  });
+
   it('offers retry only after a failure that imported nothing', async () => {
     // WHY: an enqueue failure must be visible and retryable. A failure that
     // already wrote rows must not offer a replay of the same file.

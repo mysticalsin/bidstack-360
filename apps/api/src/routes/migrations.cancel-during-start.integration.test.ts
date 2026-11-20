@@ -55,11 +55,16 @@ it(
     await held;
 
     try {
+      const started = Date.now();
       const cancel = await ctx.server.inject({
         method: 'DELETE',
         url: `/api/v1/migrations/${job.id}/cancel`,
       });
+      const cancelMs = Date.now() - started;
       expect(cancel.statusCode).toBe(202);
+      expect(cancel.json<{ cancelRequested?: boolean }>().cancelRequested).toBe(true);
+      expect(cancelMs).toBeGreaterThanOrEqual(2_000);
+      expect(cancelMs).toBeLessThan(5_000);
       const mark = await prisma.auditLog.findFirst({
         where: {
           targetId: job.id,
@@ -90,6 +95,8 @@ it(
     await prisma.$executeRaw`
       UPDATE migration_jobs SET started_at = NOW() WHERE id = ${job.id}::uuid
     `;
+    const claimed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect((claimed.meta as { attemptId?: string }).attemptId).toBe(attemptId);
 
     const { processMigrationChunk } = await import('../../../worker/src/queues/migration.js');
     await processMigrationChunk(
@@ -117,13 +124,18 @@ it(
     );
 
     const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
-    expect(stored.status).not.toBe('COMPLETE');
-    expect(stored.status).toBe('CANCELLED');
-    expect(await prisma.company.count({ where: { orgId: job.orgId, name: companyName } })).toBe(0);
+    const applied = await prisma.auditLog.count({
+      where: { targetId: job.id, action: 'migration.cancel' },
+    });
     const lost = await prisma.auditLog.count({
       where: { targetId: job.id, action: 'migration.cancel.lost' },
     });
-    expect(lost).toBe(0);
+    expect({ status: stored.status, cancel: applied, lost }).toEqual({
+      status: 'CANCELLED',
+      cancel: 1,
+      lost: 0,
+    });
+    expect(await prisma.company.count({ where: { orgId: job.orgId, name: companyName } })).toBe(0);
     await purgeAuditRows({
       where: {
         targetId: job.id,

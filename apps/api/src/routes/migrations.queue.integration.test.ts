@@ -15,10 +15,10 @@ import {
   useIsolatedOrgAuth,
   type IsolatedOrg,
 } from '../test-support/isolated-org.js';
-import { advanceCsvStartRateLimitForTests } from './migrations.js';
 import { retireActiveImports } from './migrations.test-helpers.js';
 
-let server: FastifyInstance;
+let server!: FastifyInstance;
+let serverOpen = false;
 let org: IsolatedOrg;
 let restoreAuth: () => void;
 let dbReachable = false;
@@ -33,19 +33,23 @@ beforeAll(async () => {
   }
   org = await createIsolatedOrg('migration-queue');
   restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
-  server = await buildServer();
-  await server.ready();
 }, 120_000);
 
 afterAll(async () => {
-  if (server) await server.close();
+  if (serverOpen) await server.close();
   restoreAuth?.();
   if (org) await dropIsolatedOrg(org.orgId);
 });
 
 beforeEach(async () => {
-  advanceCsvStartRateLimitForTests();
-  if (org) await retireActiveImports(org.orgId);
+  // A new server has a new in-memory rate-limit store. The suite starts more
+  // than ten imports a minute as one user; production keeps that bucket.
+  if (!dbReachable || !org) return;
+  if (serverOpen) await server.close();
+  server = await buildServer();
+  serverOpen = true;
+  await server.ready();
+  await retireActiveImports(org.orgId);
 });
 
 const t = (name: string, fn: () => Promise<void>) =>
