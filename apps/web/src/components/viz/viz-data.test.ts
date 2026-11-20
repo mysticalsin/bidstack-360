@@ -61,4 +61,23 @@ describe('viz-data', () => {
     expect(fmtCompact(12_015_000)).toBe('12,015,000');
     expect(fmtCompact(1_500_000)).toMatch(/1\.5/);
   });
+
+  it('compacts a fractional amount instead of printing the full figure', () => {
+    // WHY: 11,595,650.688 was printed as 11,595,650.688 and wrapped the dashboard hero.
+    // A fraction must use the same compact label as an integer of that size.
+    // Main's one-digit compact is 11.6m for that figure and 7.1m for 7,060,500.
+    expect(fmtCompact(11_595_650.688)).toBe('11.6m');
+    expect(fmtCompact(7_060_500)).toBe('7.1m');
+    expect(fmtCompact(999.4)).toBe('999.4');
+    expect(fmtCompact(0.5)).toBe('0.5');
+    expect(fmtCompact(1_000.4)).toBe('1k');
+    expect(fmtCompact(-11_595_650.688)).toBe('-11.6m');
+    expect(fmtCompact(-999.4)).toBe('-999.4');
+    expect(fmtCompact(-0.5)).toBe('-0.5');
+    expect(fmtCompact(Number.NaN)).toBe('NaN');
+    expect(fmtCompact(Number.POSITIVE_INFINITY)).toBe('∞');
+    expect(fmtCompact(Number.NEGATIVE_INFINITY)).toBe('-∞');
+    // Half a unit is what a micros remainder looks like once it is no longer a whole unit.
+    expect(fmtCompact(1_500_000.5)).toBe('1.5m');
+  });
 });
