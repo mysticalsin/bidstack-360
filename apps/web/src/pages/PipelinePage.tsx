@@ -370,6 +370,7 @@ export function PipelinePage() {
       ) : (
         <div
           ref={boardRef}
+          data-testid="pipeline-board"
           className={
             // One stage fills the screen. Otherwise the rail snaps to whole
             // columns: the minimum 280px track stays as the fallback until

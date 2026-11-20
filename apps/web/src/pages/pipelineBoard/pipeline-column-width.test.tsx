@@ -8,7 +8,6 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 import { PipelinePage } from '../PipelinePage';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
-import { useStageMutation } from '@/hooks/useStageMutation';
 
 import {
   PIPELINE_COLUMN_GAP_PX,
