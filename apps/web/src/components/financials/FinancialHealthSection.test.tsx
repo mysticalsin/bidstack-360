@@ -3,10 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SAMPLE_FINANCIAL_PERIODS, SAMPLE_FINANCIAL_SIGNALS, type AccountFinancials } from '@bidstack/shared';
 
 const state: { data?: AccountFinancials; isLoading: boolean; isError: boolean } = { isLoading: false, isError: false };
+const identity: { dataMode: 'demo' | 'real' } = { dataMode: 'demo' };
 const mutate = vi.fn();
 vi.mock('@/hooks/useAccountFinancials', () => ({
   useAccountFinancials: () => ({ ...state, refetch: vi.fn() }),
   useTrackFinancials: () => ({ mutate, isPending: false, isError: false }),
+}));
+vi.mock('@/hooks/usePoloIdentity', () => ({
+  usePoloPublicIdentity: () => ({ data: { dataMode: identity.dataMode }, isLoading: false }),
 }));
 
 import { FinancialHealthSection } from './FinancialHealthSection';
@@ -87,10 +91,22 @@ describe('FinancialHealthSection', () => {
   });
 
   it('sample state is labelled Sample everywhere', () => {
+    identity.dataMode = 'demo';
     state.data = { ...real, status: 'pending', statusCopy: 'Queued: the next financials pull will fill this in.', entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: SAMPLE_FINANCIAL_SIGNALS, sample: true };
     render(<FinancialHealthSection companyId="c1" />);
     expect(screen.getAllByText('Sample').length).toBeGreaterThan(2);
     expect(screen.getByTestId('fh-tile-revenue').querySelector('a')).toBeNull();
+  });
+
+  it('does not render sample filings when the data mode is real', () => {
+    // WHY: the section paints whatever periods the API marked sample. Real mode
+    // must not show that example, even if a payload still carries it.
+    identity.dataMode = 'real';
+    state.data = { ...real, status: 'pending', statusCopy: 'Queued: the next financials pull will fill this in.', entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: SAMPLE_FINANCIAL_SIGNALS, sample: true };
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.queryByText('11.0%')).toBeNull();
+    identity.dataMode = 'demo';
   });
 
   it('falls back to net margin for banks and formats money', () => {
