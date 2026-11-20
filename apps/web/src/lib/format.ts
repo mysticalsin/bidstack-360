@@ -67,10 +67,22 @@ export function formatDate(iso: string | null | undefined, locale?: string): str
   });
 }
 
-export function daysUntil(iso: string | null | undefined): number | null {
+export function daysUntil(
+  iso: string | null | undefined,
+  now: Date = new Date(Date.now()),
+  // Accepted so a test can name the viewer's zone. Still ignored: the
+  // comparison below is rounded UTC milliseconds.
+  _timeZone?: string,
+): number | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
+  const ms = new Date(iso).getTime() - now.getTime();
   return Math.round(ms / (1000 * 60 * 60 * 24));
+}
+
+/** Yesterday is -1 and is late. Today is 0 and is not. `< -1` would hide the
+ *  first late calendar day. */
+export function isLateDueDay(days: number): boolean {
+  return days < 0;
 }
 
 export function formatStage(stage: string): string {

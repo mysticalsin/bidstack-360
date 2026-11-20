@@ -134,6 +134,9 @@ describe('Tasks list — one date, no due sentence', () => {
     vi.restoreAllMocks();
   });
 
+  // Regression guard. This was already green on the commit that added it:
+  // an empty list has no due line, so it cannot fail when that line is removed.
+  // It stays to catch a due sentence or a warning glyph on the empty page.
   it('shows the empty state and no due line when there are no tasks', () => {
     mockTasks([]);
     renderPage();
@@ -242,5 +245,41 @@ describe('Tasks list — one date, no due sentence', () => {
     expect(undated.textContent).toBe('—');
     expect(undated.getAttribute('aria-label')).toBe('No due date');
     expect(undated.querySelector('[data-testid="task-due-mark"]')).toBeNull();
+  });
+});
+
+describe('Tasks list — a date-only today stays today after noon UTC', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-11-20T15:00:00Z').getTime());
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('does not mark a task due today as overdue at 15:00 UTC', () => {
+    mockTasks([
+      task({ id: 'today-afternoon', title: 'Call the buyer', dueDate: '2026-11-20', status: 'open' }),
+    ]);
+    renderPage();
+
+    expect(dueOf('Call the buyer').getAttribute('data-urgency')).toBe('today');
+  });
+
+  it('marks yesterday overdue when the count is exactly one day', () => {
+    mockTasks([
+      task({
+        id: 'yesterday',
+        title: 'Submit revised pricing',
+        dueDate: '2026-11-19',
+        status: 'open',
+      }),
+    ]);
+    renderPage();
+
+    expect(dueOf('Submit revised pricing').getAttribute('data-urgency')).toBe('overdue');
   });
 });
