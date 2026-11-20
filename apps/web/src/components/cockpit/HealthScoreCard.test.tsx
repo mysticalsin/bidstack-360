@@ -1,72 +1,67 @@
-import { render, screen } from '@testing-library/react';
-import type { ComponentProps, ElementType, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import type { AccountCockpitSnapshot } from '@bidstack/shared';
+import '@/i18n';
+import type { AccountCockpitMaybeScored, CrmCompany } from '@bidstack/shared';
 
-import { SIGNAL_COVERAGE_WEIGHTS } from './_tokens';
 import { HealthScoreCard } from './HealthScoreCard';
+import { PageHead } from './PageHead';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (_key: string, fallback: string, values?: Record<string, unknown>) => {
-      if (!values) return fallback;
-      return fallback.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => String(values[key] ?? ''));
-    },
-  }),
-}));
-
-vi.mock('framer-motion', async () => {
-  const React = await import('react');
-  const motionComponent = (tag: ElementType) => {
-    const Component = React.forwardRef<HTMLElement, ComponentProps<'div'> & { children?: ReactNode }>(
-      ({ children, ...props }, ref) => {
-        const { animate, initial, transition, ...domProps } = props as Record<string, unknown>;
-        void animate;
-        void initial;
-        void transition;
-        return React.createElement(tag, { ...domProps, ref }, children);
-      },
-    );
-    Component.displayName = `Motion${String(tag)}`;
-    return Component;
-  };
-
+function cockpit(health: AccountCockpitMaybeScored['health']): AccountCockpitMaybeScored {
   return {
-    animate: (_motion: unknown, value: number, options?: { onUpdate?: (value: number) => void }) => {
-      options?.onUpdate?.(value);
-      return { stop: vi.fn() };
-    },
-    motion: new Proxy(
-      {},
-      {
-        get: (_target, tag: string) => motionComponent(tag),
-      },
-    ),
-    useMotionValue: (value: number) => ({ get: () => value, set: vi.fn() }),
-    useReducedMotion: () => true,
+    company: {
+      id: 'other',
+      source: 'external_crm',
+      name: 'Other Co',
+      domain: null,
+      logo: null,
+      sourceAttribution: [],
+    } as unknown as CrmCompany,
+    kpis: [],
+    technicalStack: [],
+    health,
+    keyContacts: [],
+    recentActivity: [],
+    risks: [],
+    compliance: [],
+    roadmap: [],
   };
-});
+}
 
-describe('HealthScoreCard', () => {
-  it('names the signal-mix weights and does not borrow the account-list or field-fill score', () => {
-    const cockpit = {
-      health: {
-        score: 34,
-        band: 'needs_attention',
-        counts: { strong: 1, good: 0, needs_attention: 2, critical: 1 },
-        factors: [],
-      },
-    } as AccountCockpitSnapshot;
+describe('account health when the score is unknown', () => {
+  afterEach(cleanup);
 
-    render(<HealthScoreCard cockpit={cockpit} />);
+  it('HealthScoreCard says "Not scored yet" and draws no gauge or number', () => {
+    const { container } = render(<HealthScoreCard cockpit={cockpit(null)} />);
+    expect(screen.getByText('Not scored yet')).toBeDefined();
+    expect(screen.getByTestId('health-not-scored').textContent).toContain('own contacts, deals and tasks');
+    expect(container.querySelector('.health-gauge')).toBeNull();
+    expect(container.textContent).not.toMatch(/\/100/);
+  });
 
-    const caption = screen.getByText(/4 factors/).textContent ?? '';
-    expect(caption).toContain(SIGNAL_COVERAGE_WEIGHTS);
-    expect(caption).not.toMatch(/recorded-field|account list|weighted-pipeline/i);
-    expect(screen.getByText(/Bands: 75\+ strong/).textContent).toMatch(/Not measured relationship health/);
-    expect(screen.getByText('Signal mix')).toBeTruthy();
-    expect(screen.getByText('Most factors')).toBeTruthy();
-    expect(SIGNAL_COVERAGE_WEIGHTS).not.toMatch(/account-list|recorded-field/i);
+  it('HealthScoreCard still shows the score and band when it is known', () => {
+    const { container } = render(
+      <HealthScoreCard cockpit={cockpit({ score: 82, band: 'good', counts: { good: 3 } })} />,
+    );
+    expect(screen.getByRole('img', { name: /coverage 82 out of 100/i })).toBeDefined();
+    expect(screen.getAllByText('Good').length).toBeGreaterThan(0);
+    expect(container.querySelector('.health-gauge')).not.toBeNull();
+    expect(screen.queryByText('Not scored yet')).toBeNull();
+  });
+
+  it('PageHead shows a "Not scored yet" pill instead of a band for an unscored account', () => {
+    const client = new QueryClient();
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <PageHead cockpit={cockpit(null)} accountView />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const pill = container.querySelector('.acct-pill');
+    expect(pill?.textContent).toBe('Not scored yet');
+    expect(pill?.getAttribute('data-band')).toBe('unscored');
   });
 });

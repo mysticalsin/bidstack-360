@@ -8,9 +8,9 @@
 .oc-screen {
   position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--surface-page, #fff); color: var(--oc-fg);
 }
-.oc-screen[data-dark] .oc-chip[data-sen='c_level'] { color: #7fd1a8; border-color: #2f6b4f; }
+.oc-screen[data-dark] .oc-chip[data-sen='c_level'], [data-theme='dark'] .oc-chip[data-sen='c_level'] { color: #7fd1a8; border-color: #2f6b4f; }
 .oc-screen[data-dark] .oc-ava { color: #a8e3c6; background: #1f3a2e; }
-.oc-screen[data-dark] .oc-toolbar button[aria-pressed='true'] { color: #a8e3c6; background: #1f3a2e; }
+.oc-screen[data-dark] .oc-toolbar button[aria-pressed='true'], [data-theme='dark'] .oc-toolbar button[aria-pressed='true'] { color: #a8e3c6; background: #1f3a2e; }
 .oc-screen[data-dark] .oc-node[data-dim] .oc-ava, .oc-screen[data-dark] .oc-node[data-sample] .oc-ava { background: var(--oc-card); color: var(--oc-fg2); }
 .oc-screen[data-dark] { --oc-canvas: #14161a; --oc-dot: #2e333b; --oc-card: #1d2026; --oc-fg: #eef0f3; --oc-fg2: #b4b9c2; --oc-fg3: #868c96; --oc-line: #2c3038; --oc-edge: #4a505a; --oc-gap: #4a505a; }
 .oc-bar { color: var(--fg-primary); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--surface-card); }
@@ -25,6 +25,7 @@
 .oc-toggles, .oc-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .oc-tog, .oc-btn { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--fg-primary); font: inherit; font-size: 13px; cursor: pointer; }
 .oc-tog[aria-pressed='true'] { background: color-mix(in srgb, var(--oc-accent) 12%, transparent); border-color: color-mix(in srgb, var(--oc-accent) 40%, transparent); color: var(--oc-accent); }
+[data-theme='dark'] .oc-tog[aria-pressed='true'] { color: var(--brand-deep, #3fbe93); }
 .oc-btn:hover, .oc-tog:hover { background: var(--surface-sunken); }
 .oc-btn:disabled { opacity: .5; cursor: default; }
 .oc-primary { background: var(--oc-accent); border-color: var(--oc-accent); color: #fff; font-weight: 500; }

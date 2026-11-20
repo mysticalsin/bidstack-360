@@ -15,7 +15,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { springSoft } from '@/lib/motion';
-import { relativeTime } from '@/lib/format';
+import { formatStage, relativeTime } from '@/lib/format';
 
 // ─── Type → presentation maps (private) ──────────────────────────────────────
 
@@ -50,19 +50,9 @@ type ActivityItem = {
   url: string | null;
 };
 
-/** Stage and status keys are stored with underscores. The feed shows words. */
-export function activitySubtitle(value: string): string {
-  return value
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
 export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
   const { t } = useTranslation('crm');
   const visible = activity.slice(0, 8);
-  const hasMore = activity.length > 8;
 
   return (
     <GlassCard padding="none" hoverable={false}>
@@ -70,7 +60,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
-              <Icon name="activity" size={13} className="text-[var(--brand-primary)]" />
+              <Icon name="activity" size={13} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
             </div>
             <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{t('recentActivity.heading', 'Recent activity')}</h2>
           </div>
@@ -105,7 +95,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
                   {a.url ? (
                     <Link
                       to={a.url}
-                      className="truncate text-sm font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)]"
+                      className="truncate text-sm font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]"
                     >
                       {a.title}
                     </Link>
@@ -120,7 +110,7 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
                   {a.subtitle && (
                     <>
                       <span>·</span>
-                      <Badge tone="gray">{activitySubtitle(a.subtitle)}</Badge>
+                      <Badge tone="gray">{formatStage(a.subtitle)}</Badge>
                     </>
                   )}
                 </div>
@@ -132,16 +122,6 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
           ))
         )}
       </div>
-      {hasMore && (
-        <div className="px-5 py-3 border-t border-[var(--border-subtle)]">
-          <Link
-            to="/activities"
-            className="text-xs font-medium text-[var(--brand-primary)] hover:underline"
-          >
-            {t('recentActivity.viewAll', 'View all {{count}} activities →', { count: activity.length })}
-          </Link>
-        </div>
-      )}
     </GlassCard>
   );
 }

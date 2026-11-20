@@ -586,9 +586,11 @@ export const WorldMap = memo(function WorldMap({
           return (
             <button
               key={p.label}
+              type="button"
+              aria-pressed={isActive}
               onClick={() => setPosition({ coordinates: p.coordinates, zoom: p.zoom })}
               className={cn(
-                'px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all active:scale-95 cursor-pointer',
+                'px-2.5 py-1 text-xs font-semibold rounded-md transition-all active:scale-95 cursor-pointer',
                 isActive
                   ? 'bg-[var(--brand-primary)] text-white shadow-sm'
                   : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]',

@@ -1,0 +1,127 @@
+{
+ "offset": 0,
+ "limit": 3,
+ "totalFound": 5068,
+ "content": [
+  {
+   "id": "744000160311555",
+   "name": "Deburrer",
+   "uuid": "60e2bd50-caa8-4b6b-83ab-d5d830be9f99",
+   "refNumber": "REF300219N",
+   "company": {
+    "identifier": "BoschGroup",
+    "name": "Bosch Group"
+   },
+   "releasedDate": "2026-11-06T23:46:17.134Z",
+   "location": {
+    "city": "Lincolnshire",
+    "region": "IL",
+    "country": "us",
+    "address": "650 Barclay Boulevard",
+    "postalCode": "60069",
+    "remote": false,
+    "hybrid": false,
+    "latitude": "42.1842562",
+    "longitude": "-87.9365988",
+    "fullLocation": "Lincolnshire, IL, United States"
+   },
+   "industry": {
+    "id": "mechanical_engineering",
+    "label": "Mechanical Or Industrial Engineering"
+   },
+   "department": {},
+   "function": {
+    "id": "production",
+    "label": "Production"
+   },
+   "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+   },
+   "experienceLevel": {
+    "id": "associate",
+    "label": "Associate"
+   }
+  },
+  {
+   "id": "744000160312009",
+   "name": "Deburrer",
+   "uuid": "ba137975-a343-4df7-a3bc-aafbc6750a7f",
+   "refNumber": "REF300223M",
+   "company": {
+    "identifier": "BoschGroup",
+    "name": "Bosch Group"
+   },
+   "releasedDate": "2026-11-06T23:42:30.733Z",
+   "location": {
+    "city": "Lincolnshire",
+    "region": "IL",
+    "country": "us",
+    "address": "650 Barclay Boulevard",
+    "postalCode": "60069",
+    "remote": false,
+    "hybrid": false,
+    "latitude": "42.1842562",
+    "longitude": "-87.9365988",
+    "fullLocation": "Lincolnshire, IL, United States"
+   },
+   "industry": {
+    "id": "mechanical_engineering",
+    "label": "Mechanical Or Industrial Engineering"
+   },
+   "department": {},
+   "function": {
+    "id": "manufacturing",
+    "label": "Manufacturing"
+   },
+   "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+   },
+   "experienceLevel": {
+    "id": "associate",
+    "label": "Associate"
+   }
+  },
+  {
+   "id": "744000160311749",
+   "name": "Setter",
+   "uuid": "3b29562b-0869-4443-979d-25fa9078da27",
+   "refNumber": "REF300215N",
+   "company": {
+    "identifier": "BoschGroup",
+    "name": "Bosch Group"
+   },
+   "releasedDate": "2026-11-06T23:36:20.284Z",
+   "location": {
+    "city": "Lincolnshire",
+    "region": "IL",
+    "country": "us",
+    "address": "500 Barclay Boulevard",
+    "postalCode": "60069",
+    "remote": false,
+    "hybrid": false,
+    "latitude": "42.1875623",
+    "longitude": "-87.93694239999999",
+    "fullLocation": "Lincolnshire, IL, United States"
+   },
+   "industry": {
+    "id": "mechanical_engineering",
+    "label": "Mechanical Or Industrial Engineering"
+   },
+   "department": {},
+   "function": {
+    "id": "production",
+    "label": "Production"
+   },
+   "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+   },
+   "experienceLevel": {
+    "id": "associate",
+    "label": "Associate"
+   }
+  }
+ ]
+}

@@ -12,6 +12,7 @@ import {
   useIsolatedOrgAuth,
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -45,7 +46,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const id of createdTaskIds) {
-    await prisma.auditLog.deleteMany({ where: { targetType: 'task', targetId: id } });
+    await purgeAuditRows({ where: { targetType: 'task', targetId: id } });
     await prisma.task.deleteMany({ where: { id } });
   }
   if (server) await server.close();
@@ -82,6 +83,27 @@ describe('tasks routes', () => {
       dueSoon: expect.any(Number),
     });
     expect(body.items).toBeUndefined();
+  });
+
+  skipIfNoDb('GET /api/tasks/summary counts a task created outside this route', async () => {
+    // WHY: the badge is this summary. kam, opportunity transitions, and the
+    // worker insert tasks without this route, and the 15s cache kept the old
+    // overdue count while the list already showed the new task.
+    const before = await server.inject({ method: 'GET', url: '/api/tasks/summary' });
+    expect(before.statusCode).toBe(200);
+    const beforeOverdue = (before.json() as { overdue: number }).overdue;
+    const created = await prisma.task.create({
+      data: {
+        orgId: orgId!,
+        title: `Out of band ${Date.now()}`,
+        status: 'open',
+        dueDate: new Date('2020-01-01'),
+      },
+    });
+    createdTaskIds.push(created.id);
+    const after = await server.inject({ method: 'GET', url: '/api/tasks/summary' });
+    expect(after.statusCode).toBe(200);
+    expect((after.json() as { overdue: number }).overdue).toBe(beforeOverdue + 1);
   });
 
   skipIfNoDb('GET /api/tasks/summary refreshes after task mutations', async () => {

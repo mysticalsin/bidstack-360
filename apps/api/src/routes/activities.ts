@@ -25,6 +25,7 @@ import {
   encodeActivityCursor,
 } from '../services/activity.service.js';
 import type { ActivityEventType } from '../services/activity.service.js';
+import { emitActivitiesAccountEventsSafe } from '../services/account-events.service.js';
 
 type ActivityRow = {
   id: string;
@@ -274,6 +275,11 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
       // Scope by orgId too (convention) — the row was just created in this org.
       const row = await prisma.activity.findFirstOrThrow({
         where: { id: item.id, orgId: req.auth.orgId },
+      });
+      emitActivitiesAccountEventsSafe({
+        orgId: req.auth.orgId,
+        activityIds: [row.id],
+        actorUserId: req.auth.userId,
       });
       reply.status(201);
       return serializeActivity(row as ActivityRow);

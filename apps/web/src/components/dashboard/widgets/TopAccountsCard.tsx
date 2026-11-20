@@ -46,7 +46,7 @@ export function TopAccountsCard() {
             </Badge>
           ) : null}
         </div>
-        <Link to="/accounts?view=top" className="text-xs text-[var(--brand-primary)] hover:underline">
+        <Link to="/accounts?view=top" className="text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline">
           {t('topAccounts.viewAll', 'View all')}
         </Link>
       </div>
@@ -62,7 +62,7 @@ export function TopAccountsCard() {
           <span className="text-xs text-[var(--fg-secondary)]">{t('topAccounts.errorMessage', "Couldn't load top accounts.")}</span>
           <button
             type="button"
-            className="min-h-[44px] rounded-md px-3 text-xs font-semibold text-[var(--brand-primary)] hover:bg-[var(--surface-hover)]"
+            className="min-h-[44px] rounded-md px-3 text-xs font-semibold text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:bg-[var(--surface-hover)]"
             onClick={() => void accounts.refetch()}
           >
             {t('topAccounts.retry', 'Retry')}
@@ -111,7 +111,7 @@ export function TopAccountsCard() {
                 <Icon
                   name="chevron-right"
                   size={14}
-                  className="text-[var(--fg-tertiary)] group-hover:text-[var(--brand-primary)] transition-colors"
+                  className="text-[var(--fg-tertiary)] group-hover:text-[var(--brand-primary)] dark:group-hover:text-[var(--brand-deep)] transition-colors"
                 />
               </Link>
             </motion.div>

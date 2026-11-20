@@ -1,0 +1,29 @@
+{
+  "cik": 1829948,
+  "entityName": "CI Financial Corp.",
+  "facts": {
+    "ifrs-full": {
+      "Revenue": {
+        "units": {
+          "CAD": [
+            { "start": "2020-01-01", "end": "2020-12-31", "val": 2000, "form": "40-F", "filed": "2021-03-01" },
+            { "start": "2021-01-01", "end": "2021-12-31", "val": 2600, "form": "40-F", "filed": "2022-03-01" }
+          ]
+        }
+      },
+      "ProfitLossFromOperatingActivities": {
+        "units": {
+          "CAD": [
+            { "start": "2020-01-01", "end": "2020-12-31", "val": 400, "form": "40-F", "filed": "2021-03-01" },
+            { "start": "2021-01-01", "end": "2021-12-31", "val": 390, "form": "40-F", "filed": "2022-03-01" }
+          ]
+        }
+      },
+      "CashAndCashEquivalents": {
+        "units": {
+          "CAD": [{ "end": "2021-12-31", "val": 230, "form": "40-F", "filed": "2022-03-01" }]
+        }
+      }
+    }
+  }
+}

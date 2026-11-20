@@ -144,7 +144,7 @@ export function NewWorkflowDialog({ onClose, onCreate, isPending }: Props) {
               <div key={i} className="flex items-center gap-2">
                 <span
                   aria-hidden
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-[10px] font-semibold text-[var(--fg-tertiary)]"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-sunken)] text-xs font-semibold text-[var(--fg-tertiary)]"
                 >
                   {i + 1}
                 </span>

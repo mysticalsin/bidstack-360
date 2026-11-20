@@ -17,14 +17,16 @@
 //   "own records only" — intentional, not a bug.
 //
 // HONEST LIMITS of v1 (documented gaps, not silent ones):
-// - Opportunity LIST + COUNT + DETAIL-by-id (GET /opportunities/:id) are
-//   scoped — a restricted user cannot open an out-of-scope deal by direct
-//   link/ID. Companies/leads/contacts stay org-visible even though
+// - Opportunity list, count, and the by-id deal routes (via
+//   lib/visible-opportunity.ts) are scoped, so a restricted user cannot read
+//   or change an out-of-scope deal by direct link/ID. Companies/leads/contacts stay org-visible even though
 //   Company.countryCode exists (v2 candidate).
-// - API-key callers (req.auth.userId = "apikey:<id>", not a User row) are
-//   unrestricted for group membership. Their REST power is bounded by exact
-//   permission scopes in production; legacy read/write fallback is dev/migration
-//   only, and MCP uses its own mcp + read/write tool scopes.
+// - API-key callers (req.auth.userId = "apikey:<id>", not a User row) have no
+//   group membership. New keys default-deny company/MSA resources and deals
+//   unless the creator sets unrestrictedScope or an explicit company/MSA
+//   allowlist; a restricted key sees deals on its allowlisted companies only.
+//   Their REST verbs are also bounded by exact permission scopes (and
+//   readOnly). Legacy read/write fallback is dev/migration only.
 
 import { prisma, type Prisma } from '@bidstack/db';
 
@@ -39,6 +41,32 @@ export interface AccessScope {
   countries: string[];
   /** Caller's user id — needed for the owner-visibility rule. */
   userId: string;
+  /** API-key company allowlist. Empty + restricted = deny all companies. */
+  companyIds: string[];
+  /** API-key MSA allowlist. Empty + restricted = deny unless a company matches. */
+  msaIds: string[];
+}
+
+const EMPTY_RESOURCE_SCOPE = { companyIds: [] as string[], msaIds: [] as string[] };
+
+export function isApiKeyActor(userId: string): boolean {
+  return userId.startsWith('apikey:');
+}
+
+export function accessScopeFromApiKey(
+  userId: string,
+  key: { unrestrictedScope: boolean; companyIds: string[]; msaIds: string[] },
+): AccessScope {
+  if (key.unrestrictedScope) {
+    return { unrestricted: true, countries: [], userId, ...EMPTY_RESOURCE_SCOPE };
+  }
+  return {
+    unrestricted: false,
+    countries: [],
+    userId,
+    companyIds: key.companyIds,
+    msaIds: key.msaIds,
+  };
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -66,10 +94,17 @@ interface InvalidationMessage {
 /** Resolve the caller's visibility scope (60s in-process cache). */
 export async function getAccessScope(orgId: string, userId: string): Promise<AccessScope> {
   // API keys (and any non-User principal) carry no group membership —
-  // querying the uuid column with "apikey:<id>" would throw. Org-level
-  // credentials stay unrestricted; their power is bounded by API-key scopes.
+  // querying the uuid column with "apikey:<id>" would throw.
   if (!UUID_RE.test(userId)) {
-    return { unrestricted: true, countries: [], userId };
+    if (isApiKeyActor(userId)) {
+      const key = await prisma.apiKey.findFirst({
+        where: { id: userId.slice('apikey:'.length), orgId, revokedAt: null, deletedAt: null },
+        select: { unrestrictedScope: true, companyIds: true, msaIds: true },
+      });
+      if (!key) return { unrestricted: false, countries: [], userId, ...EMPTY_RESOURCE_SCOPE };
+      return accessScopeFromApiKey(userId, key);
+    }
+    return { unrestricted: true, countries: [], userId, ...EMPTY_RESOURCE_SCOPE };
   }
 
   const cacheKey = `${orgId}:${userId}`;
@@ -84,10 +119,10 @@ export async function getAccessScope(orgId: string, userId: string): Promise<Acc
 
   let scope: AccessScope;
   if (memberships.length === 0 || memberships.some((m) => m.group.scopeAll)) {
-    scope = { unrestricted: true, countries: [], userId };
+    scope = { unrestricted: true, countries: [], userId, ...EMPTY_RESOURCE_SCOPE };
   } else {
     const countries = [...new Set(memberships.flatMap((m) => m.group.scopeCountries))];
-    scope = { unrestricted: false, countries, userId };
+    scope = { unrestricted: false, countries, userId, ...EMPTY_RESOURCE_SCOPE };
   }
 
   if (scopeCache.size >= MAX_CACHE_ENTRIES) scopeCache.clear();
@@ -149,6 +184,10 @@ export function applyOpportunityScope(
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput {
   if (scope.unrestricted) return where;
+  // A key owns no deals and its userId is not a uuid: scope by its company allowlist.
+  if (isApiKeyActor(scope.userId)) {
+    return { AND: [where, { companyId: { in: scope.companyIds } }] };
+  }
   // Group codes are uppercase ISO-2 (CountryCode schema), but opportunity.country
   // / territory.countryCodes are stored raw — match both cases so a lowercase
   // record isn't silently hidden from a user who should see it. Prisma `in`
@@ -182,6 +221,7 @@ export function accountOpportunityScopePredicate(
   scope: AccessScope,
 ): Prisma.OpportunityWhereInput | null {
   if (scope.unrestricted) return null;
+  if (isApiKeyActor(scope.userId)) return { companyId: { in: scope.companyIds } };
   const variants = countryVariantsForScope(scope);
   const clauses: Prisma.OpportunityWhereInput[] = [{ ownerId: scope.userId }];
   if (variants.length > 0) {
@@ -193,6 +233,9 @@ export function accountOpportunityScopePredicate(
 
 export function companyScopePredicate(scope: AccessScope): Prisma.CompanyWhereInput | null {
   if (scope.unrestricted) return null;
+  if (isApiKeyActor(scope.userId)) {
+    return { id: { in: scope.companyIds } };
+  }
   const variants = countryVariantsForScope(scope);
   const opportunityPredicate = accountOpportunityScopePredicate(scope);
   const clauses: Prisma.CompanyWhereInput[] = [
@@ -212,6 +255,19 @@ export function applyCompanyScope(
   const predicate = companyScopePredicate(scope);
   if (!predicate) return where;
   return { AND: [where, predicate] };
+}
+
+/** API-key MSA allowlist: match listed MSAs or MSAs on listed companies. */
+export function applyMsaResourceScope(
+  where: Prisma.ContractAgreementWhereInput,
+  scope: AccessScope,
+): Prisma.ContractAgreementWhereInput {
+  if (scope.unrestricted || !isApiKeyActor(scope.userId)) return where;
+  const clauses: Prisma.ContractAgreementWhereInput[] = [];
+  if (scope.msaIds.length > 0) clauses.push({ id: { in: scope.msaIds } });
+  if (scope.companyIds.length > 0) clauses.push({ companyId: { in: scope.companyIds } });
+  if (clauses.length === 0) return { AND: [where, { id: { in: [] } }] };
+  return { AND: [where, { OR: clauses }] };
 }
 
 export function scopeCacheTag(scope: AccessScope): string {

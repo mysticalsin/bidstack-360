@@ -15,6 +15,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { pinnedDeployCli } from './pinned-deploy-cli.mjs';
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENV_FILE = join(REPO, '.env.production.local');
 const argv = process.argv.slice(2);
@@ -168,8 +170,9 @@ const spaEnv = {
 };
 // Vercel stores VITE_API_URL as sensitive → export it into the build env, then
 // build prebuilt and deploy (mirrors scripts/demo-local-backend.mjs).
-if (!run('vercel', ['build', '--prod', '--yes'], { env: spaEnv })) die('vercel build');
-if (!run('vercel', ['deploy', '--prebuilt', '--prod', '--yes'], { env: spaEnv })) die('vercel deploy');
+const vercel = pinnedDeployCli('vercel');
+if (!run(vercel, ['build', '--prod', '--yes'], { env: spaEnv })) die('vercel build');
+if (!run(vercel, ['deploy', '--prebuilt', '--prod', '--yes'], { env: spaEnv })) die('vercel deploy');
 await waitFor('SPA origin', () => ok(envVars.PUBLIC_BASE_URL), { timeoutMs: 60_000 });
 
 log(`LIVE — ${envVars.PUBLIC_BASE_URL} (SPA) → ${apiOrigin} (API on this PC)`);

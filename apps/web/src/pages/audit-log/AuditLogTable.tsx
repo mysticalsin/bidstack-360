@@ -269,7 +269,13 @@ function AuditRow({
                 )}
                 <button
                   type="button"
-                  onClick={() => writeClipboard(row.targetId ?? '')}
+                  onClick={() =>
+                    void writeClipboard(
+                      row.targetId ?? '',
+                      t('auditLogTable.idCopied', 'ID copied'),
+                      t('auditLogTable.copyFailed', 'Copy failed'),
+                    )
+                  }
                   className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
                 >
                   <Icon name="link" className="size-3" />
@@ -360,7 +366,13 @@ function AuditRow({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => writeClipboard(JSON.stringify(row.diff ?? {}, null, 2))}
+                      onClick={() =>
+                        void writeClipboard(
+                          JSON.stringify(row.diff ?? {}, null, 2),
+                          t('auditLogTable.jsonCopied', 'JSON copied'),
+                          t('auditLogTable.copyFailed', 'Copy failed'),
+                        )
+                      }
                       className="inline-flex min-h-8 items-center rounded-lg border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
                     >
                       {t('auditLogTable.copyJson', 'Copy JSON')}

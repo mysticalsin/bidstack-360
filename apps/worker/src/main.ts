@@ -5,7 +5,7 @@ import dotenvFlow from 'dotenv-flow';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
 
-import { type Queue, type Worker } from 'bullmq';
+import { Queue as BullQueue, type Queue, type Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import pino from 'pino';
 
@@ -18,6 +18,7 @@ import { startDocumentExtract } from './queues/document-extract.js';
 import { startMsaTextExtract } from './queues/msa-text-extract.js';
 import { startCalendarSync } from './queues/calendar-sync.js';
 import { startEmailSync } from './queues/email-sync.js';
+import { startTeamsChatSync } from './queues/teams-chat-sync.js';
 import { startSmsWorker } from './queues/sms.js';
 import { startWebhookDeliveryWorker } from './queues/webhook-delivery.js';
 // Wave 8 — Y.js CRDT compaction
@@ -36,11 +37,18 @@ import { startWorkflowScheduleWorker } from './queues/workflow-schedule.js';
 import { startAccountWatchdog } from './queues/account-watchdog.js';
 import { startBidDeadlineAlerts } from './queues/bid-deadline-alerts.js';
 import { startMsaReminders } from './queues/msa-reminders.js';
+import { startMsaWhitespaceDigest } from './queues/msa-whitespace-digest.js';
 import { startAccountEnrichment } from './queues/account-enrichment.js';
+import { startAccountIntel } from './queues/account-intel.js';
+import { startCompanyTechDetect } from './queues/company-tech-detect.js';
+import { startConsultingPartners } from './queues/consulting-partners.js';
+import { startNotificationDelivery } from './queues/notification-delivery.js';
+import { startAccountActivityAlertRelay } from './queues/account-activity-alerts.js';
 import { startMeetingIntel } from './queues/meeting-intel.js';
 import { startScheduledReports } from './queues/scheduled-reports.js';
 // Task due-soon/overdue + KAM initiative staleness nudges — repeatable scan
 import { startTaskKamAlerts } from './queues/task-kam-alerts.js';
+import { startWebhookOutboxRelay } from './queues/webhook-outbox-relay.js';
 // Wave 9 — RFP Automation Engine workers
 import { startRfpOrchestrator, startRfpOrchestrationReaper } from './queues/rfp-orchestrator.js';
 import { startRfpRequirementExtract } from './queues/rfp-requirement-extract.js';
@@ -58,8 +66,13 @@ import { startMigrationWorker } from './queues/migration.js';
 import { startSentrySmokeWorker } from './queues/sentry-smoke.js';
 // GDPR Art. 20 — tenant data-portability export
 import { startTenantExport } from './queues/tenant-export.js';
+import { startTenantExportSweeper } from './queues/tenant-export-sweeper.js';
+import { attachDeadLetter, DEAD_LETTER_QUEUE, trimDeadLetter } from './lib/dead-letter.js';
+import { workerReadiness } from './lib/health-probe.js';
 // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
 import { startAiAuditRetention } from './queues/ai-audit-retention.js';
+import { startDataSubjectWorker } from './queues/data-subject.js';
+import { startRetentionSweep } from './queues/retention-sweep.js';
 import { attachSentryToWorker, initWorkerSentry } from './plugins/sentry.js';
 import { assertWorkerProductionEnv } from './lib/production-env.js';
 import {
@@ -143,6 +156,8 @@ workers.push(...startCallWorkers(connection, log, queues));
 // workflow engine's `call_webhook` effect reuses this single queue instead of
 // opening (and leaking) a new one per dispatch job / schedule scan.
 const webhookDeliveryQueue = await startWebhookDeliveryWorker(connection, log, workers, queues);
+// Durable outbox -> webhook.delivery relay; no-op unless WEBHOOK_OUTBOX_ENABLED=true.
+await startWebhookOutboxRelay(connection, log, workers, queues, webhookDeliveryQueue);
 
 await Promise.all([
   startDustPoller(connection, log, workers, queues),
@@ -152,6 +167,7 @@ await Promise.all([
   startMsaTextExtract(connection, log, workers, queues),
   startCalendarSync(connection, log, workers, queues),
   startEmailSync(connection, log, workers, queues),
+  startTeamsChatSync(connection, log, workers, queues),
   startSmsWorker(connection, log, workers as never, queues),
   startYjsCompaction(connection, log, workers, queues),
   startCsWorkers(connection, log, workers, queues),
@@ -166,10 +182,22 @@ await Promise.all([
   startAccountWatchdog(connection, log, workers, queues),
   // MSA renewal / expiry reminders (90/60/30 days + notice deadline)
   startMsaReminders(connection, log, workers, queues),
+  // Weekly whitespace digest: top 3 new flags per owner (in-app only)
+  startMsaWhitespaceDigest(connection, log, workers, queues),
   // Strategic account meeting intel: source sync, match/dedupe pipeline, cross-region flags
   startMeetingIntel(connection, log, workers, queues),
   // Account enrichment: Apollo + Seamless firmographics, open jobs, potential projects
   startAccountEnrichment(connection, log, workers, queues),
+  // Account intelligence: job boards, company posts, registries, scheduled filings scan
+  startAccountIntel(connection, log, workers, queues),
+  // Open data technology stack: on create and import, plus a weekly batched sweep
+  startCompanyTechDetect(connection, log, workers, queues),
+  // Consulting partners: which consulting firms work with each account, cited
+  startConsultingPartners(connection, log, workers, queues),
+  // Account alerts: instant email and Teams copies, daily account digest
+  startNotificationDelivery(connection, log, workers, queues),
+  // Synced meetings and emails: one follower alert per account per run, sent by apps/api
+  startAccountActivityAlertRelay(connection, log, workers, queues),
   startScheduledReports(connection, log, workers, queues),
   // Task due-soon/overdue + KAM initiative staleness nudges (repeatable scan)
   startTaskKamAlerts(connection, log, workers, queues),
@@ -196,13 +224,24 @@ await Promise.all([
   startSentrySmokeWorker(connection, log, workers, queues),
   // GDPR Art. 20 — tenant data-portability export
   startTenantExport(connection, log, workers, queues),
+  startTenantExportSweeper(connection, log, workers, queues),
   // EU AI Act Art. 50 / GDPR Art. 22 — AI audit log retention purge (daily)
   startAiAuditRetention(connection, log, workers, queues),
+  startDataSubjectWorker(connection, log, workers, queues),
+  startRetentionSweep(connection, log, workers, queues),
 ]);
+
+const deadLetterQueue = new BullQueue(DEAD_LETTER_QUEUE, { connection });
+queues.push(deadLetterQueue);
+const deadLetterTrim = setInterval(() => {
+  trimDeadLetter(deadLetterQueue).catch((err) => log.warn({ err }, 'dead-letter: trim failed'));
+}, 60 * 60 * 1000);
+deadLetterTrim.unref();
 
 for (const worker of workers) {
   attachSentryToWorker(worker, worker.name, log);
   attachMetricsToWorker(worker, worker.name);
+  attachDeadLetter(worker, deadLetterQueue, log);
 }
 
 // Periodic queue-depth gauges (waiting/active per queue) for backpressure alerts.
@@ -253,23 +292,9 @@ const healthServer = http.createServer((req, res) => {
   // worker with a dead DB must not report healthy (it would keep receiving jobs
   // it can only fail).
   void (async () => {
-    const redisReady = connection.status === 'ready';
-    let dbReady: boolean;
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      dbReady = true;
-    } catch {
-      dbReady = false;
-    }
-    const ok = redisReady && dbReady;
+    const { ok, body } = await workerReadiness(connection.status, () => prisma.$queryRaw`SELECT 1`);
     res.writeHead(ok ? 200 : 503, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        status: ok ? 'ok' : 'error',
-        queue: redisReady ? 'connected' : 'disconnected',
-        db: dbReady ? 'connected' : 'disconnected',
-      }),
-    );
+    res.end(JSON.stringify(body));
   })();
 });
 
@@ -316,10 +341,12 @@ const shutdown = async (signal: string) => {
     // without a long EADDRINUSE retry window — BullMQ worker.close() below can
     // take seconds while it drains the active job.
     queueDepthCollector.stop();
+    clearInterval(deadLetterTrim);
     healthServer.close();
     await Promise.all(workers.map((w) => w.close()));
     await Promise.all(queues.map((q) => q.close()));
     await connection.quit();
+    await prisma.$disconnect();
     clearTimeout(timeout);
     process.exit(0);
   } catch (err) {

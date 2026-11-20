@@ -156,6 +156,16 @@ describe('WhatToPosition', () => {
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
   });
 
+  it('formats pipeline amounts with the shared compact formatter, like revenue', () => {
+    state.pos = {
+      ...pos,
+      brief: { ...pos.brief, pipeline: { openCount: 2, openMicros: '2400000000000', won24m: 0, lost24m: 0 } },
+    };
+    render(<WhatToPosition companyId="c1" />);
+    expect(screen.getByTestId('account-brief').textContent).toContain('worth EUR 2m');
+    expect(screen.getByTestId('wp-play-1').textContent).toContain('EUR 100,000 to EUR 300,000');
+  });
+
   it('says what is needed when there is no play, and omits the deal range when not derived', () => {
     state.pos = { ...pos, plays: [], gaps: [] };
     render(<WhatToPosition companyId="c1" />);

@@ -7,7 +7,6 @@ import {
 } from '@bidstack/db';
 
 import type { Tool } from './index.js';
-import { linkedLeadCompany } from './leads-create.js';
 
 const Input = z.object({
   id: z.string().uuid(),
@@ -17,7 +16,6 @@ const Input = z.object({
     email: z.string().email().optional().nullable(),
     phone: z.string().max(50).optional().nullable(),
     companyName: z.string().min(1).max(255).optional(),
-    companyId: z.string().uuid().optional(),
     title: z.string().max(100).optional().nullable(),
     source: z
       .enum(['website', 'referral', 'event', 'cold_outreach', 'partner', 'social', 'other'])
@@ -37,8 +35,7 @@ const Input = z.object({
 });
 
 export const leadsUpdate: Tool<typeof Input> = {
-  description:
-    'Update a lead. Changing companyName relinks when that name matches one company, clears the link when it matches none, and refuses when it matches several. Pass companyId to set the link directly. A status or score change does not touch the link.',
+  description: 'Update a lead. Common use: agent changes status, score, or BANT qualification.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -53,7 +50,6 @@ export const leadsUpdate: Tool<typeof Input> = {
           email: { type: ['string', 'null'], format: 'email' },
           phone: { type: ['string', 'null'], maxLength: 50 },
           companyName: { type: 'string', minLength: 1, maxLength: 255 },
-          companyId: { type: 'string', format: 'uuid' },
           title: { type: ['string', 'null'], maxLength: 100 },
           source: {
             type: 'string',
@@ -84,10 +80,6 @@ export const leadsUpdate: Tool<typeof Input> = {
     if (!before) throw new Error('Lead not found');
 
     const p = args.patch;
-    const relink =
-      p.companyId !== undefined || p.companyName !== undefined
-        ? await linkedLeadCompany(ctx.orgId, p.companyId, p.companyName ?? before.companyName)
-        : undefined;
     let ownerId: string | null | undefined = undefined;
     if (p.ownerEmail !== undefined) {
       if (p.ownerEmail === null) {
@@ -108,7 +100,6 @@ export const leadsUpdate: Tool<typeof Input> = {
         ...(p.email !== undefined ? { email: p.email } : {}),
         ...(p.phone !== undefined ? { phone: p.phone } : {}),
         ...(p.companyName !== undefined ? { companyName: p.companyName } : {}),
-        ...(relink !== undefined ? { companyId: relink?.id ?? null } : {}),
         ...(p.title !== undefined ? { title: p.title } : {}),
         ...(p.source !== undefined ? { source: p.source } : {}),
         ...(p.status !== undefined ? { status: p.status as PrismaLeadStatus } : {}),
@@ -140,7 +131,6 @@ export const leadsUpdate: Tool<typeof Input> = {
       lastName: updated.lastName,
       email: updated.email,
       companyName: updated.companyName,
-      companyId: updated.companyId,
       status: updated.status,
       score: updated.score,
       priority: updated.priority,

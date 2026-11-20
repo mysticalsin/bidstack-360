@@ -8,6 +8,7 @@ import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
+import { purgeAuditRows } from '../test-support/purge-audit-rows.js';
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
@@ -30,7 +31,7 @@ afterAll(async () => {
   if (server) await server.close();
   if (dbReachable) {
     if (createdAuditIds.length > 0) {
-      await prisma.auditLog.deleteMany({ where: { id: { in: createdAuditIds } } });
+      await purgeAuditRows({ where: { id: { in: createdAuditIds } } });
     }
     for (const id of createdRoleIds) {
       try {

@@ -1,4 +1,4 @@
-// v23: compact "Financial health" for the account page. Four sparklines
+// v23: compact "Public financials watchdog" for the account page. Four sparklines
 // (revenue, margin, capex, cash) from filed annual statements, each number
 // with its period and source, then the top early-warning cards. Strategic and
 // Top accounts are pulled automatically; General accounts show why not and,
@@ -67,7 +67,7 @@ function SignalCard({ s }: { s: Signal }) {
     <li className="fh-card" data-confidence={s.confidence}>
       <button type="button" className="wd-row-btn" aria-expanded={open} aria-controls={`${id}-d`} onClick={() => setOpen((v) => !v)}>
         <span className="wd-row-main">
-          <span className="wd-row-title">{noDash(s.title)}</span>
+          <span className="wd-row-title" title={noDash(s.title)}>{noDash(s.title)}</span>
           <span className="wd-row-meta">
             {CONF[s.confidence]} · period to {periodFmt.format(new Date(`${s.periodEnd}T00:00:00Z`))}
             {s.sample ? <span className="wd-sample-badge">Sample</span> : null}
@@ -117,7 +117,7 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
       <section className="wd-surface" aria-labelledby="fh-h">
         <header className="wd-head">
           <h2 id="fh-h" className="wd-h">
-            Financial health {d?.sample ? <span className="wd-sample-badge">Sample</span> : null}
+            Public financials watchdog {d?.sample ? <span className="wd-sample-badge">Sample</span> : null}
           </h2>
           {d ? (
             <span className="wd-row-meta">

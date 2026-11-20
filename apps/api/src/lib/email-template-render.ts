@@ -7,7 +7,7 @@
 
 import { prisma } from '@bidstack/db';
 import {
-  formatMicrosAmount,
+  formatMicrosDecimal,
   PLACEHOLDER_TOKEN_SET,
   type EmailTemplateRenderRequest,
   type EmailTemplateRenderResponse,
@@ -36,7 +36,7 @@ export async function renderEmailTemplate(args: {
     where: { id: args.templateId, orgId: args.orgId, deletedAt: null },
   });
   if (!template) {
-    throw new Error('Email template not found');
+    throw Object.assign(new Error('Email template not found'), { statusCode: 404 });
   }
 
   const ctx = await buildRenderContext({
@@ -49,7 +49,7 @@ export async function renderEmailTemplate(args: {
   });
 
   const missingTokens = new Set<string>();
-  const fillBody = (input: string): string =>
+  const fill = (input: string, encode: (v: string) => string): string =>
     input.replace(PLACEHOLDER_RE, (_, token: string) => {
       if (!PLACEHOLDER_TOKEN_SET.has(token)) {
         missingTokens.add(token);
@@ -60,12 +60,13 @@ export async function renderEmailTemplate(args: {
         missingTokens.add(token);
         return MISSING_SENTINEL;
       }
-      return String(value);
+      return encode(String(value));
     });
 
-  const subject = fillBody(template.subject);
-  const bodyHtml = fillBody(template.bodyHtml);
-  const bodyText = fillBody(template.bodyText ?? stripHtml(template.bodyHtml));
+  const subject = fill(template.subject, String);
+  // CRM values are user-entered: in HTML they are text, never markup.
+  const bodyHtml = fill(template.bodyHtml, escapeHtml);
+  const bodyText = fill(template.bodyText ?? stripHtml(template.bodyHtml), String);
 
   return {
     subject,
@@ -103,7 +104,7 @@ async function buildRenderContext(args: {
     args.opportunityId
       ? prisma.opportunity.findFirst({
           where: { id: args.opportunityId, orgId: args.orgId, deletedAt: null },
-          select: { name: true, valueMicros: true },
+          select: { name: true, valueMicros: true, country: true },
         })
       : null,
     args.contactId
@@ -137,8 +138,12 @@ async function buildRenderContext(args: {
     opportunity: opportunity
       ? {
           name: opportunity.name,
-          // Opportunity has no currency column. Do not infer one from the country.
-          amount: formatOpportunityAmount(opportunity.valueMicros),
+          // Polo PreSales stores values as micros (millionths) to avoid float math.
+          // Render in the opportunity's country-implied currency (EUR fallback).
+          amount: formatAmountFromMicros(
+            opportunity.valueMicros,
+            inferCurrencyFromCountry(opportunity.country),
+          ),
         }
       : null,
     contact: contact
@@ -175,11 +180,27 @@ function resolveToken(token: string, ctx: RenderContext): unknown {
   return null;
 }
 
-/** Whole units plus an explicit missing-currency mark. Not a euro or dollar figure. */
-export function formatOpportunityAmount(valueMicros: bigint | number): string {
-  const amount = formatMicrosAmount(valueMicros);
-  if (amount === '0') return '';
-  return `${amount} unspecified`;
+export function formatAmountFromMicros(micros: bigint | number, currency: string): string {
+  const decimal = formatMicrosDecimal(micros);
+  if (decimal === '0' || decimal === '-0') return '';
+  return `${currency} ${decimal}`;
+}
+
+/**
+ * Best-effort currency inference from country code so the email-template
+ * preview renders something reasonable without forcing a per-Opportunity
+ * currency column. A future Sprint can swap to a real per-record currency.
+ */
+function inferCurrencyFromCountry(country: string | null | undefined): string {
+  if (!country) return 'EUR';
+  const c = country.toUpperCase();
+  if (['US'].includes(c)) return 'USD';
+  if (['GB'].includes(c)) return 'GBP';
+  if (['CH'].includes(c)) return 'CHF';
+  if (['JP'].includes(c)) return 'JPY';
+  if (['AU'].includes(c)) return 'AUD';
+  if (['CA'].includes(c)) return 'CAD';
+  return 'EUR';
 }
 
 function formatToday(): string {
@@ -188,6 +209,15 @@ function formatToday(): string {
     month: 'long',
     year: 'numeric',
   });
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function stripHtml(input: string): string {

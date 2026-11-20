@@ -40,6 +40,19 @@ describe('files route contract', () => {
     expect(tooBig.success).toBe(false);
   });
 
+  it('rejects text/html on the account-file write path', () => {
+    // D5: HTML used to be on the allow-list. Stored XSS on the API origin
+    // is why it has to fail here, not after download headers try to paper
+    // over it. Org-chart HTML import does not use this schema.
+    const html = FileUploadUrlRequest.safeParse({
+      accountId: 'acme',
+      name: 'note.html',
+      contentType: 'text/html',
+      bytes: 1024,
+    });
+    expect(html.success).toBe(false);
+  });
+
   it('rejects unknown content types', () => {
     const badType = FileUploadUrlRequest.safeParse({
       accountId: 'acme',

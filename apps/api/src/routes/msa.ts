@@ -49,13 +49,32 @@ import {
   type MsaTimelineEvent,
 } from '@bidstack/shared';
 
-import { applyCompanyScope, getAccessScope, type AccessScope } from '../lib/access-scope.js';
+import {
+  applyCompanyScope,
+  applyMsaResourceScope,
+  getAccessScope,
+  isApiKeyActor,
+  type AccessScope,
+} from '../lib/access-scope.js';
 import { userHasPermission } from '../lib/rbac-decision-cache.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { detectMsaContentType, sha256Hex } from '../msa/file-checks.js';
 import { enqueueMsaTextExtract } from '../queues/msa-text-extract.js';
 import { issueMsaDownloadToken, MSA_DOWNLOAD_TTL_SECONDS, openMsaDownloadToken } from '../msa/download-token.js';
+
+const MsaParties = MsaDetail.shape.parties;
+const MsaFieldCitations = MsaDetail.shape.fieldCitations;
+
+function parseMsaParties(value: unknown): z.infer<typeof MsaParties> {
+  const parsed = MsaParties.safeParse(value);
+  return parsed.success ? parsed.data : [];
+}
+
+function parseMsaFieldCitations(value: unknown): z.infer<typeof MsaFieldCitations> {
+  const parsed = MsaFieldCitations.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
 
 const DAY_MS = 86_400_000;
 const USER_SELECT = { id: true, email: true, name: true } as const;
@@ -172,6 +191,9 @@ function serializeRow(r: Row): MsaSummaryRow {
 /** Scope predicate on contract_agreements: the linked company must be in scope. */
 export function msaScopeWhere(orgId: string, scope: AccessScope): Prisma.ContractAgreementWhereInput {
   if (scope.unrestricted) return { orgId, deletedAt: null };
+  if (isApiKeyActor(scope.userId)) {
+    return applyMsaResourceScope({ orgId, deletedAt: null }, scope);
+  }
   return {
     orgId,
     deletedAt: null,
@@ -338,12 +360,17 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const scope = await scopeOf(req);
       await loadVisibleCompany(req, req.params.companyId, scope);
-      const rows = await prisma.contractAgreement.findMany({
+      // One row past the page the card calls every agreement. The extra row
+      // is the probe. It is not counted, and it is not a total.
+      const ACCOUNT_AGREEMENT_SUMMARY_LIMIT = 500;
+      const loaded = await prisma.contractAgreement.findMany({
         where: { AND: [msaScopeWhere(req.auth.orgId, scope), { companyId: req.params.companyId }] },
         select: ROW_SELECT,
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
-        take: 500,
+        take: ACCOUNT_AGREEMENT_SUMMARY_LIMIT + 1,
       });
+      const agreementsContinue = loaded.length > ACCOUNT_AGREEMENT_SUMMARY_LIMIT;
+      const rows = agreementsContinue ? loaded.slice(0, ACCOUNT_AGREEMENT_SUMMARY_LIMIT) : loaded;
       const byStatus: Record<string, number> = {};
       const childCounts = { sow: 0, amendment: 0, addendum: 0 };
       for (const r of rows) {
@@ -374,6 +401,7 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
       return {
         companyId: req.params.companyId,
         total: rows.length,
+        agreementsContinue,
         byStatus,
         childCounts,
         primary: primary ? serializeRow(primary) : null,
@@ -485,11 +513,8 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
         indexation: extra.indexation,
         scopeOfServices: extra.scopeOfServices,
         affiliatesClause: extra.affiliatesClause,
-        parties: Array.isArray(extra.parties) ? extra.parties : [],
-        fieldCitations:
-          extra.fieldCitations && typeof extra.fieldCitations === 'object' && !Array.isArray(extra.fieldCitations)
-            ? extra.fieldCitations
-            : {},
+        parties: parseMsaParties(extra.parties),
+        fieldCitations: parseMsaFieldCitations(extra.fieldCitations),
       };
     },
   );

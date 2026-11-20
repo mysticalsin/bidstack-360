@@ -14,6 +14,8 @@ export interface Requirement {
 interface RequirementsResult {
   items: Requirement[];
   total: number;
+  /** True when one requirement past this page was loaded and dropped. */
+  requirementsContinue?: boolean;
 }
 
 export function useRfpRequirements(bidWorkspaceId: string | null) {

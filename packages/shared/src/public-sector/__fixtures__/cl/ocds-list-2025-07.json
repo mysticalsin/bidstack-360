@@ -1,0 +1,36 @@
+{
+  "creationDate": "2026-11-06T16:35:42.3542",
+  "version": "1.2",
+  "pagination": {
+    "offset": 0,
+    "limit": 5,
+    "total": 10328
+  },
+  "data": [
+    {
+      "ocid": "ocds-70d2nz-692240-2-CO25",
+      "urlTender": "http://api.mercadopublico.cl/APISOCDS/OCDS/tender/692240-2-CO25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/692240-2-CO25"
+    },
+    {
+      "ocid": "ocds-70d2nz-3951-19-LE25",
+      "urlTender": "http://api.mercadopublico.cl/APISOCDS/OCDS/tender/3951-19-LE25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/3951-19-LE25"
+    },
+    {
+      "ocid": "ocds-70d2nz-838102-3-LE25",
+      "urlTender": "http://api.mercadopublico.cl/APISOCDS/OCDS/tender/838102-3-LE25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/838102-3-LE25"
+    },
+    {
+      "ocid": "ocds-70d2nz-1638-46-LE25",
+      "urlTender": "http://api.mercadopublico.cl/APISOCDS/OCDS/tender/1638-46-LE25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/1638-46-LE25"
+    },
+    {
+      "ocid": "ocds-70d2nz-3885-26-LE25",
+      "urlTender": "http://api.mercadopublico.cl/APISOCDS/OCDS/tender/3885-26-LE25",
+      "urlAward": "http://api.mercadopublico.cl/APISOCDS/OCDS/award/3885-26-LE25"
+    }
+  ]
+}

@@ -101,12 +101,18 @@ export const pipelineStageRoutes: FastifyPluginAsyncZod = async (server) => {
     '/pipeline-stages',
     {
       schema: {
-        response: { 200: z.object({ items: z.array(PipelineStageSettings) }) },
+        response: {
+          200: z.object({
+            items: z.array(PipelineStageSettings),
+            pageContinues: z.boolean(),
+          }),
+        },
       },
     },
     async (req) => {
       const pipelineId = await ensureDefaultPipeline(req.auth.orgId);
-      const items = await prisma.pipelineStage.findMany({
+      const STAGE_LIST_PAGE = 100;
+      const loaded = await prisma.pipelineStage.findMany({
         where: {
           orgId: req.auth.orgId,
           pipelineId,
@@ -114,9 +120,14 @@ export const pipelineStageRoutes: FastifyPluginAsyncZod = async (server) => {
           deletedAt: null,
         },
         orderBy: { orderIndex: 'asc' },
-        take: 100,
+        take: STAGE_LIST_PAGE + 1,
       });
-      return { items: items.map(serializeStage) };
+      const pageContinues = loaded.length > STAGE_LIST_PAGE;
+      const stages = pageContinues ? loaded.slice(0, STAGE_LIST_PAGE) : loaded;
+      return {
+        pageContinues,
+        items: stages.map(serializeStage),
+      };
     },
   );
 

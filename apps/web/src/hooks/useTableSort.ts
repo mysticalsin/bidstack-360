@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react';
 
 import type { SortState } from '@/components/ui/SortableHeader';
 
-type Accessor<T> = (row: T) => string | number | bigint | null | undefined;
+type Accessor<T> = (row: T) => string | number | null | undefined;
 
 interface Options<K extends string> {
   initial?: SortState<K>;
@@ -37,11 +37,15 @@ export function useTableSort<T, K extends string>(
     if (!isControlled) setInternalState(next);
   };
 
+  // Key on the primitives: controlled callers often derive `state` from the URL
+  // on every render, and a fresh array per render loops reset-on-change logic.
+  const sortKey = state.key;
+  const sortDir = state.dir;
   const sorted = useMemo(() => {
-    if (!state.key || !state.dir) return rows;
-    const accessor = accessors[state.key];
+    if (!sortKey || !sortDir) return rows;
+    const accessor = accessors[sortKey];
     if (!accessor) return rows;
-    const dirFactor = state.dir === 'asc' ? 1 : -1;
+    const dirFactor = sortDir === 'asc' ? 1 : -1;
     // toSorted (ES2023) keeps the input immutable so the cache stays clean.
     // Fallback to spread+sort for environments that don't ship it yet —
     // Vitest's node environment is 18+ so we'd be fine, but the spread is
@@ -57,17 +61,12 @@ export function useTableSort<T, K extends string>(
       if (typeof va === 'number' && typeof vb === 'number') {
         return (va - vb) * dirFactor;
       }
-      // BigInt subtraction is exact. Number(micros) collapses past 2^53, so two
-      // different amounts would sort as a tie.
-      if (typeof va === 'bigint' && typeof vb === 'bigint') {
-        return (va > vb ? 1 : va < vb ? -1 : 0) * dirFactor;
-      }
       // String compare uses locale rules so accents sort correctly for our
       // EU customer base.
       return String(va).localeCompare(String(vb), undefined, { sensitivity: 'base' }) * dirFactor;
     });
     return next;
-  }, [rows, state, accessors]);
+  }, [rows, sortKey, sortDir, accessors]);
 
   return { state, setState, sorted };
 }

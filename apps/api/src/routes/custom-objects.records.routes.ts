@@ -25,6 +25,15 @@ import * as svc from '../services/custom-object.service.js';
 import { IdAndRecordParam, IdParam, serializeRecord } from './custom-objects.helpers.js';
 
 export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) => {
+  // Writes address a record through its parent object; a record id from a
+  // different object must 404 instead of being edited under the wrong path.
+  async function assertRecordOfObject(orgId: string, objectId: string, recordId: string) {
+    const record = await svc.getRecord(orgId, recordId);
+    if (!record || record.customObjectDefId !== objectId) {
+      throw server.httpErrors.notFound('Record not found');
+    }
+  }
+
   // GET /custom-objects/:id/records
   server.get(
     '/custom-objects/:id/records',
@@ -154,6 +163,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
       },
     },
     async (req) => {
+      await assertRecordOfObject(req.auth.orgId, req.params.id, req.params.rid);
       const updated = await svc.updateRecord({
         orgId: req.auth.orgId,
         recordId: req.params.rid,
@@ -178,6 +188,7 @@ export const customObjectRecordRoutes: FastifyPluginAsyncZod = async (server) =>
       },
     },
     async (req) => {
+      await assertRecordOfObject(req.auth.orgId, req.params.id, req.params.rid);
       const deleted = await svc.deleteRecord({
         orgId: req.auth.orgId,
         recordId: req.params.rid,

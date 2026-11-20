@@ -13,6 +13,7 @@ import {
   apiKeyScopeSatisfiesPermission,
   allowLegacyRestApiKeyScopes,
 } from '../lib/api-key-scopes.js';
+import { enforceAccessPolicy } from '../lib/access-policy-enforcement.js';
 import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 
 declare module 'fastify' {
@@ -69,6 +70,9 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
     'requirePermission',
     (permission: PermissionKey) => named(`rbac:permission(${permission})`, async (req: FastifyRequest) => {
       if (req.auth.role === 'api') {
+        if (req.auth.readOnly && permission.endsWith(':write')) {
+          throw req.server.httpErrors.forbidden('API key is read-only');
+        }
         if (apiKeyScopeSatisfiesPermission(req.auth.scopes, permission)) return;
         const legacyDetail = allowLegacyRestApiKeyScopes()
           ? ` or legacy ${permission.endsWith(':write') ? 'write' : 'read'}`
@@ -78,7 +82,10 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
         );
       }
 
-      if (await userHasPermission(req.auth.orgId, req.auth.userId, permission)) return;
+      if (await userHasPermission(req.auth.orgId, req.auth.userId, permission)) {
+        await enforceAccessPolicy(req, permission);
+        return;
+      }
 
       // No claim-based fallback. The previous code allowed `req.auth.role === 'admin'`
       // through unconditionally, which bypassed every granular check whenever the

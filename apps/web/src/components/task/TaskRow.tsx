@@ -214,7 +214,7 @@ export const TaskRow = memo(function TaskRow({
             type="button"
             onClick={onMoveUp}
             disabled={!canMoveUp}
-            className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-[10px] font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-xs font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={t('taskRow.moveUp', 'Move {{title}} up', { title: task.title })}
           >
             {t('taskRow.up', 'Up')}
@@ -223,7 +223,7 @@ export const TaskRow = memo(function TaskRow({
             type="button"
             onClick={onMoveDown}
             disabled={!canMoveDown}
-            className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-[10px] font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-[var(--border-subtle)] px-1.5 py-1 text-xs font-medium text-[var(--fg-secondary)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={t('taskRow.moveDown', 'Move {{title}} down', { title: task.title })}
           >
             {t('taskRow.down', 'Down')}
@@ -290,7 +290,7 @@ export const TaskRow = memo(function TaskRow({
               aria-haspopup="listbox"
               aria-expanded={snoozeOpen}
               className={cn(
-                'rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-[10px] text-[var(--fg-secondary)] flex items-center gap-1 hover:bg-[var(--surface-hover)] focus-visible:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:outline-none transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40',
+                'rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-0.5 text-xs text-[var(--fg-secondary)] flex items-center gap-1 hover:bg-[var(--surface-hover)] focus-visible:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:outline-none transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40',
                 snoozeOpen
                   ? 'opacity-100 ring-2 ring-[var(--brand-primary)]'
                   : 'opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100 focus:opacity-100 focus-visible:opacity-100',

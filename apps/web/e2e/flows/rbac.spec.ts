@@ -59,6 +59,10 @@ test.describe('RBAC - role-based access control', () => {
     await expect(page.getByRole('heading', { name: /audit log/i, level: 1 })).toHaveCount(0);
   });
 
+  // Matrix: viewer stub -> Read-Only. Read-Only has no audit-log:read and no
+  // writes. The UI still gates /audit-log with settings:write (RequireAdmin),
+  // so the correct destination is /dashboard, not the Settings audit tab.
+  // Sales Manager (audit-log:read, no settings:write) is a later product gap.
   test('viewer role is read-only and cannot reach admin-only audit log', async ({
     page,
     loginAs,

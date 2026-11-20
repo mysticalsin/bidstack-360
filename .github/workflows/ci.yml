@@ -43,12 +43,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Audit dependencies (high+)
-        # Pre-existing high backlog on polo/consolidated (brace-expansion,
-        # js-yaml, happy-dom, transitive vite/follow-redirects). Keep the
-        # report; do not fail the unit job on it during the main cutover.
-        # Dedicated bump PR required to make this a hard gate again.
+        # G4: high/critical advisories fail the unit job. Do not restore
+        # continue-on-error to paper over a new advisory.
         run: pnpm audit --audit-level high
-        continue-on-error: true
 
       - name: Generate Prisma client
         # Required before typecheck — apps import from the generated client.
@@ -84,12 +81,24 @@ jobs:
           --exclude src/queues/calendar-sync-cron.test.ts
           --exclude src/queues/calendar-sync-microsoft.test.ts
           --exclude src/queues/calendar-sync-push-idempotency.test.ts
+          --exclude src/queues/company-intel-import.contract.test.ts
           --exclude src/queues/document-extract.contract.test.ts
           --exclude src/queues/msa-reminders.test.ts
+          --exclude src/queues/msa-whitespace-digest.test.ts
           --exclude src/queues/msa-text-extract.test.ts
           --exclude src/queues/queues.test.ts
           --exclude src/queues/sms.test.ts
           --exclude src/queues/tenant-export.contract.test.ts
+          --exclude src/lib/workspace-token.revoke.integration.test.ts
+          --exclude src/queues/migration.attempt.test.ts
+          --exclude src/queues/migration.complete-race.test.ts
+          --exclude src/queues/migration.exhausted.test.ts
+          --exclude src/queues/migration.guard.test.ts
+          --exclude src/queues/migration.hubspot-page.test.ts
+          --exclude src/queues/migration.org-lock.test.ts
+          --exclude src/queues/migration.orphan-rows.test.ts
+          --exclude src/queues/migration.savepoint.test.ts
+          --exclude src/queues/migration.stale.test.ts
 
       # kam-tools.test.ts is fail-loud when Postgres is missing (intentional
       # "do not silently skip"). It belongs in the integration job below.
@@ -130,8 +139,14 @@ jobs:
           --exclude "src/security/penetration.injection-upload.test.ts"
           --exclude "src/security/penetration.webhook.test.ts"
 
-      - name: Build
-        run: pnpm -r build
+      - name: Build workspace and web
+        run: bash scripts/freeze-gates.sh
+
+      - name: Route inventory ratchet (permission + schema)
+        # Boots the API route table without a database and fails on any route
+        # that lacks a permission gate or input schema and is not already in
+        # scripts/route-inventory.baseline.json (shrink-only).
+        run: pnpm routes:inventory --check
 
       - name: Verify PWA manifest exists
         run: |
@@ -212,6 +227,9 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
       REDIS_URL: redis://localhost:6379
+      # Test-only. The integration Postgres uses scram, which rejects an empty
+      # app_role password. This is not a live secret.
+      APP_ROLE_TEST_PASSWORD: bidstack_app_role_test
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -229,17 +247,19 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Migrate + seed
-        run: |
-          pnpm db:generate
-          pnpm db:migrate:deploy
-          pnpm db:seed
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       - name: Build workspace packages
         run: >
           pnpm --filter @bidstack/shared --filter @bidstack/dust-client
           --filter @bidstack/odoo-mcp-client --filter @bidstack/db
           --filter @bidstack/memos --filter @bidstack/integrations build
+
+      - name: Migrate + seed
+        run: |
+          pnpm db:migrate:deploy
+          pnpm db:seed
 
       - name: API integration tests
         run: pnpm --filter @bidstack/api test
@@ -307,17 +327,19 @@ jobs:
       - name: Install Playwright Chromium (with deps)
         run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium
 
-      - name: Migrate + seed
-        run: |
-          pnpm db:generate
-          pnpm db:migrate:deploy
-          pnpm db:seed
+      - name: Generate Prisma client
+        run: pnpm db:generate
 
       - name: Build workspace packages
         run: >
           pnpm --filter @bidstack/shared --filter @bidstack/dust-client
           --filter @bidstack/odoo-mcp-client --filter @bidstack/db
           --filter @bidstack/memos --filter @bidstack/integrations build
+
+      - name: Migrate + seed
+        run: |
+          pnpm db:migrate:deploy
+          pnpm db:seed
 
       - name: Build web
         run: pnpm --filter @bidstack/web build

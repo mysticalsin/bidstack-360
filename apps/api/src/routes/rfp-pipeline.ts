@@ -24,6 +24,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
+import { proposalFrom } from '@bidstack/shared';
 import { logAiInvocation } from '../lib/ai-audit.js';
 import {
   RfpOrchestrateLoopPolicyError,
@@ -36,6 +37,7 @@ import { createLogger } from '../lib/logger.js';
 import {
   ALLOWED_MIME_TYPES,
   RFP_MAX_BYTES,
+  RFP_UPLOAD_BODY_LIMIT_BYTES,
   RFP_UPLOAD_RATE_LIMIT_MAX,
   UploadParams,
   AutofillParams,
@@ -67,9 +69,9 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       // config.permission is observability-only — enforce the gate with a real
       // preHandler so a read-only org member can't start AI/Dust spend.
       preHandler: server.requirePermission('documents:write'),
-      // WHY bodyLimit override: global cap is 10 MiB; RFP documents can be up
-      // to 50 MiB. Override here, not globally, to avoid widening attack surface.
-      bodyLimit: RFP_MAX_BYTES,
+      // The body is two ids; the document bytes go straight to storage and the
+      // 50 MiB cap is checked on the finalized FileAttachment below.
+      bodyLimit: RFP_UPLOAD_BODY_LIMIT_BYTES,
       schema: {
         params: UploadParams,
         body: z.object({
@@ -88,19 +90,6 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true },
       });
       if (!opportunity) throw server.httpErrors.notFound('Opportunity not found');
-
-      // Per-org upload rate limit.
-      const quota = await checkRfpUploadRateLimit(orgId);
-      if (!quota.allowed && quota.reason === 'unavailable') {
-        throw server.httpErrors.serviceUnavailable(
-          'RFP upload quota could not be checked, so the upload was refused.',
-        );
-      }
-      if (!quota.allowed) {
-        throw server.httpErrors.tooManyRequests(
-          `RFP upload limit: ${RFP_UPLOAD_RATE_LIMIT_MAX} uploads per hour per organisation`,
-        );
-      }
 
       // Parse multipart. Fastify's content-type parser handles multipart when
       // @fastify/multipart is registered, but we use the pre-signed URL pattern
@@ -139,6 +128,15 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         // WHY payloadTooLarge: @fastify/sensible maps HTTP 413 to payloadTooLarge.
         throw server.httpErrors.payloadTooLarge(
           `RFP document exceeds the 50 MiB limit (${file.bytes} bytes)`,
+        );
+      }
+
+      // Per-org upload rate limit, counted only once the file is accepted so a
+      // rejected attempt never burns one of the hourly slots.
+      const withinLimit = await checkRfpUploadRateLimit(orgId);
+      if (!withinLimit) {
+        throw server.httpErrors.tooManyRequests(
+          `RFP upload limit: ${RFP_UPLOAD_RATE_LIMIT_MAX} uploads per hour per organisation`,
         );
       }
 
@@ -346,8 +344,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/proposals/:proposalId/rfp-approve',
     {
-      config: { permission: 'proposals:approve' },
-      preHandler: server.requirePermission('proposals:approve'),
+      config: { permission: 'proposals:write' },
+      preHandler: server.requirePermission('proposals:write'),
       schema: {
         params: ApproveParams,
         body: ApproveBody,
@@ -441,7 +439,13 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         // concurrent double-approval loses the race (the second write sees
         // count 0) without a separate row lock.
         const approved = await tx.proposal.updateMany({
-          where: { id: proposal.id, orgId, approvedAt: null },
+          where: {
+            id: proposal.id,
+            orgId,
+            status: { in: [...proposalFrom('approve')] },
+            deletedAt: null,
+            approvedAt: null,
+          },
           data: {
             approvedAt,
             approvedByUserId: userId,
@@ -532,8 +536,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/bid-workspaces/:workspaceId/rfp/:orchestrationId/approve-drafting',
     {
-      config: { permission: 'proposals:approve' },
-      preHandler: server.requirePermission('proposals:approve'),
+      config: { permission: 'proposals:write' },
+      preHandler: server.requirePermission('proposals:write'),
       schema: {
         params: ResumeDraftingParams,
         response: { 200: ResumeDraftingResponse },
