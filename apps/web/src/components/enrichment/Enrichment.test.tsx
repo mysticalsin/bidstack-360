@@ -4,14 +4,89 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// No provider configured locally: the API says so, and the cards show Sample data.
+// The API says enrichment is not configured. The cards must not invent a revenue.
+const { AS_OF, ROLES } = vi.hoisted(() => {
+  const AS_OF = '2026-10-30';
+  const ROLES = Array.from({ length: 6 }, (_, i) => ({
+    id: `r${i}`,
+    source: 'fixture',
+    title: `Sample role ${i}`,
+    url: null,
+    city: 'Oslo',
+    country: 'NO',
+    region: 'EMEA',
+    function: 'data',
+    seniority: 'senior',
+    skills: [] as string[],
+    postedAt: AS_OF,
+  }));
+  return { AS_OF, ROLES };
+});
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
-  api: vi.fn(async () => ({ companyId: 'acct-1', status: 'not_configured', stale: false, providers: {}, provenance: {} })),
+  api: vi.fn(async (path: string) => {
+    if (path.includes('/hiring')) {
+      return {
+        companyId: 'acct-1',
+        fetchedAt: AS_OF,
+        postingsTotal: ROLES.length,
+        postings: ROLES,
+        hiring: {
+          total: ROLES.length,
+          byFunction: [{ key: 'data', count: ROLES.length }],
+          bySeniority: [{ key: 'senior', count: ROLES.length }],
+          byRegion: [{ key: 'EMEA', count: ROLES.length }],
+          topSkills: [],
+          clusters: [],
+        },
+      };
+    }
+    if (path.includes('/projects')) {
+      return {
+        companyId: 'acct-1',
+        fetchedAt: AS_OF,
+        projects: [
+          {
+            id: 'cloud',
+            kind: 'cloud',
+            name: 'Core platform move to cloud',
+            rationale: 'Synthetic fixture for the card, not a fetched filing.',
+            confidence: 'high',
+            region: 'EMEA',
+            postingCount: 1,
+            seniorCount: 0,
+            skills: [],
+            evidence: [{ postingId: 'r0', title: 'Sample role 0', url: null, region: 'EMEA', seniority: 'senior', postedAt: AS_OF, source: 'fixture' }],
+            method: 'rules',
+          },
+        ],
+      };
+    }
+    return {
+      companyId: 'acct-1',
+      status: 'not_configured',
+      stale: false,
+      fetchedAt: null,
+      expiresAt: null,
+      annualRevenueUsd: null,
+      revenueRange: null,
+      employeeCount: null,
+      employeeRange: null,
+      headcountGrowth6m: null,
+      headcountGrowth12m: null,
+      headcountGrowth24m: null,
+      industry: null,
+      industries: [],
+      locations: [],
+      techStack: [],
+      departmentHeadcount: null,
+      openJobs: 0,
+      provenance: {},
+      providers: {},
+    };
+  }),
 }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
-
-import { mockEnrichment } from '@/lib/enrichment/mock';
 
 import { FirmographicsStrip } from './FirmographicsStrip';
 import { HiringNowCard } from './HiringNowCard';
@@ -24,23 +99,21 @@ function wrap(ui: ReactNode, path = '/accounts/acct-1') {
 
 describe('enrichment cards', () => {
   afterEach(cleanup);
-  it('firmographics strip shows four facts, each with source and date, labelled Sample', async () => {
+  it('firmographics strip stays empty when enrichment is not configured', async () => {
+    // WHY: a missing provider used to be replaced with an invented CAD revenue.
     wrap(<FirmographicsStrip companyId="acct-1" />);
     const strip = await screen.findByTestId('account-firmographics');
     for (const t of ['Revenue', 'Headcount', 'Industry', 'Locations']) expect(within(strip).getByText(t)).toBeTruthy();
-    expect(strip.querySelectorAll('.en-src time').length).toBe(4);
-    expect(within(strip).getByText('Sample')).toBeTruthy();
+    expect(strip.textContent).not.toMatch(/CAD/);
+    expect(within(strip).queryByText('Sample')).toBeNull();
     expect(within(strip).getByText(/not configured/)).toBeTruthy();
-    // No provider: nothing to refresh.
     expect(within(strip).queryByTestId('enrichment-refresh')).toBeNull();
-    fireEvent.click(within(strip).getByRole('button', { name: /more/ }));
-    expect(within(strip).getByText(/London, United Kingdom/)).toBeTruthy();
+    expect(within(strip).queryByText(/London, United Kingdom/)).toBeNull();
   });
   it('hiring now drills into function / seniority / region breakdowns and postings', async () => {
     wrap(<HiringNowCard companyId="acct-1" />);
     const card = await screen.findByTestId('account-hiring-now');
-    const total = mockEnrichment('acct-1').hiring.total;
-    expect(within(card).getByText(String(total))).toBeTruthy();
+    expect(card.querySelector('.en-big')?.textContent).toBe(String(ROLES.length));
     fireEvent.click(within(card).getByTestId('hiring-breakdown'));
     const drill = within(card).getByTestId('hiring-drill');
     fireEvent.click(within(drill).getByRole('tab', { name: 'Region' }));
@@ -49,12 +122,10 @@ describe('enrichment cards', () => {
     expect(drill.querySelectorAll('.en-list > li').length).toBe(6);
   });
   it('potential projects show confidence and expand to evidence postings; a hash deep link opens one', async () => {
-    const e = mockEnrichment('acct-1');
-    const p = e.projects[0]!;
-    wrap(<PotentialProjectsCard companyId="acct-1" />, `/accounts/acct-1#enrichment-project-${p.id}`);
+    wrap(<PotentialProjectsCard companyId="acct-1" />, '/accounts/acct-1#enrichment-project-cloud');
     const card = await screen.findByTestId('account-potential-projects');
-    expect(within(card).getAllByText(/confidence ·/).length).toBe(e.projects.length);
-    const btn = within(card).getByRole('button', { name: new RegExp(p.title) });
+    expect(within(card).getAllByText(/confidence/).length).toBeGreaterThan(0);
+    const btn = within(card).getByRole('button', { name: /Core platform move to cloud/ });
     expect(btn.getAttribute('aria-expanded')).toBe('true');
     expect(within(card).getByText('Evidence postings')).toBeTruthy();
     fireEvent.click(btn);

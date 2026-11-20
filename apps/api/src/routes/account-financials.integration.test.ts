@@ -122,6 +122,23 @@ describe('account financials', () => {
     expect(await prisma.accountFinancialProfile.findUnique({ where: { companyId: c.id } })).toMatchObject({ status: 'paused', nextPullAt: null });
   });
 
+  skipIfNoDb('real mode does not return the built-in sample filings', async () => {
+    // WHY: the example periods were substituted for every tracked account with
+    // no filings, including POLO_DATA_MODE=real. Sample numbers belong only in demo.
+    const prev = process.env.POLO_DATA_MODE;
+    process.env.POLO_DATA_MODE = 'real';
+    try {
+      const c = await mk('Real Empty', 'key');
+      const body = (await server.inject({ method: 'GET', url: `/api/v1/accounts/${c.id}/financials` })).json();
+      expect(body.sample).toBe(false);
+      expect(body.periods).toEqual([]);
+      expect(body.signals).toEqual([]);
+    } finally {
+      if (prev === undefined) delete process.env.POLO_DATA_MODE;
+      else process.env.POLO_DATA_MODE = prev;
+    }
+  });
+
   skipIfNoDb('another org cannot read an account', async () => {
     const other = await prisma.org.create({ data: { clerkOrg: `org_fin_other_${Date.now()}`, name: 'Financials other' } });
     const c = await prisma.company.create({ data: { orgId: other.id, name: 'Hidden Co', tier: 'key' } });

@@ -1,6 +1,5 @@
-// Sample enrichment, shown when no provider is configured or the account has
-// not been enriched yet. Deterministic per company so screenshots and tests are
-// stable. Always flagged sample: true.
+// Deterministic card-shaped sample used by tests. The enrichment client does
+// not call this: a not-enriched account stays empty rather than inventing revenue.
 import type { CompanyEnrichment, OpenRole } from './types';
 
 type RoleFunction = 'Engineering' | 'Data & AI' | 'Product' | 'Operations' | 'Sales' | 'Finance' | 'Risk & Compliance' | 'HR';
