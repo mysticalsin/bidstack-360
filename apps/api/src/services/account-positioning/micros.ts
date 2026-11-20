@@ -30,6 +30,7 @@ export function referenceWinWhere() {
 }
 
 const SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+const MILLION = 1_000_000n;
 
 /** Sum integer micros. Null when the total cannot be a JavaScript number without drifting. */
 export function sumMicrosAsNumber(values: ReadonlyArray<bigint | null | undefined>): number | null {
@@ -37,4 +38,18 @@ export function sumMicrosAsNumber(values: ReadonlyArray<bigint | null | undefine
   for (const value of values) total += value ?? 0n;
   if (total > SAFE || total < -SAFE) return null;
   return Number(total);
+}
+
+/**
+ * Currency units for a micros total. Null only when the units themselves
+ * do not fit in one JavaScript number. A total past the safe integer in
+ * micros, such as EUR 10bn, still fits here.
+ */
+export function openTotalUnits(micros: bigint): number | null {
+  const negative = micros < 0n;
+  const abs = negative ? -micros : micros;
+  const whole = abs / MILLION;
+  if (whole > SAFE) return null;
+  const units = Number(whole) + Number(abs % MILLION) / 1_000_000;
+  return negative ? -units : units;
 }

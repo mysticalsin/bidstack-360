@@ -21,7 +21,7 @@
 .kn-tile:hover, .kn-tile:focus-visible { border-color: color-mix(in srgb, var(--kn-accent) 40%, var(--kn-line)); }
 .kn-tile:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--kn-accent) 35%, transparent); }
 .kn-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--kn-muted); }
-.kn-value { font-size: 26px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; color: var(--kn-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kn-value { font-size: 26px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; color: var(--kn-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .kn-tile[data-missing='true'] .kn-value { font-size: 16px; font-weight: 400; color: var(--kn-muted); padding: 5px 0; }
 .kn-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
 .kn-delta { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--kn-ink-2); }

@@ -157,8 +157,9 @@ describe('composeBrief', () => {
     expect(txt).not.toContain('\u2014');
   });
 
-  it('names the sample when the open count is not the whole book', () => {
-    // WHY: a silent take of 500 was read aloud as every open deal.
+  it('does not call the whole-book open amount a sample when nothing was won or lost', () => {
+    // WHY: the open amount is every open deal. "among the latest 500" on that
+    // amount says the page is the book when the page has no won or lost deal.
     const f: BriefFacts = {
       name: 'NOS',
       tierLabel: 'Strategic',
@@ -172,7 +173,49 @@ describe('composeBrief', () => {
       topSignal: null,
     };
     const txt = composeBrief(f, (v) => String(v), (m) => m);
-    expect(txt).toContain('2 open deals worth 100 among the latest 500 deals');
+    expect(txt).toContain('We have 2 open deals worth 100.');
+    expect(txt).not.toContain('latest');
+  });
+
+  it('names the latest 500 once, on the won and lost counts', () => {
+    // WHY: emitting the sample phrase on the open amount and again on the
+    // 24-month counts says two different things about the same figure.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 2, openMicros: '100', won24m: 1, lost24m: 0, latest: 500 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: null,
+    };
+    const txt = composeBrief(f, (v) => String(v), (m) => m);
+    expect(txt.match(/among the latest 500 deals/g)).toEqual(['among the latest 500 deals']);
+    expect(txt).toContain('worth 100; among the latest 500 deals, 1 won and 0 lost');
+    expect(txt).not.toContain('worth 100 among the latest');
+  });
+
+  it('does not hang the sample phrase on the 24-month clause', () => {
+    // WHY: "months among the latest 500 deals" reads as if only the won/lost
+    // line were a sample, and the phrase has no verb of its own.
+    const f: BriefFacts = {
+      name: 'NOS',
+      tierLabel: 'Strategic',
+      industry: null,
+      country: null,
+      employees: null,
+      momentum: null,
+      financials: null,
+      pipeline: { openCount: 2, openMicros: '100', won24m: 1, lost24m: 0, latest: 500 },
+      people: { known: 0, senior: 0, metLast12m: 0, lastMeeting: null },
+      topSignal: null,
+    };
+    const txt = composeBrief(f, (v) => String(v), (m) => m);
+    expect(txt).toContain('among the latest 500 deals, 1 won and 0 lost in the last 24 months');
+    expect(txt).not.toContain('months among the latest 500 deals');
   });
 });
 

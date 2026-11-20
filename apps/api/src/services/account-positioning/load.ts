@@ -2,7 +2,8 @@
 // risks, and the key-numbers strip. Read only, built from data already held.
 // Nothing is estimated: a number with no source comes back as null.
 import { prisma } from '@bidstack/db';
-import { capDealSample, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros.js';
+import { capDealSample, openTotalUnits, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros.js';
+import { readOpenBook } from './open-book.js';
 import {
   buildGaps,
   buildPlays,
@@ -136,7 +137,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
   const ids = (await groupMap(orgId, [companyId])).get(companyId) ?? [companyId];
   const live = await companiesWithLiveSignals(orgId, ids);
   const since24 = new Date(now.getTime() - 730 * DAY);
-  const [company, firmo, initiatives, fin, { people, lastMeeting }, opps, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
+  const [company, firmo, initiatives, fin, { people, lastMeeting }, opps, openBook, wonOrg, risky, topEvents, momentumIn, competitors] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, tier: true, industry: true, countryCode: true, employeeCount: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, provenance: true } }),
     loadInitiatives(orgId, scope, { id: companyId }, now),
@@ -157,6 +158,7 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
       orderBy: { updatedAt: 'desc' },
       take: POSITIONING_DEAL_SAMPLE + 1,
     }),
+    readOpenBook(orgId, ids),
     prisma.opportunity.findMany({
       where: {
         orgId,
@@ -205,7 +207,9 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
 
   const dealSample = capDealSample(opps);
   const deals = dealSample.rows;
-  const open = deals.filter((o) => positioningDealOutcome(o) === 'open');
+  const openCount = openBook.count;
+  const tooLarge = openBook.micros == null;
+  const openMicros = openBook.micros ?? 0n;
   const closed24 = deals.filter((o) => {
     if (positioningDealOutcome(o) === 'open') return false;
     return (o.closedAt ?? o.updatedAt) >= since24;
@@ -239,8 +243,9 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
           }
         : null,
     pipeline: {
-      openCount: open.length,
-      openMicros: open.reduce((s, o) => s + (o.valueMicros ?? 0n), 0n).toString(),
+      openCount,
+      openMicros: tooLarge ? '0' : openMicros.toString(),
+      tooLarge,
       won24m: closed24.filter((o) => positioningDealOutcome(o) === 'won').length,
       lost24m: closed24.filter((o) => positioningDealOutcome(o) === 'lost').length,
       latest: dealSample.capped ? POSITIONING_DEAL_SAMPLE : null,
@@ -257,13 +262,12 @@ export async function loadPositioning(orgId: string, scope: AccessScope, company
     people,
     lastMeetingAt: lastMeeting?.at ?? null,
     momentum,
-    openDeals: open.length,
+    openDeals: openCount,
     riskEvents: risky.map((e) => ({ kind: e.kind, title: cleanText(stripSamplePrefix(e.title)), at: e.occurredAt.toISOString(), url: e.sourceUrl || null, source: sourceLabel(e.source), sample: e.sample })),
     competitorMentions: competitors.map((ci) => ({ competitor: ci.competitorProfile.name, title: cleanText(ci.title), at: ci.publishedAt ? ci.publishedAt.toISOString() : null, url: ci.sourceUrl || null, source: 'Competitor intel' })),
     financialRisks: finSignals.filter((s) => fin.signals.find((x) => x.rule === s.rule && x.title === s.title)?.implication === 'RISK'),
     financialStaleFy: stale && latest ? latest.fiscalYear : null,
     financialSource: finSource,
-    dealSampleLimit: dealSample.capped ? POSITIONING_DEAL_SAMPLE : null,
     now,
   });
   return { companyId, plays, brief, gaps, sample: plays.length > 0 && plays.every((p) => p.sample), computedAt: now.toISOString() };
@@ -313,7 +317,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const live = await companiesWithLiveSignals(orgId, ids);
   const d90 = new Date(now.getTime() - 90 * DAY);
   const d180 = new Date(now.getTime() - 180 * DAY);
-  const [company, firmo, fin, rawPostings, opps, news, momentumIn, { people, lastMeeting }] = await Promise.all([
+  const [company, firmo, fin, rawPostings, opps, openBook, news, momentumIn, { people, lastMeeting }] = await Promise.all([
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
@@ -331,6 +335,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
       orderBy: { updatedAt: 'desc' },
       take: POSITIONING_DEAL_SAMPLE + 1,
     }),
+    readOpenBook(orgId, ids),
     prisma.accountWatchEvent.findMany({
       where: { orgId, companyId: { in: ids }, status: { not: 'DISMISSED' }, sentiment: { not: null }, occurredAt: { gte: d180, lte: now }, ...hideSampleWhere(live) },
       select: { sentiment: true, occurredAt: true, sample: true, source: true },
@@ -446,48 +451,48 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', value: days, goodWhen: 'down', sub: lastMeeting.title, source: 'Meeting intel and logged meetings', period: `On ${lastMeeting.at.slice(0, 10)}`, anchor: 'who-we-met' }));
   } else items.push(base({ id: 'last_meeting', group: 'health', label: 'Last meeting', unit: 'days', goodWhen: 'down', source: 'Meeting intel and logged meetings', period: 'Last 24 months', missing: 'No meeting logged' }));
 
-  // Pipeline value and trend: open value now vs reconstructed 90 days ago.
+  // Open total is the whole book. The latest 500 are only the won/lost page.
   const dealSample = capDealSample(opps);
   const deals = dealSample.rows;
-  const open = deals.filter((o) => positioningDealOutcome(o) === 'open');
-  const openAt = (t: Date) =>
-    sumMicrosAsNumber(
-      deals
-        .filter((o) => o.createdAt <= t && (positioningDealOutcome(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
-        .map((o) => o.valueMicros),
-    );
-  const nowOpen = sumMicrosAsNumber(open.map((o) => o.valueMicros));
-  const series = [150, 120, 90, 60, 30].map((d) => openAt(new Date(now.getTime() - d * DAY))).concat(nowOpen);
-  const ago = series[2];
-  if (nowOpen == null || ago == null || series.some((point) => point == null)) {
-    items.push(
-      base({
-        id: 'pipeline',
-        group: 'health',
-        label: 'Open pipeline',
-        unit: 'money_micros',
-        source: 'Polo pipeline',
-        period: 'Now, change vs 90 days ago',
-        anchor: 'deals',
-        missing: 'Open pipeline does not fit in one number',
-      }),
-    );
+  const openCount = openBook.count;
+  const openMicros = openBook.micros;
+  const sub = `${openCount} open deal${openCount === 1 ? '' : 's'}`;
+  const asNumber = openMicros == null ? null : sumMicrosAsNumber([openMicros]);
+  const tile = {
+    id: 'pipeline',
+    group: 'health' as const,
+    label: 'Open pipeline',
+    source: 'Polo pipeline',
+    period: 'Now, change vs 90 days ago',
+    anchor: 'deals',
+    sub,
+  };
+  if (asNumber != null) {
+    let delta: number | null = null;
+    let series: number[] = [];
+    if (!dealSample.capped) {
+      const openAt = (t: Date) =>
+        sumMicrosAsNumber(
+          deals
+            .filter((o) => o.createdAt <= t && (positioningDealOutcome(o) === 'open' ? true : (o.closedAt ?? o.updatedAt) > t))
+            .map((o) => o.valueMicros),
+        );
+      const points = [150, 120, 90, 60, 30].map((d) => openAt(new Date(now.getTime() - d * DAY))).concat(asNumber);
+      const ago = points[2];
+      if (ago != null && points.every((point) => point != null)) {
+        delta = pctChange(asNumber, ago);
+        series = points.filter((point): point is number => point != null);
+      }
+    }
+    items.push(base({ ...tile, unit: 'money_micros', value: asNumber, delta, deltaUnit: delta == null ? null : 'pct', series }));
+  } else if (openMicros == null) {
+    items.push(base({ ...tile, unit: 'money_micros', value: null, sub: null, missing: 'Open pipeline is too large to show' }));
   } else {
+    const units = openTotalUnits(openMicros);
     items.push(
-      base({
-        id: 'pipeline',
-        group: 'health',
-        label: 'Open pipeline',
-        unit: 'money_micros',
-        value: nowOpen,
-        delta: pctChange(nowOpen, ago),
-        deltaUnit: 'pct',
-        series: series.filter((point): point is number => point != null),
-        sub: dealSample.capped ? `${open.length} open deals in the latest ${POSITIONING_DEAL_SAMPLE}` : `${open.length} open deals`,
-        source: 'Polo pipeline',
-        period: 'Now, change vs 90 days ago',
-        anchor: 'deals',
-      }),
+      units == null
+        ? base({ ...tile, unit: 'money_micros', value: null, sub: null, missing: 'Open pipeline is too large to show' })
+        : base({ ...tile, unit: 'money', currency: 'EUR', value: units }),
     );
   }
 

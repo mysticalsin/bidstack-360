@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { capDealSample, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros';
+import { capDealSample, openTotalUnits, POSITIONING_DEAL_SAMPLE, referenceWinWhere, sumMicrosAsNumber } from './micros';
 
 describe('capDealSample', () => {
   it('keeps a short account book and does not call it a sample', () => {
@@ -43,6 +43,14 @@ describe('sumMicrosAsNumber', () => {
     // WHY: a sum that drops the sign would show money owed as money held.
     expect(sumMicrosAsNumber([-1_500_000n, -500_000n])).toBe(-2_000_000);
     expect(sumMicrosAsNumber([1_000_000n, -2_500_000n])).toBe(-1_500_000);
+  });
+
+  it('turns EUR 10bn of micros into units that still fit on one tile', () => {
+    // WHY: the safe-integer wall is about 9.007bn. The tile was saying the
+    // amount did not fit, while the brief already said EUR 10.0bn.
+    const tenBn = 10_000_000_000_000_000n;
+    expect(sumMicrosAsNumber([tenBn])).toBeNull();
+    expect(openTotalUnits(tenBn)).toBe(10_000_000_000);
   });
 });
 
