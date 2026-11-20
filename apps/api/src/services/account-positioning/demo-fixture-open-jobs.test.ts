@@ -278,8 +278,8 @@ describe('demo fixture open jobs', () => {
     // The live Apollo row on the same account stays closed. Only the three fixture rows open.
     expect(fresh).toBe(3);
     const ancientOpen = await openJobs(FIXTURE_ORG, ANCIENT_CO);
-    expect(ancientOpen).toBeGreaterThan(0);
-    expect(ancientOpen).toBe(2);
+    // The org shares one fixture clock. This older cohort is not pulled up to now.
+    expect(ancientOpen).toBe(0);
 
     const afterFirst = stamp(postings);
     expect(postings.find((row) => row.id === 'fx-52')!.postedAt.getTime() - postings.find((row) => row.id === 'fx-4')!.postedAt.getTime()).toBe(spread);

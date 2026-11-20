@@ -56,9 +56,11 @@ export function projectFixtureRow<T extends FixtureClockRow>(row: T, shiftMs: nu
 }
 
 /**
- * Per-company shifts for a fixture org in explicit demo mode.
- * Null means "do not project": the mode is not demo, or this is another org.
- * That path does not query.
+ * One shift for every requested company, from the fixture org's fixture rows only.
+ * Null means do not project.
+ * Any mode other than exactly "demo" returns before a query.
+ * Demo looks the fixture tenant up by clerk id. A different org id stops there
+ * and does not read postings. A newer non-fixture row does not move the anchor.
  */
 export async function demoFixtureShifts(
   db: PrismaClient,
@@ -69,15 +71,15 @@ export async function demoFixtureShifts(
 ): Promise<Map<string, number> | null> {
   if (env.POLO_DATA_MODE !== 'demo') return null;
   if (companyIds.length === 0) return null;
-  const org = await db.org.findUnique({ where: { id: orgId }, select: { clerkOrg: true } });
-  if (org?.clerkOrg !== FIXTURE_ORG_CLERK) return null;
+  const fixture = await db.org.findUnique({ where: { clerkOrg: FIXTURE_ORG_CLERK }, select: { id: true } });
+  if (!fixture || fixture.id !== orgId) return null;
 
-  const rows: Array<FixtureClockRow & { companyId: string }> = [];
+  const rows: FixtureClockRow[] = [];
   let cursor: string | undefined;
   for (;;) {
     const page = await db.companyJobPosting.findMany({
-      where: { orgId, companyId: { in: [...companyIds] }, source: FIXTURE_SOURCE },
-      select: { id: true, companyId: true, postedAt: true, lastSeenAt: true, fetchedAt: true },
+      where: { orgId, source: FIXTURE_SOURCE },
+      select: { id: true, postedAt: true, lastSeenAt: true, fetchedAt: true },
       orderBy: { id: 'asc' },
       take: PAGE,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -89,15 +91,8 @@ export async function demoFixtureShifts(
     cursor = next;
   }
 
-  const grouped = new Map<string, FixtureClockRow[]>();
-  for (const row of rows) {
-    const group = grouped.get(row.companyId);
-    if (group) group.push(row);
-    else grouped.set(row.companyId, [row]);
-  }
-  const shifts = new Map<string, number>();
-  for (const [companyId, group] of grouped) shifts.set(companyId, fixturePostingShiftMs(group, now));
-  return shifts;
+  const shift = fixturePostingShiftMs(rows, now);
+  return new Map(companyIds.map((companyId) => [companyId, shift]));
 }
 
 type KeyPosting = FixtureClockRow & { companyId: string; source: string };
