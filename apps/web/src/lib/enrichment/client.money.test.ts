@@ -19,4 +19,13 @@ describe('enrichment fmtMoney', () => {
   it('does not invent a currency code', () => {
     expect(fmtMoney(1_500_000, '')).toBe('1.5M');
   });
+
+  it('starts the M suffix at exactly one million', () => {
+    // WHY: a threshold of greater-than one million still passes 1.5M and 2M.
+    expect(fmtMoney(999_999.99, 'USD')).toBe('USD 999,999.99');
+    expect(fmtMoney(999_999.99, 'USD')).not.toContain('M');
+    expect(fmtMoney(1_000_000, 'USD')).toBe('USD 1M');
+    expect(fmtMoney(1_000_000.01, 'USD')).toBe('USD 1,000,000.01');
+    expect(fmtMoney(1_000_000.01, 'USD')).not.toContain('M');
+  });
 });
