@@ -18,4 +18,12 @@ describe('formatExtractedMicros', () => {
   it('refuses a micros number that is not a safe integer', () => {
     expect(formatExtractedMicros(Number.MAX_SAFE_INTEGER + 2)).toBe('amount not readable');
   });
+
+  it('rounds an exact half cent away from zero on both signs', () => {
+    // WHY: half-up and half-down disagree only when the remainder is exactly 5_000 micros.
+    expect(formatExtractedMicros(1_005_000, 'USD')).toBe('1.01 USD');
+    expect(formatExtractedMicros(-1_005_000, 'USD')).toBe('-1.01 USD');
+    expect(formatExtractedMicros(1_004_999, 'USD')).toBe('1 USD');
+    expect(formatExtractedMicros(-1_004_999, 'USD')).toBe('-1 USD');
+  });
 });
