@@ -259,10 +259,30 @@ export function sparklineIndexAtX(
   return Math.min(count - 1, Math.max(0, raw));
 }
 
+function compactKeepsUnits(units: number): boolean {
+  const abs = Math.abs(units);
+  for (const div of [1e9, 1e6, 1e3]) {
+    if (abs < div) continue;
+    for (let digits = 0; digits <= 2; digits += 1) {
+      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 function formatCompact(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  if (!Number.isSafeInteger(value)) {
+    return new Intl.NumberFormat("en", {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
+  }
+  if (!compactKeepsUnits(value)) return value.toLocaleString("en");
   return new Intl.NumberFormat("en", {
     notation: "compact",
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 

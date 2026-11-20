@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
 import { Sparkline } from './Sparkline';
+import { formatKpiCountFrame, formatKpiValue } from './kpi-value';
 
 interface Props {
   title: string;
@@ -24,12 +25,6 @@ interface Props {
   className?: string;
 }
 
-function defaultFormat(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString(undefined, { maximumFractionDigits: 1 });
-}
-
 export function KpiCard({
   title,
   value,
@@ -37,7 +32,7 @@ export function KpiCard({
   deltaPercent,
   deltaPeriod,
   sparklineData,
-  format = defaultFormat,
+  format = formatKpiValue,
   loading = false,
   className,
 }: Props) {
@@ -63,7 +58,10 @@ export function KpiCard({
       const progress = Math.min(elapsed / duration, 1);
       // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      el.textContent = format(value * eased);
+      const counting = progress < 1;
+      el.textContent = counting && format === formatKpiValue
+        ? formatKpiCountFrame(value * eased)
+        : format(counting ? value * eased : value);
       if (progress < 1) rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
