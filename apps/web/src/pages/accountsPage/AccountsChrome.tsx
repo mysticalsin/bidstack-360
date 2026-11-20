@@ -155,9 +155,13 @@ export function FilterRow({
   return (
     <div role="search" aria-label={ariaLabel} className="flex flex-wrap items-center gap-3">
       {/* flex-1 is basis 0%. A real 144px basis lets this field share the row
-          with the selects at 1280px (992px page column) and grow into whatever
-          space the selects do not use. */}
-      <div className="relative min-w-0" style={{ flex: '1 1 144px', minWidth: '0px' }}>
+          with the selects at 1280px (992px page column). The input itself has
+          flex-grow 1 so it fills that leftover; flex-grow 0 would leave it at
+          the 144px basis (240px at 1280, 174px at 390). */}
+      <div
+        className="relative min-w-0"
+        style={{ display: 'flex', flex: '1 1 144px', minWidth: '0px' }}
+      >
         <label htmlFor={searchId} className="sr-only">
           {searchLabel}
         </label>
@@ -174,6 +178,7 @@ export function FilterRow({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={searchPlaceholder}
           className="input w-full pl-9"
+          style={{ flexGrow: 1, flexShrink: 1, flexBasis: '0px', minWidth: '0px', width: '100%' }}
         />
       </div>
       {children}
