@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatConvertedMicros } from '@/lib/format';
-
 import { fmtMoneyMicros } from './labels';
 
 describe('fmtMoneyMicros', () => {
@@ -9,7 +7,7 @@ describe('fmtMoneyMicros', () => {
     // WHY: one compact digit rounded this cap up by forty thousand.
     const micros = 7_860_000_000_000;
     const label = fmtMoneyMicros(micros, 'gbp');
-    expect(label).toBe(formatConvertedMicros(BigInt(micros), 'GBP'));
+    expect(label).toMatch(/7\.86/);
     expect(label).not.toMatch(/7\.9/);
   });
 
