@@ -131,16 +131,21 @@ function lines(text) {
 }
 
 // PGVERBOSITY=verbose and LC_ALL=C make pg_restore print this once when
-// createdb already made schema public. Any other error, or a zero exit
-// that still printed it, fails the boot.
-const DUPLICATE_SCHEMA = 'ERROR:  42P06:';
+// createdb already made schema public. The SQLSTATE alone is any duplicate
+// schema. Any other error, or a zero exit that still printed it, fails the boot.
+export const DUPLICATE_PUBLIC_SCHEMA = 'ERROR:  42P06: schema "public" already exists';
 
 export function restoreFailure(status, text) {
   const body = String(text || '');
-  const marks = body.split(DUPLICATE_SCHEMA).length - 1;
+  const marks = body.split(DUPLICATE_PUBLIC_SCHEMA).length - 1;
   const errors = lines(body).filter((line) => /^pg_restore: error:/i.test(line));
   if (status === 0 && errors.length === 0 && marks === 0) return null;
-  if (status === 1 && marks === 1 && errors.length > 0 && errors.every((line) => line.includes(DUPLICATE_SCHEMA))) {
+  if (
+    status === 1 &&
+    marks === 1 &&
+    errors.length > 0 &&
+    errors.every((line) => line.includes(DUPLICATE_PUBLIC_SCHEMA))
+  ) {
     return null;
   }
   const sample = (errors.length > 0 ? errors : lines(body)).slice(0, 5).join(' | ').slice(0, 500);
@@ -180,4 +185,216 @@ export function scrubChildEnv(env) {
   delete next.POLO_APP_DB_PASSWORD;
   delete next.POLO_INTERNAL_KEY;
   return next;
+}
+
+// The password psql must print `ERROR:  42601:` rather than a bare ERROR line.
+// LC_ALL=C keeps that text stable. The caller still scrubs the secret.
+/**
+ * @param {Record<string, string>} [extra]
+ * @returns {Record<string, string>}
+ */
+export function passwordPsqlEnv(extra = {}) {
+  return { ...extra, LC_ALL: 'C', LANG: 'C', PGVERBOSITY: 'verbose' };
+}
+
+// -c would put the ALTER text, including the SCRAM verifier, on argv.
+export function assertPsqlArgsHaveNoCommand(args) {
+  if (!Array.isArray(args)) throw new Error('psql argv must be a list');
+  const list = args.map((arg) => String(arg));
+  for (const arg of list) {
+    if (arg === '-c' || arg === '--command' || arg.startsWith('--command=')) {
+      throw new Error('psql argv must not use -c');
+    }
+  }
+  return list;
+}
+
+export const BOOT_STATES = Object.freeze({
+  Init: 'Init',
+  AppRoleRestore: 'AppRoleRestore',
+  TolerateDuplicateSchema: 'TolerateDuplicateSchema',
+  DrillHooks: 'DrillHooks',
+  Ready: 'Ready',
+  Failed: 'Failed',
+});
+
+const TERMINAL_BOOT_STATES = new Set([BOOT_STATES.Ready, BOOT_STATES.Failed]);
+
+function blank(value) {
+  return String(value ?? '').trim();
+}
+
+function asEnv(env) {
+  return env && typeof env === 'object' ? env : {};
+}
+
+export function drillHooksAllowed(env) {
+  const source = asEnv(env);
+  return (
+    source.POLO_RESTORE_DRILL === '1' &&
+    String(source.NODE_ENV || '').toLowerCase() !== 'production'
+  );
+}
+
+function drillHooksRequested(env) {
+  const source = asEnv(env);
+  const gate = source.POLO_GATE_BREAK || '';
+  const knownGate = gate === 'audit-trigger' || gate === 'audit-trigger-replica';
+  return (
+    knownGate || source.POLO_DROP_APP_ROLE === '1' || Boolean(source.POLO_PASSWORD_TARGET_ROLE)
+  );
+}
+
+export function selectDrillHooks(env) {
+  const source = asEnv(env);
+  if (!drillHooksAllowed(source)) {
+    return { allowed: false, dropAppRole: false, gateBreak: '', passwordRole: 'app_role' };
+  }
+  const raw = source.POLO_PASSWORD_TARGET_ROLE || '';
+  if (raw && !/^[a-z_][a-z0-9_]{0,62}$/.test(raw)) {
+    throw new Error('POLO_PASSWORD_TARGET_ROLE is not a role name');
+  }
+  return {
+    allowed: true,
+    dropAppRole: source.POLO_DROP_APP_ROLE === '1',
+    gateBreak: source.POLO_GATE_BREAK || '',
+    passwordRole: raw || 'app_role',
+  };
+}
+
+export function classifyBootFailure(error) {
+  const message = blank(
+    error && typeof error === 'object' && 'message' in error ? error.message : error,
+  );
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : '';
+  if (code === 'ETIMEDOUT' || /timed out|\btimeout\b/i.test(message)) {
+    return { infrastructure: true, reason: `infrastructure: ${message || 'timeout'}` };
+  }
+  return { infrastructure: false, reason: message };
+}
+
+function transitionRecord(from, event, to, guard, reason, infrastructure) {
+  return { from, event, to, guard, reason, infrastructure: Boolean(infrastructure) };
+}
+
+// The container boot used to be a row of conditionals. This is that same
+// sequence: init, app-role restore, one public-schema notice, drill hooks,
+// then Ready or Failed. A false guard ends in Failed, except a drill hook
+// that production must ignore, which stays in DrillHooks.
+export function createDatabaseBoot({ log } = {}) {
+  const transitions = [];
+  let state = BOOT_STATES.Init;
+  let reason = '';
+
+  function emit(entry) {
+    transitions.push(entry);
+    if (typeof log === 'function') log(entry);
+    return entry;
+  }
+
+  function fail(from, event, why) {
+    state = BOOT_STATES.Failed;
+    reason = why;
+    return emit(transitionRecord(from, event, state, false, why, false));
+  }
+
+  function move(from, event, to, why, infrastructure = false) {
+    state = to;
+    if (to === BOOT_STATES.Ready || to === BOOT_STATES.Failed || why) reason = why;
+    return emit(transitionRecord(from, event, to, true, why || '', infrastructure));
+  }
+
+  function send(event) {
+    const name =
+      event && typeof event === 'object' && typeof event.type === 'string' ? event.type : 'unknown';
+    const from = state;
+    if (TERMINAL_BOOT_STATES.has(from)) {
+      return emit(transitionRecord(from, name, from, false, 'terminal', false));
+    }
+
+    if (from === BOOT_STATES.Init && name === 'cluster-ready') {
+      if (!event || event.ready !== true) return fail(from, name, 'cluster is not ready');
+      return move(from, name, BOOT_STATES.AppRoleRestore, '');
+    }
+
+    if (from === BOOT_STATES.Init && name === 'init-failed') {
+      const why = blank(event && event.reason);
+      if (!why) return fail(from, name, 'init failed without a reason');
+      return move(from, name, BOOT_STATES.Failed, why);
+    }
+
+    if (from === BOOT_STATES.AppRoleRestore && name === 'restore-result') {
+      const status = event ? event.status : undefined;
+      if (!(typeof status === 'number' || status === null)) {
+        return fail(from, name, 'restore result is not classifiable');
+      }
+      move(from, name, BOOT_STATES.TolerateDuplicateSchema, '');
+      const failure = restoreFailure(status, event.text);
+      if (failure) return fail(BOOT_STATES.TolerateDuplicateSchema, name, failure);
+      const why = status === 1 ? 'duplicate public schema once' : 'clean restore';
+      return move(BOOT_STATES.TolerateDuplicateSchema, name, BOOT_STATES.DrillHooks, why);
+    }
+
+    if (from === BOOT_STATES.AppRoleRestore && name === 'skip-restore') {
+      if (!event || event.how !== 'seed')
+        return fail(from, name, 'skip-restore is only for a seed boot');
+      return move(from, name, BOOT_STATES.DrillHooks, 'seed');
+    }
+
+    if (from === BOOT_STATES.DrillHooks && name === 'apply-drill-hooks') {
+      let hooks;
+      try {
+        hooks = selectDrillHooks(event && event.env);
+      } catch (error) {
+        return fail(from, name, error instanceof Error ? error.message : String(error));
+      }
+      const requested = drillHooksRequested(event && event.env);
+      if (requested && !hooks.allowed) {
+        return emit(transitionRecord(from, name, from, false, 'drill hooks refused', false));
+      }
+      return emit(
+        transitionRecord(
+          from,
+          name,
+          from,
+          true,
+          requested ? 'drill hooks applied' : 'no drill hooks',
+          false,
+        ),
+      );
+    }
+
+    if (from === BOOT_STATES.DrillHooks && name === 'gate-passed') {
+      const how = event && (event.how === 'restore' || event.how === 'seed') ? event.how : '';
+      if (!how) return fail(from, name, 'ready needs a restore or a seed');
+      return move(from, name, BOOT_STATES.Ready, how);
+    }
+
+    if (name === 'gate-failed' || name === 'boot-failed') {
+      const classified = classifyBootFailure(event && (event.error || event.reason));
+      if (classified.infrastructure)
+        return move(from, name, BOOT_STATES.Failed, classified.reason, true);
+      const why = blank(event && event.reason) || classified.reason;
+      if (!why) return fail(from, name, 'boot failed without a reason');
+      return move(from, name, BOOT_STATES.Failed, why);
+    }
+
+    return fail(from, name, `illegal transition ${from} ${name}`);
+  }
+
+  return {
+    get state() {
+      return state;
+    },
+    get reason() {
+      return reason;
+    },
+    get terminal() {
+      return TERMINAL_BOOT_STATES.has(state);
+    },
+    get transitions() {
+      return transitions.slice();
+    },
+    send,
+  };
 }

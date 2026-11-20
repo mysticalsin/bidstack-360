@@ -106,9 +106,9 @@ describe('database boot follow-ups', () => {
     expect(spawn).not.toMatch(/['"]-c['"]/);
     expect(spawn).not.toMatch(/--command/);
     expect(spawn).toContain('assertPsqlArgsHaveNoCommand(');
-    expect(() => databaseBoot.assertPsqlArgsHaveNoCommand(['-d', 'bidstack', '-c', 'select 1'])).toThrow(
-      /-c/,
-    );
+    expect(() =>
+      databaseBoot.assertPsqlArgsHaveNoCommand(['-d', 'bidstack', '-c', 'select 1']),
+    ).toThrow(/-c/);
     expect(() => databaseBoot.assertPsqlArgsHaveNoCommand(['--command', 'select 1'])).toThrow(/-c/);
     expect(() => databaseBoot.assertPsqlArgsHaveNoCommand(['--command=select 1'])).toThrow(/-c/);
     expect(() => databaseBoot.assertPsqlArgsHaveNoCommand('psql -c select 1')).toThrow(/list/);
@@ -121,12 +121,12 @@ describe('database boot follow-ups', () => {
     if (typeof databaseBoot.drillHooksAllowed !== 'function') {
       throw new Error('drillHooksAllowed is not exported');
     }
-    expect(databaseBoot.drillHooksAllowed({ POLO_RESTORE_DRILL: '1', NODE_ENV: 'production' })).toBe(
-      false,
-    );
-    expect(databaseBoot.drillHooksAllowed({ POLO_RESTORE_DRILL: '1', NODE_ENV: 'Production' })).toBe(
-      false,
-    );
+    expect(
+      databaseBoot.drillHooksAllowed({ POLO_RESTORE_DRILL: '1', NODE_ENV: 'production' }),
+    ).toBe(false);
+    expect(
+      databaseBoot.drillHooksAllowed({ POLO_RESTORE_DRILL: '1', NODE_ENV: 'Production' }),
+    ).toBe(false);
     expect(databaseBoot.drillHooksAllowed({ POLO_RESTORE_DRILL: '1' })).toBe(true);
     const password = functionBody(entry, 'setAppRolePassword');
     const gate = functionBody(entry, 'assertAppRoleGate');

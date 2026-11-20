@@ -168,7 +168,16 @@ describe('database boot guards', () => {
       throw new Error('drillHooksAllowed is not exported');
     }
     const flags = [undefined, '', '0', '1', 'true', '1 ', 'yes'] as const;
-    const nodes = [undefined, '', 'production', 'Production', 'PRODUCTION', 'test', 'development', 'prod'];
+    const nodes = [
+      undefined,
+      '',
+      'production',
+      'Production',
+      'PRODUCTION',
+      'test',
+      'development',
+      'prod',
+    ];
     for (const flag of flags) {
       for (const node of nodes) {
         const env: Record<string, string> = {};
@@ -213,7 +222,10 @@ describe('database boot guards', () => {
       passwordRole: 'no_such_role',
     });
     const max = 'a'.repeat(63);
-    expect(databaseBoot.selectDrillHooks({ POLO_RESTORE_DRILL: '1', POLO_PASSWORD_TARGET_ROLE: max }).passwordRole).toBe(max);
+    expect(
+      databaseBoot.selectDrillHooks({ POLO_RESTORE_DRILL: '1', POLO_PASSWORD_TARGET_ROLE: max })
+        .passwordRole,
+    ).toBe(max);
     expect(() =>
       databaseBoot.selectDrillHooks({
         POLO_RESTORE_DRILL: '1',
@@ -224,7 +236,8 @@ describe('database boot guards', () => {
       databaseBoot.selectDrillHooks({ POLO_RESTORE_DRILL: '1', POLO_PASSWORD_TARGET_ROLE: '1bad' }),
     ).toThrow(/not a role name/);
     expect(
-      databaseBoot.selectDrillHooks({ POLO_RESTORE_DRILL: '1', POLO_DROP_APP_ROLE: '0' }).dropAppRole,
+      databaseBoot.selectDrillHooks({ POLO_RESTORE_DRILL: '1', POLO_DROP_APP_ROLE: '0' })
+        .dropAppRole,
     ).toBe(false);
   });
 
@@ -237,7 +250,9 @@ describe('database boot guards', () => {
       infrastructure: true,
       reason: 'infrastructure: hook timed out',
     });
-    expect(databaseBoot.classifyBootFailure(new Error('Test timed out in 10000ms')).infrastructure).toBe(true);
+    expect(
+      databaseBoot.classifyBootFailure(new Error('Test timed out in 10000ms')).infrastructure,
+    ).toBe(true);
     expect(databaseBoot.classifyBootFailure('migrate exited 1')).toEqual({
       infrastructure: false,
       reason: 'migrate exited 1',

@@ -15,7 +15,21 @@ import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
-import { alterRolePasswordSql, appRolePasswordError, APP_ROLE_GATE_SQL, APP_ROLE_LOCK_SQL, ENSURE_APP_ROLE_SQL, restoreFailure, scramSha256Verifier, scrubChildEnv } from '../src/database-boot.js';
+import {
+  alterRolePasswordSql,
+  appRolePasswordError,
+  APP_ROLE_GATE_SQL,
+  APP_ROLE_LOCK_SQL,
+  assertPsqlArgsHaveNoCommand,
+  BOOT_STATES,
+  createDatabaseBoot,
+  ENSURE_APP_ROLE_SQL,
+  passwordPsqlEnv,
+  restoreFailure,
+  scramSha256Verifier,
+  scrubChildEnv,
+  selectDrillHooks,
+} from '../src/database-boot.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
@@ -109,6 +123,19 @@ function log(message) {
   const line = `[polo-container] ${new Date().toISOString()} ${message}`;
   remember(line);
   process.stdout.write(`${line}\n`);
+}
+
+// Same decisions as the old conditionals, with one record per transition.
+let databaseBoot = null;
+function bootMachine() {
+  if (!databaseBoot) {
+    databaseBoot = createDatabaseBoot({
+      log(entry) {
+        log(`boot ${JSON.stringify(entry)}`);
+      },
+    });
+  }
+  return databaseBoot;
 }
 
 function setPhase(next, why = '') {
@@ -209,16 +236,12 @@ function pgCli(args) {
   return ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, ...args];
 }
 
-function passwordRole() {
-  if (process.env.POLO_RESTORE_DRILL !== '1') return 'app_role';
-  const raw = process.env.POLO_PASSWORD_TARGET_ROLE;
-  if (!raw) return 'app_role';
-  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(raw)) throw new Error('POLO_PASSWORD_TARGET_ROLE is not a role name');
-  return raw;
-}
-
 function setAppRolePassword() {
-  if (process.env.POLO_RESTORE_DRILL === '1' && process.env.POLO_DROP_APP_ROLE === '1') {
+  const hooks = selectDrillHooks(process.env);
+  if (bootMachine().state === BOOT_STATES.DrillHooks) {
+    bootMachine().send({ type: 'apply-drill-hooks', env: process.env });
+  }
+  if (hooks.dropAppRole) {
     runSync('psql', pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-c', 'DROP OWNED BY app_role; DROP ROLE app_role']));
   }
   const password = process.env.POLO_APP_DB_PASSWORD || '';
@@ -228,11 +251,11 @@ function setAppRolePassword() {
   const verifier = scramSha256Verifier(password);
   const res = spawnSync(
     'psql',
-    pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q']),
+    assertPsqlArgsHaveNoCommand(pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'])),
     {
       encoding: 'utf8',
-      input: alterRolePasswordSql(passwordRole(), verifier),
-      env: childEnv({ PATH: process.env.PATH || '', HOME: process.env.HOME || '', LC_ALL: 'C', LANG: 'C' }),
+      input: alterRolePasswordSql(hooks.passwordRole, verifier),
+      env: childEnv(passwordPsqlEnv({ PATH: process.env.PATH || '', HOME: process.env.HOME || '' })),
       stdio: ['pipe', 'pipe', 'pipe'],
     },
   );
@@ -249,7 +272,7 @@ function lockAppRole() {
 }
 
 function assertAppRoleGate() {
-  const gateBreak = process.env.POLO_RESTORE_DRILL === '1' ? process.env.POLO_GATE_BREAK : '';
+  const gateBreak = selectDrillHooks(process.env).gateBreak;
   if (gateBreak === 'audit-trigger') {
     runSync('psql', pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-c', 'ALTER TABLE public.audit_log DISABLE TRIGGER audit_log_append_only']));
   } else if (gateBreak === 'audit-trigger-replica') {
@@ -325,6 +348,7 @@ function startDatabase() {
   }
   const exists = spawnSync('psql', pgCli(['-d', 'postgres', '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB}'`]), { encoding: 'utf8', env: childEnv() });
   if (exists.stdout.trim() !== '1') runSync('createdb', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, DB]);
+  bootMachine().send({ type: 'cluster-ready', ready: true });
 }
 
 function psqlText(sql) {
@@ -475,6 +499,7 @@ async function finishBoot(how) {
   try {
     if (how === 'seed') {
       setPhase('seeding');
+      bootMachine().send({ type: 'skip-restore', how: 'seed' });
       migrate();
       seed();
     } else {
@@ -486,8 +511,12 @@ async function finishBoot(how) {
     await waitForApi();
     apiRestarts = 0;
     startWorker();
+    bootMachine().send({ type: 'gate-passed', how });
     setPhase('ready', how);
   } catch (err) {
+    if (!bootMachine().terminal) {
+      bootMachine().send({ type: 'boot-failed', reason: String(err), error: err });
+    }
     setPhase('failed', String(err));
   }
 }
@@ -530,7 +559,9 @@ async function restoreFrom(req) {
   );
   if (restored.stdout) process.stdout.write(restored.stdout);
   if (restored.stderr) process.stderr.write(restored.stderr);
-  const failure = restoreFailure(restored.status, `${restored.stderr || ''}\n${restored.stdout || ''}`);
+  const restoredText = `${restored.stderr || ''}\n${restored.stdout || ''}`;
+  const failure = restoreFailure(restored.status, restoredText);
+  bootMachine().send({ type: 'restore-result', status: restored.status ?? null, text: restoredText });
   if (failure) {
     remember(failure);
     throw new Error(failure);
@@ -573,6 +604,9 @@ async function handleInternal(req, res, url) {
     try {
       await restoreFrom(req);
     } catch (err) {
+      if (!bootMachine().terminal) {
+        bootMachine().send({ type: 'boot-failed', reason: String(err), error: err });
+      }
       setPhase('failed', `restore: ${String(err)}`);
       return sendJson(res, 500, { phase, detail });
     }
@@ -685,6 +719,7 @@ try {
     }
   }, SELF_SEED_AFTER_MS);
 } catch (err) {
+  bootMachine().send({ type: 'init-failed', reason: String(err) });
   setPhase('failed', String(err));
 }
 

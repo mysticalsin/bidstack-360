@@ -166,7 +166,11 @@ describe('database boot transitions', () => {
     seed.send({ type: 'cluster-ready', ready: true });
     seed.send({ type: 'skip-restore', how: 'seed' });
     seed.send({ type: 'gate-passed', how: 'seed' });
-    expect(seed.transitions.map((entry) => entry.to)).toEqual(['AppRoleRestore', 'DrillHooks', 'Ready']);
+    expect(seed.transitions.map((entry) => entry.to)).toEqual([
+      'AppRoleRestore',
+      'DrillHooks',
+      'Ready',
+    ]);
     expect(seed.reason).toBe('seed');
     expect(seed.transitions.some((entry) => entry.to === 'TolerateDuplicateSchema')).toBe(false);
   });
@@ -241,7 +245,10 @@ describe('database boot transitions', () => {
       { type: 'gate-passed', how: '' },
       { type: 'boot-failed', reason: 'migrate exited 1' },
       { type: 'boot-failed', reason: '' },
-      { type: 'boot-failed', error: Object.assign(new Error('hook timed out'), { code: 'ETIMEDOUT' }) },
+      {
+        type: 'boot-failed',
+        error: Object.assign(new Error('hook timed out'), { code: 'ETIMEDOUT' }),
+      },
       { type: 'not-an-event' },
     ];
     let seed = 0x5eed;
