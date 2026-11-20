@@ -242,8 +242,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </div>
       </motion.div>
 
-      {/* Five top-level visuals, each with a plain-language caption; depth is
-          one click away in the drill sheet or on the account page. */}
+      {/* Five top-level visuals. Depth is one click away in the drill sheet
+          or on the account page. */}
       <div className="dash-v" aria-label={t('orgDashboard.cockpitAriaLabel', 'Workspace cockpit')} role="region">
         <div className="viz-grid-3">
           <DashboardHero

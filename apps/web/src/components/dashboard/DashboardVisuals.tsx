@@ -97,7 +97,6 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       ) : (
         <p className="viz-empty">No dated bids yet.</p>
       )}
-      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
     </ChartCard>
   );
 }
@@ -173,7 +172,6 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
           </div>
         </div>
       ) : <p className="viz-empty">No open bids.</p>}
-      <div className="viz-caption">Where your open bids sit today. Select a stage or a status to see the bids.</div>
       <div className="dash-chips" role="group" aria-label="Bids by status">
         {([['open', 'Open', m.open], ['won', 'Won', m.won], ['lost', 'Lost', m.lost]] as const).map(([k, label, n]) => (
           <button key={k} type="button" className="dash-chip" onClick={() => onDrill({ status: k })}>
