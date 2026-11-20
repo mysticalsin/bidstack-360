@@ -63,6 +63,13 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-20 TESTING: Polo restore drill rewrote the host
+
+- **What went wrong:** The restore drill ran under plain `pnpm test` whenever Postgres tools were installed, created `/data` and `/app` with sudo, appended `/etc/hosts`, used fixed ports, and `pkill`ed every redis-server.
+- **Root cause:** The entrypoint's paths and ports were constants, so the drill pointed the real process at the machine instead of a temp directory.
+- **Prevention rule:** `POLO_RESTORE_DRILL=1` is the only way to run that drill, and the message when it is unset says so. Paths and ports come from env with the production defaults. The drill tracks the pids it started and signals only those. An order assertion must reject a missing call (`-1`) before it compares positions.
+- **Files affected:** `apps/polo-preview/container/entrypoint.mjs`, `apps/polo-preview/src/restore-migrated-snapshot.integration.test.ts`, `apps/polo-preview/src/database-boot.test.ts`.
+
 ### 2026-11-20 BUG: Polo boot ALTER ROLE failed after a database-only restore
 
 - **What went wrong:** Every Polo container boot died in `migrating: after restore` with `could not set the app role password`. The API never reached ready.

@@ -28,10 +28,16 @@ boot, and the GRANTs inside `pg_restore` had already been ignored.
 
 ## Verification
 
+The drill does not run under `pnpm test`. Set `POLO_RESTORE_DRILL=1`.
+
 ```
 POLO_RESTORE_DRILL=1 pnpm --filter @bidstack/polo-preview exec vitest run src/restore-migrated-snapshot.integration.test.ts
 ```
 
-Postgres 16 client tools (`initdb`, `pg_dump`, `pg_restore`) and
-`redis-server` must be installed. The drill locates Postgres 16 at
-`/usr/lib/postgresql/16/bin` or on `PATH`.
+Postgres 16 client tools (`initdb`, `pg_dump`, `pg_restore`), the pgvector
+package for that server, and `redis-server` must be installed. Without
+pgvector, migrate fails with P3018 on `20260527000000_rfp_vector_indexes`.
+The drill locates Postgres 16 at `/usr/lib/postgresql/16/bin` or on `PATH`.
+It uses a temp directory and free ports. Restore onto a database that
+already has objects fails the boot; the container's disk is fresh on every
+boot, so that is the path this entrypoint takes.

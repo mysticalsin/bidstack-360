@@ -44,15 +44,35 @@ describe('polo app role boot', () => {
     const migrate = functionBody(entry, 'migrate');
     const restore = functionBody(entry, 'restoreFrom');
     const deploy = migrate.indexOf("['migrate', 'deploy'");
+    const password = migrate.indexOf('setAppRolePassword()');
     const dump = restore.indexOf("'pg_restore'");
+    const ensureMigrate = migrate.indexOf('ensureAppRole()');
+    const ensureRestore = restore.indexOf('ensureAppRole()');
+    const reported = restore.indexOf('restoreFailure(');
 
-    // WHY: grants in the dump fail if the role is created afterwards, and a
-    // fresh boot never reaches ALTER ROLE PASSWORD if migrate runs first on
-    // a cluster that does not have the role yet.
-    expect(migrate.indexOf('ensureAppRole()')).toBeGreaterThan(-1);
-    expect(migrate.indexOf('ensureAppRole()')).toBeLessThan(deploy);
-    expect(migrate.indexOf('setAppRolePassword()')).toBeGreaterThan(deploy);
-    expect(restore.indexOf('ensureAppRole()')).toBeLessThan(dump);
-    expect(restore.indexOf('restoreFailure(')).toBeGreaterThan(dump);
+    // WHY: a missing call is -1, and -1 < dump would still pass. Presence
+    // has to be asserted before order. Grants in the dump fail if the role
+    // is created afterwards, and a fresh boot never reaches ALTER ROLE
+    // PASSWORD if migrate runs first on a cluster that does not have the role.
+    expect(ensureMigrate).toBeGreaterThan(-1);
+    expect(deploy).toBeGreaterThan(-1);
+    expect(password).toBeGreaterThan(-1);
+    expect(ensureMigrate).toBeLessThan(deploy);
+    expect(password).toBeGreaterThan(deploy);
+    expect(ensureRestore).toBeGreaterThan(-1);
+    expect(dump).toBeGreaterThan(-1);
+    expect(reported).toBeGreaterThan(-1);
+    expect(ensureRestore).toBeLessThan(dump);
+    expect(reported).toBeGreaterThan(dump);
+  });
+
+  it('keeps the production paths and ports when the drill does not override them', () => {
+    expect(entry).toContain("process.env.POLO_APP_ROOT || '/app'");
+    expect(entry).toContain("process.env.POLO_DATA_DIR || '/data'");
+    expect(entry).toContain("configuredPort('POLO_HTTP_PORT', 8080)");
+    expect(entry).toContain("configuredPort('POLO_API_PORT', 4020)");
+    expect(entry).toContain("configuredPort('POLO_PG_PORT', 5432)");
+    expect(entry).toContain("configuredPort('POLO_REDIS_PORT', 6379)");
+    expect(entry).toContain('process.env.POLO_REDIS_HOST');
   });
 });

@@ -19,19 +19,44 @@ import { ENSURE_APP_ROLE_SQL, restoreFailure } from '../src/database-boot.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
-const APP = '/app';
+// Production paths and ports. A drill may point these at a temp directory
+// and free ports. Unset, the container layout is unchanged.
+function configuredPort(name, fallback) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`${name} must be a TCP port`);
+  return port;
+}
+
+function entryFile(value) {
+  return value.startsWith('/') ? value : join(APP, value);
+}
+
+const APP = process.env.POLO_APP_ROOT || '/app';
 const WEB_ROOT = join(APP, 'apps/web/dist');
-const DATA = '/data';
+const DATA = process.env.POLO_DATA_DIR || '/data';
 const PGDATA = join(DATA, 'pg');
 const STORAGE = join(DATA, 'storage');
-const API_PORT = 4020;
-const PORT = 8080;
+const API_PORT = configuredPort('POLO_API_PORT', 4020);
+const PORT = configuredPort('POLO_HTTP_PORT', 8080);
+const PG_PORT = configuredPort('POLO_PG_PORT', 5432);
+const REDIS_PORT = configuredPort('POLO_REDIS_PORT', 6379);
+const PG_SOCKET = process.env.POLO_PG_SOCKET || '/tmp';
+const API_ENTRY = entryFile(process.env.POLO_API_ENTRY || 'apps/api/dist/main.js');
+const WORKER_ENTRY = entryFile(process.env.POLO_WORKER_ENTRY || 'apps/worker/dist/main.js');
 const SELF_SEED_AFTER_MS = 120_000;
 const BOOT_ID = randomUUID();
 const INTERNAL_KEY = process.env.POLO_INTERNAL_KEY || '';
 const PG_USER = 'bidstack';
 const DB = 'bidstack';
-const OWNER_URL = ownerDatabaseUrl();
+function urlOnPgPort(databaseUrl) {
+  const url = new URL(databaseUrl);
+  url.port = String(PG_PORT);
+  return url.toString();
+}
+
+const OWNER_URL = urlOnPgPort(ownerDatabaseUrl());
 const REDIS_PASS = randomUUID().replaceAll('-', '');
 let redisHost = 'polo-redis';
 
@@ -92,7 +117,7 @@ function runtimeEnv(databaseUrl) {
     PORT_API: String(API_PORT),
     DATABASE_URL: databaseUrl,
     DATABASE_URL_UNPOOLED: databaseUrl,
-    REDIS_URL: `redis://:${REDIS_PASS}@${redisHost}:6379`,
+    REDIS_URL: `redis://:${REDIS_PASS}@${redisHost}:${REDIS_PORT}`,
     CF_ACCESS_AUTH: 'true',
     CF_ACCESS_TEAM_DOMAIN: 'tony-walteur.cloudflareaccess.com',
     CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'false',
@@ -134,7 +159,7 @@ function apiEnv() {
     delete env.DATABASE_URL_OWNER;
     return env;
   }
-  const app = appDatabaseUrl(process.env.POLO_APP_DB_PASSWORD);
+  const app = urlOnPgPort(appDatabaseUrl(process.env.POLO_APP_DB_PASSWORD));
   const env = runtimeEnv(app);
   env.DATABASE_URL_APP = app;
   delete env.DATABASE_URL_OWNER;
@@ -151,13 +176,17 @@ function quoteLiteral(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
+function pgCli(args) {
+  return ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, ...args];
+}
+
 function setAppRolePassword() {
   const password = process.env.POLO_APP_DB_PASSWORD || '';
   if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
   // psql must not echo the statement. A failure reports the role, not the secret.
   const res = spawnSync(
     'psql',
-    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'],
+    pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q']),
     {
       encoding: 'utf8',
       input: `ALTER ROLE app_role PASSWORD ${quoteLiteral(password)};\n`,
@@ -171,17 +200,22 @@ function startDatabase() {
   // The API refuses a loopback REDIS_URL in production; Redis is a sidecar in
   // this same container, reached through a named alias.
   // Some runtimes lock /etc/hosts; then Redis listens on the private interface.
+  // POLO_REDIS_HOST skips the hosts file (the drill sets 127.0.0.1).
   const bind = ['127.0.0.1'];
-  try {
-    writeFileSync('/etc/hosts', '127.0.0.1 polo-redis\n', { flag: 'a' });
-  } catch (err) {
-    const ip = Object.values(networkInterfaces())
-      .flat()
-      .find((a) => a && a.family === 'IPv4' && !a.internal)?.address;
-    if (!ip) throw new Error(`cannot write /etc/hosts (${err.message}) and no private IPv4 for Redis`, { cause: err });
-    redisHost = ip;
-    bind.push(ip);
-    log(`/etc/hosts is read-only; Redis on ${ip}`);
+  if (process.env.POLO_REDIS_HOST) {
+    redisHost = process.env.POLO_REDIS_HOST;
+  } else {
+    try {
+      writeFileSync('/etc/hosts', '127.0.0.1 polo-redis\n', { flag: 'a' });
+    } catch (err) {
+      const ip = Object.values(networkInterfaces())
+        .flat()
+        .find((a) => a && a.family === 'IPv4' && !a.internal)?.address;
+      if (!ip) throw new Error(`cannot write /etc/hosts (${err.message}) and no private IPv4 for Redis`, { cause: err });
+      redisHost = ip;
+      bind.push(ip);
+      log(`/etc/hosts is read-only; Redis on ${ip}`);
+    }
   }
   const asRoot = process.getuid?.() === 0;
   const ids = asRoot ? pgUid() : {};
@@ -191,7 +225,7 @@ function startDatabase() {
   if (!existsSync(join(PGDATA, 'PG_VERSION'))) {
     runSync('initdb', ['-D', PGDATA, '-U', PG_USER, '--auth=trust', '-E', 'UTF8'], ids);
   }
-  const pg = spawn('postgres', ['-D', PGDATA, '-h', '127.0.0.1', '-k', '/tmp', '-c', 'shared_buffers=256MB'], {
+  const pg = spawn('postgres', ['-D', PGDATA, '-h', '127.0.0.1', '-p', String(PG_PORT), '-k', PG_SOCKET, '-c', 'shared_buffers=256MB'], {
     ...ids,
     stdio: 'inherit',
   });
@@ -199,7 +233,7 @@ function startDatabase() {
     log(`postgres exited ${code}; stopping the container so it restarts clean`);
     process.exit(1);
   });
-  const redis = spawn('redis-server', ['--bind', ...bind, '--port', '6379', '--requirepass', REDIS_PASS, '--save', '', '--appendonly', 'no'], {
+  const redis = spawn('redis-server', ['--bind', ...bind, '--port', String(REDIS_PORT), '--requirepass', REDIS_PASS, '--save', '', '--appendonly', 'no'], {
     stdio: 'inherit',
   });
   redis.on('exit', (code) => {
@@ -207,18 +241,18 @@ function startDatabase() {
     process.exit(1);
   });
   for (let i = 0; i < 60; i++) {
-    const ready = spawnSync('pg_isready', ['-h', '127.0.0.1', '-U', PG_USER]);
+    const ready = spawnSync('pg_isready', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER]);
     if (ready.status === 0) break;
     spawnSync('sleep', ['1']);
   }
-  const exists = spawnSync('psql', ['-h', '127.0.0.1', '-U', PG_USER, '-d', 'postgres', '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB}'`], { encoding: 'utf8' });
-  if (exists.stdout.trim() !== '1') runSync('createdb', ['-h', '127.0.0.1', '-U', PG_USER, DB]);
+  const exists = spawnSync('psql', pgCli(['-d', 'postgres', '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB}'`]), { encoding: 'utf8' });
+  if (exists.stdout.trim() !== '1') runSync('createdb', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, DB]);
 }
 
 function psqlText(sql) {
   const res = spawnSync(
     'psql',
-    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-tAc', sql],
+    pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-tAc', sql]),
     { encoding: 'utf8' },
   );
   if (res.status !== 0) {
@@ -258,7 +292,7 @@ function ensureAppRole() {
   // role may already exist from this boot's restore or from a previous one.
   const res = spawnSync(
     'psql',
-    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'],
+    pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q']),
     { encoding: 'utf8', input: ENSURE_APP_ROLE_SQL, stdio: ['pipe', 'pipe', 'pipe'] },
   );
   if (res.status !== 0) {
@@ -300,7 +334,7 @@ function seed() {
 }
 
 function startApi() {
-  apiChild = spawn(process.execPath, ['apps/api/dist/main.js'], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  apiChild = spawn(process.execPath, [API_ENTRY], { cwd: APP, env: apiEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
   apiChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   apiChild.stderr.on('data', (chunk) => {
     process.stderr.write(chunk);
@@ -322,7 +356,7 @@ function startWorker() {
     log('worker not started; active import migration was refused');
     return;
   }
-  workerChild = spawn(process.execPath, ['apps/worker/dist/main.js'], { cwd: APP, env: workerEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+  workerChild = spawn(process.execPath, [WORKER_ENTRY], { cwd: APP, env: workerEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
   workerChild.stdout.on('data', (chunk) => process.stdout.write(chunk));
   workerChild.stderr.on('data', (chunk) => {
     process.stderr.write(chunk);
@@ -378,7 +412,7 @@ async function finishBoot(how) {
 function changeCounter() {
   const out = spawnSync(
     'psql',
-    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-tAc', 'SELECT coalesce(sum(n_tup_ins + n_tup_upd + n_tup_del), 0) FROM pg_stat_user_tables'],
+    pgCli(['-d', DB, '-tAc', 'SELECT coalesce(sum(n_tup_ins + n_tup_upd + n_tup_del), 0) FROM pg_stat_user_tables']),
     { encoding: 'utf8' },
   );
   return Number(out.stdout.trim() || 0);
@@ -388,7 +422,7 @@ function snapshotFile() {
   const dir = '/tmp/snapshot';
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  runSync('pg_dump', ['-h', '127.0.0.1', '-U', PG_USER, '-Fc', '-f', join(dir, 'db.dump'), DB]);
+  runSync('pg_dump', ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, '-Fc', '-f', join(dir, 'db.dump'), DB]);
   writeFileSync(join(dir, 'meta.json'), JSON.stringify({ at: new Date().toISOString(), bootId: BOOT_ID }));
   const out = '/tmp/snapshot.tgz';
   runSync('tar', ['-czf', out, '-C', dir, 'db.dump', 'meta.json', '-C', DATA, 'storage']);
@@ -408,7 +442,7 @@ async function restoreFrom(req) {
   ensureAppRole();
   const restored = spawnSync(
     'pg_restore',
-    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')],
+    ['-h', '127.0.0.1', '-p', String(PG_PORT), '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')],
     { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
   );
   if (restored.stdout) process.stdout.write(restored.stdout);
@@ -418,7 +452,7 @@ async function restoreFrom(req) {
     remember(failure);
     throw new Error(failure);
   }
-  const orgs = spawnSync('psql', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-tAc', 'SELECT count(*) FROM orgs'], { encoding: 'utf8' });
+  const orgs = spawnSync('psql', pgCli(['-d', DB, '-tAc', 'SELECT count(*) FROM orgs']), { encoding: 'utf8' });
   if (!(Number(orgs.stdout.trim()) > 0)) throw new Error('restored database has no orgs');
   if (existsSync(join(dir, 'storage'))) {
     rmSync(STORAGE, { recursive: true, force: true });
