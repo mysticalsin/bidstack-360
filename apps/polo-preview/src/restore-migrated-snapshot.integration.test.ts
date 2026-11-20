@@ -551,6 +551,26 @@ describe('restored polo snapshot', () => {
     }
   }, 180_000);
 
+  it('stops the boot when an audit trigger fires only on a replica', async (ctx) => {
+    if (!guard(ctx)) return;
+    const layout = await makeLayout();
+    let boot: Boot | null = null;
+    try {
+      boot = startEntrypoint(layout, { POLO_GATE_BREAK: 'audit-trigger-replica' });
+      const awaiting = await waitForPhase(layout.httpPort, (state) => state.phase === 'awaiting-data' || state.phase === 'failed', 30_000);
+      expect(awaiting.phase).toBe('awaiting-data');
+      const seeded = await postSeed(layout.httpPort);
+      expect(seeded.status, seeded.body).toBe(202);
+      const state = await waitForPhase(layout.httpPort, (next) => next.phase === 'ready' || next.phase === 'failed', 180_000);
+      expect(state.phase).toBe('failed');
+      expect(state.detail).toMatch(/audit_log_append_only/);
+    } finally {
+      expectPasswordUnlogged(boot);
+      stopBoot(boot);
+      rmSync(layout.root, { recursive: true, force: true });
+    }
+  }, 180_000);
+
   it('a failed password change does not write the secret to the logs', async (ctx) => {
     if (!guard(ctx)) return;
     const layout = await makeLayout();
@@ -564,10 +584,13 @@ describe('restored polo snapshot', () => {
       const state = await waitForPhase(layout.httpPort, (next) => next.phase === 'ready' || next.phase === 'failed', 180_000);
       expect(state.phase).toBe('failed');
       expect(boot.rawLogs()).not.toContain(FIXTURE_PASSWORD);
+      expect(boot.rawLogs()).not.toContain('SCRAM-SHA-256$');
       const serverLog = join(layout.dataDir, 'pg', 'log');
       if (existsSync(serverLog)) {
         for (const name of readdirSync(serverLog)) {
-          expect(readFileSync(join(serverLog, name), 'utf8')).not.toContain(FIXTURE_PASSWORD);
+          const text = readFileSync(join(serverLog, name), 'utf8');
+          expect(text).not.toContain(FIXTURE_PASSWORD);
+          expect(text).not.toContain('SCRAM-SHA-256$');
         }
       }
     } finally {

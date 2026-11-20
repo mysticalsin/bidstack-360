@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { alterRolePasswordSql, appRolePasswordError, ENSURE_APP_ROLE_SQL, restoreFailure, scramSha256Verifier } from './database-boot.js';
+import { alterRolePasswordSql, APP_ROLE_GATE_SQL, appRolePasswordError, ENSURE_APP_ROLE_SQL, restoreFailure, scramSha256Verifier } from './database-boot.js';
 
 const entry = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../container/entrypoint.mjs'), 'utf8');
 
@@ -29,16 +29,21 @@ describe('polo app role boot', () => {
     expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOREPLICATION\b/);
     expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOBYPASSRLS\b/);
     expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOINHERIT\b/);
+    expect(APP_ROLE_GATE_SQL).toContain("IN ('O', 'A')");
     expect(ENSURE_APP_ROLE_SQL).toMatch(/CONNECTION LIMIT 100/);
     expect(ENSURE_APP_ROLE_SQL).not.toMatch(/\bSUPERUSER\b/);
     expect(ENSURE_APP_ROLE_SQL).not.toMatch(/PASSWORD/i);
   });
 
   it('fails a restore on errors that matter and lets the public schema notice pass', () => {
-    const tolerated = 'pg_restore: error: could not execute query: ERROR:  schema "public" already exists';
+    const englishOnly = 'pg_restore: error: could not execute query: ERROR:  schema "public" already exists';
+    const tolerated = 'pg_restore: error: could not execute query: ERROR:  42P06: schema "public" already exists';
     expect(restoreFailure(0, '')).toBeNull();
+    // WHY: PGVERBOSITY=verbose prints the SQLSTATE. The English sentence alone
+    // is not the contract, and a zero exit is not this tolerated error.
+    expect(restoreFailure(1, englishOnly)).not.toBeNull();
     expect(restoreFailure(1, tolerated)).toBeNull();
-    // WHY: the duplicate-schema notice is SQLSTATE 42P06, and it may happen once.
+    expect(restoreFailure(0, tolerated)).not.toBeNull();
     expect(restoreFailure(1, `${tolerated}\n${tolerated}`)).not.toBeNull();
 
     const missing = restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  role "app_role" does not exist');
@@ -105,6 +110,7 @@ describe('polo app role boot', () => {
     expect(entry).toContain("overrideInDrill('POLO_RESTORE_DIR', '/tmp/restore', true)");
     expect(functionBody(entry, 'restoreFrom')).toContain('--no-privileges');
     expect(functionBody(entry, 'restoreFrom')).toContain('LC_ALL');
+    expect(functionBody(entry, 'restoreFrom')).toContain('PGVERBOSITY');
     expect(entry).toContain("process.env.POLO_RESTORE_DRILL !== '1'");
   });
 
@@ -127,7 +133,42 @@ describe('polo app role boot', () => {
     const sql = alterRolePasswordSql('no_such_role', scramSha256Verifier(secret));
     expect(sql).toContain('SCRAM-SHA-256$');
     expect(sql).not.toContain(secret);
+    expect(sql).toContain("SET log_statement = 'none'");
+    expect(sql).toContain("SET log_min_error_statement = 'panic'");
     const image = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../container/Dockerfile'), 'utf8');
     expect(image).toContain('pgvector/pgvector:pg16');
   });
+
+  it('gives no child the app password or the internal key', () => {
+    // WHY: spawn without an env inherits the supervisor's secrets. The API
+    // and worker still receive DATABASE_URL, which is how they connect.
+    const missing = spawnCallsMissingChildEnv(entry);
+    expect(missing).toEqual([]);
+    expect(entry).toContain('POLO_APP_DB_PASSWORD');
+    expect(entry).toContain('DATABASE_URL');
+  });
 });
+
+function spawnCallsMissingChildEnv(source: string): string[] {
+  const missing: string[] = [];
+  const re = /\bspawn(?:Sync)?\s*\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(source))) {
+    const open = source.indexOf('(', match.index);
+    const body = callBody(source, open);
+    if (!body.includes('childEnv(')) missing.push(body.split('\n')[0].trim());
+  }
+  return missing;
+}
+
+function callBody(source: string, openParen: number): string {
+  let depth = 0;
+  for (let i = openParen; i < source.length; i++) {
+    if (source[i] === '(') depth += 1;
+    else if (source[i] === ')') {
+      depth -= 1;
+      if (depth === 0) return source.slice(openParen, i + 1);
+    }
+  }
+  return source.slice(openParen);
+}
