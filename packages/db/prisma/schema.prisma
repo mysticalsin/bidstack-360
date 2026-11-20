@@ -3083,6 +3083,8 @@ model OrgSettings {
   /// Data residency tag: eu | uk | us | ca. Null = not pinned. Selects the
   /// regional bucket for tenant exports (see docs/compliance/CONTROL-MAP.md).
   dataRegion             String?   @map("data_region") @db.VarChar(8)
+  /// Owner/admin switch. Off: no fixture or sample number is shown for this org.
+  demoData               Boolean   @default(false) @map("demo_data")
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
 

@@ -19,7 +19,11 @@ import {
   type StageGateMode,
   OpportunityFilterRules,
   OpportunityFilterRulesUpdate,
+  OrgDemoDataSettings,
+  OrgDemoDataSettingsUpdate,
 } from '@bidstack/shared';
+
+import { canEditDemoData, orgDemoDataEnabled } from '../lib/demo-data.js';
 
 function parseAppModules(value: unknown): AppModules {
   const parsed = AppModules.safeParse(value ?? {});
@@ -316,6 +320,54 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       return residencyView(req.body.region);
+    },
+  );
+
+  // Demo data is off until an owner or a system Admin turns it on.
+  server.get(
+    '/org-settings/demo-data',
+    {
+      config: { permission: 'settings:write' },
+      schema: { response: { 200: OrgDemoDataSettings } },
+    },
+    async (req) => {
+      if (!(await canEditDemoData(req))) {
+        throw server.httpErrors.forbidden('Only the owner or an admin can change demo data');
+      }
+      return { demoData: await orgDemoDataEnabled(req.auth.orgId) };
+    },
+  );
+
+  server.put(
+    '/org-settings/demo-data',
+    {
+      config: { permission: 'settings:write' },
+      schema: { body: OrgDemoDataSettingsUpdate, response: { 200: OrgDemoDataSettings } },
+    },
+    async (req) => {
+      if (!(await canEditDemoData(req))) {
+        throw server.httpErrors.forbidden('Only the owner or an admin can change demo data');
+      }
+      await prisma.orgSettings.updateMany({
+        where: { orgId: req.auth.orgId, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
+      await prisma.orgSettings.upsert({
+        where: { orgId: req.auth.orgId },
+        create: { orgId: req.auth.orgId, demoData: req.body.demoData },
+        update: { demoData: req.body.demoData, deletedAt: null },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'org_settings.demo_data.update',
+          targetType: 'org_settings',
+          targetId: req.auth.orgId,
+          diff: { demoData: req.body.demoData },
+        },
+      });
+      return { demoData: req.body.demoData };
     },
   );
 };

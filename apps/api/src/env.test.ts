@@ -15,6 +15,7 @@ const COMPLETE_PRODUCTION_ENV = {
   BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
   BIDSTACK_TENANT_SCOPE_GUARD: 'enforce',
   DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
+  CLERK_SECRET_KEY: 'clerk-test-identity',
 };
 
 function restoreEnv(): void {
@@ -134,6 +135,7 @@ describe('boot environment validation', () => {
       PUBLIC_BASE_URL: 'https://demo.example.com',
       REDIS_URL: 'redis://:test@redis:6379',
       DEMO_MODE: 'true',
+      POLO_DATA_MODE: 'demo',
       DEMO_SESSION_SECRET: 'demo-session-secret',
       DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
       BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
@@ -253,14 +255,18 @@ describe('boot environment validation', () => {
     expect(env.BIDSTACK_TENANT_SCOPE_GUARD).toBe('warn');
   });
 
-  it('defaults to demo data mode and refuses real mode without an identity source', async () => {
+  it('defaults to real data mode and lets development boot without an identity provider', async () => {
     const env = await loadEnvWith({});
-    expect(env.POLO_DATA_MODE).toBe('demo');
+    expect(env.POLO_DATA_MODE).toBe('real');
     expect(env.CF_ACCESS_AUTH).toBe('false');
 
-    await expect(loadEnvWith({ POLO_DATA_MODE: 'real' })).rejects.toThrow(
-      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true',
-    );
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        CLERK_SECRET_KEY: undefined,
+        POLO_DATA_MODE: 'real',
+      }),
+    ).rejects.toThrow('POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true');
   });
 
   it('requires an allowlist when Cloudflare Access is the identity source', async () => {

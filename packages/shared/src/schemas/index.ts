@@ -71,6 +71,7 @@ export * from './kam-account.js';
 export * from './app-modules.js';
 export * from './sales-toolkit.js';
 export * from './org-locale-settings.js';
+export * from './org-demo-data.js';
 export * from './org-stage-gate.js';
 export * from './people-map.js';
 export * from './enrichment-watchdog.js';

@@ -32,6 +32,7 @@ import {
 } from '@bidstack/shared';
 
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
+import { orgDemoDataEnabled } from '../lib/demo-data.js';
 import { enqueueAccountEnrichment } from '../queues/account-enrichment.js';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -103,6 +104,39 @@ export function toJobSeniority(v: string | null): JobSeniority {
 function parseHiring(v: unknown): HiringBreakdown {
   const out = HiringBreakdown.safeParse(v);
   return out.success ? out.data : EMPTY_HIRING;
+}
+
+function disconnectedFirmographics(companyId: string, openJobs: number): Firmographics {
+  return {
+    companyId,
+    status: 'not_connected',
+    annualRevenueUsd: null,
+    revenueRange: null,
+    employeeCount: null,
+    employeeRange: null,
+    headcountGrowth6m: null,
+    headcountGrowth12m: null,
+    headcountGrowth24m: null,
+    industry: null,
+    industries: [],
+    locations: [],
+    techStack: [],
+    departmentHeadcount: null,
+    openJobs,
+    provenance: {},
+    providers: {},
+    fetchedAt: null,
+    expiresAt: null,
+    stale: false,
+  };
+}
+
+function fixtureBacked(body: Firmographics): boolean {
+  if (body.status === 'not_enriched' || body.status === 'not_configured' || body.status === 'not_connected') return true;
+  const sources = Object.values(body.provenance)
+    .map((item) => item?.source)
+    .filter((source) => typeof source === 'string');
+  return sources.length > 0 && sources.every((source) => source === 'fixture');
 }
 
 function toFirmographics(companyId: string, row: Row | null, openJobs: number, now: Date): Firmographics {
@@ -210,12 +244,19 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
     async (req) => {
       const company = await loadCompany(req, req.params.id);
       if (!company) throw server.httpErrors.notFound('Company not found');
+      const demo = await orgDemoDataEnabled(req.auth.orgId);
+      const postingWhere = {
+        orgId: req.auth.orgId,
+        companyId: company.id,
+        ...(demo ? {} : { sample: false, source: { not: 'fixture' as const } }),
+      };
       const [row, openJobs] = await Promise.all([
         prisma.companyFirmographics.findUnique({ where: { companyId: company.id } }),
-        prisma.companyJobPosting.count({ where: { orgId: req.auth.orgId, companyId: company.id } }),
+        prisma.companyJobPosting.count({ where: postingWhere }),
       ]);
       await audit(req, 'enrichment.view', company.id, { status: row?.status ?? 'not_enriched' });
-      return toFirmographics(company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date());
+      const body = toFirmographics(company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date());
+      return demo || !fixtureBacked(body) ? body : disconnectedFirmographics(company.id, openJobs);
     },
   );
 
@@ -226,9 +267,11 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
       const company = await loadCompany(req, req.params.id);
       if (!company) throw server.httpErrors.notFound('Company not found');
       const orgId = req.auth.orgId;
+      const demo = await orgDemoDataEnabled(orgId);
       const where: Prisma.CompanyJobPostingWhereInput = {
         orgId,
         companyId: company.id,
+        ...(demo ? {} : { sample: false, source: { not: 'fixture' } }),
         ...(req.query.function ? { function: req.query.function } : {}),
         ...(req.query.region ? { region: { equals: req.query.region, mode: 'insensitive' as const } } : {}),
       };
@@ -241,7 +284,7 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
       return {
         companyId: company.id,
         fetchedAt: row?.fetchedAt?.toISOString() ?? null,
-        hiring: parseHiring(row?.hiring),
+        hiring: demo ? parseHiring(row?.hiring) : rows.length ? parseHiring(row?.hiring) : EMPTY_HIRING,
         postingsTotal: total,
         postings: rows.map((p) => ({
           id: p.id,
@@ -266,12 +309,22 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
     async (req) => {
       const company = await loadCompany(req, req.params.id);
       if (!company) throw server.httpErrors.notFound('Company not found');
+      const demo = await orgDemoDataEnabled(req.auth.orgId);
       const row = await prisma.companyFirmographics.findFirst({
         where: { orgId: req.auth.orgId, companyId: company.id },
-        select: { projects: true, fetchedAt: true },
+        select: { projects: true, fetchedAt: true, status: true, provenance: true },
       });
+      const provenance = rec(row?.provenance);
+      const fixtureOnly =
+        !demo &&
+        (row?.status === 'not_enriched' ||
+          row?.status === 'not_configured' ||
+          (Object.keys(provenance).length > 0 &&
+            Object.values(provenance).every((item) => rec(item).source === 'fixture')));
       const max = CONF_RANK[req.query.minConfidence];
-      const projects = parseProjects(row?.projects).filter((p) => CONF_RANK[p.confidence] <= max);
+      const projects = fixtureOnly
+        ? []
+        : parseProjects(row?.projects).filter((p) => CONF_RANK[p.confidence] <= max);
       await audit(req, 'enrichment.projects.view', company.id, { count: projects.length });
       return { companyId: company.id, fetchedAt: row?.fetchedAt?.toISOString() ?? null, projects };
     },

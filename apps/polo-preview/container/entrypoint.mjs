@@ -95,7 +95,9 @@ function runtimeEnv(databaseUrl) {
     CF_ACCESS_AUTH: 'true',
     CF_ACCESS_TEAM_DOMAIN: 'tony-walteur.cloudflareaccess.com',
     CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'false',
-    POLO_DATA_MODE: 'demo',
+    // Leave POLO_DATA_MODE alone. Unset stays unset, so the API default is
+    // real. An explicit demo value in the environment is kept. The org Demo
+    // data switch is not a process variable.
     POLO_REAL_ORG_CLERK: 'org_seed_mantu',
     STORAGE_DRIVER: 'local',
     LOCAL_STORAGE_ROOT: STORAGE,

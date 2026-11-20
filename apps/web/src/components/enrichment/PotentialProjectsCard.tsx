@@ -51,7 +51,9 @@ export function PotentialProjectsCard({ companyId }: { companyId: string }) {
         <SampleBadge show={q.data.sample} />
       </header>
       {projects.length === 0 ? (
-        <p className="en-meta">No initiatives inferred from current hiring.</p>
+        <p className="en-meta">
+          {q.data.status === 'not_connected' ? 'Not connected' : 'No initiatives inferred from current hiring.'}
+        </p>
       ) : (
         <ul className="en-list">
           {projects.map((p) => {

@@ -33,6 +33,7 @@ import { config } from './env.js';
 import { rbacPlugin } from './plugins/rbac.js';
 import { redis, waitForRedisReady } from './redis.js';
 import { healthRoute, httpRequestsTotal, httpRequestDuration } from './routes/health.js';
+import { orgDemoDataEnabled, presentFinancials } from './lib/demo-data.js';
 import { registerRoutes } from './server.routes.js';
 import { installAccountActivityAlerts } from './services/account-events.service.js';
 
@@ -221,10 +222,8 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
     max: isLowEnv ? Math.max(10_000, config.API_RATE_LIMIT_MAX) : config.API_RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     redis: rateLimitRedis,
-    // Fail OPEN when the store errors (e.g. the Redis provider's request quota
-    // is exhausted). Rate limiting is a guard, not a hard dependency — a store
-    // outage must never turn every request into a 500. The request is allowed
-    // through; the limit simply isn't enforced until the store recovers.
+    // Real mode fail-closes when the store errors. Demo mode stays fail-open
+    // so a fixture preview is not taken down by a Redis blip.
     skipOnError: config.POLO_DATA_MODE !== 'real',
     keyGenerator: (req) => {
       // Registered after auth so authenticated routes get per-user buckets.
@@ -268,6 +267,16 @@ export async function buildServer(options: BuildServerOptions = {}): Promise<Fas
       }
     });
   }
+
+  server.addHook('preSerialization', async (req, _reply, payload) => {
+    const route = req.routeOptions.url ?? '';
+    if ((!route.endsWith('/financials') && !route.endsWith('/financials/track')) || !payload || typeof payload !== 'object') {
+      return payload;
+    }
+    const orgId = (req as { auth?: { orgId?: string } }).auth?.orgId;
+    if (!orgId) return payload;
+    return presentFinancials(payload as { sample?: boolean }, await orgDemoDataEnabled(orgId));
+  });
 
   await registerRoutes(server);
 

@@ -95,7 +95,7 @@ jobs:
             echo "E2E seed complete"
           else
             echo "seed-e2e.ts not found — falling back to standard seed"
-            pnpm db:seed
+            POLO_DATA_MODE=demo pnpm db:seed
           fi
 
       - name: Build web app
@@ -207,7 +207,7 @@ jobs:
           if pnpm --filter @bidstack/db exec ts-node --esm prisma/seed-e2e.ts 2>/dev/null; then
             echo "E2E seed complete"
           else
-            pnpm db:seed
+            POLO_DATA_MODE=demo pnpm db:seed
           fi
 
       - name: Start API

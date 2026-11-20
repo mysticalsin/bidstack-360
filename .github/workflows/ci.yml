@@ -259,7 +259,7 @@ jobs:
       - name: Migrate + seed
         run: |
           pnpm db:migrate:deploy
-          pnpm db:seed
+          POLO_DATA_MODE=demo pnpm db:seed
 
       - name: API integration tests
         run: pnpm --filter @bidstack/api test
@@ -339,7 +339,7 @@ jobs:
       - name: Migrate + seed
         run: |
           pnpm db:migrate:deploy
-          pnpm db:seed
+          POLO_DATA_MODE=demo pnpm db:seed
 
       - name: Build web
         run: pnpm --filter @bidstack/web build

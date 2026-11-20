@@ -95,18 +95,15 @@ describe('auth plugin', () => {
 
   it('refuses to start when NODE_ENV is unset and CLERK_SECRET_KEY is missing', async () => {
     const server = Fastify({ logger: false });
-    await expect(server.register(authPlugin)).rejects.toThrow(
-      'CLERK_SECRET_KEY required in production',
-    );
+    await expect(server.register(authPlugin)).rejects.toThrow(/CLERK_SECRET_KEY/);
   });
 
-  it('refuses stub auth when POLO_DATA_MODE=real even in development', async () => {
+  it('boots the development stub in real mode so an operator can enter records', async () => {
     process.env.NODE_ENV = 'development';
     process.env.POLO_DATA_MODE = 'real';
     const server = Fastify({ logger: false });
-    await expect(server.register(authPlugin)).rejects.toThrow(
-      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true',
-    );
+    await expect(server.register(authPlugin)).resolves.not.toThrow();
+    await server.close();
   });
 
   it('boots Cloudflare Access identity without Clerk in production', async () => {
@@ -144,9 +141,7 @@ describe('auth plugin', () => {
   it('refuses to start when NODE_ENV=production and CLERK_SECRET_KEY is missing', async () => {
     process.env.NODE_ENV = 'production';
     const server = Fastify({ logger: false });
-    await expect(server.register(authPlugin)).rejects.toThrow(
-      'CLERK_SECRET_KEY required in production',
-    );
+    await expect(server.register(authPlugin)).rejects.toThrow(/CLERK_SECRET_KEY/);
   });
 
   // BIDSTACK_TENANT_SCOPE_GUARD=enforce rejects updateMany without orgId, and

@@ -43,7 +43,7 @@ export function HiringNowCard({ companyId }: { companyId: string }) {
         </span>
       </header>
       {total === 0 ? (
-        <p className="en-meta">No open roles found.</p>
+        <p className="en-meta">{q.data.status === 'not_connected' ? 'Not connected' : 'No open roles found.'}</p>
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
