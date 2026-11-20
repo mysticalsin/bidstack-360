@@ -90,6 +90,17 @@ const LEGACY_REPORT_IDS = [
   'da5b0000-0000-4000-8000-000000000022',
 ];
 
+async function refuseForeignRow(
+  existingOrgId: string | null,
+  orgId: string,
+  kind: string,
+  id: string,
+): Promise<void> {
+  if (existingOrgId !== null && existingOrgId !== orgId) {
+    throw new Error(`Refusing to re-parent ${kind} ${id}: it belongs to another org`);
+  }
+}
+
 export async function seedAnalyticsCommandCenter(
   prisma: PrismaClient,
   orgId: string,
@@ -132,6 +143,11 @@ export async function seedAnalyticsCommandCenter(
   ]);
 
   for (const report of plan.reports) {
+    const existingReport = await prisma.analyticsReport.findUnique({
+      where: { id: report.id },
+      select: { orgId: true },
+    });
+    await refuseForeignRow(existingReport?.orgId ?? null, orgId, 'analytics report', report.id);
     await prisma.analyticsReport.upsert({
       where: { id: report.id },
       create: {
@@ -144,7 +160,6 @@ export async function seedAnalyticsCommandCenter(
         chartType: report.chartType,
       },
       update: {
-        orgId,
         ownerId,
         name: report.name,
         description: report.description,
@@ -169,6 +184,11 @@ export async function seedAnalyticsCommandCenter(
     });
   }
 
+  const existingDashboard = await prisma.analyticsDashboard.findUnique({
+    where: { id: plan.dashboardId },
+    select: { orgId: true },
+  });
+  await refuseForeignRow(existingDashboard?.orgId ?? null, orgId, 'analytics dashboard', plan.dashboardId);
   await prisma.analyticsDashboard.upsert({
     where: { id: plan.dashboardId },
     create: {
@@ -180,7 +200,6 @@ export async function seedAnalyticsCommandCenter(
       isShared: true,
     },
     update: {
-      orgId,
       ownerId,
       name: 'Pre-sales Command Center',
       description: 'Pipeline health, win rate, and bid coverage at a glance.',
@@ -189,6 +208,11 @@ export async function seedAnalyticsCommandCenter(
   });
 
   for (const widget of plan.widgets) {
+    const existingWidget = await prisma.analyticsDashboardWidget.findUnique({
+      where: { id: widget.id },
+      select: { orgId: true },
+    });
+    await refuseForeignRow(existingWidget?.orgId ?? null, orgId, 'analytics widget', widget.id);
     await prisma.analyticsDashboardWidget.upsert({
       where: { id: widget.id },
       create: {
@@ -202,7 +226,6 @@ export async function seedAnalyticsCommandCenter(
         position: widget.position,
       },
       update: {
-        orgId,
         dashboardId: plan.dashboardId,
         reportId: widget.reportId,
         title: widget.title,
