@@ -253,6 +253,16 @@ async function cancelWasRequested(
           AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
         )
       )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log AS resolved
+        WHERE resolved.org_id = mark.org_id
+          AND resolved.target_id = mark.target_id
+          AND resolved.target_type = 'MigrationJob'
+          AND resolved.action = 'migration.cancel.resolved'
+          AND resolved.deleted_at IS NULL
+          AND resolved.at >= mark.at
+      )
     LIMIT 1
   `;
   return rows.length > 0;
@@ -916,6 +926,16 @@ export async function maybeComplete(
               AND ${attemptId}::text IS NOT NULL
               AND COALESCE(migration_jobs.started_at, '-infinity'::timestamptz) >= mark.at
             )
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM audit_log AS resolved
+            WHERE resolved.org_id = mark.org_id
+              AND resolved.target_id = mark.target_id
+              AND resolved.target_type = 'MigrationJob'
+              AND resolved.action = 'migration.cancel.resolved'
+              AND resolved.deleted_at IS NULL
+              AND resolved.at >= mark.at
           )
       )
   `;

@@ -13,6 +13,7 @@ export interface MigrationJobError {
 
 export interface MigrationJob {
   id: string;
+  orgId?: string;
   source: string;
   status: MigrationStatus;
   totalRows: number;

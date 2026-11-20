@@ -101,6 +101,16 @@ async function jobsWithPendingCancel(orgId: string, ids: string[]): Promise<Set<
               AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
             )
           )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM audit_log AS resolved
+            WHERE resolved.org_id = mark.org_id
+              AND resolved.target_id = mark.target_id
+              AND resolved.target_type = 'MigrationJob'
+              AND resolved.action = 'migration.cancel.resolved'
+              AND resolved.deleted_at IS NULL
+              AND resolved.at >= mark.at
+          )
       )
   `;
   return new Set(rows.map((row) => row.id));
@@ -753,7 +763,20 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         claimed = await prisma.$transaction(async (tx) => {
           // The cancel mark is stamped by the database. startedAt has to be
           // that same clock, or an API clock that is ahead drops the mark.
+          // A retry is a new intent. Marks already committed are resolved
+          // here, before the new attempt is published. app_role cannot
+          // update audit_log, so the resolve is an insert.
           const [clock] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT NOW() AS now`;
+          await tx.auditLog.create({
+            data: {
+              orgId,
+              userId,
+              action: 'migration.cancel.resolved',
+              targetType: 'MigrationJob',
+              targetId: job.id,
+              diff: { reason: 'retry' },
+            },
+          });
           const moved = await tx.migrationJob.updateMany({
             where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
             data: {

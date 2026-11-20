@@ -145,18 +145,21 @@ export async function startHubspotImport(input: {
     const totalRows = discovery?.[entity] ?? 0;
 
     const attemptId = randomUUID();
-    const job = await prisma.migrationJob.create({
-      data: {
-        orgId,
-        userId,
-        source: 'HUBSPOT_OAUTH',
-        status: 'RUNNING',
-        startedAt: new Date(),
-        totalRows,
-        meta: input.syncRunId
-          ? { entityType: entity, dedupStrategy: input.dedupStrategy, syncRunId: input.syncRunId, attemptId }
-          : { entityType: entity, dedupStrategy: input.dedupStrategy, attemptId },
-      },
+    const job = await prisma.$transaction(async (tx) => {
+      const [clock] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT NOW() AS now`;
+      return tx.migrationJob.create({
+        data: {
+          orgId,
+          userId,
+          source: 'HUBSPOT_OAUTH',
+          status: 'RUNNING',
+          startedAt: clock?.now ?? new Date(),
+          totalRows,
+          meta: input.syncRunId
+            ? { entityType: entity, dedupStrategy: input.dedupStrategy, syncRunId: input.syncRunId, attemptId }
+            : { entityType: entity, dedupStrategy: input.dedupStrategy, attemptId },
+        },
+      });
     });
 
     await prisma.migrationMapping.upsert({

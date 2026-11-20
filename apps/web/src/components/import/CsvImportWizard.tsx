@@ -28,6 +28,7 @@ import {
   downloadMigrationErrors,
   useCancelMigration,
   useMigrationJob,
+  useMigrations,
   useParseSpreadsheet,
   usePreviewCsvImport,
   useRetryMigration,
@@ -38,6 +39,38 @@ import {
 
 type Step = 'upload' | 'map' | 'preview' | 'run';
 type Dedup = 'skip' | 'update' | 'duplicate';
+
+const ACTIVE_IMPORT_STORAGE = 'bidstack.csvImport.activeJob';
+const TERMINAL_IMPORT = new Set(['COMPLETE', 'FAILED', 'CANCELLED']);
+
+type StoredImport = { orgId: string; jobId: string };
+
+function readStoredImport(): StoredImport | null {
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_IMPORT_STORAGE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredImport>;
+    if (!parsed || typeof parsed.jobId !== 'string' || typeof parsed.orgId !== 'string') return null;
+    return { orgId: parsed.orgId, jobId: parsed.jobId };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredImport(value: StoredImport | null): void {
+  try {
+    if (!value) sessionStorage.removeItem(ACTIVE_IMPORT_STORAGE);
+    else sessionStorage.setItem(ACTIVE_IMPORT_STORAGE, JSON.stringify(value));
+  } catch {
+    // Private mode. The list still rehydrates this tab.
+  }
+}
+
+function newestLiveImport(items: MigrationJob[] | undefined): MigrationJob | undefined {
+  return (items ?? [])
+    .filter((job) => !TERMINAL_IMPORT.has(job.status))
+    .sort((a, b) => ((a.createdAt ?? '') < (b.createdAt ?? '') ? 1 : -1))[0];
+}
 const MAX_ROWS = 10_000;
 
 const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
@@ -171,6 +204,15 @@ export function CsvImportWizard() {
   const [mappings, setMappings] = useState<Record<string, string | null>>({});
   const [dedup, setDedup] = useState<Dedup>('update');
   const [jobId, setJobId] = useState<string | null>(null);
+  const [adoptedId, setAdoptedId] = useState<string | null>(null);
+  const migrations = useMigrations();
+  const storedImport = readStoredImport();
+  const liveFromList = newestLiveImport(migrations.data);
+  const items = migrations.data ?? [];
+  const listOrg = items.find((row) => row.orgId)?.orgId;
+  const storedId =
+    storedImport && (!listOrg || storedImport.orgId === listOrg) ? storedImport.jobId : null;
+  const candidateId = jobId ?? storedId ?? liveFromList?.id ?? null;
   const fileInput = useRef<HTMLInputElement>(null);
   const starting = useRef(false);
   const retrying = useRef(false);
@@ -181,10 +223,35 @@ export function CsvImportWizard() {
   const retry = useRetryMigration();
   const preview = usePreviewCsvImport();
   const parseSheet = useParseSpreadsheet();
-  const job = useMigrationJob(jobId);
+  const job = useMigrationJob(candidateId);
   const fields = TARGET_FIELDS[entity];
   const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
   const [cancelRequested, setCancelRequested] = useState(false);
+  const loaded = job.data && job.data.id === candidateId ? job.data : null;
+  const foreign = Boolean(loaded?.orgId && listOrg && loaded.orgId !== listOrg);
+  const terminalOnArrival = Boolean(
+    loaded && adoptedId !== loaded.id && TERMINAL_IMPORT.has(loaded.status),
+  );
+  const resumed =
+    Boolean(loaded) &&
+    !foreign &&
+    !terminalOnArrival &&
+    !job.isError &&
+    !job.isLoading &&
+    !migrations.isLoading;
+  if (resumed && loaded && adoptedId !== loaded.id) setAdoptedId(loaded.id);
+  const showRun = Boolean(loaded) && !foreign && !job.isError && (adoptedId === loaded?.id || resumed);
+  if (
+    storedImport &&
+    !job.isLoading &&
+    !migrations.isLoading &&
+    (job.isError || foreign || terminalOnArrival)
+  ) {
+    writeStoredImport(null);
+  } else if (showRun && loaded?.orgId) {
+    writeStoredImport({ orgId: loaded.orgId, jobId: loaded.id });
+  }
+  const visibleStep: Step = showRun ? 'run' : step;
 
   const requiredMissing = useMemo(() => {
     const mapped = new Set(Object.values(mappings).filter(Boolean) as string[]);
@@ -262,6 +329,7 @@ export function CsvImportWizard() {
         onSuccess: (created) => {
           setJobId(created.id);
           setStep('run');
+          if (created.orgId) writeStoredImport({ orgId: created.orgId, jobId: created.id });
         },
         onSettled: () => {
           starting.current = false;
@@ -279,6 +347,8 @@ export function CsvImportWizard() {
     setParseError(null);
     setPreviewResult(null);
     setCancelRequested(false);
+    setAdoptedId(null);
+    writeStoredImport(null);
   }
 
   function mapControl(header: string) {
@@ -302,9 +372,9 @@ export function CsvImportWizard() {
 
   return (
     <div>
-      <StepHeader step={step} />
+      <StepHeader step={visibleStep} />
 
-      {step === 'upload' && (
+      {visibleStep === 'upload' && (
         <div className="space-y-4">
           <div>
             <label
@@ -357,7 +427,7 @@ export function CsvImportWizard() {
         </div>
       )}
 
-      {step === 'map' && parsed && (
+      {visibleStep === 'map' && parsed && (
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
             <span className="font-medium text-[var(--fg-primary)]">{fileName}</span> —{' '}
@@ -483,7 +553,7 @@ export function CsvImportWizard() {
         </div>
       )}
 
-      {step === 'preview' && previewResult && (
+      {visibleStep === 'preview' && previewResult && (
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
             {previewResult.rowCount === 1
@@ -546,7 +616,7 @@ export function CsvImportWizard() {
         </div>
       )}
 
-      {step === 'run' && (
+      {visibleStep === 'run' && (
         <ImportProgress
           job={job.data ?? null}
           isLoading={job.isLoading}
@@ -658,8 +728,9 @@ function ImportProgress({
   }
 
   const done = job.status === 'COMPLETE' || job.status === 'FAILED' || job.status === 'CANCELLED';
-  // Local state covers the click in this tab. The polled job covers a reload
-  // or a second tab, which never saw that click.
+  // This tab's click is local. A reload or another tab restores the job id
+  // from session storage or from the org's job list, then reads
+  // cancelRequested only from the server job.
   const cancelling = cancelPending || cancelRequested || job.cancelRequested === true;
   const failure = importErrorCopy(
     t,
