@@ -26,8 +26,9 @@ function permission(key: string, name: string, description: string) {
 // orgchart:read follows companies:read on every seeded role: whoever can read
 // an account can read its org chart (Tony Walteur, 2026-10-31 18:57 BRT).
 // orgchart:write is Admin-only (Admin gets every key via ADMIN_PERMISSION_KEYS).
+// account-intel:read follows companies:read the same way (slice 12).
 function role(name: string, description: string, permissionKeys: readonly string[]) {
-  const keys = permissionKeys.includes('companies:read') ? [...permissionKeys, 'orgchart:read'] : permissionKeys;
+  const keys = permissionKeys.includes('companies:read') ? [...permissionKeys, 'orgchart:read', 'account-intel:read'] : permissionKeys;
   return { name, description, permissionKeys: Array.from(new Set(keys)) };
 }
 
@@ -42,6 +43,31 @@ function writeKeys(...resources: string[]) {
 // ─── Permission catalogue ─────────────────────────────────────────────────────
 
 const PERMISSION_SEEDS = [
+  permission(
+    'access-policies:approve',
+    'Approve access policies',
+    'Approve or reject an access policy another admin submitted. Never your own.',
+  ),
+  permission(
+    'access-policies:read',
+    'Read access policies',
+    'View access policy drafts, the approval queue and published versions.',
+  ),
+  permission(
+    'access-policies:write',
+    'Manage access policies',
+    'Draft, simulate, submit, publish and roll back access policies that narrow the RBAC matrix.',
+  ),
+  permission(
+    'account-intel:read',
+    'Read account intelligence',
+    'View hiring, company posts, financials, investment themes and direction for an account.',
+  ),
+  permission(
+    'account-intel:write',
+    'Refresh account intelligence',
+    'Queue a refresh of job boards, company posts, registries or filings for an account.',
+  ),
   permission('accounts:read', 'Read accounts', 'View account records and account cockpit data.'),
   permission('accounts:write', 'Manage accounts', 'Create and update account records.'),
   permission('activities:read', 'Read activities', 'View CRM activity timelines.'),
@@ -85,6 +111,11 @@ const PERMISSION_SEEDS = [
   permission('documents:write', 'Manage documents', 'Upload and update bid and account documents.'),
   permission('files:read', 'Read files', 'View uploaded files and attachments.'),
   permission('files:write', 'Manage files', 'Upload, finalize, and manage file attachments.'),
+  permission(
+    'ingest:write',
+    'Ingest activity',
+    'Push calls, emails, meetings, notes and stage changes from an external CRM or Dust.',
+  ),
   permission('integrations:read', 'Read integrations', 'View integration configuration.'),
   permission('integrations:write', 'Manage integrations', 'Configure external integrations.'),
   permission(
@@ -177,13 +208,21 @@ const PERMISSION_SEEDS = [
   permission('users:read', 'Read users', 'View organization users.'),
   permission('users:write', 'Manage users', 'Update organization users and role assignments.'),
   permission('webhooks:read', 'Read webhooks', 'View webhook subscriptions.'),
+  permission(
+    'webhooks:replay',
+    'Replay webhooks',
+    'Re-send a stored webhook message to its endpoint through the outbox.',
+  ),
   permission('webhooks:write', 'Manage webhooks', 'Create and update webhook subscriptions.'),
   permission('workflows:read', 'Read workflows', 'View workflow automation definitions and runs.'),
   permission('workflows:write', 'Manage workflows', 'Create, update, and run workflow automation.'),
 ] as const;
 
 export const ALL_PERMISSION_KEYS = PERMISSION_SEEDS.map((p) => p.key);
-const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter((key) => key.endsWith(':read'));
+// access-policies:read stays Admin-only: the rule set shows how access is restricted.
+const READ_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => key.endsWith(':read') && key !== 'access-policies:read',
+);
 // Administrator is not the commercial approver. proposals:approve is granted
 // only to Manager (below), whose description already covers approvals.
 export const ADMIN_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
@@ -214,6 +253,7 @@ export const ROLE_SEEDS = [
       'tasks',
     ),
     ...writeKeys(
+      'account-intel',
       'accounts',
       'activities',
       'comments',
@@ -273,6 +313,7 @@ export const ROLE_SEEDS = [
   role('Manager', 'Manages commercial execution, team performance, and approvals.', [
     ...READ_PERMISSION_KEYS,
     ...writeKeys(
+      'account-intel',
       'activities',
       'bid-scores',
       'comments',
@@ -325,6 +366,7 @@ export const ROLE_SEEDS = [
     [
       ...READ_PERMISSION_KEYS,
       ...writeKeys(
+        'account-intel',
         'accounts',
         'activities',
         'comments',
@@ -367,6 +409,7 @@ export const ROLE_SEEDS = [
         'territories',
       ),
       ...writeKeys(
+        'account-intel',
         'accounts',
         'activities',
         'comments',

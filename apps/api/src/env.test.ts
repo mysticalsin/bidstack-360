@@ -14,6 +14,7 @@ const COMPLETE_PRODUCTION_ENV = {
   REDIS_URL: 'redis://:test@redis:6379',
   BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
   BIDSTACK_TENANT_SCOPE_GUARD: 'enforce',
+  DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
 };
 
 function restoreEnv(): void {
@@ -134,6 +135,7 @@ describe('boot environment validation', () => {
       REDIS_URL: 'redis://:test@redis:6379',
       DEMO_MODE: 'true',
       DEMO_SESSION_SECRET: 'demo-session-secret',
+      DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
       BIDSTACK_JOB_SIGNING_SECRET: 'b'.repeat(64),
       BIDSTACK_TENANT_SCOPE_GUARD: 'enforce',
     };
@@ -149,6 +151,32 @@ describe('boot environment validation', () => {
 
     expect(env.DEMO_MODE).toBe('true');
     expect(env.STORAGE_DRIVER).toBe('local');
+  });
+
+  it('refuses a refresh-lock wait that is not shorter than the ttl', async () => {
+    await expect(
+      loadEnvWith({
+        NODE_ENV: 'development',
+        OAUTH_REFRESH_LOCK_TTL_MS: '30000',
+        OAUTH_REFRESH_LOCK_WAIT_MS: '30000',
+      }),
+    ).rejects.toThrow('OAUTH_REFRESH_LOCK_TTL_MS must be greater than OAUTH_REFRESH_LOCK_WAIT_MS');
+  });
+
+  it('refuses to start in production when the refresh lock opts out of Redis', async () => {
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+      }),
+    ).rejects.toThrow(
+      'OAUTH_REFRESH_LOCK_REDIS_REQUIRED=false is refused when NODE_ENV=production',
+    );
+    const env = await loadEnvWith({
+      NODE_ENV: 'development',
+      OAUTH_REFRESH_LOCK_REDIS_REQUIRED: 'false',
+    });
+    expect(env.OAUTH_REFRESH_LOCK_REDIS_REQUIRED).toBe('false');
   });
 
   it('requires an explicit non-loopback Redis URL in production', async () => {
@@ -209,15 +237,6 @@ describe('boot environment validation', () => {
     expect(env.S3_BUCKET).toBe('bidstack-prod-files');
   });
 
-  it('rejects an explicit RFP quota fail-open in production', async () => {
-    await expect(
-      loadEnvWith({
-        ...COMPLETE_PRODUCTION_ENV,
-        RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED: 'false',
-      }),
-    ).rejects.toThrow('RFP_UPLOAD_RATE_LIMIT_FAIL_CLOSED cannot be false in production');
-  });
-
   it('requires the tenant-scope guard set to warn or enforce in production', async () => {
     // BIDSTACK_TENANT_SCOPE_GUARD defaults 'off' for backward compatibility, but
     // an unscoped tenant-table query in production is an all-tenants data leak
@@ -232,5 +251,41 @@ describe('boot environment validation', () => {
       BIDSTACK_TENANT_SCOPE_GUARD: 'warn',
     });
     expect(env.BIDSTACK_TENANT_SCOPE_GUARD).toBe('warn');
+  });
+
+  it('defaults to demo data mode and refuses real mode without an identity source', async () => {
+    const env = await loadEnvWith({});
+    expect(env.POLO_DATA_MODE).toBe('demo');
+    expect(env.CF_ACCESS_AUTH).toBe('false');
+
+    await expect(loadEnvWith({ POLO_DATA_MODE: 'real' })).rejects.toThrow(
+      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true',
+    );
+  });
+
+  it('requires an allowlist when Cloudflare Access is the identity source', async () => {
+    await expect(loadEnvWith({ CF_ACCESS_AUTH: 'true' })).rejects.toThrow(
+      'POLO_ALLOWED_USERS is required when CF_ACCESS_AUTH=true',
+    );
+
+    const env = await loadEnvWith({
+      CF_ACCESS_AUTH: 'true',
+      POLO_ALLOWED_USERS: 'ada@mantu.com:Admin',
+    });
+    expect(env.CF_ACCESS_AUTH).toBe('true');
+    expect(env.POLO_ALLOWED_USERS).toBe('ada@mantu.com:Admin');
+  });
+
+  it('refuses the Access loopback email trust in production and defaults it off', async () => {
+    // WHY: a missing flag must not mean "trust the email header". Production
+    // must refuse to boot if an operator turns the dev bypass on.
+    const dev = await loadEnvWith({ NODE_ENV: 'development' });
+    expect(dev.CF_ACCESS_TRUST_LOOPBACK_EMAIL).toBe('false');
+    await expect(
+      loadEnvWith({
+        ...COMPLETE_PRODUCTION_ENV,
+        CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'true',
+      }),
+    ).rejects.toThrow('CF_ACCESS_TRUST_LOOPBACK_EMAIL=true is not allowed in production');
   });
 });

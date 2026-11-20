@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "period_end": "2025-12-31",
+        "date_added": "2026-03-20 08:00:00",
+        "json_url": "/api/filings/report-2025.json",
+        "report_url": "/viewer/5493004DM8FGIY6QKF37/2025",
+        "error_count": 0
+      }
+    }
+  ]
+}

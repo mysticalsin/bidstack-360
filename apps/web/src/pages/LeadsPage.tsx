@@ -35,13 +35,6 @@ const STATUS_OPTIONS: { value: LeadStatus | ''; label: string }[] = [
   { value: 'converted', label: 'Converted' },
 ];
 
-/** The lead column defaults to 0, which means not scored. Those zeros do not enter the average. */
-export function averageLeadScoreLabel(scores: number[]): string {
-  const scored = scores.filter((score) => score > 0);
-  if (scored.length === 0) return '—';
-  return Math.round(scored.reduce((sum, score) => sum + score, 0) / scored.length).toLocaleString();
-}
-
 const PRIORITY_OPTIONS: { value: LeadPriority | ''; label: string }[] = [
   { value: '', label: 'All priorities' },
   { value: 'low', label: 'Low' },
@@ -160,7 +153,10 @@ export function LeadsPage() {
     const pipelineReady = items.filter(
       (lead) => lead.status === 'qualified' || lead.status === 'converted',
     ).length;
-    const averageScore = averageLeadScoreLabel(items.map((lead) => lead.score));
+    const averageScore =
+      total === 0
+        ? '0'
+        : Math.round(items.reduce((sum, lead) => sum + lead.score, 0) / total).toLocaleString();
 
     return [
       {
@@ -276,7 +272,7 @@ export function LeadsPage() {
                   { key: 'company', label: t('leads.csv.company', 'Company') },
                   { key: 'title', label: t('leads.csv.title', 'Title') },
                   { key: 'status', label: t('leads.csv.status', 'Status') },
-                  { key: 'score', label: t('leads.csv.scoreRange', 'Score (0-10000)') },
+                  { key: 'score', label: t('leads.csv.scoreRange', 'Score (0-100)') },
                   { key: 'source', label: t('leads.csv.source', 'Source') },
                   { key: 'createdAt', label: t('leads.csv.created', 'Created') },
                 ],

@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -106,5 +106,59 @@ describe('BidNoBidPage — bid-scores:write gating', () => {
     expect(screen.queryByRole('button', { name: /Save bid score/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /AI calibrate scores/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /Defend score with AI/i })).toBeNull();
+  });
+});
+
+describe('BidNoBidPage switching opportunity', () => {
+  beforeEach(() => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    opportunitiesMocks.useOpportunities.mockReturnValue({
+      data: {
+        items: [
+          { id: 'opp-1', customer: 'Acme Corp', name: 'Big Deal', stage: 's1_lead' },
+          { id: 'opp-2', customer: 'Globex', name: 'New Deal', stage: 's1_lead' },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    // Stable references, as React Query hands back between renders.
+    const scored = {
+      data: {
+        id: 'score-1',
+        criteria: { strategic_fit: 4 },
+        totalScore: 80,
+        notes: 'Acme notes',
+        overrideJustification: null,
+      },
+    };
+    const unscored = { data: undefined };
+    bidScoreMocks.useBidScoreLatest.mockImplementation((id?: string) =>
+      id === 'opp-1' ? scored : unscored,
+    );
+    window.history.replaceState(null, '', '/bid-matrix?opportunityId=opp-1');
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.history.replaceState(null, '', '/bid-matrix');
+  });
+
+  it("does not carry the previous deal's scores and notes onto an unscored deal", async () => {
+    renderPage();
+    const notes = screen.getByRole('textbox', { name: /Bid decision notes/i }) as HTMLTextAreaElement;
+    expect(notes.value).toBe('Acme notes');
+    expect(screen.getByText(/1\/\d+ criteria rated/)).toBeTruthy();
+
+    fireEvent.change(screen.getByRole('combobox', { name: /Select opportunity/i }), {
+      target: { value: 'opp-2' },
+    });
+
+    await waitFor(() => expect(notes.value).toBe(''));
+    expect(screen.queryByText(/criteria rated/)).toBeNull();
+    expect(
+      (screen.getByRole('button', { name: /Save bid score/i }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 });

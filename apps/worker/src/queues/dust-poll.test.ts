@@ -106,33 +106,16 @@ describe('pollOrgDust', () => {
     });
   });
 
-  // WHY: current Dust document APIs require the space sId. Polling with only
-  // a data source id would call a path that docs.dust.tt no longer documents.
-  it('writes a stub tick and does not list documents when the space id is missing', async () => {
-    const dustClient = { listDocuments: vi.fn(), getDocument: vi.fn() };
-    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
-
-    await pollOrgDust(ORG_A, log);
-
-    expect(dustClient.listDocuments).not.toHaveBeenCalled();
-    expect(mocks.syncEventCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        eventType: 'tick.stub',
-        payload: expect.objectContaining({
-          reason: expect.stringMatching(/space/i),
-        }),
-      }),
-    });
-  });
-
   it('routes each doc by metadata to the matching upsert helper, org-scoped, and tallies a completed sync_event', async () => {
     const dustClient = {
-      listDocuments: vi.fn().mockResolvedValue([
-        { document_id: 'doc-opp' },
-        { document_id: 'doc-lead' },
-        { document_id: 'doc-company' },
-        { document_id: 'doc-note' },
-      ]),
+      listDocuments: vi
+        .fn()
+        .mockResolvedValue([
+          { document_id: 'doc-opp' },
+          { document_id: 'doc-lead' },
+          { document_id: 'doc-company' },
+          { document_id: 'doc-note' },
+        ]),
       getDocument: vi.fn().mockImplementation(async (_ds: string, id: string) => {
         switch (id) {
           case 'doc-opp':
@@ -146,8 +129,12 @@ describe('pollOrgDust', () => {
         }
       }),
     };
-    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1', spaceId: 'space-1' } });
-    mocks.upsertOpportunityFromDust.mockResolvedValue({ id: 'opp-1', created: true, skipped: false });
+    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
+    mocks.upsertOpportunityFromDust.mockResolvedValue({
+      id: 'opp-1',
+      created: true,
+      skipped: false,
+    });
     mocks.upsertLeadFromDust.mockResolvedValue({ id: 'lead-1', created: true, skipped: false });
     mocks.upsertCompanyFromDust.mockResolvedValue({ id: 'ce-1', created: true });
     mocks.upsertNoteFromDust.mockResolvedValue({ id: 'note-1', created: true });
@@ -197,8 +184,12 @@ describe('pollOrgDust', () => {
         metadata: { opportunity_code: 'OPP-1', company_name: 'Acme' },
       }),
     };
-    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1', spaceId: 'space-1' } });
-    mocks.upsertOpportunityFromDust.mockResolvedValue({ id: 'opp-1', created: true, skipped: false });
+    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
+    mocks.upsertOpportunityFromDust.mockResolvedValue({
+      id: 'opp-1',
+      created: true,
+      skipped: false,
+    });
 
     await pollOrgDust(ORG_A, log);
 
@@ -208,19 +199,22 @@ describe('pollOrgDust', () => {
 
   it('a malformed doc is caught and tallied as an error — it does not fail the whole org poll (skip, not fail-loud)', async () => {
     const dustClient = {
-      listDocuments: vi.fn().mockResolvedValue([{ document_id: 'doc-bad' }, { document_id: 'doc-good' }]),
+      listDocuments: vi
+        .fn()
+        .mockResolvedValue([{ document_id: 'doc-bad' }, { document_id: 'doc-good' }]),
       getDocument: vi.fn().mockImplementation(async (_ds: string, id: string) => ({
         document_id: id,
         metadata: id === 'doc-bad' ? { opportunity_code: '' } : { lead_email: 'ok@x.com' },
       })),
     };
-    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1', spaceId: 'space-1' } });
+    mocks.getOrgDust.mockResolvedValue({ client: dustClient, creds: { dataSourceId: 'ds-1' } });
     mocks.upsertOpportunityFromDust.mockRejectedValue(
       new Error('Missing opportunity_code in Dust document metadata'),
     );
     mocks.upsertLeadFromDust.mockResolvedValue({ id: 'lead-1', created: true, skipped: false });
 
-    await expect(pollOrgDust(ORG_A, log)).resolves.toBeUndefined();
+    // The bad doc is tallied, not thrown; the counts feed the Sync now result.
+    await expect(pollOrgDust(ORG_A, log)).resolves.toMatchObject({ created: 1, errors: 1 });
 
     // the doc after the bad one is still processed — one failure doesn't abort the loop
     expect(mocks.upsertLeadFromDust).toHaveBeenCalled();
@@ -246,7 +240,7 @@ describe('pollOrgDust', () => {
         listDocuments: vi.fn().mockRejectedValue(new Error('Dust GET /documents failed with 500')),
         getDocument: vi.fn(),
       },
-      creds: { dataSourceId: 'ds-1', spaceId: 'space-1' },
+      creds: { dataSourceId: 'ds-1' },
     });
 
     await expect(pollOrgDust(ORG_A, log)).rejects.toThrow(/500/);
@@ -358,7 +352,9 @@ describe('per-org circuit breaker', () => {
     // ORG_A's own circuit is open: its next poll short-circuits before even
     // resolving credentials...
     mocks.getOrgDust.mockClear();
-    await expect(pollOrgDustWithBreaker(ORG_A, log)).resolves.toBeUndefined();
+    await expect(pollOrgDustWithBreaker(ORG_A, log)).resolves.toMatchObject({
+      reason: 'circuit_open',
+    });
     expect(mocks.getOrgDust).not.toHaveBeenCalled();
     expect(logImpl.warn).toHaveBeenCalledWith({ orgId: ORG_A }, 'circuit open, skipping dust poll');
 
@@ -437,5 +433,64 @@ describe('per-org circuit breaker', () => {
     for (let i = 0; i < 10_000; i++) recordDustPollFailure(`org-${i}`, t0);
 
     expect(isDustCircuitOpen(ORG_A, t0)).toBe(false);
+  });
+});
+
+// "Sync now" reads the BullMQ return value of a per-org Dust poll to show
+// new, updated, skipped and failed counts. These cases pin that return shape.
+function dustWith(docs: Array<{ id: string; metadata: Record<string, unknown> }>) {
+  return {
+    listDocuments: vi.fn(async () => docs.map((d) => ({ document_id: d.id }))),
+    getDocument: vi.fn(async (_ds: string, id: string) => {
+      const doc = docs.find((d) => d.id === id)!;
+      if (doc.metadata.boom) throw new Error('bad doc');
+      return { document_id: id, metadata: doc.metadata };
+    }),
+  };
+}
+
+describe('pollOrgDust return value (Sync now)', () => {
+  beforeEach(() => {
+    resetDustCircuitBreakerForTest();
+    mocks.syncEventCreate.mockResolvedValue({});
+  });
+
+  it('splits created from updated, and counts skipped and failed documents', async () => {
+    mocks.getOrgDust.mockResolvedValue({
+      client: dustWith([
+        { id: 'o1', metadata: { opportunity_code: 'OP-1' } },
+        { id: 'o2', metadata: { opportunity_code: 'OP-2' } },
+        { id: 'c1', metadata: { company_name: 'DNB' } },
+        { id: 'l1', metadata: { lead_email: 'a@b.c' } },
+        { id: 'x1', metadata: { boom: true } },
+      ]),
+      creds: { dataSourceId: 'ds' },
+    });
+    mocks.upsertOpportunityFromDust
+      .mockResolvedValueOnce({ id: '1', created: true, skipped: false })
+      .mockResolvedValueOnce({ id: '2', created: false, skipped: false });
+    mocks.upsertCompanyFromDust.mockResolvedValue({ id: '3', created: true });
+    mocks.upsertLeadFromDust.mockResolvedValue({ id: '4', created: false, skipped: true });
+
+    const out = await pollOrgDust(ORG_A, log);
+    expect(out).toEqual({ created: 2, updated: 1, skipped: 1, errors: 1 });
+  });
+
+  it('reports not_configured when the org has no Dust workspace', async () => {
+    mocks.getOrgDust.mockResolvedValue({ client: null, creds: null });
+    const out = await pollOrgDust(ORG_A, log);
+    expect(out).toMatchObject({
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0,
+      reason: 'not_configured',
+    });
+  });
+
+  it('reports circuit_open when the breaker skips the poll', async () => {
+    for (let i = 0; i < 10; i++) recordDustPollFailure(ORG_A);
+    const out = await pollOrgDustWithBreaker(ORG_A, log);
+    expect(out).toMatchObject({ reason: 'circuit_open' });
   });
 });

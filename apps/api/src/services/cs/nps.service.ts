@@ -9,10 +9,10 @@
 import { createHmac, createHash } from 'node:crypto';
 import type { Logger as PinoLogger } from 'pino';
 
-import { prisma, IntegrationProvider } from '@bidstack/db';
+import { prisma } from '@bidstack/db';
 
 import { fanOutWebhookEvent } from '../../queues/webhook-delivery.js';
-import { sendEmail } from '../email-integration.service.js';
+import { sendTransactionalEmail } from '../transactional-email.service.js';
 
 const NPS_TOKEN_SECRET = process.env['NPS_TOKEN_SECRET'] ?? 'change-me-in-production';
 const SURVEY_TTL_DAYS = 30;
@@ -95,11 +95,13 @@ export async function sendNpsSurvey(
     expiresAt: exp.toISOString(),
   });
 
-  // Also attempt a direct transactional email when the org has a connected
-  // email integration. WHY: webhook fan-out covers Zapier/downstream, but
-  // direct send provides immediate delivery without requiring setup.
-  // Fail-open — never blocks survey creation.
-  void sendNpsEmailDirect({ orgId, contactId, surveyId: survey.id, publicUrl, exp }, log);
+  // Also send a direct transactional email. WHY: webhook fan-out covers
+  // Zapier/downstream, but direct send provides immediate delivery without
+  // requiring setup. Fail-open — never blocks survey creation.
+  void sendNpsEmailDirect(
+    { orgId, accountId, contactId, surveyId: survey.id, publicUrl, exp },
+    log,
+  );
 
   return { surveyId: survey.id, token, expiresAt: exp };
 }
@@ -156,13 +158,15 @@ export async function recordNpsResponse(
 // ─── Direct email dispatch ─────────────────────────────────────────────────
 
 /**
- * Attempt to send the NPS survey link via the org's active email integration.
- * WHY: Provides immediate delivery without requiring Zapier/downstream setup.
- * Silently skips when no contact email or no active integration is available.
+ * Send the NPS survey link through the transactional sender.
+ * WHY: Provides immediate delivery without requiring Zapier/downstream setup,
+ * and never depends on a user's mailbox, which is connected read-only.
+ * Skips when the contact has no email; a send failure notifies the account owner.
  */
 async function sendNpsEmailDirect(
   params: {
     orgId: string;
+    accountId: string;
     contactId: string | undefined;
     surveyId: string;
     publicUrl: string;
@@ -178,41 +182,36 @@ async function sendNpsEmailDirect(
   });
   if (!contact?.email) return;
 
-  // Pick the most-recently-used active email integration for this org.
-  const token = await prisma.integrationToken.findFirst({
-    where: {
-      orgId: params.orgId,
-      provider: { in: [IntegrationProvider.gmail, IntegrationProvider.microsoft_graph] },
-      status: 'active',
-      deletedAt: null,
-    },
-    orderBy: { updatedAt: 'desc' },
-    select: { userId: true },
+  const account = await prisma.company.findFirst({
+    where: { id: params.accountId, orgId: params.orgId },
+    select: { keyAccountOwnerId: true },
   });
-  if (!token) return; // no integration — webhook-only path is fine
 
   // Use first word of full name as a personal greeting.
   const firstName = contact.name?.split(' ')[0] ?? '';
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
   try {
-    await sendEmail(
+    const result = await sendTransactionalEmail(
       {
         orgId: params.orgId,
-        userId: token.userId,
+        notifyUserId: account?.keyAccountOwnerId ?? null,
         to: [{ email: contact.email }],
         subject: 'How are we doing? (2-second survey)',
         html: buildNpsEmailHtml(greeting, params.publicUrl, params.exp),
         text: buildNpsEmailText(greeting, params.publicUrl, params.exp),
         entityType: 'nps_survey',
         entityId: params.surveyId,
+        failureTitle: 'NPS survey email not sent',
       },
       log,
     );
-    log.info({ surveyId: params.surveyId, contactId: params.contactId }, 'cs: NPS email sent');
+    if (result.sent) {
+      log.info({ surveyId: params.surveyId, contactId: params.contactId }, 'cs: NPS email sent');
+    }
   } catch (err) {
     // WHY fail-open: email failure must never block survey creation.
-    log.warn(
+    log.error(
       { err, surveyId: params.surveyId },
       'cs: NPS direct email failed (webhook path active)',
     );

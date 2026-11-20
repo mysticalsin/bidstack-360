@@ -13,6 +13,12 @@ import type {
   EntityType,
 } from '@bidstack/shared';
 
+/** Definitions the list draws, plus whether one field past the page was dropped. */
+type CustomFieldDefinitionPage = CustomFieldDefinitionList & {
+  /** True when one field past this page was loaded and dropped. Not a total. */
+  pageContinues: boolean;
+};
+
 // ── Definitions ──────────────────────────────────────────────────────────
 
 export function useCustomFieldDefinitions(
@@ -23,7 +29,7 @@ export function useCustomFieldDefinitions(
     enabled: !!entityType && (options.enabled ?? true),
     queryKey: ['custom-field-definitions', entityType],
     queryFn: ({ signal }) =>
-      api<CustomFieldDefinitionList>(`/api/custom-fields/definitions?entityType=${entityType}`, {
+      api<CustomFieldDefinitionPage>(`/api/custom-fields/definitions?entityType=${entityType}`, {
         signal,
       }),
   });

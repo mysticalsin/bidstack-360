@@ -1,20 +1,21 @@
 /**
- * Calendar event routes — authenticated CRUD with two-way sync.
+ * Calendar event routes — authenticated CRUD with optional two-way sync.
  *
- * Create/update/delete enqueues a calendar.push job so changes propagate to
- * Google Calendar or MS Graph asynchronously via the worker.
+ * Create/update/delete enqueues a calendar.push job only when the user's
+ * grant includes calendar write access. Connect grants read-only scopes by
+ * default, so most events created here stay in Polo (localOnly).
  *
  * Multi-tenancy: all queries include orgId from req.auth — never from the client.
  */
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
-import { CALENDAR_PUSH } from '@bidstack/shared';
+import { prisma, syncCalendarEventActivity } from '@bidstack/db';
+import { CALENDAR_PUSH, mayWriteCalendar } from '@bidstack/shared';
 import { Queue } from 'bullmq';
 import { redis } from '../redis.js';
 
-const CalendarEventCreate = z.object({
+const CalendarEventBase = z.object({
   subject: z.string().min(1).max(300),
   bodyPreview: z.string().max(2000).optional(),
   startAt: z.string().datetime(),
@@ -22,16 +23,28 @@ const CalendarEventCreate = z.object({
   location: z.string().max(300).optional(),
   isAllDay: z.boolean().default(false),
   attendees: z
-    .array(z.object({ email: z.string().email(), displayName: z.string().optional() }))
+    .array(z.object({ email: z.string().email(), displayName: z.string().max(200).optional() }))
+    .max(200)
     .default([]),
   /** Which provider calendar to push to. Defaults to the user's primary integration. */
   provider: z.enum(['google_workspace', 'microsoft_graph']).optional(),
+  contactId: z.string().uuid().nullable().optional(),
+  companyId: z.string().uuid().nullable().optional(),
+  opportunityId: z.string().uuid().nullable().optional(),
+  /** Retry key: a repeated create with the same id returns the first event. */
+  clientRequestId: z.string().min(8).max(64).optional(),
 });
 
-const CalendarEventPatch = CalendarEventCreate.partial();
-type CalendarProvider = z.infer<typeof CalendarEventCreate>['provider'] extends infer P
-  ? Exclude<P, undefined>
-  : never;
+const endsAfterStart = (v: { startAt?: string; endAt?: string }) =>
+  !v.startAt || !v.endAt || new Date(v.endAt).getTime() >= new Date(v.startAt).getTime();
+const END_BEFORE_START = { message: 'endAt must not be before startAt', path: ['endAt'] };
+
+const CalendarEventCreate = CalendarEventBase.refine(endsAfterStart, END_BEFORE_START);
+const CalendarEventPatch = CalendarEventBase.omit({ clientRequestId: true, provider: true })
+  .partial()
+  .refine(endsAfterStart, END_BEFORE_START);
+
+type CalendarProvider = 'google_workspace' | 'microsoft_graph';
 
 const CalendarEventResponse = z.object({
   id: z.string().uuid(),
@@ -42,15 +55,167 @@ const CalendarEventResponse = z.object({
   isAllDay: z.boolean(),
   syncState: z.string(),
   provider: z.string(),
+  contactId: z.string().uuid().nullable(),
+  companyId: z.string().uuid().nullable(),
+  opportunityId: z.string().uuid().nullable(),
+  /** Created in Polo and not pushed to a provider calendar. */
+  localOnly: z.boolean(),
   createdAt: z.string(),
 });
 
+const EVENT_SELECT = {
+  id: true,
+  subject: true,
+  startAt: true,
+  endAt: true,
+  location: true,
+  isAllDay: true,
+  syncState: true,
+  provider: true,
+  externalId: true,
+  contactId: true,
+  companyId: true,
+  opportunityId: true,
+  createdAt: true,
+} as const;
+
+type EventRow = {
+  id: string;
+  subject: string;
+  startAt: Date;
+  endAt: Date;
+  location: string | null;
+  isAllDay: boolean;
+  syncState: string;
+  provider: string;
+  externalId: string | null;
+  contactId: string | null;
+  companyId: string | null;
+  opportunityId: string | null;
+  createdAt: Date;
+};
+
+/** The body files the event by hand (any filing field present, null included). */
+function isFiling(body: { contactId?: unknown; companyId?: unknown; opportunityId?: unknown }): boolean {
+  return body.contactId !== undefined || body.companyId !== undefined || body.opportunityId !== undefined;
+}
+
+function toResponse(e: EventRow): z.infer<typeof CalendarEventResponse> {
+  return {
+    id: e.id,
+    subject: e.subject,
+    startAt: e.startAt.toISOString(),
+    endAt: e.endAt.toISOString(),
+    location: e.location,
+    isAllDay: e.isAllDay,
+    syncState: e.syncState,
+    provider: e.provider,
+    contactId: e.contactId,
+    companyId: e.companyId,
+    opportunityId: e.opportunityId,
+    localOnly: e.externalId === null && e.syncState === 'SYNCED',
+    createdAt: e.createdAt.toISOString(),
+  };
+}
+
+/**
+ * The user's calendar grant. Google grants live on the `gmail` row (one consent
+ * for mail and calendar); older `google_workspace` rows still count.
+ */
+async function findCalendarGrant(
+  orgId: string,
+  userId: string,
+  preferred?: CalendarProvider,
+): Promise<{ provider: CalendarProvider; canWrite: boolean } | null> {
+  const rows = await prisma.integrationToken.findMany({
+    where: {
+      orgId,
+      userId,
+      status: 'active',
+      deletedAt: null,
+      provider: { in: ['google_workspace', 'gmail', 'microsoft_graph'] },
+    },
+    select: { provider: true, scope: true },
+    orderBy: { createdAt: 'asc' },
+    take: 5,
+  });
+  const grants = rows.map((r) => ({
+    provider: (r.provider === 'microsoft_graph' ? 'microsoft_graph' : 'google_workspace') as CalendarProvider,
+    canWrite: mayWriteCalendar(r.scope),
+  }));
+  const pool = preferred ? grants.filter((g) => g.provider === preferred) : grants;
+  return pool.find((g) => g.canWrite) ?? pool[0] ?? null;
+}
+
+type Filing = { contactId?: string | null; companyId?: string | null; opportunityId?: string | null };
+
+/**
+ * Filing fields after tenant checks. An opportunity brings its account when
+ * the body names none; an account that disagrees with the opportunity is
+ * rejected. Returns an error message instead of throwing so each route
+ * picks its status.
+ */
+async function checkedFiling(orgId: string, body: Filing): Promise<Filing | { error: string }> {
+  const out: Filing = {};
+  if (body.contactId !== undefined) {
+    if (body.contactId && !(await prisma.contact.count({ where: { id: body.contactId, orgId, deletedAt: null } }))) {
+      return { error: 'Contact not found' };
+    }
+    out.contactId = body.contactId;
+  }
+  if (body.companyId !== undefined) {
+    if (body.companyId && !(await prisma.company.count({ where: { id: body.companyId, orgId, deletedAt: null } }))) {
+      return { error: 'Company not found' };
+    }
+    out.companyId = body.companyId;
+  }
+  if (body.opportunityId !== undefined) {
+    if (body.opportunityId) {
+      const opp = await prisma.opportunity.findFirst({
+        where: { id: body.opportunityId, orgId, deletedAt: null },
+        select: { companyId: true },
+      });
+      if (!opp) return { error: 'Opportunity not found' };
+      if (body.companyId && opp.companyId && body.companyId !== opp.companyId) {
+        return { error: 'Opportunity belongs to another company' };
+      }
+      if (body.companyId === undefined && opp.companyId) out.companyId = opp.companyId;
+    }
+    out.opportunityId = body.opportunityId;
+  }
+  return out;
+}
+
 export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
+  /** Keep the account activity for a synced meeting in line; never fails the request. */
+  async function syncActivity(orgId: string, eventId: string, actorUserId: string): Promise<void> {
+    try {
+      await syncCalendarEventActivity(orgId, eventId, { actorUserId });
+    } catch (err) {
+      server.log.warn({ err, eventId }, 'Could not update the account activity for a calendar event');
+    }
+  }
+
+  let pushQueue: Queue | null = null;
   function getPushQueue(): Queue {
-    return new Queue(CALENDAR_PUSH.name, {
+    pushQueue ??= new Queue(CALENDAR_PUSH.name, {
       connection: redis,
       defaultJobOptions: CALENDAR_PUSH.defaultJobOptions,
     });
+    return pushQueue;
+  }
+  server.addHook('onClose', async () => {
+    await pushQueue?.close();
+  });
+
+  async function enqueuePush(
+    data: { orgId: string; userId: string; calendarEventId: string; operation: 'push' | 'update' | 'delete' },
+  ): Promise<void> {
+    try {
+      await getPushQueue().add('calendar.push', data);
+    } catch (err) {
+      server.log.warn({ err, eventId: data.calendarEventId }, 'Push queue unavailable; event will be re-picked on next sync');
+    }
   }
 
   // ── GET /calendar/events ───────────────────────────────────────────────
@@ -76,6 +241,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           ownerId: req.auth.userId,
           deletedAt: null,
+          isCancelled: false,
           syncState: { not: 'DELETED_REMOTE' },
           // Overlap predicate, not containment — an event that starts before
           // `from` or ends after `to` still belongs on screen for that range
@@ -85,32 +251,10 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
         },
         orderBy: { startAt: 'asc' },
         take: limit,
-        select: {
-          id: true,
-          subject: true,
-          startAt: true,
-          endAt: true,
-          location: true,
-          isAllDay: true,
-          syncState: true,
-          provider: true,
-          createdAt: true,
-        },
+        select: EVENT_SELECT,
       });
 
-      return {
-        items: items.map((e) => ({
-          id: e.id,
-          subject: e.subject,
-          startAt: e.startAt.toISOString(),
-          endAt: e.endAt.toISOString(),
-          location: e.location,
-          isAllDay: e.isAllDay,
-          syncState: e.syncState,
-          provider: e.provider,
-          createdAt: e.createdAt.toISOString(),
-        })),
-      };
+      return { items: items.map(toResponse) };
     },
   );
 
@@ -121,75 +265,65 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
         body: CalendarEventCreate,
-        response: { 201: CalendarEventResponse },
+        response: { 200: CalendarEventResponse, 201: CalendarEventResponse },
       },
     },
     async (req, reply) => {
       const { orgId, userId } = req.auth;
+      const { clientRequestId } = req.body;
 
-      // Resolve which provider to use (default to the first active integration)
-      let provider: CalendarProvider = req.body.provider ?? 'google_workspace';
-      if (!req.body.provider) {
-        const token = await prisma.integrationToken.findFirst({
-          where: {
-            orgId,
-            userId,
-            status: 'active',
-            deletedAt: null,
-            provider: { in: ['google_workspace', 'microsoft_graph'] },
-          },
-          select: { provider: true },
-          orderBy: { createdAt: 'asc' },
+      if (clientRequestId) {
+        const existing = await prisma.calendarEvent.findFirst({
+          where: { orgId, ownerId: userId, clientRequestId },
+          select: EVENT_SELECT,
         });
-        provider = (token?.provider as CalendarProvider | undefined) ?? 'google_workspace';
+        if (existing) return reply.code(200).send(toResponse(existing));
       }
 
-      const event = await prisma.calendarEvent.create({
-        data: {
-          orgId,
-          ownerId: userId,
-          externalId: null,
-          provider,
-          subject: req.body.subject,
-          bodyPreview: req.body.bodyPreview ?? null,
-          startAt: new Date(req.body.startAt),
-          endAt: new Date(req.body.endAt),
-          location: req.body.location ?? null,
-          isAllDay: req.body.isAllDay,
-          isCancelled: false,
-          attendees: req.body.attendees,
-          syncState: 'PENDING_PUSH',
-        },
-        select: {
-          id: true, subject: true, startAt: true, endAt: true, location: true,
-          isAllDay: true, syncState: true, provider: true, createdAt: true,
-        },
-      });
+      const filing = await checkedFiling(orgId, req.body);
+      if ('error' in filing) throw server.httpErrors.notFound(filing.error);
 
-      // Enqueue push — don't fail the request if the queue is temporarily unavailable
+      const grant = await findCalendarGrant(orgId, userId, req.body.provider);
+      const provider: CalendarProvider = grant?.provider ?? req.body.provider ?? 'google_workspace';
+      const push = grant?.canWrite === true;
+
+      let event: EventRow;
       try {
-        const queue = getPushQueue();
-        await queue.add('calendar.push', {
-          orgId,
-          userId,
-          calendarEventId: event.id,
-          operation: 'push',
+        event = await prisma.calendarEvent.create({
+          data: {
+            orgId,
+            ownerId: userId,
+            externalId: null,
+            provider,
+            subject: req.body.subject,
+            bodyPreview: req.body.bodyPreview ?? null,
+            startAt: new Date(req.body.startAt),
+            endAt: new Date(req.body.endAt),
+            location: req.body.location ?? null,
+            isAllDay: req.body.isAllDay,
+            isCancelled: false,
+            attendees: req.body.attendees,
+            contactId: filing.contactId ?? null,
+            companyId: filing.companyId ?? null,
+            opportunityId: filing.opportunityId ?? null,
+            filedManually: isFiling(req.body),
+            clientRequestId: clientRequestId ?? null,
+            syncState: push ? 'PENDING_PUSH' : 'SYNCED',
+          },
+          select: EVENT_SELECT,
         });
       } catch (err) {
-        server.log.warn({ err, eventId: event.id }, 'Push queue unavailable; event will be re-picked on next sync');
+        if ((err as { code?: string }).code !== 'P2002' || !clientRequestId) throw err;
+        const raced = await prisma.calendarEvent.findFirst({
+          where: { orgId, ownerId: userId, clientRequestId },
+          select: EVENT_SELECT,
+        });
+        if (!raced) throw err;
+        return reply.code(200).send(toResponse(raced));
       }
 
-      return reply.code(201).send({
-        id: event.id,
-        subject: event.subject,
-        startAt: event.startAt.toISOString(),
-        endAt: event.endAt.toISOString(),
-        location: event.location,
-        isAllDay: event.isAllDay,
-        syncState: event.syncState,
-        provider: event.provider,
-        createdAt: event.createdAt.toISOString(),
-      });
+      if (push) await enqueuePush({ orgId, userId, calendarEventId: event.id, operation: 'push' });
+      return reply.code(201).send(toResponse(event));
     },
   );
 
@@ -209,7 +343,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const existing = await prisma.calendarEvent.findFirst({
         where: { id: req.params.id, orgId, ownerId: userId, deletedAt: null },
-        select: { id: true, syncState: true },
+        select: { id: true, syncState: true, startAt: true, endAt: true, externalId: true, provider: true },
       });
       if (!existing) throw server.httpErrors.notFound('Calendar event not found');
 
@@ -220,47 +354,46 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
         );
       }
 
+      const startAt = req.body.startAt ? new Date(req.body.startAt) : existing.startAt;
+      const endAt = req.body.endAt ? new Date(req.body.endAt) : existing.endAt;
+      if (endAt.getTime() < startAt.getTime()) {
+        throw server.httpErrors.badRequest('endAt must not be before startAt');
+      }
+
+      const filing = await checkedFiling(orgId, req.body);
+      if ('error' in filing) throw server.httpErrors.notFound(filing.error);
+
+      const grant = await findCalendarGrant(orgId, userId, existing.provider as CalendarProvider);
+      const push = grant?.canWrite === true;
+
       const event = await prisma.calendarEvent.update({
-        where: { id: req.params.id },
+        where: { id: existing.id },
         data: {
           ...(req.body.subject !== undefined ? { subject: req.body.subject } : {}),
           ...(req.body.bodyPreview !== undefined ? { bodyPreview: req.body.bodyPreview } : {}),
-          ...(req.body.startAt !== undefined ? { startAt: new Date(req.body.startAt) } : {}),
-          ...(req.body.endAt !== undefined ? { endAt: new Date(req.body.endAt) } : {}),
+          ...(req.body.startAt !== undefined ? { startAt } : {}),
+          ...(req.body.endAt !== undefined ? { endAt } : {}),
           ...(req.body.location !== undefined ? { location: req.body.location } : {}),
           ...(req.body.isAllDay !== undefined ? { isAllDay: req.body.isAllDay } : {}),
           ...(req.body.attendees !== undefined ? { attendees: req.body.attendees } : {}),
-          syncState: 'PENDING_PUSH',
+          ...filing,
+          ...(isFiling(req.body) ? { filedManually: true } : {}),
+          syncState: push ? 'PENDING_PUSH' : 'SYNCED',
         },
-        select: {
-          id: true, subject: true, startAt: true, endAt: true, location: true,
-          isAllDay: true, syncState: true, provider: true, createdAt: true,
-        },
+        select: EVENT_SELECT,
       });
 
-      try {
-        const queue = getPushQueue();
-        await queue.add('calendar.push', {
+      if (push) {
+        await enqueuePush({
           orgId,
           userId,
           calendarEventId: event.id,
-          operation: 'update',
+          operation: existing.externalId ? 'update' : 'push',
         });
-      } catch (err) {
-        server.log.warn({ err, eventId: event.id }, 'Push queue unavailable on update');
       }
+      await syncActivity(orgId, event.id, userId);
 
-      return reply.send({
-        id: event.id,
-        subject: event.subject,
-        startAt: event.startAt.toISOString(),
-        endAt: event.endAt.toISOString(),
-        location: event.location,
-        isAllDay: event.isAllDay,
-        syncState: event.syncState,
-        provider: event.provider,
-        createdAt: event.createdAt.toISOString(),
-      });
+      return reply.send(toResponse(event));
     },
   );
 
@@ -279,30 +412,23 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const event = await prisma.calendarEvent.findFirst({
         where: { id: req.params.id, orgId, ownerId: userId, deletedAt: null },
-        select: { id: true, externalId: true },
+        select: { id: true, externalId: true, provider: true },
       });
       if (!event) throw server.httpErrors.notFound('Calendar event not found');
 
-      // Soft-delete locally
+      const grant = event.externalId
+        ? await findCalendarGrant(orgId, userId, event.provider as CalendarProvider)
+        : null;
+      const push = grant?.canWrite === true;
+
+      // Soft-delete locally. Read-only grants leave the provider copy alone.
       await prisma.calendarEvent.update({
         where: { id: event.id },
-        data: { syncState: 'PENDING_PUSH', deletedAt: new Date() },
+        data: { syncState: push ? 'PENDING_PUSH' : 'SYNCED', deletedAt: new Date() },
       });
 
-      // Enqueue delete on provider side
-      if (event.externalId) {
-        try {
-          const queue = getPushQueue();
-          await queue.add('calendar.push', {
-            orgId,
-            userId,
-            calendarEventId: event.id,
-            operation: 'delete',
-          });
-        } catch (err) {
-          server.log.warn({ err, eventId: event.id }, 'Push queue unavailable on delete');
-        }
-      }
+      if (push) await enqueuePush({ orgId, userId, calendarEventId: event.id, operation: 'delete' });
+      await syncActivity(orgId, event.id, userId);
 
       return reply.code(204).send(null);
     },

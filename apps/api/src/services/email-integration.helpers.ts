@@ -8,6 +8,7 @@
  */
 
 import { prisma } from '@bidstack/db';
+import { GrantRevokedError, microsoftRefreshScopes, tokenFrom } from '@bidstack/shared';
 import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 import type pino from 'pino';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
@@ -57,102 +58,115 @@ export interface GmailMessage {
 
 // ─── Token refresh ─────────────────────────────────────────────────────────────
 
-export async function refreshGmailToken(
-  tokenId: string,
-  refreshToken: string,
+const REVOKED_MESSAGE = 'Access was revoked at the provider. Reconnect to resume sync.';
+
+/**
+ * Exchange a refresh token. Stores rotated refresh tokens (Microsoft rotates
+ * on every refresh), asks Microsoft only for the read scopes the user granted, and
+ * marks the grant revoked on invalid_grant so the card offers a reconnect.
+ */
+async function refreshToken(
+  token: { id: string; provider: string; scope: string[] },
+  refresh: string,
   log: ServiceLogger,
 ): Promise<string> {
-  const res = await fetchWithTimeout('https://oauth2.googleapis.com/token', {
-    provider: 'Gmail',
+  const google = token.provider === 'gmail' || token.provider === 'google_workspace';
+  const url = google
+    ? 'https://oauth2.googleapis.com/token'
+    : `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID ?? 'common'}/oauth2/v2.0/token`;
+  const body = google
+    ? new URLSearchParams({
+        client_id: process.env.GMAIL_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
+        client_secret: process.env.GMAIL_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+        refresh_token: refresh,
+        grant_type: 'refresh_token',
+      })
+    : new URLSearchParams({
+        client_id: process.env.MICROSOFT_GRAPH_CLIENT_ID ?? '',
+        client_secret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET ?? '',
+        refresh_token: refresh,
+        grant_type: 'refresh_token',
+        scope: microsoftRefreshScopes(token.scope).join(' '),
+      });
+
+  const res = await fetchWithTimeout(url, {
+    provider: google ? 'Gmail' : 'Microsoft Graph',
     operation: 'oauth.refresh',
     timeoutMs: oauthTimeoutMs(),
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GMAIL_CLIENT_ID ?? '',
-      client_secret: process.env.GMAIL_CLIENT_SECRET ?? '',
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }).toString(),
+    body: body.toString(),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    log.error({ tokenId, status: res.status, body }, 'Gmail token refresh failed');
-    await prisma.integrationToken.update({
-      where: { id: tokenId },
-      data: { status: 'error', errorMessage: `refresh failed: ${res.status}` },
-    });
-    throw new Error(`Gmail refresh failed: ${res.status}`);
+    let code: string | undefined;
+    try {
+      code = ((await res.json()) as { error?: string }).error;
+    } catch {
+      code = undefined;
+    }
+    const revoked = code === 'invalid_grant' || code === 'unauthorized_client';
+    log.error({ tokenId: token.id, status: res.status, code }, 'OAuth token refresh failed');
+    await markIntegrationToken(
+      token.id,
+      revoked
+        ? { status: 'revoked', errorMessage: REVOKED_MESSAGE }
+        : { status: 'error', errorMessage: `Token refresh failed (${res.status}). Polo will retry.` },
+      log,
+    );
+    throw new Error(`${google ? 'Gmail' : 'MS Graph'} refresh failed: ${res.status}`);
   }
 
-  const data = (await res.json()) as { access_token: string; expires_in?: number };
-  const expiresAt = data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : undefined;
-
-  await prisma.integrationToken.update({
-    where: { id: tokenId },
+  const data = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
+  const stored = await prisma.integrationToken.updateMany({
+    where: { id: token.id, deletedAt: null, status: { in: [...tokenFrom('refresh_ok')] } },
     data: {
       accessTokenEncrypted: encryptToken(data.access_token),
-      expiresAt,
+      ...(data.refresh_token ? { refreshTokenEncrypted: encryptToken(data.refresh_token) } : {}),
+      expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null,
       status: 'active',
       lastRefreshedAt: new Date(),
       errorMessage: null,
     },
   });
-
+  if (stored.count !== 1) {
+    const current = await prisma.integrationToken.findFirst({
+      where: { id: token.id },
+      select: { status: true },
+    });
+    log.warn(
+      { tokenId: token.id, from: current?.status ?? null, to: 'active' },
+      'illegal integration token transition',
+    );
+    throw new GrantRevokedError('Grant was disconnected during refresh');
+  }
   return data.access_token;
 }
 
-export async function refreshMsGraphToken(
-  tokenId: string,
-  refreshToken: string,
+/** A failed refresh may leave `revoked` or `error`. It must not rewrite a tombstone. */
+async function markIntegrationToken(
+  id: string,
+  data: { status: 'revoked' | 'error'; errorMessage: string },
   log: ServiceLogger,
-): Promise<string> {
-  const tenant = process.env.MICROSOFT_TENANT_ID ?? 'common';
-  const res = await fetchWithTimeout(
-    `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
-    {
-      provider: 'Microsoft Graph',
-      operation: 'oauth.refresh',
-      timeoutMs: oauthTimeoutMs(),
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.MICROSOFT_GRAPH_CLIENT_ID ?? '',
-        client_secret: process.env.MICROSOFT_GRAPH_CLIENT_SECRET ?? '',
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-        scope:
-          'https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.Read offline_access',
-      }).toString(),
+): Promise<void> {
+  const moved = await prisma.integrationToken.updateMany({
+    where: {
+      id,
+      deletedAt: null,
+      status: { in: [...tokenFrom(data.status === 'revoked' ? 'revoke' : 'refresh_fail')] },
     },
-  );
-
-  if (!res.ok) {
-    const body = await res.text();
-    log.error({ tokenId, status: res.status, body }, 'MS Graph token refresh failed');
-    await prisma.integrationToken.update({
-      where: { id: tokenId },
-      data: { status: 'error', errorMessage: `refresh failed: ${res.status}` },
-    });
-    throw new Error(`MS Graph refresh failed: ${res.status}`);
-  }
-
-  const data = (await res.json()) as { access_token: string; expires_in?: number };
-  const expiresAt = data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : undefined;
-
-  await prisma.integrationToken.update({
-    where: { id: tokenId },
-    data: {
-      accessTokenEncrypted: encryptToken(data.access_token),
-      expiresAt,
-      status: 'active',
-      lastRefreshedAt: new Date(),
-      errorMessage: null,
-    },
+    data,
   });
-
-  return data.access_token;
+  if (moved.count === 0) {
+    const current = await prisma.integrationToken.findFirst({
+      where: { id },
+      select: { status: true },
+    });
+    log.warn(
+      { tokenId: id, from: current?.status ?? null, to: data.status },
+      'illegal integration token transition',
+    );
+  }
 }
 
 /**
@@ -165,11 +179,16 @@ export async function getAccessToken(
     accessTokenEncrypted: string;
     refreshTokenEncrypted: string | null;
     expiresAt: Date | null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WHY: union of IntegrationProvider | EmailProvider; narrowed at call sites
-    provider: any;
+    provider: string;
+    scope?: string[];
+    /** Omitted when the caller has not loaded the column. `expired` refuses a refresh. */
+    status?: string;
   },
   log: ServiceLogger,
 ): Promise<string> {
+  if (tokenRecord.status === 'expired') {
+    throw new GrantRevokedError('Grant status is expired');
+  }
   if (!tokenExpiresSoon(tokenRecord.expiresAt))
     return decryptToken(tokenRecord.accessTokenEncrypted);
 
@@ -178,15 +197,26 @@ export async function getAccessToken(
     log,
     getFreshValue: () => getFreshIntegrationAccessToken(tokenRecord.id, tokenRecord.orgId),
     refresh: async () => {
-      if (!tokenRecord.refreshTokenEncrypted) {
-        throw new Error('Token expired and no refresh token available');
+      // The caller may still hold the refresh token from before the lock.
+      // The row is the one the previous refresh stored.
+      const fresh = await prisma.integrationToken.findFirst({
+        where: { id: tokenRecord.id, orgId: tokenRecord.orgId, deletedAt: null },
+        select: { refreshTokenEncrypted: true, provider: true, scope: true, status: true },
+      });
+      if (
+        !fresh?.refreshTokenEncrypted ||
+        fresh.status === 'expired' ||
+        fresh.status === 'revoked'
+      ) {
+        throw new GrantRevokedError('Token expired and no refresh token available');
       }
 
-      const refresh = decryptToken(tokenRecord.refreshTokenEncrypted);
-      if (tokenRecord.provider === 'gmail') {
-        return refreshGmailToken(tokenRecord.id, refresh, log);
-      }
-      return refreshMsGraphToken(tokenRecord.id, refresh, log);
+      const refresh = decryptToken(fresh.refreshTokenEncrypted);
+      return refreshToken(
+        { id: tokenRecord.id, provider: fresh.provider, scope: fresh.scope ?? [] },
+        refresh,
+        log,
+      );
     },
   });
 }

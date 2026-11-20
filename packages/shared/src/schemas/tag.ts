@@ -76,6 +76,8 @@ export type TagPatch = z.infer<typeof TagPatch>;
 
 export const TagList = z.object({
   items: z.array(Tag),
+  /** True when one tag past this page was loaded and dropped. Not a total. */
+  pageContinues: z.boolean(),
 });
 export type TagList = z.infer<typeof TagList>;
 
@@ -101,7 +103,7 @@ export type EntityTagsResponse = z.infer<typeof EntityTagsResponse>;
 export const TagSuggestion = z.object({
   name: TagName,
   reason: z.string().max(280),
-  confidence: z.number().min(0).max(1).nullable(),
+  confidence: z.number().min(0).max(1),
   existingTagId: z.string().uuid().nullable(),
 });
 export type TagSuggestion = z.infer<typeof TagSuggestion>;

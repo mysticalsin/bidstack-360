@@ -15,6 +15,8 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { pinnedDeployCli } from './pinned-deploy-cli.mjs';
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENV_FILE = join(REPO, '.env.production.local');
 const log = (m) => console.log(`[spa] ${m}`);
@@ -47,16 +49,17 @@ const buildEnv = {
 
 // Push VITE_API_URL to Vercel (sensitive) so a dashboard-triggered rebuild also
 // gets it; then build prebuilt locally with the value exported (trap 1).
-run('vercel', ['env', 'rm', 'VITE_API_URL', 'production', '--yes']);
-spawnSync('vercel', ['env', 'add', 'VITE_API_URL', 'production'], {
+const vercel = pinnedDeployCli('vercel');
+run(vercel, ['env', 'rm', 'VITE_API_URL', 'production', '--yes']);
+spawnSync(vercel, ['env', 'add', 'VITE_API_URL', 'production'], {
   cwd: REPO, input: apiUrl, encoding: 'utf8', shell: process.platform === 'win32',
 });
 rmSync(join(REPO, '.vercel', '.env.production.local'), { force: true });
 rmSync(join(REPO, '.vercel', 'output'), { recursive: true, force: true });
 
 log(`building SPA (clerk) against ${apiUrl}`);
-if (!run('vercel', ['build', '--prod', '--yes'], buildEnv)) die('vercel build');
+if (!run(vercel, ['build', '--prod', '--yes'], buildEnv)) die('vercel build');
 log('deploying');
-if (!run('vercel', ['deploy', '--prebuilt', '--prod', '--yes'], buildEnv)) die('vercel deploy');
+if (!run(vercel, ['deploy', '--prebuilt', '--prod', '--yes'], buildEnv)) die('vercel deploy');
 log(`LIVE — ${spaOrigin || 'your Vercel URL'} (Clerk sign-in) → ${apiUrl}`);
 log('Sign in as your Clerk admin, change your password in Clerk, invite the team from Clerk → Organizations → Members.');

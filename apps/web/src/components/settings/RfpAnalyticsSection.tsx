@@ -10,7 +10,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import { formatExactUnspecified } from '@/components/dashboard/unspecified-currency';
 import { Card } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/StateMessages';
@@ -35,10 +34,16 @@ interface RfpAnalytics {
   byOwner: OwnerRow[];
 }
 
-/** Linked opportunity value has no currency column. */
-export function formatLinkedOpportunityValue(micros: string): string {
-  if (!/^\d+$/.test(micros)) return '—';
-  return formatExactUnspecified(micros);
+// Money is stored + transported in micros (CLAUDE.md convention). Format to a
+// whole-euro currency string at the edge for display.
+function formatEur(micros: string): string {
+  const eur = Number(micros) / 1e6;
+  if (!Number.isFinite(eur)) return '—';
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(eur);
 }
 
 export function RfpAnalyticsSection() {
@@ -77,12 +82,9 @@ export function RfpAnalyticsSection() {
         />
         <KpiTile
           label={t('rfpAnalytics.kpiPipelineLabel', 'Pipeline value')}
-          value={q.isLoading ? '…' : formatLinkedOpportunityValue(q.data?.totalValueMicros ?? '0')}
-          detail={t(
-            'rfpAnalytics.kpiPipelineDetail',
-            'linked opportunity value; currency not recorded',
-          )}
-          icon="growth"
+          value={q.isLoading ? '…' : formatEur(q.data?.totalValueMicros ?? '0')}
+          detail={t('rfpAnalytics.kpiPipelineDetail', 'linked opportunity value')}
+          icon="dollar"
         />
         <KpiTile
           label={t('rfpAnalytics.kpiWinRateLabel', 'Win rate')}
@@ -152,12 +154,6 @@ export function RfpAnalyticsSection() {
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('rfpAnalytics.byOwnerTitle', 'By owner')}
           </h3>
-          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-            {t(
-              'rfpAnalytics.byOwnerSubtitle',
-              'Who owns what. Amounts are linked opportunity value; currency is not recorded.',
-            )}
-          </p>
         </div>
         {q.isLoading ? (
           // Shimmer rows shaped like the per-owner table — shared bs-shimmer
@@ -212,7 +208,7 @@ export function RfpAnalyticsSection() {
                       {o.count}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-secondary)]">
-                      {formatLinkedOpportunityValue(o.totalValueMicros)}
+                      {formatEur(o.totalValueMicros)}
                     </td>
                   </tr>
                 ))}
@@ -239,7 +235,7 @@ function KpiTile({
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
           {label}
         </span>
         <Icon name={icon} size={14} ariaHidden />
@@ -247,7 +243,7 @@ function KpiTile({
       <div className="mt-1.5 text-2xl font-bold tracking-tight text-[var(--fg-primary)]">
         {value}
       </div>
-      <div className="mt-0.5 text-[11px] text-[var(--fg-tertiary)]">{detail}</div>
+      <div className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{detail}</div>
     </Card>
   );
 }

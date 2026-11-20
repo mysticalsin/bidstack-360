@@ -27,14 +27,15 @@ const REQUIRED: Header[] = ['name', 'customer'];
 interface ParsedRow {
   values: Partial<Record<Header, string>>;
   errors: string[];
+  line: string;
 }
 
-function parseCsv(input: string): { headers: Header[]; rows: ParsedRow[] } {
+function parseCsv(input: string): { headers: Header[]; rows: ParsedRow[]; headerLine: string } {
   const lines = input
     .replace(/\r/g, '')
     .split('\n')
     .filter((l) => l.trim().length > 0);
-  if (lines.length === 0) return { headers: [], rows: [] };
+  if (lines.length === 0) return { headers: [], rows: [], headerLine: '' };
   // Auto-detect comma vs tab — Excel pastes are tab-delimited, web copy
   // is usually comma. Whichever appears more in the first line wins.
   const sep = (lines[0]!.split('\t').length > lines[0]!.split(',').length ? '\t' : ',') as
@@ -57,16 +58,21 @@ function parseCsv(input: string): { headers: Header[]; rows: ParsedRow[] } {
       if (!values[r]) errors.push(`missing ${r}`);
     }
     if (values.email && !/^.+@.+\..+$/.test(values.email)) errors.push('email looks invalid');
+    if (values.influence && !/^[1-5]$/.test(values.influence)) {
+      errors.push('influence must be a whole number from 1 to 5');
+    }
     if (
       values.sentiment &&
       !['hot', 'warm', 'neutral', 'cold'].includes(values.sentiment.toLowerCase())
     ) {
       errors.push('sentiment must be hot/warm/neutral/cold');
     }
-    rows.push({ values, errors });
+    rows.push({ values, errors, line });
   }
-  return { headers, rows };
+  return { headers, rows, headerLine: lines[0]! };
 }
+
+const blankToNull = (value: string | undefined): string | null => (value ? value : null);
 
 interface Props {
   trigger?: React.ReactNode;
@@ -88,7 +94,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
   const mountedRef = useRef(true);
   const { t } = useTranslation('crm');
 
-  const { headers, rows } = useMemo(() => parseCsv(pasted), [pasted]);
+  const { headers, rows, headerLine } = useMemo(() => parseCsv(pasted), [pasted]);
   const importable = rows.filter((r) => r.errors.length === 0);
   const invalidRows = rows.length - importable.length;
 
@@ -103,7 +109,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
 
   const handleImport = async () => {
     if (importable.length === 0) return;
-    let failed = 0;
+    const failedRows: ParsedRow[] = [];
     const total = importable.length;
     mountedRef.current = true;
     setProgress({ done: 0, total });
@@ -116,14 +122,14 @@ export function ContactCsvImportDialog({ trigger }: Props) {
           const body: ContactCreate = {
             name: v.name ?? '',
             customer: v.customer ?? '',
-            role: v.role ?? null,
-            email: v.email ?? null,
-            phone: v.phone ?? null,
-            influence: v.influence ? Math.max(0, Math.min(5, Number(v.influence))) : null,
+            role: blankToNull(v.role),
+            email: blankToNull(v.email),
+            phone: blankToNull(v.phone),
+            influence: v.influence ? Number(v.influence) : null,
             sentiment: v.sentiment ? (v.sentiment.toLowerCase() as Sentiment) : null,
           };
           return create.mutateAsync(body).catch(() => {
-            failed += 1;
+            failedRows.push(r);
           });
         }),
       );
@@ -133,6 +139,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
 
     if (!mountedRef.current) return; // dialog was closed mid-import
     setProgress(null);
+    const failed = failedRows.length;
     if (failed === 0) {
       toast.success(
         t('contactCsvImport.toastImported', 'Imported {{count}} contact', { count: total }),
@@ -140,6 +147,9 @@ export function ContactCsvImportDialog({ trigger }: Props) {
       setOpen(false);
       reset();
     } else {
+      // Committed rows leave the paste, so Import again retries only the failures.
+      const invalidLines = rows.filter((r) => r.errors.length > 0).map((r) => r.line);
+      setPasted([headerLine, ...invalidLines, ...failedRows.map((r) => r.line)].join('\n'));
       toast.error(t('contactCsvImport.toastFailed', '{{count}} import failed', { count: failed }), {
         description: t(
           'contactCsvImport.toastFailedDescription',
@@ -235,7 +245,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                   {rows.length > 0 ? (
                     <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--border-subtle)] text-xs">
                       <table className="w-full">
-                        <thead className="bg-[var(--surface-sunken)] text-[10px] uppercase text-[var(--fg-tertiary)]">
+                        <thead className="bg-[var(--surface-sunken)] text-xs uppercase text-[var(--fg-tertiary)]">
                           <tr>
                             {headers.map((h) => (
                               <th key={h} scope="col" className="px-2 py-1 text-left font-semibold">
@@ -279,7 +289,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                         </tbody>
                       </table>
                       {rows.length > 20 ? (
-                        <div className="bg-[var(--surface-sunken)] px-2 py-1 text-[10px] text-[var(--fg-tertiary)]">
+                        <div className="bg-[var(--surface-sunken)] px-2 py-1 text-xs text-[var(--fg-tertiary)]">
                           {t('contactCsvImport.showingFirstRows', 'Showing first 20 of {{count}} rows.', {
                             count: rows.length,
                           })}

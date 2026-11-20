@@ -66,6 +66,8 @@ export type CustomFieldDefinitionPatch = z.infer<typeof CustomFieldDefinitionPat
 
 export const CustomFieldDefinitionList = z.object({
   items: z.array(CustomFieldDefinition),
+  /** True when one field past this page was loaded and dropped. Not a total. */
+  pageContinues: z.boolean(),
 });
 export type CustomFieldDefinitionList = z.infer<typeof CustomFieldDefinitionList>;
 

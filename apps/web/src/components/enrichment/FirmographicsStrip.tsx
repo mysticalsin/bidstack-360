@@ -1,12 +1,17 @@
 // Account page, top: revenue, headcount (with its 12-month trend), industry,
 // locations. Every value carries its source and date underneath.
+// Slice 22: a filed, sourced manual or Wikidata figure from the key numbers
+// fills a gap or beats provider and sample data, with its source chip; a
+// missing figure offers Refresh from public sources and Add manually.
 import './enrichment.css';
 
 import { useState } from 'react';
 
+import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { Spark } from '@/components/viz/charts';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { awaitingRefresh, useCompanyEnrichment, useRefreshEnrichment } from '@/hooks/useCompanyEnrichment';
+import { beatsProvider, figureText, useSourcedFigures } from '@/hooks/useSourcedFigures';
 import { trendPct } from '@/lib/enrichment/aggregate';
 import { fmtAsOf, fmtMoney } from '@/lib/enrichment/client';
 
@@ -19,6 +24,7 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
   const q = useCompanyEnrichment(companyId, { pollUntil: refresh.pollUntil });
   const canRefresh = useHasPermission('companies:write');
   const [allLocations, setAllLocations] = useState(false);
+  const sourced = useSourcedFigures(companyId);
   if (!q.data) return null;
   const d = q.data;
   const f = d.firmographics;
@@ -30,6 +36,10 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
   const locs = f.locations?.value ?? [];
   const hq = locs.find((l) => l.hq);
   const others = locs.filter((l) => !l.hq);
+  const useRevenue = Boolean(figureText(sourced.revenue)) && (!f.revenue || d.sample || beatsProvider(sourced.revenue));
+  const useEmployees = Boolean(figureText(sourced.employees)) && (!hc || d.sample || beatsProvider(sourced.employees));
+  const missingAction = (fieldKey: 'annualRevenueMicros' | 'employeeCount' | 'industry', label: string, text: string) =>
+    sourced.companyName ? <FigureActions companyId={companyId} companyName={sourced.companyName} fieldKey={fieldKey} label={label} missing={text} /> : NA;
   return (
     <section className="en-section" aria-labelledby="en-firmo-h" data-testid="account-firmographics" style={{ padding: '16px 24px' }}>
       <div className="en-head">
@@ -38,20 +48,30 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
           <div>
             <dt>Revenue</dt>
             <dd>
-              {f.revenue ? (
+              {useRevenue ? (
+                <>
+                  <span className="en-fact" title={figureText(sourced.revenue)!}>{figureText(sourced.revenue)}</span>
+                  {sourced.revenue?.provenance ? <SourceChip p={sourced.revenue.provenance} testId="en-chip-revenue" /> : null}
+                </>
+              ) : f.revenue ? (
                 <>
                   <span className="en-fact">
                     {f.revenue.value.amount != null ? fmtMoney(f.revenue.value.amount, f.revenue.value.currency) : `${f.revenue.value.currency} ${f.revenue.value.range}`}
                   </span>
                   <SourceNote source={f.revenue.value.fiscalYear ? `${f.revenue.source}, ${f.revenue.value.fiscalYear}` : f.revenue.source} asOf={f.revenue.asOf} />
                 </>
-              ) : NA}
+              ) : missingAction('annualRevenueMicros', 'Revenue', sourced.revenue?.missing ?? 'No public revenue figure found yet')}
             </dd>
           </div>
           <div>
             <dt>Headcount</dt>
             <dd>
-              {hc ? (
+              {useEmployees ? (
+                <>
+                  <span className="en-fact" title={figureText(sourced.employees)!}>{figureText(sourced.employees)}</span>
+                  {sourced.employees?.provenance ? <SourceChip p={sourced.employees.provenance} testId="en-chip-employees" /> : null}
+                </>
+              ) : hc ? (
                 <>
                   <span className="en-fact">
                     {hc.value.current != null ? hc.value.current.toLocaleString('en-GB') : hc.value.range}
@@ -62,7 +82,7 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
                   </span>
                   <SourceNote source={hc.source} asOf={hc.asOf} />
                 </>
-              ) : NA}
+              ) : missingAction('employeeCount', 'Headcount', sourced.employees?.missing ?? 'No headcount on record or in public sources')}
             </dd>
           </div>
           <div>
@@ -70,10 +90,10 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
             <dd>
               {f.industry ? (
                 <>
-                  <span className="en-fact-sm">{f.industry.value}</span>
+                  <span className="en-fact-sm" title={f.industry.value}>{f.industry.value}</span>
                   <SourceNote source={f.industry.source} asOf={f.industry.asOf} />
                 </>
-              ) : NA}
+              ) : missingAction('industry', 'Industry', 'No industry on record')}
             </dd>
           </div>
           <div>

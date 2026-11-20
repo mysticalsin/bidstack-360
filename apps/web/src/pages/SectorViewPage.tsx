@@ -19,17 +19,11 @@ import {
   useTerritorySegments,
   type TerritorySegment,
 } from '@/hooks/useTerritories';
-import {
-  compareMicros,
-  formatExactUnspecified,
-  microsSharePercent,
-  shareBarWidth,
-  UNSPECIFIED_CURRENCY_BASIS,
-} from '@/components/dashboard/unspecified-currency';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
-import { recordedConfidencePercent } from '@/lib/recorded-confidence';
+import { SectorPipelineCard } from './sectorView/SectorPipelineCard';
 import { sourceLabel, titleCase } from './accountsPage/accountUtils';
 import { sectorAccountSignal, sectorCoverageSignal } from './accountsPage/strategicSignals';
 
@@ -63,10 +57,7 @@ export default function SectorViewPage() {
   const classifiedPercent = view.data
     ? formatPercent(view.data.classifiedAccounts, view.data.totalAccounts)
     : '0%';
-  const maxSectorAccounts = Math.max(
-    1,
-    ...sectors.map((sector) => sector.accountCount),
-  );
+  const maxSectorAccounts = Math.max(1, ...sectors.map((sector) => sector.accountCount));
 
   return (
     <div className="space-y-5">
@@ -78,18 +69,6 @@ export default function SectorViewPage() {
       >
         <div>
           <h1 className="page-title gradient-text">{t('sectorView.title', 'Sector view')}</h1>
-          <div className="page-sub">
-            {t(
-              'sectorView.subtitle',
-              'Industry presence, country depth, and account-level coverage from ABC.',
-            )}
-            {view.data?.generatedAt ? (
-              <span>
-                {' '}
-                {t('sectorView.asOfLabel', 'As of')} {view.data.generatedAt}
-              </span>
-            ) : null}
-          </div>
         </div>
         <div className="page-actions">
           <Link to="/accounts" className="btn btn-secondary">
@@ -113,11 +92,7 @@ export default function SectorViewPage() {
             t('sectorView.errorMessage', 'The sector endpoint did not respond.')
           }
           action={
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => void view.refetch()}
-            >
+            <button type="button" className="btn btn-secondary" onClick={() => void view.refetch()}>
               {t('sectorView.retry', 'Retry')}
             </button>
           }
@@ -158,10 +133,7 @@ export default function SectorViewPage() {
           ) : null}
 
           {view.data.dataQualityWarning ? (
-            <div
-              role="status"
-              className="sector-quality-banner"
-            >
+            <div role="status" className="sector-quality-banner">
               <Icon name="info" size={16} aria-hidden />
               <div>
                 <strong>{t('sectorView.qualityWarningHeading', 'Sector coverage is low.')}</strong>{' '}
@@ -177,7 +149,10 @@ export default function SectorViewPage() {
             </div>
           ) : null}
 
-          <section className="sector-command-strip" aria-label={t('sectorView.metricsLabel', 'Sector metrics')}>
+          <section
+            className="sector-command-strip"
+            aria-label={t('sectorView.metricsLabel', 'Sector metrics')}
+          >
             <SectorMetric
               icon="building"
               label={t('sectorView.metricAccounts', 'Accounts')}
@@ -188,7 +163,9 @@ export default function SectorViewPage() {
               icon="checkCircle"
               label={t('sectorView.metricClassified', 'Classified')}
               value={classifiedPercent}
-              detail={labeledCount(view.data.classifiedAccounts, 'account', 'accounts')}
+              detail={t('sectorView.metricClassifiedDetail', '{{count}} accounts', {
+                count: view.data.classifiedAccounts,
+              })}
             />
             <SectorMetric
               icon="globe"
@@ -199,19 +176,23 @@ export default function SectorViewPage() {
             <SectorMetric
               icon="contacts"
               label={t('sectorView.metricLeaders', 'Largest sector')}
-              value={largestSector ? titleCase(largestSector.sector) : '-'}
+              value={largestSector?.sector ?? '-'}
               detail={
                 largestSector
-                  ? labeledCount(largestSector.accountCount, 'account', 'accounts')
+                  ? t('sectorView.metricLeaderDetail', '{{count}} accounts', {
+                      count: largestSector.accountCount,
+                    })
                   : '-'
               }
             />
           </section>
 
+          <SectorPipelineCard />
+
           <Card className="overflow-hidden p-0">
             <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--fg-tertiary)]">
                   {t('sectorView.geoEyebrow', 'Global opportunity map')}
                 </p>
                 <h2 className="text-base font-semibold text-[var(--fg-primary)]">
@@ -219,9 +200,6 @@ export default function SectorViewPage() {
                     ? t('sectorView.geoCountryTitle', 'Pipeline by country')
                     : t('sectorView.geoIndustryTitle', 'Pipeline by industry')}
                 </h2>
-                <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-                  {t('sectorView.pipelineBasis', UNSPECIFIED_CURRENCY_BASIS)}
-                </p>
               </div>
               <div
                 role="tablist"
@@ -257,12 +235,18 @@ export default function SectorViewPage() {
                 ) : analytics.isError ? (
                   <ErrorState
                     title={t('sectorView.geoErrorTitle', 'Could not load the map')}
-                    message={analytics.error?.message ?? t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')}
+                    message={
+                      analytics.error?.message ??
+                      t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')
+                    }
                   />
                 ) : (analytics.data?.items.length ?? 0) === 0 ? (
                   <EmptyState
                     title={t('sectorView.geoEmptyTitle', 'No geographic data')}
-                    message={t('sectorView.geoEmptyMessage', 'Opportunities need a country to appear on the map.')}
+                    message={t(
+                      'sectorView.geoEmptyMessage',
+                      'Opportunities need a country to appear on the map.',
+                    )}
                   />
                 ) : (
                   <WorldMap
@@ -282,7 +266,10 @@ export default function SectorViewPage() {
                 ) : industrySegments.isError ? (
                   <ErrorState
                     title={t('sectorView.geoErrorTitle', 'Could not load the map')}
-                    message={industrySegments.error?.message ?? t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')}
+                    message={
+                      industrySegments.error?.message ??
+                      t('sectorView.geoErrorMessage', 'The analytics endpoint did not respond.')
+                    }
                   />
                 ) : (
                   <IndustryBars items={industrySegments.data?.items ?? []} />
@@ -300,7 +287,11 @@ export default function SectorViewPage() {
                 </div>
                 <Badge tone="blue">{t('sectorView.mapBadge', 'ABC')}</Badge>
               </div>
-              <div className="sector-radar-list">
+              <div
+                className="sector-radar-list"
+                role="group"
+                aria-label={t('sectorView.sectorListLabel', 'Sectors')}
+              >
                 {view.data.sectors.map((sector) => (
                   <SectorButton
                     key={sector.sector}
@@ -323,22 +314,30 @@ export default function SectorViewPage() {
                     <p>{t('sectorView.detailEyebrow', 'Selected sector')}</p>
                     <h2>{titleCase(selectedSector.sector)}</h2>
                     <span>
-                      {sectorDetailMeta(selectedSector.accountCount, selectedSector.countries.length)}
+                      {t(
+                        'sectorView.detailSummary',
+                        '{{accounts}} accounts across {{countries}} countries',
+                        {
+                          accounts: selectedSector.accountCount,
+                          countries: selectedSector.countries.length,
+                        },
+                      )}
                     </span>
                   </div>
-                  <div className="sector-detail-score" aria-label={t('sectorView.knownFteLabel', 'Known FTE coverage')}>
-                    <strong>{formatPercent(selectedSector.coverage.knownFteAccounts, selectedSector.accountCount)}</strong>
+                  <div
+                    className="sector-detail-score"
+                    aria-label={t('sectorView.knownFteLabel', 'Known FTE coverage')}
+                  >
+                    <strong>
+                      {formatPercent(
+                        selectedSector.coverage.knownFteAccounts,
+                        selectedSector.accountCount,
+                      )}
+                    </strong>
                     <span>{t('sectorView.knownFte', 'known FTE')}</span>
                   </div>
                 </div>
 
-                <p className="mb-2 text-xs text-[var(--fg-tertiary)]">
-                  {t(
-                    'sectorView.coverageBasis',
-                    'Percents are accounts in {{sector}} with the field filled. Not a measured coverage score.',
-                    { sector: titleCase(selectedSector.sector) },
-                  )}
-                </p>
                 <div className="sector-coverage-grid">
                   <CoverageBar
                     label={t('sectorView.coverageFte', 'FTE coverage')}
@@ -365,10 +364,15 @@ export default function SectorViewPage() {
                   </div>
                 ) : null}
 
-                <div className="sector-country-strip" aria-label={t('sectorView.countryFilterLabel', 'Country filter')}>
+                <div
+                  className="sector-country-strip"
+                  role="group"
+                  aria-label={t('sectorView.countryFilterLabel', 'Country filter')}
+                >
                   <button
                     type="button"
                     className={country === null ? 'is-active' : ''}
+                    aria-pressed={country === null}
                     onClick={() => setCountry(null)}
                   >
                     {t('sectorView.countryAll', 'All')}
@@ -378,6 +382,7 @@ export default function SectorViewPage() {
                       key={item.countryCode}
                       type="button"
                       className={country === item.countryCode ? 'is-active' : ''}
+                      aria-pressed={country === item.countryCode}
                       onClick={() => setCountry(item.countryCode)}
                     >
                       {countryLabel(item.countryCode)}
@@ -386,7 +391,10 @@ export default function SectorViewPage() {
                   ))}
                 </div>
 
-                <div className="sector-account-list" aria-label={t('sectorView.accountListLabel', 'Sector accounts')}>
+                <div
+                  className="sector-account-list"
+                  aria-label={t('sectorView.accountListLabel', 'Sector accounts')}
+                >
                   {filteredAccounts.length > 0 ? (
                     filteredAccounts.map((account) => (
                       <SectorAccountRow key={account.id} account={account} />
@@ -394,7 +402,10 @@ export default function SectorViewPage() {
                   ) : (
                     <EmptyState
                       title={t('sectorView.countryEmptyTitle', 'No account in this country sample')}
-                      message={t('sectorView.countryEmptyMessage', 'Choose another country or return to all accounts.')}
+                      message={t(
+                        'sectorView.countryEmptyMessage',
+                        'Choose another country or return to all accounts.',
+                      )}
                     />
                   )}
                 </div>
@@ -432,46 +443,43 @@ function SectorMetric({
 
 function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const { t } = useTranslation('crm');
+  // Use the currency-aware formatter so this figure tracks the user's selected
+  // display currency like every other money surface — the module-level
+  // formatMoneyMicros hardcoded EUR and diverged from Territories/Opportunities
+  // showing the same segment data in the chosen currency.
+  const { formatMoneyMicros } = useFormatMoney();
   if (items.length === 0) {
     return (
       <EmptyState
         title={t('sectorView.geoIndustryEmptyTitle', 'No industry pipeline yet')}
-        message={t('sectorView.geoIndustryEmptyMessage', 'Opportunities gain an industry from their account classification.')}
+        message={t(
+          'sectorView.geoIndustryEmptyMessage',
+          'Opportunities gain an industry from their account classification.',
+        )}
       />
     );
   }
-  const sorted = [...items].sort((a, b) => compareMicros(b.totalValueMicros, a.totalValueMicros));
-  const max = sorted.reduce<string | number | bigint>(
-    (largest, segment) =>
-      compareMicros(segment.totalValueMicros, largest) > 0 ? segment.totalValueMicros : largest,
-    0,
-  );
+  const sorted = [...items].sort((a, b) => b.totalValueMicros - a.totalValueMicros);
+  const max = Math.max(1, ...sorted.map((s) => s.totalValueMicros));
   return (
     <div className="space-y-2.5">
-      <p className="text-xs text-[var(--fg-tertiary)]">
-        {t(
-          'sectorView.industryBarBasis',
-          'Bar length is share of the largest industry. Count is opportunities. Amount is unspecified pipeline. {{basis}}',
-          { basis: UNSPECIFIED_CURRENCY_BASIS },
-        )}
-      </p>
       {sorted.map((seg) => (
         <div key={seg.key}>
           <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
-            <span className="truncate font-medium text-[var(--fg-primary)]">{titleCase(seg.label)}</span>
+            <span className="truncate font-medium text-[var(--fg-primary)]">
+              {titleCase(seg.label)}
+            </span>
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
-                value: formatExactUnspecified(seg.totalValueMicros),
+                value: formatMoneyMicros(seg.totalValueMicros),
               })}
             </span>
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
             <span
               className="block h-full rounded-full bg-[var(--brand-primary)] transition-[width] duration-500"
-              style={{
-                width: `${shareBarWidth(microsSharePercent(seg.totalValueMicros, max), 3)}%`,
-              }}
+              style={{ width: `${Math.max(3, Math.round((seg.totalValueMicros / max) * 100))}%` }}
             />
           </div>
         </div>
@@ -503,7 +511,10 @@ function SectorButton({
       <span className="sector-radar-main">
         <span>{titleCase(sector.sector)}</span>
         <small>
-          {sectorRadarMeta(sector.accountCount, sector.countries.length)}
+          {t('sectorView.radarMeta', '{{accounts}} accounts / {{countries}} countries', {
+            accounts: sector.accountCount,
+            countries: sector.countries.length,
+          })}
         </small>
       </span>
       <span className="sector-radar-bar" aria-hidden>
@@ -511,9 +522,7 @@ function SectorButton({
       </span>
       <span className="sector-radar-fte">
         {sector.fteVolume != null
-          ? t('sectorView.fteRecorded', '{{fte}} FTE · recorded headcount · this sector', {
-              fte: sector.fteVolume.toLocaleString(),
-            })
+          ? sector.fteVolume.toLocaleString()
           : t('sectorView.fteUnknown', 'FTE unknown')}
       </span>
     </button>
@@ -535,18 +544,6 @@ function CoverageBar({ label, value, total }: { label: string; value: number; to
   );
 }
 
-export function sectorRadarMeta(accounts: number, countries: number): string {
-  return `${labeledCount(accounts, 'account', 'accounts')} / ${labeledCount(countries, 'country', 'countries')}`;
-}
-
-export function sectorDetailMeta(accounts: number, countries: number): string {
-  return `${labeledCount(accounts, 'account', 'accounts')} across ${labeledCount(countries, 'country', 'countries')}`;
-}
-
-export function labeledCount(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
-
 function SectorAccountRow({ account }: { account: SectorAccount }) {
   const { t } = useTranslation('crm');
   const signal = sectorAccountSignal(account);
@@ -561,7 +558,9 @@ function SectorAccountRow({ account }: { account: SectorAccount }) {
           {countryLabel(account.countryCode)}
           {account.domain ? ` / ${account.domain}` : ''}
         </small>
-        <span className={`sector-account-next${signal.status === 'complete' ? ' is-complete' : ''}`}>
+        <span
+          className={`sector-account-next${signal.status === 'complete' ? ' is-complete' : ''}`}
+        >
           {signal.reason} <b>{`Next: ${signal.nextAction}`}</b>
         </span>
       </span>
@@ -570,11 +569,9 @@ function SectorAccountRow({ account }: { account: SectorAccount }) {
           {sourceLabel(account.source)}
         </Badge>
         <small>
-          {recordedConfidencePercent(account.confidence) === null
-            ? t('sectorView.accountConfidenceNotScored', 'Confidence not scored')
-            : t('sectorView.accountConfidence', '{{value}}% recorded confidence on this account', {
-                value: recordedConfidencePercent(account.confidence),
-              })}
+          {t('sectorView.accountConfidence', '{{value}}% confidence', {
+            value: Math.round(account.confidence * 100),
+          })}
         </small>
       </span>
       <Icon name="chevron-right" size={16} aria-hidden />

@@ -34,6 +34,9 @@ import {
   useTransitionInitiative,
 } from '@/hooks/useKam';
 
+import { kamInitiativeColumnHeading } from './kam-initiative-caption';
+import { kamTodoCaption, kamTodoEmptyMessage } from './kam-todo-caption';
+
 const STAGE_LABEL: Record<InitiativeStageValue, string> = {
   initiative: 'Initiatives',
   lead: 'Leads',
@@ -170,6 +173,10 @@ export function KamInitiativeBoard({ companyId }: { companyId: string }) {
       </Card>
     );
   const items = data?.items ?? [];
+  // nextCursor is the row the list read past this page and dropped. It is
+  // not an initiative total.
+  const pageContinues = Boolean(data?.nextCursor);
+  const latest = items.length;
   return (
     <Card>
       <SectionHeader title="Initiatives" caption="Initiative → Lead → Opportunity → Dropped" />
@@ -185,7 +192,7 @@ export function KamInitiativeBoard({ companyId }: { companyId: string }) {
             return (
               <section key={stage} aria-label={STAGE_LABEL[stage]} className="space-y-2">
                 <h3 className="text-sm text-[var(--fg-secondary)]">
-                  {STAGE_LABEL[stage]} · {col.length}
+                  {kamInitiativeColumnHeading(STAGE_LABEL[stage], col.length, pageContinues, latest)}
                 </h3>
                 {col.map((init) => (
                   <InitiativeCard key={init.id} init={init} companyId={companyId} />
@@ -215,16 +222,20 @@ export function KamTodoCard({ companyId }: { companyId: string }) {
       </Card>
     );
   const items = data?.items ?? [];
+  // pageContinues is the task the list read past this page and dropped.
+  // It is not a task total. openCount and doneCount are this page.
+  const pageContinues = Boolean(data?.pageContinues);
+  const latest = (data?.openCount ?? 0) + (data?.doneCount ?? 0);
   return (
     <Card>
       <SectionHeader
         title="To-do"
-        caption={`${data?.openCount ?? 0} open · ${data?.doneCount ?? 0} done`}
+        caption={kamTodoCaption(data?.openCount ?? 0, data?.doneCount ?? 0, pageContinues, latest)}
       />
       {items.length === 0 ? (
         <EmptyState
-          title="Nothing outstanding"
-          message="No open tasks across this account's initiatives."
+          title={pageContinues ? 'No open task on this page' : 'Nothing outstanding'}
+          message={kamTodoEmptyMessage(pageContinues)}
         />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">

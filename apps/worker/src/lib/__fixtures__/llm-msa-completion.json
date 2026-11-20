@@ -1,0 +1,13 @@
+{
+  "id": "chatcmpl-fixture",
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"reference\":\"MSA-2026-001\",\"kind\":\"msa\",\"countries\":[\"FR\",\"DE\"],\"currency\":\"EUR\",\"globalRebatePercent\":7.5,\"effectiveDate\":\"2026-01-01\",\"expiryDate\":\"2027-01-01\",\"rateReviewSchedule\":\"annual\",\"rateCard\":[{\"role\":\"Senior Consultant\",\"rate\":850,\"unit\":\"day\",\"currency\":\"EUR\"}]}"
+      }
+    }
+  ]
+}

@@ -7,17 +7,18 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { TechLogo } from '@/components/company/TechLogo';
 import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
+import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout, springSnap } from '@/lib/motion';
-import { formatExactUnspecified } from '@/components/dashboard/unspecified-currency';
-import { recordedConfidencePercent } from '@/lib/recorded-confidence';
 
 import {
   healthLabel,
   healthTone,
+  rankedTechFor,
   sourcePillsFor,
   techStackPillsFor,
   titleCase,
@@ -32,10 +33,14 @@ export const AccountCard = memo(function AccountCard({
   index: number;
 }) {
   const { t } = useTranslation('crm');
+  const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
+  const rankedTech = rankedTechFor(company);
+  const topTech = rankedTech.slice(0, 3);
   const imageUrl = displayableLogoUrl(company.imageUrl);
+  const meta = `${titleCase(company.industry ?? t('account.unknownIndustry', 'Unknown industry'))}${company.domain ? ` · ${company.domain}` : ''}`;
   return (
     <motion.div
       layout
@@ -75,10 +80,9 @@ export const AccountCard = memo(function AccountCard({
               size={52}
             />
             <div className="account-card-title">
-              <div className="account-card-name">{company.name}</div>
-              <div className="account-card-meta">
-                {titleCase(company.industry ?? t('account.unknownIndustry', 'Unknown industry'))}
-                {company.domain ? ` · ${company.domain}` : ''}
+              <div className="account-card-name" title={company.name}>{company.name}</div>
+              <div className="account-card-meta" title={meta}>
+                {meta}
               </div>
             </div>
             <Badge tone={healthTone(health)}>{healthLabel(health)}</Badge>
@@ -102,9 +106,20 @@ export const AccountCard = memo(function AccountCard({
             ))}
           </div>
 
-          <div className={`account-card-tech${techPills.length === 0 ? ' is-empty' : ''}`}>
+          <div
+            data-testid="account-card-tech"
+            className={`account-card-tech${techPills.length === 0 ? ' is-empty' : ''}`}
+            title={rankedTech.length > 0 ? rankedTech.map((tech) => tech.name).join(', ') : undefined}
+          >
             <Icon name="zap" size={13} ariaHidden />
-            {techPills.length > 0 ? (
+            {topTech.length > 0 ? (
+              topTech.map((tech) => (
+                <span key={tech.name} className="account-card-tech-item" data-tech-name={tech.name}>
+                  <TechLogo name={tech.name} size={16} />
+                  <span className="account-card-tech-name">{tech.name}</span>
+                </span>
+              ))
+            ) : techPills.length > 0 ? (
               techPills.map((tech) => <span key={tech}>{tech}</span>)
             ) : (
               <span>{t('account.techStackPending', 'Tech stack pending')}</span>
@@ -119,9 +134,9 @@ export const AccountCard = memo(function AccountCard({
               </dd>
             </div>
             <div>
-              <dt>{t('account.pipeline', 'Weighted pipeline')}</dt>
+              <dt>{t('account.pipeline', 'Pipeline')}</dt>
               <dd>
-                <AnimatedMetric value={formatExactUnspecified(pipelineMicros)} />
+                <AnimatedMetric value={formatMoneyMicros(pipelineMicros, 'EUR')} />
               </dd>
             </div>
             <div>
@@ -135,25 +150,12 @@ export const AccountCard = memo(function AccountCard({
               <dd>{company.employeeCount ? company.employeeCount.toLocaleString() : '—'}</dd>
             </div>
           </dl>
-          {row.openDealsMissingProbability > 0 ? (
-            <p className="px-4 pb-2 text-xs text-[var(--fg-tertiary)]">
-              {t(
-                'account.pipelineMissingProbability',
-                '{{count}} open deals have no recorded probability and are not in the weighted pipeline.',
-                { count: row.openDealsMissingProbability },
-              )}
-            </p>
-          ) : null}
 
           <div className="account-card-signal-grid">
             <div className="account-card-confidence">
               <span>{t('account.confidence', 'Confidence')}</span>
               <strong>
-                {recordedConfidencePercent(company.confidence) === null ? (
-                  t('account.confidenceNotScored', 'Not scored')
-                ) : (
-                  <AnimatedMetric value={`${recordedConfidencePercent(company.confidence)}%`} />
-                )}
+                <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
               </strong>
             </div>
             <div className="account-card-coverage">

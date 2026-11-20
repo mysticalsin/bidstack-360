@@ -11,7 +11,7 @@ const Input = z.object({
 
 export const notesList: Tool<typeof Input> = {
   description:
-    'List notes for a company or stored account id (UUID), newest first. The account tag match ignores case. A company name is not resolved. Pass Company.id or the note accountId uuid; org scope is always applied.',
+    'List notes for a company or stored account id (UUID), newest first. A company name is not resolved. Pass Company.id or the note accountId uuid; org scope is always applied.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -32,12 +32,11 @@ export const notesList: Tool<typeof Input> = {
         'accountId must be a UUID (Company.id or the stored note account id). Company names are not resolved.',
       );
     }
-    const accountId = args.accountId.toLowerCase();
     const items = await prisma.note.findMany({
       where: {
         orgId: ctx.orgId,
         deletedAt: null,
-        OR: [{ accountId }, { companyId: args.accountId }],
+        OR: [{ accountId: args.accountId }, { companyId: args.accountId }],
       },
       include: { author: true },
       orderBy: { createdAt: 'desc' },
@@ -47,7 +46,6 @@ export const notesList: Tool<typeof Input> = {
     return items.map((n) => ({
       id: n.id,
       accountId: n.accountId,
-      companyId: n.companyId,
       title: n.title,
       bodyMd: n.bodyMd,
       pinned: n.pinned,

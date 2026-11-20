@@ -146,6 +146,7 @@ beforeEach(() => {
     status: 'active',
     accessTokenEncrypted: 'encrypted-token',
     externalAccountEmail: 'seller@example.com',
+    scope: ['https://www.googleapis.com/auth/gmail.send'],
   });
   mocks.smsConsentFindUnique.mockResolvedValue(null);
   mocks.outboundRollback.mockResolvedValue(undefined);
@@ -208,9 +209,7 @@ describe('API connector SERUM egress gates', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('blocks Gmail send before OAuth refresh, vendor egress, or persistence when policy denies', async () => {
-    checkConnector.mockResolvedValueOnce(deniedDecision('gmail', 'email.send'));
-
+  it('refuses to send on a legacy send grant before policy, OAuth refresh, egress or persistence', async () => {
     await expect(
       sendEmail(
         {
@@ -222,39 +221,11 @@ describe('API connector SERUM egress gates', () => {
         },
         log,
       ),
-    ).rejects.toThrow(/SERUM connector policy denied gmail email\.send/);
+    ).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/draft/i) });
 
     expect(mocks.integrationFindFirst).toHaveBeenCalledOnce();
-    expect(mocks.getAccessToken).not.toHaveBeenCalled();
+    expect(checkConnector).not.toHaveBeenCalled();
     expect(mocks.reserveOutboundCommunication).not.toHaveBeenCalled();
-    expect(mocks.sendViaGmail).not.toHaveBeenCalled();
-    expect(mocks.transaction).not.toHaveBeenCalled();
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('blocks Gmail send before OAuth refresh, vendor egress, or persistence when the outbound cap denies', async () => {
-    mocks.reserveOutboundCommunication.mockRejectedValueOnce(
-      new Error('Daily email org send limit reached.'),
-    );
-
-    await expect(
-      sendEmail(
-        {
-          orgId,
-          userId,
-          to: [{ email: 'buyer@example.com' }],
-          subject: 'Proposal',
-          text: 'Review attached',
-        },
-        log,
-      ),
-    ).rejects.toThrow(/Daily email org send limit/);
-
-    expect(mocks.integrationFindFirst).toHaveBeenCalledOnce();
-    expect(mocks.reserveOutboundCommunication).toHaveBeenCalledWith(
-      { channel: 'email', orgId, userId, units: 1 },
-      log,
-    );
     expect(mocks.getAccessToken).not.toHaveBeenCalled();
     expect(mocks.sendViaGmail).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();

@@ -2,17 +2,14 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import {
-  useNotificationPrefs,
-  useUpdateNotificationPrefs,
-} from '@/hooks/useNotificationPrefs';
+import { useNotificationPrefs, useUpdateNotificationPrefs } from '@/hooks/useNotificationPrefs';
 import type { NotificationPrefs } from '@bidstack/shared';
+
+import { NotificationDeliverySection } from './NotificationDeliverySection';
 
 type TFunc = (key: string, defaultValue: string) => string;
 
-const buildItems = (
-  t: TFunc,
-): { key: keyof NotificationPrefs; label: string; desc: string }[] => [
+const buildItems = (t: TFunc): { key: keyof NotificationPrefs; label: string; desc: string }[] => [
   {
     key: 'emailDigest',
     label: t('notificationPrefs.emailDigestLabel', 'Daily digest email'),
@@ -100,6 +97,7 @@ export function NotificationPrefsSection() {
             </label>
           ))
         ) : null}
+        <NotificationDeliverySection />
       </div>
     </Card>
   );

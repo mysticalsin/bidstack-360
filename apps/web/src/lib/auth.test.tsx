@@ -16,10 +16,18 @@
 // (grep `dist/assets/index-*.js` for "clerk").
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, type ReactNode } from 'react';
 
-import { AuthProvider, DEMO_TOKEN_KEY, useAuth, useSignOut, useUser } from './auth';
+import {
+  AuthProvider,
+  DEMO_SIGNED_OUT_KEY,
+  DEMO_TOKEN_KEY,
+  isTransientMeFailure,
+  useAuth,
+  useSignOut,
+  useUser,
+} from './auth';
 import { api } from './api';
 
 // Mocked Clerk SDK. The real one would attempt to fetch session JWKs and
@@ -75,10 +83,12 @@ vi.mock('@clerk/clerk-react', () => {
 });
 
 function jsonResponse(body: unknown, status = 200) {
+  const serialized = JSON.stringify(body);
   return {
     ok: status >= 200 && status < 300,
     status,
-    text: async () => JSON.stringify(body),
+    text: async () => serialized,
+    json: async () => body,
   };
 }
 
@@ -237,6 +247,23 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
       }),
     );
   });
+
+  it('marks an explicit sign-out and ends the edge session, so /login does not sign straight back in', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(localStorage.getItem(DEMO_TOKEN_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
+    expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
+    expect(screen.getByTestId('signed-in').textContent).toBe('false');
+  });
 });
 
 describe('AuthProvider — clerk mode (publishableKey set)', () => {
@@ -339,5 +366,75 @@ describe('AuthProvider — clerk mode (publishableKey set)', () => {
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
     expect(screen.getByTestId('email').textContent).toBe('none');
     expect(localStorage.getItem('bidstack:session')).toBeNull();
+  });
+});
+
+describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => {
+  it('maps /me to the signed-in user instead of Jane Smith', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'cf-access');
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes('/api/v1/me') || url.includes('/api/me')) {
+        return jsonResponse({
+          id: 'user-ada',
+          email: 'ada@mantu.com',
+          name: 'Ada Lovelace',
+          role: 'admin',
+          roles: ['Admin'],
+          dataMode: 'real',
+          authProvider: 'cf-access',
+        });
+      }
+      return jsonResponse({ ok: true });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('email').textContent).toBe('ada@mantu.com');
+    });
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+    expect(screen.getByTestId('email').textContent).not.toBe('jane@mantu.com');
+  });
+
+  it('retries /me while the box is waking up instead of showing the sign-in screen', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'cf-access');
+    let meCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.includes('/api/v1/me')) {
+        meCalls += 1;
+        if (meCalls === 1) return jsonResponse({ message: 'Service Unavailable' }, 503);
+        return jsonResponse({ id: 'user-ada', email: 'ada@mantu.com', name: 'Ada Lovelace', role: 'admin' });
+      }
+      return jsonResponse({ ok: true });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('email').textContent).toBe('ada@mantu.com');
+      },
+      { timeout: 4000 },
+    );
+    expect(meCalls).toBe(2);
+  });
+
+  it('does not retry a 403 from the allowlist', () => {
+    expect(isTransientMeFailure(403)).toBe(false);
+    expect(isTransientMeFailure(401)).toBe(false);
+    expect(isTransientMeFailure(503)).toBe(true);
+    expect(isTransientMeFailure(null)).toBe(true);
   });
 });

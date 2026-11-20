@@ -23,7 +23,7 @@ import { Worker, Queue, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { prisma } from '@bidstack/db';
+import { retentionPrisma } from '@bidstack/db';
 import { AI_AUDIT_RETENTION } from '@bidstack/shared';
 
 // Retention window in days. Default 90. Pure + exported so the env coercion is
@@ -69,6 +69,7 @@ export interface AiAuditRetentionResult {
 export async function runAiAuditRetentionPass(
   log: pino.Logger,
 ): Promise<AiAuditRetentionResult> {
+  const prisma = retentionPrisma();
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1_000);
   let rowsPurged = 0;
   let batches = 0;

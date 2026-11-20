@@ -9,7 +9,6 @@ export interface DustCredentialsSummary {
   source: 'org' | 'env' | null;
   workspaceId: string | null;
   baseUrl: string | null;
-  spaceId: string | null;
   dataSourceId: string | null;
   agentIds: Record<string, string>;
   /** Last 4 chars only, and only for the org's own key. */
@@ -20,7 +19,6 @@ export interface DustCredentialsInput {
   apiKey: string;
   workspaceId: string;
   baseUrl?: string;
-  spaceId?: string;
   dataSourceId?: string;
 }
 

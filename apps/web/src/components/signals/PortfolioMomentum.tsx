@@ -14,6 +14,7 @@ import { AreaSparkline } from '@/components/charts/bklit-sparkline';
 import { usePortfolioMomentum } from '@/hooks/useAccountSignals';
 
 import { CATEGORY_LABEL, CATEGORY_TONE, noDash, sourceLabel } from './category';
+import { portfolioAccountLabel, shownPortfolioAccounts } from './portfolio-account-caption';
 
 type Trend = PortfolioData['accounts'][number]['trend'];
 const TRENDS: Array<{ key: Trend | 'all'; label: string }> = [
@@ -36,13 +37,14 @@ export function MomentumList({ data }: { data: PortfolioData }) {
   const [filter, setFilter] = useState<Trend | 'all'>('all');
   const [all, setAll] = useState(false);
   const listId = useId();
+  const accountPage = shownPortfolioAccounts(data.accounts, data.accountsContinue);
   // Biggest movers first in either direction, so a decline is never below the fold.
-  const rows = data.accounts
+  const rows = accountPage.items
     .filter((a) => filter === 'all' || a.trend === filter)
     .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.score - a.score);
   const shown = all ? rows : rows.slice(0, TOP);
-  const maxAbs = Math.max(10, ...data.accounts.map((a) => Math.abs(a.delta)));
-  const total = data.accounts.length;
+  const maxAbs = Math.max(10, ...accountPage.items.map((a) => Math.abs(a.delta)));
+  const total = accountPage.items.length;
   return (
     <>
       <div className="sg-head">
@@ -53,11 +55,11 @@ export function MomentumList({ data }: { data: PortfolioData }) {
             </button>
           ))}
         </div>
-        {data.accounts.some((a) => a.sample) ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
+        {accountPage.items.some((a) => a.sample) ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
       </div>
       <p className="sr-only">
         {`${data.counts.gaining} accounts gaining, ${data.counts.steady} steady, ${data.counts.declining} declining. `}
-        {data.accounts.slice(0, 5).map((a) => `${a.companyName} ${a.score}, ${fmt(a.delta)} in 4 weeks`).join('; ')}.
+        {accountPage.items.slice(0, 5).map((a) => `${a.companyName} ${a.score}, ${fmt(a.delta)} in 4 weeks`).join('; ')}.
       </p>
       {rows.length === 0 ? (
         <p className="sg-empty"><span>No accounts here</span>Try another filter.</p>
@@ -92,7 +94,7 @@ export function MomentumList({ data }: { data: PortfolioData }) {
       )}
       {rows.length > TOP ? (
         <button type="button" className="sg-link" aria-expanded={all} aria-controls={listId} onClick={() => setAll((v) => !v)}>
-          {all ? 'Show fewer' : `Show all ${rows.length} accounts`}
+          {portfolioAccountLabel(rows.length, accountPage.pageContinues, all)}
         </button>
       ) : null}
     </>

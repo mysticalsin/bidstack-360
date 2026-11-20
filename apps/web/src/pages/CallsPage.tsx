@@ -27,7 +27,6 @@ import { Select } from '@/components/ui/Select';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { CallSummaryPanel } from '@/components/calls/CallSummaryPanel';
-import { sentimentFigure, sentimentTone } from '@/components/calls/sentiment';
 import { CallTranscriptViewer } from '@/components/calls/CallTranscriptViewer';
 import {
   useCalls,
@@ -428,14 +427,14 @@ export default function CallsPage() {
                     {call.sentimentScore !== null ? (
                       <Badge
                         tone={
-                          sentimentTone(call.sentimentScore) === 'positive'
+                          call.sentimentScore >= 0.7
                             ? 'jade'
-                            : sentimentTone(call.sentimentScore) === 'negative'
-                              ? 'tomato'
-                              : 'gray'
+                            : call.sentimentScore >= 0.4
+                            ? 'amber'
+                            : 'tomato'
                         }
                       >
-                        {sentimentFigure(call.sentimentScore)}
+                        {Math.round(call.sentimentScore * 100)}%
                       </Badge>
                     ) : (
                       <span className="text-[var(--fg-tertiary)]">—</span>

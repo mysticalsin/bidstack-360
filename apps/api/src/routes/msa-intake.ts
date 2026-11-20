@@ -4,10 +4,10 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
-import { prisma, Prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import {
   citationsFromFields,
-  extractMsaFields,
+  type extractMsaFields,
   MsaAccountMatch,
   MsaExtractedFields,
   MsaIntakeConfirm,
@@ -19,21 +19,15 @@ import {
   MsaIntakeUploadUrlResponse,
   MSA_ALLOWED_CONTENT_TYPES,
   MSA_MAX_BYTES,
-  rankAccountMatches,
   rankSigningEntityMatches,
   type MsaExtractedField,
 } from '@bidstack/shared';
 
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
-import { getEnv } from '../env.js';
 import { detectMsaContentType, sha256Hex } from '../msa/file-checks.js';
-import { extractMsaDocument } from '../msa/extract-document.js';
+import { createIntakeDraftFromBuffer, intakeKey } from '../msa/intake-draft.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
-
-function intakeKey(draftId: string): string {
-  return `msa-intake-${draftId}`;
-}
 
 function asFields(value: unknown): ReturnType<typeof extractMsaFields> {
   return MsaExtractedFields.parse(value);
@@ -161,91 +155,17 @@ export const msaIntakeRoutes: FastifyPluginAsyncZod = async (server) => {
       if (detected !== b.contentType) return reject('File content does not match its declared type');
       const sha256 = sha256Hex(buf);
 
-      const extracted = await extractMsaDocument(buf, detected);
-      const fields = extractMsaFields(extracted.pages);
-      const usedLlm = getEnv().MSA_LLM_EXTRACT_ENABLED === 'true';
-      // LLM path is gated and off by default. Even when the flag is on we do
-      // not send the document to a third party from this route; refinement
-      // would be a future in-process hook. The flag is recorded on the draft.
-      const companies = await prisma.company.findMany({
-        where: { orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, name: true, legalName: true, domain: true, address: true },
-        take: 500,
+      const { row, needsOcr, usedLlm } = await createIntakeDraftFromBuffer({
+        orgId: req.auth.orgId,
+        userId: req.auth.userId,
+        draftId: b.draftId,
+        fileName: b.fileName,
+        contentType: detected,
+        buffer: buf,
+        sha256,
+        storageKey: b.storageKey,
       });
-      const contacts = await prisma.contact.findMany({
-        where: { orgId: req.auth.orgId, deletedAt: null, email: { not: null } },
-        select: { customer: true, email: true },
-        take: 1000,
-      });
-      const emailsByCustomer = new Map<string, string[]>();
-      for (const c of contacts) {
-        if (!c.email) continue;
-        const list = emailsByCustomer.get(c.customer) ?? [];
-        list.push(c.email);
-        emailsByCustomer.set(c.customer, list);
-      }
-      const accountMatches = rankAccountMatches(
-        companies.map((c) => ({
-          companyId: c.id,
-          name: c.name,
-          legalName: c.legalName,
-          domain: c.domain,
-          address: typeof c.address === 'string' ? c.address : c.address ? JSON.stringify(c.address) : null,
-          emails: emailsByCustomer.get(c.name) ?? [],
-        })),
-        fields,
-      );
-      const entities = await prisma.signingEntity.findMany({
-        where: { orgId: req.auth.orgId, deletedAt: null },
-        select: { id: true, slug: true, name: true, legalName: true, aliases: true },
-        take: 200,
-      });
-      const signingEntityMatches = rankSigningEntityMatches(entities, fields);
-      const warnings: string[] = [];
-      if (extracted.needsOcr) warnings.push('This file looks scanned. Needs OCR; text-layer extraction found too little text.');
-      if (!accountMatches.length) warnings.push('No matching account. Create a new account or pick one when you confirm.');
-      if (!signingEntityMatches.length) warnings.push('Could not detect our signing entity. Confirm it on the review screen.');
-      warnings.push('Missing values stay blank. Nothing is saved until you confirm.');
-
-      const fileId = randomUUID();
-      await prisma.$transaction([
-        prisma.fileAttachment.create({
-          data: {
-            id: fileId,
-            orgId: req.auth.orgId,
-            accountId: intakeKey(b.draftId),
-            name: b.fileName,
-            contentType: detected,
-            bytes: meta.bytes,
-            storageKey: b.storageKey,
-            uploadedByUserId: req.auth.userId,
-          },
-        }),
-        prisma.msaIntakeDraft.create({
-          data: {
-            id: b.draftId,
-            orgId: req.auth.orgId,
-            status: extracted.needsOcr ? 'needs_ocr' : 'pending_review',
-            fileName: b.fileName,
-            contentType: detected,
-            bytes: meta.bytes,
-            sha256,
-            storageKey: b.storageKey,
-            fileAttachmentId: fileId,
-            extractedText: extracted.text.slice(0, 200_000),
-            pageCount: extracted.pageCount,
-            needsOcr: extracted.needsOcr,
-            usedLlm,
-            extractedFields: fields as Prisma.InputJsonValue,
-            accountMatches: accountMatches as Prisma.InputJsonValue,
-            signingEntityMatches: signingEntityMatches as Prisma.InputJsonValue,
-            warnings: warnings as Prisma.InputJsonValue,
-            createdById: req.auth.userId,
-          },
-        }),
-      ]);
-      const row = await prisma.msaIntakeDraft.findFirstOrThrow({ where: { id: b.draftId, orgId: req.auth.orgId } });
-      await audit(req, 'msa.intake.created', row.id, { fileName: b.fileName, needsOcr: extracted.needsOcr, usedLlm });
+      await audit(req, 'msa.intake.created', row.id, { fileName: b.fileName, needsOcr, usedLlm });
       return reply.code(201).send(serializeDraft(row));
     },
   );

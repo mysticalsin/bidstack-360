@@ -254,7 +254,7 @@ export const publicNpsRoutes: FastifyPluginAsync = async (app) => {
   // ── GET /public/nps/:token ─────────────────────────────────────────────
   app.get<{ Params: { token: string } }>(
     '/public/nps/:token',
-    { config: { public: true } },
+    { config: { public: true, rateLimit: { max: 30, timeWindow: '1 minute' } } },
     async (req, reply) => {
       const { token } = req.params;
       if (!token || token.length < 32 || token.length > 128) {
@@ -275,7 +275,7 @@ export const publicNpsRoutes: FastifyPluginAsync = async (app) => {
   // ── POST /public/nps/:token ────────────────────────────────────────────
   app.post<{ Params: { token: string }; Body: Record<string, string> }>(
     '/public/nps/:token',
-    { config: { public: true } },
+    { config: { public: true, rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (req, reply) => {
       const { token } = req.params;
       const body = req.body ?? {};

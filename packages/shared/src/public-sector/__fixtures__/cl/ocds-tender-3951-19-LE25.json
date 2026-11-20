@@ -1,0 +1,733 @@
+{
+  "uri": "https://api.mercadopublico.cl/APISOCDS/OCDS/tender/3951-19-LE25",
+  "version": "1.1",
+  "publishedDate": "2025-07-23T12:50:32Z",
+  "releases": [
+    {
+      "ocid": "ocds-70d2nz-3951-19-LE25",
+      "id": "658ec899-3951-19-LE25",
+      "date": "2025-07-23T11:30:06Z",
+      "tag": [
+        "tender"
+      ],
+      "initiationType": "tender",
+      "parties": [
+        {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871",
+          "identifier": {
+            "id": "619747003",
+            "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+            "scheme": "CL-RUT"
+          },
+          "address": {
+            "streetAddress": "Los Aromos Esq. Alejandro Gutierrez",
+            "region": "Región Aysén del General Carlos Ibáñez del Campo",
+            "countryName": "Chile"
+          },
+          "contactPoint": {
+            "name": "CONTACTO INSTITUCIONAL"
+          },
+          "roles": [
+            "procuringEntity",
+            "buyer"
+          ],
+          "additionalIdentifiers": [
+            {
+              "id": "4871",
+              "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+              "scheme": "CL-MP",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Comprador/Unidad/4871"
+            }
+          ]
+        }
+      ],
+      "tender": {
+        "id": "3951-19-LE25",
+        "title": "COMPRA DE SERVICIO CVDS AÑO 2025",
+        "description": "El consultorio Víctor Domingo Silva, solicita presentar ofertas de los interesados en participar del proceso de Licitación Públcia para la compra de servicio para las Unidades Clínicas y Administrativas del Consultorio Víctor Domingo Silva.",
+        "status": "active",
+        "statusDetails": "5-Publicada",
+        "value": {
+          "amount": 22622500,
+          "currency": "CLP"
+        },
+        "procuringEntity": {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871"
+        },
+        "items": [
+          {
+            "id": "42953500",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953501",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953502",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953503",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953504",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953505",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953506",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953507",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          }
+        ],
+        "procurementMethod": "open",
+        "procurementMethodDetails": "Licitación Pública Entre 100 y 1000 UTM (LE)",
+        "tenderPeriod": {
+          "startDate": "2025-07-23T11:30:06Z",
+          "endDate": "2025-07-28T15:00:00Z",
+          "durationInDays": 5
+        },
+        "awardPeriod": {
+          "startDate": "2025-07-28T15:01:00Z",
+          "endDate": "2025-07-31T20:00:00Z",
+          "durationInDays": 1
+        },
+        "hasEnquiries": false,
+        "enquiryPeriod": {
+          "startDate": "2025-07-23T13:30:00Z",
+          "endDate": "2025-07-24T17:00:00Z",
+          "durationInDays": 1
+        }
+      },
+      "language": "es"
+    },
+    {
+      "ocid": "ocds-70d2nz-3951-19-LE25",
+      "id": "d55b0514-3951-19-LE25",
+      "date": "2025-07-23T11:30:00Z",
+      "tag": [
+        "tender"
+      ],
+      "initiationType": "tender",
+      "parties": [
+        {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871",
+          "identifier": {
+            "id": "619747003",
+            "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+            "scheme": "CL-RUT"
+          },
+          "address": {
+            "streetAddress": "Los Aromos Esq. Alejandro Gutierrez",
+            "region": "Región Aysén del General Carlos Ibáñez del Campo",
+            "countryName": "Chile"
+          },
+          "contactPoint": {
+            "name": "CONTACTO INSTITUCIONAL"
+          },
+          "roles": [
+            "procuringEntity",
+            "buyer"
+          ],
+          "additionalIdentifiers": [
+            {
+              "id": "4871",
+              "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+              "scheme": "CL-MP",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Comprador/Unidad/4871"
+            }
+          ]
+        }
+      ],
+      "tender": {
+        "id": "3951-19-LE25",
+        "title": "COMPRA DE SERVICIO CVDS AÑO 2025",
+        "description": "El consultorio Víctor Domingo Silva, solicita presentar ofertas de los interesados en participar del proceso de Licitación Públcia para la compra de servicio para las Unidades Clínicas y Administrativas del Consultorio Víctor Domingo Silva.",
+        "status": "active",
+        "statusDetails": "5-Publicada",
+        "value": {
+          "amount": 22622500,
+          "currency": "CLP"
+        },
+        "procuringEntity": {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871"
+        },
+        "items": [
+          {
+            "id": "42953500",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953501",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953502",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953503",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953504",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953505",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953506",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953507",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          }
+        ],
+        "procurementMethod": "open",
+        "procurementMethodDetails": "Licitación Pública Entre 100 y 1000 UTM (LE)",
+        "tenderPeriod": {
+          "startDate": "2025-07-23T11:30:00Z",
+          "endDate": "2025-07-28T15:00:00Z",
+          "durationInDays": 5
+        },
+        "awardPeriod": {
+          "startDate": "2025-07-28T15:01:00Z",
+          "endDate": "2025-07-31T20:00:00Z",
+          "durationInDays": 1
+        },
+        "hasEnquiries": false,
+        "enquiryPeriod": {
+          "startDate": "2025-07-23T13:30:00Z",
+          "endDate": "2025-07-24T17:00:00Z",
+          "durationInDays": 1
+        }
+      },
+      "language": "es"
+    },
+    {
+      "ocid": "ocds-70d2nz-3951-19-LE25",
+      "id": "558fa49c-3951-19-LE25",
+      "date": "2025-07-23T11:30:00Z",
+      "tag": [
+        "tender"
+      ],
+      "initiationType": "tender",
+      "parties": [
+        {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871",
+          "identifier": {
+            "id": "619747003",
+            "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+            "scheme": "CL-RUT"
+          },
+          "address": {
+            "streetAddress": "Los Aromos Esq. Alejandro Gutierrez",
+            "region": "Región Aysén del General Carlos Ibáñez del Campo",
+            "countryName": "Chile"
+          },
+          "contactPoint": {
+            "name": "CONTACTO INSTITUCIONAL"
+          },
+          "roles": [
+            "procuringEntity",
+            "buyer"
+          ],
+          "additionalIdentifiers": [
+            {
+              "id": "4871",
+              "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+              "scheme": "CL-MP",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Comprador/Unidad/4871"
+            }
+          ]
+        }
+      ],
+      "tender": {
+        "id": "3951-19-LE25",
+        "title": "COMPRA DE SERVICIO CVDS AÑO 2025",
+        "description": "El consultorio Víctor Domingo Silva, solicita presentar ofertas de los interesados en participar del proceso de Licitación Públcia para la compra de servicio para las Unidades Clínicas y Administrativas del Consultorio Víctor Domingo Silva.",
+        "status": "active",
+        "statusDetails": "5-Publicada",
+        "value": {
+          "amount": 22622500,
+          "currency": "CLP"
+        },
+        "procuringEntity": {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871"
+        },
+        "items": [
+          {
+            "id": "42953500",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953501",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953502",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953503",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953504",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953505",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953506",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953507",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          }
+        ],
+        "procurementMethod": "open",
+        "procurementMethodDetails": "Licitación Pública Entre 100 y 1000 UTM (LE)",
+        "tenderPeriod": {
+          "startDate": "2025-07-23T11:30:00Z",
+          "endDate": "2025-07-28T15:00:00Z",
+          "durationInDays": 5
+        },
+        "awardPeriod": {
+          "startDate": "2025-07-28T15:01:00Z",
+          "endDate": "2025-07-31T20:00:00Z",
+          "durationInDays": 1
+        },
+        "hasEnquiries": false,
+        "enquiryPeriod": {
+          "startDate": "2025-07-23T13:30:00Z",
+          "endDate": "2025-07-24T17:00:00Z",
+          "durationInDays": 1
+        }
+      },
+      "language": "es"
+    },
+    {
+      "ocid": "ocds-70d2nz-3951-19-LE25",
+      "id": "eafea1a1-3951-19-LE25",
+      "date": "2025-07-23T11:30:00Z",
+      "tag": [
+        "tender",
+        "tenderUpdate"
+      ],
+      "initiationType": "tender",
+      "parties": [
+        {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871",
+          "identifier": {
+            "id": "619747003",
+            "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+            "scheme": "CL-RUT"
+          },
+          "address": {
+            "streetAddress": "Los Aromos Esq. Alejandro Gutierrez",
+            "region": "Región Aysén del General Carlos Ibáñez del Campo",
+            "countryName": "Chile"
+          },
+          "contactPoint": {
+            "name": "CONTACTO INSTITUCIONAL"
+          },
+          "roles": [
+            "procuringEntity",
+            "buyer"
+          ],
+          "additionalIdentifiers": [
+            {
+              "id": "4871",
+              "legalName": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+              "scheme": "CL-MP",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Comprador/Unidad/4871"
+            }
+          ]
+        }
+      ],
+      "tender": {
+        "id": "3951-19-LE25",
+        "title": "COMPRA DE SERVICIO CVDS AÑO 2025",
+        "description": "El consultorio Víctor Domingo Silva, solicita presentar ofertas de los interesados en participar del proceso de Licitación Públcia para la compra de servicio para las Unidades Clínicas y Administrativas del Consultorio Víctor Domingo Silva.",
+        "status": "cancelled",
+        "statusDetails": "15-Revocada",
+        "value": {
+          "amount": 22622500,
+          "currency": "CLP"
+        },
+        "procuringEntity": {
+          "name": "CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA | CONSULTORIO GENERAL URBANO VICTOR DOMINGO SILVA",
+          "id": "CL-MP-4871"
+        },
+        "items": [
+          {
+            "id": "42953500",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953501",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953502",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953503",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953504",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953505",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953506",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          },
+          {
+            "id": "42953507",
+            "description": "Servicios profesionales, administrativos y consultorías de gestión empresarial / Servicios de recursos humanos / Contratación de personal / Servicios de contratación de personal",
+            "quantity": 1,
+            "unit": {
+              "name": "Unidad"
+            },
+            "classification": {
+              "id": "80111701",
+              "scheme": "UNSPSC",
+              "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/80111701"
+            }
+          }
+        ],
+        "procurementMethod": "open",
+        "procurementMethodDetails": "Licitación Pública Entre 100 y 1000 UTM (LE)",
+        "tenderPeriod": {
+          "startDate": "2025-07-23T11:30:00Z",
+          "endDate": "2025-07-28T15:00:00Z",
+          "durationInDays": 5
+        },
+        "awardPeriod": {
+          "startDate": "2025-07-28T15:01:00Z",
+          "endDate": "2025-07-31T20:00:00Z",
+          "durationInDays": 1
+        },
+        "hasEnquiries": false,
+        "enquiryPeriod": {
+          "startDate": "2025-07-23T13:30:00Z",
+          "endDate": "2025-07-24T17:00:00Z",
+          "durationInDays": 1
+        }
+      },
+      "language": "es"
+    }
+  ],
+  "publisher": {
+    "name": "Dirección de Compras y Contratación Pública"
+  },
+  "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "publicationPolicy": "http://api.mercadopublico.cl/APISOCDS/Utilidades/Politicas/Actualizacion"
+}

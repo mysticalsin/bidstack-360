@@ -10,9 +10,11 @@ import { cn } from '@/lib/cn';
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '@/hooks/useTags';
 import { TAG_COLORS, type Tag } from '@bidstack/shared';
 
+import { tagLibraryCaption } from './tag-library-caption';
+
 /**
  * Sprint 1 — Krayin import.
- * Tag library Settings section. Shows every tenant-scoped tag with its
+ * Tag library Settings section. Shows the latest page of tenant tags with
  * usage count + colour palette switch. Inline name editing on click;
  * delete confirms when the tag has usage.
  */
@@ -102,7 +104,11 @@ export function TagsSection() {
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('tags.libraryHeading', 'Library')}{' '}
-            <span className="font-normal text-[var(--fg-tertiary)]">({tags.length})</span>
+            <span className="font-normal text-[var(--fg-tertiary)]">
+              {data?.pageContinues
+                ? `(${t('tags.libraryCountPartial', tagLibraryCaption(tags.length, true))})`
+                : `(${tags.length})`}
+            </span>
           </h3>
         </div>
         {isLoading ? (

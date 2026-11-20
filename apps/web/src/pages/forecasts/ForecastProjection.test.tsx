@@ -1,90 +1,41 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ForecastProjection } from './ForecastProjection';
 
+const projection = vi.hoisted(() => ({ result: { data: undefined as unknown, isLoading: false, isError: false } }));
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (_key: string, fallback: string) => fallback,
-  }),
+  useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
+}));
+vi.mock('@/hooks/useForecasts', () => ({ useForecastProjection: () => projection.result }));
+vi.mock('@/hooks/useFormatMoney', () => ({
+  useFormatMoney: () => ({ formatMoneyMicros: (m: number) => `R$${m / 1e6}` }),
 }));
 
-const projection = vi.hoisted(() => ({
-  data: undefined as unknown,
-  isLoading: false,
-  isError: false,
-  error: null as Error | null,
-  refetch: vi.fn(),
-}));
+afterEach(cleanup);
 
-vi.mock('@/hooks/useForecasts', () => ({
-  useForecastProjection: () => projection,
-}));
-
-afterEach(() => {
-  cleanup();
-  projection.data = undefined;
-  projection.isLoading = false;
-  projection.isError = false;
+const period = (label: string, open: number, weighted: number, won: number) => ({
+  period: label,
+  label,
+  openMicros: open * 1e6,
+  weightedMicros: weighted * 1e6,
+  wonMicros: won * 1e6,
+  manualCommitMicros: null,
+  byOwner: [],
 });
 
 describe('ForecastProjection', () => {
-  it('prints a weighted total from micros when the unit count no longer fits', () => {
-    // WHY: compacting the unit number showed 9,007,199,254,740,992. The stored
-    // weighted quarter is one unit higher.
-    const micros = (9007199254740993n * 1_000_000n).toString();
-    projection.data = {
-      currency: 'XXX',
-      generatedAt: '2026-07-01T00:00:00.000Z',
-      periods: [
-        {
-          period: '2026-Q3',
-          label: 'Q3 2026',
-          openMicros: micros,
-          weightedMicros: micros,
-          wonMicros: '0',
-          manualCommitMicros: null,
-          byOwner: [],
-        },
-      ],
+  it('draws every quarter as stacked won, weighted and unweighted bars', () => {
+    projection.result = {
+      data: { periods: [period('Q4 2026', 73_000_000, 39_100_000, 0), period('Q1 2027', 10_000_000, 4_000_000, 0)] },
+      isLoading: false,
+      isError: false,
     };
-
     render(<ForecastProjection />);
-
-    expect(screen.getAllByText('9,007,199,254,740,993 unspecified').length).toBeGreaterThan(0);
-    expect(screen.queryByText(/9,007,199,254,740,992/)).toBeNull();
-  });
-
-  it('keeps an ordinary quarter compact', () => {
-    projection.data = {
-      currency: 'XXX',
-      generatedAt: '2026-07-01T00:00:00.000Z',
-      periods: [
-        {
-          period: '2026-Q3',
-          label: 'Q3 2026',
-          openMicros: '1500000000000',
-          weightedMicros: '600000000000',
-          wonMicros: '0',
-          manualCommitMicros: '2500000000000',
-          byOwner: [
-            {
-              ownerId: null,
-              ownerName: 'Unassigned',
-              openMicros: '1500000000000',
-              weightedMicros: '600000000000',
-              wonMicros: '0',
-            },
-          ],
-        },
-      ],
-    };
-
-    render(<ForecastProjection />);
-
-    expect(screen.getAllByText('1.5M unspecified').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('600K unspecified').length).toBeGreaterThan(0);
-    // WHY: the manual commit was a bare number, so it read as the display currency.
-    expect(screen.getByText('Manual commit: 2.5M unspecified')).toBeTruthy();
+    expect(screen.getByRole('group', { name: /projection by quarter/i })).toBeTruthy();
+    const table = screen.getAllByRole('table').find((t) => within(t).queryByText('Unweighted'))!;
+    expect(within(table).getByText('Q1 2027')).toBeTruthy();
+    expect(screen.queryByText(/stage win-probability, by close-date quarter/)).toBeNull();
   });
 });

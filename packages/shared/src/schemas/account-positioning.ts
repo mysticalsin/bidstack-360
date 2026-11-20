@@ -8,6 +8,8 @@
  */
 import { z } from 'zod';
 
+import { FigureProvenance } from '../company-figures/index.js';
+
 import { OFFERING_HOOKS, type Initiative, type InitiativeTheme, InitiativeTheme as InitiativeThemeSchema } from './account-signals.js';
 
 const Iso = z.string();
@@ -137,15 +139,20 @@ export const KeyNumber = z.object({
   /** Short secondary line, e.g. "of 4 senior contacts". */
   sub: z.string().nullable(),
   source: z.string(),
-  period: z.string(),
+  /** Basis of the figure ("FY2025"); null when there is nothing to describe, never a placeholder. */
+  period: z.string().nullable(),
   sourceUrl: z.string().nullable(),
   anchor: z.string().nullable(),
   missing: z.string().nullable(),
   sample: z.boolean(),
+  /** Visible source chip for company figures (revenue, employees). */
+  provenance: FigureProvenance.nullable().optional(),
+  /** Set when the user may correct this figure through a field override. */
+  editKey: z.enum(['annualRevenueMicros', 'employeeCount']).nullable().optional(),
 });
 export type KeyNumber = z.infer<typeof KeyNumber>;
 
-export const AccountKeyNumbers = z.object({ companyId: z.string(), items: z.array(KeyNumber), computedAt: Iso });
+export const AccountKeyNumbers = z.object({ companyId: z.string(), companyName: z.string().optional(), items: z.array(KeyNumber), computedAt: Iso });
 export type AccountKeyNumbers = z.infer<typeof AccountKeyNumbers>;
 
 // ── people ──────────────────────────────────────────────────────────────────

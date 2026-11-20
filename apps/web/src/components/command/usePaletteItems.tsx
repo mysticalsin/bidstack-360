@@ -16,10 +16,10 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
-import { visibleNavSections } from '@/components/layout/navConfig';
-import { useOnboardingStore } from '@/stores/onboarding';
+import { NAV_SECTIONS } from '@/components/layout/navConfig';
 import { buildQuickAddOptions, chooseQuickAdd } from '@/components/quickadd/quickAddOptions';
 import { useAppModules } from '@/hooks/useAppModules';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCommandContextStore } from '@/hooks/useCommandContext';
 import { useContacts } from '@/hooks/useContacts';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
@@ -27,7 +27,6 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useTasks } from '@/hooks/useTasks';
 import { api } from '@/lib/api';
-import { useIsAdmin } from '@/lib/auth';
 import { getRecents, pushRecent, type RecentEntry } from '@/lib/palette-recents';
 import { useAccountHistory } from '@/stores/accountHistory';
 import type { OpportunityPage } from '@bidstack/shared';
@@ -124,17 +123,15 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   // this avoids the network round-trip.
   const appModules = useAppModules();
 
-  const isAdmin = useIsAdmin();
+  const canReadAuditLog = useHasPermission('audit-log:read');
 
   // Palette nav targets, derived from NAV_SECTIONS (the sidebar's single
   // source of truth) instead of a hand-maintained duplicate list — see
-  // buildNavTargets' doc comment for the drift bug this replaces. isAdmin
-  // gates the one hand-added permission-restricted palette-only route
-  // (/audit-log) the same way SettingsLayout gates its `admin: true` tabs.
-  const quickStartVisible = useOnboardingStore((s) => s.quickStartVisible);
+  // buildNavTargets' doc comment for the drift bug this replaces.
+  // audit-log:read (not settings:write) gates /audit-log.
   const navTargets = useMemo(
-    () => buildNavTargets(visibleNavSections(quickStartVisible), appModules.data, isAdmin),
-    [appModules.data, isAdmin, quickStartVisible],
+    () => buildNavTargets(NAV_SECTIONS, appModules.data, canReadAuditLog),
+    [appModules.data, canReadAuditLog],
   );
 
   const quickAddOptions = useMemo(() => buildQuickAddOptions(t), [t]);

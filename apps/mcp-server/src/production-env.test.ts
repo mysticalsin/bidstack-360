@@ -4,7 +4,8 @@ import { validateMcpProductionEnv } from './production-env.js';
 
 const validProductionEnv = {
   NODE_ENV: 'production',
-  DATABASE_URL: 'postgresql://bidstack:test@postgres:5432/bidstack',
+  DATABASE_URL: 'postgresql://app_role:test@postgres:5432/bidstack',
+  DATABASE_URL_APP: 'postgresql://app_role:test@postgres:5432/bidstack',
   REDIS_URL: 'redis://:test@redis:6379',
   INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
   PII_FIELD_ENCRYPTION: 'true',
@@ -20,6 +21,7 @@ describe('MCP production env contract', () => {
   it('requires the shared production dependencies before MCP routes are exposed', () => {
     expect(validateMcpProductionEnv({ NODE_ENV: 'production' })).toEqual([
       'DATABASE_URL is required in production',
+      'DATABASE_URL_APP is required in production',
       'REDIS_URL is required in production',
       'INTEGRATION_TOKEN_KEY must be a 64-character hex string in production',
       'PII_FIELD_ENCRYPTION=true is required in production',

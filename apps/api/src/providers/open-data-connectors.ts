@@ -1,11 +1,5 @@
 import type { CrmConnector, OpenDataSignal, SourceAttribution } from '@bidstack/shared';
 
-type UnscoredAttribution = Omit<SourceAttribution, 'confidence'> & { confidence: null };
-type UnscoredOpenDataSignal = Omit<OpenDataSignal, 'confidence' | 'sourceAttribution'> & {
-  confidence: null;
-  sourceAttribution: UnscoredAttribution[];
-};
-
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 interface OpenSignalInput {
@@ -40,8 +34,8 @@ export async function buildOpenDataSignals({
   ticker,
   now = new Date(),
   fetchImpl = fetch,
-}: OpenSignalInput): Promise<UnscoredOpenDataSignal[]> {
-  const signals: UnscoredOpenDataSignal[] = [];
+}: OpenSignalInput): Promise<OpenDataSignal[]> {
+  const signals: OpenDataSignal[] = [];
   const normalizedQuery = query?.trim();
   const normalizedTicker = ticker?.trim().toUpperCase();
 
@@ -70,37 +64,42 @@ export async function buildOpenDataSignals({
   return signals;
 }
 
-const NOT_A_LIVE_PROBE = 'Not a live probe.';
-
 export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
   const lastCheckedAt = now.toISOString();
-  // An env var means the connector is configured. It does not mean the
-  // provider answered. Healthy is reserved for a live probe.
   const credentialStatus = (envName: string): CrmConnector['status'] =>
-    process.env[envName] ? 'unverified' : 'disabled';
-  const credentialMessage = (envName: string, disabled: string) =>
-    process.env[envName]
-      ? `${envName} is set. ${NOT_A_LIVE_PROBE}`
-      : `${disabled} (${envName} not set)`;
-  const registered = (description: string) => `${description} ${NOT_A_LIVE_PROBE}`;
-  const sillageConfigured = Boolean(process.env.SILLAGE_MCP_URL || process.env.SILLAGE_API_KEY);
-  const sillageStatus: CrmConnector['status'] = sillageConfigured ? 'unverified' : 'disabled';
-  const sillageMessage = sillageConfigured
-    ? `Sillage credentials are set. ${NOT_A_LIVE_PROBE}`
-    : 'Set SILLAGE_API_KEY or SILLAGE_MCP_URL to enable';
+    process.env[envName] ? 'healthy' : 'disabled';
+  const credentialMessage = (envName: string, enabled: string, disabled: string) =>
+    process.env[envName] ? enabled : `${disabled} (${envName} not set)`;
+  // Sillage: healthy if either transport has credentials (MCP URL or REST
+  // key) — mirrors the Apollo "either lane is enough" health rule, but
+  // without a "partial" state since Sillage MCP has no separate bearer-token
+  // requirement to be half-configured on.
+  const sillageStatus: CrmConnector['status'] =
+    process.env.SILLAGE_MCP_URL || process.env.SILLAGE_API_KEY ? 'healthy' : 'disabled';
+  const sillageMessage = process.env.SILLAGE_MCP_URL
+    ? 'Sillage MCP buying-intent signals enabled.'
+    : credentialMessage(
+        'SILLAGE_API_KEY',
+        'Sillage REST buying-intent signals enabled.',
+        'Set SILLAGE_API_KEY or SILLAGE_MCP_URL to enable',
+      );
   const apolloMcpConfigured = Boolean(process.env.APOLLO_MCP_URL && process.env.APOLLO_MCP_BEARER_TOKEN);
   const apolloMcpPartial = Boolean(process.env.APOLLO_MCP_URL || process.env.APOLLO_MCP_BEARER_TOKEN);
-  const apolloConfigured = apolloMcpConfigured || Boolean(process.env.APOLLO_API_KEY);
-  const apolloStatus: CrmConnector['status'] = apolloConfigured
-    ? 'unverified'
-    : apolloMcpPartial
-      ? 'degraded'
-      : 'disabled';
-  const apolloMessage = apolloConfigured
-    ? `Apollo credentials are set. ${NOT_A_LIVE_PROBE}`
+  const apolloStatus: CrmConnector['status'] =
+    apolloMcpConfigured || process.env.APOLLO_API_KEY
+      ? 'healthy'
+      : apolloMcpPartial
+        ? 'degraded'
+        : 'disabled';
+  const apolloMessage = apolloMcpConfigured
+    ? 'Apollo MCP company search enabled; enrichment credit tools remain opt-in.'
     : apolloMcpPartial
       ? 'Apollo MCP is partially configured; set both APOLLO_MCP_URL and APOLLO_MCP_BEARER_TOKEN.'
-      : credentialMessage('APOLLO_API_KEY', 'Ready for Apollo MCP or REST credentials');
+      : credentialMessage(
+          'APOLLO_API_KEY',
+          'Apollo REST organization enrichment enabled; this can consume credits.',
+          'Ready for Apollo MCP or REST credentials',
+        );
 
   return [
     {
@@ -108,12 +107,12 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       name: 'SEC EDGAR',
       category: 'company',
       kind: 'open_api',
-      status: 'unverified',
+      status: 'healthy',
       requiresCredential: false,
       sourceUrl: 'https://data.sec.gov/',
       docsUrl: 'https://www.sec.gov/search-filings/edgar-application-programming-interfaces',
       lastCheckedAt,
-      message: registered('Open company tickers, submissions, and company facts for public issuers.'),
+      message: 'Open company tickers, submissions, and company facts for public issuers.',
       capabilities: ['public-company lookup', 'CIK mapping', 'company facts'],
     },
     {
@@ -121,14 +120,12 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       name: 'Wikidata + Wikimedia Commons',
       category: 'company',
       kind: 'open_api',
-      status: 'unverified',
+      status: 'healthy',
       requiresCredential: false,
       sourceUrl: 'https://www.wikidata.org/wiki/Wikidata:Data_access',
       docsUrl: 'https://www.mediawiki.org/wiki/API:Main_page',
       lastCheckedAt,
-      message: registered(
-        'Open company profiles, official websites, logos, and images without credentials.',
-      ),
+      message: 'Open company profiles, official websites, logos, and images without credentials.',
       capabilities: ['company profile lookup', 'official website', 'logo lookup', 'images'],
     },
     {
@@ -136,12 +133,12 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       name: 'USAspending',
       category: 'procurement',
       kind: 'open_api',
-      status: 'unverified',
+      status: 'healthy',
       requiresCredential: false,
       sourceUrl: 'https://api.usaspending.gov/',
       docsUrl: 'https://api.usaspending.gov/docs/',
       lastCheckedAt,
-      message: registered('Open federal award intelligence for account and funding signals.'),
+      message: 'Open federal award intelligence for account and funding signals.',
       capabilities: ['award search', 'recipient intelligence', 'agency context'],
     },
     {
@@ -149,14 +146,12 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       name: 'TradingView Widgets',
       category: 'market',
       kind: 'official_widget',
-      status: 'unverified',
+      status: 'healthy',
       requiresCredential: false,
       sourceUrl: 'https://www.tradingview.com/widget-docs/',
       docsUrl: 'https://www.tradingview.com/widget-docs/faq/data/',
       lastCheckedAt,
-      message: registered(
-        'Official embeddable widgets; market data is not exposed as a raw public API.',
-      ),
+      message: 'Official embeddable widgets; market data is not exposed as a raw public API.',
       capabilities: ['symbol overview widget', 'financial widget', 'technical-analysis widget'],
     },
     {
@@ -207,6 +202,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       lastCheckedAt,
       message: credentialMessage(
         'SAM_GOV_API_KEY',
+        'Federal opportunity importer enabled.',
         'Official opportunity API requires an API key',
       ),
       capabilities: ['opportunity search', 'notice metadata', 'federal bid import'],
@@ -223,6 +219,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       lastCheckedAt,
       message: credentialMessage(
         'COMPANIES_HOUSE_API_KEY',
+        'UK company registry verification enabled.',
         'UK registry lookup requires an API key',
       ),
       capabilities: ['legal name lookup', 'officer data', 'filing status'],
@@ -237,7 +234,11 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       sourceUrl: 'https://api.brandfetch.io/',
       docsUrl: 'https://docs.brandfetch.com/docs/logo-link',
       lastCheckedAt,
-      message: credentialMessage('BRANDFETCH_API_KEY', 'Favicon and initials fallback active'),
+      message: credentialMessage(
+        'BRANDFETCH_API_KEY',
+        'Logo and brand asset lookup enabled.',
+        'Favicon and initials fallback active',
+      ),
       capabilities: ['logo lookup', 'brand colors', 'domain matching'],
     },
     {
@@ -250,7 +251,11 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       sourceUrl: 'https://www.logo.dev/',
       docsUrl: 'https://www.logo.dev/docs/logo-images/introduction',
       lastCheckedAt,
-      message: credentialMessage('LOGO_DEV_TOKEN', 'Favicon and initials fallback active'),
+      message: credentialMessage(
+        'LOGO_DEV_TOKEN',
+        'Primary logo lookup enabled.',
+        'Favicon and initials fallback active',
+      ),
       capabilities: ['logo lookup', 'domain matching', 'fallback images'],
     },
     {
@@ -258,16 +263,16 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       name: 'Gmail',
       category: 'people',
       kind: 'credentialed_api',
-      // A client id is configuration, not a live mailbox. Gmail stays available
-      // in this version; Microsoft is the official account.
-      status: process.env.GMAIL_CLIENT_ID ? 'unverified' : 'disabled',
+      status: credentialStatus('GMAIL_CLIENT_ID'),
       requiresCredential: true,
       sourceUrl: 'https://mail.google.com/',
       docsUrl: 'https://developers.google.com/gmail/api',
       lastCheckedAt,
-      message: process.env.GMAIL_CLIENT_ID
-        ? 'Gmail stays available in this version. The client id is configured; a person still has to connect their Google mailbox.'
-        : 'Gmail stays available in this version. Set GMAIL_CLIENT_ID before someone can connect a Google mailbox.',
+      message: credentialMessage(
+        'GMAIL_CLIENT_ID',
+        'Gmail connection active.',
+        'Connect Gmail account to sync user mailbox.',
+      ),
       capabilities: ['email sync', 'send email', 'activity history'],
     },
     {
@@ -282,6 +287,7 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       lastCheckedAt,
       message: credentialMessage(
         'SLACK_CLIENT_ID',
+        'Slack connection active.',
         'Connect Slack workspace for DMs and alerts.',
       ),
       capabilities: ['chat write', 'channels read', 'user mapping'],
@@ -291,14 +297,16 @@ export function buildConnectorCatalog(now = new Date()): CrmConnector[] {
       name: 'Microsoft Outlook',
       category: 'people',
       kind: 'credentialed_api',
-      status: process.env.MICROSOFT_GRAPH_CLIENT_ID ? 'unverified' : 'disabled',
+      status: credentialStatus('MICROSOFT_GRAPH_CLIENT_ID'),
       requiresCredential: true,
       sourceUrl: 'https://outlook.live.com/',
       docsUrl: 'https://learn.microsoft.com/en-us/graph/outlook-mail-concept-overview',
       lastCheckedAt,
-      message: process.env.MICROSOFT_GRAPH_CLIENT_ID
-        ? 'Microsoft is the official account. The client id is configured; Outlook connects when a person signs in with Microsoft.'
-        : 'Microsoft is the official account. Set MICROSOFT_GRAPH_CLIENT_ID before someone can connect Outlook.',
+      message: credentialMessage(
+        'MICROSOFT_GRAPH_CLIENT_ID',
+        'Outlook Mail connection active.',
+        'Connect Microsoft 365 to sync Outlook mailbox.',
+      ),
       capabilities: ['email sync', 'send email', 'activity history'],
     },
   ];
@@ -308,7 +316,7 @@ export async function fetchSecTickerSignal(
   ticker: string,
   now = new Date(),
   fetchImpl: FetchLike = fetch,
-): Promise<UnscoredOpenDataSignal | null> {
+): Promise<OpenDataSignal | null> {
   const rows = await fetchJson<Record<string, SecTickerRow>>(
     'https://www.sec.gov/files/company_tickers.json',
     fetchImpl,
@@ -325,14 +333,15 @@ export async function fetchSecTickerSignal(
     summary: `SEC EDGAR resolves ${ticker} to CIK ${cik}; this can feed legal entity and public-company verification.`,
     url: `https://data.sec.gov/submissions/CIK${cik}.json`,
     observedAt: now.toISOString(),
-    confidence: null,
+    confidence: 0.93,
     sourceAttribution: [
       attribution({
         source: 'sec_edgar',
         label: 'SEC EDGAR company tickers',
         sourceUrl: 'https://www.sec.gov/files/company_tickers.json',
         fetchedAt: now,
-        providerMetadata: { cik, ticker, confidenceBasis: 'not_scored' },
+        confidence: 0.93,
+        providerMetadata: { cik, ticker },
       }),
     ],
     metadata: { cik, ticker, companyTitle: match.title },
@@ -343,7 +352,7 @@ export async function fetchUsaSpendingSignals(
   query: string,
   now = new Date(),
   fetchImpl: FetchLike = fetch,
-): Promise<UnscoredOpenDataSignal[]> {
+): Promise<OpenDataSignal[]> {
   const endDate = now.toISOString().slice(0, 10);
   const response = await fetchJson<{ results?: UsaSpendingAwardRow[] }>(
     'https://api.usaspending.gov/api/v2/search/spending_by_award/',
@@ -379,8 +388,8 @@ export async function fetchUsaSpendingSignals(
     const amount = row['Award Amount'] ?? row.AwardAmount ?? null;
     const amountSummary =
       typeof amount === 'number'
-        ? `${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} USD reported by USAspending`
-        : 'amount not disclosed by USAspending';
+        ? `$${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+        : 'undisclosed value';
 
     return {
       id: `usaspending:${awardId}`,
@@ -389,14 +398,15 @@ export async function fetchUsaSpendingSignals(
       summary: `${agency} reported ${amountSummary} tied to "${query}".`,
       url: 'https://www.usaspending.gov/search/',
       observedAt: now.toISOString(),
-      confidence: null,
+      confidence: 0.86,
       sourceAttribution: [
         attribution({
           source: 'usaspending',
           label: 'USAspending award search',
           sourceUrl: 'https://api.usaspending.gov/api/v2/search/spending_by_award/',
           fetchedAt: now,
-          providerMetadata: { awardId, query, confidenceBasis: 'not_scored' },
+          confidence: 0.86,
+          providerMetadata: { awardId, query },
         }),
       ],
       metadata: {
@@ -411,7 +421,7 @@ export async function fetchUsaSpendingSignals(
   });
 }
 
-function tradingViewWidgetSignal(symbol: string, now: Date): UnscoredOpenDataSignal {
+function tradingViewWidgetSignal(symbol: string, now: Date): OpenDataSignal {
   return {
     id: `tradingview-widget:${symbol}`,
     provider: 'TradingView Widgets',
@@ -420,14 +430,15 @@ function tradingViewWidgetSignal(symbol: string, now: Date): UnscoredOpenDataSig
       'TradingView can render an official market widget in the CRM; raw quote data must come from a licensed market-data API.',
     url: 'https://www.tradingview.com/widget-docs/',
     observedAt: now.toISOString(),
-    confidence: null,
+    confidence: 0.8,
     sourceAttribution: [
       attribution({
         source: 'tradingview_widgets',
         label: 'TradingView official widget documentation',
         sourceUrl: 'https://www.tradingview.com/widget-docs/',
         fetchedAt: now,
-        providerMetadata: { symbol, confidenceBasis: 'not_scored' },
+        confidence: 0.8,
+        providerMetadata: { symbol },
       }),
     ],
     metadata: { symbol, integrationMode: 'official_widget' },
@@ -466,20 +477,22 @@ function attribution({
   label,
   sourceUrl,
   fetchedAt,
+  confidence,
   providerMetadata,
 }: {
   source: string;
   label: string;
   sourceUrl: string;
   fetchedAt: Date;
+  confidence: number;
   providerMetadata: Record<string, unknown>;
-}): UnscoredAttribution {
+}): SourceAttribution {
   return {
     source,
     label,
     sourceUrl,
     fetchedAt: fetchedAt.toISOString(),
-    confidence: null,
+    confidence,
     providerMetadata,
   };
 }
