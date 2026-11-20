@@ -2,7 +2,7 @@
 // page already has. These tests fail while that sentence is still rendered,
 // and they keep the control: drag and arrow-move on a card, click-to-edit on
 // a cell, the account counts, the health bars, and the coverage score.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -316,20 +316,25 @@ describe('pipeline and accounts helper copy', () => {
     expect(screen.queryByText(COCKPIT_ESSAY)).toBeNull();
     expect(screen.queryByText('portfolio')).toBeNull();
     expect(screen.queryAllByText(CARD_ESSAY)).toHaveLength(0);
-    expect(screen.getByText('Accounts')).toBeTruthy();
-    expect(screen.getByText('Open deals')).toBeTruthy();
-    expect(screen.getByText('Weighted pipeline')).toBeTruthy();
-    expect(screen.getByText('Avg coverage')).toBeTruthy();
-    expect(screen.getByText('Enriched profiles')).toBeTruthy();
-    expect(screen.getByText('0%')).toBeTruthy();
+    expect(screen.getAllByText('Accounts')).toHaveLength(2);
+    const stats = screen.getByRole('region', { name: 'Account source coverage' });
+    expect(within(stats).getByText('Open deals')).toBeTruthy();
+    expect(within(stats).getByText('Weighted pipeline')).toBeTruthy();
+    expect(within(stats).getByText('Avg coverage').closest('[title]')?.getAttribute('title')).toBe(
+      '0 logos / 0 tech',
+    );
+    expect(within(stats).getByText('Enriched profiles')).toBeTruthy();
+    expect(within(stats).getByText('1')).toBeTruthy();
+    expect(within(stats).getByText('0%')).toBeTruthy();
     const coverage = document.querySelector('.account-card-coverage');
+    expect(coverage?.textContent).toContain('0%');
     expect(coverage?.getAttribute('title')).toMatch(/Missing Industry, Domain, and Logo/);
     expect(coverage?.getAttribute('title')).toMatch(/Next: Assign an industry/);
     expect(screen.getByRole('link', { name: 'Open Acme customer cockpit' })).toBeTruthy();
     expect(screen.getByText('Open account cockpit')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sync ERP accounts' })).toBeTruthy();
     expect(screen.getByRole('searchbox', { name: 'Search' })).toBeTruthy();
-    expect(screen.getByText('At risk')).toBeTruthy();
+    expect(screen.getAllByText('At risk')).toHaveLength(2);
   });
 
   it('drops the summary and the card essay when several accounts are in view', () => {

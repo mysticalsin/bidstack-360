@@ -1210,7 +1210,6 @@
   },
   "pipeline": {
     "heading": "Open pipeline",
-    "subtitle": "Drag a card between columns, or focus a card and use ← / → to move stages.",
     "stageFilterLabel": "Stage",
     "stageFilterAriaLabel": "Filter pipeline by stage",
     "stageFilterAllOption": "All",
@@ -2143,7 +2142,7 @@
     "clear": "clear",
     "stageOpportunities": "{{stage}} opportunities",
     "clearFilter": "clear filter",
-    "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "bidsInFlight": "{{count}} bids in flight",
     "exportingLabel": "Exporting opportunities…",
     "exportLabel": "Export visible opportunities as CSV",
     "exporting": "Exporting…",
