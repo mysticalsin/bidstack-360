@@ -17,7 +17,7 @@
 // POLO_RESTORE_DRILL=1 pnpm --filter @bidstack/polo-preview exec vitest run src/restore-migrated-snapshot.integration.test.ts
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
@@ -171,7 +171,7 @@ function signalPids(pids: number[], signal: NodeJS.Signals): void {
   }
 }
 
-function startEntrypoint(layout: Layout): Boot {
+function startEntrypoint(layout: Layout, extra: Record<string, string> = {}): Boot {
   mkdirSync(layout.dataDir, { recursive: true });
   let logs = '';
   const child = spawn(process.execPath, [join(repo, 'apps/polo-preview/container/entrypoint.mjs')], {
@@ -194,6 +194,8 @@ function startEntrypoint(layout: Layout): Boot {
       POLO_SNAPSHOT_DIR: join(layout.root, 'snapshot'),
       POLO_SNAPSHOT_TGZ: join(layout.root, 'snapshot.tgz'),
       POLO_RESTORE_DIR: join(layout.root, 'restore'),
+      POLO_RESTORE_DRILL: '1',
+      ...extra,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -337,7 +339,8 @@ async function startSource(): Promise<Source> {
     'ON_ERROR_STOP=1',
     '-c',
     `INSERT INTO orgs (id, clerk_org, name) VALUES ('${ORG_ID}', '${CLERK_ORG}', 'Fixture Restore Org');
-     INSERT INTO audit_log (org_id, action, target_type) VALUES ('${ORG_ID}', '${AUDIT_ACTION}', 'test');`,
+     INSERT INTO audit_log (org_id, action, target_type) VALUES ('${ORG_ID}', '${AUDIT_ACTION}', 'test');
+     GRANT UPDATE, DELETE, TRUNCATE ON TABLE public.audit_log TO app_role;`,
   ]);
   return { dir, port };
 }
@@ -527,4 +530,50 @@ describe('restored polo snapshot', () => {
       rmSync(layout.root, { recursive: true, force: true });
     }
   }, 240_000);
+
+  it('stops the boot when an audit trigger is disabled', async (ctx) => {
+    if (!guard(ctx)) return;
+    const layout = await makeLayout();
+    let boot: Boot | null = null;
+    try {
+      boot = startEntrypoint(layout, { POLO_GATE_BREAK: 'audit-trigger' });
+      const awaiting = await waitForPhase(layout.httpPort, (state) => state.phase === 'awaiting-data' || state.phase === 'failed', 30_000);
+      expect(awaiting.phase).toBe('awaiting-data');
+      const seeded = await postSeed(layout.httpPort);
+      expect(seeded.status, seeded.body).toBe(202);
+      const state = await waitForPhase(layout.httpPort, (next) => next.phase === 'ready' || next.phase === 'failed', 180_000);
+      expect(state.phase).toBe('failed');
+      expect(state.detail).toMatch(/audit_log_append_only/);
+    } finally {
+      expectPasswordUnlogged(boot);
+      stopBoot(boot);
+      rmSync(layout.root, { recursive: true, force: true });
+    }
+  }, 180_000);
+
+  it('a failed password change does not write the secret to the logs', async (ctx) => {
+    if (!guard(ctx)) return;
+    const layout = await makeLayout();
+    let boot: Boot | null = null;
+    try {
+      boot = startEntrypoint(layout, { POLO_PASSWORD_TARGET_ROLE: 'no_such_role' });
+      const awaiting = await waitForPhase(layout.httpPort, (state) => state.phase === 'awaiting-data' || state.phase === 'failed', 30_000);
+      expect(awaiting.phase).toBe('awaiting-data');
+      const seeded = await postSeed(layout.httpPort);
+      expect(seeded.status, seeded.body).toBe(202);
+      const state = await waitForPhase(layout.httpPort, (next) => next.phase === 'ready' || next.phase === 'failed', 180_000);
+      expect(state.phase).toBe('failed');
+      expect(boot.rawLogs()).not.toContain(FIXTURE_PASSWORD);
+      const serverLog = join(layout.dataDir, 'pg', 'log');
+      if (existsSync(serverLog)) {
+        for (const name of readdirSync(serverLog)) {
+          expect(readFileSync(join(serverLog, name), 'utf8')).not.toContain(FIXTURE_PASSWORD);
+        }
+      }
+    } finally {
+      expectPasswordUnlogged(boot);
+      stopBoot(boot);
+      rmSync(layout.root, { recursive: true, force: true });
+    }
+  }, 180_000);
 });

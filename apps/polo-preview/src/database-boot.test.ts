@@ -26,6 +26,10 @@ describe('polo app role boot', () => {
     // WHY: NOSUPERUSER is the server default, so the drill still passes if
     // the word is deleted. The source has to name it.
     expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOSUPERUSER\b/);
+    expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOREPLICATION\b/);
+    expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOBYPASSRLS\b/);
+    expect(ENSURE_APP_ROLE_SQL).toMatch(/\bNOINHERIT\b/);
+    expect(ENSURE_APP_ROLE_SQL).toMatch(/CONNECTION LIMIT 100/);
     expect(ENSURE_APP_ROLE_SQL).not.toMatch(/\bSUPERUSER\b/);
     expect(ENSURE_APP_ROLE_SQL).not.toMatch(/PASSWORD/i);
   });
@@ -34,6 +38,8 @@ describe('polo app role boot', () => {
     const tolerated = 'pg_restore: error: could not execute query: ERROR:  schema "public" already exists';
     expect(restoreFailure(0, '')).toBeNull();
     expect(restoreFailure(1, tolerated)).toBeNull();
+    // WHY: the duplicate-schema notice is SQLSTATE 42P06, and it may happen once.
+    expect(restoreFailure(1, `${tolerated}\n${tolerated}`)).not.toBeNull();
 
     const missing = restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  role "app_role" does not exist');
     expect(missing).toMatch(/^pg_restore failed/);
@@ -97,13 +103,17 @@ describe('polo app role boot', () => {
     expect(entry).toContain("process.env.POLO_SNAPSHOT_DIR || '/tmp/snapshot'");
     expect(entry).toContain("process.env.POLO_SNAPSHOT_TGZ || '/tmp/snapshot.tgz'");
     expect(entry).toContain("process.env.POLO_RESTORE_DIR || '/tmp/restore'");
+    expect(functionBody(entry, 'restoreFrom')).toContain('--no-privileges');
+    expect(functionBody(entry, 'restoreFrom')).toContain('LC_ALL');
+    expect(entry).toContain("process.env.POLO_RESTORE_DRILL !== '1'");
   });
 
   it('binds the app role password and records only the SQLSTATE when that fails', () => {
     const body = functionBody(entry, 'setAppRolePassword');
     // WHY: splicing the secret into the statement puts it in argv, logs, and
     // a failed ALTER's error text. psql :'var' quotes a bound value.
-    expect(body).toContain(":'app_db_password'");
+    expect(body).toContain('scramSha256Verifier(');
+    expect(body).not.toContain(":'app_db_password'");
     expect(body).not.toMatch(/\$\{/);
     expect(body).not.toContain('quoteLiteral');
     expect(body).toContain('appRolePasswordError(');
