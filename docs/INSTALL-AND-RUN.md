@@ -6,25 +6,50 @@ Production deploys need Tony's approval. Do not run `wrangler deploy` from CI, a
 
 ## 1. Prerequisites
 
-Read from the repo, then confirmed on the machine that ran the clone:
+`.nvmrc` is `24`. `package.json` says Node `>=24.0.0 <25` and pnpm `10.27.0` (`packageManager`). Postgres is the `pgvector/pgvector:pg16` image. Redis is `redis:7-alpine`. `pnpm db:backup:selftest` also needs the `psql` client on the host.
 
-| Tool | What the repo says | What ran |
-| --- | --- | --- |
-| Node.js | `.nvmrc` is `24`. `package.json` `engines.node` is `>=24.0.0 <25`. | Node `v24.22.3`. Node 22 fails `pnpm install` with `ERR_PNPM_UNSUPPORTED_ENGINE`. |
-| pnpm | `packageManager` is `pnpm@10.27.0`. `engines.pnpm` is `>=10.0.0 <11`. | pnpm `10.27.0` via Corepack (`corepack prepare pnpm@10.27.0 --activate`). |
-| PostgreSQL | `docker-compose.yml` image `pgvector/pgvector:pg16`. Migrations run `CREATE EXTENSION vector`. | PostgreSQL `16.16` inside that image. Host `pg_dump` was `16.15` and was enough for the backup drill. |
-| Redis | `docker-compose.yml` image `redis:7-alpine`. | Redis `7.4.12`. |
-| Docker | Used for Postgres and Redis. Compose file also defines `migrate`, `api`, `web`, `worker`, and `mcp-server`. | Docker `29.1.3`, Compose `2.40.3`. |
-| Wrangler | Not a dependency. `apps/polo-preview/wrangler.toml` is the Worker config. | **Not verified.** The repo does not pin a Wrangler version. |
-
-Enable Corepack, then:
+If `node -v` does not print `v24`, install Node 24 with nvm. The installer and the version check are the official ones: [nvm](https://github.com/nvm-sh/nvm#installing-and-updating). [fnm](https://github.com/Schniz/fnm) is the other installer that reads `.nvmrc` (`fnm install` && `fnm use`).
 
 ```bash
+# https://github.com/nvm-sh/nvm#installing-and-updating
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# Open a new shell so nvm is on PATH, then:
+nvm install 24
+nvm use 24
+node -v    # must print v24.x.x. v22 fails pnpm install with ERR_PNPM_UNSUPPORTED_ENGINE.
 corepack enable
 corepack prepare pnpm@10.27.0 --activate
-node -v   # v24.x
-pnpm -v   # 10.27.0
+pnpm -v    # 10.27.0
 ```
+
+Docker is not installed by the repo. Use the official packages: [Docker Engine](https://docs.docker.com/engine/install/). Then:
+
+```bash
+docker --version
+docker compose version
+```
+
+Both commands must print a version. This clone used Docker `29.1.3` and Compose `2.40.3`.
+
+`pnpm db:backup` and `pnpm db:backup:selftest` run `pg_dump` and `psql`. The server inside Compose is Postgres 16. Install a 16 client. On Ubuntu or Debian:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y postgresql-client
+psql --version    # PostgreSQL 16.x
+```
+
+On macOS the official packages are [Postgres.app](https://postgresapp.com/) or `brew install libpq`, and `psql --version` is the same check. Without `psql` on `PATH`, the selftest exits before it creates a database.
+
+| Tool | Required by the repo | Check |
+| --- | --- | --- |
+| Node.js 24 | `.nvmrc`, `engines.node` | `node -v` prints `v24` |
+| pnpm 10.27.0 | `packageManager` | `pnpm -v` |
+| Docker Engine + Compose | `docker-compose.yml` | `docker --version` and `docker compose version` |
+| PostgreSQL 16 server | image `pgvector/pgvector:pg16`, started by Compose | `docker compose exec postgres postgres -V` |
+| Redis 7 | image `redis:7-alpine` | `docker compose exec redis redis-server --version` |
+| `psql` / `pg_dump` 16 | `scripts/backup-postgres.sh`, `scripts/backup-restore-selftest.sh` | `psql --version` |
+| Wrangler | not a dependency; `apps/polo-preview/wrangler.toml` | **Not verified.** No pinned version. |
 
 ## 2. Clone, install, and environment
 
@@ -54,26 +79,30 @@ Replace both for any database that is not this local compose file. Never commit 
 
 ### Real mode on a laptop
 
-On this commit the API schema still defaults `POLO_DATA_MODE` to `demo` (`apps/api/src/env.ts`). A real install sets it explicitly. Real mode refuses the shared Jane Smith stub. It boots only with Clerk (`CLERK_SECRET_KEY`) or with Cloudflare Access (`CF_ACCESS_AUTH=true`). Those two cannot be set together. `DEMO_MODE=true` cannot be set with either, and cannot be set with `POLO_DATA_MODE=real`.
+Copying `.env.example` leaves `POLO_DATA_MODE=demo`. That is still the default on this `main` (`apps/api/src/env.ts`). [Pull request #364](https://github.com/mysticalsin/bidstack-360/pull/364) is the separate foundation change that makes real mode the default. Until that lands, run this after `cp .env.example .env`. It rewrites the copied file. It does not append a second `POLO_DATA_MODE` line.
 
-For a laptop, with no Clerk secret and no Access JWT, the verified combination is:
-
-```text
-NODE_ENV=development
-POLO_DATA_MODE=real
-CF_ACCESS_AUTH=true
-CF_ACCESS_TRUST_LOOPBACK_EMAIL=true
-POLO_ALLOWED_USERS=owner@example.test:Admin
-POLO_REAL_ORG_CLERK=org_local_example
-PUBLIC_BASE_URL=http://localhost:5173
-PUBLIC_API_URL=http://localhost:4000
-VITE_API_URL=http://localhost:4000
-VITE_AUTH_MODE=cf-access
+```bash
+cp .env.example .env
+for pair in \
+  POLO_DATA_MODE=real \
+  CF_ACCESS_AUTH=true \
+  CF_ACCESS_TRUST_LOOPBACK_EMAIL=true \
+  POLO_ALLOWED_USERS=owner@example.test:Admin \
+  POLO_REAL_ORG_CLERK=org_local_example
+do
+  key="${pair%%=*}"
+  val="${pair#*=}"
+  grep -v "^${key}=" .env > .env.tmp || true
+  printf '%s=%s\n' "$key" "$val" >> .env.tmp
+  mv .env.tmp .env
+done
 ```
+
+Real mode refuses the shared Jane Smith stub. It boots only with Clerk (`CLERK_SECRET_KEY`) or with Cloudflare Access (`CF_ACCESS_AUTH=true`). Those two cannot be set together. `DEMO_MODE=true` cannot be set with either, and cannot be set with `POLO_DATA_MODE=real`.
 
 `CF_ACCESS_TRUST_LOOPBACK_EMAIL=true` is accepted only when `NODE_ENV` is `development` or `test`. Production boot refuses it. The API then accepts `Cf-Access-Authenticated-User-Email` from `127.0.0.1` only. `POLO_ALLOWED_USERS` is `email:Role` or `@domain:Role`. The role is one of Admin, Sales Manager, Account Executive, SDR, Customer Success, Read-Only.
 
-`POLO_DATA_MODE=demo` is only for a demo. It is the fixture tenant, the demo banner, and sample filings. Do not load real accounts, revenue, or signed MSAs in that mode.
+`POLO_DATA_MODE=demo` is only for a demo. It is the fixture tenant, the demo banner, and sample filings. Do not load real accounts, revenue, or signed MSAs in that mode. Putting `VITE_AUTH_MODE=cf-access` in the repo-root `.env` does not change the browser. Vite does not read that file. Section 4 is the file Vite does read.
 
 ### Settings does not flip the mode
 
@@ -101,7 +130,7 @@ The API refuses to start if `DATABASE_URL` is missing. Everything else in `apps/
 
 The worker in production requires `DATABASE_URL`, `DATABASE_URL_APP`, `DATABASE_URL_OWNER` (different login from the app URL), `REDIS_URL` (not loopback), the same two 64-hex keys, `PII_FIELD_ENCRYPTION` exactly `true`, the job-signing secret, and the tenant-scope guard.
 
-The web build inlines only `VITE_*` values. `pnpm dev:web` forces `VITE_AUTH_MODE=stub`. A real-mode dev server is Vite without that override (section 4).
+The browser reads `import.meta.env.VITE_*` from Vite. `apps/web/vite.config.ts` does not set `envDir`, so that directory is `apps/web`, not the repo root. `pnpm dev:web` is `cross-env VITE_AUTH_MODE=stub vite`, and a variable already in the process wins over the env file. Section 4 is the working command.
 
 The container (`apps/polo-preview/container/entrypoint.mjs`) reads `POLO_INTERNAL_KEY`, `POLO_APP_DB_PASSWORD`, and optionally `POLO_INTEL_USER_AGENT` and `API_RATE_LIMIT_MAX`. It then forces `POLO_DATA_MODE=demo`, `CF_ACCESS_AUTH=true`, and a private Redis URL. That forced demo mode is the container as configured on this commit. See Known limits.
 
@@ -174,15 +203,36 @@ pnpm --filter @bidstack/shared --filter @bidstack/dust-client \
   --filter @bidstack/memos --filter @bidstack/integrations build
 ```
 
-Then, in three terminals, with the root `.env` in place (dotenv-flow loads it; you do not have to `source` it for these processes):
+The API and the worker load the repo-root `.env` through dotenv-flow. You do not have to `source` it for those two.
+
+Vite does not. `import.meta.env` is filled from `apps/web` (there is no `envDir` in `apps/web/vite.config.ts`). A `VITE_AUTH_MODE=cf-access` line in the repo-root `.env` never reaches the browser, so `AuthProvider` falls through to the Jane Smith stub while the real-mode API returns 401. `pnpm dev:web` and `pnpm dev` make that worse: the web script is `cross-env VITE_AUTH_MODE=stub vite`, and a value already in the process overrides the env file.
+
+Write the file Vite actually reads, then start Vite without `cross-env`:
 
 ```bash
+cat > apps/web/.env.development.local << 'EOF'
+VITE_AUTH_MODE=cf-access
+EOF
 pnpm dev:api
 pnpm dev:worker
-pnpm --filter @bidstack/web exec vite --host 127.0.0.1 --port 5173
+# `source .env` exports VITE_AUTH_MODE and VITE_API_URL from the repo-root
+# file. Vite copies those process values into the browser and they beat the
+# web env file. Strip them for this process only.
+env -u VITE_AUTH_MODE -u VITE_API_URL \
+  pnpm --filter @bidstack/web exec vite --host 127.0.0.1 --port 5173
 ```
 
-Do not use `pnpm dev:web` for real mode. That script is `cross-env VITE_AUTH_MODE=stub vite`, so the browser would use the stub while the API refuses the stub.
+`apps/web/.env.development.local` is gitignored (`.env.*.local`). Leave `VITE_API_URL` out of that file and out of the Vite process. An empty client base keeps the browser on the Vite origin, and `vite.config.ts` proxies `/api` to `http://localhost:4000`. Do not open the app with `pnpm dev` or `pnpm dev:web` in real mode.
+
+The dev server's own default port is 38081 (`server.port` plus `strictPort` in `vite.config.ts`). `--port 5173` overrides it. Without that flag the URL is http://127.0.0.1:38081.
+
+Check that the browser bundle is Cloudflare Access and not the stub. With Vite running:
+
+```bash
+curl -fsS 'http://127.0.0.1:5173/src/lib/auth.tsx' | grep -F '"VITE_AUTH_MODE": "cf-access"'
+```
+
+Vite replaces `import.meta.env` on the served module. That grep exits 0 only when the browser is on Cloudflare Access. A hit on `"VITE_AUTH_MODE": "stub"` means the Vite process still inherited the stub. On this check the served module began `import.meta.env = { ... "VITE_AUTH_MODE": "cf-access" }`.
 
 Verified listeners:
 
@@ -191,13 +241,13 @@ Verified listeners:
 | http://127.0.0.1:4000/health | 200 |
 | http://127.0.0.1:4000/livez | 200 |
 | http://127.0.0.1:4000/readyz | 200, `db: true`, `redis: true` |
-| http://127.0.0.1:4000/api/v1/identity | `{"dataMode":"real","authProvider":"cf-access","demoBanner":false}` |
+| http://127.0.0.1:4000/api/v1/identity | `{"dataMode":"real","authProvider":"cf-access","demoBanner":false,"cfAccessEnabled":true}` |
 | http://127.0.0.1:5173/ | 200 |
 | http://127.0.0.1:4002/health | 200 when `WORKER_HEALTH_PORT` is unset |
 
 `.env.example` sets `WORKER_HEALTH_PORT=8788`. Copying that file changes the worker health port. The code default when the variable is absent is 4002 (`apps/worker/src/main.ts`). The MCP server, when you start it with `pnpm dev:mcp`, listens on `PORT_MCP` (4001).
 
-`pnpm dev` starts web, api, worker, and mcp together. **Not verified** as a single command: the three processes above were already bound to the ports.
+`pnpm dev` runs every package `dev` script, including `pnpm dev:web`, which forces the stub. Do not use it for real mode.
 
 ## 5. First run in real mode
 
@@ -234,7 +284,7 @@ curl -sS -H "$H" -H 'content-type: application/json' \
   -d '{"oppId":"<opportunity-id>","title":"Send the reprint brief","dueDate":"2026-12-01","status":"open","assignee":"owner@example.test"}'
 ```
 
-Verified on the fresh database: company `201`, contact `201` with `linkState: linked`, opportunity `201` code `OP-2001` stage `S1 Lead` value `12000`, task `201`.
+Verified on the fresh database. Each create returned 201. The ids are UUIDs, not short codes. On that run the company id was `1701098c-37f7-4769-be1c-cfe03257b4bc`, the contact id was `5ff3f12a-0930-47ba-bd1f-e017d1ed11f9` with `linkState: linked`, the opportunity id was `1bbbe371-8ef0-49fb-b41c-cb03408f71c5` (stage `S1 Lead`, value `12000`), and the task id was `cd98d920-d317-4ecf-97b1-de81c03e48a2`.
 
 Company create also requires the legacy role `admin` (`requireRole('admin')`). The allowlist role `Admin` maps to that.
 
@@ -294,6 +344,7 @@ Root `pnpm test` is not the CI command. It runs a hermeticity check first and th
 | `pnpm audit --audit-level high` | Exit 0. The report said 3 high findings, ignored by `pnpm.auditConfig` in `package.json`. |
 | `pnpm -r lint` | Exit 0. The API package printed 17 existing warnings and 0 errors. |
 | `pnpm typecheck` | Exit 0. |
+| `pnpm --filter @bidstack/web exec vitest run src/env-example-source.test.ts src/vite-client-env.test.ts` | Exit 0 after the example file lost its BOM and quoted the mail address. The same command was red first: BOM plus `source` exit 2 on `NOTIFICATION_FROM_EMAIL`. |
 | `pnpm --filter '!@bidstack/api' --filter '!@bidstack/mcp-server' --filter '!@bidstack/worker' -r test` | Exit 0 with a clean environment. Web: 348 files, 1757 tests. A first run with `VITE_API_URL` still exported failed 7 web tests; unsetting it is required. |
 | Worker unit `vitest` line in `ci.yml` (DB files excluded) | Exit 0. 90 files, 927 tests. |
 | MCP unit `vitest` line in `ci.yml` (`kam-tools.test.ts` excluded) | Exit 0. 16 files, 94 tests. |
@@ -369,7 +420,7 @@ These are failures from the fresh clone, plus the container and restore notes in
 
 **Container boot fails after a snapshot restore.** Postgres roles are cluster-wide. A dump of one database does not recreate `app_role`. On this commit the entrypoint sets the password with `ALTER ROLE` and throws `could not set the app role password` if the role is missing. Rollback is the previous Worker deployment. Do not edit the R2 object to "fix" a failed migration; a failed boot is not what gets saved.
 
-**Restore drill.** `pnpm db:backup` writes `pg_dump -Fc` under `POLO_BACKUP_DIR` (default `./var/backups`) and deletes files older than `POLO_BACKUP_RETENTION_DAYS` (default 14). `pnpm db:restore -- <file>` refuses to run unless `POLO_RESTORE_DATABASE_URL` is set, so it cannot guess the production URL. `pnpm db:backup:selftest` creates two throwaway databases, dumps a one-row synthetic table, restores it, and compares the count. That selftest passed on this clone. Restoring the live R2 object was not done.
+**Restore drill.** This needs `psql` and `pg_dump` on `PATH` (section 1). `pnpm db:backup` writes `pg_dump -Fc` under `POLO_BACKUP_DIR` (default `./var/backups`) and deletes files older than `POLO_BACKUP_RETENTION_DAYS` (default 14). `pnpm db:restore -- <file>` refuses to run unless `POLO_RESTORE_DATABASE_URL` is set, so it cannot guess the production URL. `pnpm db:backup:selftest` creates two throwaway databases, dumps a one-row synthetic table, restores it, and compares the count. That selftest passed on this clone. Restoring the live R2 object was not done.
 
 **`docker compose up -d` with no service names.** **Not verified.** That builds `migrate`, `api`, `web`, `worker`, and `mcp-server` and binds host ports 4000 and 80. The verified command is `docker compose up -d postgres redis`.
 
@@ -416,7 +467,7 @@ No new providers. Each one is optional. Unset means the feature stays quiet or u
 
 ## Known limits
 
-- On `main` at `40b13242` the code default of `POLO_DATA_MODE` is `demo`. No open pull request against `main` had changed that default when this page was written. If a later change makes real the default, an unset variable will refuse the stub and will require Clerk or Cloudflare Access. Set `POLO_DATA_MODE=demo` only when you mean a demo. Until that change lands, a real install must set `POLO_DATA_MODE=real` itself.
+- On `main` at `40b13242` the code default of `POLO_DATA_MODE` is `demo`. Copying `.env.example` stays in demo until the real-mode edit in section 2. [Pull request #364](https://github.com/mysticalsin/bidstack-360/pull/364) is the foundation change that makes real the default. After it lands, an unset variable refuses the stub. `POLO_DATA_MODE=demo` stays the demo-only value.
 - The container entrypoint on this commit forces `POLO_DATA_MODE=demo` after it reads the environment. A laptop real-mode process does not. The container and the laptop do not behave the same until that line changes.
 - `prisma migrate dev` sees schema drift (two unique constraints) and will not run non-interactively. Install with `pnpm db:migrate:deploy`.
 - The SPA cannot complete Cloudflare Access sign-in on localhost, because it does not send the loopback email header.
@@ -431,8 +482,7 @@ No new providers. Each one is optional. Unset means the feature stays quiet or u
 | `GET /__health` on `https://polo-preview.tony-walteur.workers.dev` | Live Access-gated host. Not called. |
 | `docker build` of `apps/polo-preview/container/Dockerfile` and a container boot | Needs the five Worker secrets and would compile the production image. Not started. |
 | `docker compose up -d` with no service names | Builds app images and binds ports 4000 and 80. Only `postgres` and `redis` were started. |
-| `pnpm dev` as one command | The API, worker, and Vite were started separately. |
-| `pnpm dev:web` | That script forces stub auth. Real mode used `vite` directly. The stub script was not started on a second port. |
+| `pnpm dev` and `pnpm dev:web` for a real-mode browser | Those scripts force `VITE_AUTH_MODE=stub`. The working command is `apps/web/.env.development.local` plus `pnpm --filter @bidstack/web exec vite`. |
 | CI integration (`pnpm db:seed` on the test database, then api, mcp-server, and worker tests) and both e2e workflows | Not run. Playwright browsers were not installed. The local Postgres is on 5433, not CI's 5432. The unit exclude-lists for api, worker, and mcp-server did run, and passed. |
 | `bash scripts/freeze-gates.sh` | Not run. It builds the web bundle and is the CI step after the unit tests. |
 | Restoring R2 object `polo-preview/latest.tgz` | The local backup selftest was the drill that ran. The live object was not read. |

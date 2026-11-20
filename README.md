@@ -59,7 +59,7 @@ pnpm --filter @bidstack/shared build
 pnpm db:migrate:deploy
 ```
 
-`pnpm db:migrate` is `prisma migrate dev`. It refuses a non-interactive shell. `pnpm db:seed` loads fixture rows and refuses when `POLO_DATA_MODE=real`. Real mode uses `pnpm db:seed:prod` after the shared package is built.
+`pnpm db:migrate` is `prisma migrate dev`. It refuses a non-interactive shell. Copying `.env.example` leaves demo mode. The real-mode edit, the Vite file (`apps/web/.env.development.local`), and `pnpm db:seed:prod` are in the guide. [Pull request #364](https://github.com/mysticalsin/bidstack-360/pull/364) is what makes real mode the default.
 
 Open:
 - Web: http://localhost:5173
