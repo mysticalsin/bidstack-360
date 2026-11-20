@@ -35,18 +35,6 @@ describe('polo app role boot', () => {
     expect(restoreFailure(0, '')).toBeNull();
     expect(restoreFailure(1, tolerated)).toBeNull();
 
-    // WHY: a substring match treats a line that also carries a real failure
-    // as the public-schema notice. Only that one exact line is harmless.
-    const mixed = `${tolerated}; permission denied for table audit_log`;
-    const both = restoreFailure(1, mixed);
-    expect(both).not.toBeNull();
-    expect(both).toMatch(/permission denied/);
-
-    // WHY: widening the matcher to /already exists/ would hide this.
-    const other = restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  relation "audit_log" already exists');
-    expect(other).toMatch(/^pg_restore failed/);
-    expect(other).toMatch(/relation "audit_log" already exists/);
-
     const missing = restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  role "app_role" does not exist');
     expect(missing).toMatch(/^pg_restore failed/);
     expect(missing).toMatch(/role "app_role" does not exist/);
@@ -54,6 +42,21 @@ describe('polo app role boot', () => {
     const junk = restoreFailure(1, 'pg_restore: error: input file does not appear to be a valid archive');
     expect(junk).toMatch(/^pg_restore failed/);
     expect(junk).toMatch(/valid archive/);
+  });
+
+  it('rejects a public-schema notice that also carries another failure', () => {
+    const tolerated = 'pg_restore: error: could not execute query: ERROR:  schema "public" already exists';
+    // WHY: a substring match treats this whole line as the notice.
+    const mixed = `${tolerated}; permission denied for table audit_log`;
+    expect(restoreFailure(1, mixed)).not.toBeNull();
+    expect(restoreFailure(1, mixed)).toMatch(/permission denied/);
+  });
+
+  it('rejects some other object already existing', () => {
+    // WHY: a matcher widened to /already exists/ would hide this line.
+    const other = restoreFailure(1, 'pg_restore: error: could not execute query: ERROR:  relation "audit_log" already exists');
+    expect(other).not.toBeNull();
+    expect(other).toMatch(/relation "audit_log" already exists/);
   });
 
   it('creates the role before restore and before migrate, and checks pg_restore', () => {
