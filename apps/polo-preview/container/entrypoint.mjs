@@ -15,6 +15,7 @@ import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
+import { ENSURE_APP_ROLE_SQL, restoreFailure } from '../src/database-boot.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
@@ -252,7 +253,22 @@ function stageMigrationsWithoutIndex() {
   return join(staging, 'schema.prisma');
 }
 
+function ensureAppRole() {
+  // Cluster-wide, so a database dump does not contain it. Repeatable: the
+  // role may already exist from this boot's restore or from a previous one.
+  const res = spawnSync(
+    'psql',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'],
+    { encoding: 'utf8', input: ENSURE_APP_ROLE_SQL, stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  if (res.status !== 0) {
+    remember(`${res.stderr || ''}`.split('\n').slice(-20).join('\n'));
+    throw new Error('could not ensure the app role');
+  }
+}
+
 function migrate() {
+  ensureAppRole();
   const decision = decideBootMigration(activeImportDuplicates());
   const plan = planBootMigration(decision);
   for (const row of decision.log) log(`active import precheck org ${row.orgId} count ${row.active}`);
@@ -386,9 +402,22 @@ async function restoreFrom(req) {
   const file = join(dir, 'snapshot.tgz');
   await pipeline(req, createWriteStream(file));
   runSync('tar', ['-xzf', file, '-C', dir]);
-  // The database is fresh on every boot, so restore without --clean. pg_restore
-  // exits 1 on harmless warnings; the row check below is the real verdict.
-  spawnSync('pg_restore', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')], { stdio: 'inherit' });
+  // The database is fresh on every boot, so restore without --clean. app_role
+  // is not in the dump; create it first so the dump's grants apply. Errors
+  // other than the existing public schema fail the boot.
+  ensureAppRole();
+  const restored = spawnSync(
+    'pg_restore',
+    ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  if (restored.stdout) process.stdout.write(restored.stdout);
+  if (restored.stderr) process.stderr.write(restored.stderr);
+  const failure = restoreFailure(restored.status, `${restored.stderr || ''}\n${restored.stdout || ''}`);
+  if (failure) {
+    remember(failure);
+    throw new Error(failure);
+  }
   const orgs = spawnSync('psql', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-tAc', 'SELECT count(*) FROM orgs'], { encoding: 'utf8' });
   if (!(Number(orgs.stdout.trim()) > 0)) throw new Error('restored database has no orgs');
   if (existsSync(join(dir, 'storage'))) {

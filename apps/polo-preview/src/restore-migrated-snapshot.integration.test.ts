@@ -273,22 +273,26 @@ function packSnapshot(dir: string): { tgz: string; orgs: string; audits: string;
   };
 }
 
+function flag(expr: string): string {
+  return `CASE WHEN ${expr} THEN 't' ELSE 'f' END`;
+}
+
 function roleFacts(): string {
   return psqlOwner(
     '5432',
-    `SELECT rolcanlogin::text || '|' || rolsuper::text || '|' || rolcreatedb::text || '|' || rolcreaterole::text || '|' ||
-            has_table_privilege('app_role', 'public.audit_log', 'SELECT')::text || '|' ||
-            has_table_privilege('app_role', 'public.audit_log', 'INSERT')::text || '|' ||
-            has_table_privilege('app_role', 'public.audit_log', 'UPDATE')::text || '|' ||
-            has_table_privilege('app_role', 'public.audit_log', 'DELETE')::text || '|' ||
-            has_table_privilege('app_role', 'public.audit_log', 'TRUNCATE')::text || '|' ||
-            has_table_privilege('app_role', 'public.orgs', 'SELECT')::text || '|' ||
-            has_table_privilege('app_role', 'public.orgs', 'INSERT')::text || '|' ||
-            has_table_privilege('app_role', 'public.orgs', 'UPDATE')::text || '|' ||
-            has_table_privilege('app_role', 'public.orgs', 'DELETE')::text || '|' ||
-            has_schema_privilege('app_role', 'public', 'USAGE')::text || '|' ||
-            has_database_privilege('app_role', current_database(), 'CONNECT')::text || '|' ||
-            has_sequence_privilege('app_role', 'public.audit_log_id_seq', 'USAGE')::text
+    `SELECT ${flag('rolcanlogin')} || '|' || ${flag('rolsuper')} || '|' || ${flag('rolcreatedb')} || '|' || ${flag('rolcreaterole')} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.audit_log', 'SELECT')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.audit_log', 'INSERT')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.audit_log', 'UPDATE')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.audit_log', 'DELETE')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.audit_log', 'TRUNCATE')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.orgs', 'SELECT')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.orgs', 'INSERT')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.orgs', 'UPDATE')")} || '|' ||
+            ${flag("has_table_privilege('app_role', 'public.orgs', 'DELETE')")} || '|' ||
+            ${flag("has_schema_privilege('app_role', 'public', 'USAGE')")} || '|' ||
+            ${flag("has_database_privilege('app_role', current_database(), 'CONNECT')")} || '|' ||
+            ${flag("has_sequence_privilege('app_role', 'public.audit_log_id_seq', 'USAGE')")}
      FROM pg_roles WHERE rolname = 'app_role'`,
   );
 }

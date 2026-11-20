@@ -63,6 +63,13 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-20 BUG: Polo boot ALTER ROLE failed after a database-only restore
+
+- **What went wrong:** Every Polo container boot died in `migrating: after restore` with `could not set the app role password`. The API never reached ready.
+- **Root cause:** `snapshotFile()` dumps one database. `app_role` is a cluster role, so it is not in the dump. `pg_restore` then failed the GRANTs and the exit status was ignored. `_prisma_migrations` already listed the role migrations, so `prisma migrate deploy` did not create the role, and `ALTER ROLE` failed.
+- **Prevention rule:** Before restore and before migrate, create `app_role` idempotently (LOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE). Fail the boot on a `pg_restore` error other than schema public already existing. Prove it with a fresh initdb, a dump made the way `snapshotFile()` does, and the real restore path.
+- **Files affected:** `apps/polo-preview/container/entrypoint.mjs`, `apps/polo-preview/src/database-boot.js`.
+
 ### 2026-11-02 TESTING: Caption fold dropped financials schedule sync and tripped the query guard
 
 - **What went wrong:** #279 Integration failed on `account-financials` (GET left `accountFinancialProfile` null) and `kam-tasks` (GET `/todos` 400). E2E smoke skipped.
