@@ -102,3 +102,69 @@ export function autoMap(
 
   return result;
 }
+
+// One obviously synthetic row per entity so a new workspace can download a
+// file, see the columns, and delete the sample before importing real rows.
+const TEMPLATE_EXAMPLES: Record<ImportEntity, Record<string, string>> = {
+  company: {
+    'company.name': 'Harbor Synthetic',
+    'company.domain': 'harbor-synthetic.example',
+    'company.website': 'https://harbor-synthetic.example',
+    'company.industry': 'consulting',
+    'company.employeeCount': '12',
+    'company.countryCode': 'CA',
+  },
+  contact: {
+    'contact.firstName': 'Avery',
+    'contact.lastName': 'Founder',
+    'contact.name': 'Avery Founder',
+    'contact.email': 'avery.founder@harbor-synthetic.example',
+    'contact.companyName': 'Harbor Synthetic',
+    'contact.title': 'Founder',
+    'contact.phone': '+1-555-0100',
+    'contact.mobile': '+1-555-0101',
+  },
+  lead: {
+    'lead.firstName': 'Avery',
+    'lead.lastName': 'Founder',
+    'lead.email': 'avery.founder@harbor-synthetic.example',
+    'lead.companyName': 'Harbor Synthetic',
+    'lead.status': 'new',
+    'lead.title': 'Founder',
+    'lead.phone': '+1-555-0100',
+    'lead.notes': 'Synthetic example. Delete this row before importing.',
+  },
+  opportunity: {
+    'opportunity.name': 'Harbor Synthetic pilot bid',
+    'opportunity.customer': 'Harbor Synthetic',
+    'opportunity.valueMicros': '120000',
+    'opportunity.stage': 'Lead',
+    'opportunity.probability': '20',
+    'opportunity.closeDate': '2026-12-31',
+  },
+  financial: {
+    'financial.companyName': 'Harbor Synthetic',
+    'financial.periodEnd': '2026-12-31',
+    'financial.currency': 'CAD',
+    'financial.revenue': '1000',
+    'financial.operatingIncome': '100',
+    'financial.netIncome': '80',
+    'financial.periodType': 'FY',
+    'financial.fiscalYear': '2026',
+    'financial.periodStart': '2026-01-01',
+  },
+};
+
+function csvCell(value: string): string {
+  if (/[",\n]/.test(value)) return `"${value.replaceAll('"', '""')}"`;
+  return value;
+}
+
+/** Header labels match TARGET_FIELDS so autoMap fills the wizard without a manual match. */
+export function importTemplateCsv(entity: ImportEntity): string {
+  const fields = TARGET_FIELDS[entity];
+  const examples = TEMPLATE_EXAMPLES[entity];
+  const header = fields.map((field) => csvCell(field.label)).join(',');
+  const row = fields.map((field) => csvCell(examples[field.key] ?? '')).join(',');
+  return `${header}\n${row}\n`;
+}

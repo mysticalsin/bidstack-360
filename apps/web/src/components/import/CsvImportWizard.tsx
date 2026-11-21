@@ -20,6 +20,7 @@ import { parseCsv, type ParsedCsv } from '@/lib/csv-parse';
 import {
   autoMap,
   IMPORT_ENTITIES,
+  importTemplateCsv,
   TARGET_FIELDS,
   type ImportEntity,
 } from '@/lib/import-fields';
@@ -73,6 +74,17 @@ const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
     'The import conflicted with another write.',
   ],
 };
+
+function downloadImportTemplate(entity: ImportEntity): void {
+  const csv = importTemplateCsv(entity);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `polo-${entity}-template.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 function wizardReasonMessage(
   messages: readonly string[],
@@ -266,6 +278,22 @@ export function CsvImportWizard() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => downloadImportTemplate(entity)}
+            >
+              {t('csvImport.upload.downloadTemplate', 'Download a template')}
+            </button>
+            <p className="text-xs text-[var(--fg-tertiary)]">
+              {t(
+                'csvImport.upload.templateHint',
+                'The file has the columns Polo expects and one synthetic example row. Delete that row before you import your own data.',
+              )}
+            </p>
           </div>
 
           <button
