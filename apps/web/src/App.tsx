@@ -30,6 +30,7 @@ import { usePreferences } from '@/stores/preferences';
 import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { useGlobalUndoHotkey } from '@/stores/undoStack';
+import { isShellLessPath } from '@/lib/shell-routes';
 import { AppRoutes } from '@/routes/AppRoutes';
 
 export function App() {
@@ -40,7 +41,7 @@ export function App() {
   useGlobalShortcuts();
   useGlobalUndoHotkey();
   const location = useLocation();
-  const isShellLess = location.pathname === '/login' || location.pathname.startsWith('/sign/');
+  const isShellLess = isShellLessPath(location.pathname);
 
   const { user } = useUser();
   const scopePreferences = usePreferences((s) => s.scopeToUser);
