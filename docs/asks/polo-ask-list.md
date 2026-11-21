@@ -25,15 +25,15 @@ APP-FIT is judged against the apps as they are on `main`, plus the open pull req
 
 | Ask | Status | APP-FIT | Where it lives |
 | --- | --- | --- | --- |
-| P-01 Real mode, demo toggle, install guide | Partial | FIT | [#364](https://github.com/mysticalsin/bidstack-360/pull/364), [#363](https://github.com/mysticalsin/bidstack-360/pull/363), [#367](https://github.com/mysticalsin/bidstack-360/pull/367) |
-| P-02 Analytics Add widget | Partial | FIT | Desktop save persists on `main`. Empty chart is [#355](https://github.com/mysticalsin/bidstack-360/pull/355). Sweep 13 is [#468](https://github.com/mysticalsin/bidstack-360/pull/468), [#469](https://github.com/mysticalsin/bidstack-360/pull/469), [#470](https://github.com/mysticalsin/bidstack-360/pull/470). |
-| P-03 Company revenue, margin, open jobs | Partial | ADAPT | [#67](https://github.com/mysticalsin/bidstack-360/pull/67), [#354](https://github.com/mysticalsin/bidstack-360/pull/354), [#356](https://github.com/mysticalsin/bidstack-360/pull/356). Sweep 09 figures are a synthetic seed, not a live filing. |
-| P-04 Preview container boot | In PR #353 | FIT | [#353](https://github.com/mysticalsin/bidstack-360/pull/353), state machine [#365](https://github.com/mysticalsin/bidstack-360/pull/365) |
+| P-01 Real mode, demo toggle, install guide | In PR #364, #363, #367. Held (needs Tony: which enrichment provider, whether filings are in scope, and whether the free exchange-rate feed stays) | FIT | [#364](https://github.com/mysticalsin/bidstack-360/pull/364), [#363](https://github.com/mysticalsin/bidstack-360/pull/363), [#367](https://github.com/mysticalsin/bidstack-360/pull/367) |
+| P-02 Analytics Add widget | In PR #355, #468, #469, #470 | FIT | Desktop save persists on `main`. Empty chart is [#355](https://github.com/mysticalsin/bidstack-360/pull/355). Sweep 13 is [#468](https://github.com/mysticalsin/bidstack-360/pull/468), [#469](https://github.com/mysticalsin/bidstack-360/pull/469), [#470](https://github.com/mysticalsin/bidstack-360/pull/470). |
+| P-03 Company revenue, margin, open jobs | In PR #67, #354, #356, #491, #492. Held (needs Tony: an approved real filings or enrichment feed) | ADAPT | Figures are a synthetic seed. Leftovers are [#491](https://github.com/mysticalsin/bidstack-360/pull/491) and [#492](https://github.com/mysticalsin/bidstack-360/pull/492). |
+| P-04 Preview container boot | In PR #353, #365. Held (needs Tony: a human deploy of the preview Worker) | FIT | [#353](https://github.com/mysticalsin/bidstack-360/pull/353), [#365](https://github.com/mysticalsin/bidstack-360/pull/365) |
 | P-05 README with clips | In PR #388 | ADAPT | [#388](https://github.com/mysticalsin/bidstack-360/pull/388) |
-| P-06 Floor plan before a new screen | In PR #486 | FIT | [#486](https://github.com/mysticalsin/bidstack-360/pull/486). No owner in #348–#441 before this audit. |
-| P-07 Deep sweeps, physical E2E, stress | Partial | FIT | Twelve sweep docs in open pull requests. None are on `main`. |
-| P-08 Arabic catalogs | Partial | FIT | Catalogs and `isRtl` are on `main`. Finish and the switcher are [#418](https://github.com/mysticalsin/bidstack-360/pull/418). |
-| P-09 Review comments | Partial | FIT | Inventory [#408](https://github.com/mysticalsin/bidstack-360/pull/408). Dockerfile rows are [#409](https://github.com/mysticalsin/bidstack-360/pull/409). Chart rows are [#487](https://github.com/mysticalsin/bidstack-360/pull/487) and [#489](https://github.com/mysticalsin/bidstack-360/pull/489). |
+| P-06 Floor plan before a new screen | In PR #486 | FIT | [#486](https://github.com/mysticalsin/bidstack-360/pull/486) |
+| P-07 Deep sweeps, physical E2E, stress | In PR #403, #410, #391, #397, #399, #441, #457, #425, #456, #446, #483, #472 | FIT | Twelve sweep docs. None are on `main`. |
+| P-08 Arabic catalogs | In PR #418 | FIT | [#418](https://github.com/mysticalsin/bidstack-360/pull/418) |
+| P-09 Review comments | In PR #408, #409, #487, #489. Held (needs Tony: parked #189 and #280, and a currency on Opportunity before #64 converts the pipeline tile) | FIT | Inventory [#408](https://github.com/mysticalsin/bidstack-360/pull/408). Docker [#409](https://github.com/mysticalsin/bidstack-360/pull/409). Charts [#487](https://github.com/mysticalsin/bidstack-360/pull/487), [#489](https://github.com/mysticalsin/bidstack-360/pull/489). |
 
 ## P-01 — Real mode, a demo toggle, and an install guide
 
@@ -124,15 +124,15 @@ That read is a seed fixture. It is not a provider call and not a scrape of a pub
 
 **Needs Tony:** an approved filings or enrichment source, if the tiles should fill from a real feed in real mode. No provider is added here.
 
-### Sweep 09 leftovers still open
+### Sweep 09 leftovers
 
-[#456](https://github.com/mysticalsin/bidstack-360/pull/456) recorded these and did not change them. They are still the code on `main`. They are not the Sweep Sentinel filing. Any fix uses the synthetic sweep seed (year `0001-01-01`, the huge org's bids), not a customer book.
+[#456](https://github.com/mysticalsin/bidstack-360/pull/456) recorded these and did not change them. They are not the Sweep Sentinel filing. The fixes use synthetic seed values only.
 
 | Leftover | APP-FIT | Where |
 | --- | --- | --- |
-| Territories and Service desk empty states are a title and nothing else | FIT | `apps/web/src/pages/territoriesPage/TerritoryPanels.tsx` (`No territories`, and the routing-rules title). `apps/web/src/pages/ServiceDeskPage.tsx` (`No cases yet`). Sweep 09 section 10. |
-| A year-0001 task reads as 739,940 days late | FIT | The seed writes `due_date` `0001-01-01` (`dueDate`, band 9, in `packages/db/scripts/seed-sweep-09.ts`). `apps/web/src/components/task/TaskRow.tsx` renders `Overdue: {{count}}d late` from the day distance. Sweep 09 section 11. |
-| Monthly bars under the hero are still the latest 100 bids | FIT | `apps/web/src/components/dashboard/DashboardVisuals.tsx` sets `months` from `pipelineByCloseMonth(rows)`. Those `rows` are the loaded opportunity page. [#453](https://github.com/mysticalsin/bidstack-360/pull/453) replaced the won-this-year total and left the bars. Sweep 09 section 12. The bars are not labelled as a sample. |
+| Territories and Service desk empty states are a title and nothing else | FIT | In PR [#491](https://github.com/mysticalsin/bidstack-360/pull/491) `cursor/sweep09-empty-and-due-81b9`. Red `35688b3e`. Green `25e1b7b3`. |
+| A year-0001 task reads as 739,940 days late | FIT | Same pull request. `taskDueChip` names the date past ten years. |
+| Monthly bars under the hero are still the latest 100 bids | FIT | In PR [#492](https://github.com/mysticalsin/bidstack-360/pull/492), stacked on [#453](https://github.com/mysticalsin/bidstack-360/pull/453). Red `b3196a22`. Green `afdf2932`. The caption says the bars are the latest 100 bids. |
 
 ## P-04 — Preview container boot failures
 
@@ -224,3 +224,14 @@ Of the 21 unaddressed items, 12 sit on pull requests Tony parked (#189 and #280)
 - Parked #189, including the P0 image `ENV` and the non-root `USER` / `HEALTHCHECK` comments on `apps/polo-preview/Dockerfile` and `Dockerfile.runtime`.
 - Parked #280, including the restore-script comments on `scripts/lib/postgres-client.sh`. #280 also mentions R2, which this run does not touch.
 - A currency column, or another source of truth, before anyone restores EUR conversion on the pipeline tile (#64).
+
+## QA pass, 2026-11-21
+
+Local API on port 4000 and web on port 38081, stub auth, the fixture seed, plus the two new branches merged only in the local checkout (`cursor/qa-pass-81b9`, not pushed). Playwright opened 28 routes at 1280×800. Every document returned HTTP 200. No page error was recorded.
+
+| Check | Result |
+| --- | --- |
+| Territories empty copy | The sentence "Territories group the countries you sell in." was on the page. |
+| Service desk | New case was visible. Saving subject "Synthetic QA case" put that subject on the list. `GET /api/v1/service-cases` returned it. |
+| Hero bars | The page included "latest 100 bids". |
+| Add widget | The button was on screen (x=1109, y=139). Save widget's box was y=1341, below an 800px viewport. After the click, Pre-sales Command Center had 3 widgets (the seed has 2). The row persisted. The off-screen form is the same defect as [#468](https://github.com/mysticalsin/bidstack-360/pull/468). No second fix was opened. |
