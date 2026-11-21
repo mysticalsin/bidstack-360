@@ -52,7 +52,7 @@ export function quarterOf(iso: string): string {
 
 export function stageFunnel(rows: OppRow[]) {
   return OPEN_STAGES.map((id) => {
-    const inStage = rows.filter((o) => !isClosed(o) && stageKey(o.stage) === id);
+    const inStage = rows.filter((o) => stageKey(o.stage) === id);
     return { label: stageText(id), value: inStage.reduce((n, o) => n + (o.value ?? 0), 0), count: inStage.length };
   }).filter((s) => s.count > 0);
 }

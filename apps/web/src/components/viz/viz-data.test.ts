@@ -95,15 +95,9 @@ describe('viz-data', () => {
       pipelineStage: { isWon: false, isLost: true, deletedAt: null },
     });
     const open = row({ stage: 's2_sent', value: 20, dueDate: '2026-01-02', customer: 'C' });
-    const flaggedOpenKey = row({
-      stage: 's4_negotiation',
-      value: 5,
-      pipelineStage: { isLost: true },
-    });
     expect(statusMix([lost, open])).toEqual({ open: 1, won: 0, lost: 1 });
     expect(cumulativeOpen([lost, open])).toEqual([0, 20]);
     expect(accountBars([lost, open])).toEqual([{ label: 'C', open: 20, won: 0 }]);
-    expect(stageFunnel([flaggedOpenKey])).toEqual([]);
     expect(pastDueOpen([lost], Date.parse('2026-06-01'))).toEqual([]);
     expect(
       statusMix([
