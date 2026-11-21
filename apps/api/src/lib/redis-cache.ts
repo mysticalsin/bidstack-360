@@ -6,6 +6,10 @@ import { publish, subscribe } from '../services/realtime.service.js';
 const log = createLogger({ name: 'redis-cache' });
 
 const IN_MEMORY = new Map<string, { value: string; expiresAt: number }>();
+// Bumped on every org invalidation. A read captures it before the handler and
+// refuses to cache the result if it changed, so a fill that started before
+// the mutation cannot land after the mutation has already cleared the key.
+const memoryEpoch = new Map<string, number>();
 
 // Cross-replica invalidation for the per-process IN_MEMORY fallback tier.
 //
@@ -75,6 +79,83 @@ function orgIndexKey(orgId: string): string {
   return `bidstack:cacheidx:${orgId}`;
 }
 
+function epochKey(orgId: string): string {
+  return `bidstack:cacheepoch:${orgId}`;
+}
+
+function bumpMemoryEpoch(orgId: string): void {
+  memoryEpoch.set(orgId, (memoryEpoch.get(orgId) ?? 0) + 1);
+}
+
+/** Epoch observed before a cached read. '0' means this org has never been invalidated. */
+export async function currentCacheEpoch(orgId: string): Promise<string> {
+  try {
+    if (await ensureRedisReady()) {
+      const value = await redis.get(epochKey(orgId));
+      return value ?? '0';
+    }
+  } catch {
+    // Redis unavailable — the in-memory epoch is the source of truth.
+  }
+  return String(memoryEpoch.get(orgId) ?? 0);
+}
+
+async function bumpCacheEpoch(orgId: string): Promise<void> {
+  bumpMemoryEpoch(orgId);
+  try {
+    if (await ensureRedisReady()) {
+      await redis.incr(epochKey(orgId));
+    }
+  } catch {
+    // The memory epoch already moved. A later Redis fill compares that store.
+  }
+}
+
+const CACHE_SET_IF_EPOCH = `
+if (redis.call('GET', KEYS[1]) or '0') ~= ARGV[1] then
+  return 0
+end
+redis.call('SETEX', KEYS[2], tonumber(ARGV[2]), ARGV[3])
+redis.call('SADD', KEYS[3], KEYS[2])
+redis.call('EXPIRE', KEYS[3], tonumber(ARGV[2]) + 60)
+return 1
+`;
+
+/**
+ * Store a cache entry only if the org epoch is still the one the read
+ * captured. The value and the org index are written in one script, so an
+ * invalidation cannot delete the index and then miss this key.
+ */
+export async function cacheSetIfEpoch<T>(
+  key: string,
+  value: T,
+  ttlSeconds: number,
+  orgId: string,
+  epoch: string,
+): Promise<boolean> {
+  const raw = JSON.stringify(value);
+  try {
+    if (await ensureRedisReady()) {
+      const wrote = await redis.eval(
+        CACHE_SET_IF_EPOCH,
+        3,
+        epochKey(orgId),
+        key,
+        orgIndexKey(orgId),
+        epoch,
+        String(ttlSeconds),
+        raw,
+      );
+      return Number(wrote) === 1;
+    }
+  } catch {
+    // Fall through to the in-memory tier.
+  }
+  if (String(memoryEpoch.get(orgId) ?? 0) !== epoch) return false;
+  IN_MEMORY.set(key, { value: raw, expiresAt: Date.now() + ttlSeconds * 1000 });
+  return true;
+}
+
 /**
  * Register a freshly-written cache key under its org's index set so a later
  * mutation can invalidate it without scanning the keyspace. The index set is
@@ -109,6 +190,10 @@ export async function registerOrgCacheKey(
  * the org's entries are dropped.
  */
 export async function invalidateOrgCache(orgId: string): Promise<void> {
+  // Move the epoch before deleting keys. A fill that captured the old epoch
+  // then fails its compare-and-set instead of writing the pre-mutation value
+  // back after this delete.
+  await bumpCacheEpoch(orgId);
   try {
     if (await ensureRedisReady()) {
       const idx = orgIndexKey(orgId);
@@ -155,6 +240,7 @@ if (process.env.NODE_ENV !== 'test') {
   subscribe(INVALIDATION_CHANNEL, (payload) => {
     const data = payload.data as CacheInvalidationMessage | undefined;
     if (!data || typeof data.orgId !== 'string') return;
+    bumpMemoryEpoch(data.orgId);
     deleteInMemory(`bidstack:cache:${data.orgId}:`);
   });
 }

@@ -171,4 +171,53 @@ describe('redisCachePlugin', () => {
     const res3 = await server.inject({ method: 'GET', url: '/test-read' });
     expect(res3.json()).toEqual({ count: 2 });
   });
+
+  it('does not store a read that was in flight when the org cache was invalidated', async () => {
+    const server = Fastify({ logger: false });
+    await server.register(redisCachePlugin, { enabledInTest: true });
+    const orgId = `fill-race-${Date.now()}`;
+    server.addHook('preHandler', async (req) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub: production auth is assigned before route handlers run
+      (req as any).auth = { orgId };
+    });
+
+    let calls = 0;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let markEntered: () => void = () => undefined;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+
+    server.get('/slow-read', async (req) => {
+      return req.cache(
+        async () => {
+          calls += 1;
+          const value = calls;
+          markEntered();
+          await gate;
+          return { value };
+        },
+        { ttlSeconds: 30, tags: ['fill-race'] },
+      );
+    });
+
+    server.post('/mutate', async () => ({ mutated: true }));
+
+    const slow = server.inject({ method: 'GET', url: '/slow-read' });
+    await entered;
+    const mutated = await server.inject({ method: 'POST', url: '/mutate' });
+    expect(mutated.statusCode).toBe(200);
+    release();
+    const first = await slow;
+    expect(first.json()).toEqual({ value: 1 });
+
+    const again = await server.inject({ method: 'GET', url: '/slow-read' });
+    expect(again.json()).toEqual({ value: 2 });
+    expect(calls).toBe(2);
+
+    await server.close();
+  });
 });
