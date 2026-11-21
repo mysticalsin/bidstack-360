@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
   db: 'ok' as 'ok' | 'hang' | 'down',
-  redis: 'ok' as 'ok' | 'hang' | 'down',
+  redis: 'ok' as 'ok' | 'hang' | 'down' | 'slow',
 }));
 
 const never = () => new Promise<never>(() => undefined);
@@ -32,6 +32,7 @@ vi.mock('@bidstack/db', () => ({
 vi.mock('../redis.js', () => ({
   pingRedis: vi.fn(() => {
     if (state.redis === 'hang') return never();
+    if (state.redis === 'slow') return new Promise((resolve) => setTimeout(() => resolve(true), 250));
     return Promise.resolve(state.redis === 'ok');
   }),
 }));
@@ -57,7 +58,16 @@ describe('health probes under dependency outages', () => {
     const server = await app();
     const res = await server.inject({ method: 'GET', url: '/readyz' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ ok: true, db: true, redis: true });
+    expect(res.json()).toMatchObject({
+      ok: true,
+      db: true,
+      redis: true,
+      dependencies: {
+        db: { status: 'connected' },
+        redis: { status: 'connected' },
+      },
+    });
+    expect(res.json().dependencies.redis.latencyMs).toEqual(expect.any(Number));
     await server.close();
   });
 
@@ -75,7 +85,16 @@ describe('health probes under dependency outages', () => {
     const server = await app();
     const res = await server.inject({ method: 'GET', url: '/readyz' });
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toMatchObject({ ok: false, db: true, redis: false });
+    expect(res.json()).toMatchObject({
+      ok: false,
+      db: true,
+      redis: false,
+      dependencies: {
+        db: { status: 'connected' },
+        redis: { status: 'unavailable' },
+      },
+    });
+    expect(res.json().dependencies.redis.latencyMs).toEqual(expect.any(Number));
     await server.close();
   });
 
@@ -109,6 +128,32 @@ describe('health probes under dependency outages', () => {
     const server = await app();
     const res = await server.inject({ method: 'GET', url: '/livez' });
     expect(res.statusCode).toBe(200);
+    await server.close();
+  });
+
+  it('keeps /healthz at 200 while Redis is down', async () => {
+    state.redis = 'down';
+    const server = await app();
+    const started = Date.now();
+    const res = await server.inject({ method: 'GET', url: '/healthz' });
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true });
+    await server.close();
+  });
+
+  it('reports a slow Redis ping as degraded and still ready', async () => {
+    process.env.HEALTH_PROBE_TIMEOUT_MS = '400';
+    state.redis = 'slow';
+    const server = await app();
+    const res = await server.inject({ method: 'GET', url: '/readyz' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      ok: true,
+      redis: true,
+      dependencies: { redis: { status: 'degraded' } },
+    });
+    expect(res.json().dependencies.redis.latencyMs).toBeGreaterThanOrEqual(200);
     await server.close();
   });
 });

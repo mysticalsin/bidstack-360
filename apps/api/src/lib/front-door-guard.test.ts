@@ -10,6 +10,7 @@ async function app(expected: string | undefined) {
   registerFrontDoorGuard(s, expected);
   s.get('/api/v1/ping', async () => ({ ok: true }));
   s.get('/readyz', async () => ({ ok: true }));
+  s.get('/healthz', async () => ({ ok: true }));
   await s.ready();
   return s;
 }
@@ -35,6 +36,7 @@ describe('Front Door origin lock', () => {
   it('exempts platform probes', async () => {
     const s = await app(FDID);
     expect((await s.inject({ url: '/readyz' })).statusCode).toBe(200);
+    expect((await s.inject({ url: '/healthz' })).statusCode).toBe(200);
     await s.close();
   });
 
