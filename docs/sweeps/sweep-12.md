@@ -137,7 +137,8 @@ The sample cell is `Ångström Labs`. The columns are `name`, `email`, and `note
 Stacked on #476. Merge commit `3a870381` brings in the alias branch after it merged #434. #432 owns the unclosed-quote check in this parser.
 
 - PR: https://github.com/mysticalsin/bidstack-360/pull/478
-- Head: `3a87038155253159f07a67d1935e87de002c4405`
+- Parser commit: `8b01a58adcdc36f154b769e2bfa64ad10e9de8c9`
+- Head: `88deb846f895d2179c80b9db174d3de8e1ceb858` (a log commit that landed on this branch by mistake was reverted; the diff against #476 is only the parser)
 
 ![An unclosed quote, already #432](sweep-12/unclosed-quote.png)
 
