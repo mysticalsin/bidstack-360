@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyActivitySummary } from '@/hooks/useCompanyActivitySummary';
+import { formatPlainDateDisplay } from '@/lib/plain-date';
 import { browserTimeZone } from '@/lib/timezone';
 
 const TYPES = [
@@ -23,11 +24,7 @@ const TYPES = [
 const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
 
 const weekLabel = (isoDay: string) =>
-  new Date(`${isoDay}T00:00:00Z`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
+  formatPlainDateDisplay(isoDay, 'en-US', { month: 'short', day: 'numeric' });
 
 function ChartCard({
   icon,

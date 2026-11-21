@@ -1,6 +1,7 @@
 // Pure filter behind the bid drill-down (kept apart from the component so
 // fast refresh works and the logic is unit-testable on its own).
 import { closeDate, oppStatus, stageKey, type OppRow, type OppStatus } from '@/components/viz/viz-data';
+import { civilParts } from '@/lib/plain-date';
 
 export interface OppDrillFilter {
   status?: OppStatus | 'all';
@@ -20,12 +21,15 @@ export function filterOpps(rows: OppRow[], f: OppDrillFilter, q = '', year = new
     if (f.account && (o.customer ?? '').toLowerCase() !== f.account.toLowerCase()) return false;
     if (f.thisYear) {
       const d = closeDate(o);
-      if (!d || new Date(d).getUTCFullYear() !== year) return false;
+      const parts = d ? civilParts(d) : null;
+      if (!parts || parts.year !== year) return false;
     }
     if (f.closeMonth) {
       const d = closeDate(o);
-      const t = d ? new Date(d).getTime() : Number.NaN;
-      if (Number.isNaN(t) || new Date(t).toISOString().slice(0, 7) !== f.closeMonth) return false;
+      const parts = d ? civilParts(d) : null;
+      if (!parts) return false;
+      const key = `${parts.year}-${String(parts.month).padStart(2, '0')}`;
+      if (key !== f.closeMonth) return false;
     }
     if (needle && !`${o.name ?? ''} ${o.customer ?? ''} ${o.code ?? ''}`.toLowerCase().includes(needle)) return false;
     return true;

@@ -18,6 +18,7 @@ import { useHasPermission } from '@/hooks/useCapabilities';
 import { useWhitespace, useWhitespaceDecision } from '@/hooks/useMsaWhitespace';
 import { useUsers } from '@/hooks/useUsers';
 import { fmtDate } from '@/lib/msa/labels';
+import { addPlainDays, todayPlainDate } from '@/lib/plain-date';
 import type { WhitespaceFilters } from '@/lib/msa/whitespace';
 
 const STATES: Array<{ value: NonNullable<WhitespaceFilters['state']>; label: string }> = [
@@ -28,7 +29,8 @@ const STATES: Array<{ value: NonNullable<WhitespaceFilters['state']>; label: str
 ];
 
 function inDays(n: number): string {
-  return new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const today = todayPlainDate();
+  return addPlainDays(today, n) ?? today;
 }
 
 const plain = (v: string) => v.replace(/[\s,]/g, '').toLowerCase();

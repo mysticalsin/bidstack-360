@@ -3,6 +3,7 @@
 import { BID_CRITERIA, BID_THRESHOLDS } from '@bidstack/shared';
 
 import { closeDate, oppStatus, type OppRow } from '@/components/viz/viz-data';
+import { civilParts, daysUntilPlainDate } from '@/lib/plain-date';
 
 /** A closed bid that took longer than this from opening to outcome is flagged. */
 export const SALES_CYCLE_OVERDUE_DAYS = 90;
@@ -31,9 +32,10 @@ export function pipelineByCloseMonth(rows: OppRow[], now = Date.now()) {
   for (const o of rows) {
     const iso = closeDate(o);
     if (!iso) continue;
-    const d = new Date(iso);
-    const idx = d.getUTCFullYear() * 12 + d.getUTCMonth();
-    if (Number.isNaN(idx) || idx < start || idx > end) continue;
+    const parts = civilParts(iso);
+    if (!parts) continue;
+    const idx = parts.year * 12 + (parts.month - 1);
+    if (idx < start || idx > end) continue;
     const b = buckets.get(idx) ?? { won: 0, lost: 0, open: 0, overdue: 0 };
     const v = o.value ?? 0;
     const status = oppStatus(o);
@@ -41,7 +43,11 @@ export function pipelineByCloseMonth(rows: OppRow[], now = Date.now()) {
     else if (status === 'lost') b.lost += v;
     else {
       b.open += v;
-      if (o.dueDate && new Date(o.dueDate).getTime() < now) b.overdue += v;
+      if (o.dueDate) {
+        const days = daysUntilPlainDate(o.dueDate, today);
+        const overdue = days === null ? new Date(o.dueDate).getTime() < now : days < 0;
+        if (overdue) b.overdue += v;
+      }
     }
     buckets.set(idx, b);
   }

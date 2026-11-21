@@ -9,11 +9,17 @@ import { closeMonthLabel } from '@/components/charts/bid-chart-data';
 import { DrillSheet, type DrillCrumb } from './DrillSheet';
 import { filterOpps, type OppDrillFilter } from './filterOpps';
 import { closeDate, fmtCompact, OPEN_STAGES, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
+import { formatPlainDateDisplay, isDateOnlyString } from '@/lib/plain-date';
 
 export type { OppDrillFilter } from './filterOpps';
 
 const STATUS_LABEL: Record<OppStatus | 'all', string> = { all: 'All bids', open: 'Open', won: 'Won', lost: 'Lost' };
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const civilDisplay = { day: 'numeric', month: 'short', year: 'numeric' } as const;
+function formatClose(iso: string): string {
+  if (isDateOnlyString(iso)) return formatPlainDateDisplay(iso, 'en-GB', civilDisplay);
+  return dateFmt.format(new Date(iso));
+}
 
 export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'Dashboard' }: {
   rows: OppRow[];
@@ -124,7 +130,7 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
                     </td>
                     <td>{stageText(stageKey(o.stage))}</td>
                     <td className="num">{fmtCompact(o.value ?? 0)}</td>
-                    <td className="num">{d ? dateFmt.format(new Date(d)) : '–'}</td>
+                    <td className="num">{d ? formatClose(d) : '–'}</td>
                   </tr>
                 );
               })}

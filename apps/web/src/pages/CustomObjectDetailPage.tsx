@@ -23,6 +23,7 @@ import {
 } from '@/hooks/useCustomObjects';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
+import { localPlainDateOfInstant } from '@/lib/plain-date';
 
 /**
  * Coerce the string-backed inline edit value into the JS type the API
@@ -82,7 +83,7 @@ export function CustomObjectDetailPage() {
     const raw = String(values[fieldKey] ?? '');
     // A native date input needs YYYY-MM-DD; trim any stored ISO datetime tail.
     const isDate = fieldsByKey.get(fieldKey)?.fieldType === 'date';
-    setEditValue(isDate ? raw.slice(0, 10) : raw);
+    setEditValue(isDate ? (localPlainDateOfInstant(raw) ?? raw.slice(0, 10)) : raw);
     setEditError(null);
   }
 

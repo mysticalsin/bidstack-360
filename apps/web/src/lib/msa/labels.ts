@@ -1,5 +1,6 @@
 // Plain-language labels and tones for the Agreements screens.
 import type { BadgeTone } from '@/components/ui/Badge';
+import { formatPlainDateDisplay, isDateOnlyString } from '@/lib/plain-date';
 
 import type { MsaKind, MsaStatus } from './types';
 
@@ -15,9 +16,15 @@ export const STATUS_TONE: Record<MsaStatus, BadgeTone> = {
   draft: 'gray', in_negotiation: 'amber', active: 'jade', expired: 'tomato', terminated: 'gray', pending: 'blue',
 };
 
-const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const instantFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const civilDisplay = { day: 'numeric', month: 'short', year: 'numeric' } as const;
 export function fmtDate(iso: string | null | undefined): string {
-  return iso ? dateFmt.format(new Date(iso)) : '–';
+  if (!iso) return '–';
+  if (isDateOnlyString(iso)) {
+    const shown = formatPlainDateDisplay(iso, 'en-GB', civilDisplay);
+    return shown === '—' ? '–' : shown;
+  }
+  return instantFmt.format(new Date(iso));
 }
 
 /** "in 12 days", "today", "3 days ago". */
