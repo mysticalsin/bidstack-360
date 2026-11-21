@@ -1,18 +1,21 @@
 // Why this test exists: a key present in English and missing in French,
-// Spanish, or Italian falls back to English beside translated neighbours.
-// The rail and navigation keys are required. Everything else still missing
-// is listed in locale-gaps.allow.json so a new gap fails CI.
+// Spanish, Italian, or Arabic falls back to English beside translated
+// neighbours. The rail and navigation keys are required in fr, es, and it.
+// Everything else still missing is listed in locale-gaps.allow.json so a
+// new gap fails CI.
 //
-// Arabic is a supported locale and is not part of this comparison. Several
-// of its catalogs are empty. Whether to finish those catalogs or drop Arabic
-// from the supported list is a product question, not a choice this test makes.
+// Arabic stays a supported locale. Its catalogs are unfinished. The `ar`
+// list in locale-gaps.allow.json is that temporary gap. A separate
+// translation PR fills those catalogs. This pull request does not translate
+// Arabic.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-const LOCALES = ['fr', 'es', 'it'] as const;
+const LOCALES = ['fr', 'es', 'it', 'ar'] as const;
+const RAIL_LOCALES = ['fr', 'es', 'it'] as const;
 const RAIL_KEYS = [
   'common:nav.agreements',
   'common:nav.meetings',
@@ -57,15 +60,16 @@ function missingKeys(locale: (typeof LOCALES)[number]): string[] {
   return missing.sort();
 }
 
-describe('fr, es, and it catalogs', () => {
+describe('fr, es, it, and ar catalogs', () => {
   const allow = JSON.parse(readFileSync(ALLOW_PATH, 'utf8')) as {
     fr: string[];
     es: string[];
     it: string[];
+    ar: string[];
   };
 
-  it('include the rail and navigation keys', () => {
-    const missing = LOCALES.flatMap((locale) =>
+  it('include the rail and navigation keys in fr, es, and it', () => {
+    const missing = RAIL_LOCALES.flatMap((locale) =>
       RAIL_KEYS.filter((key) => missingKeys(locale).includes(key)).map((key) => `${locale}:${key}`),
     );
     expect(missing).toEqual([]);
@@ -83,8 +87,10 @@ describe('fr, es, and it catalogs', () => {
       for (const key of allowed) {
         if (!missing.has(key)) stale.push(`${locale}:${key}`);
       }
-      for (const key of RAIL_KEYS) {
-        expect(allowed.has(key), `${locale} allowlist must not excuse ${key}`).toBe(false);
+      if ((RAIL_LOCALES as readonly string[]).includes(locale)) {
+        for (const key of RAIL_KEYS) {
+          expect(allowed.has(key), `${locale} allowlist must not excuse ${key}`).toBe(false);
+        }
       }
     }
     expect(unexpected).toEqual([]);
