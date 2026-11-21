@@ -48,6 +48,7 @@ const MIGRATION_ROW_SENTENCES = new Set([
   'opportunity value is not a number',
   'opportunity value cannot be negative',
   'opportunity value exceeds 1e12',
+  'Could not assign an opportunity code',
 ]);
 
 const MIGRATION_ACCOUNT_FIRST = /^No account named ".+" — import accounts first$/;

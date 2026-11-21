@@ -66,6 +66,9 @@ describe('migration transition table', () => {
     expect(migrationFailureText('opportunity value is not a number')).toBe(
       'opportunity value is not a number',
     );
+    expect(migrationFailureText('Could not assign an opportunity code')).toBe(
+      'Could not assign an opportunity code',
+    );
     expect(migrationFailureText('financial.revenue is not a number')).toBe(
       'financial.revenue is not a number',
     );
