@@ -14,6 +14,8 @@ import { useNotes } from '@/hooks/useNotes';
 import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 
 export function ContactDetailPage() {
@@ -93,7 +95,7 @@ export function ContactDetailPage() {
                   {' · '}
                   <Link
                     to={`/companies?search=${encodeURIComponent(c.customer)}`}
-                    className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+                    className={brandTextLinkClass}
                   >
                     {c.customer}
                   </Link>
@@ -170,7 +172,7 @@ export function ContactDetailPage() {
                 <li key={o.id} className="px-5 py-3">
                   <Link
                     to={`/opportunities/${o.id}`}
-                    className="text-sm font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+                    className={cn(brandTextLinkClass, 'text-sm font-medium')}
                   >
                     {o.code}
                   </Link>

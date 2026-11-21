@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { RfpAnalyticsSection } from '@/components/settings/RfpAnalyticsSection';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export function AdminRfpPage() {
@@ -25,7 +27,7 @@ export function AdminRfpPage() {
         </div>
         <Link
           to="/proposals"
-          className="inline-flex h-11 items-center text-sm font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+          className={cn(brandTextLinkClass, 'inline-flex h-11 items-center text-sm font-medium')}
         >
           {t('adminRfp.viewAllProposals', 'View all proposals')}
         </Link>

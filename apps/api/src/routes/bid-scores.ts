@@ -111,7 +111,9 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: { version: 'desc' },
       });
       if (!row) {
-        return reply.notFound('No bid score found for this opportunity');
+        // No score is the empty state. A 404 shows up as a failed resource
+        // in the browser even when the card treats it as "not scored yet".
+        return reply.code(204).send();
       }
       return serializeBidScore(row);
     },

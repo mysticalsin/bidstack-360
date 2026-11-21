@@ -6,14 +6,21 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError } from '@/lib/api';
-
-vi.mock('@/lib/api', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
-  return { ...actual, api: vi.fn() };
+vi.mock('@/lib/api', () => {
+  class ApiError extends Error {
+    readonly status: number;
+    readonly body: unknown;
+    constructor(message: string, status: number, body: unknown) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.body = body;
+    }
+  }
+  return { api: vi.fn(), ApiError };
 });
 
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import { useBidScoreLatest } from './useBidScore';
 
 function wrapper({ children }: { children: ReactNode }) {

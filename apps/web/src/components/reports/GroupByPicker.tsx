@@ -3,6 +3,7 @@
 import { Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { brandTextLinkClass } from '@/lib/brand-link';
 import { cn } from '@/lib/cn';
 import type { GroupBy, ReportEntityType, TimeBucket } from '@/hooks/useAnalyticsReports';
 import { FieldPicker } from './FieldPicker';
@@ -89,7 +90,7 @@ export function GroupByPicker({ entity, groupBy, onChange }: Props) {
       <button
         onClick={add}
         className={cn(
-          'text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline',
+          cn(brandTextLinkClass, 'text-xs'),
           'focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] rounded px-2',
           'min-h-[44px]',
         )}

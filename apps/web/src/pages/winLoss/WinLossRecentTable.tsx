@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/Card';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useTableSort } from '@/hooks/useTableSort';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { REASON_LABELS } from '@/pages/winLoss/reasonLabels';
 import type { WinLossClosedRow } from '@/pages/winLoss/useWinLossAnalysis';
 
@@ -78,7 +80,7 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
                 <td className="px-4 py-3 align-top">
                   <Link
                     to={`/opportunities/${row.opportunityId}`}
-                    className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+                    className={cn(brandTextLinkClass, 'font-medium')}
                   >
                     {row.name}
                   </Link>

@@ -82,6 +82,11 @@ function MsaReminderRedirect() {
   return <Navigate to={`/agreements/${id ?? ''}${search}`} replace />;
 }
 
+function DashboardIdRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/analytics?id=${encodeURIComponent(id ?? '')}`} replace />;
+}
+
 function CustomObjectDefRedirect() {
   const { id } = useParams();
   return <Navigate to={`/settings/custom-objects/${id ?? ''}`} replace />;
@@ -500,6 +505,9 @@ export function AppRoutes() {
               </RequireAuth>
             }
           />
+          {/* The list opens a dashboard at /analytics?id=. A bare /dashboards/:id
+              used to fall through to the 404. */}
+          <Route path="/dashboards/:id" element={<DashboardIdRedirect />} />
 
           {/* ── Service & Support ────────────────────────────────────────── */}
           <Route

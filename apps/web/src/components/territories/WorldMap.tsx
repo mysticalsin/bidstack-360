@@ -605,24 +605,27 @@ export const WorldMap = memo(function WorldMap({
       {/* Floating Zoom controls */}
       <div className="absolute right-3 top-3 flex flex-col gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 p-1 shadow-[var(--shadow-sm)] backdrop-blur z-10">
         <button
+          type="button"
           onClick={handleZoomIn}
+          aria-label={t('worldMap.zoomIn', 'Zoom In')}
           className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
-          title={t('worldMap.zoomIn', 'Zoom In')}
         >
           <Icon name="plus" size={14} />
         </button>
         <button
+          type="button"
           onClick={handleZoomOut}
+          aria-label={t('worldMap.zoomOut', 'Zoom Out')}
           className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
-          title={t('worldMap.zoomOut', 'Zoom Out')}
         >
           <Icon name="minus" size={14} />
         </button>
         <div className="h-px bg-[var(--border-subtle)] mx-1" />
         <button
+          type="button"
           onClick={handleReset}
+          aria-label={t('worldMap.resetView', 'Reset View')}
           className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)] active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] cursor-pointer"
-          title={t('worldMap.resetView', 'Reset View')}
         >
           <Icon name="refresh" size={12} />
         </button>

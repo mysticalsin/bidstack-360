@@ -12,6 +12,8 @@ import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import {
   useCreateToolkit,
@@ -269,7 +271,7 @@ export function ToolkitStoreSection() {
                       href={t.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+                      className={cn(brandTextLinkClass, 'inline-flex min-h-9 items-center gap-1 text-xs font-medium')}
                     >
                       Open <Icon name="arrow-up-right" size={13} ariaHidden />
                     </a>
