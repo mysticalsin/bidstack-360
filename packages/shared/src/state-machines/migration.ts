@@ -42,6 +42,12 @@ const MIGRATION_ROW_SENTENCES = new Set([
   'financial.currency must be a 3-letter code',
   'financial.periodType must be FY or Q',
   'financial.revenue is required',
+  'financial.revenue is not a number',
+  'financial.operatingIncome is not a number',
+  'financial.netIncome is not a number',
+  'opportunity value is not a number',
+  'opportunity value cannot be negative',
+  'opportunity value exceeds 1e12',
 ]);
 
 const MIGRATION_ACCOUNT_FIRST = /^No account named ".+" — import accounts first$/;
