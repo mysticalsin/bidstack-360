@@ -22,6 +22,7 @@ export const IMPORT_ENTITIES: { value: ImportEntity; label: string }[] = [
 export const TARGET_FIELDS: Record<ImportEntity, TargetField[]> = {
   company: [
     { key: 'company.name', label: 'Name', required: true },
+    { key: 'company.legalName', label: 'Legal name' },
     { key: 'company.domain', label: 'Domain' },
     { key: 'company.website', label: 'Website' },
     { key: 'company.industry', label: 'Industry' },
@@ -41,6 +42,7 @@ export const TARGET_FIELDS: Record<ImportEntity, TargetField[]> = {
   lead: [
     { key: 'lead.firstName', label: 'First name' },
     { key: 'lead.lastName', label: 'Last name' },
+    { key: 'lead.name', label: 'Full name' },
     { key: 'lead.email', label: 'Email' },
     { key: 'lead.companyName', label: 'Company name' },
     { key: 'lead.status', label: 'Status' },
@@ -80,6 +82,19 @@ function headerMatchesField(headerNorm: string, field: TargetField): boolean {
   if (field.key === 'company.name' && headerNorm === 'accountname') return true;
   if (field.key === 'company.employeeCount' && headerNorm === 'employees') return true;
   if (field.key === 'company.countryCode' && headerNorm === 'country') return true;
+  if (field.key === 'opportunity.valueMicros' && (headerNorm === 'valueeur' || headerNorm === 'value')) {
+    return true;
+  }
+  if (field.key === 'opportunity.closeDate' && headerNorm === 'duedate') return true;
+  if ((field.key === 'contact.title' || field.key === 'lead.title') && headerNorm === 'role') {
+    return true;
+  }
+  if (
+    (field.key === 'contact.companyName' || field.key === 'lead.companyName') &&
+    (headerNorm === 'customer' || headerNorm === 'company')
+  ) {
+    return true;
+  }
   return false;
 }
 
