@@ -1,10 +1,10 @@
-// Regression: /win-loss/analysis must FLAG when its scan hits ANALYSIS_SCAN_CAP.
+// Regression: /win-loss/analysis must count every closed record, not the newest 1 000.
 //
-// WHY: the analysis aggregates only the most recent 1 000 closed records. For a
-// high-volume org that silently understates win-rate, quarter trend, and
-// reason/competitor breakdowns — older history is dropped with no signal to the
-// UI. The sibling duplicates scan already returns `truncated`; this pins that
-// win-loss does too, so the retrospective can warn instead of lying by omission.
+// WHY: the analysis used to aggregate one take:1000 page and /patterns counted
+// the whole book, so the retrospective understated win rate once an org passed
+// 1 000 recorded outcomes. The query guard still caps each findMany at 1 000;
+// the route walks the next page. The 1 001st loss is in the total and in the
+// quarter buckets. `truncated` stays false because nothing was dropped.
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect } from 'vitest';
@@ -19,8 +19,7 @@ import {
 } from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
-// One more than the route's ANALYSIS_SCAN_CAP (1 000) so the scan is forced to
-// hit the cap and drop the oldest record.
+// One more than a single findMany page (1 000). The oldest record used to be dropped.
 const OVER_CAP = 1_001;
 
 let server: Awaited<ReturnType<typeof buildServer>>;
@@ -83,14 +82,22 @@ afterAll(async () => {
 const t = makeSkipIfNoDb(() => dbReachable && !!orgId && seeded);
 
 describe('win/loss analysis truncation flag', () => {
-  t('flags truncated=true when the scan hits the record cap', async () => {
+  t('counts the record past the 1000-row page', async () => {
     const res = await server.inject({ method: 'GET', url: '/api/win-loss/analysis' });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { truncated: boolean; totalWon: number; totalLost: number };
-    // More than 1 000 closed records exist, so the scan hit the cap and older
-    // history was dropped — the client MUST be told.
-    expect(body.truncated).toBe(true);
-    // The aggregate reflects exactly the capped scan window, not every record.
-    expect(body.totalWon + body.totalLost).toBe(1_000);
+    const body = res.json() as {
+      truncated: boolean;
+      totalWon: number;
+      totalLost: number;
+      winRatePct: number | null;
+      quarters: Array<{ won: number; lost: number }>;
+    };
+    // A closed-only book of 1 001 losses is a 0% win rate, not a 1 000-row sample.
+    expect(body.truncated).toBe(false);
+    expect(body.totalWon).toBe(0);
+    expect(body.totalLost).toBe(OVER_CAP);
+    expect(body.winRatePct).toBe(0);
+    const bucketSum = body.quarters.reduce((sum, quarter) => sum + quarter.won + quarter.lost, 0);
+    expect(bucketSum).toBe(OVER_CAP);
   });
 });
