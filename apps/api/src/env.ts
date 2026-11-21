@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 import { databaseLogin } from '@bidstack/db';
-import { boot, type RuntimeEnv } from '@bidstack/shared';
 import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
 
 import { parseAllowedUsers } from './lib/allowed-users.js';
+import { bootFromProcess } from './lib/polo-mode.js';
 
 /**
  * Boot-time environment validation.
@@ -499,9 +499,6 @@ export function getEnv(): Env {
     if (!env.DEMO_SESSION_SECRET) {
       semanticErrors.push('DEMO_SESSION_SECRET is required when DEMO_MODE=true');
     }
-    if (env.NODE_ENV === 'production' && env.DEMO_PUBLIC_DEPLOYMENT_ACK !== 'true') {
-      semanticErrors.push('DEMO_MODE=true in production requires DEMO_PUBLIC_DEPLOYMENT_ACK=true');
-    }
   }
   // Flag-gated integrations fail closed: an enabled flag without its
   // credentials would render a section that can only error.
@@ -519,7 +516,9 @@ export function getEnv(): Env {
   if (env.SERUM_DEMO_MODE_ENABLED === 'true' && env.NODE_ENV === 'production') {
     semanticErrors.push('SERUM_DEMO_MODE_ENABLED=true is not allowed in production');
   }
-  const runtimeBoot = boot(env as unknown as RuntimeEnv);
+  // Boot from the raw process, not the zod object. Zod defaults NODE_ENV to
+  // development and drops host signals such as VERCEL_ENV.
+  const runtimeBoot = bootFromProcess(process.env);
   if (!runtimeBoot.ok) semanticErrors.push(runtimeBoot.error);
   if (env.CF_ACCESS_AUTH === 'true') {
     if (!env.POLO_ALLOWED_USERS?.trim()) {

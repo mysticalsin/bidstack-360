@@ -33,6 +33,7 @@ import {
 
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { showsDemoNumbers } from '../lib/runtime-request.js';
+import { firmographicsForMode } from '../lib/sample-reads.js';
 import { enqueueAccountEnrichment } from '../queues/account-enrichment.js';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -216,7 +217,10 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
         prisma.companyJobPosting.count({ where: { orgId: req.auth.orgId, companyId: company.id } }),
       ]);
       const demo = await showsDemoNumbers(req.auth.orgId);
-      const body = toFirmographics(company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date());
+      const body = firmographicsForMode(
+        demo ? 'demo' : 'real',
+        toFirmographics(company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date()),
+      );
       const status = demo || body.status !== 'not_enriched' ? body.status : 'not_connected';
       await audit(req, 'enrichment.view', company.id, { status });
       return { ...body, status };

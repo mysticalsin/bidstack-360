@@ -24,6 +24,7 @@ export default defineConfig({
       // and stub+real refuses to boot.
       POLO_DATA_MODE: 'demo',
       POLO_DEPLOYMENT_ENV: 'local',
+      DATABASE_URL: process.env.DATABASE_URL ?? 'postgresql://bidstack:bidstack@localhost:5432/bidstack_test',
     },
     coverage: {
       provider: 'v8',

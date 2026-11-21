@@ -9,8 +9,9 @@ import {
   infosearchConfigured,
   InfoSearchError,
   notifyInfoSearchActivity,
-  sampleInfoSearchLeads,
 } from '../lib/infosearch-client.js';
+import { infoSearchForMode } from '../lib/sample-reads.js';
+import { showsDemoNumbers } from '../lib/runtime-request.js';
 
 const InfoSearchLeadsResponse = z.object({
   enabled: z.boolean(),
@@ -44,7 +45,8 @@ export const infosearchRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       if (!infosearchConfigured()) {
-        return { enabled: false, preview: true, items: sampleInfoSearchLeads(req.query.account) };
+        const demo = await showsDemoNumbers(req.auth.orgId);
+        return infoSearchForMode(demo ? 'demo' : 'real', req.query.account);
       }
       try {
         const items = await fetchInfoSearchLeads(req.query.account);

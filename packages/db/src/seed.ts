@@ -177,7 +177,7 @@ async function main() {
         industry: o.industry,
         logoUrl: o.logoUrl,
         country: o.country,
-        intel: intelFor(o.code) as Prisma.InputJsonValue,
+        intel: { ...intelFor(o.code), provenance: 'fixture' } as Prisma.InputJsonValue,
       },
       update: {
         name: o.name,
@@ -187,7 +187,7 @@ async function main() {
         dueDate: o.dueDate ? new Date(o.dueDate) : null,
         ownerId,
         country: o.country,
-        intel: intelFor(o.code) as Prisma.InputJsonValue,
+        intel: { ...intelFor(o.code), provenance: 'fixture' } as Prisma.InputJsonValue,
       },
     });
   }
@@ -218,7 +218,10 @@ async function main() {
         annualRevenueMicros: company.annualRevenueMicros,
         confidenceBps: company.confidenceBps,
         sourceAttribution: company.sourceAttribution as Prisma.InputJsonValue,
-        providerMetadata: company.providerMetadata as Prisma.InputJsonValue,
+        providerMetadata: {
+          ...(company.providerMetadata as Record<string, unknown>),
+          provenance: 'fixture',
+        } as Prisma.InputJsonValue,
         cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
       update: {
@@ -233,7 +236,10 @@ async function main() {
         annualRevenueMicros: company.annualRevenueMicros,
         confidenceBps: company.confidenceBps,
         sourceAttribution: company.sourceAttribution as Prisma.InputJsonValue,
-        providerMetadata: company.providerMetadata as Prisma.InputJsonValue,
+        providerMetadata: {
+          ...(company.providerMetadata as Record<string, unknown>),
+          provenance: 'fixture',
+        } as Prisma.InputJsonValue,
         cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });

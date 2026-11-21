@@ -16,7 +16,15 @@
 import { type z } from 'zod';
 
 import { type PrismaClient } from '@bidstack/db';
-import { applyOrgOverride, resolveProcessData, type RuntimeEnv, type AiInsight, type CrmDashboardSnapshot } from '@bidstack/shared';
+import {
+  applyOrgOverride,
+  intelIsFixture,
+  metadataIsFixture,
+  resolveProcessData,
+  type AiInsight,
+  type CrmDashboardSnapshot,
+  type RuntimeEnv,
+} from '@bidstack/shared';
 
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
 import {
@@ -126,6 +134,7 @@ export async function buildDashboardSnapshot(
         updatedAt: true,
         industry: true,
         logoUrl: true,
+        intel: true,
         owner: { select: { name: true, email: true } },
         pipelineStage: {
           select: {
@@ -316,7 +325,7 @@ export async function buildDashboardSnapshot(
     // derived companies so manual edits win and the cockpit resolves by real id.
     prisma.company.findMany({
       where: { orgId, deletedAt: null },
-      select: { id: true, name: true, domain: true, logoUrl: true },
+      select: { id: true, name: true, domain: true, logoUrl: true, source: true },
       take: 500,
     }),
   ]);
@@ -341,7 +350,16 @@ export async function buildDashboardSnapshot(
   } catch {
     // A failed settings read stays hidden. Sample numbers are not the fallback.
   }
-  const companies = buildCompanies(opportunities, enrichments, companyRows, showSamples).filter(
+  const liveOpportunities = showSamples
+    ? opportunities
+    : opportunities.filter((opportunity) => !intelIsFixture(opportunity.intel));
+  const liveEnrichments = showSamples
+    ? enrichments
+    : enrichments.filter((row) => !metadataIsFixture(row.providerMetadata));
+  const liveCompanyRows = showSamples
+    ? companyRows
+    : companyRows.filter((row) => row.source !== 'fixture');
+  const companies = buildCompanies(liveOpportunities, liveEnrichments, liveCompanyRows, showSamples).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
   // A requested account with no opportunity or enrichment yet (new, imported or sparse) still
@@ -350,7 +368,7 @@ export async function buildDashboardSnapshot(
     const sparse = await findSparseAccount(prisma, orgId, accountId, scope);
     if (sparse) companies.push(companyFromRow(sparse));
   }
-  const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
+  const deals = liveOpportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
   const visibleInsights = visibleCompanyKeys
     ? persistedInsights.filter(
@@ -399,7 +417,7 @@ export async function buildDashboardSnapshot(
     cockpit: buildCockpit({
       company: selectedCompany,
       companies,
-      opportunities,
+      opportunities: liveOpportunities,
       contacts,
       tasks,
       risks: riskRows,

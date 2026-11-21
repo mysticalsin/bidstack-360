@@ -64,6 +64,8 @@ export const GUARD_NAMES = [
   'api-key-toggle',
   'provider-not-approved',
   'unknown-deployment',
+  'local-claim-in-production',
+  'demo-door-without-ack',
 ] as const;
 export type GuardName = (typeof GUARD_NAMES)[number];
 

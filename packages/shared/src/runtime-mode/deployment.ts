@@ -11,6 +11,15 @@ const EXPLICIT: Record<string, DeploymentEnv> = {
   production: 'production',
 };
 
+/** A host that is already production, even when NODE_ENV was left unset. */
+export function hasProductionSignal(env: RuntimeEnv): boolean {
+  return (
+    env.NODE_ENV === 'production' ||
+    env.VERCEL_ENV === 'production' ||
+    env.RAILWAY_ENVIRONMENT === 'production'
+  );
+}
+
 function rawDeployment(env: RuntimeEnv): string | undefined {
   const raw = env.POLO_DEPLOYMENT_ENV;
   if (raw === undefined || raw === '') return undefined;
@@ -30,11 +39,17 @@ export function resolveDeployment(env: RuntimeEnv, claimPreview = false): Deploy
   if (raw === 'preview') {
     return { ok: true, deployment: 'preview', explicitPreview: true };
   }
-  if (claimPreview || (raw !== undefined && !(raw in EXPLICIT))) {
+  if (claimPreview || (raw !== undefined && !Object.hasOwn(EXPLICIT, raw))) {
     return refuse(['preview-without-explicit-env']);
   }
-  if (raw === 'local' || raw === 'production') {
-    return { ok: true, deployment: EXPLICIT[raw] ?? 'production', explicitPreview: false };
+  if (raw === 'local' && hasProductionSignal(env)) {
+    return refuse(['local-claim-in-production']);
+  }
+  if (raw === 'production' || hasProductionSignal(env)) {
+    return { ok: true, deployment: 'production', explicitPreview: false };
+  }
+  if (raw === 'local') {
+    return { ok: true, deployment: 'local', explicitPreview: false };
   }
   if (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') {
     return { ok: true, deployment: 'local', explicitPreview: false };

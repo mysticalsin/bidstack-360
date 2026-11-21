@@ -11,7 +11,9 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import { SalesToolkit, SalesToolkitCreate, SalesToolkitList, SalesToolkitPatch } from '@bidstack/shared';
 
-import { fetchLmsCourses, lmsConfigured, LmsError, sampleLmsCourses } from '../lib/lms-360learning.js';
+import { fetchLmsCourses, lmsConfigured, LmsError } from '../lib/lms-360learning.js';
+import { showsDemoNumbers } from '../lib/runtime-request.js';
+import { lmsForMode } from '../lib/sample-reads.js';
 import { fetchSharePointToolkits, SharePointError, sharePointConfigured } from '../lib/sharepoint-graph.js';
 
 const SalesToolkitsResponse = z.object({
@@ -83,7 +85,8 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       if (!lmsConfigured()) {
-        return { enabled: false, preview: true, items: sampleLmsCourses(req.query.sector) };
+        const demo = await showsDemoNumbers(req.auth.orgId);
+        return lmsForMode(demo ? 'demo' : 'real', req.query.sector);
       }
       try {
         const items = await fetchLmsCourses(req.query.sector);

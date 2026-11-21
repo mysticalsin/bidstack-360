@@ -1,6 +1,8 @@
 // MSA API client with a labelled Sample fallback. The fallback triggers only
 // when the server has no /msa routes at all (Fastify "Route … not found" 404),
 // never for a real 404 on a record, a 403 or a 5xx.
+import { admitSample, type DataMode } from '@bidstack/shared';
+
 import { ApiError, api, buildApiUrl, getAuthToken } from '@/lib/api';
 
 import { sampleDetail, sampleList, sampleSummary, sampleTimeline } from './sample';
@@ -19,11 +21,18 @@ export function isMissingRoute(err: unknown): boolean {
   return /^Route \S+ not found/i.test(msg);
 }
 
+let resolvedDataMode: DataMode = 'real';
+
+/** The banner records the server-resolved mode. Sample fallbacks read it here. */
+export function setResolvedDataMode(mode: DataMode): void {
+  resolvedDataMode = mode === 'demo' ? 'demo' : 'real';
+}
+
 async function orSample<T>(live: () => Promise<T>, sample: () => T): Promise<Sampled<T>> {
   try {
     return { data: await live(), sample: false };
   } catch (err) {
-    if (isMissingRoute(err)) return { data: sample(), sample: true };
+    if (isMissingRoute(err) && admitSample(resolvedDataMode)) return { data: sample(), sample: true };
     throw err;
   }
 }

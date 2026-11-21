@@ -10,7 +10,13 @@ vi.mock('@/lib/api', async (orig) => {
 });
 const perm = vi.hoisted(() => ({ write: true }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn((k: string) => (k === 'orgchart:write' ? perm.write : true)) }));
-vi.mock('@/lib/auth', () => ({ useUser: () => ({ user: { fullName: 'Jane Smith' } }) }));
+vi.mock('@/lib/auth', () => ({
+  useUser: () => ({ user: { fullName: 'Jane Smith' } }),
+  useAuth: () => ({ isSignedIn: true }),
+}));
+vi.mock('@/hooks/usePoloIdentity', () => ({
+  usePoloMe: () => ({ data: { dataMode: 'demo' }, isLoading: false, isFetched: true, isError: false }),
+}));
 
 import { ApiError, api } from '@/lib/api';
 import { fakeOrgChartServer } from '@/lib/orgchart/fakeOrgChartServer.testutil';

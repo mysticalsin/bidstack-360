@@ -17,6 +17,10 @@ const ERRORS: Record<GuardName, string> = {
   'provider-not-approved': 'Not connected',
   'unknown-deployment':
     'Deployment environment is not explicit. Set POLO_DEPLOYMENT_ENV to local, preview, or production.',
+  'local-claim-in-production':
+    'POLO_DEPLOYMENT_ENV=local cannot boot when a production signal is set.',
+  'demo-door-without-ack':
+    'DEMO_MODE=true in production requires DEMO_PUBLIC_DEPLOYMENT_ACK=true',
 };
 
 export function refuse(guards: readonly GuardName[], extra?: Partial<Omit<Refusal, 'ok' | 'guard' | 'guards' | 'error'>>): Refusal {

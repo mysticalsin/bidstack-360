@@ -201,10 +201,7 @@ describe('deployment environment', () => {
     refusal(result, 'preview-without-explicit-env');
   });
 
-  it('lets the explicit deployment value win over NODE_ENV', () => {
-    expect(
-      transition('resolve-deployment', { env: { POLO_DEPLOYMENT_ENV: 'local', NODE_ENV: 'production' } }),
-    ).toMatchObject({ ok: true, deployment: 'local' });
+  it('lets an explicit production value win over a development NODE_ENV', () => {
     expect(
       transition('resolve-deployment', { env: { POLO_DEPLOYMENT_ENV: 'production', NODE_ENV: 'development' } }),
     ).toMatchObject({ ok: true, deployment: 'production' });

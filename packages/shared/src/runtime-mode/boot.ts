@@ -6,7 +6,7 @@ import { STUB_LOGIN_BANNER, type AuthMode, type DataMode, type GuardName, type R
 export type BootDecision = { ok: true; mode: RuntimeMode } | Refusal;
 
 function clerkConfigured(env: RuntimeEnv): boolean {
-  return typeof env.CLERK_SECRET_KEY === 'string' && env.CLERK_SECRET_KEY.length > 0;
+  return typeof env.CLERK_SECRET_KEY === 'string' && env.CLERK_SECRET_KEY.trim().length > 0;
 }
 
 function accessConfigured(env: RuntimeEnv): boolean {
@@ -54,6 +54,14 @@ export function boot(env: RuntimeEnv): BootDecision {
   if (door && processData === 'real') guards.push('demo-door-with-real-data');
   if (door && clerk) guards.push('demo-door-with-clerk');
   if (door && access) guards.push('demo-door-with-cf-access');
+  if (
+    door &&
+    deployment.ok &&
+    deployment.deployment === 'production' &&
+    env.DEMO_PUBLIC_DEPLOYMENT_ACK !== 'true'
+  ) {
+    guards.push('demo-door-without-ack');
+  }
 
   const configured = clerk || access;
   if (processData === 'real' && !configured && !door) {

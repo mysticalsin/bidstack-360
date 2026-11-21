@@ -129,6 +129,8 @@ describe('boot environment validation', () => {
   it('requires an explicit acknowledgement before public demo mode can run in production', async () => {
     const productionDemo = {
       NODE_ENV: 'production',
+      POLO_DEPLOYMENT_ENV: 'production',
+      POLO_DATA_MODE: 'demo',
       STORAGE_DRIVER: 'local',
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),

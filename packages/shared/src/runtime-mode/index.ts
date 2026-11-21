@@ -32,6 +32,14 @@ export { resolveProcessData } from './process-data.js';
 export { applyOrgOverride, toggleDemoData } from './org-data.js';
 export { connectProvider, providerApprovalFromEnv } from './providers.js';
 export { isSampleOrFixture, visibleRows } from './rows.js';
+export {
+  FIXTURE_PROVENANCE,
+  admitSample,
+  intelIsFixture,
+  metadataIsFixture,
+  provenanceIsFixture,
+  readSample,
+} from './samples.js';
 export { guardContainerEnv } from './container.js';
 export { transition } from './transition.js';
 

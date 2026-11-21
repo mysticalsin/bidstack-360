@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { usePoloMe, usePoloPublicIdentity, type PoloPublicIdentity } from '@/hooks/usePoloIdentity';
 import { useAuth } from '@/lib/auth';
+import { setResolvedDataMode } from '@/lib/msa/client';
 
 const LAST_MODE_KEY = 'polo:last-data-mode';
 
@@ -36,7 +37,10 @@ export function DataModeBanner() {
   const data = (isSignedIn ? me.data : undefined) ?? identity.data;
   const mode = data?.dataMode;
   useEffect(() => {
-    if (mode) rememberMode(mode);
+    if (mode) {
+      rememberMode(mode);
+      setResolvedDataMode(mode);
+    }
   }, [mode]);
 
   if (!data) {

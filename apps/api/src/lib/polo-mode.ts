@@ -6,7 +6,6 @@ import {
   boot,
   isPublicDemoDoor,
   resolveProcessData,
-  resolveRuntimeMode,
   type RuntimeEnv,
   type RuntimeMode,
 } from '@bidstack/shared';
@@ -35,11 +34,16 @@ export function isDemoAuthEnabled(env: NodeJS.ProcessEnv = process.env): boolean
   return isPublicDemoDoor(asRuntimeEnv(env));
 }
 
+export function bootFromProcess(env: NodeJS.ProcessEnv = process.env) {
+  return boot(asRuntimeEnv(env));
+}
+
 export function resolvePoloAuthProvider(env: NodeJS.ProcessEnv = process.env): PoloAuthProvider {
-  const result = resolveRuntimeMode(asRuntimeEnv(env));
-  if (result.ok && result.mode.publicDemoDoor) return 'demo';
-  if (result.ok && result.mode.auth) return result.mode.auth;
-  return 'stub';
+  const result = bootFromProcess(env);
+  if (!result.ok) throw new Error(result.error);
+  if (result.mode.publicDemoDoor) return 'demo';
+  if (result.mode.auth) return result.mode.auth;
+  throw new Error('Runtime mode resolved without an auth provider.');
 }
 
 export function realOrgClerkId(env: NodeJS.ProcessEnv = process.env): string {
@@ -49,7 +53,7 @@ export function realOrgClerkId(env: NodeJS.ProcessEnv = process.env): string {
 
 /** Boot-time rules. The thrown error is the machine's named guard. */
 export function assertPoloAuthBoot(env: NodeJS.ProcessEnv = process.env): RuntimeMode {
-  const result = boot(asRuntimeEnv(env));
+  const result = bootFromProcess(env);
   if (!result.ok) throw new Error(result.error);
   return result.mode;
 }
