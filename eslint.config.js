@@ -259,6 +259,7 @@ export default tseslint.config(
       'packages/db/src/seed-demo.ts',
       'packages/db/src/seed-prod.ts',
       'packages/db/scripts/purge-demo-data.ts',
+      'packages/db/scripts/seed-sweep-09.ts',
     ],
     rules: {
       'no-console': 'off',

@@ -27,6 +27,7 @@
     "seed:demo": "tsx src/seed-demo.ts",
     "seed:signals": "tsx src/seed-signals.ts",
     "seed:prod": "tsx src/seed-prod.ts",
+    "seed:sweep09": "tsx scripts/seed-sweep-09.ts",
     "purge:demo": "tsx scripts/purge-demo-data.ts",
     "reset": "prisma migrate reset --force",
     "studio": "prisma studio",
