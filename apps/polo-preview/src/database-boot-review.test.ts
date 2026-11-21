@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import * as databaseBoot from './database-boot.js';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const entry = readFileSync(join(here, '../container/entrypoint.mjs'), 'utf8');
 
@@ -42,5 +44,37 @@ describe('database boot review', () => {
     expect(spawn).not.toContain(secret);
     expect(spawn).not.toContain('SCRAM-SHA-256$');
     expect(spawn).not.toMatch(/['"]-c['"]/);
+  });
+
+  it('refuses Ready until the app role gate is verified', () => {
+    // WHY: gate-passed alone reached Ready, so deleting assertAppRoleGate()
+    // still left every unit test green and a disabled trigger could boot.
+    if (typeof databaseBoot.createDatabaseBoot !== 'function') {
+      throw new Error('createDatabaseBoot is not exported');
+    }
+    const boot = databaseBoot.createDatabaseBoot();
+    boot.send({ type: 'cluster-ready', ready: true });
+    boot.send({ type: 'skip-restore', how: 'seed' });
+    boot.send({ type: 'gate-passed', how: 'seed' });
+    expect(boot.state).toBe('Failed');
+    expect(boot.reason).toMatch(/app role gate was not verified/);
+
+    const disabled = databaseBoot.createDatabaseBoot();
+    disabled.send({ type: 'cluster-ready', ready: true });
+    disabled.send({ type: 'skip-restore', how: 'seed' });
+    disabled.send({
+      type: 'app-role-gate',
+      verdict: 'audit trigger disabled: audit_log_append_only',
+    });
+    expect(disabled.state).toBe('Failed');
+    expect(disabled.reason).toMatch(/audit_log_append_only/);
+    expect(disabled.state).not.toBe('Ready');
+
+    const finish = functionBody(entry, 'finishBoot');
+    const gate = functionBody(entry, 'assertAppRoleGate');
+    expect(finish).toContain('assertAppRoleGate()');
+    expect(finish.indexOf('assertAppRoleGate()')).toBeLessThan(finish.indexOf("type: 'gate-passed'"));
+    expect(gate).toContain("type: 'app-role-gate'");
+    expect(finish).toMatch(/to !== 'Ready'/);
   });
 });
