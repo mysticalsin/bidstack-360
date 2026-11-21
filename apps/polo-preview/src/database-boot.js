@@ -134,20 +134,17 @@ function lines(text) {
 // createdb already made schema public. The SQLSTATE alone is any duplicate
 // schema. Any other error, or a zero exit that still printed it, fails the boot.
 export const DUPLICATE_PUBLIC_SCHEMA = 'ERROR:  42P06: schema "public" already exists';
+const PUBLIC_SCHEMA_LINE =
+  'pg_restore: error: could not execute query: ERROR:  42P06: schema "public" already exists';
 
 export function restoreFailure(status, text) {
   const body = String(text || '');
-  const marks = body.split(DUPLICATE_PUBLIC_SCHEMA).length - 1;
   const errors = lines(body).filter((line) => /^pg_restore: error:/i.test(line));
-  if (status === 0 && errors.length === 0 && marks === 0) return null;
-  if (
-    status === 1 &&
-    marks === 1 &&
-    errors.length > 0 &&
-    errors.every((line) => line.includes(DUPLICATE_PUBLIC_SCHEMA))
-  ) {
-    return null;
-  }
+  const exact = errors.filter((line) => line === PUBLIC_SCHEMA_LINE);
+  if (status === 0 && errors.length === 0) return null;
+  // The tolerated notice is that one line and nothing after it. A second
+  // sentence on the same line is a different failure.
+  if (status === 1 && errors.length === 1 && exact.length === 1) return null;
   const sample = (errors.length > 0 ? errors : lines(body)).slice(0, 5).join(' | ').slice(0, 500);
   return `pg_restore failed (${status ?? 'error'})${sample ? `: ${sample}` : ''}`;
 }
