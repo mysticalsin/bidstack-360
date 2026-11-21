@@ -66,7 +66,12 @@ export async function logActivity(input: LogActivityInput) {
   // returns the existing row unchanged (empty update = no-op).
   if (input.idempotencyKey) {
     return prisma.activity.upsert({
-      where: { idempotencyKey: input.idempotencyKey },
+      where: {
+        orgId_idempotencyKey: {
+          orgId: input.orgId,
+          idempotencyKey: input.idempotencyKey,
+        },
+      },
       create: data,
       update: {},
       select: { id: true },
