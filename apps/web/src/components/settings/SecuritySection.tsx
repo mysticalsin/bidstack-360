@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
 
 import { DataResidencySection } from '@/components/settings/DataResidencySection';
+import { displayWorkspaceId } from '@/components/settings/workspace-id';
 
 export function SecuritySection() {
   const { t } = useTranslation('settings');
@@ -16,7 +17,7 @@ export function SecuritySection() {
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
   const ssoDomains = import.meta.env.VITE_SSO_ALLOWED_EMAIL_DOMAINS ?? 'any';
   const microsoftEnabled = import.meta.env.VITE_SSO_MICROSOFT_ENABLED === 'true';
-  const workspaceId = import.meta.env.VITE_BIDSTACK_WORKSPACE_ID ?? 'mantu-presales';
+  const workspaceId = displayWorkspaceId(import.meta.env.VITE_BIDSTACK_WORKSPACE_ID);
 
   return (
     <div className="space-y-6">

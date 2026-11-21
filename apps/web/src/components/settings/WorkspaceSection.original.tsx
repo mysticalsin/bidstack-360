@@ -8,12 +8,13 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
+import { displayWorkspaceId } from '@/components/settings/workspace-id';
 
 export function WorkspaceSection() {
   const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
   const { user } = useUser();
-  const workspaceId = import.meta.env.VITE_BIDSTACK_WORKSPACE_ID ?? 'mantu-presales';
+  const workspaceId = displayWorkspaceId(import.meta.env.VITE_BIDSTACK_WORKSPACE_ID);
   const env = (import.meta.env.MODE ?? 'development').toLowerCase();
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
