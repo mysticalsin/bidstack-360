@@ -29,6 +29,7 @@ import {
   reserveOutboundCommunication,
 } from '../lib/outbound-communication-guard.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 type SmsEntityType = 'CONTACT' | 'LEAD';
 type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
@@ -133,11 +134,34 @@ async function loadCredentials(
  * 4. Persist SmsMessage row (status=QUEUED)
  * 5. Log Activity on the linked entity
  */
+function httpError(statusCode: number, message: string): Error {
+  return Object.assign(new Error(message), { statusCode });
+}
+
+async function assertSmsEntity(
+  orgId: string,
+  entityType: SmsEntityType | undefined,
+  entityId: string | undefined,
+): Promise<void> {
+  if (!entityType && !entityId) return;
+  if (!entityType || !entityId) {
+    throw httpError(400, 'entityType and entityId are both required');
+  }
+  const kind = entityType === 'CONTACT' ? 'contact' : 'lead';
+  if (!(await tenantEntityBelongsToOrg(kind, entityId, orgId))) {
+    throw httpError(404, 'Record not found');
+  }
+}
+
 export async function sendSms(
   params: SendSmsParams,
   log: ServiceLogger,
 ): Promise<{ messageId: string }> {
   const { orgId, userId, toNumber, body, entityType, entityId } = params;
+
+  // The contact or lead is a global id. Reject another org before consent,
+  // SERUM, or Twilio, and before any row is written.
+  await assertSmsEntity(orgId, entityType, entityId);
 
   // Step 2: Consent check
   const consent = await prisma.smsConsent.findUnique({
@@ -170,17 +194,29 @@ export async function sendSms(
   );
 
   let providerAccepted = false;
-  let tokenId: string;
-  let fromNumber: string;
-  let twilioMsg: { sid: string; num_segments: string };
+  let messageId: string | null = null;
   try {
-    // Step 1: Load credentials
+    // Credentials first so the row can name this token before Twilio answers.
     const credentials = await loadCredentials(orgId);
-    const { accountSid, authToken } = credentials;
-    tokenId = credentials.tokenId;
-    fromNumber = credentials.fromNumber;
+    const { accountSid, authToken, tokenId, fromNumber } = credentials;
 
-    // Step 3: POST to Twilio
+    const created = await prisma.smsMessage.create({
+      data: {
+        orgId,
+        userId,
+        integrationTokenId: tokenId,
+        fromNumber,
+        toNumber,
+        body,
+        status: 'QUEUED',
+        segments: estimatedSegments,
+        entityType: entityType ?? null,
+        entityId: entityId ?? null,
+      },
+      select: { id: true },
+    });
+    messageId = created.id;
+
     const formBody = new URLSearchParams({
       From: fromNumber,
       To: toNumber,
@@ -207,37 +243,35 @@ export async function sendSms(
     if (!response.ok) {
       const err = await response.text();
       log.warn({ toNumber, status: response.status, err }, 'Twilio send failed');
+      await prisma.smsMessage.update({
+        where: { id: created.id },
+        data: { status: 'FAILED' },
+      });
       throw new Error(`Twilio API error ${response.status}: ${err}`);
     }
 
-    twilioMsg = (await response.json()) as { sid: string; num_segments: string };
+    const twilioMsg = (await response.json()) as { sid: string; num_segments: string };
+    await prisma.smsMessage.update({
+      where: { id: created.id },
+      data: {
+        twilioSid: twilioMsg.sid,
+        segments: parseInt(twilioMsg.num_segments ?? '1', 10),
+        sentAt: new Date(),
+      },
+    });
     providerAccepted = true;
   } catch (err) {
+    if (messageId && !providerAccepted) {
+      await prisma.smsMessage
+        .update({ where: { id: messageId }, data: { status: 'FAILED' } })
+        .catch((updateErr: unknown) => log.warn({ err: updateErr }, 'Failed to mark SMS failed'));
+    }
     if (!providerAccepted) await reservation.rollback();
     throw err;
   }
 
-  // Step 4: Persist SmsMessage
-  const msg = await prisma.smsMessage.create({
-    data: {
-      orgId,
-      userId,
-      integrationTokenId: tokenId,
-      fromNumber,
-      toNumber,
-      body,
-      status: 'QUEUED',
-      twilioSid: twilioMsg.sid,
-      segments: parseInt(twilioMsg.num_segments ?? '1', 10),
-      sentAt: new Date(),
-      entityType: entityType ?? null,
-      entityId: entityId ?? null,
-    },
-    select: { id: true },
-  });
-
   // Step 5: Log Activity (best-effort; don't fail send on activity error)
-  if (entityId && entityType) {
+  if (entityId && entityType && messageId) {
     await prisma.activity
       .create({
         data: {
@@ -253,8 +287,8 @@ export async function sendSms(
       .catch((err: unknown) => log.warn({ err }, 'Failed to log SMS activity'));
   }
 
-  log.info({ messageId: msg.id, twilioSid: twilioMsg.sid, toNumber }, 'SMS queued via Twilio');
-  return { messageId: msg.id };
+  log.info({ messageId, toNumber }, 'SMS queued via Twilio');
+  return { messageId: messageId! };
 }
 
 export async function testTwilioConnection(
