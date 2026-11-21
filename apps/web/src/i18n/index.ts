@@ -53,6 +53,15 @@ export function isRtl(locale: string): boolean {
   return RTL_LOCALES.has(locale as SupportedLocale);
 }
 
+/** Set <html lang> and dir before paint consumers read them. Arabic is rtl. */
+export function applyDocumentLocale(locale: string | null | undefined): void {
+  if (typeof document === 'undefined') return;
+  const base = (locale ?? DEFAULT_LOCALE).split('-')[0] ?? DEFAULT_LOCALE;
+  const next = isSupportedLocale(base) ? base : DEFAULT_LOCALE;
+  document.documentElement.lang = next;
+  document.documentElement.dir = isRtl(next) ? 'rtl' : 'ltr';
+}
+
 // Test environments preload synchronous resources via init() to avoid the
 // network-backend's lazy-load races inside Vitest. Production / dev fetch
 // from /locales/{lng}/{ns}.json.
@@ -106,5 +115,12 @@ void i18nPipeline
       useSuspense: false,
     },
   });
+
+// The pre-paint script in index.html sets dir from the stored locale. This
+// keeps it in sync when detection or the language switcher changes language.
+i18n.on('languageChanged', (lng: string) => {
+  applyDocumentLocale(lng);
+});
+applyDocumentLocale(i18n.resolvedLanguage ?? i18n.language);
 
 export { i18n };

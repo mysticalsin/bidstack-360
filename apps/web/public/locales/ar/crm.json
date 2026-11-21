@@ -1,5 +1,1186 @@
 {
+  "entities": {
+    "account": "حساب",
+    "accounts": "الحسابات",
+    "company": "شركة",
+    "companies": "الشركات",
+    "contact": "جهة اتصال",
+    "contacts": "جهات الاتصال",
+    "opportunity": "فرصة",
+    "opportunities": "الفرص",
+    "lead": "عميل محتمل",
+    "leads": "العملاء المحتملون",
+    "task": "مهمة",
+    "tasks": "المهام",
+    "invoice": "فاتورة",
+    "invoices": "الفواتير",
+    "product": "منتج",
+    "products": "المنتجات",
+    "territory": "منطقة",
+    "territories": "المناطق"
+  },
+  "stages": {
+    "qualifying": "التأهيل",
+    "discovery": "الاستكشاف",
+    "proposal": "عرض",
+    "negotiation": "التفاوض",
+    "closedWon": "مغلقة بفوز",
+    "closedLost": "مغلقة بخسارة"
+  },
+  "kpi": {
+    "openBids": "العطاءات المفتوحة",
+    "overdueTasks": "المهام المتأخرة",
+    "weightedPipeline": "مسار الفرص المرجّح",
+    "winRate": "معدل الفوز",
+    "averageDealSize": "متوسط حجم الصفقة",
+    "newThisWeek": "جديد هذا الأسبوع",
+    "deltaPeriodDefault": "مقارنة بالفترة السابقة",
+    "loadingAriaLabel": "جارٍ تحميل KPI",
+    "valueAriaLabel": "{{title}}: {{value}}",
+    "trendUpAriaLabel": "صعود",
+    "trendDownAriaLabel": "هبوط",
+    "trendFlatAriaLabel": "ثبات"
+  },
+  "fields": {
+    "name": "الاسم",
+    "subject": "الموضوع",
+    "stage": "المرحلة",
+    "amount": "المبلغ",
+    "currency": "العملة",
+    "closeDate": "تاريخ الإغلاق",
+    "owner": "المالك",
+    "createdAt": "أُنشئ",
+    "updatedAt": "حُدِّث",
+    "dueDate": "تاريخ الاستحقاق",
+    "status": "الحالة",
+    "priority": "الأولوية",
+    "heading": "الحقول",
+    "addFieldButton": "+ إضافة حقل",
+    "systemFieldsLabel": "حقول النظام:",
+    "errorKeyLabelRequired": "مفتاح الحقل والتسمية مطلوبان.",
+    "errorAddFailed": "تعذّرت إضافة الحقل",
+    "fieldKeyLabel": "مفتاح الحقل",
+    "fieldKeyPlaceholder": "مثال: budget",
+    "labelLabel": "التسمية",
+    "labelPlaceholder": "مثال: الميزانية",
+    "typeLabel": "النوع",
+    "requiredCheckbox": "مطلوب",
+    "cancelButton": "إلغاء",
+    "addingButton": "جارٍ الإضافة…",
+    "addButton": "إضافة",
+    "loading": "جارٍ تحميل الحقول…",
+    "loadError": "تعذّر تحميل الحقول. يُرجى إعادة المحاولة.",
+    "empty": "لا توجد حقول مخصصة بعد. يُستخدم \"إضافة حقل\" أعلاه لإنشاء الحقل الأول.",
+    "requiredBadge": "مطلوب"
+  },
+  "detail": {
+    "opportunity": "تفاصيل الفرصة",
+    "contact": "تفاصيل جهة الاتصال",
+    "lead": "تفاصيل العميل المحتمل",
+    "company": "تفاصيل الشركة",
+    "task": "تفاصيل المهمة",
+    "invoice": "تفاصيل الفاتورة",
+    "serviceCase": "تفاصيل حالة مكتب الخدمة",
+    "account": "الحساب: {{name}}"
+  },
+  "empty": {
+    "opportunities": "لا توجد فرص بعد",
+    "contacts": "لا توجد جهات اتصال بعد",
+    "tasks": "لا توجد مهام بعد",
+    "leads": "لا يوجد عملاء محتملون بعد",
+    "companies": "لا توجد شركات بعد",
+    "ctaCreate": "إنشاء أول {{entity}}"
+  },
+  "opportunities": {
+    "toast": {
+      "movedOne": "تم نقل {{count}} فرصة",
+      "movedMany": "تم نقل {{count}} فرص",
+      "updatesFailedOne": "تعذّر {{count}} تحديث",
+      "updatesFailedMany": "تعذّر {{count}} تحديثات",
+      "updatesFailedDescription": "ثُبِّتت عمليات النقل الناجحة؛ أعد المحاولة للبقية.",
+      "deletedOne": "تم حذف {{count}} فرصة",
+      "deletedMany": "تم حذف {{count}} فرص",
+      "deletesFailedOne": "تعذّر {{count}} حذف",
+      "deletesFailedMany": "تعذّر {{count}} عمليات حذف",
+      "exportComplete": "اكتمل التصدير",
+      "exportFailed": "تعذّر التصدير",
+      "exportFailedDescription": "أعد المحاولة بعد لحظات."
+    },
+    "confirmDelete": {
+      "titleOne": "حذف {{count}} فرصة؟",
+      "titleMany": "حذف {{count}} فرص؟",
+      "description": "لا يمكن التراجع عن هذا من الواجهة — يسجّل سجل التدقيق كل عملية حذف.",
+      "confirmLabel": "حذف"
+    },
+    "liveRegion": {
+      "matchingOne": "{{count}} فرصة مطابقة لـ \"{{search}}\"",
+      "matchingMany": "{{count}} فرص مطابقة لـ \"{{search}}\"",
+      "inStageOne": "{{count}} فرصة في المرحلة المحددة",
+      "inStageMany": "{{count}} فرص في المرحلة المحددة",
+      "totalOne": "{{count}} فرصة",
+      "totalMany": "{{count}} فرص"
+    },
+    "error": {
+      "title": "تعذّر تحميل الفرص",
+      "message": "أعد المحاولة بعد لحظات."
+    },
+    "empty": {
+      "title": "لا توجد فرص بعد",
+      "message": "تُنشأ أول فرصة لبدء تتبّع العطاءات."
+    },
+    "caption": {
+      "matching": "الفرص المطابقة لـ \"{{search}}\"",
+      "all": "كل الفرص، مرتّبة حسب أحدث نشاط. الخلايا قابلة للتعديل مباشرة."
+    },
+    "pagerLabel": "فرص"
+  },
+  "leads": {
+    "title": "العملاء المحتملون",
+    "actions": {
+      "exportCsv": "تصدير CSV",
+      "newLead": "عميل محتمل جديد"
+    },
+    "search": {
+      "label": "بحث في العملاء المحتملين",
+      "placeholder": "بحث في العملاء المحتملين…"
+    },
+    "filter": {
+      "status": "تصفية العملاء المحتملين حسب الحالة",
+      "priority": "تصفية العملاء المحتملين حسب الأولوية"
+    },
+    "statusOption": {
+      "all": "كل الحالات",
+      "new": "جديد",
+      "contacted": "تم التواصل",
+      "qualified": "مؤهَّل",
+      "nurture": "رعاية",
+      "disqualified": "غير مؤهَّل",
+      "converted": "محوَّل"
+    },
+    "priorityOption": {
+      "all": "كل الأولويات",
+      "low": "منخفضة",
+      "medium": "متوسطة",
+      "high": "مرتفعة",
+      "critical": "حرجة"
+    },
+    "summary": {
+      "label": "ملخص قائمة العملاء المحتملين"
+    },
+    "stats": {
+      "filtered": {
+        "label": "العملاء المحتملون المُصفَّون",
+        "detail": "العرض الحالي"
+      },
+      "highPriority": {
+        "label": "أولوية مرتفعة",
+        "detail": "مرتفعة أو حرجة"
+      },
+      "pipelineReady": {
+        "label": "جاهز لمسار الفرص",
+        "detail": "مؤهَّل أو محوَّل"
+      },
+      "avgScore": {
+        "label": "متوسط الدرجة",
+        "detail": "درجة الملاءمة"
+      }
+    },
+    "liveRegion": {
+      "count": "{{count}} عميل محتمل",
+      "matching": " مطابقة لـ \"{{query}}\""
+    },
+    "error": {
+      "title": "تعذّر تحميل العملاء المحتملين",
+      "message": "حدث خطأ ما",
+      "retry": "إعادة المحاولة"
+    },
+    "empty": {
+      "title": "لا يوجد عملاء محتملون بعد",
+      "message": "أنشئ أول عميل محتمل لبدء تتبّع العملاء المرتقبين."
+    },
+    "table": {
+      "selectAll": "تحديد الكل",
+      "deselectAll": "إلغاء تحديد الكل",
+      "name": "الاسم",
+      "company": "الشركة",
+      "status": "الحالة",
+      "priority": "الأولوية",
+      "score": "الدرجة",
+      "source": "المصدر",
+      "owner": "المالك",
+      "actions": "الإجراءات"
+    },
+    "pager": {
+      "label": "عملاء محتملون"
+    },
+    "csv": {
+      "name": "الاسم",
+      "company": "الشركة",
+      "title": "العنوان",
+      "email": "البريد الإلكتروني",
+      "status": "الحالة",
+      "priority": "الأولوية",
+      "score": "الدرجة",
+      "scoreRange": "الدرجة (0-100)",
+      "source": "المصدر",
+      "created": "تاريخ الإنشاء"
+    },
+    "toast": {
+      "nothingToExport": "لا شيء للتصدير",
+      "exported": "تم تصدير {{count}} عميل محتمل",
+      "deleted": "تم حذف {{count}} عميل محتمل",
+      "deleteFailed": "تعذّر حذف {{count}}",
+      "leadDeleted": "تم حذف العميل المحتمل",
+      "deleteOneFailed": "تعذّر حذف العميل المحتمل"
+    },
+    "bulkDelete": {
+      "title": "حذف {{count}} عميل محتمل؟",
+      "description": "لا يمكن التراجع عن هذا الإجراء.",
+      "confirm": "حذف"
+    },
+    "deleteOne": {
+      "title": "حذف العميل المحتمل؟",
+      "description": "ستُزال {{name}} نهائيًا من العملاء المحتملين.",
+      "confirm": "حذف"
+    }
+  },
+  "tasks": {
+    "title": "المهام",
+    "subtitle": "{{count}} متابعات نشطة.",
+    "actions": {
+      "exportCsv": "تصدير CSV"
+    },
+    "filters": {
+      "groupLabel": "تصفية المهام",
+      "all": "الكل",
+      "today": "اليوم",
+      "overdue": "متأخر"
+    },
+    "status": {
+      "open": "مفتوحة",
+      "in_progress": "قيد التنفيذ",
+      "blocked": "محظورة",
+      "done": "تم"
+    },
+    "view": {
+      "list": "قائمة",
+      "listLabel": "عرض القائمة",
+      "calendar": "التقويم",
+      "calendarLabel": "عرض التقويم"
+    },
+    "sort": {
+      "label": "ترتيب حسب",
+      "ariaLabel": "ترتيب المهام",
+      "recent": "الأحدث",
+      "dueDate": "تاريخ الاستحقاق",
+      "status": "الحالة"
+    },
+    "error": {
+      "title": "تعذّر تحميل المهام",
+      "generic": "حدث خطأ ما"
+    },
+    "empty": {
+      "title": "لا توجد مهام بعد",
+      "filteredTitle": "لا توجد مهام مطابقة لعامل التصفية هذا",
+      "message": "يمكن البدء بإنشاء متابعة."
+    },
+    "reorder": {
+      "announce": "نُقل {{title}} إلى الموضع {{position}} من {{total}}."
+    },
+    "srCount": "{{count}} مهمة"
+  },
+  "contacts": {
+    "title": "جهات الاتصال",
+    "subtitle": "{{count}} أشخاص في وحدة القرار.",
+    "actions": {
+      "importCsv": {
+        "label": "استيراد CSV",
+        "aria": "استيراد جهات الاتصال من CSV"
+      },
+      "exportCsv": {
+        "label": "تصدير CSV",
+        "aria": "تصدير كل جهات الاتصال الظاهرة بتنسيق CSV"
+      },
+      "newContact": {
+        "label": "جهة اتصال جديدة",
+        "aria": "إنشاء جهة اتصال جديدة"
+      },
+      "delete": "حذف",
+      "undo": "تراجع"
+    },
+    "search": {
+      "placeholder": "بحث بالاسم أو العميل أو الدور…",
+      "aria": "بحث في جهات الاتصال",
+      "clear": {
+        "aria": "مسح البحث"
+      }
+    },
+    "pager": {
+      "label": "جهات اتصال"
+    },
+    "column": {
+      "name": "الاسم",
+      "role": "الدور",
+      "customer": "العميل",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "influence": "التأثير",
+      "sentiment": "الانطباع",
+      "createdAt": "تاريخ الإنشاء"
+    },
+    "bulkDelete": {
+      "confirm": {
+        "title": "حذف {{count}} جهات اتصال؟",
+        "description": "ستُزال من أي عطاءات مرتبطة. يسجّل سجل التدقيق كل عملية حذف."
+      }
+    },
+    "delete": {
+      "confirm": {
+        "title": "حذف {{name}}؟",
+        "description": "تُزال أيضًا من أي عطاءات مرتبطة. يحتفظ سجل التدقيق بسجل."
+      }
+    },
+    "toast": {
+      "restoredCount": "تمت استعادة {{count}} جهات اتصال",
+      "deletedCount": "تم حذف {{count}} جهات اتصال",
+      "deleteFailedCount": {
+        "description": "ثُبِّتت عمليات الحذف الناجحة؛ أعد المحاولة للبقية."
+      },
+      "nothingToExport": "لا يوجد ما يُصدَّر",
+      "exportedCount": "تم تصدير {{count}} جهات اتصال",
+      "restored": "تمت استعادة {{name}}",
+      "couldNotRestore": "تعذّرت الاستعادة",
+      "deleted": "تم حذف {{name}}",
+      "deleteFailed": "تعذّر الحذف",
+      "serverRejected": "رفض الخادم الطلب."
+    },
+    "undo": {
+      "deletedCount": "تم حذف {{count}} جهات اتصال",
+      "deleted": "تم حذف {{name}}"
+    },
+    "linkedTitle": "جهات الاتصال المرتبطة",
+    "countCaption": "{{count}} جهات اتصال",
+    "linkAction": "+ ربط جهة اتصال",
+    "selectPlaceholder": "تحديد جهة اتصال…",
+    "cancel": "إلغاء",
+    "emptyTitle": "لا توجد جهات اتصال مرتبطة",
+    "emptyMessage": "تُربط جهات الاتصال لتتبّع المشاركين في هذه الصفقة.",
+    "primaryBadge": "أساسي",
+    "noEmail": "بلا بريد إلكتروني",
+    "unsetPrimary": "إلغاء التعيين كأساسي",
+    "setPrimary": "تعيين كأساسي",
+    "unlinkConfirm": "إلغاء ربط {{name}}؟",
+    "remove": "إزالة"
+  },
+  "accounts": {
+    "title": "الحسابات",
+    "error": {
+      "title": "تعذّر تحميل الحسابات",
+      "message": "لم تستجب نقطة نهاية لوحة المعلومات."
+    },
+    "empty": {
+      "title": "لا توجد حسابات بعد",
+      "body": "يُضاف أول حساب، أو يُزامَن كبار عملاء ERP أعلاه — وتُملأ إشارات مسار الفرص والسلامة والتقنية تلقائيًا.",
+      "importCsv": "أو استيراد الحسابات من CSV",
+      "filtered": "لا توجد حسابات تطابق عوامل التصفية"
+    },
+    "summary": {
+      "companyCount_one": "{{count}} شركة",
+      "companyCount_other": "{{count}} شركة",
+      "openDeals": "{{count}} صفقات مفتوحة",
+      "weightedPipeline": "{{amount}} مسار فرص مرجّح",
+      "companyCount_zero": "{{count}} شركات",
+      "companyCount_two": "{{count}} شركتان",
+      "companyCount_few": "{{count}} شركات",
+      "companyCount_many": "{{count}} شركة"
+    },
+    "sync": {
+      "result": "{{enriched}} مُثراة / {{cached}} مخزّنة مؤقتًا",
+      "buttonTitle": "مزامنة كبار عملاء sale.order في ERP إلى حسابات Polo PreSales المُحقَّقة",
+      "inProgress": "جارٍ المزامنة…",
+      "button": "مزامنة حسابات ERP",
+      "errorTitle": "فشلت مزامنة حسابات ERP",
+      "errorDescription": "تعذّر إكمال آخر سحب لعملاء ERP.",
+      "alertFallback": "تعذّر سحب كبار عملاء ERP في آخر مزامنة.",
+      "retry": "إعادة محاولة المزامنة"
+    },
+    "actions": {
+      "newAccount": "حساب جديد",
+      "retry": "إعادة المحاولة"
+    },
+    "stats": {
+      "regionLabel": "تغطية مصادر الحسابات",
+      "accounts": {
+        "label": "الحسابات",
+        "detail": "المحفظة"
+      },
+      "openDeals": {
+        "label": "صفقات مفتوحة",
+        "detail": "مسار فرص CRM الخارجي"
+      },
+      "weightedPipeline": {
+        "label": "مسار الفرص المرجّح",
+        "detail": "العطاء وما قبل البيع"
+      },
+      "logoCoverage": {
+        "label": "تغطية الشعارات",
+        "detail": "أصول العلامة"
+      },
+      "enrichedProfiles": {
+        "label": "الملفات المُثراة",
+        "detail": "ذاكرة البيانات المُحقَّقة"
+      },
+      "sourcesHealthy": {
+        "label": "المصادر السليمة",
+        "detail": "شبكة API"
+      }
+    },
+    "filters": {
+      "regionLabel": "عوامل التصفية",
+      "search": {
+        "label": "بحث",
+        "placeholder": "بحث بالاسم أو النطاق…"
+      },
+      "industry": {
+        "label": "القطاع",
+        "all": "كل القطاعات"
+      },
+      "sort": {
+        "label": "فرز",
+        "pipeline": "فرز: قيمة مسار الفرص",
+        "name": "فرز: الاسم",
+        "health": "فرز: السلامة",
+        "industry": "فرز: القطاع"
+      }
+    },
+    "liveRegion": {
+      "count_one": "{{count}} حساب",
+      "count_other": "{{count}} حساب",
+      "matching_one": "{{count}} حساب يطابق \"{{query}}\"",
+      "matching_other": "{{count}} حساب يطابق \"{{query}}\"",
+      "count_zero": "{{count}} حسابات",
+      "count_two": "{{count}} حسابان",
+      "count_few": "{{count}} حسابات",
+      "count_many": "{{count}} حساب",
+      "matching_zero": "{{count}} حسابات تطابق \"{{query}}\"",
+      "matching_two": "{{count}} حسابان يطابقان \"{{query}}\"",
+      "matching_few": "{{count}} حسابات تطابق \"{{query}}\"",
+      "matching_many": "{{count}} حساب يطابق \"{{query}}\""
+    },
+    "grid": {
+      "regionLabel": "بطاقات الحسابات"
+    },
+    "paginationLabel": "الحسابات"
+  },
+  "publicSign": {
+    "announceWelcome": "الخطوة 1: مراجعة المستند",
+    "announceSign": "الخطوة 2: التوقيع",
+    "announceSubmit": "الخطوة 3: المراجعة والإرسال",
+    "announceConfirm": "تم إرسال التوقيع بنجاح",
+    "errorDrawOrType": "يُرجى رسم التوقيع أو كتابته قبل المتابعة.",
+    "errorTypeName": "يُرجى كتابة الاسم لإنشاء توقيع.",
+    "errorAcceptTerms": "يجب قبول الشروط للمتابعة.",
+    "errorSignatureMissing": "التوقيع غير موجود. يُرجى الرجوع والتوقيع مرة أخرى.",
+    "signerFallback": "الموقّع",
+    "errorSubmitFailed": "تعذّر الإرسال. يُرجى إعادة المحاولة.",
+    "skipToMain": "تخطي إلى المحتوى الرئيسي",
+    "brandSecureSignature": "توقيع آمن",
+    "mainAriaLabel": "توقيع المستند",
+    "footerLegalNote": "هذا توقيع اعتماد داخلي، وليس توقيعًا إلكترونيًا ملزمًا قانونيًا. لا تتضمّن هذه الصفحة تقنيات تتبّع.",
+    "stepReview": "مراجعة",
+    "stepSign": "توقيع",
+    "stepSubmit": "إرسال",
+    "stepDone": "تم",
+    "progressAriaLabel": "التقدّم",
+    "welcomeHeading": "لديك مستند للتوقيع",
+    "welcomeRequestedOn": "طلب توقيعك على",
+    "expiresLabel": "تنتهي في:",
+    "documentPreviewLabel": "معاينة المستند",
+    "documentIframeTitle": "المستند المطلوب توقيعه",
+    "documentPreviewUnavailable": "معاينة المستند غير متاحة — سيتم التوقيع أدناه.",
+    "reviewAndSignButton": "مراجعة وتوقيع",
+    "signHeading": "إضافة التوقيع",
+    "signSubtitle": "يُرسم التوقيع أو يُكتب الاسم.",
+    "signatureModeAriaLabel": "وضع التوقيع",
+    "modeDraw": "رسم",
+    "modeTypeName": "كتابة الاسم",
+    "fullNameLabel": "الاسم الكامل",
+    "fullNamePlaceholder": "الاسم الكامل",
+    "signaturePreviewAriaLabel": "معاينة التوقيع: {{name}}",
+    "back": "رجوع",
+    "continue": "متابعة",
+    "submitHeading": "المراجعة والإرسال",
+    "submitLegalIntro": "بالإرسال، يُطبَّق توقيع اعتماد داخلي على",
+    "termsAgreement": "أُقرّ بأن هذا توقيع اعتماد داخلي وليس توقيعًا إلكترونيًا ملزمًا قانونيًا، وبأنه يمثّل نيتي في اعتماد هذا المستند. وقد أُتيحت لي فرصة مراجعة محتوياته.",
+    "submitting": "جارٍ الإرسال…",
+    "submitSignatureButton": "إرسال التوقيع",
+    "confirmHeading": "تم إرسال التوقيع",
+    "confirmNotified": "تم إشعار {{senderName}}. ستُرسل نسخة من المستند الموقَّع إلى بريدك الإلكتروني.",
+    "downloadSignedCopy": "تنزيل النسخة الموقَّعة",
+    "printedLabel": "مطبوع:",
+    "loadingAriaLabel": "جارٍ تحميل المستند",
+    "errorLinkInvalidShort": "رابط التوقيع هذا غير صالح أو انتهت صلاحيته.",
+    "errorLinkExpiredDetail": "انتهت صلاحية رابط التوقيع هذا. يُرجى التواصل مع المُرسِل لإعادة إرسال الطلب.",
+    "errorLinkInvalidDetail": "رابط التوقيع هذا غير صالح أو انتهت صلاحيته. يُرجى التواصل مع المُرسِل لإعادة إرسال الطلب.",
+    "errorLinkExpiredTitle": "انتهت صلاحية الرابط",
+    "errorLinkInvalidTitle": "رابط توقيع غير صالح",
+    "errorLinkClosedTitle": "أُغلق التوقيع"
+  },
+  "worldMap": {
+    "preset": {
+      "global": "عالمي",
+      "northAmerica": "أمريكا الشمالية",
+      "europe": "أوروبا",
+      "asiaPacific": "آسيا والمحيط الهادئ",
+      "latinAmerica": "أمريكا اللاتينية",
+      "middleEastAfrica": "الشرق الأوسط وأفريقيا"
+    },
+    "zoomIn": "تكبير",
+    "zoomOut": "تصغير",
+    "resetView": "إعادة ضبط العرض",
+    "legend": {
+      "pipeline": "مسار الفرص"
+    },
+    "tooltip": {
+      "opportunityCount": "{{count}} فرص",
+      "opportunityCount_one": "{{count}} فرصة",
+      "avgProbability": "متوسط الاحتمال {{probability}}%",
+      "opportunityCount_zero": "{{count}} فرص",
+      "opportunityCount_two": "{{count}} فرصتان",
+      "opportunityCount_few": "{{count}} فرص",
+      "opportunityCount_many": "{{count}} فرصة",
+      "opportunityCount_other": "{{count}} فرصة"
+    }
+  },
+  "territoryPanels": {
+    "countryDetailTitleWithCode": "تفاصيل {{countryCode}}",
+    "countryDetailTitle": "تفاصيل البلد",
+    "clickCountryHint": "انقر بلدًا على الخريطة",
+    "clear": "مسح",
+    "opportunities": "الفرص",
+    "pipeline": "مسار الفرص",
+    "globalPipelineShare": "حصة مسار الفرص العالمية",
+    "assignedTerritories": "المناطق المُسنَدة",
+    "noTerritoriesAssigned": "لا توجد مناطق مُسنَدة",
+    "accountOwners": "مالكو الحسابات",
+    "noActiveOwners": "لا يوجد مالكون نشطون",
+    "noCountrySelected": "لم يُحدَّد بلد",
+    "territories": "المناطق",
+    "countTotal": "{{count}} إجماليًا",
+    "failedToLoad": "تعذّر التحميل",
+    "retry": "إعادة المحاولة",
+    "noTerritories": "لا توجد مناطق",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "global": "عالمي",
+    "countryCountSummary": "{{count}} بلدان ({{preview}})",
+    "countryCountSummary_zero": "{{count}} بلدان ({{preview}})",
+    "countryCountSummary_one": "{{count}} بلد ({{preview}})",
+    "countryCountSummary_two": "{{count}} بلدان ({{preview}})",
+    "countryCountSummary_few": "{{count}} بلدان ({{preview}})",
+    "countryCountSummary_many": "{{count}} بلد ({{preview}})",
+    "countryCountSummary_other": "{{count}} بلد ({{preview}})",
+    "allCountries": "كل البلدان",
+    "unassigned": "غير مُسنَد",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "leadRoutingRules": "قواعد توجيه العملاء المحتملين",
+    "noRoutingRules": "لا توجد قواعد توجيه",
+    "assignUser": "مستخدم",
+    "assignTerritory": "منطقة",
+    "assignRoundRobin": "التوزيع الدوري ({{count}})",
+    "assignNone": "لا شيء",
+    "priority": "الأولوية {{priority}}"
+  },
+  "agentStudio": {
+    "eyebrow": "العطاءات وطلب تقديم العروض",
+    "title": "استوديو الوكلاء",
+    "subtitle": "وكلاء AI حسب الدور يجيبون عن كل خطوة في طلب تقديم العروض.",
+    "subtitleAdmin": "يمكن إنشاؤها هنا.",
+    "subtitleMember": "يمكن تشغيل Crew ومراجعة النتيجة.",
+    "loading": "جارٍ التحميل…",
+    "loadStandardAgents": "تحميل الوكلاء القياسيين",
+    "toastStandardLoaded": "تم تحميل الوكلاء القياسيين وCrew الخاص بطلب تقديم العروض",
+    "toastStandardLoadError": "تعذّر تحميل الوكلاء القياسيين",
+    "agentsHeading": "الوكلاء",
+    "cancel": "إلغاء",
+    "newAgent": "وكيل جديد",
+    "agentsLoadErrorTitle": "تعذّر تحميل الوكلاء",
+    "pleaseRetry": "يُرجى إعادة المحاولة.",
+    "retry": "إعادة المحاولة",
+    "agentsEmptyTitle": "لا يوجد وكلاء بعد",
+    "agentsEmptyAdmin": "يمكن تحميل الوكلاء القياسيين للشؤون القانونية والمالية والتسويق والمبيعات للبدء، أو إنشاء وكلاء خاصين.",
+    "agentsEmptyMember": "لم يُعدّ المسؤول أي وكلاء بعد.",
+    "badgeStandard": "قياسي",
+    "badgeCustom": "مخصص",
+    "deleteAgentConfirmTitle": "حذف {{role}}؟",
+    "deleteAgentConfirmDescription": "يُزال الوكيل من كل Crew يستخدمه. لا يمكن التراجع عن هذا.",
+    "delete": "حذف",
+    "deleteAgentAriaLabel": "حذف {{role}}",
+    "toastAgentDeleted": "تم حذف الوكيل",
+    "toastAgentDeleteError": "تعذّر حذف الوكيل",
+    "agentKeyPlaceholder": "المفتاح (مثل security_lead)",
+    "agentKeyAriaLabel": "مفتاح الوكيل",
+    "rolePlaceholder": "الدور (مثل قائد الأمن)",
+    "roleAriaLabel": "الدور",
+    "goalPlaceholder": "الهدف — ما يتولاه هذا الوكيل",
+    "goalAriaLabel": "الهدف",
+    "backstoryPlaceholder": "الخلفية — الخبرة والأسلوب اللذان يشكلان إجاباته",
+    "backstoryAriaLabel": "الخلفية",
+    "createAgentError": "تعذّر إنشاء الوكيل.",
+    "creating": "جارٍ الإنشاء…",
+    "createAgent": "إنشاء وكيل",
+    "crewsHeading": "مجموعات Crew",
+    "crewsSubtitle": "يشغّل Crew وكلاءه على طلب تقديم العروض، خطوة بخطوة.",
+    "crewsLoadErrorTitle": "تعذّر تحميل مجموعات Crew",
+    "crewsEmptyTitle": "لا توجد مجموعات Crew بعد",
+    "crewsEmptyMessage": "بعد توفر الوكلاء، يمكن للمسؤول تجميعهم في Crew. تتضمن المجموعة القياسية RFP Response Crew الجاهزة للتشغيل.",
+    "stepCount": "{{count}} خطوة",
+    "close": "إغلاق",
+    "run": "تشغيل",
+    "rfpPlaceholder": "ألصق نص طلب تقديم العروض هنا…",
+    "rfpAriaLabel": "نص طلب تقديم العروض",
+    "starting": "جارٍ البدء…",
+    "runCrew": "تشغيل Crew",
+    "runStartError": "تعذّر بدء التشغيل.",
+    "toastRunStartError": "تعذّر بدء التشغيل",
+    "statusLabel": "الحالة:",
+    "runAnother": "تشغيل آخر",
+    "runStatusError": "تعذّر تحميل حالة التشغيل — جارٍ إعادة الاتصال…",
+    "runFailed": "فشل التشغيل.",
+    "fallback": "احتياطي",
+    "finalResponsePartial": "الاستجابة النهائية (استخدمت بعض الخطوات مسارًا احتياطيًا)",
+    "finalResponse": "الاستجابة النهائية",
+    "subtitleReadOnly": "يمكن تصفح الوكلاء ومجموعات Crew التي أعدّها المسؤول.",
+    "runPermissionHint": "يلزم إذن تشغيل الوكلاء لتشغيل Crew. يمكن للمسؤول منح هذا الإذن."
+  },
+  "contractAgreements": {
+    "regionLabel": "الاتفاقيات التعاقدية",
+    "title": "الاتفاقيات التعاقدية",
+    "caption": "اتفاقيات الخدمات الرئيسية والاتفاقيات الإطارية، والتغطية، والخصومات، وجدول مراجعة الأسعار",
+    "loadErrorTitle": "تعذّر تحميل الاتفاقيات التعاقدية",
+    "tryAgainShortly": "أعد المحاولة بعد قليل.",
+    "empty": "لم تُسجَّل اتفاقيات خدمات رئيسية أو اتفاقيات إطارية لهذا الحساب بعد.",
+    "noCountriesSet": "لم تُحدَّد بلدان",
+    "rebateSuffix": " · خصم {{pct}}%",
+    "rateReviewSuffix": " · مراجعة الأسعار {{schedule}}",
+    "nextReviewSuffix": " (التالي {{date}})",
+    "expiresSuffix": " · تنتهي {{date}}",
+    "viewDocument": "عرض المستند",
+    "tableRole": "الدور",
+    "tableRate": "السعر",
+    "toastExtractApplied": "طُبّقت الحقول المستخرجة — تُراجَع قبل الحفظ",
+    "toastMissingReferenceTitle": "مرجع ناقص",
+    "toastMissingReferenceDesc": "مرجع العقد مطلوب.",
+    "toastAgreementRecorded": "تم تسجيل الاتفاقية",
+    "toastCouldNotSave": "تعذّر الحفظ",
+    "addAgreement": "إضافة اتفاقية",
+    "fieldAgreementType": "نوع الاتفاقية",
+    "placeholderReference": "مرجع (مثل MSA-2026-001)",
+    "fieldReference": "مرجع العقد",
+    "placeholderCountries": "البلدان (FR, DE, ES)",
+    "fieldCountries": "البلدان المشمولة",
+    "placeholderRebate": "نسبة الخصم العالمية %",
+    "fieldRebate": "نسبة الخصم العالمية",
+    "fieldRateReviewSchedule": "جدول مراجعة الأسعار",
+    "scheduleAnnual": "مراجعة أسعار سنوية",
+    "scheduleBiannual": "مراجعة أسعار نصف سنوية",
+    "scheduleQuarterly": "مراجعة أسعار ربع سنوية",
+    "scheduleAdhoc": "مراجعة أسعار حسب الحاجة",
+    "fieldExpiryDate": "تاريخ الانتهاء",
+    "placeholderCurrency": "العملة (EUR)",
+    "fieldCurrency": "العملة",
+    "sourceDocument": "المستند المصدر",
+    "removeAttachedDocument": "إزالة المستند المرفق",
+    "remove": "إزالة",
+    "toastExtractStartFailed": "تعذّر بدء الاستخراج",
+    "starting": "جارٍ البدء…",
+    "extractFields": "استخراج الحقول من المستند",
+    "applyExtractedFields": "تطبيق الحقول المستخرجة (تُراجَع قبل الحفظ)",
+    "extractionFailedWithReason": "فشل الاستخراج: {{reason}}. تُدخَل الحقول يدويًا.",
+    "extractionFailed": "فشل الاستخراج. تُدخَل الحقول يدويًا.",
+    "extracting": "جارٍ الاستخراج… (تعرّف ضوئي + تحليل)",
+    "uploading": "جارٍ الرفع…",
+    "attachDocument": "إرفاق مستند اتفاقية الخدمات الرئيسية / جدول الأسعار (PDF، صورة)",
+    "toastUploadFailed": "فشل الرفع",
+    "rateCard": "جدول الأسعار",
+    "placeholderRoleProfile": "الدور / الملف",
+    "rateLineRole": "دور سطر السعر {{n}}",
+    "placeholderRate": "السعر",
+    "rateLineRate": "سعر سطر السعر {{n}}",
+    "rateLineUnit": "وحدة سطر السعر {{n}}",
+    "removeRateLine": "إزالة سطر السعر {{n}}",
+    "addRateLine": "+ إضافة سطر سعر",
+    "saving": "جارٍ الحفظ…",
+    "save": "حفظ",
+    "cancel": "إلغاء"
+  },
+  "calls": {
+    "heading": "المكالمات",
+    "count": {
+      "one": "{{count}} مكالمة",
+      "other": "{{count}} مكالمات"
+    },
+    "error": {
+      "title": "تعذّر تحميل المكالمات",
+      "fallback": "حدث خطأ ما"
+    },
+    "empty": {
+      "title": "لم يُعثر على مكالمات",
+      "message": "يمكن تعديل عوامل التصفية، أو بدء مكالمة من صفحة جهة اتصال أو صفقة."
+    },
+    "loadMore": {
+      "loading": "جارٍ التحميل…",
+      "label": "تحميل المزيد"
+    },
+    "filter": {
+      "groupAria": "تصفية المكالمات",
+      "entityAria": "التصفية حسب نوع الكيان",
+      "providerAria": "التصفية حسب المزوّد",
+      "statusAria": "التصفية حسب الحالة",
+      "dateAria": "التصفية حسب النطاق الزمني",
+      "entity": {
+        "all": "كل الأنواع",
+        "deal": "صفقة",
+        "contact": "جهة اتصال",
+        "opportunity": "فرصة",
+        "lead": "عميل محتمل"
+      },
+      "provider": {
+        "all": "كل المزوّدين",
+        "zoom": "Zoom",
+        "teams": "Teams",
+        "googleMeet": "Google Meet",
+        "twilioVoice": "Twilio Voice"
+      },
+      "status": {
+        "all": "كل الحالات",
+        "scheduled": "مجدولة",
+        "live": "مباشر",
+        "completed": "مكتملة",
+        "failed": "فاشلة",
+        "cancelled": "ملغاة"
+      },
+      "date": {
+        "all": "كل الفترات",
+        "week": "هذا الأسبوع",
+        "month": "هذا الشهر"
+      }
+    },
+    "table": {
+      "aria": "قائمة المكالمات",
+      "provider": "المزوّد",
+      "entity": "الكيان",
+      "scheduled": "الموعد",
+      "duration": "المدة",
+      "sentiment": "الانطباع",
+      "status": "الحالة"
+    },
+    "row": {
+      "aria": "{{icon}} مكالمة {{provider}} — {{status}}"
+    },
+    "detail": {
+      "title": "تفاصيل المكالمة",
+      "recordingAria": "تسجيل المكالمة"
+    }
+  },
+  "customObjectsAdmin": {
+    "title": "الكائنات المخصصة",
+    "subtitle": "تُعرَّف أنواع كيانات جديدة للمؤسسة — مشاريع ومورّدون وأصول وغيرها.",
+    "newObjectButton": "كائن جديد",
+    "loadingLabel": "جارٍ تحميل الكائنات المخصصة",
+    "errorLoad": "فشل تحميل الكائنات المخصصة. يُرجى التحديث.",
+    "emptyTitle": "لا توجد كائنات مخصصة بعد",
+    "emptyDescription": "يُعرَّف أول نوع كيان مخصص بالنقر على \"كائن جديد\".",
+    "recordCount": "{{count}} سجلات",
+    "deleteItemLabel": "حذف {{label}}",
+    "modalTitle": "كائن مخصص جديد",
+    "fieldSingularLabel": "التسمية المفردة",
+    "fieldSingularPlaceholder": "مثل مشروع",
+    "fieldPluralLabel": "التسمية الجمعية",
+    "fieldPluralPlaceholder": "مثل مشاريع",
+    "fieldKeyLabel": "مفتاح API",
+    "fieldKeyAuto": "(تلقائي)",
+    "fieldKeyPlaceholder": "مثل project",
+    "fieldKeyHint": "أحرف لاتينية صغيرة أو أرقام أو _ أو - فقط. لا يتغيّر بعد الإنشاء.",
+    "fieldDescriptionLabel": "الوصف",
+    "fieldColorLegend": "اللون",
+    "selectColorLabel": "تحديد اللون {{color}}",
+    "cancelButton": "إلغاء",
+    "creatingButton": "جارٍ الإنشاء…",
+    "createButton": "إنشاء",
+    "errorRequiredFields": "المفتاح والتسمية المفردة والتسمية الجمعية مطلوبة.",
+    "errorKeyFormat": "يجب أن يبدأ المفتاح بحرف ويحتوي فقط على أحرف لاتينية صغيرة أو أرقام أو _ أو -",
+    "toastCreated": "تم إنشاء الكائن المخصص",
+    "errorCreateFailed": "فشل الإنشاء",
+    "deleteConfirmTitle": "حذف الكائن المخصص؟",
+    "deleteConfirmDescription": "سيُحذف تعريف الكائن وجميع السجلات التابعة له نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
+    "deleteConfirmLabel": "حذف",
+    "toastDeleteFailedTitle": "فشل الحذف"
+  },
+  "smsComposer": {
+    "title": "إرسال SMS",
+    "recipientLabel": "إلى: {{name}}",
+    "optedOutLabel": "أُلغي الاشتراك:",
+    "optedOutMessage": "طلب هذا الرقم إيقاف استلام SMS. الإرسال محظور (امتثال TCPA).",
+    "phoneLabel": "إلى (تنسيق E.164)",
+    "phoneFormatHint": "يُستخدم تنسيق E.164: +12025550100",
+    "messageLabel": "الرسالة",
+    "charCountMultipart": "{{chars}} حرفًا · {{segments}} مقاطع (يتبقى {{remaining}} في المقطع)",
+    "charCountSingle": "{{count}}/{{limit}}",
+    "messagePlaceholder": "اكتب رسالتك…",
+    "segmentPreview": "تُرسَل هذه الرسالة في {{count}} مقاطع (تُفوتر لكل مقطع عبر Twilio).",
+    "successMessage": "تم إرسال SMS بنجاح!",
+    "cancel": "إلغاء",
+    "checking": "جارٍ التحقق…",
+    "sending": "جارٍ الإرسال…",
+    "sent": "تم الإرسال!",
+    "send": "إرسال SMS",
+    "errorInvalidE164": "يجب أن يكون رقم الهاتف بتنسيق E.164 (مثل +12025550100)",
+    "errorEmptyBody": "لا يمكن أن يكون نص الرسالة فارغًا",
+    "errorOptedOut": "ألغى هذا الرقم الاشتراك في SMS. يتعذّر الإرسال.",
+    "errorSendFailed": "فشل إرسال SMS. أعد المحاولة."
+  },
+  "contactTable": {
+    "announceFiltered": "يُعرض {{count}} من {{total}} جهات اتصال مطابقة لـ {{search}}.",
+    "announceTotal": "يُعرض {{count}} جهات اتصال.",
+    "errorTitle": "تعذّر تحميل جهات الاتصال",
+    "tryAgain": "أعد المحاولة",
+    "emptyFilteredTitle": "لا توجد مطابقات",
+    "emptyTitle": "لا توجد جهات اتصال بعد",
+    "emptyFilteredMessage": "لا شيء طابق \"{{search}}\".",
+    "emptyMessage": "أضف أول صانع قرار لبدء رسم مجموعة الشراء.",
+    "clearSearch": "مسح البحث",
+    "addFirstContact": "إضافة أول جهة اتصال",
+    "deselectAll": "إلغاء تحديد كل جهات الاتصال",
+    "selectAll": "تحديد كل جهات الاتصال",
+    "colName": "الاسم",
+    "colRole": "الدور",
+    "colCustomer": "العميل",
+    "colContact": "جهة الاتصال",
+    "colInfluence": "التأثير",
+    "colSentiment": "المشاعر",
+    "colActions": "الإجراءات",
+    "deselectRow": "إلغاء تحديد {{name}}",
+    "selectRow": "تحديد {{name}}",
+    "editRoleLabel": "تعديل الدور لـ {{name}}",
+    "addRolePlaceholder": "إضافة دور…",
+    "editInfluenceLabel": "تعديل التأثير لـ {{name}}",
+    "editSentimentLabel": "تعديل المشاعر لـ {{name}}",
+    "editRowLabel": "تعديل {{name}}",
+    "editAction": "تعديل",
+    "deleteRowLabel": "حذف {{name}}",
+    "deleteAction": "حذف"
+  },
+  "companies": {
+    "title": "الشركات",
+    "subtitleOne": "{{count}} شركة ظاهرة.",
+    "subtitleMany": "{{count}} شركات ظاهرة.",
+    "newCompany": "شركة جديدة",
+    "summaryAriaLabel": "ملخص قائمة الشركات",
+    "stats": {
+      "visibleLabel": "الشركات الظاهرة",
+      "visibleDetail": "العرض الحالي",
+      "domainLabel": "تغطية النطاقات",
+      "domainDetail": "جاهزة للتحقق من البيانات",
+      "industriesLabel": "القطاعات",
+      "industriesDetail": "ملفات مصنّفة",
+      "countriesLabel": "البلدان",
+      "countriesDetail": "التغطية السوقية"
+    },
+    "searchPlaceholder": "البحث بالاسم أو النطاق…",
+    "searchAriaLabel": "بحث الشركات",
+    "resultsCountOne": "{{count}} نتيجة عن \"{{term}}\"",
+    "resultsCountMany": "{{count}} نتائج عن \"{{term}}\"",
+    "showingLatest": "عرض أحدث 50 شركة",
+    "clear": "مسح",
+    "error": {
+      "title": "تعذّر تحميل الشركات",
+      "fallback": "حدث خطأ ما"
+    },
+    "empty": {
+      "searchTitle": "لا توجد شركات مطابقة للبحث",
+      "title": "لم يُعثر على شركات",
+      "searchMessage": "لا شيء يطابق \"{{term}}\". يمكن تجربة اسم شركة أو نطاق.",
+      "message": "يبدأ بناء قائمة الحسابات بإنشاء الشركة الأولى.",
+      "clearSearch": "مسح البحث",
+      "addCompany": "إضافة شركة"
+    },
+    "toast": {
+      "nothingToExport": "لا شيء للتصدير",
+      "exportedOne": "تم تصدير {{count}} شركة",
+      "exportedMany": "تم تصدير {{count}} شركات",
+      "deletedOne": "تم حذف {{count}} شركة",
+      "deletedMany": "تم حذف {{count}} شركات",
+      "deleteFailedOne": "فشلت {{count}} عملية حذف",
+      "deleteFailedMany": "فشلت {{count}} عمليات حذف"
+    },
+    "confirmDelete": {
+      "titleOne": "حذف {{count}} شركة؟",
+      "titleMany": "حذف {{count}} شركات؟",
+      "description": "لا يمكن التراجع عن هذا الإجراء.",
+      "confirmLabel": "حذف"
+    },
+    "table": {
+      "selectAll": "تحديد الكل",
+      "deselectAll": "إلغاء تحديد الكل",
+      "company": "الشركة",
+      "domain": "النطاق",
+      "industry": "القطاع",
+      "employees": "الموظفون",
+      "country": "البلد",
+      "actions": "إجراءات"
+    }
+  },
+  "opportunityTabs": {
+    "sectionsAriaLabel": "أقسام الفرصة",
+    "tabDecisionUnit": "وحدة القرار",
+    "tabContacts": "جهات الاتصال",
+    "tabTasks": "المهام",
+    "tabDocuments": "المستندات",
+    "tabCalls": "المكالمات",
+    "tabActivity": "النشاط",
+    "decisionUnitErrorTitle": "تعذّر تحميل جهات اتصال وحدة القرار",
+    "errorMessage": "يُرجى إعادة المحاولة.",
+    "retry": "إعادة المحاولة",
+    "decisionUnitEmptyTitle": "لا يوجد أعضاء في وحدة القرار بعد",
+    "decisionUnitEmptyMessage": "أضف جهة اتصال من صفحة جهات الاتصال أو أجرِ مزامنة من Dust.",
+    "decisionUnitTitle": "وحدة القرار",
+    "stakeholdersCount": "{{count}} أصحاب مصلحة",
+    "dustBadge": "Dust",
+    "influenceAriaLabel": "التأثير {{value}} من 5",
+    "tasksEmptyTitle": "لا توجد مهام بعد",
+    "tasksEmptyMessage": "أنشئ متابعة لمواصلة تقدّم هذا العطاء.",
+    "tasksTitle": "المهام",
+    "tasksActiveCount": "{{count}} نشط",
+    "taskDue": "الاستحقاق {{date}}",
+    "callsErrorTitle": "تعذّر تحميل المكالمات",
+    "callsEmptyTitle": "لا توجد مكالمات بعد",
+    "callsEmptyMessage": "تظهر هنا المكالمات المجدولة والمكتملة لهذه الفرصة.",
+    "callsTitle": "المكالمات",
+    "callsCount": "{{count}} مكالمة",
+    "callScheduledAt": "مجدولة {{date}}",
+    "callDurationMinutes": "{{count}} د",
+    "documentsEmptyTitle": "لا توجد مستندات مرفقة",
+    "documentsEmptyMessage": "ارفع طلب تقديم العروض أو بيان عمل أو مسودة عرض.",
+    "documentsTitle": "المستندات",
+    "documentsCount": "{{count}} ملفات",
+    "documentUnknownSize": "حجم غير معروف",
+    "activityEmptyTitle": "لا يوجد نشاط بعد",
+    "activityEmptyMessage": "ستظهر هنا انتقالات المراحل وويب هوك Dust والملاحظات.",
+    "activityTitle": "النشاط"
+  },
+  "callTimeline": {
+    "sentimentPositive": "إيجابي",
+    "sentimentNeutral": "محايد",
+    "sentimentNegative": "سلبي",
+    "sentimentScoreTitle": "درجة الانطباع: {{pct}}%",
+    "noActionItems": "لا توجد بنود إجراء.",
+    "actionItemsAriaLabel": "بنود الإجراء",
+    "markItemComplete": "تعليم \"{{item}}\" كمكتمل",
+    "loadError": "تعذّر تحميل تفاصيل المكالمة.",
+    "recordingSectionAriaLabel": "تسجيل المكالمة",
+    "recordingLabel": "التسجيل",
+    "recordingAudioAriaLabel": "صوت تسجيل المكالمة",
+    "summarySectionAriaLabel": "ملخص المكالمة",
+    "summaryLabel": "ملخص AI",
+    "actionItemsSectionAriaLabel": "بنود الإجراء من هذه المكالمة",
+    "actionItemsLabel": "بنود الإجراء",
+    "viewTranscript": "عرض النص",
+    "analysing": "جارٍ التحليل…",
+    "reExtractInsights": "إعادة استخراج الرؤى",
+    "cardAriaLabel": "مكالمة {{provider}} — {{status}}",
+    "emptyState": "لم تُسجَّل مكالمات بعد.",
+    "historyAriaLabel": "سجل المكالمات",
+    "loadingMore": "جارٍ التحميل…",
+    "loadMore": "تحميل المزيد من المكالمات"
+  },
+  "smartCompany": {
+    "source": {
+      "domainSignal": "إشارة النطاق",
+      "logoPreview": "معاينة الشعار",
+      "openDataReady": "البيانات المفتوحة جاهزة",
+      "nameSignal": "إشارة الاسم"
+    },
+    "autofill": {
+      "legalProfile": "الملف القانوني",
+      "domain": "النطاق",
+      "website": "الموقع",
+      "logo": "الشعار",
+      "sourceReceipts": "إيصالات المصدر",
+      "value": {
+        "verified": "مُتحقَّق",
+        "queued": "مُدرج",
+        "waiting": "بانتظار",
+        "needed": "مطلوب",
+        "ready": "جاهز",
+        "preview": "معاينة",
+        "fallback": "احتياطي",
+        "live": "{{count}} مباشر"
+      },
+      "mapLabel": "خريطة جاهزية التعبئة التلقائية"
+    },
+    "error": {
+      "nameRequired": "أضف اسم شركة أو نطاقًا أولًا."
+    },
+    "trigger": {
+      "newAccount": "حساب جديد"
+    },
+    "dialog": {
+      "title": "إضافة شركة",
+      "description": "عبّئ الحساب مسبقًا من مصادر مُتحقَّق منها ومزوّدي الشعارات وذاكرة البيانات المُتحقَّق منها."
+    },
+    "preview": {
+      "companyFallback": "شركة",
+      "namePlaceholder": "معاينة الشركة",
+      "domainPrompt": "أضف نطاقًا لمطابقة الشعار والسجل",
+      "confidence": "الثقة"
+    },
+    "field": {
+      "companyOrDomain": "الشركة أو النطاق",
+      "companyOrDomainPlaceholder": "Mantu أو mantu.com",
+      "domain": "النطاق",
+      "domainPlaceholder": "company.com",
+      "website": "الموقع",
+      "websitePlaceholder": "https://company.com/"
+    },
+    "intel": {
+      "existingAccount": "حساب موجود",
+      "newData": "بيانات جديدة",
+      "resolving": "جارٍ تحديد الملف…"
+    },
+    "alternatives": {
+      "select": "تحديد {{name}}"
+    },
+    "action": {
+      "cancel": "إلغاء",
+      "openCockpit": "فتح قمرة القيادة",
+      "enriching": "جارٍ الإثراء…",
+      "createEnriched": "إنشاء حساب مُثرى"
+    }
+  },
+  "leadDetail": {
+    "toastSaved": "تم الحفظ",
+    "toastSaveFailed": "فشل الحفظ",
+    "errorTitle": "تعذّر تحميل العميل المحتمل",
+    "errorMessage": "ربما حُذف العميل المحتمل.",
+    "notFoundTitle": "العميل المحتمل غير موجود",
+    "notFoundMessage": "ربما حُذف العميل المحتمل أو لا تتوفر صلاحية الوصول إليه.",
+    "goBack": "رجوع",
+    "toastStatusUpdated": "تم تحديث الحالة",
+    "toastPriorityUpdated": "تم تحديث الأولوية",
+    "toastConverted": "تم تحويل العميل المحتمل بنجاح",
+    "toastConvertFailed": "فشل تحويل العميل المحتمل",
+    "deleteConfirmTitle": "حذف العميل المحتمل؟",
+    "deleteConfirmDescription": "ستتم إزالة {{firstName}} {{lastName}} نهائيًا من العملاء المحتملين.",
+    "deleteConfirmLabel": "حذف",
+    "toastDeleted": "تم حذف العميل المحتمل",
+    "breadcrumbAriaLabel": "مسار التنقل",
+    "breadcrumbLeads": "العملاء المحتملون",
+    "convertAction": "تحويل إلى فرصة",
+    "convertUnavailable": "تحويل العميل المحتمل غير متاح",
+    "deleteAction": "حذف",
+    "convertedBannerPrefix": "تم تحويل هذا العميل المحتمل إلى",
+    "convertedBannerLink": "فرصة مُحوَّلة",
+    "statusScoringHeading": "الحالة والدرجة",
+    "labelStatus": "الحالة",
+    "labelPriority": "الأولوية",
+    "labelScore": "الدرجة",
+    "labelSource": "المصدر",
+    "bantHeading": "تأهيل BANT",
+    "labelBudget": "الميزانية",
+    "placeholderBudget": "مثل €500 ألف",
+    "labelAuthority": "السلطة",
+    "placeholderAuthority": "صاحب القرار",
+    "labelNeed": "الحاجة",
+    "placeholderNeed": "ما المشكلة المراد حلها؟",
+    "labelTimeline": "الخط الزمني",
+    "placeholderTimeline": "مثل الربع 2 2026",
+    "labelNotes": "ملاحظات",
+    "placeholderNotes": "ملاحظات عن هذا العميل المحتمل…",
+    "metaCreated": "أُنشئ {{date}}",
+    "metaUpdated": "حُدّث {{date}}",
+    "metaOwner": "المالك: {{name}}",
+    "liveCollaboration": "تعاون مباشر",
+    "readOnlyHint": "يلزم صلاحية الكتابة على العملاء المحتملين لإجراء التغييرات."
+  },
+  "dashboard": {
+    "srHeading": "لوحة المعلومات",
+    "cockpitErrorTitle": "تعذّر تحميل قمرة قيادة الحساب",
+    "cockpitErrorMessage": "لم تستجب نقطة نهاية لوحة المعلومات.",
+    "retry": "إعادة المحاولة",
+    "backToAccounts": "رجوع إلى الحسابات",
+    "liveRefreshFailed": "تحذير: فشل التحديث المباشر، ويُعرض آخر لقطة مُتحقَّق منها.",
+    "portfolioIntelTitle": "استخبارات مبيعات المحفظة",
+    "portfolioIntelSubtitle": "مسار الفرص والمخاطر وجهات الاتصال والسجلات لهذا الحساب.",
+    "accountCockpitAria": "قمرة قيادة الحساب",
+    "cockpitDetailsAria": "تفاصيل قمرة القيادة"
+  },
+  "leadKanban": {
+    "convertFromLead": "افتح العميل المحتمل واستخدم التحويل",
+    "moveSuccess": "تم النقل إلى {{status}}",
+    "moveError": "تعذّر نقل العميل المحتمل",
+    "boardAriaLabel": "كانبان مسار العملاء المحتملين",
+    "column": {
+      "new": "جديد",
+      "contacted": "تم التواصل",
+      "qualified": "مؤهَّل",
+      "nurture": "رعاية",
+      "disqualified": "غير مؤهَّل",
+      "converted": "محوَّل"
+    },
+    "columnAriaLabel": "عمود {{label}} وفيه {{count}} عملاء محتملين",
+    "emptyColumn": "لا يوجد عملاء محتملون",
+    "columnLeadsAriaLabel": "عملاء محتملون {{label}}",
+    "cardAriaLabel": "{{firstName}} {{lastName}}، {{company}}، في {{status}}. استخدم مفتاحي السهم الأيسر والأيمن للتنقل بين الأعمدة.",
+    "daysInStage": "{{count}} ي في المرحلة",
+    "rotBadgeAriaLabel": "تقادم: {{count}} أيام تجاوزت الحد. افتح إجراءات الاستعادة.",
+    "rotBadgeLabel": "تقادم · +{{count}} ي",
+    "recoveryMenuAriaLabel": "إجراءات الاستعادة المقترحة",
+    "recoveryHeading": "الاستعادة المقترحة",
+    "recoveryLoading": "جارٍ التفكير…",
+    "recoveryEmpty": "لا توجد اقتراحات.",
+    "play": {
+      "sendReengagementEmail": "إرسال بريد إعادة التفاعل",
+      "scheduleCall": "جدولة مكالمة",
+      "addToNurture": "إضافة إلى وتيرة الرعاية",
+      "markLost": "تعليم كخسارة"
+    }
+  },
   "csvImport": {
+    "error": {
+      "noDataRows": "لا يحتوي هذا الملف على صفوف بيانات.",
+      "tooManyRows": "يحتوي هذا الملف على {{count}} صفًا — الحد {{limit}}.",
+      "unreadable": "تعذّر قراءة هذا الملف. تأكد من أنه CSV بترميز UTF-8."
+    },
+    "upload": {
+      "entityLabel": "ماذا يتم استيراده؟",
+      "chooseFile": "اختيار ملف CSV أو Excel",
+      "maxRows": "حتى {{rows}} صفًا"
+    },
+    "map": {
+      "summary": "{{rows}} صفًا. يُطابَق كل عمود بحقل، أو يُترك على عدم الاستيراد.",
+      "colCsvColumn": "عمود CSV",
+      "colSample": "عيّنة",
+      "colMapsTo": "يُقابل",
+      "mapColumnAria": "تعيين العمود {{header}}",
+      "dontImport": "عدم الاستيراد",
+      "dedupLabel": "إذا كان السجل موجودًا مسبقًا",
+      "dedupUpdate": "تحديثه بالقيم الجديدة",
+      "dedupSkip": "تخطي الصف",
+      "dedupDuplicate": "إنشاء سجل جديد دائمًا",
+      "requiredMissing": "عيّن عمودًا إلى: {{fields}}.",
+      "startError": "تعذّر بدء الاستيراد. راجع التعيينات وأعد المحاولة.",
+      "startServerError": "تعذّر بدء الاستيراد. أعد المحاولة.",
+      "startOver": "البدء من جديد",
+      "starting": "جارٍ البدء…",
+      "importRows": "استيراد {{rows}} صفًا"
+    },
+    "stepHeader": {
+      "upload": "رفع",
+      "map": "تعيين الأعمدة",
+      "run": "استيراد"
+    },
     "progress": {
       "starting": "جارٍ بدء الاستيراد…",
       "statusComplete": "اكتمل الاستيراد",
@@ -23,26 +1204,388 @@
       "importAnother": "استيراد ملف آخر"
     }
   },
-  "references": {
-    "column": {
-      "reference": "المرجع",
-      "company": "الشركة",
-      "industry": "القطاع",
-      "tags": "الوسوم",
-      "uses": "مرات الاستخدام",
-      "lastUsed": "آخر استخدام",
-      "document": "المستند",
-      "actions": "الإجراءات"
+  "territories": {
+    "pageTitle": "المناطق",
+    "totalsBadge": "{{opportunities}} فرص عبر {{countries}} بلدان",
+    "newRuleButton": "قاعدة جديدة",
+    "newTerritoryButton": "منطقة جديدة",
+    "kpiTotalPipeline": "إجمالي مسار الفرص",
+    "kpiCountriesActive": "بلدان نشطة",
+    "kpiOpportunities": "الفرص",
+    "kpiAvgProbability": "متوسط الاحتمال",
+    "sectionTitleRegion": "خريطة الفرص العالمية",
+    "sectionTitleIndustry": "الفرص حسب القطاع",
+    "sectionTitleAccount": "الفرص حسب الحساب",
+    "sectionCaptionRegion": "شدة الحرارة = إجمالي قيمة مسار الفرص. يُنقر على بلد لعرض التفاصيل.",
+    "sectionCaptionSegment": "مرتّبة حسب إجمالي قيمة مسار الفرص عبر كل الفرص.",
+    "breakdownTablistLabel": "بُعد التفصيل",
+    "tabRegion": "الإقليم",
+    "tabIndustry": "القطاع",
+    "tabAccount": "الحساب",
+    "mapErrorTitle": "تعذّر تحميل بيانات الخريطة",
+    "retryButton": "إعادة المحاولة",
+    "mapEmptyTitle": "لا توجد بيانات جغرافية",
+    "mapEmptyMessage": "تحتاج الفرص إلى تعيين بلد أو منطقة للظهور على الخريطة.",
+    "deleteTerritoryConfirmTitle": "حذف \"{{name}}\"؟",
+    "deleteTerritoryConfirmDescription": "سيتم تعطيل هذه المنطقة.",
+    "deleteRuleConfirmTitle": "حذف \"{{name}}\"؟",
+    "deleteRuleConfirmDescription": "سيتم تعطيل قاعدة التوجيه هذه."
+  },
+  "pipeline": {
+    "heading": "مسار الفرص المفتوح",
+    "subtitle": "اسحب بطاقة بين الأعمدة، أو ركّز على بطاقة واستخدم ← / → لنقل المراحل.",
+    "stageFilterLabel": "المرحلة",
+    "stageFilterAriaLabel": "تصفية مسار الفرص حسب المرحلة",
+    "stageFilterAllOption": "الكل",
+    "updatingIndicator": "جارٍ التحديث…",
+    "liveRegionCountOne": "{{count}} فرصة",
+    "liveRegionCountOther": "{{count}} فرص",
+    "kpiTotalPipeline": "إجمالي مسار الفرص",
+    "kpiOpenValue": "القيمة المفتوحة",
+    "kpiWinRate": "معدل الفوز",
+    "winRateNoClosedBids": "لا توجد عطاءات مغلقة",
+    "kpiActiveDeals": "صفقات نشطة",
+    "errorTitle": "تعذّر تحميل مسار الفرص",
+    "errorMessage": "يُرجى إعادة المحاولة.",
+    "errorReloadButton": "إعادة التحميل",
+    "emptyTitle": "لا توجد فرص بعد",
+    "emptyMessage": "أنشئ فرصة لبدء بناء مسار الفرص.",
+    "emptyGoToOpportunitiesButton": "الانتقال إلى الفرص",
+    "movedToStageToast": "تم النقل إلى {{stage}}",
+    "movedOpportunityToast": "تم نقل \"{{name}}\" إلى {{stage}}",
+    "moveErrorToastTitle": "تعذّر نقل الفرصة",
+    "moveErrorToastDescription": "رفض الخادم الطلب.",
+    "openOpportunitiesLabel": "الفرص المفتوحة",
+    "openCount_one": "{{count}} فرصة مفتوحة",
+    "openCount_other": "{{count}} فرصة مفتوحة",
+    "emptyStageValue": "لا توجد قيمة للمرحلة بعد",
+    "chartAriaLabel": "توزيع قيمة مراحل مسار الفرص",
+    "openCount_zero": "{{count}} فرص مفتوحة",
+    "openCount_two": "{{count}} فرصتان مفتوحتان",
+    "openCount_few": "{{count}} فرص مفتوحة",
+    "openCount_many": "{{count}} فرصة مفتوحة"
+  },
+  "auditLogTable": {
+    "evidenceStreamTitle": "تدفق الأدلة",
+    "evidenceStreamSummary": "يُعرض {{count}} أحداث مُصفّاة من {{total}} سجلات محمّلة.",
+    "newer": "الأحدث",
+    "page": "صفحة {{page}}",
+    "older": "الأقدم",
+    "emptyTitle": "لا توجد أدلة مطابقة",
+    "emptyDescription": "عدّل الفئة أو نوع السجل أو عبارات البحث لتوسيع مسار التدقيق.",
+    "tableRegionLabel": "جدول أدلة التدقيق",
+    "tableCaption": "إدخالات سجل التدقيق، الأحدث أولًا",
+    "columnEvent": "الحدث",
+    "columnActor": "الفاعل",
+    "columnTarget": "الهدف",
+    "columnTime": "الوقت",
+    "columnDetails": "التفاصيل",
+    "riskBadge": "الخطر {{risk}}",
+    "moreFields": "+{{count}} المزيد",
+    "systemGenerated": "مُولَّد من النظام",
+    "targetTypeSystem": "نظام",
+    "targetIdLabel": "معرّف الهدف {{id}}",
+    "noRecordReference": "لا يوجد مرجع للسجل",
+    "open": "فتح",
+    "copyId": "نسخ المعرّف",
+    "hide": "إخفاء",
+    "inspect": "فحص",
+    "hideDiffLabel": "إخفاء حمولة الفرق لـ {{action}} بواسطة {{actor}}",
+    "inspectDiffLabel": "فحص حمولة الفرق لـ {{action}} بواسطة {{actor}}",
+    "diffPayloadLabel": "حمولة الفرق لـ {{action}}",
+    "changeSummary": "ملخص التغيير",
+    "noStructuredDiff": "لم يُلتقط فرق منظّم لهذا الحدث. استخدم الحمولة الخام عند الحاجة إلى تفاصيل التحقيق.",
+    "rawPayloadTitle": "حمولة الأدلة الخام",
+    "copyJson": "نسخ JSON",
+    "immutable": "غير قابل للتغيير"
+  },
+  "taskRow": {
+    "toast": {
+      "markedDone": "تم تعليم \"{{title}}\" كمُنجزة",
+      "updateFailedTitle": "تعذّر تحديث المهمة",
+      "serverRejected": "رفض الخادم الطلب.",
+      "snoozed": "أُجّلت \"{{title}}\" إلى {{label}}",
+      "snoozeFailedTitle": "فشل التأجيل"
     },
-    "noMatch": {
-      "title": "لا توجد مراجع تطابق هذه المرشحات",
-      "message": "امسح مرشح القطاع أو الوسم، أو ابحث عن مصطلح آخر.",
-      "action": "مسح المرشحات"
+    "snooze": {
+      "tomorrow": "غدًا",
+      "inThreeDays": "خلال 3 أيام",
+      "nextWeek": "الأسبوع القادم",
+      "button": "تأجيل…",
+      "presets": "خيارات التأجيل"
     },
-    "viewDocument": "عرض المستند",
-    "unsafeDocumentUrl": "رابط المستند غير متاح"
+    "reorderTask": "إعادة ترتيب المهمة",
+    "dragToReorder": "سحب لإعادة الترتيب",
+    "moveUp": "نقل {{title}} للأعلى",
+    "up": "أعلى",
+    "moveDown": "نقل {{title}} للأسفل",
+    "down": "أسفل",
+    "due": "الاستحقاق {{date}}",
+    "warning": "تحذير",
+    "overdue": "متأخر: {{count}} يوم تأخير",
+    "dueIn": "خلال {{count}} يوم",
+    "snoozeTask": "تأجيل {{title}}",
+    "statusAction": "الحالة: {{status}}. يُفعَّل للتغيير إلى {{next}}.",
+    "statusTitle": "يُفعَّل لتغيير الحالة إلى {{next}}",
+    "readOnlyHint": "يلزم صلاحية الكتابة على المهام لتعديل هذه المهمة."
+  },
+  "collaborativeRichTextEditor": {
+    "editingAnnouncementOne": "{{names}} يحرّر",
+    "editingAnnouncementOther": "{{names}} يحرّرون",
+    "loading": "جارٍ التحميل…",
+    "statusLive": "مباشر",
+    "statusConnecting": "جارٍ الاتصال…",
+    "statusOffline": "غير متصل",
+    "statusError": "خطأ"
+  },
+  "notes": {
+    "panelTitle": "ملاحظات",
+    "addButton": "+ إضافة",
+    "noAccountTitle": "اختر حسابًا لعرض الملاحظات",
+    "noAccountMessage": "تُرفق الملاحظات بحساب العميل.",
+    "loadErrorTitle": "تعذّر تحميل الملاحظات",
+    "unknownError": "خطأ غير معروف",
+    "emptyTitle": "لا توجد ملاحظات بعد",
+    "emptyMessage": "يمكن تسجيل ملخص اجتماع أو سياق.",
+    "deleteConfirmTitle": "حذف هذه الملاحظة؟",
+    "deleteConfirmDescription": "ستُزال الملاحظة من هذا الحساب. يحتفظ سجل التدقيق بسجل عملية الحذف.",
+    "deleteConfirmLabel": "حذف",
+    "deleteSuccess": "تم حذف الملاحظة",
+    "deleteErrorTitle": "فشل الحذف",
+    "serverRejected": "رفض الخادم الطلب.",
+    "pinnedBadge": "مثبّتة",
+    "unknownAuthor": "غير معروف",
+    "unpinAriaLabel": "إلغاء تثبيت الملاحظة",
+    "pinAriaLabel": "تثبيت الملاحظة",
+    "unpinTitle": "إلغاء التثبيت",
+    "pinTitle": "تثبيت",
+    "unpinAction": "إلغاء التثبيت",
+    "pinAction": "تثبيت",
+    "editAriaLabel": "تعديل الملاحظة",
+    "editTitle": "تعديل",
+    "editAction": "تعديل",
+    "deleteAriaLabel": "حذف الملاحظة",
+    "deleteTitle": "حذف",
+    "deleteAction": "حذف",
+    "titleRequired": "العنوان مطلوب",
+    "saveFailed": "فشل الحفظ",
+    "titlePlaceholder": "العنوان",
+    "titleAriaLabel": "عنوان الملاحظة",
+    "bodyPlaceholder": "يدعم Markdown **العريض** و*المائل*",
+    "bodyAriaLabel": "متن الملاحظة",
+    "cancelAction": "إلغاء",
+    "savingAction": "جارٍ الحفظ…",
+    "saveAction": "حفظ",
+    "addNoteAction": "إضافة ملاحظة"
+  },
+  "usePaletteItems": {
+    "recentlyVisited": "زيارات أخيرة"
+  },
+  "routingRule": {
+    "nameLabel": "الاسم",
+    "namePlaceholder": "مثال: عملاء محتملون للمؤسسات في US",
+    "priorityLabel": "الأولوية",
+    "countryFilterLabel": "تصفية البلد",
+    "industryFilterLabel": "تصفية القطاع",
+    "industryFilterPlaceholder": "تقنية",
+    "minValueLabel": "أدنى قيمة (ميكرو)",
+    "assignmentLabel": "التعيين",
+    "assignTypeUser": "مستخدم",
+    "assignTypeTerritory": "منطقة",
+    "assignTypeRoundRobin": "تناوب دوري",
+    "assignToUserLabel": "تعيين لمستخدم",
+    "selectUserOption": "تحديد مستخدم",
+    "assignToTerritoryLabel": "تعيين لمنطقة",
+    "selectTerritoryOption": "تحديد منطقة",
+    "roundRobinTeamLabel": "أعضاء الفريق للتناوب الدوري",
+    "noUsersAvailable": "لا يوجد مستخدمون",
+    "roundRobinHint": "يُحدَّد عضو واحد أو أكثر من الفريق. يتناوب النظام على هذا الفريق.",
+    "activeLabel": "نشط",
+    "cancelButton": "إلغاء",
+    "saveChangesButton": "حفظ التغييرات",
+    "createRuleButton": "إنشاء قاعدة",
+    "editDialogTitle": "تعديل قاعدة التوجيه",
+    "newDialogTitle": "قاعدة توجيه جديدة"
+  },
+  "roles": {
+    "access": {
+      "readWrite": "قراءة وكتابة",
+      "readOnly": "للقراءة فقط",
+      "none": "بلا وصول"
+    },
+    "cell": {
+      "readWriteTitle": "قراءة + كتابة",
+      "readOnlyTitle": "للقراءة فقط",
+      "noAccessTitle": "بلا وصول"
+    },
+    "legend": {
+      "label": "مفتاح",
+      "readWrite": "قراءة وكتابة",
+      "readOnly": "للقراءة فقط",
+      "noAccess": "بلا وصول"
+    },
+    "tabs": {
+      "matrix": "مصفوفة أدوار النظام",
+      "custom": "أدوار مخصصة"
+    },
+    "header": {
+      "title": "الأدوار والأذونات",
+      "subtitle": "مصفوفة الأذونات الافتراضية لأدوار النظام. يمكن للمسؤولين إنشاء أدوار مخصصة أدناه."
+    },
+    "tablist": {
+      "label": "عروض الأدوار"
+    },
+    "table": {
+      "label": "مصفوفة أذونات أدوار النظام",
+      "resourceHeader": "المورد"
+    },
+    "card": {
+      "systemBadge": "النظام",
+      "readCount": "{{count}} قراءة",
+      "writeCount": "{{count}} كتابة",
+      "fullAccess": "وصول كامل",
+      "noWriteAccess": "بلا صلاحية كتابة",
+      "leadFocused": "تركيز على العملاء المحتملين",
+      "postSale": "ما بعد البيع",
+      "pipelineOwner": "مالك مسار الفرص",
+      "teamLead": "قائد الفريق"
+    }
+  },
+  "orgDashboard": {
+    "greetingMorning": "صباح الخير",
+    "greetingAfternoon": "طاب نهارك",
+    "greetingEvening": "مساء الخير",
+    "pageTitle": "لوحة المعلومات",
+    "pageSubtitle": "{{companies}} شركات · {{openDeals}} صفقات مفتوحة · {{pipeline}} مسار الفرص",
+    "allAccounts": "كل الحسابات",
+    "opportunities": "الفرص",
+    "errorTitle": "تعذّر تحميل لوحة المعلومات",
+    "errorMessage": "لم تستجب نقطة نهاية ملخص مساحة العمل.",
+    "retry": "إعادة المحاولة",
+    "metricsAriaLabel": "مقاييس مساحة العمل",
+    "cockpitAriaLabel": "قمرة قيادة مساحة العمل",
+    "detailsAriaLabel": "تفاصيل مساحة العمل",
+    "statAccountsLabel": "الحسابات",
+    "statAccountsDetail": "المحفظة",
+    "statContactsLabel": "جهات الاتصال",
+    "statContactsDetail": "أشخاص",
+    "statOpenDealsLabel": "صفقات مفتوحة",
+    "statOpenDealsDetail": "مسار الفرص",
+    "statPipelineLabel": "مسار الفرص",
+    "statPipelineDetail": "المرجّح",
+    "statOverdueLabel": "متأخر",
+    "statOverdueDetail": "مهام",
+    "kpiCompaniesLabel": "الشركات",
+    "kpiCompaniesDetail": "في المحفظة",
+    "kpiContactsLabel": "جهات الاتصال",
+    "kpiContactsDetail": "صنّاع القرار",
+    "kpiLeadsLabel": "العملاء المحتملون",
+    "kpiLeadsDetail": "في القمع",
+    "kpiOpportunitiesLabel": "الفرص",
+    "kpiOpportunitiesDetail": "إجمالي العطاءات",
+    "kpiOpenPipelineLabel": "مسار الفرص المفتوح",
+    "kpiOpenPipelineDetail": "صفقات نشطة",
+    "kpiTasksLabel": "المهام",
+    "kpiTasksDetail": "متابعات",
+    "signalAccounts": "الحسابات",
+    "signalContacts": "جهات الاتصال",
+    "signalLeads": "العملاء المحتملون",
+    "signalOpportunities": "الفرص",
+    "signalOpenDeals": "صفقات مفتوحة",
+    "signalOpen": "مفتوح",
+    "signalWon": "فوز",
+    "signalLost": "خسارة",
+    "signalActive": "نشط",
+    "signalOverdue": "متأخر",
+    "overdueTasks": "مهام متأخرة"
+  },
+  "calendar": {
+    "previousWeek": "الأسبوع السابق",
+    "today": "اليوم",
+    "nextWeek": "الأسبوع التالي",
+    "filterGroup": "تصفية التقويم",
+    "providerAll": "الكل",
+    "providerGoogle": "Google",
+    "providerMicrosoft": "Microsoft",
+    "newEvent": "+ حدث جديد",
+    "loading": "جارٍ تحميل التقويم…",
+    "loadError": "تعذّر تحميل أحداث التقويم.",
+    "dayMon": "إثنين",
+    "dayTue": "ثلاثاء",
+    "dayWed": "أربعاء",
+    "dayThu": "خميس",
+    "dayFri": "جمعة",
+    "daySat": "سبت",
+    "daySun": "أحد",
+    "slotLabel": "حدث جديد {{date}} الساعة {{time}}",
+    "syncConflict": "تعارض المزامنة",
+    "createError": "تعذّر إنشاء الحدث. أعد المحاولة."
+  },
+  "contactCsvImport": {
+    "triggerButton": "لصق CSV",
+    "dialogTitle": "استيراد جهات الاتصال من CSV",
+    "dialogDescription": "تُلصق كتلة مفصولة بعلامات جدولة أو فواصل. يجب أن يكون الصف الأول ترويسة — الأعمدة المدعومة:",
+    "textareaLabel": "صفوف جهات اتصال CSV",
+    "guidancePrefix": "تُضمَّن ترويسات على الأقل لـ",
+    "guidanceAnd": "و",
+    "guidanceOptional": "الترويسات الاختيارية هي",
+    "invalidRowsError": "تحتاج {{count}} صفوف إلى تصحيح قبل الاستيراد. تُراجَع الحقول المطلوبة الناقصة وصيغة البريد الإلكتروني وقيم الانطباع.",
+    "tableStatusHeader": "الحالة",
+    "rowStatusOk": "ok",
+    "rowStatusIssues": "{{count}} مشكلة",
+    "showingFirstRows": "عرض أول 20 من {{count}} صفوف.",
+    "footerImporting": "جارٍ استيراد {{done}} من {{total}}…",
+    "footerReady": "{{ready}}/{{total}} جاهزة للاستيراد",
+    "footerAwaiting": "بانتظار اللصق",
+    "cancelButton": "إلغاء",
+    "importButtonImporting": "جارٍ الاستيراد {{done}} / {{total}}…",
+    "importButton": "استيراد {{label}}",
+    "toastImported": "تم استيراد {{count}} جهة اتصال",
+    "toastFailed": "فشل استيراد {{count}}",
+    "toastFailedDescription": "تم حفظ الصفوف الناجحة. تُراجَع البقية وتُعاد المحاولة."
   },
   "bidNoBid": {
+    "title": "مصفوفة قرار العطاء/عدم تقديم عطاء",
+    "overrideBadge": "تجاوز مسجّل",
+    "subtitle": "يُقيَّم كل معيار للحصول على توصية متابعة/عدم متابعة مدعومة بـ AI.",
+    "criteriaRated": "تم تقييم {{rated}}/{{total}} معايير.",
+    "aiCalibrate": {
+      "aria": "معايرة الدرجات بـ AI",
+      "pending": "جارٍ المعايرة…",
+      "label": "معايرة AI"
+    },
+    "defend": {
+      "aria": "الدفاع عن الدرجة بـ AI",
+      "pending": "جارٍ التحليل…",
+      "label": "الدفاع عن الدرجة"
+    },
+    "save": {
+      "aria": "حفظ درجة العطاء",
+      "pending": "جارٍ الحفظ…",
+      "label": "حفظ الدرجة"
+    },
+    "error": {
+      "saveScore": "تعذّر حفظ الدرجة. أعد المحاولة.",
+      "aiCalibrate": "فشلت معايرة AI. أعد المحاولة.",
+      "defend": "تعذّر إنشاء الدفاع عن الدرجة. أعد المحاولة."
+    },
+    "opportunity": {
+      "label": "فرصة",
+      "aria": "تحديد فرصة",
+      "loading": "جارٍ تحميل الفرص…",
+      "loadError": "تعذّر تحميل الفرص",
+      "placeholder": "— حدد فرصة —",
+      "loadFailed": "فشل تحميل الفرص. حدّث وأعد المحاولة.",
+      "hint": "تُحدَّد فرصة لتفعيل الحفظ ومعايرة AI."
+    },
+    "defensePanel": {
+      "title": "دفاع AI عن الدرجة"
+    },
+    "notes": {
+      "title": "ملاحظات القرار",
+      "placeholder": "المبرر أو المخاوف الرئيسية أو شروط تقديم العطاء…",
+      "aria": "ملاحظات قرار العطاء"
+    },
     "panel": {
       "composite": "النتيجة المركبة",
       "compositeDescription": "قدّم العرض عند {{bid}} فأكثر، ومشروط ابتداءً من {{caution}}.",
@@ -94,6 +1637,2454 @@
       "sortedAsc": "{{column}}، مرتَّب تصاعديًا. فعّل للترتيب تنازليًا.",
       "sortedDesc": "{{column}}، مرتَّب تنازليًا. فعّل للترتيب تصاعديًا."
     }
+  },
+  "opportunityDetail": {
+    "stageS1Lead": "S1 عميل محتمل",
+    "stageS1Ongoing": "S1 مستمر",
+    "stageS2Sent": "S2 مُرسَل",
+    "stageS3TechnicalIteration": "S3 تكرار تقني",
+    "stageS4Negotiation": "S4 التفاوض",
+    "stageClosedWon": "مغلقة بفوز",
+    "stageClosedLost": "مغلقة بخسارة",
+    "commandCreateTaskLabel": "إنشاء مهمة لـ {{name}}",
+    "commandCreateTaskHint": "إضافة مهمة مرتبطة بهذه الفرصة",
+    "commandBriefingLabel": "فتح إحاطة AI لـ {{name}}",
+    "commandBriefingHint": "إنشاء مستند إحاطة Dust AI",
+    "errorTitle": "تعذّر تحميل هذه الفرصة",
+    "notFoundTitle": "الفرصة غير موجودة",
+    "notFoundMessage": "ربما حُذفت الفرصة أو لا يتوفّر إذن الوصول إليها.",
+    "goBack": "رجوع",
+    "breadcrumbAriaLabel": "مسار التنقل",
+    "breadcrumbOpportunities": "الفرص",
+    "editNameLabel": "تعديل اسم الفرصة",
+    "nameRequired": "الاسم مطلوب",
+    "editCustomerLabel": "تعديل اسم العميل",
+    "customerRequired": "العميل مطلوب",
+    "editIndustryLabel": "تعديل القطاع",
+    "industryPlaceholder": "القطاع",
+    "addTaskButton": "+ مهمة",
+    "rfpPipelineButton": "مسار طلبات تقديم العروض",
+    "reviewDefaultTopic": "مراجعة المتابعة/عدم المتابعة — {{name}}",
+    "scheduleReviewButton": "جدولة مراجعة",
+    "askDustButton": "اسأل Dust",
+    "changeStageLabel": "تغيير المرحلة",
+    "editValueLabel": "تعديل قيمة الصفقة (EUR)",
+    "editProbabilityLabel": "تعديل الاحتمال",
+    "likely": "محتمل",
+    "editDueDateLabel": "تعديل تاريخ الاستحقاق",
+    "liveCollaborationLabel": "تعاون مباشر",
+    "readOnlyHint": "يلزم إذن كتابة على الفرص لتعديل هذه الفرصة."
+  },
+  "callSummary": {
+    "meddicEmpty": "لم تُستخرج إشارات MEDDIC. قد يكون النص قصيرًا جدًا أو لم يُعالَج بعد.",
+    "meddicTableLabel": "جدول إشارات MEDDIC",
+    "colDimension": "البُعد",
+    "colExtractedSignal": "الإشارة المستخرجة",
+    "colConfidence": "الثقة",
+    "dimension": {
+      "MEDDIC_METRIC": "المقاييس",
+      "MEDDIC_ECONOMIC_BUYER": "المشتري الاقتصادي",
+      "MEDDIC_DECISION_CRITERIA": "معايير القرار",
+      "MEDDIC_DECISION_PROCESS": "عملية القرار",
+      "MEDDIC_IDENTIFY_PAIN": "الألم المحدد",
+      "MEDDIC_CHAMPION": "البطل"
+    },
+    "dealSuggestionsLabel": "تحديثات مقترحة للصفقة",
+    "dealSuggestionsHeading": "تحديثات مقترحة للصفقة",
+    "dealSuggestionsNote": "هذه اقتراحات AI فقط. تُراجَع قبل تطبيقها على الصفقة.",
+    "talkRatioLabel": "نسبة الحديث",
+    "talkRatioHeading": "نسبة الحديث",
+    "speakerTalkRatio": "نسبة حديث {{speaker}}",
+    "loadingLabel": "جارٍ تحميل ملخص المكالمة",
+    "loadError": "فشل تحميل ملخص المكالمة.",
+    "aiSummaryLabel": "ملخص AI",
+    "summaryHeading": "الملخص",
+    "actionItemsLabel": "بنود الإجراء",
+    "actionItemsHeading": "بنود الإجراء",
+    "meddicSignalsLabel": "إشارات MEDDIC",
+    "meddicSignalsHeading": "إشارات MEDDIC",
+    "analysisNotRun": "لم يُشغَّل تحليل AI بعد.",
+    "transcriptUnavailable": "النص غير متاح. تُستخرج الرؤى بعد معالجة التسجيل.",
+    "analysing": "جارٍ التحليل…",
+    "extractInsights": "استخراج الرؤى الآن",
+    "reAnalysing": "جارٍ إعادة التحليل…",
+    "reExtractInsights": "إعادة استخراج الرؤى"
+  },
+  "commandPalette": {
+    "title": "لوحة الأوامر",
+    "searchPlaceholder": "بحث في الحسابات وجهات الاتصال والمهام والفرص…",
+    "searchAriaLabel": "البحث عبر مساحة العمل",
+    "searching": "جارٍ البحث…",
+    "noMatches": "لا توجد مطابقات."
+  },
+  "inlineEdit": {
+    "editLabel": "تعديل",
+    "mustBeNumber": "يجب أن يكون رقمًا"
+  },
+  "callTranscript": {
+    "emptyNotAvailable": "النص غير متاح بعد.",
+    "sectionLabel": "نص المكالمة",
+    "searchLabel": "بحث في النص",
+    "searchPlaceholder": "بحث في النص…",
+    "downloadAriaLabel": "تنزيل النص كملف نصي",
+    "downloadButton": "تنزيل",
+    "resultCountOne": "{{count}} تطابق لـ\"{{term}}\"",
+    "resultCountOther": "{{count}} تطابقات لـ\"{{term}}\"",
+    "segmentsLabel": "مقاطع النص",
+    "noSegmentsMatch": "لا توجد مقاطع تطابق البحث.",
+    "seekTo": "الانتقال إلى {{time}}"
+  },
+  "forecastList": {
+    "sectionTitle": "تفاصيل التوقّع",
+    "sectionCaption": "{{count}} مجموعات توقّع",
+    "errorTitle": "تعذّر تحميل التوقعات",
+    "retry": "إعادة المحاولة",
+    "emptyTitle": "لم يُعثر على توقعات",
+    "emptyMessage": "جرّب تغيير تصفية الفترة أو أنشئ أول توقّع.",
+    "newForecast": "توقّع جديد",
+    "tableLabel": "توقعات الإيراد",
+    "columnOwner": "المالك",
+    "columnPeriod": "الفترة",
+    "columnPipeline": "مسار الفرص",
+    "columnBestCase": "أفضل حالة",
+    "columnCommit": "الالتزام",
+    "columnClosed": "مغلق",
+    "columnTotal": "الإجمالي",
+    "unassigned": "غير مُسنَد",
+    "cellLabel": "{{category}} للفترة {{period}}",
+    "cellEditLabel": "تعديل {{category}} للفترة {{period}}",
+    "deleteLabel": "حذف التوقعات للفترة {{period}}",
+    "totalLabel": "الإجمالي:"
+  },
+  "customObjectList": {
+    "createErrorFallback": "تعذّر إنشاء السجل",
+    "notFound": "الكائن المخصص \"{{objectKey}}\" غير موجود.",
+    "manageLink": "إدارة الكائنات المخصصة",
+    "totalCount": "{{count}} إجماليًا",
+    "newRecordButton": "{{label}} جديد",
+    "loadError": "تعذّر تحميل السجلات.",
+    "emptyTitle": "لا يوجد {{label}} بعد",
+    "emptyDescription": "انقر \"{{label}} جديد\" لإنشاء أول سجل.",
+    "columnRecord": "السجل",
+    "columnUpdated": "التحديث",
+    "paginationLabel": "ترقيم الصفحات",
+    "previous": "← السابق",
+    "pageOf": "صفحة {{page}} من {{totalPages}}",
+    "next": "التالي →",
+    "newRecordTitle": "{{label}} جديد",
+    "nameLabel": "الاسم",
+    "cancel": "إلغاء",
+    "creating": "جارٍ الإنشاء…",
+    "create": "إنشاء"
+  },
+  "widgetRenderer": {
+    "chartRenderError": "خطأ في رسم المخطط",
+    "retry": "إعادة المحاولة",
+    "configure": "إعداد",
+    "duplicate": "تكرار",
+    "exportCsv": "تصدير CSV",
+    "delete": "حذف"
+  },
+  "intelTabs": {
+    "solutionsEmptyTitle": "لا توجد حلول بعد",
+    "solutionsEmptyMessage": "تُرفع المستندات ويُشغَّل الاستخراج لمراجعة الحلول المقترحة.",
+    "highConfidenceBadge": "ثقة مرتفعة",
+    "sourceLabel": "من: {{source}}",
+    "deleteAriaLabel": "حذف {{name}}",
+    "productsEmptyTitle": "لا توجد منتجات بعد",
+    "productsEmptyMessage": "تُرفع المستندات ويُشغَّل الاستخراج لمراجعة المنتجات المقترحة.",
+    "extractionsEmptyTitle": "لا توجد مستندات",
+    "extractionsEmptyMessage": "تُرفع ملفات إلى هذا الحساب لبدء الاستخراج.",
+    "extractingButton": "جارٍ الاستخراج…",
+    "reExtractButton": "إعادة الاستخراج",
+    "extractButton": "استخراج",
+    "extractionSummary": "تم العثور على {{solutionCount}} حلول و{{productCount}} منتجات"
+  },
+  "customFieldValues": {
+    "heading": "حقول مخصصة",
+    "definedCount": "{{count}} معرّفة",
+    "reset": "إعادة تعيين",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ…",
+    "toastSaved": "تم حفظ الحقول المخصصة",
+    "toastSaveFailed": "تعذّر حفظ الحقول المخصصة",
+    "selectNone": "—"
+  },
+  "createOpportunity": {
+    "triggerButton": "+ فرصة جديدة",
+    "dialogTitle": "فرصة جديدة",
+    "dialogDescription": "أضف عطاءً إلى مسار الفرص. يمكن تنقيح الاستخبارات بعد اكتمال التحقق من بيانات Dust.",
+    "customerLabel": "العميل",
+    "customerPlaceholder": "بحث في الشركات…",
+    "nameLabel": "اسم الفرصة",
+    "namePlaceholder": "Acme — تحديث تقنية المعلومات",
+    "stageLabel": "المرحلة",
+    "industryLabel": "القطاع",
+    "valueLabel": "القيمة (EUR)",
+    "probabilityLabel": "الاحتمال %",
+    "dueDateLabel": "تاريخ الاستحقاق",
+    "countryLabel": "البلد",
+    "cancel": "إلغاء",
+    "submitting": "جارٍ الإنشاء…",
+    "submit": "إنشاء فرصة",
+    "readOnlyHint": "يلزم إذن كتابة للفرص لإنشاء فرصة."
+  },
+  "companyDetail": {
+    "error": {
+      "title": "تعذّر تحميل الشركة",
+      "message": "ربما حُذفت الشركة."
+    },
+    "notFound": {
+      "title": "الشركة غير موجودة",
+      "message": "ربما حُذفت الشركة أو لا يتوفّر إذن الوصول إليها.",
+      "goBack": "رجوع"
+    },
+    "field": {
+      "companyName": "اسم الشركة",
+      "industry": "القطاع",
+      "domain": "النطاق"
+    },
+    "meta": {
+      "employees": "{{count}} موظفين",
+      "taxId": "الرقم الضريبي: {{taxId}}",
+      "parent": "الشركة الأم:"
+    },
+    "action": {
+      "cancel": "إلغاء",
+      "saving": "جارٍ الحفظ…",
+      "save": "حفظ",
+      "edit": "تعديل"
+    },
+    "tabs": {
+      "label": "أقسام الشركة"
+    },
+    "tab": {
+      "contacts": "جهات الاتصال ({{shown}})",
+      "opportunities": "الفرص ({{shown}})",
+      "cases": "الحالات ({{shown}})",
+      "notes": "الملاحظات ({{count}})",
+      "hierarchy": "التسلسل الهرمي"
+    }
+  },
+  "currencySelector": {
+    "statusUpdating": "جارٍ تحديث الأسعار المباشرة",
+    "statusCached": "استخدام أسعار مخزّنة",
+    "tooltipRatesUnavailable": "الأسعار غير متاحة: {{error}}",
+    "tooltipCurrency": "العملة: {{name}}",
+    "triggerAriaLabel": "تحديد العملة، الحالية: {{currency}}",
+    "triggerLabel": "العملة",
+    "listboxAriaLabel": "تحديد العملة",
+    "displayCurrencyLabel": "عملة العرض",
+    "autoButtonTitle": "يختار التلقائي العملة من موقع المتصفح ثم المنطقة الزمنية",
+    "autoButton": "تلقائي",
+    "statusLiveRates": "أسعار مباشرة",
+    "statusRatesUpdated": "تم تحديث الأسعار {{date}}"
+  },
+  "contact": {
+    "newContactTrigger": "+ جهة اتصال جديدة",
+    "editTitle": "تعديل {{name}}",
+    "newTitle": "جهة اتصال جديدة",
+    "editDescription": "يُحدَّث السجل ويُضاف قيد إلى سجل التدقيق.",
+    "newDescription": "يمكن إضافة شخص إلى وحدة القرار.",
+    "errorRequired": "العميل والاسم مطلوبان",
+    "errorSaveFailed": "فشل الحفظ",
+    "fieldCustomer": "العميل / الحساب",
+    "fieldName": "الاسم",
+    "fieldRole": "الدور",
+    "rolePlaceholder": "مثل الرئيس التقني، مدير البنية التحتية",
+    "fieldEmail": "البريد الإلكتروني",
+    "fieldPhone": "الهاتف",
+    "fieldInfluence": "التأثير (1–5)",
+    "fieldSentiment": "الانطباع",
+    "sentiment": {
+      "hot": "ساخن",
+      "warm": "دافئ",
+      "neutral": "محايد",
+      "cold": "بارد"
+    },
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ…",
+    "saveChanges": "حفظ التغييرات",
+    "createContact": "إنشاء جهة اتصال"
+  },
+  "references": {
+    "column": {
+      "reference": "المرجع",
+      "company": "الشركة",
+      "industry": "القطاع",
+      "tags": "الوسوم",
+      "uses": "مرات الاستخدام",
+      "lastUsed": "آخر استخدام",
+      "document": "المستند",
+      "actions": "الإجراءات"
+    },
+    "noMatch": {
+      "title": "لا توجد مراجع تطابق هذه المرشحات",
+      "message": "امسح مرشح القطاع أو الوسم، أو ابحث عن مصطلح آخر.",
+      "action": "مسح المرشحات"
+    },
+    "viewDocument": "عرض المستند",
+    "unsafeDocumentUrl": "رابط المستند غير متاح",
+    "heading": "مكتبة المراجع",
+    "subtitle": "برهان يفوز بالعطاءات — دراسة الحالة والشهادة المناسبتان لكل عرض.",
+    "newButton": "مرجع جديد",
+    "searchPlaceholder": "بحث في المراجع…",
+    "searchAriaLabel": "بحث في المراجع",
+    "filterIndustryAriaLabel": "تصفية حسب القطاع",
+    "allIndustries": "كل القطاعات",
+    "filterTagAriaLabel": "تصفية حسب الوسم",
+    "allTags": "كل الوسوم",
+    "resultCount": "{{count}} مراجع",
+    "errorTitle": "تعذّر تحميل المراجع",
+    "errorMessage": "يُرجى إعادة المحاولة بعد لحظات.",
+    "emptyTitle": "لا توجد مراجع بعد",
+    "emptyMessage": "أضف مراجع العملاء لبناء مكتبة العروض.",
+    "emptyAction": "إضافة مرجع",
+    "lastUsed": "آخر استخدام: {{date}}",
+    "deleteAriaLabel": "حذف المرجع: {{title}}",
+    "recording": "جارٍ التسجيل…",
+    "useReference": "استخدام المرجع",
+    "toast": {
+      "created": "تمت إضافة المرجع",
+      "createError": "تعذّر إنشاء المرجع",
+      "deleted": "تم حذف المرجع",
+      "deleteError": "تعذّر حذف المرجع"
+    },
+    "deleteConfirm": {
+      "title": "حذف المرجع؟",
+      "description": "ستُزال \"{{title}}\" من المكتبة. لا يمكن التراجع عن هذا.",
+      "confirmLabel": "حذف"
+    }
+  },
+  "callButton": {
+    "providerZoom": "بدء Zoom",
+    "providerTeams": "بدء Teams",
+    "providerGoogleMeet": "بدء Google Meet",
+    "providerTwilio": "مكالمة عبر Twilio",
+    "phoneDialAriaLabel": "إدخال رقم الهاتف",
+    "phoneLabel": "رقم الهاتف (E.164)",
+    "phonePlaceholder": "+1 555 000 0000",
+    "phoneInputAriaLabel": "رقم هاتف E.164",
+    "dialling": "جارٍ الطلب…",
+    "dial": "طلب",
+    "cancel": "إلغاء",
+    "starting": "جارٍ البدء…",
+    "startCall": "بدء المكالمة",
+    "menuAriaLabel": "اختيار مزوّد المكالمة"
+  },
+  "customObjectDetail": {
+    "saveFailed": "فشل الحفظ",
+    "deleteConfirmTitle": "حذف {{label}}؟",
+    "recordFallback": "سجل",
+    "deleteConfirmDescription": "سيُحذف {{recordKey}} حذفًا غير نهائي. يمكن استعادته عبر API.",
+    "thisRecordFallback": "هذا السجل",
+    "deleteConfirmLabel": "حذف",
+    "deleteFailedTitle": "فشل الحذف",
+    "deleteFailedDescription": "فشل الحذف",
+    "recordNotFound": "السجل غير موجود.",
+    "backToPlural": "رجوع إلى {{plural}}",
+    "breadcrumbAriaLabel": "مسار التنقل",
+    "deleteButton": "حذف",
+    "fieldValuesHeading": "قيم الحقول",
+    "editFieldAriaLabel": "تعديل {{field}}",
+    "saving": "…",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "editFieldValueAriaLabel": "تعديل {{field}}: {{value}}",
+    "emptyFields": "لم تُعرَّف حقول بعد. تُضاف الحقول في",
+    "objectEditorLink": "محرّر الكائن",
+    "emptyFieldsPeriod": ".",
+    "createdAt": "أُنشئ {{time}}",
+    "updatedAt": "حُدّث {{time}}",
+    "deletedAt": "حُذف {{time}}"
+  },
+  "predictiveAdmin": {
+    "modelTableLoadingLabel": "جارٍ تحميل النماذج…",
+    "modelTableEmpty": "لا توجد نماذج {{entityType}} مدرَّبة بعد. يُنقَر \"إعادة التدريب الآن\" لتدريب النموذج الأول.",
+    "modelTableCaption": "سجل النموذج التنبؤي لـ {{entityType}}",
+    "colVersion": "الإصدار",
+    "colAccuracyMetrics": "مقاييس الدقة",
+    "colSamples": "العيّنات",
+    "colTrained": "تاريخ التدريب",
+    "colActive": "نشط",
+    "metricAuc": "AUC",
+    "metricF1": "F1",
+    "metricPrecision": "إحكام",
+    "metricRecall": "استرجاع",
+    "activeModelLabel": "النموذج النشط",
+    "inactiveModelLabel": "غير نشط",
+    "sectionHeading": "نموذج تقييم {{entityType}}",
+    "sectionSubtitle": "انحدار لوجستي · لكل مؤسسة · يُعاد التدريب أسبوعيًا",
+    "retrainButtonLabel": "إعادة تدريب نموذج {{entityType}} الآن",
+    "retrainPending": "جارٍ الإدراج في الانتظار…",
+    "retrainButton": "إعادة التدريب الآن",
+    "retrainError": "تعذّرت إعادة التدريب. يُرجى إعادة المحاولة.",
+    "pageTitle": "التقييم التنبؤي",
+    "pageSubtitle": "تقييم العملاء المحتملين والفرص استنادًا إلى ML — مُدرَّب على سجل الصفقات المغلقة في المؤسسة. يُعاد تدريب النماذج تلقائيًا كل يوم أحد عند الساعة 02:00 UTC.",
+    "dataPrivacyLabel": "خصوصية البيانات:",
+    "dataPrivacyBody": "تحتوي عناصر النموذج على الأوزان المتعلَّمة فقط — دون بيانات صفقات خام أو أسماء أو عناوين بريد إلكتروني. تدرّب كل مؤسسة نموذجها المعزول. تُخزَّن الدرجات مؤقتًا لمدة ساعة واحدة في Redis وتُبطَل عند تحديث السجلات."
+  },
+  "scoreFactors": {
+    "featureLabel": {
+      "dealValue": "قيمة الصفقة",
+      "pipelineStage": "مرحلة مسار الفرص",
+      "daysInStage": "أيام في المرحلة",
+      "dealAge": "عمر الصفقة",
+      "daysToClose": "أيام حتى الإغلاق",
+      "contactCount": "عدد جهات الاتصال",
+      "meetingsHeld": "اجتماعات معقودة",
+      "emailsExchanged": "رسائل متبادلة",
+      "lastActivity": "آخر نشاط",
+      "ownerWinRate90d": "معدل فوز المالك (90 يومًا)",
+      "qualificationScore": "درجة التأهيل",
+      "contactSeniority": "أقدمية جهة الاتصال",
+      "engagement30d": "التفاعل (30 يومًا)",
+      "emailDomain": "نطاق البريد الإلكتروني",
+      "companySize": "حجم الشركة",
+      "activityRecency": "حداثة النشاط",
+      "budget": "الميزانية",
+      "authority": "السلطة",
+      "need": "الحاجة",
+      "timeline": "الخط الزمني"
+    },
+    "contributionAria": "المساهمة: {{value}}",
+    "loadingAria": "جارٍ تحميل عوامل الدرجة",
+    "tableCaption": "العوامل المساهمة في الدرجة",
+    "tableHeaderFactor": "العامل",
+    "tableHeaderContribution": "المساهمة",
+    "title": "تحليل درجة ML",
+    "chartAria": "أعلى {{count}} عوامل تؤثر في {{label}}",
+    "footer": "إصدار النموذج {{modelVersion}} · انحدار لوجستي · يُحدَّث كل ساعة",
+    "labelLeadScore": "درجة العميل المحتمل",
+    "labelWinProbability": "احتمال الفوز"
+  },
+  "files": {
+    "cardLabel": "الملفات",
+    "heading": "الملفات",
+    "attachmentCount": "{{count}} مرفق/مرفقات",
+    "uploading": "جارٍ الرفع…",
+    "upload": "رفع",
+    "dropzoneLabel": "سحب الملفات إلى هنا للرفع",
+    "dropPrompt": "إفلات الملفات أو النقر للاستعراض",
+    "acceptedFormats": "PDF وDOCX وXLSX والصور — حتى 50 MB",
+    "unsupportedType": "نوع ملف غير مدعوم: {{type}}",
+    "unknownType": "غير معروف",
+    "loadErrorTitle": "تعذّر تحميل الملفات",
+    "unknownError": "خطأ غير معروف",
+    "emptyTitle": "لا توجد ملفات بعد",
+    "emptyMessage": "يُرفع ملف لإرفاق مستندات بهذا الحساب.",
+    "deleteTitle": "حذف الملف؟",
+    "deleteDescription": "تُزال \"{{name}}\" نهائيًا. لا يمكن التراجع عن هذا.",
+    "cancel": "إلغاء",
+    "deleting": "جارٍ الحذف…",
+    "delete": "حذف",
+    "downloadTitle": "تنزيل {{name}}",
+    "unknownUploader": "غير معروف",
+    "deleteAria": "حذف {{name}}"
+  },
+  "analyticsDashboard": {
+    "confirmRemoveWidget": "إزالة هذه الأداة؟",
+    "title": "التحليلات",
+    "switchDashboardAria": "تبديل لوحة المعلومات",
+    "selectDashboard": "تحديد لوحة المعلومات",
+    "manageDashboards": "إدارة لوحات المعلومات",
+    "reportsLink": "التقارير",
+    "newReportLink": "تقرير جديد",
+    "addWidget": "إضافة أداة",
+    "noDashboardsTitle": "لا توجد لوحات معلومات",
+    "noDashboardsMessage": "أنشئ أول لوحة معلومات لبدء تصوّر بياناتك.",
+    "createDashboard": "إنشاء لوحة معلومات",
+    "loadWidgetsError": "تعذّر تحميل الأدوات",
+    "emptyDashboardTitle": "لوحة معلومات فارغة",
+    "emptyDashboardMessage": "أضف أول أداة لبدء تصوّر البيانات."
+  },
+  "pageHead": {
+    "companyProfileIncomplete": "ملف الشركة غير مكتمل",
+    "dashboardSubtitle": "اليوم: {{date}} - قمرة قيادة {{company}}",
+    "dashboardTitle": "لوحة المعلومات",
+    "accountStatusSummaryLabel": "ملخص حالة الحساب",
+    "notScored": "لم تُحتسب الدرجة بعد",
+    "notScoredTitle": "تحتاج تغطية الإشارات إلى جهات اتصال هذا الحساب وصفقاته ومهامه",
+    "attributionConfidence": "ثقة الإسناد {{percent}}%",
+    "refreshed": "تم التحديث {{time}}",
+    "externalFreshness": "خارجي {{freshness}} - {{time}}",
+    "externalNotSynced": "لم يُزامَن المصدر الخارجي",
+    "opportunityLinked": "فرصة مرتبطة",
+    "noOpportunityLinked": "لا توجد فرصة مرتبطة",
+    "removeFromFavorites": "إزالة من المفضلة",
+    "addToFavorites": "إضافة إلى المفضلة",
+    "starred": "مميّزة",
+    "star": "تمييز",
+    "enrichTitle": "تحديث مصادر البيانات المتاحة",
+    "enriching": "جارٍ الإثراء…",
+    "enrichNow": "إثراء الآن",
+    "printTitle": "طباعة قمرة القيادة كموجز من صفحة واحدة",
+    "print": "طباعة",
+    "generateBriefTitle": "إنشاء موجز لـ {{name}}",
+    "generateBrief": "إنشاء موجز",
+    "createOpportunityTitle": "إنشاء فرصة لـ {{name}}",
+    "createOpportunity": "إنشاء فرصة",
+    "briefIndustry": "القطاع",
+    "briefHeadcount": "عدد الموظفين",
+    "briefDomain": "النطاق",
+    "briefLegalName": "الاسم القانوني",
+    "briefFounded": "التأسيس",
+    "briefConfidence": "الثقة: {{percent}}%"
+  },
+  "publicBooking": {
+    "errorNotFound": "صفحة الحجز غير موجودة",
+    "errorAvailabilityFailed": "تعذّر جلب التوفر",
+    "errorUnavailable": "صفحة الحجز غير متاحة",
+    "errorSlotTaken": "لم يعد هذا الوقت متاحًا.",
+    "errorBookingFailed": "فشل الحجز",
+    "notFoundTitle": "صفحة الحجز غير موجودة",
+    "notFoundBody": "رابط الجدولة هذا غير صالح أو لم يعد يقبل الاجتماعات.",
+    "eyebrow": "جدولة Polo PreSales",
+    "loadingTitle": "جارٍ تحميل صفحة الحجز",
+    "confirmedTitle": "تم تأكيد الحجز",
+    "confirmedBody": "تم الحجز. رسالة التأكيد في الطريق.",
+    "calendarAriaLabel": "اختيار تاريخ الحجز",
+    "chooseDayHeading": "اختر يومًا",
+    "availableTimesHeading": "الأوقات المتاحة",
+    "slotAriaLabel": "الموعد المتاح {{slot}}",
+    "noSlots": "لا توجد مواعيد متاحة في هذا اليوم. يمكن تجربة تاريخ آخر.",
+    "selectedLabel": "المحدد:",
+    "nameLabel": "الاسم",
+    "emailLabel": "البريد الإلكتروني",
+    "confirmButton": "تأكيد الحجز"
+  },
+  "oppToolbar": {
+    "kpiOpportunities": "الفرص",
+    "kpiRevenue": "الإيراد",
+    "kpiWeightedRevenue": "مرجّح",
+    "kpiOpen": "مفتوحة",
+    "kpiOpenCount": "مفتوحة",
+    "kpiOpenPipeline": "مسار الفرص المفتوح",
+    "kpiWeightedRevenuePage": "مرجّح (الصفحة)",
+    "kpiOpportunitiesPage": "الفرص (الصفحة)",
+    "kpiRevenuePage": "الإيراد (الصفحة)",
+    "kpiOpenPage": "مفتوحة (الصفحة)",
+    "kpiRegionLabel": "ملخص KPI للفرص",
+    "title": "الفرص",
+    "resultsFor": "نتائج لـ",
+    "clear": "مسح",
+    "stageOpportunities": "فرص {{stage}}",
+    "clearFilter": "مسح التصفية",
+    "bidsInFlight": "{{count}} عطاءات قيد التنفيذ · يمكن تعديل أي خلية بالنقر عليها.",
+    "exportingLabel": "جارٍ تصدير الفرص…",
+    "exportLabel": "تصدير الفرص الظاهرة بتنسيق CSV",
+    "exporting": "جارٍ التصدير…",
+    "exportCsv": "تصدير CSV",
+    "stageFilterGroupLabel": "تصفية الفرص حسب المرحلة",
+    "stageAll": "الكل",
+    "dueFilterGroupLabel": "تصفية الفرص حسب تاريخ الاستحقاق",
+    "dueWithin7": "الاستحقاق ≤ 7 أيام",
+    "dueOverdue": "متأخر",
+    "bulkActionsLabel": "إجراءات جماعية",
+    "selectedCount": "{{count}} محددة",
+    "moveSelectionLabel": "نقل التحديد إلى مرحلة",
+    "moveToStage": "نقل إلى مرحلة…",
+    "deleteSelected": "حذف المحدد",
+    "clearSelection": "مسح"
+  },
+  "newLead": {
+    "toastNameRequired": "الاسم الأول واسم العائلة مطلوبان",
+    "toastCreateFailed": "تعذّر إنشاء العميل المحتمل",
+    "breadcrumbLabel": "مسار التنقل",
+    "breadcrumbLeads": "العملاء المحتملون",
+    "breadcrumbCurrent": "عميل محتمل جديد",
+    "heading": "عميل محتمل جديد",
+    "subtitle": "يمكن إضافة عميل محتمل جديد إلى مسار الفرص.",
+    "labelFirstName": "الاسم الأول",
+    "labelLastName": "اسم العائلة",
+    "labelEmail": "البريد الإلكتروني",
+    "labelPhone": "الهاتف",
+    "labelCompany": "الشركة",
+    "labelTitle": "المسمى الوظيفي",
+    "labelSource": "المصدر",
+    "sourceWebsite": "الموقع",
+    "sourceReferral": "إحالة",
+    "sourceEvent": "فعالية",
+    "sourceColdOutreach": "تواصل بارد",
+    "sourcePartner": "شريك",
+    "sourceSocial": "تواصل اجتماعي",
+    "sourceOther": "أخرى",
+    "labelPriority": "الأولوية",
+    "priorityLow": "منخفضة",
+    "priorityMedium": "متوسطة",
+    "priorityHigh": "مرتفعة",
+    "priorityCritical": "حرجة",
+    "labelScore": "الدرجة",
+    "submitPending": "جارٍ الإنشاء…",
+    "submit": "إنشاء عميل محتمل",
+    "cancel": "إلغاء",
+    "readOnlyNotice": "يلزم إذن الكتابة على العملاء المحتملين لإنشاء عميل محتمل.",
+    "backToLeads": "رجوع إلى العملاء المحتملين"
+  },
+  "topAccounts": {
+    "heading": "أبرز الحسابات",
+    "badgeCurated": "منسّقة — أعلى 10 عالميًا",
+    "badgeAuto": "مرتّبة تلقائيًا حسب قيمة مسار الفرص",
+    "subtitleCurated": "أعلى 10 عالميًا، اختارها المسؤولون ورتّبوها في الإعدادات.",
+    "subtitleAuto": "الحسابات الأعلى قيمة مرتّبة حسب إجمالي مسار الفرص والإيراد.",
+    "searchLabel": "بحث في أبرز الحسابات",
+    "searchPlaceholder": "بحث في أبرز الحسابات…",
+    "industryLabel": "تصفية أبرز الحسابات حسب القطاع",
+    "industriesUnavailable": "القطاعات غير متاحة",
+    "allIndustries": "كل القطاعات",
+    "industryLoadError": "تعذّر تحميل عوامل تصفية القطاع.",
+    "retry": "إعادة المحاولة",
+    "resultCount": "{{count}} حساب",
+    "errorTitle": "تعذّر تحميل أبرز الحسابات",
+    "errorMessage": "تعذّر تحميل أبرز الحسابات.",
+    "emptyTitle": "لا توجد بيانات حسابات بعد",
+    "emptyMessage": "تُضاف فرص ذات قيم لعرض أبرز الحسابات مرتّبة حسب مسار الفرص.",
+    "totalPipeline": "إجمالي مسار الفرص",
+    "won": "فوز",
+    "openDeals": "{{count}} صفقات مفتوحة",
+    "contacts": "{{count}} جهات اتصال",
+    "sourceCurated": "أعلى 10 منسّقة",
+    "sourceAuto": "ترتيب تلقائي",
+    "viewAll": "عرض الكل",
+    "empty": "لا توجد حسابات مرتّبة بعد — تُضاف قيم الفرص أو يُنسَّق أعلى 10 في الإعدادات.",
+    "portfolioAccount": "حساب المحفظة"
+  },
+  "forecasts": {
+    "title": "توقعات الإيراد",
+    "subtitle": "هل ستحقّق العطاءات قيد التجربة الرقم المستهدف؟ مسار الفرص وأفضل حالة والالتزام والمغلق حسب الفترة.",
+    "newForecast": "توقّع جديد",
+    "periodFilterLabel": "تصفية الفترة",
+    "periodMonthly": "شهري",
+    "periodQuarterly": "ربع سنوي",
+    "periodYearly": "سنوي",
+    "totalsLabel": "إجماليات التوقّع للفترة المحددة",
+    "totalCommit": "الالتزام",
+    "totalBestCase": "أفضل حالة",
+    "totalPipeline": "مسار الفرص",
+    "totalClosed": "مغلق",
+    "toastUpdated": "تم تحديث التوقّع",
+    "toastUpdateFailed": "تعذّر تحديث التوقّع",
+    "toastCreated": "تم إنشاء التوقّع",
+    "toastCreateFailed": "تعذّر إنشاء التوقّع",
+    "toastDeleted": "تم حذف التوقعات",
+    "toastDeleteFailed": "تعذّر حذف التوقعات",
+    "deleteConfirmTitle": "حذف التوقعات للفترة {{period}}؟",
+    "deleteConfirmDescription": "سيُزيل هذا كل توقعات الفئات لهذه الفترة وهذا المالك.",
+    "unknownError": "خطأ غير معروف"
+  },
+  "cartesianCharts": {
+    "lineChartAriaLabel": "مخطط خطي",
+    "barChartAriaLabel": "مخطط شريطي",
+    "areaChartAriaLabel": "مخطط مساحي",
+    "funnelChartAriaLabel": "مخطط قمعي",
+    "scatterChartAriaLabel": "مخطط تشتت"
+  },
+  "commandCenter": {
+    "region": {
+      "ariaLabel": "مركز قيادة Polo PreSales"
+    },
+    "kicker": "مركز قيادة Polo PreSales",
+    "actions": {
+      "ariaLabel": "إشارات قرار الحساب"
+    },
+    "badge": {
+      "ready": "{{count}}% جاهز",
+      "stackSignals": "{{count}} إشارات المكدس التقني"
+    },
+    "signal": {
+      "readiness": {
+        "label": "تقدير جاهزية العطاء",
+        "detailReady": "جاهز للمراجعة التنفيذية",
+        "detailFocus": "يحتاج إلى تركيز ما قبل البيع"
+      },
+      "source": {
+        "label": "تغطية المصدر",
+        "detail": "{{count}} مصدر منسوب"
+      },
+      "decision": {
+        "label": "تغطية القرار"
+      },
+      "risk": {
+        "label": "عبء المخاطر المفتوحة",
+        "valueHigh": "{{count}} مرتفعة",
+        "valueOpen": "{{count}} مفتوحة",
+        "detailEscalate": "تصعيد قبل العرض",
+        "detailManageable": "يمكن التعامل معها بمتابعة المالك"
+      }
+    },
+    "nextMove": {
+      "unblock": "يُزال العائق عن {{label}} قبل بوابة العطاء.",
+      "escalateWithOwner": "يُصعَّد {{title}} مع {{owner}} قبل اعتماد العرض.",
+      "escalate": "يُصعَّد {{title}} قبل اعتماد العرض.",
+      "champion": "يُعتمد {{name}} بطلًا لمحطة ما قبل البيع التالية.",
+      "refreshSources": "يُحدَّث التحقق من البيانات لتعزيز إثبات الجانب القانوني والشعار والسوق ومصدر الحساب.",
+      "advance": "تُقدَّم الخطوة التالية للعرض باستخدام سياق الحساب المتاح ومواءمة المالك."
+    },
+    "committee": {
+      "champions": "{{count}} بطل مُحدَّد",
+      "buyers": "{{count}} مشترٍ مُحدَّد",
+      "stakeholders": "{{count}} صاحب مصلحة مُحدَّد",
+      "empty": "تحديد المشتري والبطل"
+    },
+    "footer": {
+      "primarySignal": {
+        "label": "الإشارة التجارية الأساسية",
+        "pending": "مسار الفرص قيد الانتظار"
+      },
+      "weightedValue": {
+        "label": "قيمة الحساب المرجّحة",
+        "notVerified": "غير متحقَّق"
+      },
+      "ownerMap": {
+        "label": "خريطة مالك القرار",
+        "contacts": "{{count}} جهات اتصال مُحدَّدة"
+      }
+    }
+  },
+  "contactDetail": {
+    "errorTitle": "تعذّر تحميل جهة الاتصال",
+    "errorMessage": "ربما حُذفت جهة الاتصال.",
+    "notFoundTitle": "جهة الاتصال غير موجودة",
+    "notFoundMessage": "ربما حُذفت جهة الاتصال أو لا يتوفر إذن الوصول إليها.",
+    "backToContacts": "رجوع إلى جهات الاتصال",
+    "breadcrumbLabel": "مسار التنقل",
+    "contacts": "جهات الاتصال",
+    "noRole": "بدون دور",
+    "influence": "التأثير: {{value}}/5",
+    "added": "أُضيفت",
+    "opportunitiesTitle": "الفرص",
+    "relatedCount": "{{count}} مرتبطة",
+    "noOpportunities": "لا توجد فرص لـ {{customer}}.",
+    "tasksTitle": "المهام",
+    "noTasks": "لا توجد مهام مرتبطة.",
+    "dueDate": "الاستحقاق {{date}}",
+    "noDueDate": "بدون تاريخ استحقاق",
+    "notesTitle": "ملاحظات",
+    "noNotes": "لا توجد ملاحظات لهذا الحساب.",
+    "unknownAuthor": "غير معروف",
+    "liveCollaboration": "تعاون مباشر"
+  },
+  "keyAccounts": {
+    "title": "الحسابات الاستراتيجية",
+    "subtitle": "حسابات استراتيجية إقليمية مملوكة لمسار الفرص والتغطية والمتابعة التنفيذية — بمعزل عن أفضل 10 العالمية المنتقاة.",
+    "searchLabel": "بحث في الحسابات الرئيسية",
+    "searchPlaceholder": "بحث في الحسابات الرئيسية…",
+    "industryFilterLabel": "تصفية الحسابات الرئيسية حسب القطاع",
+    "industriesUnavailable": "القطاعات غير متاحة",
+    "allIndustries": "كل القطاعات",
+    "industryFilterError": "تعذّر تحميل عوامل تصفية القطاع.",
+    "retry": "إعادة المحاولة",
+    "resultCount_one": "{{count}} حساب",
+    "resultCount_other": "{{count}} حساب",
+    "statKeyAccounts": "الحسابات الرئيسية",
+    "statTotalPipeline": "إجمالي مسار الفرص",
+    "statOpenDeals": "صفقات مفتوحة",
+    "statContacts": "جهات الاتصال",
+    "errorTitle": "تعذّر تحميل الحسابات الرئيسية",
+    "errorMessage": "لم تستجب نقطة نهاية الحسابات الرئيسية.",
+    "emptyTitle": "لا توجد حسابات رئيسية بعد",
+    "emptyMessage": "علّم الشركات المهمة استراتيجيًا كحسابات رئيسية من صفحة الشركات.",
+    "metricPipeline": "مسار الفرص",
+    "metricOpenDeals": "صفقات مفتوحة",
+    "metricContacts": "جهات اتصال",
+    "resultCount_zero": "{{count}} حسابات",
+    "resultCount_two": "{{count}} حسابان",
+    "resultCount_few": "{{count}} حسابات",
+    "resultCount_many": "{{count}} حساب"
+  },
+  "companyTabs": {
+    "contacts": {
+      "emptyTitle": "لا توجد جهات اتصال بعد",
+      "emptyMessage": "أضف جهات اتصال من صفحة جهات الاتصال.",
+      "colName": "الاسم",
+      "colRole": "الدور",
+      "colEmail": "البريد الإلكتروني",
+      "colPhone": "الهاتف"
+    },
+    "opportunities": {
+      "emptyTitle": "لا توجد فرص بعد",
+      "emptyMessage": "أنشئ فرصًا مرتبطة بهذه الشركة.",
+      "colCode": "الرمز",
+      "colName": "الاسم",
+      "colStage": "المرحلة",
+      "colValue": "القيمة",
+      "colProbability": "الاحتمال"
+    },
+    "cases": {
+      "emptyTitle": "لا توجد حالات مفتوحة",
+      "emptyMessage": "الوضع سليم — لا توجد حالات دعم نشطة.",
+      "colNumber": "الرقم",
+      "colSubject": "الموضوع",
+      "colStatus": "الحالة",
+      "colPriority": "الأولوية"
+    },
+    "notes": {
+      "emptyTitle": "لا توجد ملاحظات بعد",
+      "emptyMessage": "ستظهر هنا الملاحظات المرتبطة بهذه الشركة.",
+      "byAuthor": "بواسطة {{author}}"
+    },
+    "hierarchy": {
+      "directChildren": "الفروع المباشرة",
+      "errorTitle": "تعذّر تحميل الهيكل",
+      "errorMessage": "تعذّر جلب هيكل الحساب."
+    }
+  },
+  "oppInlineEditCells": {
+    "unknownStage": "غير معروف",
+    "stageTriggerAria": "المرحلة: {{stage}}. انقر للتغيير.",
+    "numberTriggerAria": "{{value}}. انقر للتعديل.",
+    "dateTriggerAria": "الاستحقاق {{date}}. انقر للتعديل."
+  },
+  "liveDataMesh": {
+    "availabilityAvailable": "{{count}} متاحة",
+    "availabilityConnected": "{{enabled}}/{{total}} متصلة",
+    "regionLabel": "مصادر البيانات المتصلة",
+    "titleAvailable": "مصادر البيانات المتاحة",
+    "titleConnected": "مصادر البيانات المتصلة",
+    "captionAvailable": "مصادر تتاح بعد بيانات الاعتماد أو إعداد الموصّل",
+    "captionConnected": "واجهات API المُعدّة وعناصر الواجهة وموجزات البيانات المُحقَّقة",
+    "kicker": "توفّر المصادر",
+    "publicSources": "مصادر عامة",
+    "connectorStatus": "حالة الموصّل",
+    "signalsLabel": "إشارات المصادر المتاحة",
+    "loading": "جارٍ التحقق من المصادر المُعدّة…",
+    "error": "تم تحميل سجل الموصّلات؛ وأعاد فحص المصادر خطأ.",
+    "empty": "لم تُرجع إشارة عامة لهذا الحساب بعد.",
+    "connectorAria": "حالة {{name}}: {{status}}"
+  },
+  "serviceDesk": {
+    "title": "مكتب الخدمة",
+    "searchPlaceholder": "بحث في الحالات…",
+    "searchAriaLabel": "بحث في الحالات",
+    "exportCsv": "تصدير CSV",
+    "filterByStatusAriaLabel": "تصفية حسب الحالة",
+    "filterByPriorityAriaLabel": "تصفية حسب الأولوية",
+    "statusOption": {
+      "all": "الكل",
+      "new": "جديدة",
+      "open": "مفتوحة",
+      "waitingCustomer": "بانتظار العميل",
+      "waitingInternal": "بانتظار داخلي",
+      "resolved": "محلولة",
+      "closed": "مغلقة",
+      "escalated": "مُصعَّدة"
+    },
+    "priorityOption": {
+      "all": "الكل",
+      "low": "منخفضة",
+      "medium": "متوسطة",
+      "high": "مرتفعة",
+      "critical": "حرجة"
+    },
+    "csv": {
+      "caseNumber": "رقم الحالة",
+      "subject": "الموضوع",
+      "status": "الحالة",
+      "priority": "الأولوية",
+      "owner": "المالك",
+      "source": "المصدر",
+      "satisfaction": "الرضا",
+      "created": "أُنشئ",
+      "resolved": "حُلّ"
+    },
+    "error": {
+      "title": "تعذّر تحميل الحالات"
+    },
+    "retry": "إعادة المحاولة",
+    "empty": {
+      "title": "لا توجد حالات بعد",
+      "message": "ستظهر حالات الخدمة هنا."
+    },
+    "column": {
+      "subject": "الموضوع",
+      "status": "الحالة",
+      "priority": "الأولوية",
+      "owner": "المالك",
+      "source": "المصدر"
+    },
+    "resultCount": {
+      "one": "{{count}} حالة",
+      "other": "{{count}} حالات"
+    },
+    "resultMatching": " المطابقة لـ \"{{search}}\""
+  },
+  "widgetConfig": {
+    "title": "تهيئة الأداة",
+    "closeAriaLabel": "إغلاق",
+    "titleLabel": "العنوان",
+    "titlePlaceholder": "عنوان الأداة",
+    "dataSourceLabel": "مصدر البيانات (تقرير)",
+    "dataSourceNone": "— لا شيء (تجريبي ثابت) —",
+    "chartTypeLabel": "نوع المخطط",
+    "type": {
+      "kpi": {
+        "label": "بطاقة KPI",
+        "description": "مقياس واحد مع الاتجاه"
+      },
+      "line": {
+        "label": "مخطط خطي",
+        "description": "الاتجاه عبر الزمن"
+      },
+      "bar": {
+        "label": "مخطط شريطي",
+        "description": "مقارنة الفئات"
+      },
+      "area": {
+        "label": "مخطط مساحي",
+        "description": "الحجم عبر الزمن"
+      },
+      "pie": {
+        "label": "مخطط دائري",
+        "description": "توزيع (≤6 شرائح)"
+      },
+      "donut": {
+        "label": "مخطط حلقي",
+        "description": "توزيع مع قيمة مركزية"
+      },
+      "funnel": {
+        "label": "قمع",
+        "description": "تراجع مراحل مسار الفرص"
+      },
+      "gauge": {
+        "label": "عداد",
+        "description": "التقدم نحو الهدف"
+      },
+      "table": {
+        "label": "جدول",
+        "description": "شبكة بيانات جدولية"
+      },
+      "scatter": {
+        "label": "تشتت",
+        "description": "الارتباط بين مقياسين"
+      },
+      "radar": {
+        "label": "رادار",
+        "description": "مقارنة متعددة الأبعاد"
+      },
+      "heatmap": {
+        "label": "خريطة حرارية",
+        "description": "كثافة النشاط عبر الزمن"
+      }
+    },
+    "xAxisLabel": "حقل المحور السيني",
+    "yAxisLabel": "حقل المحور الصادي",
+    "cancel": "إلغاء",
+    "save": "حفظ الأداة",
+    "saving": "جارٍ الحفظ…"
+  },
+  "auditLogInsights": {
+    "activityCadenceTitle": "وتيرة النشاط",
+    "activityCadenceSubtitle": "حجم الأحداث الفعلي من صفحة الأدلة المحمّلة حاليًا.",
+    "attentionEventsBadge": "{{percent}}% أحداث تستدعي الانتباه",
+    "eventVolumeChartLabel": "مخطط حجم أحداث التدقيق",
+    "bucketTooltip": "{{label}}: {{count}} أحداث",
+    "forensicWatchlistTitle": "قائمة المراقبة الجنائية",
+    "forensicWatchlistSubtitle": "فرز سريع من مجموعة الأدلة المحمّلة.",
+    "topActorLabel": "أبرز فاعل",
+    "hottestTargetLabel": "أكثر الأهداف استهدافًا",
+    "reviewQueueLabel": "قائمة انتظار المراجعة",
+    "noneValue": "لا شيء",
+    "eventsCount": "{{count}} أحداث",
+    "noLoadedEvents": "لا توجد أحداث محمّلة",
+    "attentionEventsValue": "{{count}} أحداث تستدعي الانتباه",
+    "reviewQueueDetail": "{{destructive}} إتلافي، {{security}} أمن/API",
+    "evidenceQualityTitle": "جودة الأدلة",
+    "evidenceQualitySubtitle": "إشارات تغطية تجعل التدقيق قابلًا للدفاع.",
+    "scoreOutOf": "{{score}}/100",
+    "structuredDiffsLabel": "فروقات منظّمة",
+    "eventsRatioDetail": "{{count}}/{{total}} أحداث",
+    "targetReferencesLabel": "مراجع الهدف",
+    "linkedRatioDetail": "{{count}}/{{total}} مرتبطة",
+    "actorAttributionLabel": "إسناد الفاعل",
+    "attributedRatioDetail": "{{count}}/{{total}} مُسندة",
+    "healthRowProgressLabel": "{{label}}: {{value}}%"
+  },
+  "scheduleReview": {
+    "errorPickDateTime": "يلزم تحديد تاريخ ووقت",
+    "toastScheduledTitle": "تمت جدولة المراجعة",
+    "toastScheduledWithLink": "أُضيف رابط الاجتماع إلى تبويب المكالمات.",
+    "toastScheduledNoLink": "أُضيف إلى تبويب المكالمات.",
+    "errorServerRejected": "رفض الخادم الطلب.",
+    "errorProviderUnreachable": "تعذّر الوصول إلى {{provider}}. يُوصَل من الإعدادات إلى التكاملات، أو يُختار مزوّد آخر.",
+    "triggerButton": "جدولة مراجعة",
+    "dialogTitle": "جدولة مراجعة",
+    "dialogDescription": "يُنشأ اجتماع مراجعة للمتابعة/عدم المتابعة أو لطلب تقديم العروض على تقويم متصل.",
+    "fieldTopic": "الموضوع",
+    "placeholderTopic": "مراجعة المتابعة/عدم المتابعة",
+    "fieldProvider": "المزوّد",
+    "fieldDuration": "المدة (دقيقة)",
+    "fieldStart": "البداية",
+    "fieldAttendees": "الحضور (عناوين بريد مفصولة بفواصل)",
+    "cancel": "إلغاء",
+    "submitting": "جارٍ الجدولة…",
+    "submit": "جدولة"
+  },
+  "search": {
+    "heading": "بحث",
+    "form": {
+      "ariaLabel": "بحث مساحة العمل"
+    },
+    "input": {
+      "placeholder": "البحث في الفرص وجهات الاتصال والشركات والمهام والملاحظات والطلبات…",
+      "ariaLabel": "بحث مساحة العمل"
+    },
+    "tab": {
+      "all": "الكل",
+      "opportunity": "الفرص",
+      "lead": "العملاء المحتملون",
+      "contact": "جهات الاتصال",
+      "company": "الشركات",
+      "task": "المهام",
+      "note": "ملاحظات"
+    },
+    "type": {
+      "opportunity": "فرصة",
+      "lead": "عميل محتمل",
+      "contact": "جهة اتصال",
+      "company": "شركة",
+      "task": "مهمة",
+      "note": "ملاحظة"
+    },
+    "results": {
+      "ariaLabel": "نتائج البحث",
+      "countOne": "{{count}} نتيجة",
+      "countOther": "{{count}} نتائج"
+    },
+    "error": {
+      "title": "فشل البحث",
+      "message": "حدث خطأ ما"
+    },
+    "empty": {
+      "title": "لا توجد نتائج",
+      "message": "تعذّر العثور على ما يطابق \"{{query}}\". يمكن تجربة كلمات مختلفة أو مراجعة الإملاء."
+    },
+    "guidance": {
+      "ariaLabel": "إرشادات البحث",
+      "title": "البحث في مساحة العمل",
+      "message": "أدخل كلمة أعلاه للعثور على الفرص وجهات الاتصال والشركات والمهام والملاحظات وطلبات البيع."
+    }
+  },
+  "createWebhook": {
+    "adminOnlyBadge": "للمسؤول فقط",
+    "editTitle": "تعديل اشتراك ويب هوك",
+    "createTitle": "اشتراك ويب هوك جديد",
+    "subtitle": "تُستخدم نقطة نهاية HTTPS للإنتاج. يوقّع Polo PreSales كل عملية تسليم بـ HMAC-SHA256.",
+    "closeAriaLabel": "إغلاق",
+    "endpointUrlLabel": "URL نقطة النهاية",
+    "endpointUrlPlaceholder": "https://your-app.com/webhooks/polo",
+    "endpointUrlHelp": "HTTPS مطلوب. يُرفض المضيف المحلي والعناوين الخاصة وأسماء المضيفين الداخلية.",
+    "eventsLabel": "الأحداث",
+    "eventsHelp": "تُختار فقط الأحداث التي يعالجها المستقبِل فعلًا.",
+    "selectAll": "تحديد الكل",
+    "clear": "مسح",
+    "securityContractTitle": "عقد الأمان",
+    "securityReturn2xx": "تُرجَع حالة 2xx خلال 10 ثوانٍ.",
+    "securityVerifyHeader": "تُحقَّق ترويسة X-Polo-Signature.",
+    "securityRejectOld": "تُرفَض التواقيع الأقدم من 5 دقائق.",
+    "securityAsync": "يُعالَج العمل الثقيل بشكل غير متزامن بعد الإقرار.",
+    "selectedEventsLabel": "الأحداث المحددة",
+    "selectedNone": "يلزم اختيار حدث واحد على الأقل.",
+    "selectedOne": "سيُسلَّم حدث واحد.",
+    "selectedMany": "سيُسلَّم {{count}} أحداث.",
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ…",
+    "creating": "جارٍ الإنشاء…",
+    "saveSubscription": "حفظ الاشتراك",
+    "createSubscription": "إنشاء اشتراك"
+  },
+  "governanceLog": {
+    "regionLabel": "اجتماعات الحوكمة",
+    "title": "سجل الحوكمة",
+    "caption": "نظام اللجان — اللجان، مراجعات الإدارة العليا، إدارة علاقات الأعمال، مراجعة الحساب الاستراتيجي",
+    "errorTitle": "تعذّر تحميل سجل الحوكمة",
+    "errorMessage": "أعد المحاولة قريبًا.",
+    "empty": "لم تُسجَّل اجتماعات حوكمة لهذا الحساب بعد.",
+    "advanceStatusLabel": "تقديم حالة {{description}}",
+    "dateRequired": "التاريخ مطلوب",
+    "meetingRecorded": "تم تسجيل الاجتماع",
+    "couldNotSave": "تعذّر الحفظ",
+    "addMeeting": "إضافة اجتماع",
+    "meetingTypeLabel": "نوع الاجتماع",
+    "meetingDateLabel": "تاريخ الاجتماع",
+    "participantsPlaceholder": "المشاركون (مفصولون بفواصل)",
+    "outcomesPlaceholder": "النتائج / القرارات",
+    "saving": "جارٍ الحفظ…",
+    "save": "حفظ",
+    "cancel": "إلغاء"
+  },
+  "polarCharts": {
+    "pieChartAriaLabel": "مخطط دائري",
+    "columnName": "الاسم",
+    "columnValue": "القيمة",
+    "donutChartAriaLabel": "مخطط حلقي",
+    "radarChartAriaLabel": "مخطط رادار"
+  },
+  "quickAddMenu": {
+    "title": "إنشاء",
+    "option": {
+      "opportunity": {
+        "label": "فرصة جديدة",
+        "description": "يُضاف عطاء إلى مسار الفرص."
+      },
+      "task": {
+        "label": "مهمة جديدة",
+        "description": "تُنشأ متابعة، مع ربط اختياري بفرصة."
+      },
+      "contact": {
+        "label": "جهة اتصال جديدة",
+        "description": "يُضاف صاحب قرار."
+      },
+      "note": {
+        "label": "ملاحظة جديدة",
+        "description": "تُدوَّن فكرة على الحساب الحالي."
+      }
+    }
+  },
+  "dashboardsList": {
+    "errorTitle": "تعذّر تحميل لوحات المعلومات",
+    "heading": "لوحات المعلومات",
+    "countOne": "{{count}} لوحة معلومات",
+    "countOther": "{{count}} لوحات معلومات",
+    "newButton": "لوحة معلومات جديدة",
+    "namePlaceholder": "اسم لوحة المعلومات…",
+    "creating": "جارٍ الإنشاء…",
+    "create": "إنشاء",
+    "cancel": "إلغاء",
+    "emptyTitle": "لا توجد لوحات معلومات بعد",
+    "emptyMessage": "يمكن إنشاء لوحة المعلومات الأولى لبدء متابعة ما يهم.",
+    "openAria": "فتح لوحة المعلومات: {{name}}",
+    "sharedAria": "مشتركة",
+    "privateAria": "خاصة",
+    "deleteConfirm": "حذف \"{{name}}\"؟",
+    "deleteAria": "حذف لوحة المعلومات {{name}}"
+  },
+  "relations": {
+    "errorKeyLabelRequired": "مفتاح العلاقة والتسمية مطلوبان.",
+    "errorAddFailed": "تعذّرت إضافة العلاقة",
+    "heading": "العلاقات",
+    "addButton": "+ إضافة علاقة",
+    "fieldKeyLabel": "مفتاح العلاقة",
+    "fieldKeyPlaceholder": "مثال: primary_contact",
+    "fieldLabelLabel": "التسمية",
+    "fieldLabelPlaceholder": "مثال: جهة الاتصال الأساسية",
+    "fieldEntityLabel": "الكيان المرتبط",
+    "fieldEntityPlaceholder": "مثال: contact، opportunity",
+    "fieldCardinalityLabel": "التعددية",
+    "cancelButton": "إلغاء",
+    "submitButtonPending": "جارٍ الإضافة…",
+    "submitButton": "إضافة",
+    "emptyState": "لم تُعرَّف علاقات بعد."
+  },
+  "chartContainer": {
+    "emptyMessage": "لا تتوفر بيانات لهذه الفترة الزمنية.",
+    "refresh": "تحديث",
+    "regionLabel": "مخطط",
+    "actionsLabel": "إجراءات المخطط",
+    "loadingLabel": "جارٍ تحميل المخطط"
+  },
+  "crossSell": {
+    "regionLabel": "إجراءات البيع المتقاطع",
+    "title": "إجراءات البيع المتقاطع",
+    "caption": "إجراءات مبيعات عابرة للبلدان / الفرق على هذا الحساب",
+    "errorTitle": "تعذّر تحميل إجراءات البيع المتقاطع",
+    "errorRetry": "أعد المحاولة بعد قليل.",
+    "empty": "لم تُسجَّل إجراءات بيع متقاطع لهذا الحساب بعد.",
+    "advanceStatusLabel": "تقديم حالة {{description}}",
+    "advanceStatusHint": "نقرة لتقديم الحالة",
+    "status": {
+      "open": "مفتوح",
+      "inProgress": "قيد التنفيذ",
+      "done": "تم"
+    },
+    "logAction": "تسجيل إجراء",
+    "toast": {
+      "missingFieldsTitle": "حقول ناقصة",
+      "missingFieldsBody": "الوصف والوحدتان مطلوبان.",
+      "logged": "تم تسجيل إجراء البيع المتقاطع",
+      "saveError": "تعذّر الحفظ",
+      "statusAdvanced": "الحالة: {{status}}",
+      "statusError": "تعذّر تحديث الحالة"
+    },
+    "form": {
+      "descriptionPlaceholder": "ما المطلوب تنفيذه؟",
+      "requestingUnitPlaceholder": "البلد/الفريق الطالب",
+      "assignedUnitPlaceholder": "البلد/الفريق المُكلَّف",
+      "assigneeLabel": "المُكلَّف",
+      "unassigned": "غير مُكلَّف",
+      "dueDateLabel": "تاريخ الاستحقاق",
+      "saving": "جارٍ الحفظ…",
+      "save": "حفظ",
+      "cancel": "إلغاء"
+    },
+    "subtitle": "إجراءات مبيعات عابرة للبلدان والفرق على الحسابات المشتركة. تتبع ما قبل البيع.",
+    "filterGroupLabel": "تصفية حسب الحالة",
+    "filterAll": "الكل",
+    "filterOpen": "مفتوح",
+    "filterInProgress": "قيد التنفيذ",
+    "filterDone": "تم",
+    "errorMessage": "أعد المحاولة بعد قليل.",
+    "emptyTitle": "لا توجد إجراءات بيع متقاطع",
+    "emptyMessage": "تُسجَّل الإجراءات العابرة للفرق من لوحة قيادة أي حساب — وتظهر هنا للمؤسسة كلها.",
+    "colAccount": "الحساب",
+    "colAction": "الإجراء",
+    "colRoute": "المسار",
+    "colAssignee": "المُكلَّف",
+    "colDue": "الاستحقاق",
+    "colStatus": "الحالة",
+    "updateFailed": "تعذّر التحديث",
+    "advanceStatusAria": "تقديم حالة {{description}}",
+    "updating": "جارٍ التحديث…"
+  },
+  "auditLogFilters": {
+    "chipSearch": "بحث: {{value}}",
+    "chipRange": "النطاق: {{value}}",
+    "chipTarget": "الهدف: {{value}}",
+    "chipCategory": "الفئة: {{value}}",
+    "barAriaLabel": "عوامل تصفية سجل التدقيق",
+    "searchLabel": "بحث في صفحة التدقيق الحالية",
+    "searchPlaceholder": "بحث في الصفحة الحالية حسب الإجراء أو الفاعل أو الهدف أو الفرق…",
+    "dateRangeLabel": "النطاق الزمني",
+    "targetTypeLabel": "نوع الهدف",
+    "exportVisible": "تصدير الظاهر",
+    "copyViewLink": "نسخ رابط العرض",
+    "refreshing": "جارٍ التحديث",
+    "refresh": "تحديث",
+    "categoryFiltersAriaLabel": "عوامل تصفية فئات أحداث التدقيق",
+    "activeView": "العرض النشط",
+    "clearFilters": "مسح عوامل التصفية"
+  },
+  "createTask": {
+    "errorTitleRequired": "العنوان مطلوب",
+    "errorSaveFailed": "فشل الحفظ",
+    "triggerButton": "+ مهمة جديدة",
+    "dialogTitle": "مهمة جديدة",
+    "dialogDescription": "تُنشأ متابعة — مع إمكانية ربطها بفرصة.",
+    "fieldTitle": "العنوان",
+    "fieldOpportunity": "فرصة",
+    "opportunityNone": "— لا شيء —",
+    "fieldStatus": "الحالة",
+    "statusOpen": "مفتوحة",
+    "statusInProgress": "قيد التنفيذ",
+    "statusBlocked": "محظورة",
+    "statusDone": "تم",
+    "fieldDueDate": "تاريخ الاستحقاق",
+    "cancelButton": "إلغاء",
+    "savingButton": "جارٍ الحفظ…",
+    "submitButton": "إنشاء مهمة"
+  },
+  "oppWinProbabilityBadge": {
+    "loading": "جارٍ تحميل الاحتمال…",
+    "labelLikely": "راجح",
+    "labelPossible": "ممكن",
+    "labelAtRisk": "معرّض للخطر",
+    "featureDealValue": "قيمة الصفقة",
+    "featureOwnerWinRate": "معدل فوز المالك",
+    "featurePipelineStage": "مرحلة مسار الفرص",
+    "featureQualificationScore": "درجة التأهيل",
+    "factorsAriaLabel": "عوامل احتمال الفوز",
+    "popoverTitle": "احتمال الفوز: {{prob}}%",
+    "keyFactors": "العوامل الرئيسية",
+    "badgeAriaLabel": "احتمال الفوز: {{prob}}% — {{label}}"
+  },
+  "intelCards": {
+    "dataFreshness": "حُدّثت المعلومات {{date}} · المصادر: Crunchbase، LinkedIn، سجل الاتحاد الأوروبي",
+    "noIntel": "لا توجد معلومات خارجية بعد — لم تُستعلم المصادر عن هذه الفرصة.",
+    "financial": {
+      "title": "السلامة المالية",
+      "private": "خاصة",
+      "marketCap": "القيمة السوقية",
+      "revenueTtm": "الإيراد (آخر 12 شهرًا)",
+      "growth": "النمو",
+      "ebitdaMargin": "هامش EBITDA",
+      "creditRating": "التصنيف الائتماني",
+      "headcount": "عدد الموظفين"
+    },
+    "winPrediction": {
+      "title": "تنبؤ الفوز",
+      "empty": "لا يتوفر تنبؤ.",
+      "modelCaption": "النموذج {{version}}",
+      "probability": "الاحتمال"
+    },
+    "triggers": {
+      "title": "محفّزات الشراء",
+      "caption": "إشارات مرجّحة",
+      "unknownSource": "غير معروف",
+      "weightAria": "الوزن {{weight}}/10",
+      "empty": "لم تُرصد محفّزات بعد."
+    },
+    "competitors": {
+      "title": "مشهد المنافسين",
+      "empty": "لم يُدرَج منافسون."
+    },
+    "news": {
+      "title": "الأخبار الأخيرة",
+      "empty": "لم تُجلب أخبار."
+    }
+  },
+  "serviceCaseDetail": {
+    "errorTitle": "تعذّر تحميل الحالة",
+    "errorMessage": "حدث خطأ ما",
+    "notFoundTitle": "الحالة غير موجودة",
+    "notFoundMessage": "ربما حُذفت هذه الحالة.",
+    "noteAddedToast": "أُضيفت ملاحظة إلى الحالة",
+    "noteErrorToast": "تعذّر حفظ الملاحظة",
+    "ownerLabel": "المالك: {{name}}",
+    "priorityLabel": "الأولوية: {{priority}}",
+    "sourceLabel": "المصدر: {{source}}",
+    "slaLabel": "مستوى الخدمة: {{date}}",
+    "markStatusButton": "تعيين {{status}}",
+    "descriptionHeading": "الوصف",
+    "noDescription": "لم يُقدَّم وصف.",
+    "addNoteLabel": "إضافة ملاحظة",
+    "notePlaceholder": "اكتب ملاحظة داخلية…",
+    "savingButton": "جارٍ الحفظ…",
+    "saveNoteButton": "حفظ الملاحظة",
+    "detailsHeading": "التفاصيل",
+    "createdLabel": "تاريخ الإنشاء",
+    "updatedLabel": "تاريخ التحديث",
+    "resolvedLabel": "تم الحل",
+    "closedLabel": "مغلق",
+    "statusErrorToast": "تعذّر تحديث الحالة",
+    "readOnlyHint": "يلزم إذن كتابة في مكتب الخدمة لتحديث هذه الحالة."
+  },
+  "tagPicker": {
+    "addTag": "وسم",
+    "popoverLabel": "منتقي الوسوم",
+    "searchPlaceholder": "بحث أو إنشاء…",
+    "existingTagsLabel": "الوسوم الحالية",
+    "createNamed": "+ إنشاء “{{name}}”",
+    "aiSuggestions": "اقتراحات AI",
+    "suggestThinking": "جارٍ التفكير…",
+    "suggestAction": "اقتراح"
+  },
+  "workflows": {
+    "toastCreated": "تم إنشاء سير العمل",
+    "toastCreateError": "تعذّر إنشاء سير العمل",
+    "toastPaused": "تم إيقاف سير العمل مؤقتًا",
+    "toastActivated": "تم تنشيط سير العمل",
+    "toastUpdateError": "تعذّر تحديث سير العمل",
+    "toastRunSuccess": "اكتمل تشغيل سير العمل بنجاح",
+    "toastRunFailed": "تشغيل سير العمل {{status}}{{detail}}",
+    "toastRunError": "تعذّر تشغيل سير العمل",
+    "deleteConfirmTitle": "حذف سير العمل؟",
+    "deleteConfirmDescription": "ستُزال \"{{name}}\". لا يمكن التراجع عن هذا.",
+    "deleteConfirmLabel": "حذف",
+    "toastDeleted": "تم حذف سير العمل",
+    "toastDeleteError": "تعذّر حذف سير العمل",
+    "pageTitle": "سير العمل",
+    "activeOnly": "النشطة فقط",
+    "newWorkflow": "سير عمل جديد",
+    "countOne": "{{count}} سير عمل",
+    "countOther": "{{count}} مسارات عمل",
+    "activeOnlySuffix": " · النشطة فقط",
+    "errorTitle": "تعذّر تحميل سير العمل",
+    "retry": "إعادة المحاولة",
+    "emptyTitle": "لا يوجد سير عمل بعد",
+    "emptyMessage": "أتمت سير عمل ما قبل البيع.",
+    "statusActive": "نشط",
+    "statusInactive": "غير نشط",
+    "runCount": "{{count}} عمليات تشغيل",
+    "lastRun": "آخر تشغيل {{date}}",
+    "statusPaused": "متوقف مؤقتًا",
+    "running": "جارٍ التشغيل…",
+    "run": "تشغيل",
+    "deleteAriaLabel": "حذف سير العمل: {{name}}",
+    "readOnlyHint": "يلزم إذن كتابة لسير العمل لإدارة هذا السير."
+  },
+  "topbarNotifications": {
+    "tooltipUnread": "{{count}} إشعار غير مقروء",
+    "tooltipTitle": "الإشعارات",
+    "bellAriaUnread": "الإشعارات، {{count}} غير مقروء",
+    "bellAria": "الإشعارات",
+    "trayAria": "الإشعارات",
+    "heading": "الإشعارات",
+    "markAllRead": "تعليم الكل كمقروء",
+    "errorMessage": "تعذّر تحميل الإشعارات",
+    "loading": "جارٍ التحميل…",
+    "empty": "تم الاطلاع على كل الإشعارات"
+  },
+  "createEvent": {
+    "modalLabel": "إنشاء حدث في التقويم",
+    "heading": "حدث جديد",
+    "titleLabel": "العنوان",
+    "titlePlaceholder": "عنوان الحدث",
+    "dateLabel": "التاريخ",
+    "calendarLabel": "التقويم",
+    "providerGoogle": "Google",
+    "providerMicrosoft": "Microsoft",
+    "startLabel": "البداية",
+    "endLabel": "النهاية",
+    "locationLabel": "الموقع (اختياري)",
+    "locationPlaceholder": "قاعة، رابط Zoom، عنوان…",
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ…",
+    "submit": "إنشاء حدث"
+  },
+  "leadScoreBadge": {
+    "labelHot": "ساخن",
+    "labelWarm": "دافئ",
+    "labelCold": "بارد",
+    "loading": "جارٍ تحميل الدرجة…",
+    "badgeAriaLabel": "درجة العميل المحتمل: {{score}} من 100 — {{label}}",
+    "popoverAriaLabel": "عوامل الدرجة",
+    "popoverHeading": "أبرز عوامل التقييم",
+    "popoverFooter": "الدرجة {{score}}/100 · نموذج ML"
+  },
+  "winLossReasons": {
+    "regionLabel": "أسباب الفوز/الخسارة",
+    "title": "أسباب الفوز / الخسارة",
+    "caption": "لماذا تُغلق الصفقات — والنمط عبر المؤسسة",
+    "errorTitle": "تعذّر تحميل أنماط الفوز/الخسارة",
+    "errorMessage": "أعد المحاولة بعد قليل.",
+    "recordedCount": "{{won}} فوز · {{lost}} خسارة مُسجَّلة",
+    "patternBadge": "نمط",
+    "mostLossesCitePrefix": "تشير معظم الخسائر إلى ",
+    "noReasonsYet": "لم تُسجَّل أسباب خسارة بعد — يُسجَّل بعضها لإظهار الأنماط.",
+    "toastPickDeal": "تُحدَّد صفقة مغلقة أولًا",
+    "toastRecorded": "تم تسجيل السبب",
+    "toastSaveError": "تعذّر الحفظ",
+    "formHeading": "تسجيل سبب",
+    "closedDealLabel": "صفقة مغلقة",
+    "selectClosedDeal": "تحديد صفقة مغلقة…",
+    "reasonLabel": "السبب",
+    "competitorPlaceholder": "منافس (اختياري)",
+    "competitorLabel": "المنافس",
+    "notePlaceholder": "ملاحظة (اختياري)",
+    "noteLabel": "الملاحظة",
+    "saving": "جارٍ الحفظ…",
+    "submit": "تسجيل السبب"
+  },
+  "accountIntel": {
+    "title": "استخبارات الحساب",
+    "caption": "الحلول والمنتجات واستخراجات المستندات",
+    "tablistLabel": "طرق عرض استخبارات الحساب",
+    "tabSolutions": "الحلول ({{count}})",
+    "tabProducts": "المنتجات ({{count}})",
+    "tabExtractions": "الاستخراجات ({{count}})",
+    "loadFailed": "تعذّر التحميل",
+    "extractQueued": "أُدرج الاستخراج في الانتظار — ستظهر الاستخبارات قريبًا",
+    "extractFailed": "فشل الاستخراج",
+    "unknownError": "خطأ غير معروف"
+  },
+  "newWorkflow": {
+    "triggerRecordCreated": "عند إنشاء سجل",
+    "triggerRecordUpdated": "عند تحديث سجل",
+    "triggerStageChanged": "عند تغيّر مرحلة",
+    "triggerSchedule": "حسب جدول",
+    "triggerWebhookReceived": "عند استلام ويب هوك",
+    "triggerManual": "يدويًا / عند الطلب",
+    "actionSendEmail": "إرسال بريد إلكتروني",
+    "actionSendSlack": "إرسال رسالة Slack",
+    "actionCreateTask": "إنشاء مهمة",
+    "actionUpdateField": "تحديث حقل",
+    "actionCallWebhook": "استدعاء ويب هوك",
+    "actionAssignOwner": "تعيين المالك",
+    "actionRunDustAgent": "تشغيل وكيل Dust",
+    "actionCreateNotification": "إنشاء إشعار",
+    "nameRequiredError": "اسم سير العمل مطلوب.",
+    "dialogTitle": "سير عمل جديد",
+    "dialogDescription": "يُختار المشغّل والإجراءات التي تُنفَّذ عند إطلاقه. يمكن ضبط كل خطوة بعد إنشاء سير العمل.",
+    "nameLabel": "اسم سير العمل",
+    "namePlaceholder": "إشعار المالك عند بلوغ صفقة مرحلة التفاوض",
+    "triggerLabel": "المشغّل",
+    "actionsLabel": "الإجراءات",
+    "actionSelectAriaLabel": "الإجراء {{number}}",
+    "removeActionAriaLabel": "إزالة الإجراء {{number}}",
+    "addAction": "إضافة إجراء",
+    "descriptionLabel": "الوصف",
+    "descriptionPlaceholder": "ما الذي يفعله سير العمل هذا ومتى يُشغَّل…",
+    "cancel": "إلغاء",
+    "creating": "جارٍ الإنشاء…",
+    "submit": "إنشاء سير عمل"
+  },
+  "territory": {
+    "fieldName": "الاسم",
+    "namePlaceholder": "مثل DACH Enterprise",
+    "fieldRegion": "الإقليم",
+    "regionPlaceholder": "مثل أوروبا",
+    "fieldCountryCodes": "رموز البلدان",
+    "countryCodesPlaceholder": "DE, AT, CH",
+    "countryCodesHint": "رموز ISO-3166 alpha-2 مفصولة بفواصل.",
+    "fieldPostalCodes": "الرموز البريدية",
+    "postalCodesPlaceholder": "اختياري",
+    "postalCodesHint": "رموز بريدية مفصولة بفواصل للتوجيه الأدق.",
+    "fieldOwner": "المالك",
+    "ownerPlaceholder": "اختر مالكًا",
+    "fieldActive": "نشط",
+    "cancel": "إلغاء",
+    "saveChanges": "حفظ التغييرات",
+    "create": "إنشاء منطقة",
+    "editTitle": "تعديل المنطقة",
+    "newTitle": "منطقة جديدة"
+  },
+  "meetingPrep": {
+    "ariaLabel": "تحضير اجتماع AI",
+    "title": "✦ تحضير اجتماع AI",
+    "preparing": "جارٍ التحضير…",
+    "generateButton": "إنشاء موجز",
+    "generatingAriaLabel": "جارٍ إنشاء موجز الاجتماع…",
+    "errorCapReached": "تم بلوغ الحد اليومي لـ AI. أعد المحاولة غدًا.",
+    "errorGeneric": "تعذّر إعداد الموجز. يُرجى إعادة المحاولة.",
+    "sectionAttendees": "الحاضرون",
+    "sectionOpenDeals": "الصفقات المفتوحة",
+    "sectionTalkingPoints": "نقاط الحديث",
+    "sectionSuggestedQuestions": "أسئلة مقترحة",
+    "sectionRecentInteractions": "التفاعلات الأخيرة",
+    "cost": "التكلفة: ${{amount}}",
+    "emptyState": "يمكن إنشاء موجز مدعوم بـ AI يغطي الحاضرين والصفقات المفتوحة ونقاط الحديث والأسئلة المقترحة لهذا الاجتماع."
+  },
+  "intake": {
+    "title": "الاستقبال",
+    "subtitle": "استلام المستندات، واستخراج المعلومات، ومراجعتها، ونشرها في ملفات الحسابات.",
+    "toastExtractionComplete": "اكتمل الاستخراج",
+    "toastSelectDocument": "يلزم تحديد مستند واحد على الأقل",
+    "toastExtractionFailed": "فشل الاستخراج"
+  },
+  "healthScore": {
+    "notScored": "لم تُحتسب الدرجة بعد",
+    "notScoredBody": "تُحتسب تغطية الإشارات من جهات اتصال هذا الحساب وصفقاته ومهامه. لم يُحمَّل أي منها هنا بعد.",
+    "regionLabel": "تغطية إشارات الحساب",
+    "title": "تغطية الإشارات",
+    "signalsScored": "تم تقييم {{count}} من إشارات الحساب",
+    "gaugeLabel": "تغطية إشارات الحساب {{score}} من 100",
+    "coverage": "التغطية",
+    "strongestBand": "أقوى نطاق تغطية",
+    "noSignal": "لا توجد إشارة",
+    "healthBands": "نطاقات السلامة",
+    "whatDrivesScore": "ما الذي يحدّد هذه الدرجة",
+    "scoreFactors": "عوامل الدرجة",
+    "nextLabel": "التالي: ",
+    "band": {
+      "strong": "قوية",
+      "good": "جيدة",
+      "needsAttention": "بحاجة إلى انتباه",
+      "critical": "حرجة"
+    }
+  },
+  "objectSettingsForm": {
+    "updateFailed": "تعذّر التحديث",
+    "heading": "إعدادات الكائن",
+    "saved": "تم الحفظ.",
+    "singularLabel": "تسمية المفرد",
+    "pluralLabel": "تسمية الجمع",
+    "description": "الوصف",
+    "color": "اللون",
+    "selectColor": "تحديد اللون {{color}}",
+    "apiKeyLabel": "مفتاح API:",
+    "apiKeyImmutable": "(غير قابل للتغيير)",
+    "saving": "جارٍ الحفظ…",
+    "saveChanges": "حفظ التغييرات"
+  },
+  "contactContextMenu": {
+    "copySuccess": "تم نسخ {{label}}",
+    "copyError": "تعذّر النسخ",
+    "menuAriaLabel": "إجراءات لـ {{name}}",
+    "editContact": "تعديل جهة الاتصال",
+    "emailLabel": "البريد الإلكتروني",
+    "copyEmail": "نسخ البريد الإلكتروني",
+    "phoneLabel": "الهاتف",
+    "copyPhone": "نسخ الهاتف",
+    "deleteContact": "حذف جهة الاتصال"
+  },
+  "dataTrust": {
+    "regionLabel": "موثوقية البيانات والإسناد",
+    "title": "موثوقية البيانات",
+    "caption": "تتضمن الحقول الأساسية إسناد المصدر المتاح",
+    "attributionConfidence": "ثقة الإسناد",
+    "attributedSources": "{{count}} مصادر مُسندة",
+    "checkLegalIdentity": "الهوية القانونية",
+    "checkLogo": "الشعار",
+    "checkFreshness": "الحداثة",
+    "valueAttributed": "مُسند",
+    "valuePending": "قيد الانتظار",
+    "sourceReceipts": "إيصالات المصادر",
+    "emptySources": "يُشغَّل التحقق من البيانات لإرفاق مصادر السجل والشعار وبيانات السوق.",
+    "logoSourceLogoDev": "Logo.dev",
+    "logoSourceOfficial": "رسمي",
+    "logoSourceBrandfetch": "Brandfetch",
+    "logoSourceWikimedia": "Wikimedia",
+    "logoSourceFavicon": "أيقونة الموقع",
+    "logoSourceManual": "يدوي",
+    "logoSourceInitials": "الأحرف الأولى"
+  },
+  "topbarSearch": {
+    "label": "بحث في الفرص وجهات الاتصال والمهام",
+    "placeholder": "بحث أو انتقال إلى…",
+    "recentSearchesAriaLabel": "عمليات البحث الأخيرة",
+    "recentHeading": "الأخيرة",
+    "clear": "مسح"
+  },
+  "newReference": {
+    "titleRequired": "عنوان المرجع مطلوب.",
+    "dialogTitle": "مرجع جديد",
+    "dialogDescription": "سجّل مرجع عميل قابلًا لإعادة الاستخدام — دراسة حالة أو شهادة أو قصة فوز — للعروض والعطاءات.",
+    "titleLabel": "العنوان",
+    "titlePlaceholder": "Acme Corp — انضمام أسرع بنسبة 40%",
+    "descriptionLabel": "الوصف",
+    "descriptionPlaceholder": "ما سُلّم، والنتيجة، وسبب صلاحيته للاقتباس…",
+    "industryLabel": "القطاع",
+    "industryPlaceholder": "برمجيات",
+    "dealValueLabel": "قيمة الصفقة",
+    "dealValuePlaceholder": "250000",
+    "contactNameLabel": "اسم جهة الاتصال",
+    "contactNamePlaceholder": "Jane Doe",
+    "contactEmailLabel": "البريد الإلكتروني لجهة الاتصال",
+    "contactEmailPlaceholder": "jane@acme.com",
+    "documentUrlLabel": "URL المستند",
+    "tagsLabel": "الوسوم",
+    "tagsHelper": "مفصولة بفواصل",
+    "tagsPlaceholder": "دراسة-حالة, مؤسسات, أوروبا-الشرق-الأوسط",
+    "cancel": "إلغاء",
+    "creating": "جارٍ الإنشاء…",
+    "create": "إنشاء مرجع"
+  },
+  "bidScore": {
+    "title": "درجة العطاء/عدم تقديم عطاء",
+    "criteriaBreakdownLabel": "تفصيل المعايير",
+    "criterionPoints": "{{points}}/{{weight}} نقطة",
+    "categoryScoresLabel": "درجات الفئات",
+    "recBid": "عطاء",
+    "recNoBid": "عدم تقديم عطاء",
+    "recConditionalBid": "عطاء مشروط",
+    "loadError": "تعذّر تحميل درجة العطاء. حدّث لإعادة المحاولة.",
+    "overallScore": "الدرجة الإجمالية",
+    "overridden": "تم التجاوز",
+    "detailsButton": "التفاصيل",
+    "emptyState": "لم تُسجَّل درجة تقييم عطاء لهذه الفرصة بعد.",
+    "evaluateButton": "التقييم الآن"
+  },
+  "salesToolkits": {
+    "pageTitle": "حقائب أدوات المبيعات",
+    "pageSubtitle": "أدلة العمل والدورات من أكاديمية Mantu — تُجلب مباشرة وتُصفّى حسب القطاع.",
+    "errorTitle": "تعذّر الوصول إلى أكاديمية Mantu",
+    "errorMessage": "لم يستجب نظام إدارة التعلّم. أعد المحاولة بعد قليل.",
+    "emptyFilteredTitle": "لا توجد دورات موسومة بـ\"{{sector}}\"",
+    "emptyTitle": "لا توجد دورات منشورة بعد",
+    "emptyMessage": "تظهر الدورات هنا فور نشرها في أكاديمية Mantu مع وسوم القطاعات.",
+    "resultCount": "{{count}} دورة",
+    "resultCountInSector": "{{count}} دورة في {{sector}}",
+    "filterGroupLabel": "تصفية حسب القطاع",
+    "allSectors": "كل القطاعات",
+    "openInAcademy": "فتح في أكاديمية Mantu",
+    "sampleDataLabel": "بيانات عيّنة.",
+    "sampleDataIntro": "هذه حقائب أدوات توضيحية. اضبط",
+    "sampleDataOutro": "+ بيانات الاعتماد لجلب الدورات المباشرة من أكاديمية Mantu."
+  },
+  "reviewStep": {
+    "toastRemoved": "تمت إزالة \"{{name}}\"",
+    "toastRemoveFailed": "تعذّرت إزالة \"{{name}}\"",
+    "heading": "مراجعة البيانات المستخرجة",
+    "refresh": "تحديث",
+    "loading": "جارٍ التحميل…",
+    "groupSolutions": "الحلول",
+    "groupProducts": "المنتجات",
+    "back": "← رجوع",
+    "publish": "نشر →",
+    "groupHeading": "{{title}} ({{count}})",
+    "empty": "لم يُستخرج {{label}}.",
+    "removeAria": "إزالة {{name}}"
+  },
+  "kpiRow": {
+    "workspaceMetricsAriaLabel": "مقاييس مساحة العمل",
+    "noLiveSignalTitle": "لا توجد إشارة مباشرة بعد"
+  },
+  "taskDetail": {
+    "errorTitle": "تعذّر تحميل المهمة",
+    "errorMessage": "حدث خطأ ما",
+    "notFoundTitle": "المهمة غير موجودة",
+    "notFoundMessage": "ربما حُذفت هذه المهمة.",
+    "titleAriaLabel": "عنوان المهمة",
+    "opportunityLink": "فرصة",
+    "assignedTo": "مُسندة إلى {{assignee}}",
+    "due": "الاستحقاق {{date}}",
+    "noDate": "بدون تاريخ",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "edit": "تعديل",
+    "statusLabel": "الحالة",
+    "statusAriaLabel": "الحالة",
+    "statusOpen": "مفتوحة",
+    "statusInProgress": "قيد التنفيذ",
+    "statusBlocked": "محظورة",
+    "statusDone": "تم",
+    "idLabel": "المعرّف",
+    "createdLabel": "أُنشئت",
+    "toast": {
+      "updateFailedTitle": "تعذّر تحديث المهمة",
+      "serverRejected": "رفض الخادم الطلب."
+    }
+  },
+  "auditLogHero": {
+    "badge": "وحدة تحكم الحوكمة",
+    "eyebrow": "مسار أدلة للقراءة فقط",
+    "title": "سجل التدقيق",
+    "subtitle": "مراجعة تغييرات الأمان والوكيل وسير العمل والبيانات مع سياق كافٍ لشرح من غيّر ماذا، ومتى حدث ذلك، وأين تُتابع المراجعة.",
+    "refreshing": "جارٍ تحديث الأدلة…",
+    "visibleOnPage": "{{count}} ظاهرة في الصفحة {{page}}",
+    "refreshedSuffix": "حُدِّث {{time}}",
+    "metric": {
+      "eventsLoaded": {
+        "label": "الأحداث المحمَّلة",
+        "helper": "صفحة الخادم الحالية"
+      },
+      "security": {
+        "label": "الأمان/API",
+        "helper": "المفاتيح وMCP والمصادقة وويب هوك"
+      },
+      "destructive": {
+        "label": "هدّام",
+        "helper": "حذف وإبطال وإلغاء"
+      },
+      "dataChanges": {
+        "label": "تغييرات البيانات",
+        "helper": "تعديلات سجلات الإيراد"
+      },
+      "latestEvent": {
+        "label": "أحدث حدث",
+        "none": "لا شيء",
+        "noEvents": "لا توجد أحداث ضمن النطاق"
+      }
+    }
+  },
+  "taskCalendar": {
+    "previousMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "weekdaySun": "أحد",
+    "weekdayMon": "إثن",
+    "weekdayTue": "ثلا",
+    "weekdayWed": "أرب",
+    "weekdayThu": "خمي",
+    "weekdayFri": "جمع",
+    "weekdaySat": "سبت"
+  },
+  "recentActivity": {
+    "heading": "النشاط الأخير",
+    "latestUpdates": "آخر التحديثات",
+    "empty": "لا يوجد نشاط أخير",
+    "viewAll": "عرض كل الأنشطة ({{count}}) →"
+  },
+  "extractStep": {
+    "heading": "تشغيل الاستخراج",
+    "processingCount": "جارٍ معالجة {{count}} مستندات…",
+    "intro": "سيحلّل وكلاء Dust {{count}} مستندات ويستخرجون الحلول والمنتجات والقدرات والتسعير.",
+    "back": "← رجوع",
+    "queuing": "جارٍ الإدراج في الانتظار…",
+    "runButton": "تشغيل الاستخراج",
+    "status": {
+      "queued": "مُدرج",
+      "pending": "قيد الانتظار",
+      "running": "قيد التشغيل",
+      "done": "مكتمل",
+      "completed": "مكتمل",
+      "error": "خطأ",
+      "failed": "فشل"
+    }
+  },
+  "companyLogo": {
+    "ariaLabel": "شعار {{name}}"
+  },
+  "ai-feedback": {
+    "thanks": "شكرًا على ملاحظاتك!",
+    "aria-rate-response": "تقييم استجابة AI هذه",
+    "was-this-helpful": "هل كان هذا مفيدًا؟",
+    "aria-rating": "التقييم",
+    "aria-star-rating": "{{count}} نجمة",
+    "comment-placeholder": "تعليق اختياري…",
+    "aria-comment": "تعليق الملاحظات",
+    "submitting": "جارٍ الإرسال…",
+    "submit": "إرسال الملاحظات",
+    "error": "تعذّر إرسال الملاحظات. يُرجى إعادة المحاولة."
+  },
+  "contactQuickLook": {
+    "title": "نظرة سريعة",
+    "fieldCustomer": "العميل",
+    "fieldEmail": "البريد الإلكتروني",
+    "fieldPhone": "الهاتف",
+    "fieldInfluence": "التأثير",
+    "fieldSentiment": "الانطباع",
+    "footerPress": "اضغط",
+    "footerOr": "أو",
+    "footerToClose": "للإغلاق",
+    "readOnly": "للقراءة فقط"
+  },
+  "opportunityAccountIntel": {
+    "title": "استخبارات الحساب",
+    "errorTitle": "تعذّر التحميل",
+    "emptyTitle": "لا توجد استخبارات بعد",
+    "emptyMessage": "تُرفع المستندات في لوحة قيادة الحساب لاستخراج الحلول والمنتجات.",
+    "caption": "{{solutionCount}} حلول · {{productCount}} منتجات",
+    "solutionsHeading": "الحلول",
+    "productsHeading": "المنتجات",
+    "moreSolutions": "+{{count}} المزيد",
+    "moreProducts": "+{{count}} المزيد"
+  },
+  "account": {
+    "openCockpitAria": "فتح قمرة قيادة العميل {{name}}",
+    "unknownIndustry": "قطاع غير معروف",
+    "dataSourcesAria": "مصادر بيانات {{name}}",
+    "openDeals": "صفقات مفتوحة",
+    "pipeline": "مسار الفرص",
+    "totalDeals": "إجمالي الصفقات",
+    "employees": "الموظفون",
+    "confidence": "الثقة",
+    "openAccountCockpit": "فتح قمرة قيادة الحساب"
+  },
+  "openIssues": {
+    "regionLabel": "المشكلات المفتوحة حسب الشدّة",
+    "title": "المشكلات المفتوحة",
+    "captionAllClear": "الوضع سليم",
+    "captionItemsToAction_one": "{{count}} عنصر بانتظار الإجراء",
+    "captionItemsToAction_other": "{{count}} عنصر بانتظار الإجراء",
+    "bucketsLabel": "فئات الشدّة",
+    "severityCritical": "حرجة",
+    "severityHigh": "مرتفعة",
+    "severityMedium": "متوسطة",
+    "severityLow": "منخفضة",
+    "emptyTitle": "لا توجد مشكلات مفتوحة",
+    "emptyMessage": "لم تُسجَّل مخاطر أو فحوصات امتثال لهذا الحساب بعد.",
+    "unassigned": "غير مُكلَّف",
+    "dueSuffix": " - الاستحقاق {{dueDate}}",
+    "noOwner": "لا يوجد مالك",
+    "captionItemsToAction_zero": "{{count}} عناصر بانتظار الإجراء",
+    "captionItemsToAction_two": "{{count}} عنصران بانتظار الإجراء",
+    "captionItemsToAction_few": "{{count}} عناصر بانتظار الإجراء",
+    "captionItemsToAction_many": "{{count}} عنصرًا بانتظار الإجراء"
+  },
+  "deliveryHistory": {
+    "heading": "سجل التسليم",
+    "showingRecent": "عرض أحدث 50",
+    "errorTitle": "تعذّر التحميل",
+    "errorMessage": "تعذّر تحميل سجل التسليم.",
+    "empty": "لم تُسجَّل عمليات تسليم بعد.",
+    "columnEvent": "الحدث",
+    "columnStatus": "الحالة",
+    "columnDuration": "المدة",
+    "columnAttempt": "المحاولة",
+    "columnTime": "الوقت",
+    "statusTimeout": "انتهاء المهلة",
+    "hideError": "إخفاء الخطأ",
+    "showError": "إظهار الخطأ"
+  },
+  "activityTimeline": {
+    "regionLabel": "النشاط الأخير",
+    "title": "النشاط الأخير",
+    "itemCount": "آخر {{count}} عناصر",
+    "emptyTitle": "لا شيء بعد",
+    "emptyMessage": "ستظهر هنا المهام ورسائل البريد الإلكتروني وعمليات تشغيل Dust لهذا الحساب."
+  },
+  "routeAnnouncer": {
+    "nowOn": "الآن في {{title}}",
+    "accountDetail": "حساب: {{name}}",
+    "opportunityDetail": "تفاصيل الفرصة",
+    "contactDetail": "تفاصيل جهة الاتصال",
+    "leadDetail": "تفاصيل العميل المحتمل",
+    "companyDetail": "تفاصيل الشركة",
+    "taskDetail": "تفاصيل المهمة",
+    "serviceDeskCaseDetail": "تفاصيل حالة مكتب الخدمة",
+    "routeFallback": "صفحة",
+    "routeDashboard": "لوحة المعلومات",
+    "routeAccounts": "الحسابات",
+    "routeKeyAccounts": "الحسابات الرئيسية",
+    "routeTopAccounts": "أبرز الحسابات",
+    "routeCompanies": "الشركات",
+    "routeReferenceLibrary": "مكتبة المراجع",
+    "routeOpportunities": "الفرص",
+    "routePipeline": "مسار الفرص",
+    "routeBidDecisionMatrix": "مصفوفة قرار العطاء",
+    "routeLeads": "العملاء المحتملون",
+    "routeContacts": "جهات الاتصال",
+    "routeTasks": "المهام",
+    "routeTerritories": "المناطق",
+    "routeServiceDesk": "مكتب الخدمة",
+    "routeWorkflows": "سير العمل",
+    "routeDocumentIntake": "استقبال المستندات",
+    "routeReports": "التقارير",
+    "routeAnalytics": "التحليلات",
+    "routeDashboards": "لوحات المعلومات",
+    "routeSearch": "بحث",
+    "routeIntegrations": "التكاملات",
+    "routeAuditLog": "سجل التدقيق",
+    "routeSettings": "الإعدادات",
+    "routeLogin": "تسجيل الدخول",
+    "routeAgreements": "الاتفاقيات",
+    "agreementDetail": "تفاصيل الاتفاقية",
+    "routeMeetings": "الاجتماعات",
+    "routeMeetingFlags": "علامات عبر المناطق",
+    "meetingDetail": "تفاصيل الاجتماع"
+  },
+  "sectorView": {
+    "title": "عرض القطاعات",
+    "subtitle": "حيث ينشط Mantu حسب القطاع — الحسابات والبلدان وحجم FTE من ABC.",
+    "errorTitle": "تعذّر تحميل عرض القطاعات",
+    "errorMessage": "لم تستجب نقطة نهاية القطاعات.",
+    "emptyTitle": "لا توجد بيانات قطاعات بعد",
+    "emptyMessage": "تكتسب الحسابات قطاعًا عندما يُملأ قطاعها بتصنيف ABC (أو بالإثراء الخارجي).",
+    "qualityWarningHeading": "جودة بيانات القطاعات منخفضة.",
+    "qualityWarningDetail": "{{classified}} من أصل {{total}} حسابات تحمل تصنيف قطاع ABC — تُعد هذه التقسيمات توجيهية إلى أن تتحسن تغطية ABC.",
+    "accountCountOne": "{{count}} حساب",
+    "accountCountOther": "{{count}} حسابات",
+    "fteValue": "{{value}} FTE",
+    "fteUnknown": "FTE غير معروف",
+    "fteUnknownTooltip": "لا يوجد حساب في هذا القطاع بعدد موظفين معروف",
+    "countriesBadge": "{{count}} بلدان",
+    "tableCountry": "البلد",
+    "tableAccounts": "الحسابات",
+    "tableFteVolume": "حجم FTE",
+    "unknownCountry": "غير معروف"
+  },
+  "opportunitiesTableHead": {
+    "selectAll": "تحديد الكل",
+    "deselectAll": "إلغاء تحديد الكل",
+    "columnCode": "الرمز",
+    "columnOpportunity": "الفرصة",
+    "columnTerritory": "المنطقة",
+    "columnStage": "المرحلة",
+    "columnValue": "القيمة",
+    "columnProbability": "الاحتمال",
+    "columnDue": "الاستحقاق"
+  },
+  "territorySegmentBreakdown": {
+    "nounIndustry": "قطاع",
+    "nounAccount": "حساب",
+    "nounCountry": "بلد",
+    "emptyIndustry": "تحتاج الفرص إلى قطاع للظهور هنا.",
+    "emptyAccount": "تحتاج الفرص إلى حساب مرتبط للظهور هنا.",
+    "emptyCountry": "تحتاج الفرص إلى بلد للظهور هنا.",
+    "errorTitle": "تعذّر تحميل تفصيل {{noun}}",
+    "errorMessage": "رفض الخادم الطلب.",
+    "retry": "إعادة المحاولة",
+    "emptyTitle": "لا توجد بيانات بعد",
+    "oppCountOne": "{{count}} فرصة",
+    "oppCountOther": "{{count}} فرص",
+    "avgProbability": "{{percent}}% متوسط الاحتمال",
+    "overflowOne": "+ {{count}} {{noun}} إضافي غير معروض",
+    "overflowIndustryOther": "+ {{count}} شرائح {{noun}} إضافية غير معروضة",
+    "overflowOther": "+ {{count}} {{noun}} إضافية غير معروضة"
+  },
+  "convertLead": {
+    "title": "تحويل العميل المحتمل",
+    "description": "سيُنشئ هذا فرصة وجهة اتصال جديدتين من هذا العميل المحتمل.",
+    "opportunityNameLabel": "اسم الفرصة",
+    "opportunityNamePlaceholderWithCompany": "{{companyName}} — فرصة",
+    "opportunityNamePlaceholder": "اسم الفرصة",
+    "valueLabel": "القيمة (EUR)",
+    "stageLabel": "المرحلة",
+    "stageDiscovery": "الاستكشاف",
+    "stageQualified": "مؤهلة",
+    "stageProposal": "عرض",
+    "stageNegotiation": "التفاوض",
+    "stageClosedWon": "مغلقة بفوز",
+    "stageClosedLost": "مغلقة بخسارة",
+    "converting": "جارٍ التحويل…",
+    "submit": "تحويل العميل المحتمل",
+    "cancel": "إلغاء"
+  },
+  "poloPreSalesLogo": {
+    "title": "Polo PreSales",
+    "tagline": "منصة قيادة العطاءات"
+  },
+  "leadRow": {
+    "statusNew": "جديد",
+    "statusContacted": "تم التواصل",
+    "statusQualified": "مؤهَّل",
+    "statusNurture": "رعاية",
+    "statusDisqualified": "غير مؤهَّل",
+    "statusConverted": "محوَّل",
+    "priorityLow": "منخفضة",
+    "priorityMedium": "متوسطة",
+    "priorityHigh": "مرتفعة",
+    "priorityCritical": "حرجة",
+    "deselectLead": "إلغاء تحديد {{name}}",
+    "selectLead": "تحديد {{name}}",
+    "editStatusLabel": "تعديل الحالة لـ {{name}}",
+    "editPriorityLabel": "تعديل الأولوية لـ {{name}}",
+    "deleteLead": "حذف {{name}}",
+    "delete": "حذف",
+    "readOnlyHint": "يلزم إذن كتابة للعملاء المحتملين لإدارة هذا السجل."
+  },
+  "companyRow": {
+    "selectCompany": "تحديد {{name}}",
+    "deselectCompany": "إلغاء تحديد {{name}}",
+    "view": "عرض",
+    "delete": "حذف",
+    "deleteConfirmTitle": "حذف {{name}}؟",
+    "deleteConfirmDescription": "لا يمكن التراجع عن هذا الإجراء.",
+    "deleteConfirmLabel": "حذف"
+  },
+  "infoSearchLeads": {
+    "regionLabel": "معلومات العملاء المحتملين من InfoSearch",
+    "title": "عملاء InfoSearch المحتملون",
+    "captionPreview": "عيّنة من معلومات العملاء المحتملين — للاتصال بـ InfoSearch (INFOSEARCH_ENABLED) والحصول على قوائم مكالمات مباشرة",
+    "captionLive": "قوائم المكالمات ومعلومات العملاء المحتملين لهذا الحساب — تُجلب مباشرة من InfoSearch",
+    "errorTitle": "تعذّر الوصول إلى InfoSearch",
+    "errorMessage": "تعذّر تحميل معلومات العملاء المحتملين.",
+    "empty": "لا يطابق أي عميل محتمل من InfoSearch هذا الحساب.",
+    "emailAction": "البريد الإلكتروني",
+    "callAction": "مكالمة"
+  },
+  "displayCharts": {
+    "heatmapAriaLabel": "خريطة حرارية",
+    "noRows": "لا توجد صفوف للعرض.",
+    "tableAriaLabel": "جدول البيانات"
+  },
+  "newCompany": {
+    "nameRequiredError": "اسم الشركة مطلوب.",
+    "title": "شركة جديدة",
+    "description": "أنشئ ملف الحساب أولًا. يمكن إثراء البيانات المؤسسية وجهات الاتصال بعد إنشاء السجل.",
+    "nameLabel": "اسم الشركة",
+    "namePlaceholder": "Acme Inc.",
+    "domainLabel": "النطاق",
+    "domainPlaceholder": "acme.com",
+    "countryCodeLabel": "رمز البلد",
+    "countryCodePlaceholder": "CA",
+    "industryLabel": "القطاع",
+    "industryPlaceholder": "برمجيات",
+    "cancelButton": "إلغاء",
+    "creatingButton": "جارٍ الإنشاء…",
+    "createButton": "إنشاء شركة"
+  },
+  "salesFunnel": {
+    "title": "قمع المبيعات",
+    "viewPipeline": "عرض مسار الفرص",
+    "stageLeads": "العملاء المحتملون",
+    "stageOpportunities": "الفرص",
+    "stageOpenDeals": "صفقات مفتوحة",
+    "stagePipeline": "مسار الفرص"
+  },
+  "customObjectEditor": {
+    "loadError": {
+      "title": "تعذّر تحميل تعريفات الكائنات",
+      "message": "لم يستجب الخادم."
+    },
+    "retry": "إعادة المحاولة",
+    "notFound": "الكائن غير موجود.",
+    "backToList": "رجوع إلى القائمة",
+    "breadcrumbLabel": "مسار التنقل",
+    "customObjects": "الكائنات المخصصة",
+    "viewRecords": "عرض {{labelPlural}} →"
+  },
+  "errorBoundary": {
+    "title": "حدث خطأ ما",
+    "description": "نأسف، فقد حدث خطأ غير متوقع.",
+    "reloadButton": "إعادة تحميل الصفحة",
+    "clearDataButton": "مسح بيانات التطبيق وإعادة التحميل"
+  },
+  "newForecast": {
+    "title": "توقّع جديد",
+    "description": "تُدخَل المبالغ لكل فئة.",
+    "periodLabel": "الفترة",
+    "periodPlaceholder": "مثال: 2026-05 أو 2026-Q2 أو 2026",
+    "ownerLabel": "المالك",
+    "ownerPlaceholder": "تحديد المالك…",
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ…",
+    "save": "حفظ التوقّع"
+  },
+  "webVitalsHud": {
+    "regionLabel": "HUD مقاييس التطوير",
+    "title": "HUD التطوير",
+    "hideButtonLabel": "إخفاء HUD التطوير",
+    "fetchMutLabel": "جلب / تعديل"
+  },
+  "settings": {
+    "pageTitle": "الإعدادات",
+    "pageSubtitle": "إدارة الحساب وعناصر التحكّم في مساحة العمل ونموذج البيانات ووصول المطوّرين.",
+    "sectionOverview": "نظرة عامة",
+    "sectionProfile": "الملف الشخصي",
+    "sectionAppearance": "المظهر واللغة",
+    "sectionLanguage": "اللغة",
+    "sectionNotifications": "الإشعارات",
+    "sectionSecurity": "الملف الشخصي والأمان",
+    "sectionWorkspace": "مساحة العمل",
+    "sectionCrm": "تهيئة البيانات",
+    "sectionDataImport": "استيراد البيانات",
+    "sectionTopAccounts": "أبرز الحسابات",
+    "sectionGroups": "مجموعات الوصول",
+    "sectionOpportunityFilters": "عوامل تصفية الفرص",
+    "sectionRfpAnalytics": "تحليلات طلبات تقديم العروض",
+    "sectionIntegrations": "التكاملات",
+    "sectionWebhooks": "ويب هوك",
+    "sectionAuditLog": "سجل التدقيق",
+    "sectionDeveloper": "وصول المطوّرين",
+    "sectionMeetingSources": "مصادر الاجتماعات"
+  },
+  "override": {
+    "title": "الدرجة أقل من حد العطاء",
+    "description": "ناتج هذا التقييم {{totalScore}}/100 — {{verdict}}. يُحفظ كما هو، أو يمكن تجاوز التوصية للمتابعة بالعطاء. يتطلب التجاوز مبررًا ويُسجَّل لمراجعة المدير أو نائب الرئيس.",
+    "justificationLabel": "مبرر التجاوز",
+    "justificationPlaceholder": "لماذا يُقدَّم العطاء رغم الدرجة؟ حساب استراتيجي، دخول سوق، إطار إلزامي…",
+    "hintReady": "{{count}} حرفًا — جاهز للإرسال.",
+    "hintMore": "الحد الأدنى {{min}} حرفًا (يلزم {{remaining}} إضافية).",
+    "followAriaLabel": "حفظ الدرجة واتباع التوصية",
+    "followButton": "حفظ واتباع التوصية",
+    "overrideAriaLabel": "تجاوز التوصية والمتابعة بالعطاء",
+    "saving": "جارٍ الحفظ…",
+    "overrideButton": "تجاوز والمتابعة بالعطاء"
+  },
+  "kpiSidebar": {
+    "title": "حالة المنصة",
+    "caption": "أحدث مقاييس Polo PreSales المتاحة",
+    "releaseScore": "درجة الإصدار",
+    "providersHealthy": "مزوّدون سليمون",
+    "queueBacklog": "تراكم قائمة الانتظار",
+    "overdueTasks": "مهام متأخرة"
+  },
+  "inlineTaskAdd": {
+    "toastAddedTitle": "تمت إضافة المهمة",
+    "toastErrorTitle": "تعذّرت إضافة المهمة",
+    "toastErrorDescription": "رفض الخادم الطلب.",
+    "titlePlaceholder": "إضافة مهمة سريعة — إدخال للحفظ",
+    "titleAriaLabel": "عنوان المهمة السريعة",
+    "dueDateAriaLabel": "تاريخ استحقاق اختياري",
+    "submitButton": "إضافة"
+  },
+  "recentOpportunities": {
+    "accountTitle": "فرص الحساب",
+    "recentTitle": "الفرص الأخيرة",
+    "accountCaption": "الفرص المفتوحة المرتبطة بـ {{accountName}}",
+    "recentCaption": "أحدث نشاط في المحفظة عبر كل العملاء",
+    "openPipeline": "مسار الفرص المفتوح",
+    "viewAll": "عرض الكل",
+    "emptyAccountTitle": "لا توجد فرص لهذا الحساب بعد",
+    "emptyTitle": "لا توجد فرص بعد",
+    "emptyAccountMessage": "أنشئ فرصة من ترويسة الحساب لبدء مساحة عمل للعطاء."
+  },
+  "spotlightRefs": {
+    "regionLabel": "مراجع Spotlight",
+    "sectionTitle": "مراجع المشاريع",
+    "sectionCaption": "مراجع Spotlight Ref المُحقَّقة لهذا الحساب",
+    "errorTitle": "تعذّر تحميل المراجع",
+    "errorMessage": "أعد المحاولة بعد قليل.",
+    "emptyTitle": "لا توجد مراجع بعد",
+    "emptyMessage": "تصل المراجع المُحقَّقة من Spotlight Ref بعد إرسال المستشار لها واعتماد المدير.",
+    "statusDraft": "مسودة",
+    "statusManagerReview": "بانتظار التحقق",
+    "statusValidated": "مُحقَّق",
+    "statusDispatched": "مُرسَل",
+    "toastValidatedTitle": "تم التحقق من المرجع",
+    "toastValidationFailedTitle": "فشل التحقق",
+    "validateButton": "تحقق"
+  },
+  "cockpitCustomizeMenu": {
+    "groupMain": "العمود الرئيسي",
+    "groupSide": "الشريط الجانبي",
+    "triggerLabel": "تخصيص",
+    "hiddenCount": "({{count}} مخفي)",
+    "menuAriaLabel": "تخصيص كتل قمرة القيادة",
+    "showBlocks": "إظهار الكتل",
+    "reset": "إعادة الضبط"
+  },
+  "insightsBar": {
+    "heading": "إشارات الأولوية",
+    "overdueTasks": "{{count}} مهام متأخرة",
+    "stalledOpps": "{{count}} فرص متوقفة",
+    "newLeads": "{{count}} عملاء محتملون جدد هذا الأسبوع",
+    "pipelineValue": "قيمة مسار الفرص {{value}}"
+  },
+  "importOpportunities": {
+    "trigger": "استيراد",
+    "dialog": {
+      "title": "استيراد الفرص",
+      "description": "تُلصق مصفوفة JSON من الفرص. تُولَّد الرموز تلقائيًا إذا أُغفلت."
+    },
+    "cancel": "إلغاء",
+    "submit": "استيراد",
+    "submitLoading": "جارٍ الاستيراد…",
+    "toast": {
+      "invalidJson": "JSON غير صالح",
+      "successOne": "تم استيراد {{count}} فرصة",
+      "successOther": "تم استيراد {{count}} فرص",
+      "rowsFailedOne": "فشل {{count}} صف",
+      "rowsFailedOther": "فشل {{count}} صفوف",
+      "failed": "فشل الاستيراد",
+      "unknownError": "خطأ غير معروف"
+    }
+  },
+  "winRate": {
+    "heading": "معدل الفوز",
+    "emptyNoClosedBids": "لا توجد عطاءات مغلقة",
+    "wonCount": "{{count}} فوز",
+    "lostCount": "{{count}} خسارة"
+  },
+  "businessSnapshot": {
+    "title": "لمحة الأعمال",
+    "caption": "السلامة: {{band}} - الدرجة {{score}}/100",
+    "region": {
+      "ariaLabel": "لمحة الأعمال"
+    },
+    "row": {
+      "legalName": "الاسم القانوني",
+      "founded": "التأسيس",
+      "headquarters": "المقر الرئيسي",
+      "annualRevenue": "الإيراد السنوي",
+      "employees": "الموظفون",
+      "intentTopics": "موضوعات النية",
+      "hiringMovement": "حركة التوظيف",
+      "leadershipChanges": "تغييرات القيادة",
+      "externalSync": "المزامنة الخارجية",
+      "sourceReceipts": "إثباتات المصدر",
+      "lastRefreshed": "آخر تحديث",
+      "confidence": "الثقة"
+    },
+    "value": {
+      "notVerified": "غير متحقّق",
+      "notSynced": "غير مُزامَن",
+      "hiringSummary": "{{trend}} ({{count}} إشارات)",
+      "leadershipSummary": "{{count}} إشارات قيادية عليا",
+      "sourceCount_one": "{{count}} مصدر",
+      "sourceCount_other": "{{count}} مصدر",
+      "sourceCount_zero": "{{count}} مصادر",
+      "sourceCount_two": "{{count}} مصدران",
+      "sourceCount_few": "{{count}} مصادر",
+      "sourceCount_many": "{{count}} مصدر"
+    }
+  },
+  "savedViewsBar": {
+    "namePromptTitle": "تسمية هذا العرض",
+    "namePromptPlaceholder": "مثال: \"متأخر اليوم\"",
+    "namePromptConfirm": "حفظ العرض",
+    "savedToast": "تم حفظ العرض \"{{name}}\"",
+    "recallAriaLabel": "استدعاء العرض المحفوظ",
+    "selectPlaceholder": "العروض المحفوظة…",
+    "saveViewButton": "حفظ العرض",
+    "removeConfirmTitle": "إزالة العرض المحفوظ؟",
+    "removeConfirmDescription": "تُزال \"{{name}}\" من اختصارات المهام.",
+    "removeConfirmButton": "إزالة",
+    "removeButtonTitle": "إزالة أحدث عرض محفوظ"
+  },
+  "collaborativeNotes": {
+    "heading": "تعاون مباشر",
+    "realTimeBadge": "· في الوقت الفعلي",
+    "loadingEditor": "جارٍ تحميل المحرّر",
+    "placeholder": "ابدأ بكتابة ملاحظات تعاونية…"
+  },
+  "tagChip": {
+    "tagLabel": "{{name}}، وسم",
+    "removeTag": "إزالة وسم {{name}}"
+  },
+  "scoreSummaryStrip": {
+    "overallBidScoreLabel": "الدرجة الإجمالية للعطاء: {{score}}%",
+    "rateCriteriaToBegin": "تُقيَّم المعايير للبدء",
+    "weightedScoreSummary": "الدرجة المرجّحة عبر {{count}} عوامل قرار"
+  },
+  "accountNewsSignal": {
+    "title": "الأخبار والإشارات",
+    "caption": "أخبار حديثة من الويب العام عن هذا الحساب — إشارة نشاط مجانية، وليست بيانات مشاريع داخلية.",
+    "badgeFreeOpenWeb": "مجاني · ويب مفتوح",
+    "errorTitle": "تعذّر تحميل الأخبار",
+    "errorMessage": "لم يستجب موجز أخبار الويب المفتوح. هذه إشارة مجانية بأفضل جهد متاح.",
+    "retry": "إعادة المحاولة",
+    "emptyTitle": "لا توجد أخبار حديثة",
+    "emptyMessage": "لم تطابق عناوين الويب العام اسم هذا الحساب في الفترة الأخيرة.",
+    "badgeExternal": "خارجي",
+    "sourceNote": "المصدر: Google News · يُتحقَّق قبل اعتباره حقيقة لدى Mantu."
+  },
+  "googleSignInButton": {
+    "label": "تسجيل الدخول باستخدام Google",
+    "ariaLabel": "تسجيل الدخول باستخدام Google"
+  },
+  "sidebarCards": {
+    "quickActionsHeading": "إجراءات سريعة",
+    "action": {
+      "newLead": "عميل محتمل جديد",
+      "openTasks": "المهام المفتوحة",
+      "contacts": "جهات الاتصال",
+      "companies": "الشركات"
+    },
+    "quickLinksHeading": "روابط سريعة",
+    "link": {
+      "pipeline": "مسار الفرص",
+      "reports": "التقارير",
+      "tasks": "المهام",
+      "settings": "الإعدادات"
+    }
+  },
+  "briefing": {
+    "title": "الموجز: {{label}}",
+    "description": "ملخص تنفيذي أنشأه Dust (وضع محلي تجريبي بدون DUST_API_KEY).",
+    "errorTitle": "تعذّر إنشاء الموجز",
+    "errorUnknown": "خطأ غير معروف",
+    "contentAriaLabel": "محتوى الموجز",
+    "modelMeta": "النموذج {{model}} · {{tokens}} رمزًا",
+    "copy": "نسخ",
+    "regenerate": "إعادة الإنشاء"
+  },
+  "forecastChart": {
+    "title": "تفصيل التوقّع",
+    "caption": "مكدّس حسب الفئة عبر الفترات"
+  },
+  "techStack": {
+    "regionLabel": "نظرة عامة على الحزمة التقنية",
+    "title": "نظرة عامة على الحزمة التقنية",
+    "caption": "من الاستكشاف والتحقق",
+    "emptyTitle": "لا توجد بيانات حزمة بعد",
+    "emptyMessage": "يُثرى هذا الحساب لاكتشاف حزمته."
+  },
+  "keyContacts": {
+    "title": "جهات الاتصال الرئيسية",
+    "noTitleOrEmail": "غير متاح"
+  },
+  "pipelineByStageMini": {
+    "heading": "مسار الفرص حسب المرحلة"
+  },
+  "microsoftSignInButton": {
+    "label": "تسجيل الدخول باستخدام Microsoft"
+  },
+  "customObjectNavItem": {
+    "recordCountLabel": "{{count}} سجلات"
+  },
+  "alert": {
+    "ofTotal": "من {{total}}"
+  },
+  "pipelineByStage": {
+    "regionLabel": "مسار فرص المحفظة حسب المرحلة",
+    "title": "مسار فرص المحفظة",
+    "caption": "مسار الفرص لكل الحسابات حسب المرحلة"
+  },
+  "accountDashboardWidgets": {
+    "railAriaLabel": "حالة تكامل CRM",
+    "railLabel": "نشاط التكامل",
+    "railCaption": "ERP وCRM خارجي وموصلات بيانات مُحقَّقة"
+  },
+  "oppIndustryBreakdown": {
+    "title": "مسار الفرص حسب القطاع",
+    "sectorCount": "{{count}} قطاع"
+  },
+  "revenueEvolution": {
+    "regionLabel": "تطور الإيراد",
+    "title": "تطور الإيراد",
+    "caption": "إيراد صفقات الفوز مع هذا العميل حسب الشهر",
+    "srSummary": "{{count}} أشهر من إيراد صفقات الفوز. الذروة {{period}}.",
+    "barsListLabel": "إيراد صفقات الفوز حسب الشهر",
+    "barLabel": "{{period}}: {{amount}}"
+  },
+  "winLoss": {
+    "regionLabel": "فوز / خسارة",
+    "title": "فوز / خسارة",
+    "caption": "الصفقات المحسومة في هذا الحساب",
+    "winRateLabel": "معدل الفوز",
+    "wonCount": "{{count}} فوز",
+    "lostCount": "{{count}} خسارة",
+    "barLabel": "{{won}} فوز، {{lost}} خسارة — معدل فوز {{rate}}%",
+    "wonValue": "{{value}} في صفقات الفوز"
+  },
+  "pipelineViewSwitch": {
+    "ariaLabel": "عرض الفرص",
+    "list": "قائمة",
+    "board": "لوحة"
+  },
+  "accountHierarchyTree": {
+    "heading": "التسلسل الهرمي للحساب"
+  },
+  "keyboardShortcutsHelp": {
+    "title": "اختصارات لوحة المفاتيح",
+    "description": "تُستخدم مجموعة المفاتيح للتنقل بسرعة.",
+    "commandPalette": "لوحة الأوامر",
+    "helpPanel": "لوحة المساعدة هذه",
+    "goToDashboard": "الانتقال إلى لوحة المعلومات",
+    "goToOpportunities": "الانتقال إلى الفرص",
+    "goToPipeline": "الانتقال إلى مسار الفرص",
+    "goToContacts": "الانتقال إلى جهات الاتصال",
+    "goToTasks": "الانتقال إلى المهام",
+    "goToReports": "الانتقال إلى التقارير",
+    "goToSettings": "الانتقال إلى الإعدادات",
+    "closeDialog": "إغلاق أي مربع حوار/لوحة"
+  },
+  "leadStatusBadge": {
+    "statusNew": "جديد",
+    "statusContacted": "تم التواصل",
+    "statusQualified": "مؤهَّل",
+    "statusNurture": "رعاية",
+    "statusDisqualified": "غير مؤهَّل",
+    "statusConverted": "تم التحويل",
+    "priorityLow": "منخفضة",
+    "priorityMedium": "متوسطة",
+    "priorityHigh": "مرتفعة",
+    "priorityCritical": "حرجة"
+  },
+  "publishStep": {
+    "heading": "منشور",
+    "summary": "{{solutionCount}} حل{{solutionSuffix}} و{{productCount}} منتج{{productSuffix}} أصبحت متاحة مباشرة على لوحة قيادة الحساب.",
+    "backButton": "← مراجعة",
+    "startNewButton": "بدء استقبال جديد"
+  },
+  "offlineIndicator": {
+    "statusLabel": "غير متصل",
+    "retryMessage": "— تُعاد محاولة الحفظ عند استعادة الاتصال"
+  },
+  "accountTierBadges": {
+    "top": "الأبرز",
+    "topRanked": "الأبرز #{{rank}}",
+    "key": "رئيسي"
+  },
+  "stubAuthBypass": {
+    "devModeSkipToDashboard": "وضع المطوّر — تخطي إلى لوحة المعلومات"
+  },
+  "upsellFiles": {
+    "title": "الملفات",
+    "emptyTitle": "اختر حسابًا",
+    "emptyMessage": "افتح حسابًا من /accounts لإرفاق العروض واتفاقيات عدم الإفصاح والبنى المرجعية."
+  },
+  "serum": {
+    "eyebrow": "شبكة فهم الإيراد ذاتية التطوّر",
+    "title": "مركز قيادة SERUM",
+    "subtitle": "مستوى تحكّم مستند إلى المصادر للوكلاء والمستندات وتوجيه النماذج والاعتمادات وقابلية المراقبة.",
+    "updatedAt": "حُدِّث {{time}}",
+    "moduleMapEyebrow": "خريطة الوحدات المباشرة",
+    "moduleMapTitle": "جاهزية مستوى التحكّم",
+    "agentStudioLink": "استوديو الوكلاء",
+    "eventFeedEyebrow": "موجز الأحداث",
+    "eventFeedTitle": "أحداث SERUM الدائمة",
+    "eventFeedEmptyTitle": "لا يوجد دفتر أحداث SERUM بعد",
+    "eventFeedEmptyDetail": "يقرأ الإصدار الحالي إشارات Crew وطلبات تقديم العروض والمستندات والمزوّد وقائمة الانتظار والتدقيق الموجودة. يُفترض أن يشغّل جدول أحداث SERUM المستقبلي للإلحاق فقط إعادة التشغيل المباشر قبل إتاحة الحلقات المستقلة.",
+    "guardrailsTitle": "حواجز الحماية",
+    "loopSourcesLabel": "مصادر الحلقات",
+    "loopSourcesDetail": "{{count}} حلقات نشطة من تشغيلات Crew وتنسيقات طلبات تقديم العروض.",
+    "documentSourcesLabel": "مصادر المستندات",
+    "documentSourcesDetail": "{{processed}} عمليات استخراج ناجحة اليوم؛ {{failed}} إشارات مهام فاشلة عبر قوائم الانتظار والمستندات وحلقات طلبات تقديم العروض.",
+    "modelSourcesLabel": "مصادر النماذج",
+    "modelSourcesDetail": "{{calls}} صفوف تدقيق لاستدعاءات AI اليوم تتضمن {{tokens}} رمزًا.",
+    "providerHealthTitle": "سلامة المزوّد",
+    "noLatencyRecorded": "لم يُسجَّل زمن استجابة",
+    "latencyMs": "{{ms}} مللي ثانية",
+    "providerEmptyTitle": "لا توجد صفوف نبض للمزوّد",
+    "providerEmptyDetail": "قد تظل بيانات اعتماد المزوّد موجودة، لكن لم تُكتب فحوصات سلامة لهذه المؤسسة.",
+    "queueHealthTitle": "سلامة قائمة الانتظار",
+    "queueCounts": "{{waiting}} بالانتظار / {{active}} نشط / {{failed}} فشل / {{completed}} مكتمل",
+    "queueEmptyTitle": "لا توجد لقطات لقائمة الانتظار",
+    "queueEmptyDetail": "لم تُسجَّل صفوف مراقبة قائمة الانتظار لهذه المؤسسة بعد.",
+    "backendSignalsEyebrow": "إشارات الواجهة الخلفية",
+    "backendSignalsTitle": "توفّر الإشارات"
+  },
+  "dueDateChip": {
+    "noDate": "بلا تاريخ",
+    "overdueBy": "متأخر {{count}} يوم",
+    "dueToday": "مستحق اليوم",
+    "daysLeft": "متبقٍ {{count}} يوم",
+    "ariaLabel": "الاستحقاق {{date}}",
+    "ariaLabelNoDate": "لم يُحدَّد تاريخ استحقاق"
+  },
+  "closingThisWeek": {
+    "heading": "الإغلاق هذا الأسبوع",
+    "viewAll": "عرض الكل",
+    "errorMessage": "تعذّر تحميل العطاءات التي تُغلق هذا الأسبوع.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد عطاءات تُغلق هذا الأسبوع."
+  },
+  "crm": {
+    "pipelineCardAriaLabelReadOnly": "{{code}}: {{name}}، {{stage}}، {{value}}.",
+    "receiveStep": {
+      "pickAccountTitle": "اختر حسابًا للبدء",
+      "pickAccountHint": "ابحث عن الحساب المراد تشغيل الاستقبال له.",
+      "pickAccountPlaceholder": "بحث الحسابات…",
+      "pickAccountErrorTitle": "تعذّر تحميل الحسابات",
+      "pickAccountListLabel": "الحسابات",
+      "pickAccountEmpty": "لا توجد حسابات مطابقة."
+    }
+  },
+  "duplicates": {
+    "mergeDisabledHintCompany": "يلزم إذن companies:write لدمج الحسابات.",
+    "mergeDisabledHintContact": "يلزم إذن contacts:write لدمج جهات الاتصال."
   },
   "bidClass": {
     "activeEscalations": "تصعيدات نشطة (الفئة دون تغيير)",

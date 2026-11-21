@@ -1,4 +1,175 @@
 {
+  "nav": {
+    "rfpSection": "أتمتة طلبات تقديم العروض"
+  },
+  "states": {
+    "error": "حدث خطأ ما. أعد المحاولة.",
+    "saving": "جارٍ الحفظ…"
+  },
+  "upload": {
+    "title": "رفع مستند طلب تقديم العروض",
+    "dropzone": "أفلت هنا مستند طلب تقديم العروض أو ملفًا نصيًا أو جدول بيانات أو صورة",
+    "or": "أو",
+    "browse": "استعراض الملفات",
+    "dropzoneLabel": "منطقة إفلات رفع الملفات",
+    "progressLabel": "تقدّم الرفع",
+    "uploading": "جارٍ رفع المستند…",
+    "processingUpload": "جارٍ معالجة الرفع…",
+    "cancel": "إلغاء الرفع",
+    "errorType": "ارفع مصدرًا مدعومًا لطلب تقديم العروض: PDF أو Office أو نص أو CSV أو JSON أو HTML أو RTF أو صورة.",
+    "errorSize": "يتجاوز الملف الحد الأقصى للحجم وهو {{max}} MB."
+  },
+  "pipeline": {
+    "title": "مسار معالجة طلب تقديم العروض",
+    "subtitle": "استخراج آلي ومطابقة للقصص وصياغة وامتثال واعتماد.",
+    "processing": "جارٍ تشغيل المسار…",
+    "overallProgress": "التقدّم الإجمالي للمسار",
+    "eventLog": "سجل أحداث المسار",
+    "progressLabel": "تقدّم مرحلة المسار",
+    "breadcrumbLabel": "مسار تنقل الصفحة",
+    "breadcrumbOpportunities": "الفرص",
+    "errorTitle": "فشل المسار",
+    "errorRetry": "إعادة المحاولة",
+    "errorReset": "إعادة تشغيل المسار",
+    "stages": {
+      "uploading": "رفع",
+      "queued": "في الانتظار",
+      "extraction": "استخراج",
+      "extracting": "استخراج",
+      "story_matching": "مطابقة القصص",
+      "section_drafting": "صياغة",
+      "compliance_fill": "الامتثال",
+      "legal_scan": "قانوني",
+      "qa_review": "مراجعة QA",
+      "awaiting_approval": "بانتظار الاعتماد",
+      "approved": "معتمد",
+      "completed": "مكتمل",
+      "rejected": "مرفوض",
+      "timeout": "انتهت المهلة"
+    }
+  },
+  "requirements": {
+    "heading": "المتطلبات المستخرجة",
+    "count": "تم استخراج {{count}} متطلب",
+    "listLabel": "قائمة المتطلبات",
+    "emptyTitle": "لا توجد متطلبات بعد",
+    "emptyMessage": "ستظهر المتطلبات هنا عند اكتمال الاستخراج."
+  },
+  "stories": {
+    "heading": "قصص النجاح المطابقة",
+    "count": "تمت مطابقة {{count}} قصة",
+    "listLabel": "مطابقات القصص",
+    "emptyTitle": "لا توجد قصص مطابقة",
+    "emptyMessage": "ستظهر قصص النجاح ذات الصلة هنا بعد مطابقة القصص.",
+    "matchedRequirements": "تمت تغطية {{count}} متطلب",
+    "viewStory": "عرض القصة"
+  },
+  "draft": {
+    "heading": "أقسام المسودة",
+    "sectionNav": "تنقل أقسام المسودة",
+    "selectSection": "اختر قسمًا أعلاه لمراجعته وتعديله.",
+    "emptyTitle": "لا توجد مسودة بعد",
+    "emptyMessage": "ستظهر أقسام المسودة هنا عند اكتمال صياغة الأقسام."
+  },
+  "compliance": {
+    "heading": "مصفوفة الامتثال",
+    "matrixLabel": "مصفوفة الامتثال",
+    "summary": "{{compliant}} / {{total}} مطابق · {{pending}} قيد الانتظار",
+    "noResponse": "لا توجد إجابة — بانتظار المراجعة",
+    "colRequirement": "المتطلب",
+    "colStatus": "الحالة",
+    "edit": "تحرير",
+    "done": "تم",
+    "emptyTitle": "لا توجد بيانات امتثال بعد",
+    "emptyMessage": "ستظهر صفوف الامتثال هنا بعد مرحلة تعبئة الامتثال.",
+    "notAssessed": "لم يُقيَّم",
+    "colAnswer": "الإجابة",
+    "colConfidence": "الثقة",
+    "colActions": "إجراءات",
+    "facetStatus": "الحالة",
+    "facetSection": "القسم",
+    "facetMandatory": "إلزامي",
+    "mandatory": "إلزامي",
+    "mandatoryYes": "الإلزامية فقط",
+    "mandatoryNo": "الاختيارية فقط",
+    "clearFilters": "مسح عوامل التصفية",
+    "noMatches": "لا توجد متطلبات تطابق عوامل التصفية هذه.",
+    "cancel": "إلغاء",
+    "status": {
+      "compliant": "مطابق",
+      "partial": "مطابق جزئيًا",
+      "non_compliant": "غير مطابق",
+      "pending": "قيد الانتظار"
+    }
+  },
+  "approval": {
+    "title": "مراجعة واعتماد",
+    "checklist": "قائمة المراجعة (تُستكمل بالترتيب)",
+    "notesLabel": "ملاحظات المراجعة (اختياري)",
+    "notesPlaceholder": "أضف أي تعليقات أو تحفظات للمراجع…",
+    "requiresAdmin": "لا يمكن اعتماد العروض إلا للمسؤولين والمالكين. تواصل مع المسؤول.",
+    "waitingForStage": "العرض غير جاهز للاعتماد بعد. أكمل كل مراحل المسار أولًا.",
+    "checklistIncomplete": "أكمل كل خطوات المراجعة قبل الاعتماد.",
+    "approve": "اعتماد وإرسال",
+    "approving": "جارٍ الاعتماد…",
+    "approved": "معتمد",
+    "approvedMessage": "تم اعتماد العرض وإرساله.",
+    "errorGeneric": "تعذّر الاعتماد. أعد المحاولة.",
+    "steps": {
+      "executiveSummary": "راجعت الملخص التنفيذي",
+      "requirementsMapping": "تحققت من ربط المتطلبات",
+      "complianceMatrix": "راجعت مصفوفة الامتثال",
+      "draftSections": "راجعت كل أقسام المسودة",
+      "legalClearance": "تمت معالجة نتائج الفحص القانوني"
+    }
+  },
+  "crew": {
+    "title": "Crew العطاء",
+    "subtitle": "وكلاء حسب الأدوار يعملون على طلب تقديم العروض هذا، مرحلة بمرحلة. اسحب وكيلًا لإعادة تعيين مرحلته.",
+    "dropHere": "أفلت وكيلًا هنا",
+    "closeBrief": "إغلاق موجز الدور",
+    "responsibilities": "المسؤوليات"
+  },
+  "competitor": {
+    "heading": "استخبارات المنافسين",
+    "subtitle": "مستند إلى مصادر عامة — كل نتيجة ترتبط بمصدرها. لا شيء مُختلَق.",
+    "selectLabel": "المنافس المراد بحثه",
+    "selectPlaceholder": "اختر منافسًا",
+    "research": "بحث",
+    "researching": "جارٍ البحث…",
+    "addPlaceholder": "أضف منافسًا بالاسم",
+    "add": "إضافة",
+    "queued": "أُضيف البحث إلى الانتظار — ستظهر النتائج الموثّقة هنا قريبًا.",
+    "listLabel": "نتائج المنافسين الموثّقة",
+    "sourceNewTab": "(يُفتح في علامة تبويب جديدة)",
+    "emptyTitle": "لا توجد نتائج للمنافسين بعد",
+    "emptyMessage": "اختر منافسًا وشغّل البحث. لا تُعرض إلا الادعاءات التي يمكن ربطها بمصدر عام — بما في ذلك أسعار العقود الفيدرالية الفعلية من USASpending.",
+    "error": "تعذّر تحميل نتائج المنافسين."
+  },
+  "proposalDetail": {
+    "loadingAriaLabel": "جارٍ تحميل العرض",
+    "errorTitle": "تعذّر تحميل العرض",
+    "errorRetry": "أعد المحاولة بعد قليل.",
+    "backToProposals": "رجوع إلى العروض",
+    "notFound": "العرض غير موجود.",
+    "backToProposalsAriaLabel": "رجوع إلى العروض",
+    "version": "الإصدار {{version}}",
+    "due": "الاستحقاق {{date}}",
+    "requiredBadge": "مطلوب",
+    "aiDraftedBadge": "أُعدّ بـ AI",
+    "wordCount": "{{count}} كلمة",
+    "draftingSectionAriaLabel": "جارٍ صياغة {{title}}…",
+    "aiDraftSectionAriaLabel": "مسودة AI لـ {{title}}",
+    "drafting": "جارٍ الصياغة…",
+    "aiDraft": "مسودة AI",
+    "editSectionAriaLabel": "تعديل قسم {{title}}",
+    "editContentAriaLabel": "تعديل محتوى {{title}}",
+    "cancel": "إلغاء",
+    "saving": "جارٍ الحفظ…",
+    "save": "حفظ",
+    "emptyContent": "لا يوجد محتوى بعد. استخدم مسودة AI لإنشاء النسخة الأولى.",
+    "draftSectionError": "تعذّر إنشاء مسودة AI. أعد المحاولة."
+  },
   "proposals": {
     "title": "المقترحات",
     "subtitle": "مساحة عمل طلبات العروض — صياغة المقترحات ومراجعتها وتقديمها.",
@@ -10,12 +181,16 @@
     "create": "إنشاء",
     "cancel": "إلغاء",
     "createError": "تعذر إنشاء المقترح.",
+    "filterByStatus": "تصفية حسب الحالة",
     "resultCount": "{{count}} مقترح",
     "loading": "جارٍ تحميل المقترحات",
     "loadError": "تعذر تحميل المقترحات",
     "loadErrorRetry": "يرجى المحاولة مرة أخرى بعد قليل.",
     "emptyTitle": "لا توجد مقترحات بعد.",
+    "emptyMessage": "أنشئ أول عرض للبدء.",
+    "viewProposal": "عرض العرض: {{name}}",
     "version": "v{{version}}",
+    "due": "الاستحقاق {{date}}",
     "columns": {
       "name": "المقترح",
       "stage": "المرحلة",
@@ -49,7 +224,16 @@
     "allStages": "كل المراحل",
     "emptyFiltered": "لا توجد مقترحات مطابقة لعوامل التصفية.",
     "truncated": "يتم عرض {{loaded}} من أحدث المقترحات المحدَّثة من أصل {{total}}. ضيّق نطاق المرحلة أو البحث للوصول إلى البقية.",
-    "percent": "{{value}}%"
+    "percent": "{{value}}%",
+    "readOnlyHint": "يلزم إذن الكتابة للعروض لإنشاء عرض."
+  },
+  "rfpCrew": {
+    "statusWaiting": "بانتظار",
+    "statusWorking": "قيد العمل",
+    "statusDone": "تم",
+    "statusOverseeing": "قيد الإشراف",
+    "viewRoleDetailsAria": "{{role}} — عرض تفاصيل الدور",
+    "moveToStageAria": "انقل {{role}} إلى مرحلة أخرى. استخدم مفتاحي السهم الأيسر والأيمن."
   },
   "proposalStatusChip": {
     "label": {
@@ -61,39 +245,46 @@
       "lost": "خاسر"
     }
   },
-  "states": {
-    "saving": "جارٍ الحفظ…"
+  "sectionEditor": {
+    "ariaLabelEditSection": "تعديل القسم: {{title}}",
+    "statusReviewed": "✓ تمت المراجعة",
+    "statusNotReviewed": "لم تُراجَع بعد",
+    "saving": "جارٍ الحفظ…",
+    "saveAndMarkReviewed": "حفظ ووضع علامة تمت المراجعة"
   },
-  "compliance": {
-    "heading": "مصفوفة الامتثال",
-    "matrixLabel": "مصفوفة الامتثال",
-    "summary": "{{compliant}} / {{total}} مطابق · {{pending}} قيد الانتظار",
-    "noResponse": "لا توجد إجابة — بانتظار المراجعة",
-    "colRequirement": "المتطلب",
-    "colStatus": "الحالة",
-    "edit": "تحرير",
-    "done": "تم",
-    "emptyTitle": "لا توجد بيانات امتثال بعد",
-    "emptyMessage": "ستظهر صفوف الامتثال هنا بعد مرحلة تعبئة الامتثال.",
-    "notAssessed": "لم يُقيَّم",
-    "colAnswer": "الإجابة",
-    "colConfidence": "الثقة",
-    "colActions": "إجراءات",
-    "facetStatus": "الحالة",
-    "facetSection": "القسم",
-    "facetMandatory": "إلزامي",
-    "mandatory": "إلزامي",
-    "mandatoryYes": "الإلزامية فقط",
-    "mandatoryNo": "الاختيارية فقط",
-    "clearFilters": "مسح عوامل التصفية",
-    "noMatches": "لا توجد متطلبات تطابق عوامل التصفية هذه.",
-    "cancel": "إلغاء",
-    "status": {
-      "compliant": "مطابق",
-      "partial": "مطابق جزئيًا",
-      "non_compliant": "غير مطابق",
-      "pending": "قيد الانتظار"
-    }
+  "rfpStatusChip": {
+    "stageIdle": "خامل",
+    "stageQueued": "في الانتظار",
+    "stageExtracting": "جارٍ الاستخراج",
+    "stageStoryMatching": "جارٍ مطابقة القصص",
+    "stageSectionDrafting": "جارٍ الصياغة",
+    "stageComplianceFill": "الامتثال",
+    "stageLegalScan": "Crew المراجعة",
+    "stageQaReview": "مراجعة QA",
+    "stageAwaitingApproval": "بانتظار الاعتماد",
+    "stageApproved": "معتمد",
+    "stageCompleted": "مكتمل",
+    "stageFailed": "فشل",
+    "stageRejected": "مرفوض",
+    "stageTimeout": "انتهت المهلة",
+    "ariaPipelineStatus": "حالة المسار: {{status}}"
+  },
+  "requirementRow": {
+    "pageRefAria": "وُجد في الصفحة {{page}}",
+    "confidenceAria": "ثقة AI: {{percent}}%",
+    "confidenceLabel": "ثقة {{percent}}%",
+    "notAssessed": "لم يُقيَّم"
+  },
+  "adminRfp": {
+    "eyebrow": "مسؤول",
+    "title": "تحليلات طلبات تقديم العروض",
+    "subtitle": "كل طلب تقديم عروض عبر المؤسسة، وقيمته، والتفصيل حسب المالك.",
+    "viewAllProposals": "عرض كل العروض"
+  },
+  "aiDisclosureBadge": {
+    "ariaLabel": "أُنشئ هذا المحتوى بمساعدة AI",
+    "title": "مسودة بمساعدة AI — راجعها قبل الإرسال",
+    "label": "مسودة بمساعدة AI"
   },
   "agent": {
     "held": "معلّق",

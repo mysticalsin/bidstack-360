@@ -1,12 +1,535 @@
 {
+  "title": "التكاملات",
+  "subtitle": "اربط Polo PreSales بأدواتك وخدماتك",
+  "connected": "متصل",
+  "disconnected": "غير متصل",
+  "connect": "اتصال",
+  "disconnect": "قطع الاتصال",
+  "configure": "تهيئة",
+  "reconnect": "إعادة الاتصال",
+  "lastSync": "آخر مزامنة {{when}}",
+  "syncNow": "مزامنة الآن",
+  "syncing": "جارٍ المزامنة…",
+  "status": {
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "error": "خطأ",
+    "pending": "قيد الانتظار"
+  },
+  "gmail": {
+    "name": "Gmail",
+    "description": "تُزامَن رسائل Gmail والأنشطة مع Polo PreSales.",
+    "permissionsRequired": "مطلوب إذن قراءة للبريد الإلكتروني",
+    "connectViaGoogle": "اتصال عبر Google"
+  },
+  "microsoft": {
+    "name": "Microsoft 365",
+    "description": "يُزامَن Outlook والتقويم وTeams مع Polo PreSales.",
+    "connectViaMicrosoft": "اتصال عبر Microsoft"
+  },
+  "slack": {
+    "name": "Slack",
+    "description": "تُستقبل الإشعارات وتُشارَك التحديثات في Slack.",
+    "workspace": "مساحة عمل Slack",
+    "connectViaSlack": "اتصال عبر Slack",
+    "notifyChannel": "قناة الإشعارات"
+  },
+  "zapier": {
+    "name": "Zapier",
+    "description": "يمكن أتمتة Polo PreSales مع آلاف التطبيقات عبر Zapier.",
+    "apiKey": "مفتاح API لـ Zapier",
+    "viewZaps": "عرض Zaps الخاصة بي"
+  },
+  "dust": {
+    "name": "Dust",
+    "description": "تُربَط مساحة عمل Dust لتفعيل وكلاء AI.",
+    "workspace": "مساحة عمل Dust",
+    "apiKey": "مفتاح API لـ Dust",
+    "status": "حالة اتصال Dust"
+  },
+  "errors": {
+    "connectFailed": "فشل الاتصال. تحقق من بيانات الاعتماد.",
+    "syncFailed": "فشلت المزامنة.",
+    "disconnectFailed": "فشل قطع الاتصال."
+  },
   "agentProviderCredentials": {
-    "dialog": {
-      "accountIdHint": "ستجده في عنوان URL الخاص بلوحة تحكم Cloudflare، أو نفّذ الأمر `wrangler whoami`. كما يمكن استخدام عنوان URL أساسي كامل يبدأ بـ https://.",
-      "accountIdLabel": "معرّف حساب Cloudflare"
+    "toast": {
+      "activeSet": "أصبح {{label}} النموذج النشط",
+      "activeCleared": "تم مسح النموذج النشط",
+      "activeSetDescription": "تستخدم كل خطوة AI هذا المزوّد حتى التبديل مجددًا — دون إعادة نشر.",
+      "switchFailedTitle": "تعذّر تبديل المزوّد",
+      "serverRejected": "رفض الخادم الطلب.",
+      "testAliveTitle": "{{label}} يعمل",
+      "testAliveDescription": "استجاب {{model}} خلال {{latencyMs}} مللي ثانية.",
+      "testNoResponseTitle": "{{label}} لم يستجب",
+      "testNoResponseDescription": "لا استجابة من المزوّد.",
+      "testFailedTitle": "فشل الاختبار",
+      "savedTitle": "تم حفظ {{label}}",
+      "savedDescription": "تم تحديث حالة المزوّد وجاهزية استوديو الوكلاء.",
+      "removedTitle": "تمت إزالة بيانات اعتماد {{label}}",
+      "removeFailedTitle": "فشلت الإزالة"
     },
     "error": {
       "accountIdInvalid": "هذا ليس معرّف حساب Cloudflare (32 خانة ست عشرية) ولا عنوان URL كاملاً يبدأ بـ https://.",
-      "accountIdRequired": "يحتاج Workers AI من Cloudflare إلى معرّف حسابك."
+      "accountIdRequired": "يحتاج Workers AI من Cloudflare إلى معرّف حسابك.",
+      "apiKeyRequired": "مفتاح API مطلوب لهذا المزوّد.",
+      "claudeModelRequired": "يتطلب Claude نموذجًا، مثل claude-sonnet-4-5.",
+      "saveFailed": "تعذّر حفظ بيانات اعتماد المزوّد."
+    },
+    "remove": {
+      "confirmTitle": "إزالة بيانات اعتماد {{label}}؟",
+      "confirmDescription": "يعود الوكلاء إلى بيانات اعتماد بيئة المنصة إن توفرت. تبقى تعريفات الوكلاء الحالية كما هي.",
+      "confirmLabel": "إزالة"
+    },
+    "header": {
+      "title": "مزوّدو النماذج",
+      "caption": "الاستقلال عن المورّد: تُخزَّن مفاتيح تملكها المؤسسة لـ GPT أو Claude أو Kimi أو NVIDIA NIM أو Gemma المحلي، ثم يُختار المزوّد النشط. يسري تبديل المزوّد النشط في خطوة AI التالية — دون إعادة نشر. تُشفَّر المفاتيح في حالة السكون ولا تُعرض مرة أخرى.",
+      "addProvider": "إضافة مزوّد"
+    },
+    "errorState": {
+      "title": "تعذّر تحميل مفاتيح المزوّدين",
+      "message": "ما زالت جاهزية المزوّد تستخدم بديل بيئة الخادم، لكن تعذّر تحميل مفاتيح المؤسسة المحفوظة.",
+      "retry": "إعادة المحاولة"
+    },
+    "emptyState": {
+      "title": "لم تُرجَع قائمة المزوّدين",
+      "message": "يفترض أن يعيد API دائمًا المزوّدين المباشرين المدعومين."
+    },
+    "summary": {
+      "savedCountOne": "{{count}} مزوّد مؤسسة محفوظ",
+      "savedCountOther": "{{count}} مزوّدي مؤسسة محفوظين",
+      "activeBadge": "نشط · {{label}}",
+      "noActiveBadge": "لا مزوّد نشط — يُستخدم افتراضي المنصة",
+      "fallbackNote": "يبقى مزوّدو بيئة المنصة متاحين كبديل عند التهيئة."
+    },
+    "row": {
+      "activeBadge": "نشط",
+      "orgKeySaved": "مفتاح المؤسسة محفوظ",
+      "noOrgKey": "لا مفتاح للمؤسسة",
+      "activeDescription": "يشغّل كل خطوة AI لهذه المؤسسة الآن.",
+      "readyDescription": "محفوظ وجاهز — يُعيَّن نشطًا لتوجيه AI عبره.",
+      "fallbackDescription": "يستخدم بديل بيئة المنصة إن كان مهيّأً.",
+      "edit": "تعديل",
+      "connect": "اتصال",
+      "remove": "إزالة",
+      "inUse": "قيد الاستخدام",
+      "setActive": "تعيين كنشط",
+      "testing": "جارٍ الاختبار…",
+      "test": "اختبار",
+      "testAlive": "يعمل · {{latencyMs}} مللي ثانية",
+      "testFailed": "فشل · {{error}}",
+      "testNoResponse": "لا استجابة"
+    },
+    "detail": {
+      "model": "النموذج",
+      "endpoint": "نقطة النهاية",
+      "key": "المفتاح",
+      "keyOptional": "اختياري",
+      "keyNotSaved": "غير محفوظ",
+      "updated": "آخر تحديث",
+      "updatedNever": "أبدًا"
+    },
+    "dialog": {
+      "accountIdHint": "ستجده في عنوان URL الخاص بلوحة تحكم Cloudflare، أو نفّذ الأمر `wrangler whoami`. كما يمكن استخدام عنوان URL أساسي كامل يبدأ بـ https://.",
+      "accountIdLabel": "معرّف حساب Cloudflare",
+      "addTitle": "إضافة مزوّد نموذج",
+      "apiKeyLabel": "مفتاح API",
+      "apiKeyLabelOptional": "مفتاح API (اختياري)",
+      "apiKeyPlaceholder": "ألصق مفتاح المزوّد",
+      "apiKeyPlaceholderKeep": "يُترك فارغًا للإبقاء على المفتاح المحفوظ",
+      "apiKeyPlaceholderOptional": "اختياري لبيئات التشغيل المحلية",
+      "baseUrlHint": "يجب أن يكون نقطة نهاية https عامة.",
+      "baseUrlHintLocal": "يُقبل localhost في التطوير المحلي فقط. يتطلب الإنتاج https عامًا.",
+      "baseUrlLabel": "عنوان URL الأساسي",
+      "cancel": "إلغاء",
+      "description": "يُشفَّر مفتاح API قبل التخزين ولا يُعاد إلى المتصفح. يُترك المفتاح فارغًا عند التعديل للإبقاء على المفتاح المحفوظ.",
+      "modelLabel": "النموذج",
+      "providerLabel": "المزوّد",
+      "save": "حفظ المزوّد",
+      "saving": "جارٍ الحفظ…",
+      "updateTitle": "تحديث {{label}}"
+    },
+    "omnirouteHint": "بوابة AI محلية مجانية — بلا حاجة إلى مفتاح. توزّع على مزوّدين مجانيين كثر مع بديل تلقائي."
+  },
+  "connectors": {
+    "category": {
+      "company": "بيانات الشركات",
+      "market": "بيانات السوق والبيانات المفتوحة",
+      "procurement": "المشتريات والمناقصات",
+      "logo": "الشعارات والهوية البصرية",
+      "people": "الأشخاص وجهات الاتصال",
+      "ai": "AI والوكلاء"
+    },
+    "header": {
+      "title": "دليل الموصّلات",
+      "caption": "مصادر بيانات خارجية يستطيع Polo PreSales الوصول إليها. تعمل التغذيات المفتوحة دون مفاتيح؛ وتحتاج التغذيات المرخّصة إلى بيانات اعتماد.",
+      "sourcesBadge": "{{count}} مصادر"
+    },
+    "error": {
+      "title": "تعذّر تحميل الموصّلات",
+      "retry": "أعد المحاولة"
+    },
+    "stat": {
+      "totalSources": "إجمالي المصادر",
+      "healthy": "سليم",
+      "needsKey": "يحتاج مفتاحًا",
+      "degradedDown": "متدهور/متوقف",
+      "catalogBadge": "دليل"
+    },
+    "filter": {
+      "groupLabel": "تصفية الموصّلات حسب الفئة",
+      "all": "الكل"
+    },
+    "empty": {
+      "title": "لا موصّلات في هذه الفئة"
+    },
+    "row": {
+      "checkedAt": "فُحص {{time}}",
+      "docsLink": "الوثائق ↗",
+      "disconnecting": "جارٍ قطع الاتصال…",
+      "disconnect": "قطع الاتصال",
+      "connecting": "جارٍ الاتصال…",
+      "connect": "اتصال",
+      "requiresKey": "يتطلب مفتاحًا",
+      "open": "مفتوح",
+      "slackWriteHint": "يلزم إذن كتابة للتكاملات لقطع اتصال مساحة عمل Slack المشتركة."
+    },
+    "status": {
+      "healthy": "سليم",
+      "degraded": "متدهور",
+      "down": "متوقف",
+      "disabled": "معطّل"
+    }
+  },
+  "erpConnector": {
+    "title": "ERP MCP",
+    "caption": "عيّن ERP_MCP_URL + ERP_DB للتفعيل",
+    "status": {
+      "error": "خطأ",
+      "checking": "جارٍ الفحص",
+      "notConfigured": "غير مهيّأ",
+      "live": "مباشر",
+      "unreachable": "غير قابل للوصول"
+    },
+    "error": {
+      "title": "تعذّر الوصول إلى نقطة نهاية حالة ERP",
+      "message": "هذه مشكلة اتصال، لا نقص في التهيئة. يُرجى إعادة المحاولة.",
+      "retry": "إعادة المحاولة"
+    },
+    "notConfigured": {
+      "set": "عيّن",
+      "andOptionally": "واختياريًا",
+      "tail": "للوصول إلى الخدمة الجانبية لـ ERP MCP. حتى ذلك الحين، يستخدم Polo PreSales بيانات محلية موثّقة وموصّلات بيانات موثّقة."
+    },
+    "stat": {
+      "endpoint": "نقطة النهاية",
+      "database": "قاعدة البيانات",
+      "mcpTools": "أدوات MCP",
+      "status": "الحالة"
+    },
+    "value": {
+      "na": "غير متاح",
+      "reachable": "قابل للوصول",
+      "unreachable": "غير قابل للوصول"
+    },
+    "kit": {
+      "title": "حزمة تشغيل عطاءات ERP",
+      "subtitle": "أنماط الشريك والفرصة وعرض السعر والنشاط والمستند والتسليم، مكيّفة لأعمال ما قبل البيع في Polo PreSales.",
+      "badge": {
+        "sidecar": "خدمة جانبية",
+        "fixSidecar": "أصلح الخدمة الجانبية",
+        "local": "محلي"
+      }
+    },
+    "autocomplete": {
+      "title": "إكمال تلقائي للشريك",
+      "subtitle": "بحث عن كيان قانوني بأسلوب ERP مع بديل Polo PreSales.",
+      "ariaLabel": "استعلام الإكمال التلقائي للشركة",
+      "placeholder": "الاسم أو النطاق أو VAT أو DUNS",
+      "check": "تحقق",
+      "empty": "لا اقتراحات شركات بعد. أضف بيانات اعتماد ERP MCP أو تحقق من هذا الحساب في Polo PreSales."
+    },
+    "item": {
+      "vat": "VAT {{value}}",
+      "duns": "DUNS {{value}}",
+      "noRegistryKeys": "لا مفاتيح سجل بعد"
+    }
+  },
+  "connectionCommandCenter": {
+    "path": {
+      "dust": {
+        "title": "جسر وكلاء Dust",
+        "eyebrow": "إجراءات الوكيل",
+        "summary": "تُوفَّر لـ Dust حزمة أدوات CRM على الخادم مع MCP ومزامنة REST."
+      },
+      "mcp": {
+        "title": "خادم MCP",
+        "eyebrow": "أدوات مخصصة",
+        "summary": "يُسجَّل Polo PreSales كخادم MCP لـ Dust أو Claude لسطح المكتب أو الوكلاء الداخليين."
+      },
+      "rest": {
+        "title": "REST API",
+        "eyebrow": "بيانات ثنائية الاتجاه",
+        "summary": "تُستخدم مفاتيح API محددة النوع لمهام الاستخراج والتحويل والتحميل وبوابات العملاء وأتمتة المؤسسة."
+      },
+      "webhooks": {
+        "title": "ويب هوك",
+        "eyebrow": "أحداث فورية",
+        "summary": "تُشرَك الأنظمة الخارجية في أحداث الصفقة والعطاء والعرض والفاتورة والوكيل."
+      }
+    },
+    "readyLabel": "جاهز",
+    "needsSetupLabel": "يحتاج إعدادًا",
+    "error": {
+      "title": "تعذّر تحميل دليل الإعداد",
+      "message": "لم تستجب نقطة نهاية عقد التكامل.",
+      "retry": "إعادة محاولة دليل الإعداد"
+    },
+    "readiness": {
+      "dustCredentials": {
+        "label": "بيانات اعتماد Dust",
+        "ready": "جاهز",
+        "needsKey": "يحتاج مفتاحًا"
+      },
+      "dustAgents": {
+        "label": "وكلاء Dust",
+        "found": "عُثر على {{count}}",
+        "disabled": "معطّل"
+      },
+      "mcpEndpoint": {
+        "label": "نقطة نهاية MCP",
+        "publicUrlSet": "تم تعيين URL عام",
+        "localFallback": "بديل محلي"
+      },
+      "dustDataSource": {
+        "label": "مصدر بيانات Dust",
+        "ready": "جاهز",
+        "missing": "مفقود"
+      }
+    },
+    "title": "مركز قيادة الاتصال",
+    "generatedAt": "أُنشئ {{time}}",
+    "subtitle": "اختر مسارًا، وأنشئ المفتاح المناسب، وانسخ نقطة النهاية كما هي، واتصل بالنظام الخارجي بصلاحيات الحد الأدنى.",
+    "keyVault": "مخزن المفاتيح",
+    "webhookHub": "مركز ويب هوك",
+    "tablistLabel": "مسارات إعداد التكامل"
+  },
+  "dustCredentials": {
+    "sectionTitle": "بيانات اعتماد Dust",
+    "sectionCaption": "تُربَط مساحة عمل Dust مرة واحدة — يستخدمها تلقائيًا وكلاء Crew وصياغة طلب تقديم العروض والامتثال وذكاء المستندات.",
+    "removeButton": "إزالة",
+    "updateKeysButton": "تحديث المفاتيح",
+    "connectButton": "اتصال بـ Dust",
+    "dialogUpdateTitle": "تحديث بيانات اعتماد Dust",
+    "dialogConnectTitle": "اتصال بـ Dust",
+    "dialogDescription": "يُتحقق من المفاتيح لدى Dust قبل الحفظ. يُشفَّر مفتاح API في حالة السكون ولا يُعرض مرة أخرى.",
+    "fieldApiKeyLabel": "مفتاح API",
+    "fieldApiKeyHint": "من Dust → الإعدادات → مفاتيح API.",
+    "fieldWorkspaceIdLabel": "معرّف مساحة العمل",
+    "fieldDataSourceIdLabel": "معرّف مصدر البيانات",
+    "fieldDataSourceIdPlaceholder": "اختياري — يفعّل مزامنة المستندات",
+    "fieldBaseUrlLabel": "عنوان URL الأساسي",
+    "fieldBaseUrlPlaceholder": "اختياري — القيمة الافتراضية https://dust.tt/api",
+    "cancelButton": "إلغاء",
+    "validatingButton": "جارٍ التحقق…",
+    "validateSaveButton": "تحقق وحفظ",
+    "errorBothRequired": "مفتاح API ومعرّف مساحة العمل مطلوبان معًا.",
+    "errorCouldNotSave": "تعذّر حفظ بيانات الاعتماد.",
+    "toastConnectedTitle": "تم اتصال Dust",
+    "toastConnectedDescription": "تم التحقق من بيانات الاعتماد وحفظها. تستخدم ميزات AI الآن مساحة عملك.",
+    "confirmRemoveTitle": "إزالة بيانات اعتماد Dust؟",
+    "confirmRemoveDescription": "تعود ميزات AI إلى افتراضي المنصة (إن كان معيّنًا) أو تتوقف مؤقتًا حتى تُضاف مفاتيح جديدة.",
+    "confirmRemoveLabel": "إزالة",
+    "toastRemovedTitle": "تمت إزالة بيانات اعتماد Dust",
+    "toastRemoveFailedTitle": "فشلت الإزالة",
+    "errorServerRejected": "رفض الخادم الطلب.",
+    "loadErrorTitle": "تعذّر تحميل بيانات اعتماد Dust",
+    "loadErrorMessage": "يُرجى إعادة المحاولة.",
+    "retryButton": "إعادة المحاولة",
+    "emptyTitle": "Dust غير متصل بعد",
+    "emptyMessageAdmin": "أضف مفتاح API لـ Dust ومعرّف مساحة العمل لتفعيل صياغة AI والامتثال ووكلاء Crew.",
+    "emptyMessageNonAdmin": "اطلب من مسؤول أن يربط مساحة عمل Dust لتفعيل ميزات AI.",
+    "badgePlatformDefault": "افتراضي المنصة",
+    "badgeConnected": "متصل",
+    "platformKeyNote": "يعمل بمفتاح Dust المشترك للمنصة. أضف مفتاحك أعلاه لاستخدام مساحة عملك.",
+    "detailWorkspaceId": "معرّف مساحة العمل",
+    "detailDataSourceId": "معرّف مصدر البيانات",
+    "detailBaseUrl": "عنوان URL الأساسي",
+    "detailAgentOverrides": "تجاوزات الوكلاء",
+    "agentOverridesConfigured": "{{count}} مهيّأ",
+    "agentOverridesDefaults": "الافتراضيات مستخدمة"
+  },
+  "dataQuality": {
+    "title": "جودة البيانات",
+    "caption": {
+      "generated": "تقرير أُنشئ {{time}} · {{count}} مشكلة",
+      "idle": "يرصد الشركات المكررة والبيانات القديمة والمالكين المفقودين والنطاقات غير الصالحة."
+    },
+    "error": {
+      "title": "تعذّر تحميل تقرير جودة البيانات",
+      "retry": "أعد المحاولة"
+    },
+    "emptyScan": {
+      "title": "لا يوجد فحص لجودة البيانات",
+      "message": "شغّل فحص جودة البيانات لعرض النطاقات المكررة والسجلات القديمة والمالكين المفقودين والنطاقات غير الصالحة وتغطية الشعار."
+    },
+    "stat": {
+      "qualityScore": "درجة الجودة",
+      "highSeverity": "خطورة مرتفعة",
+      "mediumSeverity": "خطورة متوسطة",
+      "totalIssues": "إجمالي المشكلات",
+      "badge": "بيانات"
+    },
+    "noIssues": {
+      "title": "لا مشكلات في جودة البيانات",
+      "message": "لم يُرصد في هذا الفحص نطاق مكرر أو بيانات قديمة أو مالك مفقود أو نطاق غير صالح أو شعار مفقود."
+    },
+    "issue": {
+      "company": "الشركة: {{name}}"
+    },
+    "kind": {
+      "duplicateCompany": "شركة مكررة",
+      "staleData": "بيانات قديمة",
+      "missingOwner": "مالك مفقود",
+      "invalidDomain": "نطاق غير صالح",
+      "missingLogo": "شعار مفقود"
+    },
+    "severity": {
+      "high": "مرتفعة",
+      "medium": "متوسطة",
+      "low": "منخفضة"
+    }
+  },
+  "connectionTester": {
+    "title": "فاحص الاتصال",
+    "caption": "افحص نقطة نهاية من خدمة API قبل حفظها. لا تُرسل الأسرار ولا رموز الحامل.",
+    "status": {
+      "reachable": "قابل للوصول",
+      "needsAttention": "يحتاج انتباهًا",
+      "ready": "جاهز للاختبار"
+    },
+    "probeOption": {
+      "mcp": {
+        "label": "MCP",
+        "description": "نقاط نهاية أدوات الوكيل"
+      },
+      "rest": {
+        "label": "REST API",
+        "description": "نقاط نهاية مزامنة البيانات"
+      },
+      "webhook": {
+        "label": "ويب هوك",
+        "description": "مستقبلات الأحداث"
+      }
+    },
+    "endpointUrlLabel": "عنوان URL لنقطة النهاية",
+    "placeholder": {
+      "loading": "جارٍ تحميل عقد الإعداد…"
+    },
+    "useDefault": "استخدام الافتراضي",
+    "testing": "جارٍ الاختبار…",
+    "testEndpoint": "اختبار نقطة النهاية",
+    "hint": {
+      "noSecrets": {
+        "title": "لا تُرسل أسرار",
+        "body": "يفحص API قابلية الوصول فقط. يزيل سلاسل الاستعلام والأجزاء وأسماء المستخدمين وكلمات المرور."
+      },
+      "ssrf": {
+        "title": "محمي من SSRF",
+        "body": "تُحظر الشبكات الخاصة والمضيفات الداخلية خارج التطوير المحلي قبل إرسال أي طلب."
+      },
+      "timeout": {
+        "title": "مهلة قصيرة",
+        "body": "يتوقف الفحص بعد 5 ثوانٍ ويُسجَّل حدث تدقيق محدد النطاق لتتبّع المسؤول."
+      }
+    },
+    "toast": {
+      "missingUrl": "أضف عنوان URL لنقطة النهاية أولًا",
+      "reachedTitle": "تم الوصول إلى نقطة النهاية",
+      "warningTitle": "اكتمل الفحص بتحذير",
+      "probeFailed": "فشل فحص نقطة النهاية.",
+      "blockedTitle": "حُظر الفحص"
+    }
+  },
+  "integrationHero": {
+    "eyebrowBadge": "نسيج التكامل",
+    "eyebrowChannels": "MCP، REST، ويب هوك، Dust",
+    "title": "التكاملات",
+    "subtitle": "اربط الوكلاء وواجهات API وأنظمة ERP وتدفقات الأحداث بمسارات إعداد واضحة وبيانات اعتماد محددة النطاق وفحوصات سلامة مباشرة تنسجم مع بقية المنصة.",
+    "posture": {
+      "refreshing": "جارٍ تحديث وضع التكامل…"
+    },
+    "actions": {
+      "createApiKey": "إنشاء مفتاح API",
+      "addWebhook": "إضافة ويب هوك"
+    },
+    "metrics": {
+      "readyPaths": {
+        "label": "مسارات جاهزة",
+        "helperCurrent": "العرض الحالي",
+        "helperOverview": "تبويب نظرة عامة"
+      },
+      "dustAgents": {
+        "label": "وكلاء Dust"
+      },
+      "webhookEvents": {
+        "label": "أحداث ويب هوك",
+        "helperNeedReview": "{{count}} بحاجة إلى مراجعة",
+        "helperNoErrors": "لم تُحمَّل أخطاء أحداث"
+      },
+      "activeMcpTools": {
+        "label": "أدوات MCP النشطة",
+        "helper": "أدوات crm_* المواجهة لـ Dust"
+      },
+      "controlPlane": {
+        "label": "مستوى التحكم",
+        "helper": "إعداد بالحد الأدنى من الصلاحيات"
+      }
+    }
+  },
+  "integrationAtoms": {
+    "copyEndpoint": "نسخ نقطة النهاية",
+    "copySnippet": "نسخ المقتطف",
+    "alreadyCopied": "نُسخ مسبقًا",
+    "copiedToClipboard": "تم النسخ إلى الحافظة",
+    "copyFailedTitle": "فشل النسخ",
+    "copyFailedDescription": "لم يتوفر الوصول إلى الحافظة.",
+    "copied": "تم النسخ",
+    "copy": "نسخ",
+    "httpStatus": "HTTP {{status}}",
+    "noResponse": "لا استجابة",
+    "latencyMs": "{{latency}} مللي ثانية"
+  },
+  "dustAgents": {
+    "title": "وكلاء Dust",
+    "caption": "وكلاء مساحة العمل المتاحون لسير عمل التحقق من بيانات الحساب",
+    "statusDegraded": "متدهور",
+    "statusConfigured": "مهيّأ",
+    "statusDisabled": "معطّل",
+    "notConfigured": "أضف بيانات اعتماد Dust لسرد وكلاء مساحة العمل المتاحين.",
+    "empty": "Dust مهيّأ، لكن لم يُرجَع أي وكيل يمكن الوصول إليه لمساحة العمل هذه.",
+    "badgeAgent": "وكيل"
+  },
+  "connectionRunway": {
+    "sectionLabel": "سير عمل إعداد التكامل",
+    "stepBadge": "الخطوة {{number}}",
+    "steps": {
+      "pickSurface": {
+        "title": "اختر السطح",
+        "body": "اختر MCP للوكلاء، وREST للمزامنة، وويب هوك للأحداث، أو الموصّلات لـ ERP."
+      },
+      "scopeAccess": {
+        "title": "حدّد نطاق الوصول",
+        "body": "أنشئ مفاتيح قراءة/كتابة لسير العمل المحدد فقط، وأبقِ الأسرار على جانب الخادم."
+      },
+      "probeBeforeSave": {
+        "title": "افحص قبل الحفظ",
+        "body": "شغّل فحص وصول آمن مع حماية من SSRF ودون إرسال رموز الحامل."
+      },
+      "monitorEvidence": {
+        "title": "راقب الأدلة",
+        "body": "راجع سلامة المزوّد وأحداث ويب هوك دون مغادرة مركز التكامل."
+      }
     }
   }
 }

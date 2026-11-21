@@ -26,6 +26,14 @@ function detectLocale(): string {
     : DEFAULT_LOCALE;
 }
 
+/** Arabic UI copy is RTL, but chart ticks and money stay in Western digits. */
+function withLatinDigits(locale: string): string {
+  if ((locale === 'ar' || locale.startsWith('ar-')) && !locale.includes('-u-nu-')) {
+    return `${locale}-u-nu-latn`;
+  }
+  return locale;
+}
+
 function detectCurrency(): string {
   if (typeof window === 'undefined') return DEFAULT_CURRENCY;
   try {
@@ -42,7 +50,7 @@ function detectCurrency(): string {
 
 export function formatMoney(value: number, currency?: string, locale?: string): string {
   const resolvedCurrency = currency ?? detectCurrency();
-  const resolvedLocale = locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(locale ?? detectLocale());
   if (value >= 1_000_000)
     return new Intl.NumberFormat(resolvedLocale, {
       style: 'currency',
@@ -59,7 +67,7 @@ export function formatMoney(value: number, currency?: string, locale?: string): 
 
 export function formatDate(iso: string | null | undefined, locale?: string): string {
   if (!iso) return '—';
-  const resolvedLocale = locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(locale ?? detectLocale());
   return new Date(iso).toLocaleDateString(resolvedLocale, {
     month: 'short',
     day: 'numeric',
@@ -91,7 +99,7 @@ export function formatMoneyMicros(
   options: { compact?: boolean; locale?: string } = {},
 ): string {
   const resolvedCurrency = currency ?? detectCurrency();
-  const resolvedLocale = options.locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(options.locale ?? detectLocale());
   const asBigInt =
     typeof micros === 'bigint'
       ? micros
@@ -123,7 +131,7 @@ export function formatMoneyMicrosFull(
 /** Render a +/- percentage delta with one decimal. Null → "—". */
 export function formatPctDelta(pct: number | null, locale?: string): string {
   if (pct === null || Number.isNaN(pct)) return '—';
-  const resolvedLocale = locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(locale ?? detectLocale());
   const sign = pct > 0 ? '↑' : pct < 0 ? '↓' : '';
   return `${sign}${Math.abs(pct).toLocaleString(resolvedLocale, { maximumFractionDigits: 1 })}%`;
 }
@@ -137,7 +145,7 @@ export function formatPercent(
   options: { fractionDigits?: number; locale?: string } = {},
 ): string {
   if (value === null || Number.isNaN(value)) return '—';
-  const resolvedLocale = options.locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(options.locale ?? detectLocale());
   return new Intl.NumberFormat(resolvedLocale, {
     style: 'percent',
     minimumFractionDigits: options.fractionDigits ?? 0,
@@ -146,7 +154,7 @@ export function formatPercent(
 }
 
 export function relativeTime(iso: string, locale?: string): string {
-  const resolvedLocale = locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(locale ?? detectLocale());
   const diffMs = Date.now() - new Date(iso).getTime();
   const sec = Math.floor(diffMs / 1000);
   const rtf = new Intl.RelativeTimeFormat(resolvedLocale, { numeric: 'auto' });
@@ -165,7 +173,7 @@ export function relativeTime(iso: string, locale?: string): string {
  * en-US, "1,2 Mo" in fr).
  */
 export function formatBytes(bytes: number, locale?: string): string {
-  const resolvedLocale = locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(locale ?? detectLocale());
   const safe = Math.max(0, bytes);
   const units: Array<{ unit: 'byte' | 'kilobyte' | 'megabyte' | 'gigabyte' | 'terabyte'; threshold: number }> = [
     { unit: 'terabyte', threshold: 1024 ** 4 },
@@ -189,6 +197,6 @@ export function formatBytes(bytes: number, locale?: string): string {
  * "Alice, Bob et Carol" (fr) vs "Alice, Bob y Carol" (es).
  */
 export function formatList(items: readonly string[], locale?: string): string {
-  const resolvedLocale = locale ?? detectLocale();
+  const resolvedLocale = withLatinDigits(locale ?? detectLocale());
   return new Intl.ListFormat(resolvedLocale, { style: 'long', type: 'conjunction' }).format(items);
 }

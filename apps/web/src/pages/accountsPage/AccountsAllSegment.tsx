@@ -275,11 +275,7 @@ export function AccountsAllSegment() {
           title={t('accounts.title', 'Accounts')}
           subtitle={
             <>
-              {rows.length === 1
-                ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
-                : t('accounts.summary.companyCount_other', '{{count}} companies', {
-                    count: rows.length,
-                  })}{' '}
+              {t('accounts.summary.companyCount', '{{count}} companies', { count: rows.length })}{' '}
               · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
                 amount: formatMoneyMicros(totalPipeline, 'EUR'),
@@ -519,18 +515,11 @@ export function AccountsAllSegment() {
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {search
-          ? rows.length === 1
-            ? t('accounts.liveRegion.matching_one', '{{count}} account matching "{{query}}"', {
-                count: rows.length,
-                query: search,
-              })
-            : t('accounts.liveRegion.matching_other', '{{count}} accounts matching "{{query}}"', {
-                count: rows.length,
-                query: search,
-              })
-          : rows.length === 1
-            ? t('accounts.liveRegion.count_one', '{{count}} account', { count: rows.length })
-            : t('accounts.liveRegion.count_other', '{{count}} accounts', { count: rows.length })}
+          ? t('accounts.liveRegion.matching', '{{count}} accounts matching "{{query}}"', {
+              count: rows.length,
+              query: search,
+            })
+          : t('accounts.liveRegion.count', '{{count}} accounts', { count: rows.length })}
       </p>
 
       {leverageOnly && leverageMissing.length > 0 ? (
@@ -542,7 +531,7 @@ export function AccountsAllSegment() {
           )}
           {' '}
           {leverageMissing.slice(0, 8).map((item) => (
-            <Link key={item.companyId} to={`/accounts/${item.companyId}`} className="mr-2 underline">
+            <Link key={item.companyId} to={`/accounts/${item.companyId}`} className="me-2 underline">
               {item.companyName}
             </Link>
           ))}

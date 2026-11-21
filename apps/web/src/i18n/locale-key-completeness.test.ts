@@ -4,10 +4,8 @@
 // Everything else still missing is listed in locale-gaps.allow.json so a
 // new gap fails CI.
 //
-// Arabic stays a supported locale. Its catalogs are unfinished. The `ar`
-// list in locale-gaps.allow.json is that temporary gap. A separate
-// translation PR fills those catalogs. This pull request does not translate
-// Arabic.
+// Arabic stays a supported locale. The `ar` list in locale-gaps.allow.json
+// is empty: every English key has an Arabic string. A new gap fails CI.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

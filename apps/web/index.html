@@ -30,6 +30,17 @@
           var theme = saved || (prefersDark ? 'dark' : 'light');
           document.documentElement.dataset.theme = theme;
         } catch (e) {}
+        try {
+          var supported = { en: 1, fr: 1, es: 1, pt: 1, it: 1, zh: 1, ar: 1 };
+          var fromCookie = document.cookie.match(/(?:^|; )bidstack-locale=([^;]*)/);
+          var raw = fromCookie && fromCookie[1] ? decodeURIComponent(fromCookie[1]) : '';
+          if (!raw) raw = localStorage.getItem('bidstack-locale') || '';
+          if (!raw && navigator.language) raw = navigator.language;
+          var base = (raw || 'en').toLowerCase().split('-')[0];
+          if (!supported[base]) base = 'en';
+          document.documentElement.lang = base;
+          document.documentElement.dir = base === 'ar' ? 'rtl' : 'ltr';
+        } catch (e) {}
       })();
     </script>
   </head>
