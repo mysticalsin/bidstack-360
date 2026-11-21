@@ -149,4 +149,161 @@ describe('start-csv lost claim redis key', () => {
       add.mockRestore();
     }
   });
+
+  t('an enqueue failure after cancel removes the rows key', async () => {
+    // WHY: cancel can win while the chunks are being handed to the queue.
+    // The job will not import, so the rows stored for that job id must not
+    // sit until the 1h TTL.
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
+      const jobId = (jobs[0]?.data as { migrationJobId: string }).migrationJobId;
+      await prisma.migrationJob.update({
+        where: { id: jobId },
+        data: { status: 'CANCELLED', completedAt: new Date() },
+      });
+      throw new Error('queue down');
+    });
+    try {
+      const res = await start([{ name: 'Cancelled enqueue' }]);
+      expect(res.statusCode).toBe(409);
+      const row = await newestJob();
+      expect(row.status).toBe('CANCELLED');
+      expect(await server.redis.get(rowsKey(row.id))).toBeNull();
+    } finally {
+      add.mockRestore();
+    }
+  });
+
+  t('a cancel that lands during enqueue removes the rows key', async () => {
+    // WHY: the queue accepted the chunks, then the status read saw CANCELLED.
+    // That 409 is not the lost-claim branch. The rows are still this job's,
+    // and a cancelled job does not read them.
+    const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
+      const jobId = (jobs[0]?.data as { migrationJobId: string }).migrationJobId;
+      await prisma.migrationJob.update({
+        where: { id: jobId },
+        data: { status: 'CANCELLED', completedAt: new Date() },
+      });
+      return [{ id: jobId }] as never;
+    });
+    try {
+      const res = await start([{ name: 'Cancel during enqueue' }]);
+      expect(res.statusCode).toBe(409);
+      const row = await newestJob();
+      expect(row.status).toBe('CANCELLED');
+      expect(await server.redis.get(rowsKey(row.id))).toBeNull();
+    } finally {
+      add.mockRestore();
+    }
+  });
+
+  t('cancel removes the stored rows', async () => {
+    // WHY: a cancelled import is not going to read migration:<id>:company:rows.
+    // Leaving the key keeps the uploaded rows for the rest of the hour.
+    const user = await prisma.user.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        startedAt: new Date(),
+        meta: { entityType: 'company', mappings: { name: 'company.name' }, dedupStrategy: 'update' },
+      },
+    });
+    await server.redis.set(rowsKey(job.id), JSON.stringify([{ name: 'Cancel me' }]), 'EX', 3600);
+    const res = await server.inject({
+      method: 'DELETE',
+      url: `/api/v1/migrations/${job.id}/cancel`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(await server.redis.get(rowsKey(job.id))).toBeNull();
+  });
+
+  t('a status read fails a running import after the rows key expires', async () => {
+    // WHY: the rows key lives for one hour. After that the worker cannot
+    // finish, and a poll that still says RUNNING never heals the row.
+    const user = await prisma.user.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        meta: { entityType: 'company', mappings: { name: 'company.name' }, dedupStrategy: 'update' },
+      },
+    });
+    const detail = await server.inject({ method: 'GET', url: `/api/v1/migrations/${job.id}` });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json<{ status: string }>().status).toBe('FAILED');
+    expect(detail.json<{ errorSummary: Array<{ message: string }> }>().errorSummary).toEqual([
+      expect.objectContaining({ message: 'rows_expired' }),
+    ]);
+    const list = await server.inject({ method: 'GET', url: '/api/v1/migrations' });
+    const listed = list
+      .json<{ items: Array<{ id: string; status: string }> }>()
+      .items.find((item) => item.id === job.id);
+    expect(listed?.status).toBe('FAILED');
+  });
+
+  t('a status read keeps a running import while the rows key is still there', async () => {
+    // WHY: expiry is the missing key after an hour, not the age by itself.
+    // A long import that can still read its rows stays RUNNING.
+    const user = await prisma.user.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        meta: { entityType: 'company', mappings: { name: 'company.name' }, dedupStrategy: 'update' },
+      },
+    });
+    await server.redis.set(rowsKey(job.id), JSON.stringify([{ name: 'Still here' }]), 'EX', 3600);
+    const detail = await server.inject({ method: 'GET', url: `/api/v1/migrations/${job.id}` });
+    expect(detail.json<{ status: string }>().status).toBe('RUNNING');
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(stored.status).toBe('RUNNING');
+  });
+
+  t('a status read does not fail a young running import that has no rows key', async () => {
+    // WHY: the 15 minute stall flag is derived and must not write. A missing
+    // key before the hour is up is not the expiry heal.
+    const user = await prisma.user.findFirstOrThrow({
+      where: { orgId: org.orgId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    const job = await prisma.migrationJob.create({
+      data: {
+        orgId: org.orgId,
+        userId: user.id,
+        source: 'CSV',
+        status: 'RUNNING',
+        totalRows: 1,
+        startedAt: new Date(Date.now() - 16 * 60 * 1000),
+        meta: { entityType: 'company', mappings: { name: 'company.name' }, dedupStrategy: 'update' },
+      },
+    });
+    const detail = await server.inject({ method: 'GET', url: `/api/v1/migrations/${job.id}` });
+    expect(detail.json<{ status: string }>().status).toBe('RUNNING');
+    const stored = await prisma.migrationJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(stored.status).toBe('RUNNING');
+  });
 });

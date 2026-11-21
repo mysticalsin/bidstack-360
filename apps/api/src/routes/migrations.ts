@@ -48,6 +48,9 @@ import { serializeJob, serializeMapping } from './migrations.helpers.js';
 
 const CHUNK_SIZE = 100;
 
+/** Same window as the Redis EX on migration:<id>:<entity>:rows. */
+const IMPORT_ROWS_TTL_MS = 60 * 60 * 1000;
+
 /** Empty on purpose. Retry takes the id from the path and no fields. */
 const RetryBody = z.object({}).strict().nullish();
 
@@ -132,15 +135,84 @@ async function abandonUnqueuedStart(input: {
   const removed = await prisma.migrationJob.deleteMany({
     where: { id: input.jobId, orgId: input.orgId, status: 'FAILED' },
   });
-  // A cancel that already won is not pending, so its key stays. A throw from
-  // the delete must not replace the 409 the caller is about to return.
+  // A throw from the delete must not replace the 409 the caller is about to
+  // return. A cancel that already won is not deleted here, and it will not
+  // import, so its key goes too. RUNNING is not this branch.
   if (removed.count > 0) {
-    try {
-      await input.redis.del(input.redisKey);
-    } catch (err) {
-      input.log.warn({ err, migrationJobId: input.jobId }, 'import row delete failed');
-    }
+    await dropImportRows(input.redis, input.redisKey, input.jobId, input.log);
+    return;
   }
+  const left = await prisma.migrationJob.findFirst({
+    where: { id: input.jobId, orgId: input.orgId },
+    select: { status: true },
+  });
+  if (left?.status === 'CANCELLED') {
+    await dropImportRows(input.redis, input.redisKey, input.jobId, input.log);
+  }
+}
+
+async function dropImportRows(
+  redis: { del: (key: string) => Promise<unknown> },
+  redisKey: string,
+  jobId: string,
+  log: { warn: (obj: object, msg?: string) => void },
+): Promise<void> {
+  try {
+    await redis.del(redisKey);
+  } catch (err) {
+    log.warn({ err, migrationJobId: jobId }, 'import row delete failed');
+  }
+}
+
+type RunningImportRow = {
+  id: string;
+  orgId: string;
+  source: string;
+  status: string;
+  startedAt: Date | null;
+  meta: unknown;
+};
+
+/**
+ * A RUNNING csv import whose rows key is gone after the hour cannot finish.
+ * The 15 minute stall flag stays derived. This write is only the expiry.
+ */
+async function healExpiredRunningImport<T extends RunningImportRow>(
+  job: T,
+  redis: { get: (key: string) => Promise<string | null> },
+  log: { warn: (obj: object, msg?: string) => void },
+): Promise<T> {
+  if (job.status !== 'RUNNING' || job.source === 'HUBSPOT_OAUTH' || !job.startedAt) return job;
+  if (Date.now() - job.startedAt.getTime() < IMPORT_ROWS_TTL_MS) return job;
+  const meta = job.meta;
+  const entityType =
+    meta &&
+    typeof meta === 'object' &&
+    !Array.isArray(meta) &&
+    typeof (meta as { entityType?: unknown }).entityType === 'string'
+      ? (meta as { entityType: string }).entityType
+      : '';
+  if (!entityType) return job;
+  let raw: string | null;
+  try {
+    raw = await redis.get(`migration:${job.id}:${entityType}:rows`);
+  } catch (err) {
+    log.warn({ err, migrationJobId: job.id }, 'import row read failed');
+    return job;
+  }
+  if (raw !== null) return job;
+  await prisma.migrationJob.updateMany({
+    where: { id: job.id, orgId: job.orgId, status: 'RUNNING' },
+    data: {
+      status: 'FAILED',
+      completedAt: new Date(),
+      errorSummary: [{ row: 0, field: null, message: MIGRATION_ROWS_EXPIRED }],
+    },
+  });
+  const current = await prisma.migrationJob.findFirst({
+    where: { id: job.id, orgId: job.orgId },
+  });
+  return (current ?? job) as T;
 }
 
 async function enqueueCsvChunks(input: {
@@ -330,7 +402,11 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: { createdAt: 'desc' },
         take: limit,
       });
-      return { items: jobs.map((job) => ({ ...serializeJob(job), stalled: stalledFlag(job) })) };
+      const healed = [];
+      for (const job of jobs) {
+        healed.push(await healExpiredRunningImport(job, server.redis, req.log));
+      }
+      return { items: healed.map((job) => ({ ...serializeJob(job), stalled: stalledFlag(job) })) };
     },
   );
 
@@ -351,9 +427,11 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      // Read-only. The worker persists RUNNING → FAILED. This flag is derived
-      // so a poll can show the stall before that write lands.
-      return { ...serializeJob(job), stalled: stalledFlag(job) };
+      // The 15 minute stall flag stays derived. A rows key that has passed
+      // its hour is gone, so this read fails that import instead of leaving
+      // it RUNNING.
+      const current = await healExpiredRunningImport(job, server.redis, req.log);
+      return { ...serializeJob(current), stalled: stalledFlag(current) };
     },
   );
 
@@ -422,7 +500,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         // Store rows in Redis with 1h TTL so the worker can read them in chunks.
         const redisKey = `migration:${job.id}:${entityType}:rows`;
         try {
-          await server.redis.set(redisKey, JSON.stringify(rows), 'EX', 3600);
+          await server.redis.set(redisKey, JSON.stringify(rows), 'EX', IMPORT_ROWS_TTL_MS / 1000);
         } catch (err) {
           req.log.error({ err, migrationJobId: job.id }, 'failed to store import rows');
           await abandonUnqueuedStart({
@@ -551,6 +629,9 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           select: { status: true },
         });
         if (current?.status !== 'RUNNING') {
+          if (current?.status === 'CANCELLED') {
+            await dropImportRows(server.redis, redisKey, job.id, req.log);
+          }
           req.log.warn(
             { migrationJobId: job.id, orgId, from: current?.status ?? null, to: 'RUNNING' },
             'illegal migration transition',
@@ -878,6 +959,15 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       const updated = await prisma.migrationJob.findFirstOrThrow({
         where: { id: job.id, orgId },
       });
+      const meta = (updated.meta ?? {}) as { entityType?: unknown };
+      if (typeof meta.entityType === 'string' && meta.entityType.length > 0) {
+        await dropImportRows(
+          server.redis,
+          `migration:${updated.id}:${meta.entityType}:rows`,
+          updated.id,
+          req.log,
+        );
+      }
       await prisma.auditLog.create({
         data: {
           orgId,
