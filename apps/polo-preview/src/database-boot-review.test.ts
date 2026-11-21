@@ -230,11 +230,11 @@ describe('database boot review', () => {
     // WHY: -c is not the only way to put SQL on argv. -cSQL, a cluster such
     // as -Atc, and a long-option prefix such as --comm do the same.
     const reject = (args: string[]) => databaseBoot.assertPsqlArgsHaveNoCommand(args);
-    expect(() => reject(['-cSELECT 1'])).toThrow(/-c/);
-    expect(() => reject(['-Atc', 'select 1'])).toThrow(/-c/);
-    expect(() => reject(['-qc', 'select 1'])).toThrow(/-c/);
-    expect(() => reject(['--comm', 'select 1'])).toThrow(/-c/);
-    expect(() => reject(['--comma=select 1'])).toThrow(/-c/);
+    expect(() => reject(['-cSELECT 1'])).toThrow(/not allowed/);
+    expect(() => reject(['-Atc', 'select 1'])).toThrow(/not allowed/);
+    expect(() => reject(['-qc', 'select 1'])).toThrow(/not allowed/);
+    expect(() => reject(['--comm', 'select 1'])).toThrow(/not allowed/);
+    expect(() => reject(['--comma=select 1'])).toThrow(/not allowed/);
     expect(reject(['-d', 'bidstack', '-v', 'VERBOSITY=verbose', '-q'])).toEqual([
       '-d',
       'bidstack',

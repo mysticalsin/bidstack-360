@@ -109,9 +109,13 @@ describe('database boot follow-ups', () => {
     expect(spawn).toContain('assertPsqlArgsHaveNoCommand(');
     expect(() =>
       databaseBoot.assertPsqlArgsHaveNoCommand(['-d', 'bidstack', '-c', 'select 1']),
-    ).toThrow(/-c/);
-    expect(() => databaseBoot.assertPsqlArgsHaveNoCommand(['--command', 'select 1'])).toThrow(/-c/);
-    expect(() => databaseBoot.assertPsqlArgsHaveNoCommand(['--command=select 1'])).toThrow(/-c/);
+    ).toThrow(/not allowed/);
+    expect(() => databaseBoot.assertPsqlArgsHaveNoCommand(['--command', 'select 1'])).toThrow(
+      /not allowed/,
+    );
+    expect(() => databaseBoot.assertPsqlArgsHaveNoCommand(['--command=select 1'])).toThrow(
+      /not allowed/,
+    );
     expect(() => databaseBoot.assertPsqlArgsHaveNoCommand('psql -c select 1')).toThrow(/list/);
     expect(
       databaseBoot.assertPsqlArgsHaveNoCommand(['-d', 'bidstack', '-v', 'ON_ERROR_STOP=1', '-q']),

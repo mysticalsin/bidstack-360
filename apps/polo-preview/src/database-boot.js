@@ -195,24 +195,20 @@ export function passwordPsqlEnv(extra = {}) {
   return { ...extra, LC_ALL: 'C', LANG: 'C', PGVERBOSITY: 'verbose' };
 }
 
-function psqlArgCarriesCommand(arg) {
-  if (arg.startsWith('--')) {
-    const name = arg.slice(2).split('=')[0];
-    // --c, --comm, --command, and --command=sql are all the command option.
-    return name.length > 0 && ('command'.startsWith(name) || name.startsWith('command'));
-  }
-  if (!arg.startsWith('-') || arg === '-') return false;
-  // -c, -cSQL, and a short cluster that includes c, such as -Atc or -qc.
-  const letters = /^[A-Za-z]+/.exec(arg.slice(1))?.[0] ?? '';
-  return letters.includes('c');
-}
+// The password psql argv is a fixed list of separate tokens. A denylist of
+// -c shapes cannot keep up with psql 16 getopt, which accepts digit-led
+// clusters such as -1cSELECT. Only these flag tokens are permitted. A value
+// is its own token and must not start with '-'.
+const PASSWORD_PSQL_FLAGS = new Set(['-h', '-p', '-U', '-d', '-v', '-q']);
 
 // -c would put the ALTER text, including the SCRAM verifier, on argv.
 export function assertPsqlArgsHaveNoCommand(args) {
   if (!Array.isArray(args)) throw new Error('psql argv must be a list');
   const list = args.map((arg) => String(arg));
   for (const arg of list) {
-    if (psqlArgCarriesCommand(arg)) throw new Error('psql argv must not use -c');
+    if (arg.startsWith('-') && !PASSWORD_PSQL_FLAGS.has(arg)) {
+      throw new Error('psql argv token is not allowed');
+    }
   }
   return list;
 }
