@@ -286,7 +286,9 @@ export function CsvImportWizard() {
           <input
             ref={fileInput}
             type="file"
-            aria-label={t('csvImport.upload.chooseFile', 'Choose a CSV or Excel file')}
+            // A file input is a button in the accessibility tree. Reusing the
+            // visible control's name makes "Choose a CSV" match both.
+            aria-label={t('csvImport.upload.fileInput', 'Spreadsheet file')}
             accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="sr-only"
             onChange={(e) => {
