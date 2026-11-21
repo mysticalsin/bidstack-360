@@ -39,7 +39,7 @@ import {
   targetUrl,
 } from './protocol.js';
 
-const TEAM = 'https://tony-walteur.cloudflareaccess.com';
+const TEAM = 'https://example.cloudflareaccess.com';
 let jwksCache = null;
 
 function b64urlToBytes(s) {
@@ -637,7 +637,7 @@ export class Relay extends DurableObject {
     const entry = this.pending.get(parsed.id);
     if (!entry) return;
     this.pending.delete(parsed.id);
-    const publicOrigin = 'https://polo-preview.tony-walteur.workers.dev';
+    const publicOrigin = 'https://polo.example.workers.dev';
     const headers = new Headers();
     for (const [key, value] of rewriteResponseHeaders(parsed.headers || [], publicOrigin)) {
       headers.append(key, value);

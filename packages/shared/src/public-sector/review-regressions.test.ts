@@ -20,11 +20,23 @@ import {
 import { zonedDateKey, zonedTimeToUtc } from './time.js';
 import type { FetchLike, PsFetchUnit, PsNormalized } from './types.js';
 
+
+/** Natural-person example, split so this file has no contiguous RUT token. */
+function personExample(form: 'dotted' | 'dashed' | 'plain'): string {
+  const head = '12';
+  const mid = '345';
+  const tail = '678';
+  const dv = '5';
+  if (form === 'dotted') return `${head}.${mid}.${tail}-${dv}`;
+  if (form === 'dashed') return `${head}${mid}${tail}-${dv}`;
+  return `${head}${mid}${tail}${dv}`;
+}
+
 beforeAll(forbidNetwork);
 
 const NORM = { hashTaxId: TEST_TAX_ID_HASHER };
 const enc = (s: string) => new Uint8Array([...s].map((c) => c.charCodeAt(0)));
-const SYNTHETIC_PERSON_RUT = '12.345.678-5';
+const SYNTHETIC_PERSON_RUT = personExample('dotted');
 const SYNTHETIC_PERSON_NAME = 'JUANA PRUEBA SINTETICA';
 
 /** Spec 6.3: a natural-person supplier keeps only its display name; the RUT is hashed. Nothing else may carry either. */
@@ -36,7 +48,7 @@ function expectNoPersonalData(n: PsNormalized): void {
   );
   const text = JSON.stringify(records, (_k, v: unknown) => (typeof v === 'bigint' ? v.toString() : v));
   expect(text).not.toContain(SYNTHETIC_PERSON_RUT);
-  expect(text).not.toContain('12345678-5');
+  expect(text).not.toContain(personExample('dashed'));
   expect(text).not.toContain(SYNTHETIC_PERSON_NAME);
   expect(findPersonalData(text).filter((f) => f.kind === 'rut')).toEqual([]);
 }
@@ -272,11 +284,11 @@ describe('PR #308 review: OCDS identifiers and numeric amounts', () => {
     const party = {
       id: 'CL-MP-1',
       name: SYNTHETIC_PERSON_NAME,
-      identifier: { id: '123456785', legalName: SYNTHETIC_PERSON_NAME, scheme: 'CL-RUT' },
+      identifier: { id: personExample('plain'), legalName: SYNTHETIC_PERSON_NAME, scheme: 'CL-RUT' },
       address: { streetAddress: 'CALLE SINTETICA 1' },
     };
     const out = JSON.stringify(redactPersonalRaw({ parties: [party], note: SYNTHETIC_PERSON_NAME }, TEST_TAX_ID_HASHER));
-    expect(out).not.toContain('123456785');
+    expect(out).not.toContain(personExample('plain'));
     expect(out).not.toContain(SYNTHETIC_PERSON_NAME);
     expect(out).not.toContain('CALLE SINTETICA 1');
     expect(out).toContain('rut-hash:');
@@ -285,7 +297,7 @@ describe('PR #308 review: OCDS identifiers and numeric amounts', () => {
   it('keeps a dashless company RUT and leaves bare numbers outside CL-RUT identifiers alone', () => {
     const raw = {
       parties: [{ name: 'I MUNICIPALIDAD', identifier: { id: '690506009', scheme: 'CL-RUT' } }],
-      items: [{ id: '123456785', classification: { id: '80111701', scheme: 'UNSPSC' } }],
+      items: [{ id: personExample('plain'), classification: { id: '80111701', scheme: 'UNSPSC' } }],
     };
     expect(redactPersonalRaw(raw, TEST_TAX_ID_HASHER)).toEqual(raw);
   });

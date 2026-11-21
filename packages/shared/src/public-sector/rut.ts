@@ -2,7 +2,7 @@
 export interface Rut {
   body: number;
   dv: string;
-  /** `12.345.678-5` form. */
+  /** `1.000.100-5` form. */
   formatted: string;
 }
 
@@ -25,13 +25,13 @@ export function rutCheckDigit(body: number): string {
   return r === 11 ? '0' : r === 10 ? 'K' : String(r);
 }
 
-/** Format a RUT body and verifier as `12.345.678-5`. */
+/** Format a RUT body and verifier as `1.000.100-5`. */
 export function formatRut(body: number, dv: string): string {
   return `${String(body).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}-${dv.toUpperCase()}`;
 }
 
 /**
- * Parse `12.345.678-5`, `12345678-5` or the OCDS `123456785` form. Returns
+ * Parse `1.000.100-5`, `1000100-5` or the OCDS `123456785` form. Returns
  * `null` unless the verifier digit checks out.
  */
 export function parseRut(raw: string | null | undefined): Rut | null {

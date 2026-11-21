@@ -1,5 +1,5 @@
 {
-  "description": "Explicit allowlist for the personal-data guard. gmailAddresses are synthetic free-mail fixtures required by tests. fixtureEmailDomains are pre-existing domains that are not RFC 2606 reserved or example; this change did not rewrite them. rutBodies are outputs of syntheticRutBody() only. rutPaths are pre-existing files this change did not rewrite. mantuPaths stays empty.",
+  "description": "Explicit allowlist for the personal-data guard. gmailAddresses are synthetic free-mail fixtures required by tests. fixtureEmailDomains are pre-existing domains that are not RFC 2606 reserved or example; this change did not rewrite them. rutBodies are syntheticRutBody() outputs plus organization tax ids pinned by the public-sector fixtures and tests. Natural-person examples in the detector tests are assembled from parts, so those files are scanned. rutPaths are Norwegian registry fixtures whose organization numbers collide with the Chile checksum; they are not Chilean personal ids. mantuPaths stays empty.",
   "gmailAddresses": [
     "a@gmail.com",
     "buyer@gmail.com",
@@ -39,7 +39,11 @@
     1000127,
     1000128,
     1000129,
+    1000130,
+    1000131,
+    1000132,
     1000600,
+    61000001,
     61000100,
     61000101,
     61000102,
@@ -90,6 +94,11 @@
     61000147,
     61000148,
     61000600,
+    61606917,
+    69050600,
+    76000002,
+    76000003,
+    76853950,
     99000100,
     99000101,
     99000102,
@@ -300,16 +309,7 @@
     "apps/worker/src/lib/account-intel/__fixtures__/brreg-enhet.json",
     "apps/worker/src/lib/account-intel/__fixtures__/brreg-regnskap.json",
     "apps/worker/src/lib/account-intel/run.test.ts",
-    "apps/worker/src/lib/account-intel/sources.http.contract.test.ts",
-    "packages/shared/src/public-sector/__fixtures__/cl/mp-api-licitaciones-dia.synthetic.json",
-    "packages/shared/src/public-sector/__fixtures__/cl/mp-api-ordenesdecompra-dia.synthetic.json",
-    "packages/shared/src/public-sector/__fixtures__/cl/ocds-award-2741-120-TD25.json",
-    "packages/shared/src/public-sector/__fixtures__/cl/ocds-award-3951-19-LE25.json",
-    "packages/shared/src/public-sector/__fixtures__/cl/ocds-tender-3951-19-LE25.json",
-    "packages/shared/src/public-sector/cl/mercadopublico-api.test.ts",
-    "packages/shared/src/public-sector/review-regressions.test.ts",
-    "packages/shared/src/public-sector/rut.ts",
-    "packages/shared/src/public-sector/scrub.test.ts"
+    "apps/worker/src/lib/account-intel/sources.http.contract.test.ts"
   ],
   "fixtureEmailDomains": [
     "acme.com",

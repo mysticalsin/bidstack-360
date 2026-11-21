@@ -177,7 +177,7 @@ recommended for the best frontend performance + a `vercel.app` link.
 
 ## Polo Cloudflare preview (Access-gated)
 
-The internal preview at `https://polo-preview.tony-walteur.workers.dev` is not
+The internal preview at `https://polo.example.workers.dev` is not
 Vercel/Railway. A Cloudflare Worker (Access in front, Durable Object relay
 behind) forwards HTTP to a box that must be checked out on `main`.
 

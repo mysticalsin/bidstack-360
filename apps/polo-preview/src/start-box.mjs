@@ -17,7 +17,7 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const API_PORT = Number(process.env.PORT_API ?? 4020);
 const WEB_PORT = Number(process.env.POLO_PREVIEW_WEB_PORT ?? 4180);
 const PUBLIC_ORIGIN =
-  process.env.POLO_PREVIEW_PUBLIC_ORIGIN ?? 'https://polo-preview.tony-walteur.workers.dev';
+  process.env.POLO_PREVIEW_PUBLIC_ORIGIN ?? 'https://polo.example.workers.dev';
 
 function log(message) {
   console.error(`[polo-preview-box] ${message}`);

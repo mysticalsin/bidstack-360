@@ -11,7 +11,7 @@ export function allowedUsersFromEmails(emails, admins) {
 }
 
 export function containerEnv(env) {
-  const origin = env.PUBLIC_ORIGIN || 'https://polo-preview.tony-walteur.workers.dev';
+  const origin = env.PUBLIC_ORIGIN || 'https://polo.example.workers.dev';
   const missing = [
     'ACCESS_AUD',
     'POLO_ADMIN_EMAILS',

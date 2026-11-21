@@ -3,7 +3,7 @@
 ## Problem
 
 The internal Polo preview is an Access-gated Worker
-(`polo-preview.tony-walteur.workers.dev`). It cannot host the CRM. A box
+(`polo.example.workers.dev`). It cannot host the CRM. A box
 process opens an outbound WebSocket; the Worker Durable Object forwards
 browser HTTP to `vite preview :4180` and Fastify `:4020`. Serving `demo`
 or inlining `VITE_API_URL=http://localhost:4020` makes the preview look
