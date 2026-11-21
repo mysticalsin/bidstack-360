@@ -36,7 +36,8 @@ const USER = 'alex.example@example.test';
 const AUD = 'audience-under-test';
 const here = dirname(fileURLToPath(import.meta.url));
 
-let privateKey: CryptoKey;
+type SignKey = Parameters<typeof crypto.subtle.sign>[1];
+let privateKey: SignKey;
 
 function b64url(bytes: Uint8Array): string {
   let text = '';
@@ -87,16 +88,22 @@ beforeAll(async () => {
     true,
     ['sign'],
   );
+  if (!('privateKey' in pair)) throw new Error('expected a signing key pair');
   privateKey = pair.privateKey;
-  const jwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
-  delete jwk.key_ops;
-  jwk.kid = 'test-key';
-  jwk.alg = 'RS256';
-  jwk.use = 'sig';
+  const exported = await crypto.subtle.exportKey('jwk', pair.publicKey);
+  const jwk = {
+    kty: exported.kty,
+    n: exported.n,
+    e: exported.e,
+    alg: 'RS256',
+    use: 'sig',
+    kid: 'test-key',
+  };
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input) === `${TEAM}/cdn-cgi/access/certs`) {
+    vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === `${TEAM}/cdn-cgi/access/certs`) {
         return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
       }
       return new Response('unexpected', { status: 500 });
