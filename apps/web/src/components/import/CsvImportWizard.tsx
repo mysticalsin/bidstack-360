@@ -34,6 +34,7 @@ import {
   type ImportPreviewResult,
   type MigrationJob,
 } from '@/hooks/useMigrations';
+import { csvImportProgressPct } from './csv-import-progress';
 
 type Step = 'upload' | 'map' | 'preview' | 'run';
 type Dedup = 'skip' | 'update' | 'duplicate';
@@ -597,7 +598,7 @@ function ImportProgress({
   const refusal =
     retryError instanceof ApiError && retryError.status === 409 ? retryError.message : null;
   const pct =
-    job.totalRows > 0 ? Math.round((job.processedRows / job.totalRows) * 100) : done ? 100 : 0;
+    job.totalRows > 0 ? csvImportProgressPct(job) : done ? 100 : 0;
 
   return (
     <div className="space-y-4">
