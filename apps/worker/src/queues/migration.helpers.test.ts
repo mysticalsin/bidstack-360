@@ -10,9 +10,11 @@ import {
   asDate,
   asInt,
   asMicros,
+  asTrimmed,
   mapStage,
   normalizeEntity,
   readOpportunityValue,
+  splitLeadName,
 } from './migration.js';
 
 describe('migration value coercion', () => {
@@ -55,6 +57,20 @@ describe('migration value coercion', () => {
     expect(asInt('1,234')).toBe(1234);
     expect(asInt('42')).toBe(42);
     expect(asInt('')).toBeNull();
+  });
+
+  it('reads the probability the opportunity export writes, and drops a spreadsheet apostrophe', () => {
+    // WHY: the export cell is "50%". Number("50%") is NaN, so a re-import
+    // stored probability 0. A phone exported as '+33…' must come back as +33.
+    expect(asInt('50%')).toBe(50);
+    expect(asTrimmed("'+33 1 23 45 67 89")).toBe('+33 1 23 45 67 89');
+    expect(asTrimmed("'=Acme")).toBe('=Acme');
+    expect(asTrimmed("O'Brien")).toBe("O'Brien");
+  });
+
+  it('splits the single Name column the leads export writes', () => {
+    expect(splitLeadName('Ada Lovelace')).toEqual({ firstName: 'Ada', lastName: 'Lovelace' });
+    expect(splitLeadName('Ada').lastName).toBe('');
   });
 });
 
