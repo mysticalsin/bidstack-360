@@ -309,18 +309,37 @@ async function resolveStubRoleOverride(
   };
 }
 
+function isLoopbackAddress(ip: string): boolean {
+  const normalized = ip.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return normalized === '127.0.0.1' || normalized === '::1' || normalized === '::ffff:127.0.0.1';
+}
+
+/**
+ * The dev proxy's socket is loopback even when the browser is not. xfwd puts
+ * the browser address in X-Forwarded-For. A non-loopback first hop means this
+ * request was forwarded for someone else. The header is never used to *grant*
+ * stub auth — only to refuse a proxied remote client. A direct localhost
+ * request with no header stays allowed.
+ */
+function forwardedClientIsRemote(req: FastifyRequest): boolean {
+  const raw = req.headers['x-forwarded-for'];
+  if (!raw) return false;
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  const first = header.split(',')[0]?.trim() ?? '';
+  if (!first) return false;
+  return !isLoopbackAddress(first);
+}
+
 async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
   // P1 #19: restrict stub auth to loopback interfaces only — a mis-configured dev
   // environment should NOT be exploitable from another host on the same network.
   // Fastify normalises the IPv4-mapped form (::ffff:127.0.0.1) to 127.0.0.1 when
   // trustProxy is false, but we guard all three variants to be safe.
+  // The dev server proxy is itself loopback, so the socket check is not enough
+  // once the proxy records the original client.
   const remoteIp = req.ip;
-  const isLoopback =
-    remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
-  if (!isLoopback) {
-    throw req.server.httpErrors.forbidden(
-      `Stub auth is restricted to localhost (remote: ${remoteIp})`,
-    );
+  if (!isLoopbackAddress(remoteIp) || forwardedClientIsRemote(req)) {
+    throw req.server.httpErrors.forbidden('Stub auth is restricted to localhost');
   }
 
   // Precedence: per-request header (cross-tenant cases) > per-file env default
