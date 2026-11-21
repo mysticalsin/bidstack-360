@@ -100,6 +100,10 @@ const dashboardState: { current: unknown } = { current: null };
 vi.mock('@/hooks/useCrmDashboard', () => ({
   useCrmDashboard: () => dashboardState.current,
 }));
+const orgCompanyCount: { current: number | undefined } = { current: undefined };
+vi.mock('@/hooks/useOrgSummary', () => ({
+  useOrgSummary: () => ({ data: orgCompanyCount.current === undefined ? undefined : { companies: orgCompanyCount.current } }),
+}));
 vi.mock('@/hooks/useMsaLeverage', () => ({
   useMsaLeverage: () => ({ isLoading: false, isError: false, data: { items: [], hemaPharmaCount: 0 } }),
 }));
@@ -157,6 +161,7 @@ const CAP = 200;
 describe('AccountsAllSegment snapshot-cap honesty', () => {
   beforeEach(() => {
     dashboardState.current = null;
+    orgCompanyCount.current = undefined;
   });
 
   afterEach(() => {
@@ -174,9 +179,22 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
 
   it('does not warn when the snapshot is complete (small org) — no false alarm', () => {
     setDashboard(5);
+    orgCompanyCount.current = 5;
     renderSegment();
 
     expect(screen.queryByText(/from the live dashboard/i)).toBeNull();
+  });
+
+  it('warns when the org has more accounts than this snapshot, even under the enrichment ceiling', () => {
+    // WHY: the opportunity sample is 100 rows. A 20,000-account org never
+    // reaches the enrichment ceiling of 200, so the page used to say "101
+    // companies" with no mention of the rest.
+    setDashboard(100);
+    orgCompanyCount.current = 20_000;
+    renderSegment();
+
+    expect(screen.getByText(/100 of 20000 companies/i)).toBeTruthy();
+    expect(screen.getByText(/Showing 100 of 20000 accounts from the live dashboard/i)).toBeTruthy();
   });
 
   it('tells the user search only covers the loaded snapshot when a capped search misses', () => {
