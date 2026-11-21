@@ -286,6 +286,7 @@ export function CsvImportWizard() {
           <input
             ref={fileInput}
             type="file"
+            aria-label={t('csvImport.upload.chooseFile', 'Choose a CSV or Excel file')}
             accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="sr-only"
             onChange={(e) => {

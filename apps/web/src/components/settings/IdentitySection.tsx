@@ -24,7 +24,7 @@ export function IdentitySection() {
             'Who Polo thinks you are. In real mode this is your Cloudflare Access or Clerk email, never a shared Jane Smith stub.',
           )}
         />
-        <div className="space-y-3 p-5 text-sm">
+        <dl className="space-y-3 p-5 text-sm">
           {publicId.isLoading || me.isLoading ? (
             <LoadingSkeleton rows={3} />
           ) : (
@@ -49,7 +49,7 @@ export function IdentitySection() {
               </Row>
             </>
           )}
-        </div>
+        </dl>
       </Card>
 
       {isAdmin ? (

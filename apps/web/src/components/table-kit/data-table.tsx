@@ -556,7 +556,6 @@ export function DataTable<TRow, TSub = unknown>({
                     onClick={clickable ? handleClick : undefined}
                     onMouseEnter={onRowHover ? () => onRowHover(row) : undefined}
                     onFocus={onRowHover ? () => onRowHover(row) : undefined}
-                    aria-expanded={canExpand ? isOpen : undefined}
                     className={
                       clickable
                         ? anyExpandable
@@ -568,14 +567,29 @@ export function DataTable<TRow, TSub = unknown>({
                     {anyExpandable && (
                       <TableCell className="w-10 px-3 py-3 text-center text-fg-secondary">
                         {canExpand && (
-                          <Icon
-                            name="chevron-right"
-                            size={12}
-                            className={cn(
-                              'inline-block transition-transform',
-                              isOpen && 'rotate-90',
-                            )}
-                          />
+                          <button
+                            type="button"
+                            aria-expanded={isOpen}
+                            aria-label={
+                              isOpen
+                                ? t('tableKit.dataTable.collapseRow', 'Hide details')
+                                : t('tableKit.dataTable.expandRow', 'Show details')
+                            }
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleClick();
+                            }}
+                          >
+                            <Icon
+                              name="chevron-right"
+                              size={12}
+                              className={cn(
+                                'inline-block transition-transform',
+                                isOpen && 'rotate-90',
+                              )}
+                            />
+                          </button>
                         )}
                       </TableCell>
                     )}
