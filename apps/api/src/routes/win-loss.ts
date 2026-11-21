@@ -15,7 +15,7 @@ import {
 
 import { visibleOpportunityRelation, visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 
-import { salesCycleDays } from './win-loss.helpers.js';
+import { readAllPages, salesCycleDays, winRatePct } from './win-loss.helpers.js';
 
 interface DbRow {
   id: string;
@@ -44,11 +44,11 @@ function serialize(r: DbRow): z.infer<typeof WinLossRecord> {
 // ── Analysis (dedicated /win-loss page) ──────────────────────────────────────
 // Time-bucketed + filterable aggregate for the quarterly retrospective. Unlike
 // /patterns (index-only groupBy), the owner + date filters need the opportunity
-// join, so we scan a bounded window of the most recent records and aggregate in
-// code — 1 000 closed-bid records is years of bid history for one org, and it
-// is the largest `take` the query-guard plugin accepts as bounded.
+// join. The query guard caps one findMany at 1 000, so the read walks pages
+// until a short page. Totals, quarters, and reasons include every matching
+// record. The recent table stays the newest 50.
 
-const ANALYSIS_SCAN_CAP = 1000;
+const ANALYSIS_PAGE = 1000;
 const ANALYSIS_RECENT_LIMIT = 50;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -69,9 +69,8 @@ const WinLossAnalysis = z.object({
   /** 0–100, one decimal; null when the range has no closed records. */
   winRatePct: z.number().nullable(),
   /**
-   * true when the scan hit ANALYSIS_SCAN_CAP, i.e. older history was dropped
-   * from these aggregates. Mirrors the sibling duplicates scan's `truncated`
-   * so the UI can warn the retrospective understates a high-volume org.
+   * Kept on the wire so existing clients still parse the body. The read now
+   * walks every page, so this is false: older history is not dropped.
    */
   truncated: z.boolean(),
   quarters: z.array(OutcomeCounts.extend({ quarter: z.string() })),
@@ -157,12 +156,11 @@ function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLoss
     const competitor = r.competitor?.trim();
     if (competitor) bump(competitors, competitor, won);
   }
-  const total = totalWon + totalLost;
   const byLostDesc = (a: { lost: number }, b: { lost: number }) => b.lost - a.lost;
   return {
     totalWon,
     totalLost,
-    winRatePct: total === 0 ? null : Math.round((totalWon / total) * 1000) / 10,
+    winRatePct: winRatePct(totalWon, totalLost),
     truncated,
     // "2026-Q1" sorts lexically because the year is zero-padded to 4 digits.
     quarters: [...quarters.entries()]
@@ -236,41 +234,47 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
       const { from, to, ownerId } = req.query;
       const scoped = await visibleOpportunityRelation(req.auth);
       // Backed by win_loss_records_org_created_idx (orgId, createdAt desc).
-      const rows = await prisma.winLossRecord.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          ...(from || to
-            ? {
-                createdAt: {
-                  ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
-                  ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
-                },
-              }
-            : {}),
-          // Owner lives on the opportunity; the join also hides soft-deleted opps.
-          opportunity: { AND: [{ deletedAt: null, ...(ownerId ? { ownerId } : {}) }, scoped ?? {}] },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: ANALYSIS_SCAN_CAP,
-        select: {
-          outcome: true,
-          reason: true,
-          competitor: true,
-          createdAt: true,
-          opportunity: {
-            select: {
-              id: true,
-              name: true,
-              customer: true,
-              valueMicros: true,
-              ownerId: true,
-              createdAt: true,
-              owner: { select: { name: true, email: true } },
-            },
+      const where = {
+        orgId: req.auth.orgId,
+        ...(from || to
+          ? {
+              createdAt: {
+                ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
+                ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+              },
+            }
+          : {}),
+        // Owner lives on the opportunity; the join also hides soft-deleted opps.
+        opportunity: { AND: [{ deletedAt: null, ...(ownerId ? { ownerId } : {}) }, scoped ?? {}] },
+      };
+      const select = {
+        id: true,
+        outcome: true,
+        reason: true,
+        competitor: true,
+        createdAt: true,
+        opportunity: {
+          select: {
+            id: true,
+            name: true,
+            customer: true,
+            valueMicros: true,
+            ownerId: true,
+            createdAt: true,
+            owner: { select: { name: true, email: true } },
           },
         },
-      });
-      return aggregateAnalysis(rows, rows.length === ANALYSIS_SCAN_CAP);
+      } as const;
+      const rows = await readAllPages(ANALYSIS_PAGE, (cursor) =>
+        prisma.winLossRecord.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: ANALYSIS_PAGE,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+          select,
+        }),
+      );
+      return aggregateAnalysis(rows, false);
     },
   );
 
