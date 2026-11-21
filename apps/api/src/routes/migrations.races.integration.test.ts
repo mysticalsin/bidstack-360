@@ -288,6 +288,10 @@ describe('migration status races', () => {
     });
     let jobId = '';
     const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
+      // Longer than vitest's default waitFor (1s). Under load the handler
+      // reaches addBulk after that poll has given up, and the test fails on
+      // the timeout instead of observing the claim.
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
       calls += 1;
       jobId = (jobs[0]?.data as { migrationJobId?: string } | undefined)?.migrationJobId ?? '';
       return blocked;
