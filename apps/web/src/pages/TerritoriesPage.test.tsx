@@ -177,7 +177,9 @@ describe('TerritoriesPage', () => {
 
     // Check header and KPI values
     expect(screen.getByRole('heading', { name: 'Territories', level: 1 })).toBeTruthy();
-    expect(screen.getByText('$15K')).toBeTruthy(); // 15,000,000,000 micros = 15,000 EUR, converted to USD and compacted
+    // 15,000,000,000 micros is €15,000. The header is USD. No rate is applied.
+    expect(screen.getByText(/€15K EUR/)).toBeTruthy();
+    expect(screen.getAllByText(/not converted to USD/).length).toBeGreaterThan(0);
     expect(screen.getByText('75%')).toBeTruthy();
 
     // Check list entries
