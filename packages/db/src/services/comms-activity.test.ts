@@ -85,8 +85,8 @@ interface Fixture {
 function fakeDb(f: Fixture = {}) {
   const db = {
     user: table([
-      { id: OWNER, orgId: ORG, email: 'tony@amaris.com', microsoftEmail: null },
-      { id: COLLEAGUE, orgId: ORG, email: 'sam@amaris.com', microsoftEmail: null },
+      { id: OWNER, orgId: ORG, email: 'tony@example.test', microsoftEmail: null },
+      { id: COLLEAGUE, orgId: ORG, email: 'sam@example.test', microsoftEmail: null },
       { id: 'u-other', orgId: OTHER_ORG, email: 'eve@acme.com', microsoftEmail: null },
     ]),
     opportunity: table(f.opportunities ?? []),
@@ -117,9 +117,9 @@ function event(over: Record<string, unknown> = {}): Row {
     attendees: [
       { email: 'Jane@Acme.com', responseStatus: 'accepted' },
       { email: 'bob@acme.com' },
-      { email: 'sam@amaris.com', responseStatus: 'tentativelyAccepted' },
+      { email: 'sam@example.test', responseStatus: 'tentativelyAccepted' },
     ],
-    organizerEmail: 'tony@amaris.com',
+    organizerEmail: 'tony@example.test',
     companyId: COMPANY,
     opportunityId: null,
     contactId: CONTACT,
@@ -183,7 +183,7 @@ describe('comms activity bridge: meetings', () => {
 
   it('skips a meeting where everyone is internal', async () => {
     const db = fakeDb({
-      events: [event({ attendees: [{ email: 'sam@amaris.com' }, { email: 'kim@amaris.com' }] })],
+      events: [event({ attendees: [{ email: 'sam@example.test' }, { email: 'kim@example.test' }] })],
     });
     const out = await bridgeFor(db).syncCalendarEvent(ORG, EVENT);
     expect(out).toEqual({ action: 'skipped', reason: 'internal_only', activityId: null });
@@ -401,7 +401,7 @@ describe('comms activity bridge: emails', () => {
       externalMessageId: 'msg-1',
       subject: 'Re: proposal',
       fromEmail: 'jane@acme.com',
-      toEmails: [{ email: 'tony@amaris.com' }],
+      toEmails: [{ email: 'tony@example.test' }],
       ccEmails: [],
       sentAt: new Date('2026-11-03T10:00:00Z'),
       receivedAt: new Date('2026-11-03T10:00:05Z'),
@@ -436,7 +436,7 @@ describe('comms activity bridge: emails', () => {
 
   it('labels Gmail and skips internal-only threads', async () => {
     const db = fakeDb({
-      emails: [email({ provider: 'GMAIL', fromEmail: 'sam@amaris.com', toEmails: [{ email: 'tony@amaris.com' }] })],
+      emails: [email({ provider: 'GMAIL', fromEmail: 'sam@example.test', toEmails: [{ email: 'tony@example.test' }] })],
     });
     expect((await bridgeFor(db).syncEmailMessage(ORG, EMAIL)).action).toBe('skipped');
 
@@ -460,7 +460,7 @@ describe('comms activity bridge: one meeting, several calendars', () => {
       attendees: [
         { email: 'jane@acme.com', responseStatus: 'accepted' },
         { email: 'bob@acme.com' },
-        { email: 'tony@amaris.com', responseStatus: 'accepted' },
+        { email: 'tony@example.test', responseStatus: 'accepted' },
       ],
     }),
   ];

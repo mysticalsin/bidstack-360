@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { allowedUsersFromEmails, containerEnv } from './container-env.js';
 
 const SECRETS = {
+  ACCESS_AUD: 'aud',
+  POLO_ADMIN_EMAILS: 'a@example.test',
   POLO_INTERNAL_KEY: 'k',
   POLO_INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
   POLO_PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
@@ -16,8 +18,8 @@ describe('container env', () => {
   });
 
   it('passes @domain entries through as Sales Manager domain rules', () => {
-    expect(allowedUsersFromEmails('a@x.com,@Amaris.com,@example.test', ['a@x.com'])).toBe(
-      'a@x.com:Admin,@amaris.com:Sales Manager,@example.test:Sales Manager',
+    expect(allowedUsersFromEmails('a@x.com,@Example.com,@example.test', ['a@x.com'])).toBe(
+      'a@x.com:Admin,@example.com:Sales Manager,@example.test:Sales Manager',
     );
   });
 
@@ -49,7 +51,21 @@ describe('container env', () => {
   });
 
   it('refuses to start without the encryption secrets instead of booting with blank keys', () => {
-    expect(() => containerEnv({ ALLOWED_EMAILS: 'a@x.com' })).toThrow(/POLO_PII_ENCRYPTION_MASTER_KEY/);
+    expect(() =>
+      containerEnv({
+        ACCESS_AUD: 'aud',
+        POLO_ADMIN_EMAILS: 'a@example.test',
+        ALLOWED_EMAILS: 'a@x.com',
+      }),
+    ).toThrow(/POLO_PII_ENCRYPTION_MASTER_KEY/);
+  });
+
+  it('refuses to boot when admin and Access settings are absent instead of demoting admins', () => {
+    const base: Record<string, string> = { ...SECRETS, ALLOWED_EMAILS: 'a@example.test' };
+    delete base.ACCESS_AUD;
+    delete base.POLO_ADMIN_EMAILS;
+    expect(() => containerEnv(base)).toThrow(/ACCESS_AUD/);
+    expect(() => containerEnv({ ...base, ACCESS_AUD: 'aud' })).toThrow(/POLO_ADMIN_EMAILS/);
   });
 
   it('names the app database secret and does not repeat a password in the error', () => {

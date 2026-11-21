@@ -13,12 +13,14 @@ export function allowedUsersFromEmails(emails, admins) {
 export function containerEnv(env) {
   const origin = env.PUBLIC_ORIGIN || 'https://polo-preview.tony-walteur.workers.dev';
   const missing = [
+    'ACCESS_AUD',
+    'POLO_ADMIN_EMAILS',
     'POLO_INTERNAL_KEY',
     'POLO_INTEGRATION_TOKEN_KEY',
     'POLO_PII_ENCRYPTION_MASTER_KEY',
     'POLO_JOB_SIGNING_SECRET',
     'POLO_APP_DB_PASSWORD',
-  ].filter((name) => !env[name]);
+  ].filter((name) => !String(env[name] || '').trim());
   if (missing.length) throw new Error(`polo-preview is missing Worker secrets: ${missing.join(', ')}`);
   return {
     POLO_INTERNAL_KEY: env.POLO_INTERNAL_KEY,
