@@ -8,7 +8,7 @@ vi.mock('@/lib/api', async (orig) => {
 
 import { ApiError, api } from '@/lib/api';
 
-import { isMissingRoute, isOwnApiUrl, listQueryString, msaClient, uploadMsaVersion, validateMsaFile } from './client';
+import { isMissingRoute, isOwnApiUrl, listQueryString, msaClient, setResolvedDataMode, uploadMsaVersion, validateMsaFile } from './client';
 import { actionLabel, urgency } from './labels';
 import { filterRows, sampleDetail, sampleRows, sampleSummary, sampleTimeline } from './sample';
 
@@ -28,10 +28,17 @@ describe('isMissingRoute', () => {
 
 describe('msaClient sample fallback', () => {
   it('falls back to labelled Sample data when the API has no MSA routes', async () => {
+    setResolvedDataMode('demo');
     vi.mocked(api).mockRejectedValueOnce(missing);
     const res = await msaClient.list({ topLevel: 'false' });
     expect(res.sample).toBe(true);
     expect(res.data.items.length).toBeGreaterThan(5);
+    setResolvedDataMode('real');
+  });
+  it('does not substitute sample data in real mode when the route is missing', async () => {
+    setResolvedDataMode('real');
+    vi.mocked(api).mockRejectedValueOnce(missing);
+    await expect(msaClient.list({ topLevel: 'false' })).rejects.toBe(missing);
   });
   it('returns live data untouched', async () => {
     vi.mocked(api).mockResolvedValueOnce({ items: [], nextCursor: null, total: 0 });
