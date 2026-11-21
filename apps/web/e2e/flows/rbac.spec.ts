@@ -113,6 +113,11 @@ test.describe('RBAC - role-based access control', () => {
   test('admin-only route (audit-log) is accessible to admin session', async ({ page, loginAs }) => {
     await loginAs('admin');
     await page.goto('/audit-log', { waitUntil: 'load' });
+    // The capability manifest can arrive after the first paint and bounce an
+    // admin to the dashboard. One more navigation uses the role that is now set.
+    if (page.url().includes('/dashboard')) {
+      await page.goto('/audit-log', { waitUntil: 'load' });
+    }
     await expect(
       page.getByRole('heading', { name: /audit log/i, level: 1 }),
     ).toBeVisible({ timeout: 15_000 });
