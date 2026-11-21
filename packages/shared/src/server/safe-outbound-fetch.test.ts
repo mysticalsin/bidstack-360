@@ -55,12 +55,15 @@ describe('createSafeFetch', () => {
     expect(baseFetch).not.toHaveBeenCalled();
   });
 
-  it('calls the base fetch for a public URL with redirect: manual', async () => {
+  it('calls the pinned transport for a public URL with redirect: manual', async () => {
     lookupMock.mockResolvedValue([{ address: '93.184.216.34' }]);
-    const baseFetch = vi.fn().mockResolvedValue(new Response('ok'));
-    const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
-    await safe('https://example.com', { redirect: 'manual' });
-    expect(baseFetch).toHaveBeenCalledOnce();
+    const baseFetch = vi.fn();
+    const transport = vi.fn(async () => ({ status: 200, headers: {}, body: new TextEncoder().encode('ok') }));
+    const safe = createSafeFetch(baseFetch as unknown as typeof fetch, { transport });
+    const res = await safe('https://example.com', { redirect: 'manual' });
+    expect(await res.text()).toBe('ok');
+    expect(transport).toHaveBeenCalledOnce();
+    expect(baseFetch).not.toHaveBeenCalled();
   });
 
   // Regression: undici/fetch defaults to redirect: 'follow', which would let a
@@ -85,21 +88,44 @@ describe('createSafeFetch', () => {
 
   it("accepts redirect: 'manual'", async () => {
     lookupMock.mockResolvedValue([{ address: '93.184.216.34' }]);
-    const baseFetch = vi.fn().mockResolvedValue(new Response('ok'));
-    const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
-    await expect(safe('https://example.com', { redirect: 'manual' })).resolves.toBeInstanceOf(
-      Response,
-    );
-    expect(baseFetch).toHaveBeenCalledOnce();
+    const transport = vi.fn(async () => ({ status: 200, headers: {}, body: new Uint8Array() }));
+    const safe = createSafeFetch(vi.fn() as unknown as typeof fetch, { transport });
+    await expect(safe('https://example.com', { redirect: 'manual' })).resolves.toBeInstanceOf(Response);
+    expect(transport).toHaveBeenCalledOnce();
+  });
+
+  it('pins the first address and does not fetch the hostname when a later lookup is private', async () => {
+    // WHY: F-09. assert-then-fetch looks the name up twice. The second answer
+    // can be the metadata address. The socket must use the first answer only.
+    let n = 0;
+    lookupMock.mockImplementation(async () => {
+      n += 1;
+      return [{ address: n === 1 ? '93.184.216.34' : '169.254.169.254', family: 4 }];
+    });
+    const dials: string[] = [];
+    const base = vi.fn(async () => new Response('should-not-run'));
+    const safe = createSafeFetch(base as unknown as typeof fetch, {
+      resolve: async () => {
+        n += 1;
+        return [{ address: n === 1 ? '93.184.216.34' : '169.254.169.254', family: 4 as const }];
+      },
+      transport: async (dial: { address: string }) => {
+        dials.push(dial.address);
+        return { status: 204, headers: {}, body: new Uint8Array() };
+      },
+    });
+    const res = await safe('https://rebind.example/a', { redirect: 'manual' });
+    expect(res.status).toBe(204);
+    expect(base).not.toHaveBeenCalled();
+    expect(dials).toEqual(['93.184.216.34']);
+    expect(n).toBe(1);
   });
 
   it("accepts redirect: 'error'", async () => {
     lookupMock.mockResolvedValue([{ address: '93.184.216.34' }]);
-    const baseFetch = vi.fn().mockResolvedValue(new Response('ok'));
-    const safe = createSafeFetch(baseFetch as unknown as typeof fetch);
-    await expect(safe('https://example.com', { redirect: 'error' })).resolves.toBeInstanceOf(
-      Response,
-    );
-    expect(baseFetch).toHaveBeenCalledOnce();
+    const transport = vi.fn(async () => ({ status: 200, headers: {}, body: new Uint8Array() }));
+    const safe = createSafeFetch(vi.fn() as unknown as typeof fetch, { transport });
+    await expect(safe('https://example.com', { redirect: 'error' })).resolves.toBeInstanceOf(Response);
+    expect(transport).toHaveBeenCalledOnce();
   });
 });

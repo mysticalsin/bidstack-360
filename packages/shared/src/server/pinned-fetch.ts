@@ -452,7 +452,14 @@ function responseOf(url: string, address: string, hop: PinnedHopResult): PinnedF
     headers: { get: (name) => headers.get(name.toLowerCase()) ?? null },
     body: hop.body,
     text: () => Promise.resolve(new TextDecoder('utf-8', { fatal: false }).decode(hop.body)),
-    toResponse: () => new Response(Buffer.from(hop.body), { status: hop.status, headers: Object.fromEntries(headers) }),
+    toResponse: () => {
+      // 204, 205 and 304 are null-body statuses. The Fetch constructor rejects a body on them.
+      const noBody = hop.status === 204 || hop.status === 205 || hop.status === 304;
+      return new Response(noBody ? null : Buffer.from(hop.body), {
+        status: hop.status,
+        headers: Object.fromEntries(headers),
+      });
+    },
   };
 }
 

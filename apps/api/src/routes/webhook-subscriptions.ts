@@ -19,7 +19,7 @@ import {
   encryptSecret,
   hashWebhookSigningSecret,
 } from '@bidstack/shared/server-crypto';
-import { assertUrlResolvesPublic } from '@bidstack/shared/server';
+import { deliverWebhookTestPing } from './webhook-test-ping.js';
 import {
   assertSerumConnectorAllowed,
   recordSerumConnectorTestSuccess,
@@ -608,34 +608,11 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
         if (!signature) {
           throw new Error(result!.error);
         }
-        // Close the DNS-rebind gap the comment below names: resolve sub.url and
-        // reject if it points at an internal/metadata address before connecting.
-        // The static assertSafeWebhookUrl (string) check ran at registration.
-        await assertUrlResolvesPublic(sub.url);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TEST_PING_TIMEOUT_MS);
-        let res: Response;
-        try {
-          res = await fetch(sub.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Polo-Signature': signature,
-              // Legacy header kept during the rebrand deprecation window.
-              'X-BidStack-Signature': signature,
-              'User-Agent': 'PoloPreSales-Webhooks/1.0',
-            },
-            body: pingBody,
-            signal: controller.signal,
-            // SSRF: refuse to follow redirects — a 30x to an internal host would
-            // bypass the static assertSafeWebhookUrl check on the original URL.
-            // (Full DNS-rebind parity with the worker's safe-research-fetch is
-            // follow-up once that helper moves to a shared package.)
-            redirect: 'error',
-          });
-        } finally {
-          clearTimeout(timeoutId);
-        }
+        // Pinned POST. Redirects throw. The static assertSafeWebhookUrl check
+        // already ran at registration.
+        const res = await deliverWebhookTestPing(sub.url, pingBody, signature, {
+          timeoutMs: TEST_PING_TIMEOUT_MS,
+        });
         result = {
           success: res.status >= 200 && res.status < 300,
           statusCode: res.status,

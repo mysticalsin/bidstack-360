@@ -1,46 +1,60 @@
-// SSRF-hardened fetch for competitor research.
+// SSRF-hardened fetch for competitor research and other worker callers.
 //
-// The shared competitor-intel core (`fetchGroundedDocuments`) is web-safe and so
-// cannot use node:dns — it gates on the URL string and follows redirects
-// manually, re-validating each hop. THIS wrapper closes the residual
-// DNS-rebinding gap: before every hop it resolves the host and rejects if ANY
-// resolved address is internal. The worker injects it as `fetchImpl`, so the
-// DNS check runs for the initial URL AND every redirect target.
-//
-// Residual (documented): without a custom undici dispatcher we cannot pin the
-// connection to the validated IP, so a sub-millisecond resolve→connect rebind is
-// still theoretically possible. resolve-and-validate is the standard mitigation
-// and is layered with the per-hop string gate. If `undici` is added as a dep,
-// upgrade this to a dispatcher with a connect-time IP allow-check.
+// Each call is one hop. Callers that follow redirects re-enter this function,
+// so every hop is pinned again. The socket dials the address pinnedFetch
+// checked. There is no second DNS lookup.
 
-import { lookup } from 'node:dns/promises';
-
-import { assertPublicHttpUrl, isPublicHostname } from '@bidstack/shared';
+import { pinnedFetch, type PinnedResolver, type PinnedTransport } from '@bidstack/shared/server';
+import { assertPublicHttpUrl } from '@bidstack/shared';
 
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
+export interface ResearchFetchOptions {
+  resolve?: PinnedResolver;
+  transport?: PinnedTransport;
+}
+
+function headerRecord(init: RequestInit['headers']): Record<string, string> {
+  if (!init) return {};
+  if (typeof Headers !== 'undefined' && init instanceof Headers) {
+    const out: Record<string, string> = {};
+    init.forEach((value, key) => {
+      out[key] = value;
+    });
+    return out;
+  }
+  if (Array.isArray(init)) return Object.fromEntries(init);
+  return { ...(init as Record<string, string>) };
+}
+
+function requestBody(body: RequestInit['body']): string | Uint8Array | null {
+  if (body == null) return null;
+  if (typeof body === 'string') return body;
+  if (body instanceof Uint8Array) return body;
+  throw new Error('createResearchFetch: unsupported body type');
+}
+
 /**
  * Build a fetch that refuses any URL whose host (or any of its resolved IPs)
- * points at internal space. Throws before a request is made on a violation —
- * `fetchGroundedDocuments` treats a throw as "drop this document".
+ * points at internal space, and dials only the address that passed that check.
+ * Throws before a request is made on a violation — callers treat a throw as
+ * "drop this document".
  */
-export function createResearchFetch(baseFetch: FetchLike = fetch): FetchLike {
+export function createResearchFetch(_baseFetch?: FetchLike, opts: ResearchFetchOptions = {}): FetchLike {
   return async (input, init) => {
-    const url = assertPublicHttpUrl(input.toString());
-    let addresses: Array<{ address: string }>;
-    try {
-      addresses = await lookup(url.hostname, { all: true });
-    } catch {
-      throw new Error(`DNS resolution failed for ${url.hostname}`);
-    }
-    if (addresses.length === 0) {
-      throw new Error(`No addresses resolved for ${url.hostname}`);
-    }
-    for (const { address } of addresses) {
-      if (!isPublicHostname(address)) {
-        throw new Error('URL resolves to an internal address');
-      }
-    }
-    return baseFetch(url.toString(), init);
+    // String gate first so IP literals and bad schemes never reach DNS.
+    assertPublicHttpUrl(input.toString());
+    const res = await pinnedFetch(input.toString(), {
+      method: init?.method,
+      headers: headerRecord(init?.headers),
+      body: requestBody(init?.body),
+      redirect: 'manual',
+      maxHops: 0,
+      signal: init?.signal ?? undefined,
+      resolve: opts.resolve,
+      transport: opts.transport,
+      timeoutMs: 120_000,
+    });
+    return res.toResponse();
   };
 }
