@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@bidstack/db';
-import { microsToUnits, quarterStart } from '@bidstack/shared';
+import { microsToUnits, quarterBounds } from '@bidstack/shared';
 
 export interface PipelineKpis {
   byStage: Array<{ stage: string; count: number; valueSum: number }>;
@@ -9,7 +9,7 @@ export interface PipelineKpis {
   velocity: { avgDaysOpen: number; closedThisQuarter: number };
 }
 
-export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
+export async function getPipelineKpis(orgId: string, now = new Date()): Promise<PipelineKpis> {
   const grouped = await prisma.opportunity.groupBy({
     by: ['stage'],
     where: { orgId, deletedAt: null },
@@ -29,8 +29,23 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
 
   const open = byStage.filter((s) => s.stage !== 'closed_won' && s.stage !== 'closed_lost');
 
+  // "Closed this quarter" is a close, not an edit. closedAt is the trigger-maintained
+  // instant the deal entered a terminal stage. The window is the org's wall-clock
+  // quarter: the last hours of 31 Dec in São Paulo are still the previous quarter,
+  // and a win from last quarter that was edited today is not a close today.
+  // Losses count. The hero says "closed", and a quarter of only losses is not zero.
+  const settings = await prisma.orgSettings.findUnique({
+    where: { orgId },
+    select: { timezone: true },
+  });
+  const quarter = quarterBounds(now, settings?.timezone);
   const closedThisQuarter = await prisma.opportunity.count({
-    where: { orgId, deletedAt: null, stage: 'closed_won', updatedAt: { gte: quarterStart() } },
+    where: {
+      orgId,
+      deletedAt: null,
+      stage: { in: ['closed_won', 'closed_lost'] },
+      closedAt: { gte: quarter.start, lt: quarter.end },
+    },
   });
 
   // Weighted pipeline is SUM(value_micros * probability / 100) in integer

@@ -12,10 +12,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const opportunityGroupBy = vi.fn();
 const opportunityCount = vi.fn();
 const queryRaw = vi.fn();
+const orgSettingsFindUnique = vi.fn();
 
 vi.mock('@bidstack/db', () => ({
   prisma: {
     opportunity: { groupBy: opportunityGroupBy, count: opportunityCount },
+    orgSettings: { findUnique: orgSettingsFindUnique },
     $queryRaw: queryRaw,
   },
   // Prisma.sql is used as a tagged template in the service; a passthrough is
@@ -28,6 +30,7 @@ const { getPipelineKpis } = await import('./funnel.service.js');
 beforeEach(() => {
   opportunityGroupBy.mockReset();
   opportunityCount.mockReset().mockResolvedValue(0);
+  orgSettingsFindUnique.mockReset().mockResolvedValue({ timezone: 'America/Sao_Paulo' });
   queryRaw.mockReset().mockResolvedValue([{ weightedMicros: '0', avgDaysOpen: 0, openCount: 0 }]);
 });
 
@@ -72,5 +75,26 @@ describe('getPipelineKpis money precision', () => {
     const result = await getPipelineKpis('org-1');
 
     expect(result.weightedPipeline).toBe(0.015);
+  });
+
+  it('counts closes in the org quarter, including a loss and excluding an edit', async () => {
+    // WHY: the hero says "N closed this quarter". That number used updatedAt
+    // and UTC, so a 2024 win edited today counted, a loss closed today did
+    // not, and 2026-01-01 02:00 UTC (still 31 Dec in São Paulo) opened Q1.
+    opportunityGroupBy.mockResolvedValue([]);
+
+    await getPipelineKpis('org-sp', new Date('2026-01-01T02:00:00.000Z'));
+
+    const args = opportunityCount.mock.calls[0]![0] as {
+      where: {
+        stage: { in: string[] };
+        closedAt: { gte: Date; lt: Date };
+        updatedAt?: unknown;
+      };
+    };
+    expect(args.where.stage.in).toEqual(['closed_won', 'closed_lost']);
+    expect(args.where.updatedAt).toBeUndefined();
+    expect(args.where.closedAt.gte.toISOString()).toBe('2025-10-01T03:00:00.000Z');
+    expect(args.where.closedAt.lt.toISOString()).toBe('2026-01-01T03:00:00.000Z');
   });
 });
