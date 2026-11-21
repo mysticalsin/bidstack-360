@@ -54,37 +54,13 @@ There is no in-app "create an organization" step. Local stub auth binds to `org_
 
 ## Screenshots
 
-Accounts, before #494:
+`*.png` is gitignored, so the shots are attached to this pull request and to each fix PR. They are the Harbor Synthetic walk:
 
-![Accounts showing a fabricated Mantu card](sweep-15/accounts-before.png)
-
-Accounts, after #494:
-
-![Accounts first-run empty state](sweep-15/accounts-after.png)
-
-Profile, before #499:
-
-![Profile showing Jane Smith](sweep-15/profile-before.png)
-
-Profile, after #499:
-
-![Profile showing Avery Founder](sweep-15/profile-after.png)
-
-CSV import, before #497:
-
-![Import with no template](sweep-15/csv-before.png)
-
-CSV import, after #497:
-
-![Import with Download a template](sweep-15/csv-after.png)
-
-Workspace id, after #501 (the name on this shot is the stub label from `main`; #499 replaces it):
-
-![Workspace row says Not configured](sweep-15/workspace-after.png)
-
-Invite, after #503:
-
-![Identity and roles with the one-member hint](sweep-15/invite-after.png)
+- Accounts before and after #494
+- Profile before and after #499
+- CSV import before and after #497
+- Workspace id after #501
+- Invite landing on Identity & roles, #503
 
 ## Stacking
 
