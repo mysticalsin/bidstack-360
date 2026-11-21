@@ -104,3 +104,17 @@ export function formatMicrosDecimal(micros: bigint | number): string {
   const body = frac.length === 0 ? whole.toString() : `${whole.toString()}.${frac}`;
   return negative ? `-${body}` : body;
 }
+
+/**
+ * Weighted micros for one deal: value × probability / 100, integer division.
+ * Probability is a whole percent from 0 to 100. Zero adds nothing. 1% of
+ * 1.50 (1_500_000 micros) is 15_000 micros (0.015), not the 0.02 a cent
+ * round of the float product produces. The multiply stays in BigInt so a
+ * value past 2^53 does not round before the probability is applied.
+ */
+export function weightedMicros(valueMicros: bigint, probability: number): bigint {
+  if (!Number.isInteger(probability) || probability < 0 || probability > 100) {
+    throw new Error('Probability must be an integer from 0 to 100');
+  }
+  return (valueMicros * BigInt(probability)) / 100n;
+}

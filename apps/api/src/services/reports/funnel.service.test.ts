@@ -28,7 +28,7 @@ const { getPipelineKpis } = await import('./funnel.service.js');
 beforeEach(() => {
   opportunityGroupBy.mockReset();
   opportunityCount.mockReset().mockResolvedValue(0);
-  queryRaw.mockReset().mockResolvedValue([{ weighted: 0, avgDaysOpen: 0, openCount: 0 }]);
+  queryRaw.mockReset().mockResolvedValue([{ weightedMicros: '0', avgDaysOpen: 0, openCount: 0 }]);
 });
 
 describe('getPipelineKpis money precision', () => {
@@ -60,5 +60,17 @@ describe('getPipelineKpis money precision', () => {
 
     const args = opportunityGroupBy.mock.calls[0]![0] as { where?: Record<string, unknown> };
     expect(args.where).toMatchObject({ orgId: 'org-42', deletedAt: null });
+  });
+
+  it('reads the weighted total as integer micros, not a float', async () => {
+    // WHY: float8((micros / 1e6) * (probability / 100)) rounds a stage sum past
+    // 2^53, and the cent round turned 1% of 1.50 into 0.02. The SQL returns
+    // the integer micros sum as text. 1% of 1.50 is 15_000 micros = 0.015.
+    opportunityGroupBy.mockResolvedValue([]);
+    queryRaw.mockResolvedValue([{ weightedMicros: '15000', avgDaysOpen: 0, openCount: 1 }]);
+
+    const result = await getPipelineKpis('org-1');
+
+    expect(result.weightedPipeline).toBe(0.015);
   });
 });
