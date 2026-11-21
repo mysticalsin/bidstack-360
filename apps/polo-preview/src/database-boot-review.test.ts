@@ -124,6 +124,29 @@ describe('database boot review', () => {
     expect(databaseBoot.restoreFailure(1, trailed)).toMatch(/permission denied/);
   });
 
+  it('tolerates the real psql 16 verbose public-schema notice', () => {
+    // WHY: PostgreSQL 16.15 libpq with PQERRORS_VERBOSE (what psql -v
+    // VERBOSITY=verbose and a verbose pg_restore print) puts the SQLSTATE on
+    // the error line and LOCATION on the next line. That next line must not
+    // hide the one tolerated notice or widen it.
+    // Captured from PQerrorMessage after CREATE SCHEMA public on 16.15:
+    //   ERROR:  42P06: schema "public" already exists
+    //   LOCATION:  NamespaceCreate, pg_namespace.c:62
+    // pg_restore prefixes the first line and then prints "Command was:".
+    const verbose = [
+      'pg_restore: error: could not execute query: ERROR:  42P06: schema "public" already exists',
+      'LOCATION:  NamespaceCreate, pg_namespace.c:62',
+      'Command was: CREATE SCHEMA public;',
+    ].join('\n');
+    expect(verbose).toContain('ERROR:  42P06: schema "public" already exists');
+    expect(databaseBoot.restoreFailure(1, verbose)).toBeNull();
+    const glued = verbose.replace(
+      'already exists\nLOCATION:',
+      'already exists LOCATION:',
+    );
+    expect(databaseBoot.restoreFailure(1, glued)).not.toBeNull();
+  });
+
   it('rejects bundled and prefixed psql command options', () => {
     // WHY: -c is not the only way to put SQL on argv. -cSQL, a cluster such
     // as -Atc, and a long-option prefix such as --comm do the same.
