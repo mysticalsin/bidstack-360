@@ -280,8 +280,13 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
         });
         if (!report) throw server.httpErrors.badRequest('Report not found in this org');
       }
-      await prisma.analyticsDashboardWidget.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId },
+      const version = req.body.expectedUpdatedAt;
+      const updateResult = await prisma.analyticsDashboardWidget.updateMany({
+        where: {
+          id: existing.id,
+          orgId: req.auth.orgId,
+          ...(version ? { updatedAt: new Date(version) } : {}),
+        },
         data: {
           ...(req.body.reportId !== undefined ? { reportId: req.body.reportId } : {}),
           ...(req.body.title !== undefined ? { title: req.body.title } : {}),
@@ -290,6 +295,17 @@ export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) =
           ...(req.body.position !== undefined ? { position: req.body.position } : {}),
         },
       });
+      if (updateResult.count === 0) {
+        if (!version) throw server.httpErrors.notFound('Widget not found');
+        const still = await prisma.analyticsDashboardWidget.findFirst({
+          where: { id: existing.id, orgId: req.auth.orgId },
+          select: { id: true },
+        });
+        if (!still) throw server.httpErrors.notFound('Widget not found');
+        throw server.httpErrors.conflict(
+          'Widget was modified since you loaded it — reload and retry',
+        );
+      }
       const updated = await prisma.analyticsDashboardWidget.findFirstOrThrow({
         where: { id: existing.id, orgId: req.auth.orgId },
       });

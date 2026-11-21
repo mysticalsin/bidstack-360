@@ -29,6 +29,10 @@ export const DashboardWidget = z.object({
   w: z.number().int().min(1),
   h: z.number().int().min(1),
   config: z.record(z.unknown()).default({}),
+  // Present on rows read from the database. Omitted for the built-in layout
+  // a new org sees before anyone saves. Clients send it back as
+  // expectedUpdatedAt on the next save.
+  updatedAt: z.string().datetime().optional(),
 });
 export type DashboardWidget = z.infer<typeof DashboardWidget>;
 
