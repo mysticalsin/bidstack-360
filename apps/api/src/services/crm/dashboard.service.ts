@@ -28,7 +28,7 @@ import {
 import {
   buildCompanies,
   companyFromRow,
-  fallbackCompany,
+  emptyWorkspaceCompany,
   findSelectedCompany,
 } from './company-enrichment.service.js';
 import {
@@ -361,12 +361,15 @@ export async function buildDashboardSnapshot(
       }))
     : buildDefaultInsights(opportunities);
   const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : DEFAULT_WIDGETS;
-  const selectedCompany =
-    findSelectedCompany(companies, accountId) ??
-    companies.find((company) => company.name === 'CI Financial') ??
-    companies.find((company) => company.name === 'Mantu') ??
-    companies[0] ??
-    fallbackCompany('Mantu');
+    // buildCompanies used to append a fabricated Mantu row whenever the org had
+    // none, and this picker then preferred that row. An empty org rendered one
+    // account with invented headcount and revenue. Pick the requested account,
+    // otherwise the first real company. A workspace with no companies has no
+    // cockpit subject — the placeholder is not added to `companies`.
+    const selectedCompany =
+      findSelectedCompany(companies, accountId) ??
+      (accountId ? null : (companies[0] ?? null)) ??
+      emptyWorkspaceCompany();
   const [fieldOverrides, performance] = await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },

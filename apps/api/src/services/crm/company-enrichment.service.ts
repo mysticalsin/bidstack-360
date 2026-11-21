@@ -364,6 +364,23 @@ export function fallbackCompany(name: string): z.infer<typeof CrmCompany> {
   };
 }
 
+/**
+ * Cockpit subject when the org has no companies. It is not inserted into the
+ * company list. No headcount and no revenue: those used to be Mantu's
+ * invented 12,000 employees and 1e15 micros.
+ */
+export function emptyWorkspaceCompany(): z.infer<typeof CrmCompany> {
+  const blank = fallbackCompany('Workspace');
+  return {
+    ...blank,
+    industry: null,
+    employeeCount: null,
+    annualRevenueMicros: null,
+    confidence: 0,
+    sourceAttribution: [],
+  };
+}
+
 // ─── Company list builders ────────────────────────────────────────────────────
 
 /** A Company row with no opportunity or enrichment footprint (a new or sparse account), as a CrmCompany. */
@@ -511,6 +528,5 @@ export function buildCompanies(
     }
   }
 
-  if (!byName.has('mantu')) byName.set('mantu', fallbackCompany('Mantu'));
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
