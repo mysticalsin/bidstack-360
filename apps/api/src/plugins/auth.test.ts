@@ -243,7 +243,7 @@ describe('auth plugin', () => {
     }
   });
 
-  it('accepts ?access_token= only on WebSocket upgrades, never on plain HTTP', async () => {
+  it('ignores ?access_token= on plain HTTP and on WebSocket upgrades', async () => {
     process.env.NODE_ENV = 'production';
     process.env.CLERK_SECRET_KEY = 'sk_test_query_token';
     process.env.PUBLIC_BASE_URL = 'https://app.bidstack.test';
@@ -264,12 +264,15 @@ describe('auth plugin', () => {
       expect(plain.json().message).toBe('Missing Authorization header');
       expect(verifyToken).not.toHaveBeenCalled();
 
-      await server.inject({
+      const upgraded = await server.inject({
         method: 'GET',
         url: '/private-probe?access_token=ws-token',
         headers: { upgrade: 'websocket', connection: 'Upgrade' },
       });
-      expect(verifyToken).toHaveBeenCalledWith('ws-token', expect.anything());
+      expect(upgraded.statusCode).toBe(401);
+      expect(upgraded.json().message).toBe('Missing Authorization header');
+      expect(upgraded.body).not.toContain('ws-token');
+      expect(verifyToken).not.toHaveBeenCalled();
     } finally {
       await server.close();
     }

@@ -21,6 +21,7 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { fromUint8Array, toUint8Array } from 'js-base64';
+import { fetchRealtimeTicket } from '@/lib/api';
 
 export interface YjsClientOptions {
   entityType: string;
@@ -80,13 +81,6 @@ export class YjsClient {
     });
   }
 
-  /** Open the WebSocket connection and begin syncing. */
-  connect(bearerToken: string): void {
-    if (this.destroyed) return;
-    this.bearerToken = bearerToken;
-    this.openSocket();
-  }
-
   /** Send cursor position to other collaborators. */
   setCursor(anchor: number, head: number): void {
     if (!this.ydocId || this.ws?.readyState !== WebSocket.OPEN) return;
@@ -114,17 +108,40 @@ export class YjsClient {
 
   // ─── Private ─────────────────────────────────────────────────────────────
 
-  private bearerToken = '';
+  private session = false;
 
-  private openSocket(): void {
+  /** Open the socket. A signed-in caller gets a one-time ticket first. */
+  connect(bearerToken: string): void {
+    if (this.destroyed) return;
+    this.session = bearerToken.length > 0;
+    void this.openAuthenticated();
+  }
+
+  private async openAuthenticated(): Promise<void> {
+    if (this.destroyed) return;
+    let ticket: string | null = null;
+    if (this.session) {
+      try {
+        ticket = await fetchRealtimeTicket();
+        if (!ticket) throw new Error('missing realtime ticket');
+      } catch {
+        this.setConnectionState('error');
+        if (!this.destroyed) this.scheduleReconnect();
+        return;
+      }
+    }
+    if (this.destroyed) return;
+    this.openSocket(ticket);
+  }
+
+  private openSocket(ticket: string | null): void {
     if (this.destroyed) return;
 
     // In the hybrid deploy the API lives on a different origin (Railway), so the
     // WS must target VITE_API_URL's host — not window.location.host (the Vercel
     // SPA, which returns 200/the SPA shell for the upgrade and fails the
     // handshake). Fall back to the current origin for single-origin deploys.
-    // The token rides as ?access_token= (browsers can't set WS headers); it's
-    // wss (TLS) and scrubUrl() redacts it server-side.
+    // The query carries a one-time ticket, never the Clerk session JWT.
     const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
     let wsBase: string;
     if (apiUrl) {
@@ -133,7 +150,9 @@ export class YjsClient {
     } else {
       wsBase = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
     }
-    const url = `${wsBase}/api/v1/yjs-sync?access_token=${encodeURIComponent(this.bearerToken)}`;
+    const url = ticket
+      ? `${wsBase}/api/v1/yjs-sync?ticket=${encodeURIComponent(ticket)}`
+      : `${wsBase}/api/v1/yjs-sync`;
 
     this.setConnectionState('connecting');
 
@@ -142,16 +161,12 @@ export class YjsClient {
 
     socket.onopen = () => {
       this.reconnectAttempts = 0;
-      // Send auth token then init.
-      // WHY header not supported in browser WS: we pass the token in the first
-      // message instead. The server plugin validates req.auth (set by the auth
-      // plugin on the HTTP Upgrade), so this is belt-and-suspenders for context.
+      // Auth already happened on the upgrade via the one-time ticket.
       this.sendJson({
         type: 'yjs:init',
         entityType: this.opts.entityType,
         entityId: this.opts.entityId,
         fieldKey: this.opts.fieldKey,
-        token: this.bearerToken,
       });
     };
 
@@ -245,7 +260,7 @@ export class YjsClient {
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.openSocket();
+      void this.openAuthenticated();
     }, delay);
   }
 
