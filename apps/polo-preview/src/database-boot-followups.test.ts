@@ -173,4 +173,13 @@ describe('database boot follow-ups', () => {
       expect(assignsDrillFlag(readFileSync(join(here, file), 'utf8')), file).toBe(false);
     }
   });
+
+  it('catches a template drill-flag value and a computed key', () => {
+    // WHY: a regex on quotes misses `1` and ['POLO_RESTORE_DRILL']. The key
+    // is the name, whatever literal form it uses.
+    expect(assignsDrillFlag('{ POLO_RESTORE_DRILL: `1` }')).toBe(true);
+    expect(assignsDrillFlag("{ ['POLO_RESTORE_DRILL']: '1' }")).toBe(true);
+    expect(assignsDrillFlag('{ [`POLO_RESTORE_DRILL`]: `1` }')).toBe(true);
+    expect(assignsDrillFlag('process.env["POLO_RESTORE_DRILL"] = `1`')).toBe(true);
+  });
 });
