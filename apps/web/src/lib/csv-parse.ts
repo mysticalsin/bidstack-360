@@ -75,6 +75,10 @@ function toMatrix(text: string): string[][] {
     }
   }
 
+  if (inQuotes) {
+    throw new Error('unclosed quote');
+  }
+
   // Flush the final field/row if the file did not end with a newline.
   if (field.length > 0 || row.length > 0) {
     row.push(field);

@@ -35,6 +35,16 @@ describe('parseCsv', () => {
   it('returns empty result for empty input', () => {
     expect(parseCsv('')).toEqual({ headers: [], rows: [] });
   });
+
+  it('rejects an unclosed quote instead of gluing the rest of the file into one cell', () => {
+    // WHY: a missing closing quote used to swallow the following rows into the
+    // first name, and the wizard offered to import that corrupted row.
+    expect(() =>
+      parseCsv(
+        'name,email\n"Northwind Labs,avery@northwind.example.com\nContoso Rail,blair@contoso.example.com\n',
+      ),
+    ).toThrow(/unclosed quote/);
+  });
 });
 
 describe('autoMap', () => {
