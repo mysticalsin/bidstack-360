@@ -1128,7 +1128,8 @@
     "error": {
       "noDataRows": "That file has no data rows.",
       "tooManyRows": "That file has {{count}} rows — the limit is {{limit}}.",
-      "unreadable": "Could not read that file. Make sure it is a UTF-8 CSV."
+      "unreadable": "Could not read that file. Make sure it is a UTF-8 CSV.",
+      "tooLarge": "That file is too large to import."
     },
     "upload": {
       "entityLabel": "What are you importing?",

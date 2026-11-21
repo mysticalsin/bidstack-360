@@ -72,6 +72,8 @@ function newestLiveImport(items: MigrationJob[] | undefined): MigrationJob | und
     .sort((a, b) => ((a.createdAt ?? '') < (b.createdAt ?? '') ? 1 : -1))[0];
 }
 const MAX_ROWS = 10_000;
+/** Same ceiling as the spreadsheet upload. A larger file is read into memory and then rejected by the API body limit. */
+const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
 
 const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
   [MIGRATION_STALE_REASON]: [
@@ -270,6 +272,10 @@ export function CsvImportWizard() {
 
   async function onFile(file: File) {
     setParseError(null);
+    if (file.size > MAX_IMPORT_BYTES) {
+      setParseError(t('csvImport.error.tooLarge', 'That file is too large to import.'));
+      return;
+    }
     try {
       const lower = file.name.toLowerCase();
       const result = lower.endsWith('.xlsx') || lower.endsWith('.xls')
