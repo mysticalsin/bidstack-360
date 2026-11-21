@@ -137,11 +137,41 @@ export function titleCase(value: string) {
     .join(' ');
 }
 
-export function formatMicrosCompact(micros: number) {
-  const units = micros / 1_000_000;
-  if (units >= 1_000_000_000) return `$${(units / 1_000_000_000).toFixed(1)}B`;
-  if (units >= 1_000_000) return `$${(units / 1_000_000).toFixed(1)}M`;
-  return `$${units.toLocaleString()}`;
+function unspecifiedCompact(units: number): string {
+  if (!Number.isFinite(units)) return 'amount not readable';
+  const sign = units < 0 ? '-' : '';
+  const abs = Math.abs(units);
+  const full = `${sign}${abs.toLocaleString('en-GB', { maximumFractionDigits: 2 })} unspecified`;
+  if (!Number.isSafeInteger(abs)) return full;
+  const scales: Array<[number, string]> = [
+    [1e12, 'T'],
+    [1e9, 'B'],
+    [1e6, 'M'],
+    [1e3, 'K'],
+  ];
+  for (const [divisor, suffix] of scales) {
+    if (abs < divisor) continue;
+    for (let digits = 0; digits <= 2; digits += 1) {
+      const shown = Number((abs / divisor).toFixed(digits));
+      if (shown * divisor === abs) {
+        const text = digits === 0 ? String(shown) : shown.toFixed(digits).replace(/\.?0+$/, '');
+        return `${sign}${text}${suffix} unspecified`;
+      }
+    }
+    return full;
+  }
+  return full;
+}
+
+/** Company revenue has no currency column. A dollar sign would invent one. */
+export function formatMicrosCompact(micros: number): string {
+  if (!Number.isSafeInteger(micros)) return 'amount not readable';
+  const asBig = BigInt(micros);
+  const whole = asBig / 1_000_000n;
+  const remainder = asBig % 1_000_000n;
+  if (whole > BigInt(Number.MAX_SAFE_INTEGER)) return 'amount not readable';
+  const units = Number(whole) + Number(remainder) / 1_000_000;
+  return unspecifiedCompact(units);
 }
 
 // ─── Normalizers ─────────────────────────────────────────────────────────────

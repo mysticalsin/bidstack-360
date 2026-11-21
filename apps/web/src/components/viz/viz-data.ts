@@ -32,6 +32,23 @@ export interface OppRow {
   name?: string | null;
   code?: string | null;
   owner?: string | null;
+  /** Integer micros. Used when the unit number has already lost the amount. */
+  valueMicros?: string | null;
+}
+
+/** Chart units from integer micros when the row has them, otherwise the unit number. */
+export function chartUnits(row: { value?: number | null; valueMicros?: string | null }): number {
+  const raw = row.valueMicros;
+  if (raw != null && /^-?\d+$/.test(raw)) {
+    const micros = BigInt(raw);
+    const whole = micros / 1_000_000n;
+    const absWhole = whole < 0n ? -whole : whole;
+    if (absWhole <= BigInt(Number.MAX_SAFE_INTEGER)) {
+      const remainder = micros % 1_000_000n;
+      return Number(whole) + Number(remainder) / 1_000_000;
+    }
+  }
+  return row.value ?? 0;
 }
 
 const isWon = (o: OppRow) => stageKey(o.stage) === 'closed_won';
@@ -49,7 +66,7 @@ export function quarterOf(iso: string): string {
 export function stageFunnel(rows: OppRow[]) {
   return OPEN_STAGES.map((id) => {
     const inStage = rows.filter((o) => stageKey(o.stage) === id);
-    return { label: stageText(id), value: inStage.reduce((n, o) => n + (o.value ?? 0), 0), count: inStage.length };
+    return { label: stageText(id), value: inStage.reduce((n, o) => n + chartUnits(o), 0), count: inStage.length };
   }).filter((s) => s.count > 0);
 }
 
@@ -87,7 +104,7 @@ export function wonByQuarter(rows: OppRow[]) {
     if (!at) continue;
     const q = quarterOf(at);
     const cur = by.get(q) ?? { v: 0, t: new Date(at).getTime() };
-    cur.v += o.value ?? 0;
+    cur.v += chartUnits(o);
     by.set(q, cur);
   }
   return [...by.entries()].sort((a, b) => a[1].t - b[1].t).map(([label, v]) => ({ label, won: v.v }));
@@ -96,7 +113,7 @@ export function wonByQuarter(rows: OppRow[]) {
 const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });
 /** Cumulative won value by close month for the year of the latest close. */
 export function cumulativeWon(rows: OppRow[]) {
-  const won = rows.filter(isWon).map((o) => ({ at: closeDate(o), v: o.value ?? 0 })).filter((r): r is { at: string; v: number } => Boolean(r.at));
+  const won = rows.filter(isWon).map((o) => ({ at: closeDate(o), v: chartUnits(o) })).filter((r): r is { at: string; v: number } => Boolean(r.at));
   if (!won.length) return [];
   const year = Math.max(...won.map((r) => new Date(r.at).getUTCFullYear()));
   const lastMonth = Math.max(...won.filter((r) => new Date(r.at).getUTCFullYear() === year).map((r) => new Date(r.at).getUTCMonth()));
@@ -114,7 +131,7 @@ export function accountBars(rows: OppRow[], n = 6) {
   for (const o of rows) {
     if (!o.customer || isLost(o)) continue;
     const cur = by.get(o.customer) ?? { open: 0, won: 0 };
-    if (isWon(o)) cur.won += o.value ?? 0; else cur.open += o.value ?? 0;
+    if (isWon(o)) cur.won += chartUnits(o); else cur.open += chartUnits(o);
     by.set(o.customer, cur);
   }
   return [...by.entries()]
@@ -141,7 +158,7 @@ export function cumulativeOpen(rows: OppRow[]) {
   if (!open.length) return [];
   // Starts at 0 so a single open bid still draws a rising line.
   let run = 0;
-  return [0, ...open.map((o) => (run += o.value ?? 0))];
+  return [0, ...open.map((o) => (run += chartUnits(o)))];
 }
 
 const chartCompact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 2 });
@@ -165,8 +182,48 @@ function compactKeepsUnits(units: number): boolean {
  * Otherwise one digit, including fractions. The full figure wrapped the hero.
  */
 export function fmtCompact(v: number): string {
-  if (!Number.isFinite(v) || !compactKeepsUnits(v)) return chartCompactRounded.format(v);
+  if (!Number.isFinite(v)) return chartCompactRounded.format(v);
+  if (Number.isSafeInteger(v) && !compactKeepsUnits(v)) {
+    const sign = v < 0 ? '-' : '';
+    return `${sign}${Math.abs(v).toLocaleString('en-GB')}`;
+  }
+  if (!compactKeepsUnits(v)) return chartCompactRounded.format(v);
   return chartCompact.format(v);
+}
+
+export function forecastAmount(period: {
+  wonMicros: string | number;
+  weightedMicros: string | number;
+  openMicros: string | number;
+}): { won: number; weighted: number; open: number; wonLabel: string; weightedLabel: string; openLabel: string } {
+  const one = (raw: string | number) => {
+    if (typeof raw === 'number' && !Number.isSafeInteger(raw)) {
+      return { units: 0, label: 'amount not readable' };
+    }
+    if (typeof raw === 'string' && !/^-?\d+$/.test(raw)) {
+      return { units: 0, label: 'amount not readable' };
+    }
+    const micros = BigInt(raw);
+    const whole = micros / 1_000_000n;
+    const absWhole = whole < 0n ? -whole : whole;
+    if (absWhole > BigInt(Number.MAX_SAFE_INTEGER)) {
+      return { units: 0, label: 'amount not readable' };
+    }
+    const remainder = micros % 1_000_000n;
+    const units = Number(whole) + Number(remainder) / 1_000_000;
+    return { units, label: fmtCompact(units) };
+  };
+  const won = one(period.wonMicros);
+  const weighted = one(period.weightedMicros);
+  const open = one(period.openMicros);
+  return {
+    won: won.units,
+    weighted: weighted.units,
+    open: open.units,
+    wonLabel: won.label,
+    weightedLabel: weighted.label,
+    openLabel: open.label,
+  };
 }
 
 export type OppStatus = 'open' | 'won' | 'lost';

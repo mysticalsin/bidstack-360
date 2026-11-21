@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, forecastAmount, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -95,7 +95,7 @@ describe('viz-data', () => {
     expect(fmtCompact(7_860_000)).toBe('7.86m');
     expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
     expect(fmtCompact(11_890_000)).toBe('11.89m');
-    expect(fmtCompact(12_015_000)).toBe('12m');
+    expect(fmtCompact(12_015_000)).toBe('12,015,000');
     expect(fmtCompact(1_500_000)).toBe('1.5m');
   });
 
@@ -104,7 +104,7 @@ describe('viz-data', () => {
     // A fraction must use the same compact label as an integer of that size.
     // Main's one-digit compact is 11.6m for that figure and 7.1m for 7,060,500.
     expect(fmtCompact(11_595_650.688)).toBe('11.6m');
-    expect(fmtCompact(7_060_500)).toBe('7.1m');
+    expect(fmtCompact(7_060_500)).toBe('7,060,500');
     expect(fmtCompact(999.4)).toBe('999.4');
     expect(fmtCompact(0.5)).toBe('0.5');
     expect(fmtCompact(1_000.4)).toBe('1k');

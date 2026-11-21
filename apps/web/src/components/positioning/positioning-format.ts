@@ -30,8 +30,13 @@ export type MicrosFormatter = (micros: string | number) => string;
 export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
   if (n.value === null) return 'No data';
   switch (n.unit) {
-    case 'money':
-      return fmtMoney(n.value, n.currency ?? 'USD');
+    case 'money': {
+      const amount = fmtMoney(n.value, n.currency?.trim() ?? '');
+      if (!n.currency?.trim()) {
+        return amount === 'amount not readable' ? amount : `${amount} unspecified`;
+      }
+      return amount;
+    }
     case 'money_micros':
       return fmtMicros ? fmtMicros(Math.round(n.value)) : formatMoneyMicros(Math.round(n.value), undefined, { compact: true });
     case 'pct':

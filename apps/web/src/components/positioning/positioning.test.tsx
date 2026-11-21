@@ -168,8 +168,8 @@ describe('WhatToPosition', () => {
       brief: { ...pos.brief, pipeline: { openCount: 2, openMicros: '2400000000000', won24m: 0, lost24m: 0 } },
     };
     render(<WhatToPosition companyId="c1" />);
-    expect(screen.getByTestId('account-brief').textContent).toContain('worth EUR 2m');
-    expect(screen.getByTestId('wp-play-1').textContent).toContain('EUR 100,000 to EUR 300,000');
+    expect(screen.getByTestId('account-brief').textContent).toContain('worth EUR 2,400,000');
+    expect(screen.getByTestId('wp-play-1').textContent).toContain('EUR 100k to EUR 300k');
   });
 
   it('says what is needed when there is no play, and omits the deal range when not derived', () => {

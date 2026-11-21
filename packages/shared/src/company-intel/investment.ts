@@ -58,12 +58,38 @@ export function compactAmount(n: number): string {
  * (EUR 29.9bn, CAD 935m, USD 12,400). Key numbers, financials and the
  * intel panels all go through this so one figure never reads two ways.
  */
+function compactIsExact(amount: number, divisor: number, digits: number): boolean {
+  const shown = Number((amount / divisor).toFixed(digits));
+  return shown * divisor === amount;
+}
+
+/**
+ * Code, then amount. A short label is kept only when it names the same
+ * amount: whole millions, and a billion only at the digits that still match.
+ * 7,860,000 stays 7,860,000. 2,000,000 stays 2m. 90,649,000,000 stays in full.
+ */
 export function formatCompactMoney(v: number, ccy: string): string {
-  const a = Math.abs(v);
+  if (!Number.isFinite(v)) return 'amount not readable';
   const sign = v < 0 ? '-' : '';
-  if (a >= 1e9) return `${sign}${ccy} ${(a / 1e9).toFixed(a >= 1e10 ? 1 : 2)}bn`;
-  if (a >= 1e6) return `${sign}${ccy} ${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
-  return `${sign}${ccy} ${Math.round(a).toLocaleString('en-GB')}`;
+  const a = Math.abs(v);
+  const code = ccy.trim();
+  const prefix = code ? `${code} ` : '';
+  const full = `${sign}${prefix}${a.toLocaleString('en-GB')}`;
+  if (!Number.isSafeInteger(a)) return full;
+  if (a >= 1e9) {
+    const digits = a >= 1e10 ? 1 : 2;
+    if (compactIsExact(a, 1e9, digits)) {
+      return `${sign}${prefix}${(a / 1e9).toFixed(digits)}bn`;
+    }
+    return full;
+  }
+  if (a >= 1e6 && compactIsExact(a, 1e6, 0)) {
+    return `${sign}${prefix}${Math.round(a / 1e6).toLocaleString('en-GB')}m`;
+  }
+  if (a >= 1e3 && a < 1e6 && compactIsExact(a, 1e3, 0)) {
+    return `${sign}${prefix}${Math.round(a / 1e3).toLocaleString('en-GB')}k`;
+  }
+  return full;
 }
 
 function money(n: number, currency: string | null): string {

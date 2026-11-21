@@ -4,7 +4,7 @@
  * Rules compare the latest annual period with the one before; nothing is
  * guessed when an input is missing.
  */
-import { cleanText, type FinancialSignal, type FinancialSignalRule } from '@bidstack/shared';
+import { cleanText, formatCompactMoney, type FinancialSignal, type FinancialSignalRule } from '@bidstack/shared';
 
 import { derived, type ExtractedPeriod } from './xbrl.js';
 
@@ -35,10 +35,9 @@ const pct = (a: number, b: number) => (b === 0 ? null : ((a - b) / Math.abs(b)) 
 const r0 = (n: number) => Math.round(n);
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
+/** Filing amounts use the shared compact rule: a short label only when it matches. */
 export function fmtMoney(v: number, ccy: string): string {
-  const a = Math.abs(v);
-  const s = a >= 1e9 ? `${r1(a / 1e9)}bn` : a >= 1e6 ? `${r0(a / 1e6)}m` : `${r0(a / 1e3)}k`;
-  return `${v < 0 ? '-' : ''}${ccy} ${s}`;
+  return formatCompactMoney(v, ccy);
 }
 
 const fy = (p: ExtractedPeriod) => `FY${p.periodEnd.slice(0, 4)}`;
