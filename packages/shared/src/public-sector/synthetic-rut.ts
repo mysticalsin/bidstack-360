@@ -31,11 +31,11 @@ export function syntheticRutBody(index: number, kind: SyntheticRutKind): number 
 export interface SyntheticRut {
   body: number;
   dv: string;
-  /** `12.345.678-5` form. */
+  /** Dotted form. */
   formatted: string;
-  /** `123456785` form. */
+  /** Plain form, digits plus verifier. */
   plain: string;
-  /** `12345678-5` form. */
+  /** Dashed form, without thousands separators. */
   dashed: string;
 }
 
