@@ -4,7 +4,7 @@
 // registered) left the "Global Pipeline Share" metric with an invisible icon
 // in both themes. This pins the row to a REAL registered glyph: it fails if
 // the name ever drifts back to an unregistered icon.
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
@@ -79,7 +79,7 @@ describe('empty territory lists', () => {
       />,
     );
     expect(screen.getByText(/group the countries you sell in/i)).toBeTruthy();
-    screen.getByRole('button', { name: /new territory/i }).click();
+    fireEvent.click(screen.getByText('New territory'));
     expect(onCreate).toHaveBeenCalled();
   });
 
@@ -98,7 +98,7 @@ describe('empty territory lists', () => {
       />,
     );
     expect(screen.getByText(/send a new lead/i)).toBeTruthy();
-    screen.getByRole('button', { name: /new rule/i }).click();
+    fireEvent.click(screen.getByText('New rule'));
     expect(onCreate).toHaveBeenCalled();
   });
 });

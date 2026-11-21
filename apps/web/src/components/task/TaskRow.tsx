@@ -12,7 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/cn';
-import { daysUntil, formatDate } from '@/lib/format';
+import { daysUntil, formatDate, taskDueChip } from '@/lib/format';
 
 import type { Task } from '@bidstack/shared';
 
@@ -46,6 +46,7 @@ export const TaskRow = memo(function TaskRow({
   const update = useUpdateTask();
   const d = daysUntil(task.dueDate);
   const overdue = d !== null && d < 0;
+  const dueChip = d !== null && task.dueDate ? taskDueChip(d, task.dueDate) : null;
   const readOnlyHint = t('taskRow.readOnlyHint', 'You need task write access to edit this task.');
 
   const [snoozeOpen, setSnoozeOpen] = useState(false);
@@ -263,8 +264,12 @@ export const TaskRow = memo(function TaskRow({
                   <span role="img" aria-label={t('taskRow.warning', 'warning')}>
                     ⚠️
                   </span>
-                  {t('taskRow.overdue', 'Overdue: {{count}}d late', { count: Math.abs(d) })}
+                  {dueChip?.kind === 'since'
+                    ? t('taskRow.overdueSince', 'Overdue since {{date}}', { date: dueChip.when })
+                    : t('taskRow.overdue', 'Overdue: {{count}}d late', { count: Math.abs(d) })}
                 </>
+              ) : dueChip?.kind === 'since' ? (
+                t('taskRow.dueOn', 'Due on {{date}}', { date: dueChip.when })
               ) : (
                 t('taskRow.dueIn', 'in {{count}}d', { count: d })
               )}

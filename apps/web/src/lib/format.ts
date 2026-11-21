@@ -73,6 +73,18 @@ export function daysUntil(iso: string | null | undefined): number | null {
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
+/** Ten years. Past this, "739940d late" stops being a sentence. */
+export const TASK_DAY_CHIP_LIMIT = 3_650;
+
+export function taskDueChip(
+  days: number,
+  iso: string,
+): { kind: 'count'; days: number } | { kind: 'since'; when: string } {
+  if (Math.abs(days) <= TASK_DAY_CHIP_LIMIT) return { kind: 'count', days: Math.abs(days) };
+  const when = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
+  return { kind: 'since', when };
+}
+
 export function formatStage(stage: string): string {
   return stage
     .split('_')
