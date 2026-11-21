@@ -72,10 +72,19 @@ async function getApiToken(options?: ApiTokenOptions): Promise<string | null> {
 /**
  * Public accessor for the current auth token. Used by non-fetch transports that
  * can't route through api() — notably the collaborative-editing WebSocket, which
- * passes the token as ?access_token= because browsers can't set WS headers.
+ * must not put that bearer on a URL. Call fetchRealtimeTicket and pass the
+ * opaque id as ?ticket= — it is single-use and is not a session JWT.
  */
 export async function getAuthToken(): Promise<string | null> {
   return getApiToken();
+}
+
+/** Bearer in, opaque WebSocket ticket out. Null when there is no session. */
+export async function fetchRealtimeTicket(): Promise<string | null> {
+  const token = await getAuthToken();
+  if (!token) return null;
+  const body = await api<{ ticket: string }>('/api/v1/realtime/ticket', { method: 'POST' });
+  return body.ticket;
 }
 
 function getE2eRoleHeader(): Record<string, string> {

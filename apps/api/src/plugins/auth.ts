@@ -17,6 +17,7 @@ import { prisma } from '@bidstack/db';
 import { emailDomainForTelemetry } from '../lib/email-privacy.js';
 import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import { assertPoloAuthBoot, isCfAccessAuthEnabled, isRealDataMode } from '../lib/polo-mode.js';
+import { redeemWsTicket } from '../lib/ws-ticket.js';
 import { writeAuthAudit } from './auth-audit.js';
 import { verifyCfAccessAuth } from './cf-access-auth.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
@@ -529,25 +530,10 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   }
 
   const authHeader = req.headers.authorization ?? '';
-  let token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  // WebSocket upgrades (e.g. /api/v1/yjs-sync) can't set an Authorization
-  // header from the browser, so accept a ?access_token= query param as a
-  // fallback ONLY when no header is present. Same JWT, same verification path;
-  // scrubUrl() already redacts access_token from any logged URL, and it travels
-  // over wss (TLS). Parsed from req.url directly so it doesn't depend on
-  // req.query being populated at the onRequest stage.
-  // Only for WebSocket upgrades: a bearer in a normal URL leaks through
-  // Referer headers, browser history and proxy access logs.
-  const isWebSocketUpgrade =
-    String(req.headers.upgrade ?? '').toLowerCase() === 'websocket';
-  if (!token && isWebSocketUpgrade) {
-    const url = req.url ?? '';
-    const qIdx = url.indexOf('?');
-    if (qIdx >= 0) {
-      const qToken = new URLSearchParams(url.slice(qIdx + 1)).get('access_token');
-      if (qToken) token = qToken;
-    }
-  }
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  // A Clerk JWT in the query string is copied into edge access logs, browser
+  // history, and Referer. WebSocket handshakes redeem a one-time ticket in
+  // the onRequest hook instead. ?access_token= is ignored on every route.
   if (!token) {
     throw req.server.httpErrors.unauthorized('Missing Authorization header');
   }
@@ -720,6 +706,25 @@ const plugin: FastifyPluginAsync = fp(
       if (apiAuth) {
         req.auth = apiAuth;
         return;
+      }
+
+      // Browsers cannot set Authorization on a WebSocket. The query carries
+      // an opaque single-use ticket from POST /api/v1/realtime/ticket, never
+      // the Clerk session JWT. A ticket on a normal HTTP request is ignored
+      // so it is not consumed by a stray GET.
+      if (String(req.headers.upgrade ?? '').toLowerCase() === 'websocket') {
+        const url = req.url ?? '';
+        const qIdx = url.indexOf('?');
+        const ticket =
+          qIdx >= 0 ? new URLSearchParams(url.slice(qIdx + 1)).get('ticket') : null;
+        if (ticket) {
+          const redeemed = await redeemWsTicket(ticket);
+          if (!redeemed) {
+            throw req.server.httpErrors.unauthorized('Invalid or expired token');
+          }
+          req.auth = redeemed;
+          return;
+        }
       }
 
       if (hasClerkKey) {

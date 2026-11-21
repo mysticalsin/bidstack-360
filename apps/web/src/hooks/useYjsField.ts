@@ -69,10 +69,9 @@ export function useYjsField({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the Yjs document is created by the external collaboration client.
     setYdoc(client.doc);
 
-    // Obtain a Clerk JWT for the WS auth handshake. Use the app's real token
-    // provider (getAuthToken) — the old window.__apiTokenProvider global was
-    // never set, so the token was always empty and the WS 401'd. The client
-    // passes it as ?access_token= (browsers can't set WS headers).
+    // Obtain a Clerk JWT so the client can trade it for a one-time WebSocket
+    // ticket. The JWT stays on the Authorization header of that POST. The
+    // socket URL carries the ticket, not the session.
     const connectWithToken = async (): Promise<void> => {
       const token = (await getAuthToken()) ?? '';
       client.connect(token);

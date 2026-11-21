@@ -221,6 +221,7 @@ export function createLogger(options: LoggerOptions = {}): pino.Logger {
         '*.auth_token',
         '*.accessToken',
         '*.access_token',
+        '*.ticket',
         '*.refreshToken',
         '*.refresh_token',
       ],

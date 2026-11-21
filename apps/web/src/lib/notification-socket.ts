@@ -2,7 +2,7 @@
 // auto-subscribes each connection to `notification:user:<id>`, so the client
 // only connects and listens. Reconnects with capped backoff; the 60s poll in
 // useNotifications stays the fallback when the socket is down.
-import { getAuthToken } from '@/lib/api';
+import { fetchRealtimeTicket } from '@/lib/api';
 
 export interface LiveNotification {
   id: string;
@@ -15,7 +15,7 @@ export interface LiveNotification {
 
 type Listener = (n: LiveNotification) => void;
 
-export function realtimeUrl(token: string | null): string {
+export function realtimeUrl(ticket: string | null): string {
   const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
   let base: string;
   if (apiUrl) {
@@ -24,7 +24,7 @@ export function realtimeUrl(token: string | null): string {
   } else {
     base = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
   }
-  return `${base}/api/v1/realtime${token ? `?access_token=${encodeURIComponent(token)}` : ''}`;
+  return `${base}/api/v1/realtime${ticket ? `?ticket=${encodeURIComponent(ticket)}` : ''}`;
 }
 
 /** Parse one server frame; returns the notification or null for anything else. */
@@ -67,11 +67,17 @@ export class NotificationSocket {
 
   async start(): Promise<void> {
     if (this.closed || typeof WebSocket === 'undefined') return;
-    const token = await getAuthToken().catch(() => null);
+    let ticket: string | null;
+    try {
+      ticket = await fetchRealtimeTicket();
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
     if (this.closed) return;
     let socket: WebSocket;
     try {
-      socket = this.factory(realtimeUrl(token));
+      socket = this.factory(realtimeUrl(ticket));
     } catch {
       this.scheduleReconnect();
       return;

@@ -243,7 +243,7 @@ describe('auth plugin', () => {
     }
   });
 
-  it('accepts ?access_token= only on WebSocket upgrades, never on plain HTTP', async () => {
+  it('ignores ?access_token= on plain HTTP and on WebSocket upgrades', async () => {
     process.env.NODE_ENV = 'production';
     process.env.CLERK_SECRET_KEY = 'sk_test_query_token';
     process.env.PUBLIC_BASE_URL = 'https://app.bidstack.test';
@@ -264,12 +264,51 @@ describe('auth plugin', () => {
       expect(plain.json().message).toBe('Missing Authorization header');
       expect(verifyToken).not.toHaveBeenCalled();
 
-      await server.inject({
+      const upgraded = await server.inject({
         method: 'GET',
         url: '/private-probe?access_token=ws-token',
         headers: { upgrade: 'websocket', connection: 'Upgrade' },
       });
-      expect(verifyToken).toHaveBeenCalledWith('ws-token', expect.anything());
+      expect(upgraded.statusCode).toBe(401);
+      expect(upgraded.json().message).toBe('Missing Authorization header');
+      expect(upgraded.body).not.toContain('ws-token');
+      expect(verifyToken).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects a Clerk JWT on the WebSocket query string', async () => {
+    // The session JWT must not be a URL credential. Edge logs, history, and
+    // Referer keep the query string after the app has scrubbed its own logs.
+    process.env.NODE_ENV = 'production';
+    process.env.CLERK_SECRET_KEY = 'sk_test_query_token';
+    process.env.PUBLIC_BASE_URL = 'https://app.bidstack.test';
+    vi.mocked(verifyToken).mockReset();
+    vi.mocked(verifyToken).mockResolvedValue({
+      org_id: 'org_clerk',
+      sub: 'user_clerk',
+      email: 'ada@example.test',
+    } as never);
+
+    const server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(authPlugin);
+    // Same upgrade the yjs and realtime sockets send. verifyClerkAuth runs
+    // for every non-public route, including /api/v1/yjs-sync.
+    server.get('/private-probe', async () => ({ ok: true }));
+    await server.ready();
+
+    try {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/private-probe?access_token=clerk-session-jwt',
+        headers: { upgrade: 'websocket', connection: 'Upgrade' },
+      });
+      expect(verifyToken).not.toHaveBeenCalled();
+      expect(response.statusCode).toBe(401);
+      expect(response.json().message).toBe('Missing Authorization header');
+      expect(response.body).not.toContain('clerk-session-jwt');
     } finally {
       await server.close();
     }
