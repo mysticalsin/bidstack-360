@@ -195,14 +195,24 @@ export function passwordPsqlEnv(extra = {}) {
   return { ...extra, LC_ALL: 'C', LANG: 'C', PGVERBOSITY: 'verbose' };
 }
 
+function psqlArgCarriesCommand(arg) {
+  if (arg.startsWith('--')) {
+    const name = arg.slice(2).split('=')[0];
+    // --c, --comm, --command, and --command=sql are all the command option.
+    return name.length > 0 && ('command'.startsWith(name) || name.startsWith('command'));
+  }
+  if (!arg.startsWith('-') || arg === '-') return false;
+  // -c, -cSQL, and a short cluster that includes c, such as -Atc or -qc.
+  const letters = /^[A-Za-z]+/.exec(arg.slice(1))?.[0] ?? '';
+  return letters.includes('c');
+}
+
 // -c would put the ALTER text, including the SCRAM verifier, on argv.
 export function assertPsqlArgsHaveNoCommand(args) {
   if (!Array.isArray(args)) throw new Error('psql argv must be a list');
   const list = args.map((arg) => String(arg));
   for (const arg of list) {
-    if (arg === '-c' || arg === '--command' || arg.startsWith('--command=')) {
-      throw new Error('psql argv must not use -c');
-    }
+    if (psqlArgCarriesCommand(arg)) throw new Error('psql argv must not use -c');
   }
   return list;
 }
