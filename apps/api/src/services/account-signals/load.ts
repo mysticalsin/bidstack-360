@@ -6,6 +6,7 @@ import {
   categoryForKind,
   computeMomentum,
   sentimentForRow,
+  stageOutcome,
   type Implication,
   type MomentumData,
   type MomentumOpp,
@@ -38,10 +39,7 @@ export function recordedOutcome(o: {
   stage: string;
   pipelineStage?: { isWon: boolean; isLost: boolean; deletedAt?: Date | null } | null;
 }): 'won' | 'lost' | 'open' {
-  const live = o.pipelineStage?.deletedAt ? null : o.pipelineStage;
-  if (o.stage === 'closed_lost' || live?.isLost) return 'lost';
-  if (o.stage === 'closed_won' || live?.isWon) return 'won';
-  return 'open';
+  return stageOutcome(o);
 }
 
 /** When a deal closed: closedAt, or the last update for deals closed before closedAt existed. */

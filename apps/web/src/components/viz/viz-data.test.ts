@@ -82,4 +82,30 @@ describe('viz-data', () => {
     // Half a unit is what a micros remainder looks like once it is no longer a whole unit.
     expect(fmtCompact(1_500_000.5)).toBe('1.5m');
   });
+
+  it('keeps a live lost stage out of the open charts', () => {
+    // WHY: the list sends the stage name, not closed_lost, so a name check
+    // left the deal open. Lost wins when both flags are set. A deleted stage
+    // row does not close the deal.
+    const lost = row({
+      stage: 'Price lost',
+      value: 80,
+      dueDate: '2026-01-01',
+      customer: 'C',
+      pipelineStage: { isWon: false, isLost: true, deletedAt: null },
+    });
+    const open = row({ stage: 's2_sent', value: 20, dueDate: '2026-01-02', customer: 'C' });
+    expect(statusMix([lost, open])).toEqual({ open: 1, won: 0, lost: 1 });
+    expect(cumulativeOpen([lost, open])).toEqual([0, 20]);
+    expect(accountBars([lost, open])).toEqual([{ label: 'C', open: 20, won: 0 }]);
+    expect(pastDueOpen([lost], Date.parse('2026-06-01'))).toEqual([]);
+    expect(
+      statusMix([
+        row({
+          stage: 's2_sent',
+          pipelineStage: { isLost: true, deletedAt: '2026-02-01T00:00:00.000Z' },
+        }),
+      ]).open,
+    ).toBe(1);
+  });
 });
