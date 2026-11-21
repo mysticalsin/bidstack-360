@@ -1,9 +1,12 @@
 // Tiny client-side CSV exporter. RFC 4180-ish — handles quote-escaping,
-// embedded commas, newlines. No dependency, no streaming (CRM tables fit
-// in memory for the next two years comfortably).
+// embedded commas, newlines. Formula neutralization is spreadsheetCell in
+// @bidstack/shared, which the opportunity export uses too. No streaming
+// (CRM tables fit in memory for the next two years comfortably).
 //
 // Triggers a browser download via a synthesized <a download> click, which
 // works in every evergreen browser without an extra library.
+
+import { spreadsheetCell } from '@bidstack/shared';
 
 export function rowsToCsv<T extends Record<string, unknown>>(
   rows: ReadonlyArray<T>,
@@ -34,7 +37,7 @@ function toString(value: unknown): string {
  * sanitization rather than re-deriving (and drifting from) it.
  */
 export function csvCell(value: string): string {
-  return value.replace(/^(=|\+|-|@|\t|\r)/, "'$1");
+  return spreadsheetCell(value);
 }
 
 function quote(value: string): string {

@@ -18,7 +18,7 @@ import { PassThrough } from 'node:stream';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
-import { OpportunityFilter, microsToUnits } from '@bidstack/shared';
+import { OpportunityFilter, microsToUnits, spreadsheetCell } from '@bidstack/shared';
 
 import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
 import { pumpBatches } from '../lib/batch-stream.js';
@@ -36,7 +36,7 @@ const exportGate = createConcurrencyGate(gateSizeFromEnv('EXPORT_MAX_CONCURRENCY
 // a formula on attacker-controlled free-text (name/customer). Mirrors
 // invoices.export.ts. (Review finding, 2026-06-04.)
 function csvCell(value: string): string {
-  const sanitized = value.replace(/^([=+\-@\t\r])/, "'$1");
+  const sanitized = spreadsheetCell(value);
   if (/[,"\n\r]/.test(sanitized)) return `"${sanitized.replace(/"/g, '""')}"`;
   return sanitized;
 }
