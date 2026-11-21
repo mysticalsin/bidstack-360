@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { lostOutcomeWhere, stageOutcome, type StageClassification, type StageOutcome } from './stage-outcome';
+import {
+  lostOutcomeWhere,
+  stageOutcome,
+  type StageClassification,
+  type StageOutcome,
+} from './stage-outcome';
 
 const FLAGS = [false, true] as const;
 
@@ -59,18 +64,14 @@ describe('stageOutcome', () => {
             };
             const outcome = expectedOutcome(deal);
             expect(stageOutcome(deal)).toBe(outcome);
-            const whereLost =
-              stage === 'closed_lost' || (!deleted && isLost);
+            const whereLost = stage === 'closed_lost' || (!deleted && isLost);
             expect(outcome === 'lost').toBe(whereLost);
           }
         }
       }
     }
     expect(lostOutcomeWhere()).toEqual({
-      OR: [
-        { stage: 'closed_lost' },
-        { pipelineStage: { is: { deletedAt: null, isLost: true } } },
-      ],
+      OR: [{ stage: 'closed_lost' }, { pipelineStage: { is: { deletedAt: null, isLost: true } } }],
     });
   });
 });

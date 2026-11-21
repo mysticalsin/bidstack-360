@@ -17,7 +17,11 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useOpportunities, usePatchOpportunity } from '@/hooks/useOpportunities';
+import {
+  useOpportunities,
+  useOpportunityMatchSummary,
+  usePatchOpportunity,
+} from '@/hooks/useOpportunities';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
@@ -73,7 +77,8 @@ export function OpportunitiesPage() {
   // A1 (bid clock) quick filters — "due" is independent of stage, so both can
   // be active together (e.g. "S2 Sent, overdue").
   const dueParam = searchParams.get('due');
-  const dueFilter: DueQuickFilter = dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
+  const dueFilter: DueQuickFilter =
+    dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
   const setDueFilter = (next: DueQuickFilter) => {
     const params = new URLSearchParams(searchParams);
     if (next) params.set('due', next);
@@ -84,9 +89,8 @@ export function OpportunitiesPage() {
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
   const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
-  const { data, isLoading, isError, error } = useOpportunities({
-    limit: 50,
-    ...(pager.cursor ? { cursor: pager.cursor } : {}),
+  const filtered = Boolean(search || stageFilter || dueFilter);
+  const listFilter = {
     ...(search ? { search } : {}),
     ...(stageFilter
       ? isPipelineStageIdUuid(stageFilter)
@@ -97,7 +101,13 @@ export function OpportunitiesPage() {
       : {}),
     ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
     ...(dueFilter === 'overdue' ? { overdue: true } : {}),
+  };
+  const { data, isLoading, isError, error } = useOpportunities({
+    limit: 50,
+    ...(pager.cursor ? { cursor: pager.cursor } : {}),
+    ...listFilter,
   });
+  const matchSummary = useOpportunityMatchSummary(filtered ? listFilter : undefined);
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
   const orgSummary = useOrgSummary();
@@ -309,24 +319,28 @@ export function OpportunitiesPage() {
     const stamp = new Date().toISOString().slice(0, 10);
     setIsExporting(true);
     try {
-      await downloadFromApi('/api/opportunities/export', `polo-presales-opportunities-${stamp}.csv`, {
-        // Mirror the list query's stage branching: a configured stage is a UUID
-        // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
-        // legacy enum as pipelineStageId 400s the export.
-        // Export must send the same filters as the list query.
-        querystring: {
-          ...(stageFilter
-            ? isPipelineStageIdUuid(stageFilter)
-              ? { pipelineStageId: stageFilter }
-              : isLegacyOpportunityStage(stageFilter)
-                ? { stage: stageFilter }
-                : {}
-            : {}),
-          ...(search ? { search } : {}),
-          ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
-          ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
+      await downloadFromApi(
+        '/api/opportunities/export',
+        `polo-presales-opportunities-${stamp}.csv`,
+        {
+          // Mirror the list query's stage branching: a configured stage is a UUID
+          // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
+          // legacy enum as pipelineStageId 400s the export.
+          // Export must send the same filters as the list query.
+          querystring: {
+            ...(stageFilter
+              ? isPipelineStageIdUuid(stageFilter)
+                ? { pipelineStageId: stageFilter }
+                : isLegacyOpportunityStage(stageFilter)
+                  ? { stage: stageFilter }
+                  : {}
+              : {}),
+            ...(search ? { search } : {}),
+            ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
+            ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
+          },
         },
-      });
+      );
       toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
       toast.error(t('opportunities.toast.exportFailed', 'Export failed'), {
@@ -352,7 +366,12 @@ export function OpportunitiesPage() {
           ))}
         </div>
       ) : data && data.items.length > 0 ? (
-        <OppKpiBar opps={data.items} summary={orgSummary.data} />
+        <OppKpiBar
+          opps={data.items}
+          partial={Boolean(pager.cursor || data.nextCursor) && !matchSummary.data}
+          match={matchSummary.data}
+          summary={filtered ? undefined : orgSummary.data}
+        />
       ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}
@@ -450,9 +469,7 @@ export function OpportunitiesPage() {
         ) : isError ? (
           <ErrorState
             title={t('opportunities.error.title', "Couldn't load opportunities")}
-            message={
-              error?.message ?? t('opportunities.error.message', 'Try again in a moment.')
-            }
+            message={error?.message ?? t('opportunities.error.message', 'Try again in a moment.')}
           />
         ) : data?.items.length === 0 ? (
           <EmptyState
