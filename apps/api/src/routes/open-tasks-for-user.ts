@@ -33,6 +33,15 @@ export function openTasksForUserWhere(orgId: string, userId: string): {
   };
 }
 
+/**
+ * Day the summary compares due dates against. Still the UTC date, so
+ * 2026-11-21T01:00:00Z (22:00 on Nov 20 in America/Sao_Paulo) treats a task
+ * due Nov 20 as overdue.
+ */
+export function taskSummaryToday(now: Date, _orgTimeZone?: string | null): string {
+  return now.toISOString().slice(0, 10);
+}
+
 export function isOpenTaskForUser(row: CountableTask, orgId: string, userId: string): boolean {
   const where = openTasksForUserWhere(orgId, userId);
   return (
