@@ -84,14 +84,17 @@ export function normalizeEntity(entityType: string): TargetEntity | null {
 
 export function asTrimmed(v: unknown): string | null {
   if (v === null || v === undefined) return null;
-  const s = String(v).trim();
+  let s = String(v).trim();
+  // Export prefixes a formula character with one apostrophe so a spreadsheet
+  // will not execute the cell. The stored value is the text without that prefix.
+  if (s.startsWith("'") && /^[=+\-@\t\r]/.test(s.slice(1))) s = s.slice(1);
   return s.length > 0 ? s : null;
 }
 
 export function asInt(v: unknown): number | null {
   const s = asTrimmed(v);
   if (!s || !/\d/.test(s)) return null; // require a digit — "n/a" is not 0
-  const n = Number(s.replace(/[,\s]/g, ''));
+  const n = Number(s.replace(/[,\s%]/g, ''));
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
@@ -278,6 +281,7 @@ async function writeCompany(ctx: WriteCtx, t: Record<string, unknown>): Promise<
     industry: asTrimmed(t['company.industry']),
     employeeCount: asInt(t['company.employeeCount']),
     countryCode: asTrimmed(t['company.countryCode'])?.slice(0, 2).toUpperCase() ?? null,
+    legalName: asTrimmed(t['company.legalName']),
   };
   if (ctx.dedupStrategy !== 'duplicate') {
     const existing = await ctx.tx.company.findFirst({
@@ -340,9 +344,24 @@ async function writeContact(ctx: WriteCtx, t: Record<string, unknown>): Promise<
   return created.id;
 }
 
+/** The leads export writes one Name column. The first space splits it. */
+export function splitLeadName(full: string): { firstName: string; lastName: string } {
+  const space = full.indexOf(' ');
+  if (space === -1) return { firstName: full, lastName: '' };
+  return { firstName: full.slice(0, space), lastName: full.slice(space + 1).trim() };
+}
+
 async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<string | null> {
-  const firstName = asTrimmed(t['lead.firstName']) ?? '';
-  const lastName = asTrimmed(t['lead.lastName']) ?? '';
+  let firstName = asTrimmed(t['lead.firstName']) ?? '';
+  let lastName = asTrimmed(t['lead.lastName']) ?? '';
+  if (!firstName && !lastName) {
+    const full = asTrimmed(t['lead.name']);
+    if (full) {
+      const split = splitLeadName(full);
+      firstName = split.firstName;
+      lastName = split.lastName;
+    }
+  }
   if (!firstName && !lastName) throw new Error('lead first or last name is required');
   const companyName = asTrimmed(t['lead.company']) ?? asTrimmed(t['lead.companyName']) ?? '';
   if (!companyName) throw new Error('lead company is required');

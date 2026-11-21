@@ -22,6 +22,7 @@ export const IMPORT_ENTITIES: { value: ImportEntity; label: string }[] = [
 export const TARGET_FIELDS: Record<ImportEntity, TargetField[]> = {
   company: [
     { key: 'company.name', label: 'Name', required: true },
+    { key: 'company.legalName', label: 'Legal name' },
     { key: 'company.domain', label: 'Domain' },
     { key: 'company.website', label: 'Website' },
     { key: 'company.industry', label: 'Industry' },
@@ -45,6 +46,7 @@ export const TARGET_FIELDS: Record<ImportEntity, TargetField[]> = {
     { key: 'lead.companyName', label: 'Company name' },
     { key: 'lead.status', label: 'Status' },
     { key: 'lead.title', label: 'Job title' },
+    { key: 'lead.name', label: 'Full name' },
     { key: 'lead.phone', label: 'Phone' },
     { key: 'lead.notes', label: 'Notes' },
   ],
@@ -73,6 +75,34 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// Headers written by this app's Export CSV buttons, when they are not already
+// the import field's label. Each list is tried only for a field on the entity
+// being imported, so "Customer" still means the deal's customer on an
+// opportunity file and the contact's company on a contact file.
+const EXPORT_HEADER_ALIASES: Record<string, readonly string[]> = {
+  employees: ['company.employeeCount'],
+  country: ['company.countryCode'],
+  valueeur: ['opportunity.valueMicros'],
+  value: ['opportunity.valueMicros'],
+  duedate: ['opportunity.closeDate'],
+  role: ['contact.title', 'lead.title'],
+  customer: ['contact.companyName'],
+  company: ['lead.companyName', 'contact.companyName'],
+  name: ['lead.name'],
+};
+
+function aliasTarget(
+  header: string,
+  fields: TargetField[],
+  used: Set<string>,
+): string | null {
+  for (const key of EXPORT_HEADER_ALIASES[normalize(header)] ?? []) {
+    if (used.has(key)) continue;
+    if (fields.some((field) => field.key === key)) return key;
+  }
+  return null;
+}
+
 /**
  * Best-effort auto-mapping of CSV headers to target fields by normalized name.
  * A header maps to the first field whose label or key tail it matches; each
@@ -96,6 +126,7 @@ export function autoMap(
         break;
       }
     }
+    if (!match) match = aliasTarget(header, fields, used);
     if (match) used.add(match);
     result[header] = match;
   }

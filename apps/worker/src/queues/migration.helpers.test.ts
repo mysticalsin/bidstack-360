@@ -14,6 +14,7 @@ import {
   mapStage,
   normalizeEntity,
   readOpportunityValue,
+  splitLeadName,
 } from './migration.js';
 
 describe('migration value coercion', () => {
@@ -65,6 +66,11 @@ describe('migration value coercion', () => {
     expect(asTrimmed("'+33 1 23 45 67 89")).toBe('+33 1 23 45 67 89');
     expect(asTrimmed("'=Acme")).toBe('=Acme');
     expect(asTrimmed("O'Brien")).toBe("O'Brien");
+  });
+
+  it('splits the single Name column the leads export writes', () => {
+    expect(splitLeadName('Ada Lovelace')).toEqual({ firstName: 'Ada', lastName: 'Lovelace' });
+    expect(splitLeadName('Ada').lastName).toBe('');
   });
 });
 
