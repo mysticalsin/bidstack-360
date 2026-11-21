@@ -54,6 +54,23 @@ describe('DashboardHero', () => {
     render(<DashboardHero rows={[]} openValue={0} weighted={0} openCount={0} />);
     expect(screen.getByText('No dated bids yet.')).toBeTruthy();
   });
+
+  it('uses the org won-this-year total instead of the rows on screen', () => {
+    // WHY: the hero used to sum the latest 100 opportunities. A book of wins
+    // outside that page showed up as whatever those 100 happened to contain.
+    render(
+      <DashboardHero
+        rows={rows}
+        openValue={11_900_000}
+        weighted={7_100_000}
+        openCount={6}
+        wonThisYear={413_000_000_000}
+        onDrill={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /won this year 413bn/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /won this year 7\.9M/i })).toBeNull();
+  });
 });
 
 describe('filterOpps closeMonth', () => {
