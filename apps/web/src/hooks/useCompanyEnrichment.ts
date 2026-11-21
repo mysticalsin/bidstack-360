@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { usePoloMe } from '@/hooks/usePoloIdentity';
 import { ApiError } from '@/lib/api';
-import { fetchEnrichment, refreshEnrichment } from '@/lib/enrichment/client';
+import { useAuth } from '@/lib/auth';
+import { fetchEnrichment, refreshEnrichment, type EnrichmentDataMode } from '@/lib/enrichment/client';
 import type { CompanyEnrichment } from '@/lib/enrichment/types';
+import { useRuntimeMode } from '@/lib/runtime-mode';
 
 const key = (companyId: string | undefined) => ['company-enrichment', companyId] as const;
 /** After a refresh, poll this long for the worker to land new data. */
@@ -18,10 +21,18 @@ export function awaitingRefresh(d: CompanyEnrichment | undefined, pollUntil: num
 }
 
 export function useCompanyEnrichment(companyId: string | undefined, opts: { pollUntil?: number } = {}) {
+  const { isSignedIn } = useAuth();
+  const me = usePoloMe(isSignedIn);
+  const runtime = useRuntimeMode();
+  // /me is the org's resolved mode. The public identity is the boot snapshot,
+  // which stays real until that override is known. Anything other than demo is real.
+  const dataMode: EnrichmentDataMode =
+    (isSignedIn ? me.data?.dataMode : runtime?.dataMode) === 'demo' ? 'demo' : 'real';
+  const modeKnown = !isSignedIn || me.isFetched || me.isError;
   return useQuery({
-    queryKey: key(companyId),
-    queryFn: ({ signal }) => fetchEnrichment(companyId!, signal),
-    enabled: Boolean(companyId),
+    queryKey: [...key(companyId), dataMode],
+    queryFn: ({ signal }) => fetchEnrichment(companyId!, dataMode, signal),
+    enabled: Boolean(companyId) && modeKnown,
     staleTime: 5 * 60_000,
     retry: (n, err) => n < 2 && !(err instanceof ApiError && (err.status === 404 || err.status === 403)),
     refetchInterval: (q) => {
