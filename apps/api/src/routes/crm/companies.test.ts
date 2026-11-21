@@ -31,6 +31,12 @@ beforeAll(async () => {
   const iso = await createIsolatedOrg('crm-companies');
   orgId = iso.orgId;
   restoreAuth = useIsolatedOrgAuth(iso.clerkOrg);
+  // The labelled Mantu house account is a demo fixture. Real mode hides it.
+  await prisma.orgSettings.upsert({
+    where: { orgId },
+    create: { orgId, demoData: true },
+    update: { demoData: true, deletedAt: null },
+  });
 
   await prisma.companyEnrichment.deleteMany({
     where: { orgId, normalizedName: TEST_NORMALIZED },
@@ -77,6 +83,21 @@ describe('crm companies routes', () => {
     const body = res.json();
     expect(Array.isArray(body.items)).toBe(true);
     expect(body.items.length).toBeGreaterThan(0);
+  });
+
+  skipIfNoDb('real mode hides the Mantu house account', async () => {
+    await prisma.orgSettings.update({ where: { orgId: orgId! }, data: { demoData: false } });
+    try {
+      const search = await server.inject({ method: 'GET', url: '/api/crm/companies/search?q=Mantu' });
+      expect(search.statusCode).toBe(200);
+      expect(search.json().items.some((c: { name: string }) => c.name === 'Mantu')).toBe(false);
+      const lookup = await server.inject({ method: 'GET', url: '/api/crm/companies/lookup?name=Mantu' });
+      expect(lookup.statusCode).toBe(200);
+      expect(lookup.json().match).toBe('none');
+      expect(lookup.json().company).toBeNull();
+    } finally {
+      await prisma.orgSettings.update({ where: { orgId: orgId! }, data: { demoData: true } });
+    }
   });
 
   skipIfNoDb('GET /api/crm/companies/search?q= filters by query', async () => {

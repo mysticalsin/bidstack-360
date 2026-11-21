@@ -23,6 +23,7 @@ import {
   type RuntimeEnv,
 } from '@bidstack/shared';
 
+import { showsDemoNumbers } from '../../lib/runtime-request.js';
 import { buildCompanies } from './company-enrichment.service.js';
 import { buildCockpit, type AccountPerformance } from './dashboard.cockpit.js';
 
@@ -252,7 +253,8 @@ export async function getCompaniesOnly(
     scope && !scope.unrestricted
       ? new Set(opportunities.map((opportunity) => normalizeName(opportunity.customer)))
       : null;
-  return buildCompanies(opportunities, enrichments).filter(
+  const showHouse = await showsDemoNumbers(orgId).catch(() => false);
+  return buildCompanies(opportunities, enrichments, [], showHouse).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
 }
@@ -274,11 +276,12 @@ export async function resolveCockpitCompany(
   prisma: PrismaClient,
 ): Promise<z.infer<typeof CrmCompany> | null> {
   const isUuid = UUID_RE.test(companyId);
+  const showHouse = await showsDemoNumbers(orgId).catch(() => false);
   const enrichment = await prisma.companyEnrichment.findFirst({
     where: { orgId, deletedAt: null, ...(isUuid ? { id: companyId } : { normalizedName: companyId }) },
     select: ENRICHMENT_SELECT,
   });
-  if (enrichment) return buildCompanies([], [enrichment])[0] ?? null;
+  if (enrichment) return buildCompanies([], [enrichment], [], showHouse)[0] ?? null;
   if (isUuid) {
     // A UUID that isn't an enrichment may be a Company-table row (manual / key /
     // top account). Resolve it so the cockpit doesn't 404; merge its by-name
@@ -293,13 +296,14 @@ export async function resolveCockpitCompany(
       select: ENRICHMENT_SELECT,
     });
     const list = byNameEnrichment
-      ? buildCompanies([], [byNameEnrichment], [company])
+      ? buildCompanies([], [byNameEnrichment], [company], showHouse)
       : buildCompanies(
           [{ customer: company.name, industry: null, logoUrl: company.logoUrl, updatedAt: new Date() }],
           [],
           [company],
+          showHouse,
         );
-    // buildCompanies always appends a Mantu fallback and sorts by name, so pick by
+    // buildCompanies sorts by name and, in demo mode, appends a Mantu fallback, so pick by
     // identity, not position. An enrichment keeps its id unless its display name
     // matches the Company row, in which case the row's id is stamped on it.
     const resolved =
@@ -322,7 +326,7 @@ export async function resolveCockpitCompany(
     distinct: ['customer'],
     take: 1000,
   });
-  return buildCompanies(opportunities, []).find((c) => c.id === companyId) ?? null;
+  return buildCompanies(opportunities, [], [], showHouse).find((c) => c.id === companyId) ?? null;
 }
 
 // ─── Per-company cockpit query ────────────────────────────────────────────────
