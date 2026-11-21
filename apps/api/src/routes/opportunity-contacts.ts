@@ -96,7 +96,14 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       // One row past the contacts the deal list draws. The extra row is the
       // probe. It is not a shown contact, and it is not a total.
       const loaded = await prisma.opportunityContact.findMany({
-        where: { opportunityId: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+        // contact.deletedAt is a relation filter. The soft-delete middleware
+        // does not apply inside include, so a tombstoned buyer stayed on the deal.
+        where: {
+          opportunityId: req.params.id,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          contact: { deletedAt: null },
+        },
         include: {
           contact: { select: { id: true, name: true, email: true, phone: true, role: true } },
         },
