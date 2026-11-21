@@ -18,7 +18,7 @@ export function legacyRoleForSystemRole(role: SystemRoleName): AllowedUser['lega
 
 /**
  * Parse `POLO_ALLOWED_USERS` (`email:Role,email:Role`).
- * An entry may name a whole domain as `@domain:Role` (e.g. `@amaris.com:Sales Manager`);
+ * An entry may name a whole domain as `@domain:Role` (e.g. `@example.test:Sales Manager`);
  * the domain must match exactly. A named email always wins over its domain rule.
  * Role must be a seeded system role name (Admin, Sales Manager, …).
  */

@@ -69,9 +69,9 @@ describe('externalParticipants on a free mail domain', () => {
 describe('externalParticipants', () => {
   it('drops the mailbox owner, colleagues on the same domain, blanks and duplicates', () => {
     expect(
-      externalParticipants('tony@amaris.com', [
-        'Tony@Amaris.com',
-        'colleague@amaris.com',
+      externalParticipants('tony@example.test', [
+        'Tony@example.test',
+        'colleague@example.test',
         'buyer@acme.com',
         'BUYER@acme.com',
         '',
@@ -88,7 +88,7 @@ describe('resolveCaptureTarget', () => {
       openOpps: { 'company-1': ['opp-1'] },
     });
     const target = await resolveCaptureTarget(
-      { orgId, ownerEmail: 'tony@amaris.com', participants: ['tony@amaris.com', 'Buyer@Acme.com'] },
+      { orgId, ownerEmail: 'tony@example.test', participants: ['tony@example.test', 'Buyer@Acme.com'] },
       db,
     );
     expect(target).toEqual({
@@ -104,7 +104,7 @@ describe('resolveCaptureTarget', () => {
   it('falls back to the account by domain when no contact matches', async () => {
     const db = fakeDb({ companies: [{ id: 'company-2', domain: 'acme.com' }] });
     const target = await resolveCaptureTarget(
-      { orgId, ownerEmail: 'tony@amaris.com', participants: ['new.person@mail.acme.com'] },
+      { orgId, ownerEmail: 'tony@example.test', participants: ['new.person@mail.acme.com'] },
       db,
     );
     expect(target).toEqual({
@@ -131,7 +131,7 @@ describe('resolveCaptureTarget', () => {
   it('never matches free mail domains to an account', async () => {
     const db = fakeDb({ companies: [{ id: 'company-4', domain: 'gmail.com' }] });
     const target = await resolveCaptureTarget(
-      { orgId, ownerEmail: 'tony@amaris.com', participants: ['someone@gmail.com'] },
+      { orgId, ownerEmail: 'tony@example.test', participants: ['someone@gmail.com'] },
       db,
     );
     expect(target).toBeNull();
@@ -141,7 +141,7 @@ describe('resolveCaptureTarget', () => {
   it('returns null without querying when only colleagues took part', async () => {
     const db = fakeDb({});
     const target = await resolveCaptureTarget(
-      { orgId, ownerEmail: 'tony@amaris.com', participants: ['a@amaris.com', 'b@amaris.com'] },
+      { orgId, ownerEmail: 'tony@example.test', participants: ['a@example.test', 'b@example.test'] },
       db,
     );
     expect(target).toBeNull();

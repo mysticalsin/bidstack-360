@@ -25,8 +25,8 @@ export function normalizeEmail(value) {
 
 /**
  * True when `email` is listed exactly, or its domain is listed as `@domain`.
- * Domains match exactly: `@amaris.com` does not admit `sub.amaris.com` or
- * `evil-amaris.com`.
+ * Domains match exactly: `@example.test` does not admit `sub.example.test` or
+ * `not-example.test`.
  */
 export function isAllowed(email, allowList) {
   if (!email) return false;

@@ -103,6 +103,7 @@ async function verifyAccess(req, env) {
     new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
   );
   if (!ok) return null;
+  if (!env.ACCESS_AUD) return null;
   const now = Math.floor(Date.now() / 1000);
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   if (
@@ -119,6 +120,11 @@ async function verifyAccess(req, env) {
 
 function otpEnabled(env) {
   return Boolean(env.SESSION_SECRET && env.OTP_EMAIL && env.OTP_FROM);
+}
+
+// A deploy that omits these secrets must not serve the app with a demoted admin list.
+function accessIdentityReady(env) {
+  return Boolean(env.ACCESS_AUD && String(env.POLO_ADMIN_EMAILS || '').trim());
 }
 
 async function identify(req, env) {
@@ -346,6 +352,9 @@ export default {
         return new Response('unauthorized', { status: 401 });
       }
       return env.RELAY.get(env.RELAY.idFromName('box')).fetch(req);
+    }
+    if (!accessIdentityReady(env)) {
+      return new Response('Forbidden: Cloudflare Access sign-in required', { status: 403 });
     }
     const who = await identify(req, env);
     if (url.pathname.startsWith('/__auth/')) return handleAuth(req, env, url, who);
