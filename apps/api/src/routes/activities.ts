@@ -22,6 +22,7 @@ import {
   logActivity,
   getTimeline,
   activityCursorWhere,
+  activityListSkip,
   encodeActivityCursor,
 } from '../services/activity.service.js';
 import type { ActivityEventType } from '../services/activity.service.js';
@@ -164,7 +165,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
           // unique, and ties at a page boundary were permanently skipped.
           orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
           take: limit,
-          skip: offset,
+          skip: activityListSkip(cursor, offset),
           // Narrow select matching ActivityRow exactly — serializeActivity's
           // param type below fails to compile if this list ever drops a field
           // the serializer needs, so it can't silently drift out of sync.

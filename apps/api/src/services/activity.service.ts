@@ -88,6 +88,15 @@ export function encodeActivityCursor(row: { occurredAt: Date; id: string }): str
   return `${row.occurredAt.toISOString()}|${row.id}`;
 }
 
+/**
+ * Offset and a cursor both move the page. Applying both skips twice: the
+ * cursor already starts after the previous page, and `skip: offset` jumps
+ * that many more rows. A cursor wins. Offset is only for the no-cursor page.
+ */
+export function activityListSkip(cursor: string | undefined, offset: number): number {
+  return cursor ? 0 : offset;
+}
+
 export function activityCursorWhere(cursor: string): Prisma.ActivityWhereInput {
   const sep = cursor.indexOf('|');
   // Legacy bare-ISO cursors (issued before the tiebreaker existed) degrade to
