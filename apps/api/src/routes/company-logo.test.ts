@@ -63,3 +63,46 @@ describe('GET /logo negative cache', () => {
     expect(miss.mock.calls.length).toBe(calls);
   });
 });
+
+describe('GET /logo outbound fetch (F-03, F-13)', () => {
+  it('does not follow a provider redirect onto the metadata service', async () => {
+    const requests: string[] = [];
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      const target = String(url);
+      requests.push(target);
+      if (target.startsWith('https://www.google.com/s2/favicons')) {
+        // The runtime follows when redirect is omitted or 'follow'. That is the bug.
+        if ((init?.redirect ?? 'follow') === 'follow') {
+          requests.push('http://169.254.169.254/latest/meta-data/');
+          return new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } });
+        }
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location: 'http://169.254.169.254/latest/meta-data/',
+            'content-type': 'image/png',
+          },
+        });
+      }
+      return new Response('', { status: 404 });
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/api/v1/logo?domain=brand.attacker.com' });
+    expect(res.statusCode).toBe(404);
+    expect(requests).not.toContain('http://169.254.169.254/latest/meta-data/');
+  });
+
+  it('does not serve an SVG script as an inline image document', async () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script>${'<!-- pad -->'.repeat(20)}</svg>`;
+    vi.stubGlobal(
+      'fetch',
+      async () => new Response(svg, { status: 200, headers: { 'content-type': 'image/svg+xml' } }),
+    );
+    const res = await app.inject({ method: 'GET', url: '/api/v1/logo?tech=script-icon' });
+    const disposition = String(res.headers['content-disposition'] ?? '');
+    const csp = String(res.headers['content-security-policy'] ?? '');
+    const held = res.statusCode === 404 || (disposition.includes('attachment') && csp.includes("default-src 'none'"));
+    expect(held).toBe(true);
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+});
