@@ -50,6 +50,20 @@ describe('DashboardHero', () => {
     expect(screen.getByRole('rowheader', { name: 'Sep 2026' })).toBeTruthy();
   });
 
+  it('says the monthly bars are the latest bids when the hero is given a sample', () => {
+    render(
+      <DashboardHero
+        rows={rows}
+        openValue={11_900_000}
+        weighted={7_100_000}
+        openCount={6}
+        wonThisYear={412_990_241_967}
+        monthlySample={100}
+      />,
+    );
+    expect(screen.getByText(/latest 100 bids, not the whole book/i)).toBeTruthy();
+  });
+
   it('shows an empty state without dated bids', () => {
     render(<DashboardHero rows={[]} openValue={0} weighted={0} openCount={0} />);
     expect(screen.getByText('No dated bids yet.')).toBeTruthy();

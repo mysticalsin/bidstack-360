@@ -13,7 +13,7 @@ import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useForecastProjection } from '@/hooks/useForecasts';
-import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { OPPORTUNITY_VIZ_LIMIT, useOpportunityRows } from '@/hooks/useOpportunityRows';
 import { useWatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { springSoft } from '@/lib/motion';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
@@ -252,6 +252,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
             weighted={pipelineReport.data?.weightedPipeline ?? 0}
             openCount={s?.openOpportunities ?? 0}
             wonThisYear={s?.wonThisYear}
+            monthlySample={OPPORTUNITY_VIZ_LIMIT}
             feed={feed.data}
             onDrill={setDrill}
             rowsPending={opps.isLoading}
