@@ -17,7 +17,7 @@ import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
-import { isDueOn, isOverdueOn, resolveTaskTimeZone, summaryToday } from '@bidstack/shared';
+import { civilDay } from '@bidstack/shared';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { useTaskOrder } from '@/stores/taskOrder';
 import { Select } from '@/components/ui/Select';
@@ -82,26 +82,25 @@ export function TasksPage() {
   const [isFilterPending, startFilterTransition] = useTransition();
   const [taskOrderMessage, setTaskOrderMessage] = useState('');
 
-  const civilDay =
-    taskSummary.data?.civilToday ??
-    summaryToday(new Date(), resolveTaskTimeZone(taskSummary.data?.timeZone));
+  const today =
+    taskSummary.data?.civilToday ?? civilDay(new Date(), taskSummary.data?.timeZone);
   const filteredItems = useMemo(() => {
     const all = data?.items ?? [];
     return all.filter((t) => {
       if (filter === 'all') return true;
       if (filter === 'today') {
-        // Same civil day the summary counted, including 22:00 in the org zone
-        // when UTC has already moved to the next date.
-        return isDueOn(t.dueDate, civilDay) && t.status !== 'done';
+        // Same civil day the summary counted. 22:00 in São Paulo is still
+        // that local date even though UTC has moved to the next day.
+        return t.dueDate === today && t.status !== 'done';
       }
       if (filter === 'overdue') {
-        return isOverdueOn(t.dueDate, civilDay) && t.status !== 'done';
+        return t.dueDate !== null && t.dueDate < today && t.status !== 'done';
       }
       // Concrete statuses are already narrowed server-side; this is a no-op
       // guard for the loaded page.
       return t.status === filter;
     });
-  }, [civilDay, data?.items, filter]);
+  }, [data?.items, filter, today]);
 
   // Sort. Default 'natural' = server order (createdAt desc on the backend).
   // 'due' sorts asc with nulls last so overdue surfaces at the top of the

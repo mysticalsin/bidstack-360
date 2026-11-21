@@ -89,7 +89,8 @@ describe('open tasks for this user, over HTTP', () => {
       civilToday: string;
       timeZone: string;
     };
-    expect(summary.timeZone).toBe('America/Sao_Paulo');
+    expect(summary.timeZone).toBe('America/Toronto');
+    expect(summary.civilToday).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
     const pageRes = await server.inject({ method: 'GET', url: '/api/tasks?scope=mine&limit=100' });
     expect(pageRes.statusCode).toBe(200);

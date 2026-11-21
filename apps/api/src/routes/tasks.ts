@@ -4,9 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
 import {
-  addCivilDays,
-  resolveTaskTimeZone,
-  summaryToday,
+  resolveTimeZone,
   Task,
   TaskCreate,
   TaskFilter,
@@ -17,7 +15,15 @@ import {
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
-import { openTasksForUserWhere } from './open-tasks-for-user.js';
+import { openTasksForUserWhere, taskSummaryToday } from './open-tasks-for-user.js';
+
+function addCivilDays(iso: string, days: number): string {
+  const [year, month, day] = iso.split('-').map((part) => Number(part));
+  const shifted = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, (day ?? 1) + days));
+  const monthText = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const dayText = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${shifted.getUTCFullYear()}-${monthText}-${dayText}`;
+}
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
 type TaskRollup = Omit<TaskSummaryPayload, 'openForUser' | 'civilToday' | 'timeZone'>;
@@ -27,8 +33,8 @@ async function taskClock(orgId: string, now = new Date()): Promise<{ timeZone: s
     where: { orgId, deletedAt: null },
     select: { timezone: true },
   });
-  const timeZone = resolveTaskTimeZone(row?.timezone);
-  return { timeZone, today: summaryToday(now, timeZone) };
+  const timeZone = resolveTimeZone(row?.timezone);
+  return { timeZone, today: taskSummaryToday(now, timeZone) };
 }
 
 async function buildTaskSummary(orgId: string, userId: string): Promise<TaskSummaryPayload> {

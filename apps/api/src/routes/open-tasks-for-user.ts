@@ -1,3 +1,5 @@
+import { civilDay } from '@bidstack/shared';
+
 // Open-task counting for the nav badge and the Tasks page.
 //
 // One predicate — openTasksForUserWhere — decides membership. The badge count
@@ -34,12 +36,12 @@ export function openTasksForUserWhere(orgId: string, userId: string): {
 }
 
 /**
- * Day the summary compares due dates against. Still the UTC date, so
- * 2026-11-21T01:00:00Z (22:00 on Nov 20 in America/Sao_Paulo) treats a task
- * due Nov 20 as overdue.
+ * Day the summary compares due dates against: `civilDay` in the org timezone.
+ * 2026-11-21T01:00:00Z is 22:00 on Nov 20 in America/Sao_Paulo, so a task due
+ * Nov 20 is due today, not overdue.
  */
-export function taskSummaryToday(now: Date, _orgTimeZone?: string | null): string {
-  return now.toISOString().slice(0, 10);
+export function taskSummaryToday(now: Date, orgTimeZone?: string | null): string {
+  return civilDay(now, orgTimeZone);
 }
 
 export function isOpenTaskForUser(row: CountableTask, orgId: string, userId: string): boolean {
