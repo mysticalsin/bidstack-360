@@ -4,6 +4,7 @@ import {
   csvRow,
   fileHash,
   holdAdvisory,
+  flushRateLimits,
   http,
   listeningPid,
   messageOf,
@@ -20,8 +21,7 @@ function q(value) {
 }
 
 export async function scenarioB11() {
-  const keys = redis(['--scan', '--pattern', '*rate-limit*']).split('\n').filter(Boolean);
-  for (const key of keys) redis(['DEL', key]);
+  flushRateLimits();
   const statuses = [];
   for (let i = 0; i < 11; i++) {
     const res = await http('POST', '/api/v1/migrations/start-csv', {
@@ -56,6 +56,7 @@ export async function scenarioB11() {
 }
 
 export async function scenarioSameFile() {
+  flushRateLimits();
   const name = `Same ${Date.now()}`;
   const body = csvRow(name);
   const [a, b] = await Promise.all([
@@ -88,6 +89,7 @@ export async function scenarioSameFile() {
 }
 
 export async function scenarioDifferentFiles() {
+  flushRateLimits();
   const stamp = Date.now();
   const [a, b] = await Promise.all([
     http('POST', '/api/v1/migrations/start-csv', { body: csvRow(`Left ${stamp}`), timeoutMs: 20_000 }),
@@ -128,6 +130,7 @@ export function dropClaimDelay() {
 }
 
 export async function scenarioC2B() {
+  flushRateLimits();
   installClaimDelay();
   const lock = holdAdvisory();
   const name = `C2B ${Date.now()}`;
@@ -213,14 +216,20 @@ async function stopListener(port) {
   return { before, after: afterPid, gone: afterPid == null };
 }
 
-function startWorker() {
-  const tmux = '/exec-daemon/tmux.portal.conf';
-  const cmd =
-    'export PATH="$HOME/.nvm/versions/node/v24.22.3/bin:$PATH"; set -a; source /tmp/stress.env; set +a; cd /agent/repos/bidstack-360; pnpm --filter @bidstack/worker exec tsx src/main.ts';
-  spawn('tmux', ['-f', tmux, 'send-keys', '-t', 'bidstack-worker:0.0', cmd, 'C-m'], { stdio: 'ignore' });
+export function startWorker() {
+  const child = spawn(
+    'bash',
+    [
+      '-lc',
+      'set -a; source /tmp/stress.env; set +a; export PATH="$HOME/.nvm/versions/node/v24.22.3/bin:$PATH"; cd /agent/repos/bidstack-360; exec pnpm --filter @bidstack/worker exec tsx src/main.ts',
+    ],
+    { detached: true, stdio: 'ignore' },
+  );
+  child.unref();
 }
 
 export async function scenarioR1E() {
+  flushRateLimits();
   const stopped = await stopListener(4002);
   const name = `R1E ${Date.now()}`;
   const started = await http('POST', '/api/v1/migrations/start-csv', {
@@ -290,6 +299,7 @@ export async function scenarioR1E() {
 }
 
 export async function scenarioD2() {
+  flushRateLimits();
   const name = `D2 ${Date.now()}`;
   const started = await http('POST', '/api/v1/migrations/start-csv', {
     body: csvRow(name),
@@ -383,6 +393,7 @@ export async function scenarioDoubleCreate() {
 }
 
 export async function scenarioCancelKey() {
+  flushRateLimits();
   const name = `CancelKey ${Date.now()}`;
   const started = await http('POST', '/api/v1/migrations/start-csv', {
     body: csvRow(name),

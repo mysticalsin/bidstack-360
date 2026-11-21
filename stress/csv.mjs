@@ -1,4 +1,4 @@
-import { CAPS, http, listeningPid, psql, rssBytes, sleep, zipBomb } from './lib.mjs';
+import { CAPS, flushRateLimits, http, listeningPid, psql, rssBytes, sleep, zipBomb } from './lib.mjs';
 
 function rows(count) {
   const out = new Array(count);
@@ -21,6 +21,7 @@ async function peakRss(pid, fn) {
 }
 
 export async function scenarioCsv() {
+  flushRateLimits();
   const api = listeningPid(4000);
   const worker = listeningPid(4002);
   const workerBefore = rssBytes(worker);

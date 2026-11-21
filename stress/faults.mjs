@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 
+import { startWorker } from './hammer.mjs';
 import {
   CAPS,
   http,
@@ -127,11 +128,7 @@ export async function scenarioFaults() {
   const tasksPg = await http('GET', '/api/v1/tasks?limit=1', { timeoutMs: 5_000 });
   const pgRecoverMs = readyPgUp ? Date.now() - pgBackAt : null;
   if (!listeningPid(4002)) {
-    const cmd =
-      'export PATH="$HOME/.nvm/versions/node/v24.22.3/bin:$PATH"; set -a; source /tmp/stress.env; set +a; cd /agent/repos/bidstack-360; pnpm --filter @bidstack/worker exec tsx src/main.ts';
-    spawn('tmux', ['-f', '/exec-daemon/tmux.portal.conf', 'send-keys', '-t', 'bidstack-worker:0.0', cmd, 'C-m'], {
-      stdio: 'ignore',
-    });
+    startWorker();
     await waitFor(async () => listeningPid(4002), 30_000);
   }
   const running = psql(

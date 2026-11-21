@@ -118,7 +118,11 @@ async function main() {
     console.error('run', name);
     const value = await guard(name, fn);
     results.push(value);
-    console.error('done', name, value?.pass, value?.expectedFailUntil ?? '');
+    writeFileSync(
+      join(repo, 'stress/LAST-RUN.json'),
+      JSON.stringify({ head: headSha(), partial: true, results }, null, 2) + '\n',
+    );
+    console.error('done', name, value?.pass, value?.expectedFailUntil ?? '', JSON.stringify(value).slice(0, 500));
   }
   dropClaimDelay();
   const report = {

@@ -57,6 +57,13 @@ export function redis(args) {
   return execFileSync('redis-cli', ['-p', REDIS_PORT, ...args], { encoding: 'utf8' }).trim();
 }
 
+/** Route limits share Redis with the global bucket. Clear them between cases. */
+export function flushRateLimits() {
+  const keys = redis(['--scan', '--pattern', 'fastify-rate-limit-*']).split('\n').filter(Boolean);
+  for (const key of keys) redis(['DEL', key]);
+  return keys.length;
+}
+
 export function alive(pid) {
   if (!pid) return false;
   try {
