@@ -1212,7 +1212,8 @@
     "error": {
       "noDataRows": "Ce fichier ne contient aucune ligne de données.",
       "tooManyRows": "Ce fichier compte {{count}} lignes — la limite est de {{limit}}.",
-      "unreadable": "Impossible de lire ce fichier. Assurez-vous qu'il s'agit d'un CSV UTF-8."
+      "unreadable": "Impossible de lire ce fichier. Assurez-vous qu'il s'agit d'un CSV UTF-8.",
+      "tooLarge": "Ce fichier est trop volumineux pour être importé."
     },
     "upload": {
       "entityLabel": "Que souhaitez-vous importer ?",

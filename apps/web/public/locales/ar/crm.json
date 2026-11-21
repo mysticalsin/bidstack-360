@@ -1,5 +1,8 @@
 {
   "csvImport": {
+    "error": {
+      "tooLarge": "هذا الملف أكبر من أن يُستورد."
+    },
     "progress": {
       "starting": "جارٍ بدء الاستيراد…",
       "statusComplete": "اكتمل الاستيراد",

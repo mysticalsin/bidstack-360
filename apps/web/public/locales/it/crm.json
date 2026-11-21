@@ -1127,7 +1127,8 @@
     "error": {
       "noDataRows": "Quel file non contiene righe di dati.",
       "tooManyRows": "Quel file ha {{count}} righe — il limite è {{limit}}.",
-      "unreadable": "Impossibile leggere quel file. Assicurati che sia un CSV UTF-8."
+      "unreadable": "Impossibile leggere quel file. Assicurati che sia un CSV UTF-8.",
+      "tooLarge": "Questo file è troppo grande per essere importato."
     },
     "upload": {
       "entityLabel": "Cosa stai importando?",
