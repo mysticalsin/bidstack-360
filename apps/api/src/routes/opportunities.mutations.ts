@@ -84,8 +84,18 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         ownerId = null;
       }
 
-      // Auto-assign territory from country if not explicitly provided
+      // Auto-assign territory from country if not explicitly provided.
+      // An explicit id is a global FK, so it has to be this org's live territory.
+      // Otherwise the deal stores the other org's id and the response returns
+      // that territory's name.
       let territoryId: string | null | undefined = body.territoryId;
+      if (typeof body.territoryId === 'string') {
+        const ownedTerritory = await prisma.territory.findFirst({
+          where: { id: body.territoryId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!ownedTerritory) throw server.httpErrors.badRequest('Invalid territory');
+      }
       if (needsTerritoryLookup && territory) {
         territoryId = territory.id;
       }
