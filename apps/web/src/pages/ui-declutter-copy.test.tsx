@@ -275,6 +275,29 @@ describe('pipeline and accounts helper copy', () => {
     expect(card.getAttribute('href')).toBe('/opportunities/33333333-3333-4333-8333-333333333333');
   });
 
+  it('does not call a list that has not loaded an empty book', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <OppPageHeader
+            search={undefined}
+            stageFilter={null}
+            stageOptions={[STAGE_1]}
+            itemCount={0}
+            countReady={false}
+            hasData={false}
+            onClearSearch={vi.fn()}
+            onClearStageFilter={vi.fn()}
+            onExportCsv={vi.fn()}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByText('0 bids in flight')).toBeNull();
+    expect(screen.getByText('Loading opportunities…')).toBeTruthy();
+  });
+
   it.each([0, 1, 6])('drops the inline-edit sentence and keeps %s bids in flight', (count) => {
     renderHeader(count);
     expect(screen.queryByText(INLINE_HELPER)).toBeNull();

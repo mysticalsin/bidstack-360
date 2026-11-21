@@ -263,11 +263,15 @@ export function CompaniesPage() {
         <div>
           <h1 className="page-title">{t('companies.title', 'Companies')}</h1>
           <p className="page-sub">
-            {items.length === 1
-              ? t('companies.subtitleOne', '{{count}} company visible.', { count: items.length })
-              : t('companies.subtitleMany', '{{count}} companies visible.', {
-                  count: items.length,
-                })}
+            {companies.isLoading
+              ? t('companies.loading', 'Loading companies…')
+              : companies.isError
+                ? t('companies.error.title', 'Failed to load companies')
+                : items.length === 1
+                  ? t('companies.subtitleOne', '{{count}} company visible.', { count: items.length })
+                  : t('companies.subtitleMany', '{{count}} companies visible.', {
+                      count: items.length,
+                    })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -289,6 +293,7 @@ export function CompaniesPage() {
         </div>
       </header>
 
+      {!companies.isLoading && !companies.isError ? (
       <section
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
         aria-label={t('companies.summaryAriaLabel', 'Company list summary')}
@@ -303,6 +308,7 @@ export function CompaniesPage() {
           </Card>
         ))}
       </section>
+      ) : null}
 
       <Card className="overflow-hidden">
         <div className="card-body flex flex-wrap items-center justify-between gap-3 pt-4">

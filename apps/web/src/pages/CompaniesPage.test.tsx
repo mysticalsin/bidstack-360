@@ -115,6 +115,24 @@ describe('CompaniesPage — companies:write gating', () => {
     expect(screen.queryByRole('button', { name: /Add company/i })).toBeNull();
   });
 
+  it('does not describe a failed load as zero companies', () => {
+    // WHY: a 400 or 500 used to leave the header and the four tiles at 0,
+    // which reads as the book being empty, next to the error.
+    vi.mocked(useHasAdminPermission).mockReturnValue(true);
+    mockCompanies({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('body/name Required'),
+    });
+
+    renderWithProviders(<CompaniesPage />);
+
+    expect(screen.queryByText(/0 companies visible/)).toBeNull();
+    expect(screen.queryByText('Visible companies')).toBeNull();
+    expect(screen.getAllByText('Failed to load companies').length).toBeGreaterThan(0);
+  });
+
   it('checks the admin+permission gate, not just the permission grant', () => {
     // A non-admin holding the raw companies:write grant must still see the
     // controls hidden — the server 403s them regardless (requireRole('admin')
