@@ -19,7 +19,7 @@ Screenshots below are from that physical pass (the first failing pass, where a b
 | Severity | New (not a duplicate) | Fixed here | Duplicate of an open PR | Blocked | Still open |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | High | 1 | 1 | 0 | 0 | 0 |
-| Medium | 3 | 1 | 5 | 1 | 1 |
+| Medium | 3 | 2 | 5 | 1 | 0 |
 | Low | 0 | 0 | 4 | 0 | 0 |
 
 Journeys that behaved correctly are not counted as findings.
@@ -61,7 +61,7 @@ Journeys that behaved correctly are not counted as findings.
 
 ### 3. Medium — Proposal name cannot be clicked on a phone
 
-- **Status:** not fixed. The shared data table (`apps/web/src/components/table-kit/data-table.tsx`) paints the stage cell over the name link at 390px, so a normal click hits "Draft". Opening the row needs a forced click. Changing that table changes every list, so this sweep did not patch it.
+- **Status:** fixed in https://github.com/mysticalsin/bidstack-360/pull/407 (`4b415c0f`). The shared table grows to its columns (`w-max min-w-full`) and scrolls, so the name column is no longer 0px wide and a normal click opens the proposal.
 - **Steps:** At 390px, Proposals → click the new proposal's name.
 - **Expected:** The click hits the proposal link.
 - **Actual:** Playwright reports the Draft cell intercepts the pointer. The link's box is covered.
@@ -152,6 +152,7 @@ Journeys that behaved correctly are not counted as findings.
 | Finding | PR | Head | What changed |
 | --- | --- | --- | --- |
 | 1 | https://github.com/mysticalsin/bidstack-360/pull/401 | `021d420e` | Stage and industry options use `formatStage`. An empty customer says "Choose a customer." |
-| 2 | https://github.com/mysticalsin/bidstack-360/pull/402 | `b60efc31` | Sign out keeps `tb-signout-keep` so the phone and tablet rules no longer set `display: none` on it |
+| 2 | https://github.com/mysticalsin/bidstack-360/pull/402 | `12562855` | Sign out keeps `tb-signout-keep` so the phone and tablet rules no longer set `display: none` on it |
+| 3 | https://github.com/mysticalsin/bidstack-360/pull/407 | `4b415c0f` | The shared table uses `w-max min-w-full`, so the name column keeps a width and a normal click hits the link |
 
 The journey gate is `pnpm e2e:journeys`.
