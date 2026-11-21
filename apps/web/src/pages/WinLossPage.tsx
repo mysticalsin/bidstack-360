@@ -88,7 +88,9 @@ export default function WinLossPage() {
       { value: '', label: t('winLoss.allOwners', 'All owners') },
       ...(users.data ?? []).map((u) => ({
         value: u.id,
-        label: u.deletedAt ? t('winLoss.formerOwner', '{{name}} (former)', { name: u.name ?? u.email }) : (u.name ?? u.email),
+        label: u.deletedAt
+          ? t('winLoss.formerOwner', '{{name}} (former)', { name: u.name ?? u.email ?? '' })
+          : (u.name ?? u.email ?? ''),
       })),
     ],
     [users.data, t],

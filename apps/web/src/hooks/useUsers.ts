@@ -5,9 +5,12 @@ import { toast } from '@/components/ui/Toast';
 interface OrgUser {
   id: string;
   name: string | null;
-  email: string;
-  role: string;
-  createdAt: string;
+  /** Null until the user row stores an image. Present on the list so pickers can reserve the slot. */
+  avatarUrl?: string | null;
+  /** Omitted unless the caller has users:read. */
+  email?: string;
+  role?: string;
+  createdAt?: string;
   /** Set only when the list was fetched with includeDeleted (former member). */
   deletedAt?: string | null;
 }

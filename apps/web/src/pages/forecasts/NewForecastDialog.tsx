@@ -15,7 +15,7 @@ import type { Forecast } from '@bidstack/shared';
 import { CATEGORIES, CATEGORY_LABELS } from './forecastsConfig';
 
 interface NewForecastDialogProps {
-  users: Array<{ id: string; name: string | null; email: string }>;
+  users: Array<{ id: string; name: string | null; email?: string }>;
   onClose: () => void;
   onSubmit: (body: {
     period: string;
@@ -68,7 +68,7 @@ export function NewForecastDialogContent({
           onChange={(e) => setOwnerId(e.target.value)}
           options={[
             { value: '', label: t('newForecast.ownerPlaceholder', 'Select owner…') },
-            ...users.map((u) => ({ value: u.id, label: u.name ?? u.email })),
+            ...users.map((u) => ({ value: u.id, label: u.name ?? u.email ?? '' })),
           ]}
         />
         <div className="grid grid-cols-2 gap-3">
