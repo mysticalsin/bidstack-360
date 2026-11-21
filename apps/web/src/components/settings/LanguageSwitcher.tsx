@@ -1,7 +1,7 @@
-// LanguageSwitcher — lets the user pick their UI language (EN | FR | ES | PT | IT | 中文).
+// LanguageSwitcher — lets the user pick their UI language (EN | FR | ES | PT | IT | 中文 | عربي).
 // Persists the choice to localStorage + cookie (bidstack-locale) so both the
 // i18next LanguageDetector and the API Accept-Language middleware pick it up.
-// Updates <html lang> immediately for screen-reader accuracy.
+// Updates <html lang> and dir immediately so Arabic paints right-to-left.
 //
 // WHY separate from CurrencyLocaleSection: language is a personal preference
 // (per-user), whereas currency/timezone are workspace-level defaults.
@@ -11,13 +11,11 @@ import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { cn } from '@/lib/cn';
-import { isSupportedLocale, type SupportedLocale } from '@/i18n';
+import { applyDocumentLocale, isSupportedLocale, type SupportedLocale } from '@/i18n';
 
-// The locales we expose in the switcher. AR is supported in the codebase but
-// deferred from the UI switcher until RTL layout is fully QA'd.
-type DisplayLocale = 'en' | 'fr' | 'es' | 'pt' | 'it' | 'zh';
+type DisplayLocale = 'en' | 'fr' | 'es' | 'pt' | 'it' | 'zh' | 'ar';
 
-const DISPLAY_LOCALES: readonly DisplayLocale[] = ['en', 'fr', 'es', 'pt', 'it', 'zh'];
+const DISPLAY_LOCALES: readonly DisplayLocale[] = ['en', 'fr', 'es', 'pt', 'it', 'zh', 'ar'];
 
 // Human-readable label always shown in the language itself so the user can
 // recognise their own language even when the UI is in another tongue.
@@ -28,6 +26,7 @@ const LOCALE_NATIVE_LABEL: Readonly<Record<DisplayLocale, string>> = {
   pt: 'PT',
   it: 'IT',
   zh: '中文',
+  ar: 'عربي',
 };
 
 const LOCALE_FULL_LABEL: Readonly<Record<DisplayLocale, string>> = {
@@ -37,6 +36,7 @@ const LOCALE_FULL_LABEL: Readonly<Record<DisplayLocale, string>> = {
   pt: 'Português',
   it: 'Italiano',
   zh: '中文',
+  ar: 'العربية',
 };
 
 const COOKIE_NAME = 'bidstack-locale';
@@ -51,8 +51,7 @@ function persistLocale(locale: SupportedLocale): void {
   }
   // Write cookie — read by the API Accept-Language middleware.
   document.cookie = `${COOKIE_NAME}=${locale}; path=/; SameSite=Lax; max-age=31536000`;
-  // Update <html lang> immediately for screen reader accuracy.
-  document.documentElement.lang = locale;
+  applyDocumentLocale(locale);
 }
 
 /** Standalone language-switcher widget rendered inside SettingsPage. */
@@ -92,7 +91,7 @@ export function LanguageSwitcher() {
       <div className="p-5">
         <fieldset>
           <legend className="sr-only">{t('languageSwitcher.ariaLabel')}</legend>
-          {/* Badge-style toggle row: EN | FR | ES | PT | IT | 中文 */}
+          {/* Badge-style toggle row: EN | FR | ES | PT | IT | 中文 | عربي */}
           <div
             role="group"
             aria-label={t('languageSwitcher.ariaLabel')}

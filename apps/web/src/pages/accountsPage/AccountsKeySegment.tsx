@@ -225,9 +225,7 @@ export function AccountsKeySegment() {
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!accounts.isLoading && accounts.data
           ? `${
-              items.length === 1
-                ? t('keyAccounts.resultCount_one', '{{count}} account', { count: items.length })
-                : t('keyAccounts.resultCount_other', '{{count}} accounts', { count: items.length })
+              t('keyAccounts.resultCount', '{{count}} accounts', { count: items.length })
             }${industry ? ` · ${industry}` : ''}`
           : ''}
       </p>

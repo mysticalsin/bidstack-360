@@ -60,12 +60,12 @@ export function ChartCard({
           <thead><tr>{table.columns.map((c) => <th key={c} scope="col">{c}</th>)}</tr></thead>
           <tbody>
             {table.rows.map((r, i) => (
-              <tr key={i}>{r.map((c, j) => (j === 0 ? <th key={j} scope="row" style={{ fontWeight: 400, color: 'var(--viz-ink)', borderBottom: '1px solid var(--viz-line)', padding: '8px 8px 8px 0', textAlign: 'left' }}>{c}</th> : <td key={j}>{c}</td>))}</tr>
+              <tr key={i}>{r.map((c, j) => (j === 0 ? <th key={j} scope="row" style={{ fontWeight: 400, color: 'var(--viz-ink)', borderBottom: '1px solid var(--viz-line)', padding: '8px 8px 8px 0', textAlign: 'start' }}>{c}</th> : <td key={j} dir="ltr">{c}</td>))}</tr>
             ))}
           </tbody>
         </table>
       ) : (
-        <figure className="viz-figure" {...(interactive ? { 'aria-label': summary, style: { position: 'relative' } } : { role: 'img', 'aria-label': summary })}>
+        <figure className="viz-figure" dir="ltr" {...(interactive ? { 'aria-label': summary, style: { position: 'relative' } } : { role: 'img', 'aria-label': summary })}>
           {children}
         </figure>
       )}

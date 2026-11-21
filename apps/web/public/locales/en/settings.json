@@ -636,7 +636,12 @@
     "itemWebhooks": "Webhooks",
     "itemDeveloper": "Developer access",
     "itemAuditLog": "Audit log",
-    "itemMeetingSources": "Meeting sources"
+    "itemMeetingSources": "Meeting sources",
+    "itemSerum": "SERUM Control Plane",
+    "itemIdentity": "Identity & roles",
+    "itemAccessPolicies": "Access policies",
+    "itemModules": "Modules",
+    "itemSigningEntities": "Signing entities"
   },
   "team": {
     "title": "Team",

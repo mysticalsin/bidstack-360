@@ -1,1 +1,153 @@
-{}
+{
+  "title": "التوقيعات الإلكترونية",
+  "send": {
+    "title": "إرسال للتوقيع",
+    "recipients": "المستلمون",
+    "addRecipient": "إضافة مستلم",
+    "recipientName": "الاسم",
+    "recipientEmail": "عنوان البريد الإلكتروني",
+    "recipientRole": "الدور",
+    "message": "رسالة مخصصة",
+    "messagePlaceholder": "أضف رسالة للموقّعين (اختياري)",
+    "send": "إرسال للتوقيع",
+    "sending": "جارٍ الإرسال…",
+    "cancel": "إلغاء",
+    "document": "المستند",
+    "selectDocument": "اختر مستندًا"
+  },
+  "status": {
+    "pending": "قيد الانتظار",
+    "sent": "مُرسَل",
+    "viewed": "تمت المشاهدة",
+    "signed": "موقّع",
+    "declined": "مرفوض",
+    "expired": "منتهي الصلاحية",
+    "completed": "مكتمل",
+    "cancelled": "ملغى"
+  },
+  "pad": {
+    "title": "توقيع المستند",
+    "instruction": "وقّع في المساحة أدناه",
+    "clear": "مسح",
+    "sign": "تطبيق التوقيع",
+    "signing": "جارٍ التوقيع…",
+    "decline": "رفض",
+    "declineReason": "سبب الرفض (اختياري)",
+    "typedSignature": "توقيع مكتوب",
+    "drawnSignature": "توقيع مرسوم",
+    "typeNamePlaceholder": "اكتب اسمك الكامل",
+    "agreed": "أدرك أن هذا التوقيع الإلكتروني توقيع اعتماد داخلي، وليس توقيعًا إلكترونيًا ملزمًا قانونًا."
+  },
+  "timeline": {
+    "title": "سجل التوقيع",
+    "sent": "أُرسل إلى {{name}}",
+    "viewed": "شوهد بواسطة {{name}}",
+    "signed": "وقّعه {{name}}",
+    "declined": "رفضه {{name}}",
+    "completed": "وقّع جميع الموقّعين",
+    "reminder": "أُرسل تذكير إلى {{name}}"
+  },
+  "actions": {
+    "remind": "إرسال تذكير",
+    "download": "تنزيل",
+    "cancel": "إلغاء الطلب",
+    "viewCertificate": "عرض الشهادة",
+    "confirmCancel": "إلغاء طلب التوقيع هذا؟ سيتم إخطار الموقّعين."
+  },
+  "signaturePad": {
+    "modeTablistLabel": "طريقة التوقيع",
+    "modeDraw": "رسم",
+    "modeType": "كتابة",
+    "drawPlaceholder": "وقّع هنا",
+    "canvasLabel": "منطقة رسم التوقيع. استخدم الفأرة أو اللمس لرسم توقيعك.",
+    "typedNameLabel": "اكتب اسمك الكامل",
+    "typedNamePlaceholder": "اسمك",
+    "clearButtonLabel": "مسح التوقيع",
+    "clearButton": "مسح",
+    "undoButtonLabel": "تراجع عن آخر خط",
+    "undoButton": "تراجع"
+  },
+  "sendForSignature": {
+    "stepsNavLabel": "خطوات الإرسال",
+    "step": {
+      "template": "قالب",
+      "recipients": "المستلمون",
+      "reviewSend": "مراجعة وإرسال"
+    },
+    "dialogTitle": "إرسال للتوقيع",
+    "successTitle": "تم إرسال طلب التوقيع!",
+    "successMessage": "سيتلقى المستلمون بريدًا إلكترونيًا لتوقيع المستند.",
+    "doneButton": "تم"
+  },
+  "recipientStatusTimeline": {
+    "eventLabel": {
+      "sent": "مُرسَل",
+      "delivered": "تم التسليم",
+      "viewed": "تم الفتح",
+      "signed": "موقّع",
+      "declined": "مرفوض",
+      "voided": "مُبطل"
+    },
+    "recipientEventsAriaLabel": "أحداث {{name}}",
+    "noEventsYet": "لا توجد أحداث بعد"
+  },
+  "recipientsStep": {
+    "listAriaLabel": "المستلمون",
+    "nameLabel": "الاسم",
+    "namePlaceholder": "Jane Smith",
+    "emailLabel": "البريد الإلكتروني",
+    "emailPlaceholder": "jane@example.com",
+    "roleLabel": "الدور",
+    "roleSigner": "موقّع",
+    "roleCc": "نسخة",
+    "removeRecipientAriaLabel": "إزالة المستلم {{recipient}}",
+    "addRecipient": "+ إضافة مستلم",
+    "back": "رجوع",
+    "nextReview": "التالي: مراجعة"
+  },
+  "signatureGuide": {
+    "title": "التحقق من التوقيع",
+    "introBefore": "تتضمن كل عملية تسليم",
+    "introAfter": "كترويسة. تحقق منها قبل الوثوق بالحمولة. التنسيق:",
+    "languageTablistLabel": "لغة التحقق من التوقيع",
+    "copyCodeLabel": "نسخ الرمز",
+    "replayBefore": "ارفض الأحداث التي يكون فيها",
+    "replayAfter": "ثوانٍ لمنع هجمات الإعادة. استخدم دائمًا مقارنة ثابتة الزمن."
+  },
+  "templateStep": {
+    "kindFilterLabel": "نوع القالب",
+    "allTypesOption": "كل الأنواع",
+    "documentTemplateLabel": "قالب المستند",
+    "selectTemplatePlaceholder": "اختر قالبًا…",
+    "templateVariablesHeading": "متغيرات القالب",
+    "nextButton": "التالي: المستلمون"
+  },
+  "reviewStep": {
+    "previewTitle": "معاينة المستند",
+    "messageLabel": "رسالة إلى المستلمين (اختياري)",
+    "messagePlaceholder": "يرجى مراجعة المستند المرفق وتوقيعه…",
+    "recipientsHeading": "المستلمون ({{count}})",
+    "recipientSummaryAria": "ملخص المستلمين",
+    "back": "رجوع",
+    "sending": "جارٍ الإرسال…",
+    "send": "إرسال للتوقيع"
+  },
+  "documentPreviewIframe": {
+    "regionAriaLabel": "معاينة المستند",
+    "emptyMessage": "لا تتوفر معاينة للمستند",
+    "errorMessage": "تعذّر تحميل معاينة المستند.",
+    "openInNewTab": "فتح المستند في علامة تبويب جديدة",
+    "regionAriaLabelTitled": "معاينة المستند: {{title}}",
+    "loading": "جارٍ تحميل المستند…",
+    "iframeAriaLabel": "معاينة {{title}}"
+  },
+  "signatureStatusBadge": {
+    "statusDraft": "مسودة",
+    "statusSent": "مُرسَل",
+    "statusViewed": "تمت المشاهدة",
+    "statusSigned": "موقّع",
+    "statusDeclined": "مرفوض",
+    "statusVoided": "مُبطل",
+    "statusExpired": "منتهي الصلاحية"
+  }
+}

@@ -161,7 +161,9 @@ export function ChartContainer({
         ) : empty ? (
           <ChartEmpty message={resolvedEmptyMessage} />
         ) : (
-          children
+          <div className="chart-plot" dir="ltr">
+            {children}
+          </div>
         )}
       </div>
     </div>

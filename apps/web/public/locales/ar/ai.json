@@ -1,1 +1,51 @@
-{}
+{
+  "agents": {
+    "title": "وكلاء Dust",
+    "ask": "اسأل وكيلاً",
+    "placeholder": "ماذا تريد أن تعرف أو تُعدّ؟",
+    "submit": "إرسال",
+    "thinking": "جارٍ التفكير…",
+    "noAgents": "لم يُضبط أي وكيل Dust",
+    "configureFirst": "يُضبط اتصال Dust من إعدادات التكامل.",
+    "error": "تعذّر رد الوكيل. يُرجى إعادة المحاولة.",
+    "copyResponse": "نسخ الرد",
+    "newConversation": "محادثة جديدة",
+    "selectAgent": "اختيار وكيل",
+    "sources": "المصادر",
+    "confidence": "الثقة",
+    "regenerate": "إعادة التوليد"
+  },
+  "meetingPrep": {
+    "title": "التحضير للاجتماع",
+    "generate": "إنشاء موجز التحضير",
+    "generating": "جارٍ الإنشاء…",
+    "attendees": "الحضور",
+    "agenda": "جدول الأعمال",
+    "context": "سياق الحساب",
+    "keyTopics": "الموضوعات الرئيسية",
+    "recentActivity": "النشاط الأخير",
+    "risks": "المخاطر المحددة",
+    "opportunities": "الفرص",
+    "noMeetingSelected": "يُختار اجتماع لإنشاء موجز التحضير."
+  },
+  "feedback": {
+    "helpful": "مفيد",
+    "notHelpful": "غير مفيد",
+    "reportIssue": "الإبلاغ عن مشكلة",
+    "thanks": "شكراً على الملاحظات"
+  },
+  "intel": {
+    "title": "استخبارات الحساب",
+    "loading": "جارٍ التحليل…",
+    "lastUpdated": "تم التحديث {{when}}",
+    "refresh": "تحديث",
+    "noData": "لا تتوفر بيانات استخباراتية",
+    "signals": {
+      "hiring": "التعيينات الأخيرة",
+      "funding": "جولات التمويل",
+      "news": "الأخبار",
+      "technographics": "التقنيات المستخدمة",
+      "executives": "المديرون التنفيذيون"
+    }
+  }
+}

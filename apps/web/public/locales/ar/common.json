@@ -1,4 +1,396 @@
 {
+  "app": {
+    "name": "Polo PreSales",
+    "tagline": "Mantu · العطاءات وما قبل البيع",
+    "guest": "ضيف",
+    "notSignedIn": "لم يُسجَّل الدخول"
+  },
+  "nav": {
+    "primary": "التنقل الرئيسي",
+    "breadcrumb": "مسار التنقل",
+    "workspace": "مساحة العمل",
+    "settings": "الإعدادات",
+    "starred": "المميزة بنجمة",
+    "recent": "الأحدث",
+    "openNavigation": "فتح التنقل",
+    "closeNavigation": "إغلاق التنقل",
+    "expandSidebar": "توسيع الشريط الجانبي",
+    "collapseSidebar": "طي الشريط الجانبي",
+    "dashboard": "لوحة المعلومات",
+    "sales": "المبيعات",
+    "salesOrders": "عروض الأسعار والطلبات",
+    "products": "المنتجات",
+    "invoices": "الفواتير",
+    "accounts": "الحسابات",
+    "companies": "الشركات",
+    "opportunities": "الفرص",
+    "pipeline": "مسار الفرص",
+    "forecasts": "التوقعات",
+    "bidMatrix": "مصفوفة العطاء/عدم تقديم عطاء",
+    "rfpResponse": "طلب تقديم العروض / الرد على العطاء",
+    "rfpSection": "طلب تقديم العروض · الرد على العطاء",
+    "rfpHub": "مركز الرد على العطاءات",
+    "proposals": "العروض",
+    "leads": "العملاء المحتملون",
+    "contacts": "جهات الاتصال",
+    "tasks": "المهام",
+    "territories": "المناطق",
+    "serviceDesk": "مكتب الخدمة",
+    "workflows": "سير العمل",
+    "intake": "الاستقبال",
+    "reports": "التقارير",
+    "integrations": "التكاملات",
+    "auditLog": "سجل التدقيق",
+    "agents": "وكلاء Dust",
+    "search": "بحث",
+    "references": "مكتبة المراجع",
+    "settingsPage": "الإعدادات",
+    "home": "الرئيسية",
+    "bidsRfp": "العطاءات وطلب تقديم العروض",
+    "quickStart": "البدء السريع",
+    "salesToolkits": "حقائب أدوات المبيعات",
+    "keyAccounts": "الحسابات الرئيسية",
+    "topAccounts": "أبرز الحسابات",
+    "sectorView": "عرض القطاعات",
+    "crossSell": "البيع المتقاطع",
+    "agentStudio": "استوديو الوكلاء",
+    "calendar": "التقويم",
+    "customObjects": "الكائنات المخصصة",
+    "analyticsReports": "التحليلات والتقارير",
+    "agreements": "الاتفاقيات",
+    "meetings": "الاجتماعات"
+  },
+  "crumbs": {
+    "portfolio": "المحفظة",
+    "detail": "التفاصيل"
+  },
+  "actions": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "create": "إنشاء",
+    "update": "تحديث",
+    "submit": "إرسال",
+    "search": "بحث",
+    "filter": "تصفية",
+    "sort": "فرز",
+    "clear": "مسح",
+    "loading": "جارٍ التحميل…",
+    "retry": "إعادة المحاولة",
+    "back": "رجوع",
+    "next": "التالي",
+    "previous": "السابق",
+    "viewAll": "عرض الكل",
+    "markRead": "تعليم كمقروء",
+    "signOut": "تسجيل الخروج",
+    "skipToContent": "تخطي إلى المحتوى"
+  },
+  "search": {
+    "placeholder": "بحث أو انتقال إلى…",
+    "label": "بحث في الفرص وجهات الاتصال والمهام",
+    "recent": "الأحدث",
+    "clear": "مسح",
+    "shortcut": "Ctrl+/"
+  },
+  "theme": {
+    "switchToLight": "التبديل إلى الوضع الفاتح",
+    "switchToDark": "التبديل إلى الوضع الداكن"
+  },
+  "notifications": {
+    "title": "الإشارات",
+    "unread_one": "{{count}} إشارة غير مقروءة",
+    "unread_other": "{{count}} إشارة غير مقروءة",
+    "noUnread": "لا توجد إشارات غير مقروءة",
+    "loading": "جارٍ التحميل…",
+    "couldNotLoad": "تعذّر تحميل الإشارات",
+    "ariaLabel": "الإشعارات",
+    "ariaLabelWithCount": "الإشعارات، {{count}} غير مقروءة",
+    "mentionTooltip": "الإشعارات",
+    "youWereMentioned": "تمت الإشارة إليك في تعليق",
+    "unread_zero": "{{count}} إشارات غير مقروءة",
+    "unread_two": "{{count}} إشارتان غير مقروءتان",
+    "unread_few": "{{count}} إشارات غير مقروءة",
+    "unread_many": "{{count}} إشارة غير مقروءة"
+  },
+  "help": {
+    "tooltip": "المساعدة والاختصارات (?)",
+    "ariaLabel": "المساعدة واختصارات لوحة المفاتيح"
+  },
+  "states": {
+    "loading": "جارٍ التحميل…",
+    "empty": "لا شيء للعرض",
+    "error": "حدث خطأ ما",
+    "noResults": "لا توجد نتائج"
+  },
+  "toast": {
+    "saved": "تم الحفظ",
+    "updated": "تم التحديث",
+    "created": "تم الإنشاء",
+    "deleted": "تم الحذف",
+    "copied": "تم النسخ إلى الحافظة",
+    "genericError": "حدث خطأ ما. يُرجى إعادة المحاولة.",
+    "networkError": "خطأ في الشبكة. يُرجى التحقق من الاتصال.",
+    "regionLabel": "الإشعارات",
+    "clearAll": "مسح الكل ({{count}})",
+    "dismiss": "تجاهل"
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب",
+    "invalidEmail": "يُرجى إدخال عنوان بريد إلكتروني صالح",
+    "tooShort": "يجب ألا يقل عن {{min}} حرفاً",
+    "tooLong": "يجب ألا يزيد عن {{max}} حرفاً",
+    "invalidUrl": "يُرجى إدخال URL صالح",
+    "invalidNumber": "يُرجى إدخال رقم صالح",
+    "invalidDate": "يُرجى إدخال تاريخ صالح"
+  },
+  "offline": {
+    "title": "أنت غير متصل",
+    "message": "تتم مزامنة التغييرات عند استعادة الاتصال."
+  },
+  "page": {
+    "titleSuffix": "Polo PreSales"
+  },
+  "routeAnnouncer": {
+    "nowOn": "الآن في {{title}}"
+  },
+  "footer": {
+    "createdBy": "من إنشاء Tony Walteur",
+    "dustConnected": "Dust متصل",
+    "dustSynced": "تمت المزامنة {{when}}"
+  },
+  "pages": {
+    "dashboard": {
+      "title": "لوحة المعلومات"
+    },
+    "opportunities": {
+      "title": "الفرص"
+    },
+    "contacts": {
+      "title": "جهات الاتصال"
+    },
+    "rfpHub": {
+      "title": "مركز الرد على العطاءات",
+      "subtitle": "تأهيل ومسودة وتقييم وإرسال — سير عمل طلب تقديم العروض كاملاً في مكان واحد.",
+      "kpi": {
+        "proposalsInFlight": "العروض قيد التنفيذ",
+        "proposalsDetail": "مسودة · مراجعة · معتمد · مُرسل",
+        "openOpps": "فرص العطاءات المفتوحة",
+        "openOppsDetail": "ليست مغلقة بفوز ولا مغلقة بخسارة",
+        "avgScore": "متوسط درجة العطاء",
+        "winRate": "معدل الفوز"
+      },
+      "proposals": {
+        "heading": "العروض قيد التنفيذ",
+        "caption": "مسودات نشطة وعمليات إرسال عبر مسار الرد.",
+        "viewAll": "عرض الكل ←",
+        "emptyTitle": "لا توجد عروض قيد التنفيذ",
+        "emptyMessage": "يُجرى تقييم عطاء/عدم تقديم عطاء على فرصة مؤهّلة، ثم يُعدّ الرد هنا.",
+        "openMatrix": "فتح مصفوفة العطاء/عدم تقديم عطاء"
+      },
+      "bidScores": {
+        "heading": "درجات العطاء الأخيرة",
+        "matrixLink": "المصفوفة ←",
+        "emptyTitle": "لا توجد درجات عطاء بعد",
+        "emptyMessage": "يُجرى أول تحليل لعطاء/عدم تقديم عطاء لتعبئة هذه القائمة."
+      },
+      "agents": {
+        "heading": "مساعدو AI لسير العمل هذا",
+        "caption": "يساعد وكلاء Dust في التأهيل والصياغة والامتثال والمراجعة.",
+        "qualifier": {
+          "title": "مقيّم العطاء",
+          "description": "يقيّم الملاءمة ومحاور الفوز والجهد مقابل القيمة من استخبارات طلب تقديم العروض.",
+          "cta": "تشغيل على فرصة"
+        },
+        "drafter": {
+          "title": "معدّ الأقسام",
+          "description": "يعدّ أقسام العرض من حالات الفوز السابقة ومجموعة المتطلبات.",
+          "cta": "فتح العروض"
+        },
+        "compliance": {
+          "title": "مراجع الامتثال",
+          "description": "يراجع كل قسم مقابل مصفوفة متطلبات طلب تقديم العروض.",
+          "cta": "فتح وكلاء Dust"
+        },
+        "winLoss": {
+          "title": "محلل الفوز والخسارة",
+          "description": "يُظهر أسباب الفوز والخسارة الأخيرة لتغذية العطاء التالي.",
+          "cta": "عرض التقارير"
+        }
+      },
+      "actions": {
+        "bidNoBid": "عطاء/عدم تقديم عطاء",
+        "newProposal": "عرض جديد"
+      }
+    },
+    "leads": {
+      "title": "العملاء المحتملون",
+      "search": "بحث في العملاء المحتملين…",
+      "filterStatus": "تصفية حسب الحالة",
+      "filterPriority": "تصفية حسب الأولوية",
+      "allStatuses": "كل الحالات",
+      "allPriorities": "كل الأولويات",
+      "stats": {
+        "filtered": "العملاء المحتملون المصفّون",
+        "filteredDetail": "العرض الحالي",
+        "highPriority": "أولوية مرتفعة",
+        "highPriorityDetail": "مرتفعة أو حرجة",
+        "pipelineReady": "جاهز لمسار الفرص",
+        "pipelineReadyDetail": "مؤهّل أو محوّل",
+        "avgScore": "متوسط الدرجة",
+        "avgScoreDetail": "درجة الملاءمة"
+      },
+      "table": {
+        "name": "الاسم",
+        "company": "الشركة",
+        "status": "الحالة",
+        "priority": "الأولوية",
+        "score": "الدرجة",
+        "source": "المصدر",
+        "owner": "المالك",
+        "actions": "الإجراءات",
+        "selectAll": "تحديد الكل",
+        "deselectAll": "إلغاء تحديد الكل"
+      },
+      "empty": {
+        "title": "لا يوجد عملاء محتملون بعد",
+        "message": "يُنشأ أول عميل محتمل لبدء تتبّع العملاء المرتقبين."
+      },
+      "error": {
+        "title": "تعذّر تحميل العملاء المحتملين"
+      },
+      "view": {
+        "list": "قائمة",
+        "kanban": "كانبان",
+        "ariaLabel": "عرض العملاء المحتملين"
+      },
+      "actions": {
+        "exportCsv": "تصدير CSV",
+        "newLead": "عميل محتمل جديد"
+      }
+    },
+    "settings": {
+      "title": "الإعدادات",
+      "subtitle": "إدارة الحساب والتفضيلات وتكاملات مساحة العمل.",
+      "sections": {
+        "overview": "نظرة عامة",
+        "profile": "الملف الشخصي",
+        "appearance": "المظهر",
+        "language": "اللغة",
+        "notifications": "الإشعارات",
+        "security": "الأمان",
+        "workspace": "مساحة العمل",
+        "crm": "إعداد CRM",
+        "developer": "وصول المطوّر",
+        "emailTemplates": "قوالب البريد الإلكتروني",
+        "tags": "الوسوم",
+        "leadRot": "قواعد تقادم العملاء المحتملين"
+      }
+    }
+  },
+  "topbar": {
+    "skipToContent": "تخطي إلى المحتوى",
+    "switchToLight": "التبديل إلى الوضع الفاتح",
+    "switchToDark": "التبديل إلى الوضع الداكن",
+    "help": "المساعدة والاختصارات",
+    "helpAria": "المساعدة واختصارات لوحة المفاتيح",
+    "productTour": "بدء جولة المنتج",
+    "signOut": "تسجيل الخروج",
+    "portfolio": "المحفظة",
+    "detail": "التفاصيل"
+  },
+  "appRoutes": {
+    "notFoundTitle": "الصفحة غير موجودة",
+    "notFoundMessage": "الصفحة المطلوبة غير موجودة.",
+    "goToDashboard": "الانتقال إلى لوحة المعلومات"
+  },
+  "select": {
+    "placeholder": "—",
+    "noOptions": "لا توجد خيارات"
+  },
+  "lookupFieldPicker": {
+    "placeholder": "بحث…",
+    "clearSelection": "مسح التحديد",
+    "searching": "جارٍ البحث…",
+    "noResults": "لا توجد نتائج.",
+    "typeToSearch": "اكتب للبحث…"
+  },
+  "confirm": {
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "confirm": "تأكيد",
+    "save": "حفظ"
+  },
+  "avatar": {
+    "statusOnline": "متصل",
+    "statusOffline": "غير متصل"
+  },
+  "helpDrawer": {
+    "title": "اختصارات لوحة المفاتيح",
+    "closeAria": "إغلاق الاختصارات",
+    "groupGlobal": "عام",
+    "groupNavigation": "التنقل",
+    "groupRecords": "السجلات",
+    "openCommandPalette": "فتح لوحة الأوامر",
+    "quickAddMenu": "قائمة الإضافة السريعة",
+    "openThisDrawer": "فتح هذه اللوحة",
+    "closeCurrentDialog": "إغلاق الحوار الحالي",
+    "goToDashboard": "الانتقال إلى لوحة المعلومات",
+    "goToOpportunities": "الانتقال إلى الفرص",
+    "goToPipeline": "الانتقال إلى مسار الفرص",
+    "goToContacts": "الانتقال إلى جهات الاتصال",
+    "goToTasks": "الانتقال إلى المهام",
+    "goToReports": "الانتقال إلى التقارير",
+    "goToAccounts": "الانتقال إلى الحسابات",
+    "goToSettings": "الانتقال إلى الإعدادات",
+    "goToSearch": "الانتقال إلى البحث",
+    "moveSelectionInLists": "نقل التحديد في القوائم",
+    "openRecord": "فتح السجل",
+    "editSelectedRecord": "تعديل السجل المحدد",
+    "deleteWithConfirmation": "حذف مع التأكيد",
+    "footer": "تعمل معظم الاختصارات في كل مكان باستثناء حقول النص. اضغط ? في أي وقت لإعادة فتح هذه اللوحة."
+  },
+  "breadcrumbs": {
+    "dashboard": "لوحة المعلومات",
+    "accounts": "الحسابات",
+    "opportunities": "الفرص",
+    "pipeline": "مسار الفرص",
+    "contacts": "جهات الاتصال",
+    "tasks": "المهام",
+    "reports": "التقارير",
+    "integrations": "التكاملات",
+    "settings": "الإعدادات",
+    "auditLog": "سجل التدقيق",
+    "login": "تسجيل الدخول",
+    "ariaLabel": "مسار التنقل",
+    "agreements": "الاتفاقيات",
+    "meetings": "الاجتماعات"
+  },
+  "progressRing": {
+    "ariaLabelPercentComplete": "{{percent}}% مكتمل"
+  },
+  "sortableHeader": {
+    "ariaLabel": "فرز حسب {{label}}. الفرز الحالي: {{current}}. فعّل للفرز {{next}}."
+  },
+  "upgradeBanner": {
+    "actionLabel": "ترقية"
+  },
+  "showMore": {
+    "moreLabel": "عرض المزيد",
+    "lessLabel": "عرض أقل"
+  },
+  "bulkActionBar": {
+    "regionLabel": "إجراءات جماعية",
+    "selectedCount": "{{count}} محدد",
+    "exportSelected": "تصدير المحدد",
+    "deleting": "جارٍ الحذف…",
+    "deleteSelected": "حذف المحدد",
+    "clear": "مسح"
+  },
+  "dialog": {
+    "closeAriaLabel": "إغلاق"
+  },
   "tableKit": {
     "pagination": {
       "noResults": "لا توجد نتائج",

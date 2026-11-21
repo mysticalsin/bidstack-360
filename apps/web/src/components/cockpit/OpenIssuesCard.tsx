@@ -69,9 +69,8 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
         caption={
           total === 0
             ? t('openIssues.captionAllClear', 'All clear')
-            : t('openIssues.captionItemsToAction', '{{count}} item{{plural}} to action', {
+            : t('openIssues.captionItemsToAction', '{{count}} items to action', {
                 count: total,
-                plural: total === 1 ? '' : 's',
               })
         }
       />
