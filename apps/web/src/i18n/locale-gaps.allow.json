@@ -1,0 +1,6 @@
+{
+  "note": "Remainder versus English after the rail and navigation keys were filled. A key listed here is a known gap, not a pass to add new ones. Arabic is not in this file: it is a supported locale with empty catalogs, and finishing it or dropping it from the supported list is a product question.",
+  "fr": [],
+  "es": [],
+  "it": []
+}
