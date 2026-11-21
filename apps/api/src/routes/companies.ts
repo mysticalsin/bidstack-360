@@ -20,6 +20,7 @@ import { queueFirstAccountIntel } from '../queues/account-intel.js';
 import { queueCompanyTechDetect } from '../queues/company-tech-detect.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
+import { openDealsBlockAccountDelete, openDealsForAccountWhere } from './companies.delete-guard.js';
 
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
@@ -520,6 +521,15 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, name: true },
       });
       if (!existing) throw server.httpErrors.notFound('Company not found');
+
+      const openDeals = await prisma.opportunity.count({
+        where: openDealsForAccountWhere(req.auth.orgId, existing.id),
+      });
+      if (openDealsBlockAccountDelete(openDeals)) {
+        throw server.httpErrors.conflict(
+          'This account still has open deals. Close or move them before deleting the account.',
+        );
+      }
 
       await prisma.company.updateMany({
         where: { id: existing.id, orgId: req.auth.orgId },
