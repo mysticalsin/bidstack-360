@@ -222,5 +222,10 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     expect(
       screen.getByRole('link', { name: /import accounts from csv/i }),
     ).toBeTruthy();
+    // The portfolio cockpit (coverage, health bars, "At risk") is a book of
+    // accounts. On a zero-account org it reads as a broken dashboard of zeros
+    // and hides the create action below the fold.
+    expect(screen.queryByText('At risk')).toBeNull();
+    expect(screen.queryByText(/weighted pipeline/i)).toBeNull();
   });
 });

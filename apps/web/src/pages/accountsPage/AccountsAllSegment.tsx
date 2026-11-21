@@ -274,6 +274,7 @@ export function AccountsAllSegment() {
         <SegmentHeader
           title={t('accounts.title', 'Accounts')}
           subtitle={
+            orgHasNoAccounts ? undefined : (
             <>
               {rows.length === 1
                 ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
@@ -285,6 +286,7 @@ export function AccountsAllSegment() {
                 amount: formatMoneyMicros(totalPipeline, 'EUR'),
               })}
             </>
+            )
           }
           actions={
             <>
@@ -359,6 +361,8 @@ export function AccountsAllSegment() {
         </div>
       ) : null}
 
+      {!orgHasNoAccounts ? (
+      <>
       <section
         aria-label={t('accounts.stats.regionLabel', 'Account source coverage')}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
@@ -515,6 +519,8 @@ export function AccountsAllSegment() {
           </FilterSelect>
         </FilterRow>
       </motion.div>
+      </>
+      ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
