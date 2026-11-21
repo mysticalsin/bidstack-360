@@ -1127,7 +1127,8 @@
     "error": {
       "noDataRows": "该文件没有数据行。",
       "tooManyRows": "该文件有 {{count}} 行，上限为 {{limit}}。",
-      "unreadable": "无法读取该文件。请确保它是 UTF-8 编码的 CSV。"
+      "unreadable": "无法读取该文件。请确保它是 UTF-8 编码的 CSV。",
+      "tooLarge": "文件太大，无法导入。"
     },
     "upload": {
       "entityLabel": "您要导入什么？",

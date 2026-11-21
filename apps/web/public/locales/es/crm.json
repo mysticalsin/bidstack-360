@@ -1190,7 +1190,8 @@
     "error": {
       "noDataRows": "Ese archivo no tiene filas de datos.",
       "tooManyRows": "Ese archivo tiene {{count}} filas: el límite es {{limit}}.",
-      "unreadable": "No se pudo leer ese archivo. Asegúrate de que sea un CSV en UTF-8."
+      "unreadable": "No se pudo leer ese archivo. Asegúrate de que sea un CSV en UTF-8.",
+      "tooLarge": "Ese archivo es demasiado grande para importarlo."
     },
     "upload": {
       "entityLabel": "¿Qué vas a importar?",
