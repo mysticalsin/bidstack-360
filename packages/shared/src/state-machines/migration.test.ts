@@ -63,6 +63,12 @@ describe('migration transition table', () => {
     expect(migrationFailureText('financial.periodEnd must be an ISO date')).toBe(
       'financial.periodEnd must be an ISO date',
     );
+    expect(migrationFailureText('opportunity value is not a number')).toBe(
+      'opportunity value is not a number',
+    );
+    expect(migrationFailureText('financial.revenue is not a number')).toBe(
+      'financial.revenue is not a number',
+    );
     expect(migrationFailureText('No account named "Acme" — import accounts first')).toBe(
       'No account named "Acme" — import accounts first',
     );

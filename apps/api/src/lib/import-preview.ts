@@ -4,6 +4,8 @@
  * surfaced after the worker had already started mutating the tenant.
  */
 
+import { microsToUnits, parseImportMoney } from '@bidstack/shared';
+
 export type ImportPreviewEntity = 'company' | 'contact' | 'lead' | 'opportunity' | 'financial';
 
 export interface ImportPreviewIssue {
@@ -25,7 +27,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T/;
 const CURRENCY_CODE_RE = /^[A-Za-z]{3}$/;
-const MAX_MONEY_UNITS = 1_000_000_000_000;
+const MAX_MONEY_MICROS = 1_000_000_000_000n * 1_000_000n;
 
 const REQUIRED: Record<ImportPreviewEntity, string[]> = {
   company: ['company.name'],
@@ -44,16 +46,26 @@ const MONEY_FIELDS = new Set([
 
 const DATE_FIELDS = new Set(['opportunity.closeDate', 'financial.periodEnd', 'financial.periodStart']);
 
-export function parseMoneyUnits(raw: string): { ok: true; units: number } | { ok: false; reason: string } {
-  const cleaned = raw.replace(/[, ]/g, '').replace(/^[€$£]/, '').trim();
-  if (!cleaned || /^n\/?a$/i.test(cleaned) || cleaned === '-') {
-    return { ok: false, reason: 'empty or n/a is not a number' };
+export function parseMoneyUnits(
+  raw: string,
+  opts?: { signed?: boolean },
+): { ok: true; units: number } | { ok: false; reason: string } {
+  const micros = parseImportMoney(raw);
+  if (micros === null) {
+    const blank = raw.trim();
+    if (!blank || /^(?:n\/?a|tbd|—|-)$/i.test(blank)) {
+      return { ok: false, reason: 'empty or n/a is not a number' };
+    }
+    return { ok: false, reason: 'not a number' };
   }
-  const n = Number(cleaned);
-  if (!Number.isFinite(n)) return { ok: false, reason: 'not a number' };
-  if (n < 0) return { ok: false, reason: 'money cannot be negative' };
-  if (n > MAX_MONEY_UNITS) return { ok: false, reason: 'exceeds 1e12 unit cap' };
-  return { ok: true, units: n };
+  // A deal amount follows the create schema (zero or more, at most 1e12).
+  // A filed loss is a real operating-income or net-income figure, so those
+  // columns accept a sign. The cap is the same either way.
+  if (micros < 0n && !opts?.signed) return { ok: false, reason: 'money cannot be negative' };
+  if (micros > MAX_MONEY_MICROS || micros < -MAX_MONEY_MICROS) {
+    return { ok: false, reason: 'exceeds 1e12 unit cap' };
+  }
+  return { ok: true, units: microsToUnits(micros) };
 }
 
 export function parseIsoDate(raw: string): { ok: true; iso: string } | { ok: false; reason: string } {
@@ -118,7 +130,7 @@ export function previewImportRows(input: {
     for (const field of MONEY_FIELDS) {
       const raw = mappedValue(row, input.mappings, field);
       if (!raw) continue;
-      const parsed = parseMoneyUnits(raw);
+      const parsed = parseMoneyUnits(raw, { signed: field.startsWith('financial.') });
       if (!parsed.ok) issues.push({ row: rowNumber, field, message: parsed.reason });
     }
 

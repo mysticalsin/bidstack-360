@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatMicrosDecimal, microsToUnits, sumMicros, unitsToMicros } from './money.js';
+import { formatMicrosDecimal, microsToUnits, parseImportMoney, sumMicros, unitsToMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -107,6 +107,24 @@ describe('unitsToMicros', () => {
     expect(() => unitsToMicros('1.2345678')).toThrow(/Invalid money units/);
     expect(() => unitsToMicros('1e6')).toThrow(/Invalid money units/);
     expect(() => unitsToMicros(Number.NaN)).toThrow(/Invalid money units/);
+  });
+});
+
+describe('parseImportMoney', () => {
+  it('reads the separators a spreadsheet writes, including a loss in parentheses', () => {
+    // WHY: an import that strips every comma stores €1.23 for a €1,234.56
+    // European cell, and a parenthesised loss as a profit. The micros have
+    // to be the amount in the cell, including one cent past a trillion where
+    // Number()*1e6 is no longer exact.
+    expect(parseImportMoney('1,200,000.50')).toBe(1_200_000_500_000n);
+    expect(parseImportMoney('€2 500')).toBe(2_500_000_000n);
+    expect(parseImportMoney('1.234,56')).toBe(1_234_560_000n);
+    expect(parseImportMoney('1,50')).toBe(1_500_000n);
+    expect(parseImportMoney('(1,234.50)')).toBe(-1_234_500_000n);
+    expect(parseImportMoney("'-1.50")).toBe(-1_500_000n);
+    expect(parseImportMoney('1000000000000.01')).toBe(1_000_000_000_000_010_000n);
+    expect(parseImportMoney('n/a')).toBeNull();
+    expect(parseImportMoney('')).toBeNull();
   });
 });
 
