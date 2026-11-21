@@ -1046,7 +1046,15 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   );
 };
 
-function parseSpreadsheetBuffer(
+/** Bytes that are not a readable spreadsheet. The route maps this to 400. */
+export class SpreadsheetRejected extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SpreadsheetRejected';
+  }
+}
+
+export function parseSpreadsheetBuffer(
   buf: Buffer,
   filename: string,
 ): { headers: string[]; rows: Record<string, string>[] } {
