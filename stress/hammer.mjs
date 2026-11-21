@@ -75,8 +75,9 @@ export async function scenarioSameFile() {
   const codes = [a.status, b.status].sort();
   const pass = rows === 1 && codes[0] === 201 && codes[1] === 409 && active <= 1;
   const winnerId = a.status === 201 ? a.json?.id : b.json?.id;
+  const loserId = a.status === 409 ? a.json?.id : b.status === 409 ? b.json?.id : null;
   const keys = redis(['--scan', '--pattern', 'migration:*:rows']).split('\n').filter(Boolean);
-  const leaked = keys.filter((key) => winnerId && !key.includes(winnerId) && key.startsWith('migration:'));
+  const leaked = loserId ? keys.filter((key) => key.includes(loserId)) : [];
   return {
     id: 'same-csv',
     pass,
@@ -247,10 +248,11 @@ export async function scenarioR1E() {
     INSERT INTO audit_log (org_id, user_id, action, target_type, target_id, diff)
     VALUES (${q(orgId)}::uuid, ${q(userId)}::uuid, 'migration.cancel.requested', 'MigrationJob', ${q(id)}, '{"attemptId":null}'::jsonb)
   `);
+  const staleIso = new Date(Date.now() - 20 * 60_000).toISOString();
   psql(`
     UPDATE migration_jobs
-    SET updated_at = now() - interval '20 minutes',
-        meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{progressAt}', to_jsonb((now() - interval '20 minutes')::text), true)
+    SET updated_at = ${q(staleIso)}::timestamptz,
+        meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{progressAt}', to_jsonb(${q(staleIso)}::text), true)
     WHERE id = ${q(id)}::uuid
   `);
   const { Queue } = await import('bullmq');
@@ -375,6 +377,7 @@ export async function scenarioDoubleCreate() {
     industry: null,
     logo: null,
     country: null,
+    territoryId: null,
   };
   const [a, b] = await Promise.all([
     http('POST', '/api/v1/opportunities', { body, timeoutMs: 15_000 }),

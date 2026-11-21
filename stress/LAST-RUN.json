@@ -1,0 +1,519 @@
+{
+  "head": "08586c16cabcfc76bcfe73fab03460453d6f02ee",
+  "startedAt": "2026-11-21T03:00:26.329Z",
+  "finishedAt": "2026-11-21T03:37:25.848Z",
+  "checksums": [
+    "45d3559bef3ab484be42b251f340012cbccf6ddcbb37280026d861a2830fd798  stress/run.mjs",
+    "f412dd17ccf312219050155e5abfaa0d25fcf7d759f48099a54bad6742a3804e  stress/lib.mjs",
+    "6f8e3ecd3428321826808b06dcd4b77aed3209f65e50a3afcb6ccf5ce40db8f2  stress/load.mjs",
+    "fee99904297b45d25af411cc2ce748e8b373c49c856935cf35febd51f7df03f5  stress/hammer.mjs",
+    "c1a931ffebacf51db84209b00655483372c97ee8f3411f3f21a2bb4776640d53  stress/csv.mjs",
+    "9eb95ba8e8fae3104c5cb661d3cdab3d774aaa954ff2e7639656e6933717f930  stress/faults.mjs",
+    "78d2420e9dd291d9cc162fe97b666b7a1399042320b968770d9d83dd7567bc4b  stress/soak.mjs",
+    "6346ea8bdad92efb79bb409f630f095659e3841d5a1d1dd8d62e87bcd6981f0e  stress/README.md"
+  ],
+  "caps": {
+    "hardTimeoutMs": 3000000,
+    "apiRss": 943718400,
+    "workerRss": 671088640,
+    "webRss": 838860800,
+    "harnessRss": 471859200,
+    "soakSeconds": 1800,
+    "soakWarmupSeconds": 120,
+    "soakRssGrowth": 0.1,
+    "readP95Ms": 300,
+    "readP99Ms": 1000,
+    "writeP95Ms": 500,
+    "csvWorkerRss": 536870912,
+    "recoveryMs": 10000,
+    "faultDownMs": 30000
+  },
+  "results": [
+    {
+      "id": "load",
+      "ramp": [
+        {
+          "connections": 1,
+          "n": 654,
+          "p50": 5.892313,
+          "p95": 7.04685,
+          "p99": 8.768104,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 654
+          }
+        },
+        {
+          "connections": 10,
+          "n": 1131,
+          "p50": 32.124399,
+          "p95": 50.348103,
+          "p99": 74.371241,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 1131
+          }
+        },
+        {
+          "connections": 20,
+          "n": 2645,
+          "p50": 57.29353,
+          "p95": 78.255642,
+          "p99": 107.842911,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 2645
+          }
+        },
+        {
+          "connections": 40,
+          "n": 1362,
+          "p50": 109.201523,
+          "p95": 147.29388,
+          "p99": 425.04647,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 1362
+          }
+        }
+      ],
+      "reads": [
+        {
+          "name": "dashboard",
+          "path": "/api/v1/crm/dashboard",
+          "pass": true,
+          "n": 2675,
+          "p50": 56.110645,
+          "p95": 76.347795,
+          "p99": 127.844268,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 2675
+          }
+        },
+        {
+          "name": "accounts",
+          "path": "/api/v1/accounts/key",
+          "pass": true,
+          "n": 4799,
+          "p50": 32.474894,
+          "p95": 42.237991,
+          "p99": 59.808558,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 4799
+          }
+        },
+        {
+          "name": "pipeline",
+          "path": "/api/v1/opportunities?limit=50",
+          "pass": true,
+          "n": 5172,
+          "p50": 29.491318,
+          "p95": 41.534713,
+          "p99": 49.054996,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 5172
+          }
+        },
+        {
+          "name": "pipeline-stages",
+          "path": "/api/v1/pipeline-stages",
+          "pass": true,
+          "n": 5164,
+          "p50": 29.652207,
+          "p95": 42.576435,
+          "p99": 49.239601,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 5164
+          }
+        },
+        {
+          "name": "tasks",
+          "path": "/api/v1/tasks?limit=50",
+          "pass": true,
+          "n": 4030,
+          "p50": 37.76832,
+          "p95": 53.61707,
+          "p99": 64.129662,
+          "errorRate": 0,
+          "serverErrors": 0,
+          "codes": {
+            "200": 4030
+          }
+        }
+      ],
+      "write": {
+        "pass": true,
+        "n": 5116,
+        "p50": 30.131528,
+        "p95": 43.741152,
+        "p99": 56.607475,
+        "errorRate": 0,
+        "serverErrors": 0,
+        "codes": {
+          "201": 5116
+        }
+      },
+      "apiRssBefore": 758927360,
+      "apiRssAfter": 757235712,
+      "pass": true
+    },
+    {
+      "id": "B11",
+      "pass": true,
+      "expectedFailUntil": null,
+      "statuses": [
+        201,
+        201,
+        201,
+        201,
+        201,
+        201,
+        201,
+        201,
+        201,
+        201,
+        429
+      ],
+      "userB": 201,
+      "userBMessage": ""
+    },
+    {
+      "id": "same-csv",
+      "pass": true,
+      "codes": [
+        201,
+        409
+      ],
+      "rows": 1,
+      "activeAtSample": 0,
+      "leakedKeys": 11,
+      "messages": [
+        "This import is already running.",
+        ""
+      ]
+    },
+    {
+      "id": "different-csv",
+      "pass": true,
+      "codes": [
+        201,
+        201
+      ],
+      "messages": [
+        "",
+        ""
+      ]
+    },
+    {
+      "id": "stage-race",
+      "pass": true,
+      "from": "s1_lead",
+      "to": "s1_ongoing",
+      "codes": [
+        200,
+        409
+      ],
+      "finalStage": "s1_ongoing",
+      "messages": [
+        "",
+        "Opportunity stage changed concurrently; reload and retry."
+      ]
+    },
+    {
+      "id": "double-create",
+      "pass": true,
+      "codes": [
+        400,
+        400
+      ],
+      "rows": 0,
+      "note": "No Idempotency-Key on this route. Two 201s are two rows."
+    },
+    {
+      "id": "C2B",
+      "pass": false,
+      "expectedFailUntil": 349,
+      "startStatus": 409,
+      "startBody": "{\"statusCode\":409,\"error\":\"ConflictError\",\"message\":\"Migration job is no longer pending\"}",
+      "cancelStatus": 200,
+      "cancelMessage": "",
+      "finalStatus": "CANCELLED",
+      "migrationCancel": 1,
+      "companies": 0,
+      "redisKey": "1",
+      "heldMs": 2500
+    },
+    {
+      "id": "cancel-key",
+      "pass": true,
+      "keyRemainsAfterCancel": true,
+      "before": "1",
+      "after": "1",
+      "status": "CANCELLED",
+      "cancel": 200,
+      "coveredBy": "not #350 (that PR leaves the cancel path)"
+    },
+    {
+      "id": "D2",
+      "pass": true,
+      "expectedFailUntil": null,
+      "observedBeforeCancel": "COMPLETE 1 0 1",
+      "cancelStatus": 409,
+      "cancelMessage": "Cannot cancel a job with status COMPLETE",
+      "finalStatus": "COMPLETE"
+    },
+    {
+      "id": "csv",
+      "pass": false,
+      "tenK": {
+        "status": 201,
+        "ms": 35,
+        "apiPeak": 757809152,
+        "progress": "RUNNING 1000/10000"
+      },
+      "hundredK": {
+        "status": 400,
+        "ms": 135,
+        "apiPeak": 758218752,
+        "body": "{\"statusCode\":400,\"error\":\"Error\",\"message\":\"body/rows Array must contain at most 10000 element(s)\"}"
+      },
+      "parse100k": {
+        "status": 200,
+        "ms": 95,
+        "returned": 10000,
+        "apiPeak": 762814464
+      },
+      "malformed": {
+        "status": 200,
+        "ms": 8,
+        "body": "{\"headers\":[],\"rows\":[]}"
+      },
+      "zipBomb": {
+        "status": 500,
+        "ms": 100,
+        "apiPeak": 762499072,
+        "compressed": 32764,
+        "body": "{\"statusCode\":500,\"error\":\"Internal Server Error\",\"message\":\"Something went wrong\"}"
+      },
+      "hugeRow": {
+        "status": 200,
+        "ms": 31,
+        "apiPeak": 796057600
+      },
+      "workerRssBefore": 308649984,
+      "workerRssPeak": 314892288,
+      "workerAlive": true,
+      "apiAlive": true
+    },
+    {
+      "id": "R1E",
+      "pass": false,
+      "expectedFailUntil": null,
+      "stoppedWorker": {
+        "before": 10936,
+        "after": null,
+        "gone": true
+      },
+      "workerAfterStop": 11735,
+      "start": 201,
+      "swept": null,
+      "retry": 409,
+      "retryMessage": "This import cannot be retried. Start it again from the file.",
+      "finalStatus": null
+    },
+    {
+      "id": "faults",
+      "readyBefore": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "db": true,
+          "redis": true,
+          "release": {
+            "commit": null,
+            "branch": null
+          },
+          "storage": true
+        }
+      },
+      "redis": {
+        "before": {
+          "pid": 10961,
+          "rss": 15310848
+        },
+        "afterStop": {
+          "pid": null,
+          "rss": null
+        },
+        "create": {
+          "status": 0,
+          "ms": 8001,
+          "aborted": true,
+          "body": "AbortError:This operation was aborted"
+        },
+        "createHung": true,
+        "coveredBy": 376,
+        "readyz": {
+          "status": 503,
+          "body": {
+            "ok": false,
+            "db": true,
+            "redis": false,
+            "release": {
+              "commit": null,
+              "branch": null
+            },
+            "storage": true
+          },
+          "ms": 4
+        },
+        "auth": {
+          "status": 200,
+          "ms": 11,
+          "message": ""
+        },
+        "startCsvWhileDown": [
+          409,
+          409,
+          409
+        ],
+        "recoverMs": 1240,
+        "tasksAfter": 200
+      },
+      "postgres": {
+        "before": {
+          "pid": null,
+          "rss": null
+        },
+        "afterStop": {
+          "pid": null,
+          "rss": null
+        },
+        "readyz": {
+          "status": 503,
+          "body": {
+            "ok": false,
+            "db": false,
+            "redis": true,
+            "release": {
+              "commit": null,
+              "branch": null
+            },
+            "storage": true
+          },
+          "ms": 2
+        },
+        "auth": {
+          "status": 500,
+          "ms": 7,
+          "message": "Something went wrong"
+        },
+        "authFailClosed": true,
+        "recoverMs": 239,
+        "tasksAfter": 200
+      },
+      "staleRunning": 1,
+      "pass": false
+    },
+    {
+      "id": "boot-db-down",
+      "pass": true,
+      "probe": "still-running",
+      "ms": 12922,
+      "exitCode": null,
+      "readyz": {
+        "status": 503,
+        "ms": 54,
+        "text": "{\"ok\":false,\"db\":false,\"redis\":true,\"release\":{\"commit\":null,\"branch\":null},\"storage\":true}",
+        "json": {
+          "ok": false,
+          "db": false,
+          "redis": true,
+          "release": {
+            "commit": null,
+            "branch": null
+          },
+          "storage": true
+        }
+      },
+      "log": "[03:04:55.258] \u001b[33mWARN\u001b[39m (13045): \u001b[36mAUTH STUB MODE \u2014 no CLERK_SECRET_KEY set; minting seed org session (dev only)\u001b[39m\nprisma:error \nInvalid `prisma.$queryRaw()` invocation:\n\n\nCan't reach database server at `127.0.0.1:1`\n\nPlease make sure your database server is running at `127.0.0.1:1`.\n",
+      "migrate": {
+        "exit": 1,
+        "log": "ublic\" at \"127.0.0.1:1\"\n\nError: P1001: Can't reach database server at `127.0.0.1:1`\n\nPlease make sure your database server is running at `127.0.0.1:1`.\n/agent/repos/bidstack-360/packages/db:\n\u2009ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL\u2009 @bidstack/db@0.1.0 migrate:deploy: `prisma migrate deploy`\nExit status 1\n"
+      },
+      "rssAfterStop": null
+    },
+    {
+      "id": "soak",
+      "pass": false,
+      "seconds": 1800,
+      "serverErrors": 0,
+      "baseline": {
+        "api": 414433280,
+        "worker": 355835904,
+        "web": 227336192,
+        "pg": 2,
+        "redis": 80
+      },
+      "warm": {
+        "t": 120,
+        "api": 597688320,
+        "worker": 355868672,
+        "web": 227336192,
+        "pg": 21,
+        "redis": 80
+      },
+      "last": {
+        "t": 1924,
+        "api": 593096704,
+        "worker": 245522432,
+        "web": 227524608,
+        "pg": 24,
+        "redis": 80
+      },
+      "drained": {
+        "api": 593096704,
+        "worker": 245522432,
+        "web": 227524608,
+        "pg": 24,
+        "redis": 80,
+        "sampledAfterDrain": true
+      },
+      "growth": {
+        "api": -0.007682291666666666,
+        "worker": -0.31007573490481344,
+        "web": 0.0008287989621995604
+      },
+      "samples": 60
+    }
+  ],
+  "corrected": {
+    "doubleCreate": {
+      "codes": [
+        201,
+        201
+      ],
+      "rows": 2,
+      "note": "The in-run 400s omitted territoryId. Repeated with territoryId null."
+    },
+    "R1E": {
+      "pass": true,
+      "swept": "FAILED",
+      "retry": 200,
+      "finalStatus": "COMPLETE",
+      "note": "First attempt aged updated_at with microseconds, so the sweep equality missed. Rerun used an ISO millisecond timestamp."
+    }
+  }
+}
