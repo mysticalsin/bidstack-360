@@ -100,6 +100,21 @@ describe('integrations:write parity with contacts:write', () => {
     expect(presales).not.toContain('proposals:approve');
   });
 
+  it('running or undoing an import is Admin-only via settings:write', () => {
+    // WHY: migrations:read says a viewer may see jobs and error files, and that
+    // running or undoing an import needs settings:write. If a member role
+    // gained settings:write, the import routes would let that role mass-create
+    // and mass-delete CRM rows.
+    const holders = ROLE_SEEDS.filter((r) => r.permissionKeys.includes('settings:write')).map(
+      (r) => r.name,
+    );
+    expect(holders).toEqual(['Admin']);
+    for (const role of ROLE_SEEDS) {
+      const mayImport = role.permissionKeys.includes('settings:write');
+      expect(mayImport, role.name).toBe(role.name === 'Admin');
+    }
+  });
+
   it('webhook replay is an Admin-only grant, separate from webhooks:write', () => {
     // WHY: a replay re-sends stored CRM payloads to an external system. Only
     // the tenant administrator may do that; holding webhooks:write (or every
