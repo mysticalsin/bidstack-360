@@ -397,17 +397,27 @@ async function writeLead(ctx: WriteCtx, t: Record<string, unknown>): Promise<str
   return created.id;
 }
 
-/** Inline copy of apps/api/src/routes/opportunities.helpers.ts mintNextCode —
- * the worker cannot import from apps/api. Keep the two in sync. */
+/**
+ * Next OP- code from the highest numeric suffix. OP-H10 and OP-0NaN are not
+ * numbers, so they must not become the sequence. Matches
+ * apps/api/src/routes/opportunities.helpers.ts (the worker cannot import it).
+ */
+export function formatNextOpportunityCode(maxNumeric: number | null): string {
+  const n = (maxNumeric ?? 2000) + 1;
+  return `OP-${n.toString().padStart(4, '0')}`;
+}
+
+/** Inline copy of the API helper. Numeric suffix, not lexicographic order. */
 async function mintNextCode(tx: Prisma.TransactionClient, orgId: string): Promise<string> {
-  const last = await tx.opportunity.findFirst({
-    where: { orgId, code: { startsWith: 'OP-' } },
-    orderBy: { code: 'desc' },
-    select: { code: true },
-  });
-  if (!last) return 'OP-2001';
-  const n = Number(last.code.slice(3));
-  return `OP-${(n + 1).toString().padStart(4, '0')}`;
+  const rows = await tx.$queryRaw<{ maxCode: number | bigint | null }[]>(Prisma.sql`
+    SELECT MAX((substring(code FROM 4))::integer) AS "maxCode"
+    FROM opportunities
+    WHERE org_id = ${orgId}::uuid
+      AND code ~ '^OP-[0-9]+$'
+  `);
+  const raw = rows[0]?.maxCode;
+  const max = raw === null || raw === undefined ? null : Number(raw);
+  return formatNextOpportunityCode(Number.isSafeInteger(max) ? max : null);
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -465,7 +475,12 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
       });
       return created.id;
     } catch (err) {
-      if (!isUniqueViolation(err) || attempt === 4) throw err;
+      if (!isUniqueViolation(err) || attempt === 4) {
+        if (isUniqueViolation(err)) {
+          throw new Error('Could not assign an opportunity code', { cause: err });
+        }
+        throw err;
+      }
     }
   }
   return null;
