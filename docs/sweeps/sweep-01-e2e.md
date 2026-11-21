@@ -16,11 +16,11 @@ Screenshots below are from that physical pass (the first failing pass, where a b
 
 ## Counts
 
-| Severity | New | Fixed here | Duplicate of an open PR | Blocked |
-| --- | ---: | ---: | ---: | ---: |
-| High | 1 | 1 | 0 | 0 |
-| Medium | 3 | 1 | 8 | 1 |
-| Low | 0 | 0 | 4 | 0 |
+| Severity | New (not a duplicate) | Fixed here | Duplicate of an open PR | Blocked | Still open |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| High | 1 | 1 | 0 | 0 | 0 |
+| Medium | 3 | 1 | 5 | 1 | 1 |
+| Low | 0 | 0 | 4 | 0 | 0 |
 
 Journeys that behaved correctly are not counted as findings.
 
