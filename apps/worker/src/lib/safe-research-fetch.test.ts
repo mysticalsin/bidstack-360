@@ -22,7 +22,7 @@ describe('createResearchFetch (SSRF + DNS-rebinding guard)', () => {
     lookupMock.mockResolvedValueOnce([{ address: '10.0.0.5' }]);
     const base = vi.fn(async () => new Response('nope')) as unknown as FetchLike;
     const f = createResearchFetch(base);
-    await expect(f('https://rebind.example/')).rejects.toThrow('internal address');
+    await expect(f('https://rebind.example/')).rejects.toThrow(/blocked address/);
     expect(base).not.toHaveBeenCalled();
   });
 
@@ -53,9 +53,12 @@ describe('createResearchFetch (SSRF + DNS-rebinding guard)', () => {
 
   it('fetches when the host resolves to only public IPs', async () => {
     lookupMock.mockResolvedValueOnce([{ address: '93.184.216.34' }]);
-    const base = vi.fn(async () => new Response('ok')) as unknown as FetchLike;
-    const f = createResearchFetch(base);
+    const base = vi.fn(async () => new Response('nope')) as unknown as FetchLike;
+    const f = createResearchFetch(base, {
+      transport: async () => ({ status: 200, headers: {}, body: new TextEncoder().encode('ok') }),
+    });
     const res = await f('https://example.com/');
     expect(await res.text()).toBe('ok');
+    expect(base).not.toHaveBeenCalled();
   });
 });
