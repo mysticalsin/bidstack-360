@@ -4,6 +4,7 @@ import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
+import { throwIntegrationNotConfigured } from '../lib/integration-not-configured.js';
 import { enqueueSentrySmoke } from '../queues/sentry-smoke.js';
 
 const API_SMOKE_MARKER = 'bidstack-api-sentry-smoke';
@@ -52,17 +53,15 @@ function assertSmokeAuthorized(req: FastifyRequest): void {
     throw req.server.httpErrors.notFound('Not found');
   }
   if (!process.env.SENTRY_DSN) {
-    throw req.server.httpErrors.serviceUnavailable('SENTRY_DSN is required for Sentry smoke');
+    throwIntegrationNotConfigured(req, 'SENTRY_DSN');
   }
   if (!process.env.SENTRY_RELEASE) {
-    throw req.server.httpErrors.serviceUnavailable('SENTRY_RELEASE is required for Sentry smoke');
+    throwIntegrationNotConfigured(req, 'SENTRY_RELEASE');
   }
 
   const expected = process.env.SENTRY_SMOKE_TOKEN ?? '';
   if (expected.length < 24) {
-    throw req.server.httpErrors.serviceUnavailable(
-      'SENTRY_SMOKE_TOKEN must be at least 24 characters',
-    );
+    throwIntegrationNotConfigured(req, 'SENTRY_SMOKE_TOKEN');
   }
   if (!constantTimeEqual(readSmokeToken(req), expected)) {
     throw req.server.httpErrors.unauthorized('Invalid Sentry smoke token');

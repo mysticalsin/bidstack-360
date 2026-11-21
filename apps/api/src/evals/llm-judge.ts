@@ -16,6 +16,8 @@
 
 import { z } from 'zod';
 
+import { discardUpstreamBody } from '../lib/upstream-body.js';
+
 import { detectPhantomMetrics } from './hallucination-detector.js';
 import type { GoldenFixture } from './types.js';
 
@@ -202,7 +204,8 @@ async function judgeWithAnthropic(fixture: GoldenFixture, apiKey: string): Promi
   });
 
   if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.status} ${await response.text()}`);
+    await discardUpstreamBody(response);
+    throw new Error(`Anthropic API error: ${response.status}`);
   }
 
   const data = (await response.json()) as {

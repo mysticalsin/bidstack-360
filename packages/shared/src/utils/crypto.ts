@@ -29,6 +29,34 @@ const VERSION = 0x01; // bump if we ever change algorithm/layout
 const WEBHOOK_SIGNING_SECRET_PREFIX = 'whsec_';
 const WEBHOOK_SIGNING_SECRET_HASH_PURPOSE = 'webhook-signing-secret-lookup-v1';
 
+/**
+ * Brand for a 503 whose message we wrote. Symbol.for survives a second copy
+ * of this package after a rebuild. A plain Error cannot set it unless it
+ * knows the key, and the handler never trusts err.name.
+ */
+export const DELIBERATE_503 = Symbol.for('bidstack.deliberate503');
+
+/**
+ * INTEGRATION_TOKEN_KEY is unset. Callers map this once to HTTP 503.
+ * A present but malformed key stays a plain Error so it is not advertised
+ * as a normal "not configured" response.
+ */
+export class IntegrationTokenKeyMissingError extends Error {
+  readonly statusCode = 503;
+
+  constructor() {
+    super('Integration token encryption is not configured');
+    this.name = 'IntegrationTokenKeyMissingError';
+    Object.defineProperty(this, DELIBERATE_503, { value: true });
+  }
+}
+
+export function isDeliberate503(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const branded = err as { statusCode?: unknown; [DELIBERATE_503]?: unknown };
+  return branded.statusCode === 503 && branded[DELIBERATE_503] === true;
+}
+
 function decodeMasterKey(raw: string): Buffer {
   const trimmed = raw.trim();
   if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
@@ -45,9 +73,7 @@ let cachedKey: Buffer | null = null;
 export function getIntegrationTokenKey(): Buffer {
   if (cachedKey) return cachedKey;
   const raw = process.env.INTEGRATION_TOKEN_KEY;
-  if (!raw) {
-    throw new Error('INTEGRATION_TOKEN_KEY env var is required to encrypt integration tokens');
-  }
+  if (!raw) throw new IntegrationTokenKeyMissingError();
   cachedKey = decodeMasterKey(raw);
   return cachedKey;
 }

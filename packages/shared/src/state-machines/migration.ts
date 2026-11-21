@@ -44,9 +44,13 @@ const MIGRATION_ROW_SENTENCES = new Set([
   'financial.revenue is required',
 ]);
 
-const MIGRATION_ACCOUNT_FIRST = /^No account named ".+" — import accounts first$/;
-const MIGRATION_UNSUPPORTED_ENTITY =
-  /^Entity type ".+" is not supported by the import worker yet$/;
+const MIGRATION_QUOTED_NAME = '[^\\x00-\\x1f"]{1,80}';
+const MIGRATION_ACCOUNT_FIRST = new RegExp(
+  `^No account named "${MIGRATION_QUOTED_NAME}" — import accounts first$`,
+);
+const MIGRATION_UNSUPPORTED_ENTITY = new RegExp(
+  `^Entity type "${MIGRATION_QUOTED_NAME}" is not supported by the import worker yet$`,
+);
 
 function migrationKnownRowSentence(message: string): boolean {
   return (
@@ -67,12 +71,32 @@ const MIGRATION_FAILURE_TEXT: Record<string, string> = {
   [MIGRATION_LEGACY_ROWS_EXPIRED]: 'Those rows expired. Upload the file again.',
 };
 
+function migrationFailureKnown(message: string): string | undefined {
+  if (!Object.hasOwn(MIGRATION_FAILURE_TEXT, message)) return undefined;
+  return MIGRATION_FAILURE_TEXT[message];
+}
+
 /** The sentence a downloaded error CSV shows. A known row sentence passes through; other text does not. */
 export function migrationFailureText(message: string): string {
-  const known = MIGRATION_FAILURE_TEXT[message];
+  const known = migrationFailureKnown(message);
   if (known) return known;
   if (migrationKnownRowSentence(message)) return message;
   return 'The import could not be completed.';
+}
+
+const CHUNK_FAILED_PREFIX = 'chunk failed permanently:';
+
+/**
+ * The message a job response may return. Known codes and row sentences stay,
+ * because the import wizard keys on them. Driver and provider text becomes a
+ * code. A permanent chunk failure keeps its prefix so retry stays hidden,
+ * without the raw tail.
+ */
+export function migrationPublicMessage(message: string): string {
+  if (message.startsWith(CHUNK_FAILED_PREFIX)) return `${CHUNK_FAILED_PREFIX} import_failed`;
+  if (migrationFailureKnown(message) !== undefined) return message;
+  if (migrationKnownRowSentence(message)) return message;
+  return 'import_failed';
 }
 
 /** A spreadsheet treats a cell starting with one of these as a formula. */

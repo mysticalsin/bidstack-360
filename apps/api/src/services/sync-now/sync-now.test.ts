@@ -117,7 +117,7 @@ describe('hubspotRunFromJobs', () => {
           processedRows: 8,
           errorRows: 2,
           completedAt: new Date(5_000),
-          errorSummary: [{ row: 3, field: 'email', message: 'invalid email' }],
+          errorSummary: [{ row: 3, field: 'email', message: 'company.name is required' }],
         },
       ],
       6,
@@ -126,7 +126,7 @@ describe('hubspotRunFromJobs', () => {
       state: 'completed',
       progress: 100,
       result: { new: 6, updated: 2, skipped: 0, failed: 2 },
-      reasons: ['invalid email'],
+      reasons: ['company.name is required'],
       finishedAt: new Date(5_000).toISOString(),
     });
   });

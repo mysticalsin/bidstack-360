@@ -17,6 +17,7 @@ import { prisma, EmailProvider } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
 import { getAccessToken, GRAPH_BASE, type ServiceLogger } from './microsoft-graph-auth.service.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../lib/upstream-body.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 
 // ─── Email send ────────────────────────────────────────────────────────────────
@@ -123,8 +124,8 @@ export async function sendEmail(
   });
 
   if (!res.ok) {
-    const errBody = await res.text();
-    log.error({ status: res.status, errBody, orgId: params.orgId }, 'Graph sendMail failed');
+    await discardUpstreamBody(res);
+    log.error({ status: res.status, orgId: params.orgId }, 'Graph sendMail failed');
     throw new Error(`Graph sendMail failed: ${res.status}`);
   }
 

@@ -15,8 +15,9 @@ import fp from 'fastify-plugin';
 import { prisma } from '@bidstack/db';
 
 import { emailDomainForTelemetry } from '../lib/email-privacy.js';
-import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
+import { throwIntegrationNotConfigured } from '../lib/integration-not-configured.js';
 import { assertPoloAuthBoot, isCfAccessAuthEnabled, isRealDataMode } from '../lib/polo-mode.js';
+import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import { writeAuthAudit } from './auth-audit.js';
 import { verifyCfAccessAuth } from './cf-access-auth.js';
 import { ensureAdminRoleGrant, mapClerkRole } from './auth-helpers.js';
@@ -525,7 +526,7 @@ async function resolveClerkAuthFromDb(
 async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
-    throw req.server.httpErrors.serviceUnavailable('CLERK_SECRET_KEY not configured');
+    throwIntegrationNotConfigured(req, 'CLERK_SECRET_KEY');
   }
 
   const authHeader = req.headers.authorization ?? '';
@@ -554,7 +555,7 @@ async function verifyClerkAuth(req: FastifyRequest): Promise<AuthContext> {
 
   const publicBaseUrl = process.env.PUBLIC_BASE_URL;
   if (process.env.NODE_ENV === 'production' && (!publicBaseUrl || publicBaseUrl.trim() === '')) {
-    throw req.server.httpErrors.serviceUnavailable('PUBLIC_BASE_URL is required in production');
+    throwIntegrationNotConfigured(req, 'PUBLIC_BASE_URL');
   }
   const authorizedParties = publicBaseUrl ? [publicBaseUrl] : [];
 
