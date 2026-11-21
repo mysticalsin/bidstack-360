@@ -1,57 +1,60 @@
-import { useEffect } from 'react';
+import { useMemo } from 'react';
 
+import { moneyFromMicros, presentMoney, unitsToMicros } from '@bidstack/shared';
+
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { useCurrencyStore } from '@/stores/currency';
-import { formatMoney, formatMoneyMicros } from '@/lib/format';
-
-const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
 
 /**
- * Convert and format a money amount for the user's selected display currency.
- * Uses live exchange rates fetched from open.er-api.com.
+ * Format a unit amount in its own currency. The header selector does not
+ * convert it. A different selector is named on the text.
  */
-export function useDisplayMoney(value: number, sourceCurrency = 'EUR'): string {
-  const { currency, convert, fetchRates } = useCurrencyStore();
-  useEffect(() => {
-    if (!SHOULD_AUTO_FETCH_RATES) return;
-    void fetchRates();
-  }, [fetchRates]);
-  const converted = convert(value, sourceCurrency);
-  return formatMoney(converted, currency);
+export function useDisplayMoney(value: number, sourceCurrency?: string | null): string {
+  const currency = useCurrencyStore((state) => state.currency);
+  return useMemo(() => {
+    const source = sourceCurrency?.trim();
+    if (!source) return UNSPECIFIED_CURRENCY_BASIS;
+    try {
+      return presentMoney(moneyFromMicros(unitsToMicros(value), source), currency, {
+        compact: Math.abs(value) >= 1_000_000,
+      }).text;
+    } catch {
+      return UNSPECIFIED_CURRENCY_BASIS;
+    }
+  }, [value, sourceCurrency, currency]);
 }
 
-/** Convert and format micros (string/number/bigint) for the display currency. */
+/** Format stored micros in their own currency. No rate is applied. */
 export function useDisplayMoneyMicros(
   micros: string | number | bigint,
-  // Micros are EUR-denominated at rest — keep in sync with useDisplayMoney.
-  sourceCurrency = 'EUR',
+  sourceCurrency?: string | null,
   options?: { compact?: boolean },
 ): string {
-  const { currency, convert, fetchRates } = useCurrencyStore();
-  useEffect(() => {
-    if (!SHOULD_AUTO_FETCH_RATES) return;
-    void fetchRates();
-  }, [fetchRates]);
-  // Convert micros to unit value
-  const asBigInt =
-    typeof micros === 'bigint'
-      ? micros
-      : typeof micros === 'number'
-        ? BigInt(Math.trunc(micros))
-        : BigInt(micros);
-  const million = BigInt(1_000_000);
-  const whole = asBigInt / million;
-  const remainder = asBigInt % million;
-  const value = Number(whole) + Number(remainder) / 1_000_000;
-  const converted = convert(value, sourceCurrency);
-  // Convert back to micros string for formatMoneyMicros
-  const convertedMicros = String(BigInt(Math.round(converted * 1_000_000)));
-  return formatMoneyMicros(convertedMicros, currency, options);
+  const currency = useCurrencyStore((state) => state.currency);
+  return useMemo(() => {
+    let asBigInt: bigint;
+    try {
+      asBigInt =
+        typeof micros === 'bigint'
+          ? micros
+          : typeof micros === 'number'
+            ? BigInt(Math.trunc(micros))
+            : BigInt(micros);
+    } catch {
+      return UNSPECIFIED_CURRENCY_BASIS;
+    }
+    const source = sourceCurrency?.trim();
+    if (!source) return UNSPECIFIED_CURRENCY_BASIS;
+    const major = asBigInt < 0n ? -asBigInt : asBigInt;
+    const compact = options?.compact ?? major / 1_000_000n >= 1000n;
+    return presentMoney(moneyFromMicros(asBigInt, source), currency, { compact }).text;
+  }, [micros, sourceCurrency, options?.compact, currency]);
 }
 
 /** Same as useDisplayMoneyMicros but always full precision. */
 export function useDisplayMoneyMicrosFull(
   micros: string | number | bigint,
-  sourceCurrency = 'EUR',
+  sourceCurrency?: string | null,
 ): string {
   return useDisplayMoneyMicros(micros, sourceCurrency, { compact: false });
 }

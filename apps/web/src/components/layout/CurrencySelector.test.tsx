@@ -50,7 +50,7 @@ describe('CurrencySelector', () => {
     const listbox = await screen.findByRole('listbox', { name: 'Select currency' });
     expect(within(listbox).getAllByRole('option')).toHaveLength(SUPPORTED_CURRENCIES.length);
     expect(listbox.className).not.toContain('overflow-y-auto');
-    expect(within(listbox).getByText('Rates updated May 31')).toBeDefined();
+    expect(within(listbox).getByText(/does not convert/i)).toBeDefined();
     expect(screen.getByRole('button', { name: 'Auto' })).toBeDefined();
   });
 
