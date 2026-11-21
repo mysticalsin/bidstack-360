@@ -6,17 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { SmartCompanyDialog } from '@/components/company/SmartCompanyDialog';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { Icon } from '@/components/ui/Icon';
-import {
-  EmptyState,
-  EmptyStateLink,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import {
-  AUTOPOPULATE_MAX,
-  useAutopopulateSalesCompanies,
-} from '@/hooks/useAutopopulateSalesCompanies';
+import { AUTOPOPULATE_MAX, useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
@@ -191,26 +183,14 @@ export function AccountsAllSegment() {
 
   const healthDistribution = useMemo(
     () => [
-      {
-        key: 'strong',
-        label: t('accounts.health.strong', 'Strong'),
-        count: rows.filter((row) => row.health === 'strong').length,
-      },
-      {
-        key: 'good',
-        label: t('accounts.health.good', 'Good'),
-        count: rows.filter((row) => row.health === 'good').length,
-      },
+      { key: 'strong', label: t('accounts.health.strong', 'Strong'), count: rows.filter((row) => row.health === 'strong').length },
+      { key: 'good', label: t('accounts.health.good', 'Good'), count: rows.filter((row) => row.health === 'good').length },
       {
         key: 'needs_attention',
         label: t('accounts.health.watch', 'Watch'),
         count: rows.filter((row) => row.health === 'needs_attention').length,
       },
-      {
-        key: 'critical',
-        label: t('accounts.health.risk', 'At risk'),
-        count: rows.filter((row) => row.health === 'critical').length,
-      },
+      { key: 'critical', label: t('accounts.health.risk', 'At risk'), count: rows.filter((row) => row.health === 'critical').length },
     ],
     [rows, t],
   );
@@ -256,16 +236,13 @@ export function AccountsAllSegment() {
     );
   }
 
-  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } =
-    summaryStats;
-  const dealsSampleCapped = dashboard.data?.dealsSampleCapped === true;
+  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
+  const dealsSampleCapped = dashboard.data.dealsSampleCapped === true;
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
   const snapshotCapped = loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP;
-  const filtersActive = Boolean(
-    search || industry || technology || segment !== 'all' || leverageOnly,
-  );
+  const filtersActive = Boolean(search || industry || technology || segment !== 'all' || leverageOnly);
   // True first-run org state: no search/filter narrowing the view AND the
   // underlying snapshot itself has zero rows. Distinct from "filters matched
   // nothing" — that case keeps the existing filter-miss copy below.
@@ -280,10 +257,7 @@ export function AccountsAllSegment() {
             description:
               error instanceof Error
                 ? error.message
-                : t(
-                    'accounts.sync.errorDescription',
-                    'The latest ERP customer pull could not complete.',
-                  ),
+                : t('accounts.sync.errorDescription', 'The latest ERP customer pull could not complete.'),
             action: { label: t('accounts.actions.retry', 'Retry'), onClick: syncErpAccounts },
           });
         },
@@ -303,9 +277,7 @@ export function AccountsAllSegment() {
           subtitle={
             <>
               {rows.length === 1
-                ? t('accounts.summary.companyCount_one', '{{count}} company', {
-                    count: rows.length,
-                  })
+                ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
                 : t('accounts.summary.companyCount_other', '{{count}} companies', {
                     count: rows.length,
                   })}{' '}
@@ -314,18 +286,12 @@ export function AccountsAllSegment() {
                 ? t('accounts.summary.openDealsCapped', '{{count}} open deals in the latest 100', {
                     count: totalOpen,
                   })
-                : t('accounts.summary.openDeals', '{{count}} open deals', {
-                    count: totalOpen,
-                  })}{' '}
+                : t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })}{' '}
               ·{' '}
               {dealsSampleCapped
-                ? t(
-                    'accounts.summary.weightedPipelineCapped',
-                    '{{amount}} from the latest 100 deals',
-                    {
-                      amount: formatMoneyMicros(totalPipeline, 'EUR'),
-                    },
-                  )
+                ? t('accounts.summary.weightedPipelineCapped', '{{amount}} from the latest 100 deals', {
+                    amount: formatMoneyMicros(totalPipeline, 'EUR'),
+                  })
                 : t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
                     amount: formatMoneyMicros(totalPipeline, 'EUR'),
                   })}
@@ -449,9 +415,7 @@ export function AccountsAllSegment() {
       <InsightPanel
         ariaLabel={t('accounts.experience.regionLabel', 'Portfolio cockpit')}
         eyebrow={t('accounts.experience.eyebrow', 'Portfolio cockpit')}
-        heading={t('accounts.experience.title', '{{count}} accounts in view', {
-          count: rows.length,
-        })}
+        heading={t('accounts.experience.title', '{{count}} accounts in view', { count: rows.length })}
         sub={
           topMissingFields.length > 0
             ? t('accounts.experience.gaps', 'Top gaps: {{gaps}}', {
@@ -462,8 +426,7 @@ export function AccountsAllSegment() {
       >
         <div className="account-health-bars">
           {healthDistribution.map((item) => {
-            const width =
-              rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';
+            const width = rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';
             return (
               <div key={item.key} className={`account-health-bar account-health-${item.key}`}>
                 <div>
@@ -485,33 +448,13 @@ export function AccountsAllSegment() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...springSoft, delay: reducedMotion ? 0 : 0.08 }}
       >
-        <div
-          className="account-segment-bar"
-          role="group"
-          aria-label={t('accounts.segments.label', 'Account segments')}
-        >
+        <div className="account-segment-bar" role="group" aria-label={t('accounts.segments.label', 'Account segments')}>
           {[
             { key: 'all', label: t('accounts.segments.all', 'All'), count: segmentCounts.all },
-            {
-              key: 'enriched',
-              label: t('accounts.segments.enriched', 'Enriched'),
-              count: segmentCounts.enriched,
-            },
-            {
-              key: 'with_tech',
-              label: t('accounts.segments.withTech', 'Tech stack'),
-              count: segmentCounts.with_tech,
-            },
-            {
-              key: 'needs_data',
-              label: t('accounts.segments.needsData', 'Needs data'),
-              count: segmentCounts.needs_data,
-            },
-            {
-              key: 'watch',
-              label: t('accounts.segments.watch', 'Watch'),
-              count: segmentCounts.watch,
-            },
+            { key: 'enriched', label: t('accounts.segments.enriched', 'Enriched'), count: segmentCounts.enriched },
+            { key: 'with_tech', label: t('accounts.segments.withTech', 'Tech stack'), count: segmentCounts.with_tech },
+            { key: 'needs_data', label: t('accounts.segments.needsData', 'Needs data'), count: segmentCounts.needs_data },
+            { key: 'watch', label: t('accounts.segments.watch', 'Watch'), count: segmentCounts.watch },
           ].map((option) => (
             <button
               key={option.key}
@@ -586,12 +529,8 @@ export function AccountsAllSegment() {
             </option>
             <option value="name">{t('accounts.filters.sort.name', 'Sort: name')}</option>
             <option value="health">{t('accounts.filters.sort.health', 'Sort: health')}</option>
-            <option value="industry">
-              {t('accounts.filters.sort.industry', 'Sort: industry')}
-            </option>
-            <option value="coverage">
-              {t('accounts.filters.sort.coverage', 'Sort: coverage')}
-            </option>
+            <option value="industry">{t('accounts.filters.sort.industry', 'Sort: industry')}</option>
+            <option value="coverage">{t('accounts.filters.sort.coverage', 'Sort: coverage')}</option>
           </FilterSelect>
         </FilterRow>
       </motion.div>
@@ -614,22 +553,15 @@ export function AccountsAllSegment() {
       </p>
 
       {leverageOnly && leverageMissing.length > 0 ? (
-        <p
-          role="status"
-          className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-sm"
-          data-testid="accounts-leverage-outside-snapshot"
-        >
+        <p role="status" className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2 text-sm" data-testid="accounts-leverage-outside-snapshot">
           {t(
             'accounts.leverage.outsideSnapshot',
             '{{count}} under-leveraged accounts sit outside this dashboard snapshot.',
             { count: leverageMissing.length },
-          )}{' '}
+          )}
+          {' '}
           {leverageMissing.slice(0, 8).map((item) => (
-            <Link
-              key={item.companyId}
-              to={`/accounts/${item.companyId}`}
-              className="mr-2 underline"
-            >
+            <Link key={item.companyId} to={`/accounts/${item.companyId}`} className="mr-2 underline">
               {item.companyName}
             </Link>
           ))}
