@@ -117,7 +117,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                   isLost: true,
                 },
               },
-              _count: { select: { tasks: true } },
+              // Relation counts skip the soft-delete middleware, so a tombstoned
+              // task was still counted on the pipeline card.
+              _count: { select: { tasks: { where: { deletedAt: null } } } },
             },
             // When a due-date window is requested, order by soonest-due-first
             // (or oldest-overdue-first) instead of updatedAt — otherwise a

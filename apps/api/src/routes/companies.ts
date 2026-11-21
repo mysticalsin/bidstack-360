@@ -161,7 +161,9 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           scope,
         ),
         include: {
-          parent: { select: { id: true, name: true } },
+          // Nested reads skip the soft-delete middleware. deletedAt is selected
+          // so a tombstoned parent can be dropped before the response.
+          parent: { select: { id: true, name: true, deletedAt: true } },
           children: {
             where: { deletedAt: null },
             select: { id: true, name: true },
@@ -204,7 +206,11 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!c) throw server.httpErrors.notFound('Company not found');
 
-      return serializeCompanyDetail(c);
+      const parent =
+        c.parent && c.parent.deletedAt === null
+          ? { id: c.parent.id, name: c.parent.name }
+          : null;
+      return serializeCompanyDetail({ ...c, parent });
     },
   );
 
@@ -521,18 +527,33 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Company not found');
 
-      await prisma.company.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId },
-        data: { deletedAt: new Date() },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'company.delete',
-          targetType: 'company',
-          targetId: req.params.id,
-        },
+      // Children keep parentId after a soft delete (no FK action runs). Clear
+      // it in the same transaction as the tombstone so the account is not
+      // still named as their parent. Tombstoned children are included: the
+      // soft-delete middleware would otherwise skip them.
+      await prisma.$transaction(async (tx) => {
+        await tx.company.updateMany({
+          where: { orgId: req.auth.orgId, parentId: existing.id, deletedAt: null },
+          data: { parentId: null },
+        });
+        await tx.company.updateMany({
+          where: { orgId: req.auth.orgId, parentId: existing.id, deletedAt: { not: null } },
+          data: { parentId: null },
+        });
+        const updated = await tx.company.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
+        if (updated.count !== 1) throw server.httpErrors.notFound('Company not found');
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'company.delete',
+            targetType: 'company',
+            targetId: req.params.id,
+          },
+        });
       });
       return reply.code(204).send(null);
     },
