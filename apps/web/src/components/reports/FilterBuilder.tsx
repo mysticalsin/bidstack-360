@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { brandTextLinkClass } from '@/lib/brand-link';
 import { cn } from '@/lib/cn';
 import { springSoft } from '@/lib/motion';
 import type {
@@ -341,7 +342,7 @@ function GroupNode({
         <button
           onClick={addCondition}
           className={cn(
-            'flex items-center gap-1 text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline',
+            cn(brandTextLinkClass, 'flex items-center gap-1 text-xs'),
             'focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] rounded px-2',
             'min-h-[44px]',
           )}

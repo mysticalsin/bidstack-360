@@ -12,6 +12,8 @@ import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
@@ -46,7 +48,7 @@ export function TopAccountsCard() {
             </Badge>
           ) : null}
         </div>
-        <Link to="/accounts?view=top" className="text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline">
+        <Link to="/accounts?view=top" className={cn(brandTextLinkClass, 'text-xs')}>
           {t('topAccounts.viewAll', 'View all')}
         </Link>
       </div>

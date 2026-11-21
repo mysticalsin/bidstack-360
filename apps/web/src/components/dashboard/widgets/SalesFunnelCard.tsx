@@ -11,6 +11,8 @@ import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { Icon } from '@/components/ui/Icon';
 import { springSoft } from '@/lib/motion';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '../unspecified-currency';
@@ -72,7 +74,7 @@ export function SalesFunnelCard({
             {t('salesFunnel.title', 'Sales funnel')}
           </h2>
         </div>
-        <Link to="/pipeline" className="text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline">
+        <Link to="/pipeline" className={cn(brandTextLinkClass, 'text-xs')}>
           {t('salesFunnel.viewPipeline', 'View pipeline')}
         </Link>
       </div>

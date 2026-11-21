@@ -4,6 +4,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { RestrictedCompanyLabel } from '@/components/RestrictedCompanyLabel';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { isRestrictedCompany } from '@/lib/restrictedCompany';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -202,7 +204,7 @@ export function CompanyDetailPage() {
                 ) : (
                   <Link
                     to={`/companies/${c.parent.id}`}
-                    className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+                    className={cn(brandTextLinkClass, 'font-medium')}
                   >
                     {c.parent.name}
                   </Link>
