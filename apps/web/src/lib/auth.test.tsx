@@ -166,6 +166,28 @@ describe('AuthProvider — stub mode (no publishableKey)', () => {
     expect(screen.getByTestId('email').textContent).toBe('jane@mantu.com');
   });
 
+  it('drops the stub session in a tab that did not click Sign out', async () => {
+    localStorage.setItem('bidstack:session', 'stub');
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+
+    // The other tab wrote these. This tab only hears the storage event.
+    localStorage.setItem('bidstack:stub-signed-out', 'true');
+    localStorage.removeItem('bidstack:session');
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'bidstack:stub-signed-out', newValue: 'true' }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('signed-in').textContent).toBe('false');
+    });
+    expect(screen.getByTestId('email').textContent).toBe('none');
+  });
+
   it('preserves explicit stub sign-out across reloads', async () => {
     const { rerender } = render(
       <AuthProvider publishableKey={undefined}>
@@ -263,6 +285,28 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
     expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
     expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
+  });
+
+  it('drops the demo session in a tab that did not click Sign out', async () => {
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ ok: true })));
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+
+    localStorage.removeItem(DEMO_TOKEN_KEY);
+    localStorage.setItem(DEMO_SIGNED_OUT_KEY, '1');
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: DEMO_TOKEN_KEY, newValue: null }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('signed-in').textContent).toBe('false');
+    });
   });
 });
 
