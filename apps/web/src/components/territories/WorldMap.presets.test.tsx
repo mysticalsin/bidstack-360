@@ -30,6 +30,12 @@ describe('WorldMap region presets', () => {
     expect(europe.getAttribute('aria-pressed')).toBe('false');
     expect(global.getAttribute('type')).toBe('button');
 
+    // Icon-only zoom controls need a name. A title attribute is not the name
+    // we rely on: it is absent from the accessibility tree in some browsers.
+    expect(screen.getByRole('button', { name: 'Zoom In' }).getAttribute('aria-label')).toBe('Zoom In');
+    expect(screen.getByRole('button', { name: 'Zoom Out' }).getAttribute('aria-label')).toBe('Zoom Out');
+    expect(screen.getByRole('button', { name: 'Reset View' }).getAttribute('aria-label')).toBe('Reset View');
+
     fireEvent.click(europe);
 
     expect(europe.getAttribute('aria-pressed')).toBe('true');
