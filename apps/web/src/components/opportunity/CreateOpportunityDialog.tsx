@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCreateOpportunity } from '@/hooks/useOpportunities';
 import { api } from '@/lib/api';
+import { formatStage } from '@/lib/format';
 import {
   INDUSTRIES,
   type OpportunityCreate,
@@ -115,7 +116,16 @@ export function CreateOpportunityDialog({
     // also re-validates — this is for fast inline feedback, not security.
     const parsed = OpportunityCreateSchema.safeParse(candidate);
     if (!parsed.success) {
-      setFieldErrors(parsed.error.flatten().fieldErrors as FieldErrors);
+      const raw = parsed.error.flatten().fieldErrors as FieldErrors;
+      setFieldErrors({
+        ...raw,
+        customer: raw.customer?.map((message) =>
+          /at least 1 character/i.test(message) ? 'Choose a customer.' : message,
+        ),
+        name: raw.name?.map((message) =>
+          /at least 1 character/i.test(message) ? 'Enter an opportunity name.' : message,
+        ),
+      });
       return;
     }
     create.mutate(parsed.data, {
@@ -208,7 +218,7 @@ export function CreateOpportunityDialog({
               <Select id="stage" name="stage" defaultValue="s1_ongoing">
                 {STAGES.map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {formatStage(s)}
                   </option>
                 ))}
               </Select>
@@ -222,7 +232,7 @@ export function CreateOpportunityDialog({
                 <option value="">—</option>
                 {INDUSTRIES.map((i) => (
                   <option key={i} value={i}>
-                    {i}
+                    {formatStage(i)}
                   </option>
                 ))}
               </Select>
