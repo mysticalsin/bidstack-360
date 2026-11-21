@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CrmCompany } from '@bidstack/shared';
+import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
 import { AccountsAllSegment } from './AccountsAllSegment';
 
@@ -132,6 +132,24 @@ function company(i: number): CrmCompany {
   } as CrmCompany;
 }
 
+function deal(index: number, companyId: string): CrmDeal {
+  return {
+    id: `d-${index}`,
+    source: 'external_crm',
+    companyId,
+    companyName: null,
+    name: `Deal ${index}`,
+    stage: 'proposal',
+    amountMicros: 0,
+    currencyCode: 'EUR',
+    probability: 0,
+    closeDate: null,
+    ownerId: null,
+    ownerName: null,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
 function setDashboard(companyCount: number) {
   dashboardState.current = {
     data: {
@@ -182,15 +200,47 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     expect(screen.queryByText(/latest 100 deals/i)).toBeNull();
   });
 
-  it('names the pipeline as the latest 100 deals when the deal sample is full', () => {
-    // WHY: 100 deals is the server cap. Showing that sum as the portfolio
-    // pipeline hides every older deal.
-    setDashboard(2);
-    const current = dashboardState.current as { data: { dealsSampleCapped?: boolean } };
+  it('names the 100 deals that were counted when the sample is full', () => {
+    // WHY: a full sample is still a counted set. The label names those 100
+    // deals, and it does not invent a window the totals did not use.
+    setDashboard(1);
+    const current = dashboardState.current as {
+      data: { dealsSampleCapped?: boolean; deals: CrmDeal[] };
+    };
     current.data.dealsSampleCapped = true;
+    current.data.deals = Array.from({ length: 100 }, (_, index) => deal(index, 'c-0'));
     renderSegment();
 
-    expect(screen.getAllByText(/latest 100 deals/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/100 deals counted/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/latest 100/i)).toBeNull();
+  });
+
+  it('states the deals that were counted when that set is not the latest 100', () => {
+    // WHY: the capped flag only means the org query stopped at 100. The totals
+    // sum the deals on the rows in view. A merged account sample can be 150,
+    // and a filter drops some of those. "latest 100" would name a different set
+    // than the count and the amount.
+    const companies = [company(0), company(1)];
+    const deals = [
+      ...Array.from({ length: 100 }, (_, index) => deal(index, 'c-0')),
+      ...Array.from({ length: 50 }, (_, index) => deal(100 + index, 'c-1')),
+    ];
+    dashboardState.current = {
+      data: { companies, deals, dealsSampleCapped: true, providerHealth: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+    };
+    renderSegment();
+
+    expect(screen.getAllByText(/150 deals counted/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/latest 100/i)).toBeNull();
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Acme 1' } });
+
+    expect(screen.getAllByText(/50 deals counted/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/150 deals counted/i)).toBeNull();
+    expect(screen.queryByText(/latest 100/i)).toBeNull();
   });
 
   it('tells the user search only covers the loaded snapshot when a capped search misses', () => {
