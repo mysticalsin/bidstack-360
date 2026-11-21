@@ -32,6 +32,7 @@ describe('rewriteServerlessUrl', () => {
     expect(rewriteServerlessUrl('/api/health')).toBe('/health');
     expect(rewriteServerlessUrl('/api/readyz?x=1')).toBe('/readyz?x=1');
     expect(rewriteServerlessUrl('/api/livez')).toBe('/livez');
+    expect(rewriteServerlessUrl('/api/healthz')).toBe('/healthz');
   });
 
   it('leaves every other path alone', () => {

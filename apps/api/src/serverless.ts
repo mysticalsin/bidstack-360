@@ -42,7 +42,7 @@ export function tuneDatabaseUrl(raw: string | undefined): string | undefined {
 /** `/api/health` is the documented probe; the API serves it at `/health`. */
 export function rewriteServerlessUrl(url: string | undefined): string {
   const value = url ?? '/';
-  const match = /^\/api\/(health|livez|readyz)(?=$|\?)/.exec(value);
+  const match = /^\/api\/(health|healthz|livez|readyz)(?=$|\?)/.exec(value);
   return match ? `/${match[1]}${value.slice(match[0].length)}` : value;
 }
 

@@ -3,8 +3,9 @@
  *
  * Routes:
  *   GET /livez   — liveness probe (always 200 if process is alive)
+ *   GET /healthz — same liveness contract as /livez (does not touch Redis)
  *   GET /readyz  — readiness probe (200 when DB + Redis + storage are ready)
- *   GET /health  — health check (DB + Redis ping, returns 200/503)
+ *   GET /health  — health check (DB + Redis ping, always 200 for dashboards)
  *   GET /metrics — Prometheus exposition format
  *
  * Metrics implementation: built-in counter/gauge/histogram without external
@@ -35,10 +36,21 @@ const ReleaseSchema = z.object({
   branch: z.string().nullable(),
 });
 
+export const DependencyStatus = z.enum(['connected', 'degraded', 'unavailable']);
+
+const DependencyProbe = z.object({
+  status: DependencyStatus,
+  latencyMs: z.number().int().nonnegative(),
+});
+
 const CoreHealthSchema = z.object({
   ok: z.boolean(),
   db: z.boolean(),
   redis: z.boolean(),
+  dependencies: z.object({
+    db: DependencyProbe,
+    redis: DependencyProbe,
+  }),
   // Optional: release metadata (commit SHA + branch) is gated behind the same
   // bearer token /metrics requires — see releaseMetadataForCaller. An
   // unauthenticated caller gets a response with the key omitted entirely.
@@ -225,6 +237,32 @@ function probeTimeoutMs(): number {
  * that accepts the connection but never answers must read as down, not hang
  * the probe until the request timeout.
  */
+/**
+ * Redis that never answers is `unavailable` and `/readyz` is 503. A replica
+ * that cannot reach Redis cannot share rate limits, idempotency, or the job
+ * producers, so it must leave the load balancer. A ping that succeeds but
+ * takes at least half the probe budget is `degraded` and stays 200: the
+ * dependency answered. Liveness (`/livez`, `/healthz`) does not call this.
+ */
+export function dependencyState(
+  ok: boolean,
+  latencyMs: number,
+  budgetMs: number,
+): z.infer<typeof DependencyStatus> {
+  if (!ok) return 'unavailable';
+  if (latencyMs >= Math.floor(budgetMs / 2)) return 'degraded';
+  return 'connected';
+}
+
+async function timedProbe(
+  probe: () => Promise<boolean>,
+  timeoutMs: number,
+): Promise<{ ok: boolean; latencyMs: number }> {
+  const started = Date.now();
+  const ok = await boundedProbe(probe, timeoutMs);
+  return { ok, latencyMs: Math.max(0, Date.now() - started) };
+}
+
 export async function boundedProbe(probe: () => Promise<boolean>, timeoutMs: number): Promise<boolean> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<boolean>((resolve) => {
@@ -242,17 +280,29 @@ async function probeCoreHealth(
   headers: FastifyRequest['headers'],
 ): Promise<z.infer<typeof CoreHealthSchema>> {
   const timeoutMs = probeTimeoutMs();
-  const [db, redisOk] = await Promise.all([
-    boundedProbe(async () => {
+  const [dbProbe, redisProbe] = await Promise.all([
+    timedProbe(async () => {
       const t0 = Date.now();
       await prisma.$queryRaw`SELECT 1`;
       dbQueryDuration.observe({ operation: 'ping' }, (Date.now() - t0) / 1000);
       return true;
     }, timeoutMs),
-    boundedProbe(pingRedis, timeoutMs),
+    timedProbe(pingRedis, timeoutMs),
   ]);
 
-  return { ok: db && redisOk, db, redis: redisOk, release: releaseMetadataForCaller(headers) };
+  return {
+    ok: dbProbe.ok && redisProbe.ok,
+    db: dbProbe.ok,
+    redis: redisProbe.ok,
+    dependencies: {
+      db: { status: dependencyState(dbProbe.ok, dbProbe.latencyMs, timeoutMs), latencyMs: dbProbe.latencyMs },
+      redis: {
+        status: dependencyState(redisProbe.ok, redisProbe.latencyMs, timeoutMs),
+        latencyMs: redisProbe.latencyMs,
+      },
+    },
+    release: releaseMetadataForCaller(headers),
+  };
 }
 
 export function storageConfigReady(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -297,22 +347,24 @@ function releaseMetadataForCaller(
 // ── Route plugin ────────────────────────────────────────────────────────────
 
 export const healthRoute: FastifyPluginAsyncZod = async (server) => {
-  // Liveness — just proves the process is alive.
-  server.get(
-    '/livez',
-    {
-      config: { public: true },
-      schema: {
-        response: {
-          200: z.object({
-            ok: z.literal(true),
-            release: CoreHealthSchema.shape.release,
-          }),
-        },
+  // Liveness — proves the process is alive. Neither path reads Redis or Postgres.
+  const livenessSchema = {
+    config: { public: true },
+    schema: {
+      response: {
+        200: z.object({
+          ok: z.literal(true),
+          release: CoreHealthSchema.shape.release,
+        }),
       },
     },
-    async (req) => ({ ok: true as const, release: releaseMetadataForCaller(req.headers) }),
-  );
+  };
+  const livenessHandler = async (req: FastifyRequest) => ({
+    ok: true as const,
+    release: releaseMetadataForCaller(req.headers),
+  });
+  server.get('/livez', livenessSchema, livenessHandler);
+  server.get('/healthz', livenessSchema, livenessHandler);
 
   // Readiness — checks DB + Redis + storage are operational.
   server.get(

@@ -11,12 +11,12 @@ import type { FastifyInstance } from 'fastify';
  * with `X-Azure-FDID: <profile frontDoorId>`; when AZURE_FRONT_DOOR_ID is set
  * we reject anything that does not carry that exact value.
  *
- * Platform probes (/livez, /readyz, /health) and the bearer-protected /metrics
- * scrape come from inside the environment and are exempt.
+ * Platform probes (/livez, /healthz, /readyz, /health) and the bearer-protected
+ * /metrics scrape come from inside the environment and are exempt.
  *
  * Unset = disabled (local dev, CI, non-Azure deploys).
  */
-const EXEMPT_PATHS = new Set(['/livez', '/readyz', '/health', '/metrics']);
+const EXEMPT_PATHS = new Set(['/livez', '/healthz', '/readyz', '/health', '/metrics']);
 
 function sameId(a: string, b: string): boolean {
   const ab = Buffer.from(a.toLowerCase());

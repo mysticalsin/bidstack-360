@@ -17,7 +17,8 @@ import {
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { queueFirstAccountIntel } from '../queues/account-intel.js';
-import { queueCompanyTechDetect } from '../queues/company-tech-detect.js';
+import { enqueueCompanyTechDetect } from '../queues/company-tech-detect.js';
+import { ENRICHMENT_FAILED_MESSAGE, ENRICHMENT_QUEUED_MESSAGE } from '../queues/producer-redis.js';
 import { serializeCompany, serializeCompanyDetail } from '../serializers/company.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
@@ -214,7 +215,14 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
         body: CompanyCreate,
-        response: { 201: Company },
+        response: {
+          201: Company.extend({
+            enrichment: z.object({
+              status: z.enum(['queued', 'failed']),
+              message: z.string(),
+            }),
+          }),
+        },
       },
     },
     async (req, reply) => {
@@ -255,10 +263,36 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           targetId: c.id,
         },
       });
-      queueCompanyTechDetect([{ kind: 'refresh', orgId: req.auth.orgId, companyId: c.id, reason: 'create' }]);
-      await queueFirstAccountIntel(prisma, { orgId: req.auth.orgId, companyId: c.id, requestedBy: req.auth.userId });
+      // Redis is not part of the company write. Both enqueues share a bounded
+      // producer: a down socket returns null instead of holding the response.
+      const [intelJobId, techJobId] = await Promise.all([
+        queueFirstAccountIntel(prisma, {
+          orgId: req.auth.orgId,
+          companyId: c.id,
+          requestedBy: req.auth.userId,
+        }),
+        enqueueCompanyTechDetect({
+          kind: 'refresh',
+          orgId: req.auth.orgId,
+          companyId: c.id,
+          reason: 'create',
+        }),
+      ]);
+      const enrichmentQueued = Boolean(intelJobId) && Boolean(techJobId);
+      if (!enrichmentQueued) {
+        req.log.warn(
+          { companyId: c.id, accountIntel: Boolean(intelJobId), techDetect: Boolean(techJobId) },
+          ENRICHMENT_FAILED_MESSAGE,
+        );
+      }
       reply.status(201);
-      return serializeCompany(c);
+      return {
+        ...serializeCompany(c),
+        enrichment: {
+          status: enrichmentQueued ? ('queued' as const) : ('failed' as const),
+          message: enrichmentQueued ? ENRICHMENT_QUEUED_MESSAGE : ENRICHMENT_FAILED_MESSAGE,
+        },
+      };
     },
   );
 
