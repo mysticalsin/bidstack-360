@@ -111,7 +111,7 @@ describe('polo app role boot', () => {
     expect(functionBody(entry, 'restoreFrom')).toContain('--no-privileges');
     expect(functionBody(entry, 'restoreFrom')).toContain('LC_ALL');
     expect(functionBody(entry, 'restoreFrom')).toContain('PGVERBOSITY');
-    expect(entry).toContain("process.env.POLO_RESTORE_DRILL !== '1'");
+    expect(functionBody(entry, 'overrideInDrill')).toContain('drillHooksAllowed(');
   });
 
   it('binds the app role password and records only the SQLSTATE when that fails', () => {

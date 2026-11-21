@@ -231,10 +231,24 @@ function asEnv(env) {
 
 export function drillHooksAllowed(env) {
   const source = asEnv(env);
-  return (
-    source.POLO_RESTORE_DRILL === '1' &&
-    String(source.NODE_ENV || '').toLowerCase() !== 'production'
-  );
+  if (source.POLO_RESTORE_DRILL !== '1') return false;
+  // The container supervisor does not set NODE_ENV. POLO_DEPLOYMENT is what
+  // the Worker puts on the process, so a production boot refuses the drill
+  // even when NODE_ENV is unset.
+  if (String(source.POLO_DEPLOYMENT || '').toLowerCase() === 'production') return false;
+  if (String(source.NODE_ENV || '').toLowerCase() === 'production') return false;
+  return true;
+}
+
+// A SQL literal writes a single quote as two quotes. That form is still the secret.
+export function secretLeakKind(text, secret) {
+  const body = String(text || '');
+  const raw = String(secret || '');
+  if (raw && body.includes(raw)) return 'plaintext';
+  const doubled = raw.replaceAll("'", "''");
+  if (raw && doubled !== raw && body.includes(doubled)) return 'plaintext';
+  if (body.includes('SCRAM-SHA-256$')) return 'verifier';
+  return 'clean';
 }
 
 function drillHooksRequested(env) {

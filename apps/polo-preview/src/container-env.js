@@ -31,6 +31,9 @@ export function containerEnv(env) {
     PII_ENCRYPTION_MASTER_KEY: env.POLO_PII_ENCRYPTION_MASTER_KEY,
     BIDSTACK_JOB_SIGNING_SECRET: env.POLO_JOB_SIGNING_SECRET,
     POLO_APP_DB_PASSWORD: env.POLO_APP_DB_PASSWORD,
+    // The container supervisor reads this. Drill hooks stay off in production
+    // even though that process has no NODE_ENV.
+    POLO_DEPLOYMENT: 'production',
     ...(env.POLO_INTEL_USER_AGENT ? { POLO_INTEL_USER_AGENT: env.POLO_INTEL_USER_AGENT } : {}),
     ...(env.COMPANIES_HOUSE_API_KEY ? { COMPANIES_HOUSE_API_KEY: env.COMPANIES_HOUSE_API_KEY } : {}),
   };

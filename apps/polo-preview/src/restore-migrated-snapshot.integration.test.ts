@@ -26,6 +26,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { secretLeakKind } from './database-boot.js';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = realpathSync(join(here, '../../..'));
 const pgBin = '/usr/lib/postgresql/16/bin';
@@ -393,9 +395,7 @@ function roleFacts(port: number): string {
 }
 
 function secretKind(text: string): 'clean' | 'plaintext' | 'verifier' {
-  if (text.includes(FIXTURE_PASSWORD)) return 'plaintext';
-  if (text.includes('SCRAM-SHA-256$')) return 'verifier';
-  return 'clean';
+  return secretLeakKind(text, FIXTURE_PASSWORD);
 }
 
 function expectClean(text: string): void {

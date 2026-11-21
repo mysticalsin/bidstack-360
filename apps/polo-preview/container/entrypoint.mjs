@@ -23,6 +23,7 @@ import {
   assertPsqlArgsHaveNoCommand,
   BOOT_STATES,
   createDatabaseBoot,
+  drillHooksAllowed,
   ENSURE_APP_ROLE_SQL,
   passwordPsqlEnv,
   restoreFailure,
@@ -62,7 +63,7 @@ function insideTemp(name, raw, tempOnly) {
 }
 
 function overrideInDrill(name, fallback, tempOnly) {
-  if (process.env.POLO_RESTORE_DRILL !== '1') return fallback;
+  if (!drillHooksAllowed(process.env)) return fallback;
   const raw = process.env[name];
   if (!raw) return fallback;
   return insideTemp(name, raw, tempOnly);
@@ -301,7 +302,7 @@ function startDatabase() {
   // Some runtimes lock /etc/hosts; then Redis listens on the private interface.
   // POLO_REDIS_HOST skips the hosts file (the drill sets 127.0.0.1).
   const bind = ['127.0.0.1'];
-  const redisOverride = process.env.POLO_RESTORE_DRILL === '1' ? process.env.POLO_REDIS_HOST || '' : '';
+  const redisOverride = drillHooksAllowed(process.env) ? process.env.POLO_REDIS_HOST || '' : '';
   if (redisOverride && redisOverride !== '127.0.0.1') throw new Error('POLO_REDIS_HOST must be 127.0.0.1');
   if (redisOverride) {
     redisHost = redisOverride;
@@ -327,7 +328,7 @@ function startDatabase() {
     runSync('initdb', ['-D', PGDATA, '-U', PG_USER, '--auth=trust', '-E', 'UTF8'], ids);
   }
   const pgArgs = ['-D', PGDATA, '-h', '127.0.0.1', '-p', String(PG_PORT), '-k', PG_SOCKET, '-c', 'shared_buffers=256MB'];
-  if (process.env.POLO_RESTORE_DRILL === '1') {
+  if (drillHooksAllowed(process.env)) {
     mkdirSync(join(PGDATA, 'log'), { recursive: true });
     pgArgs.push('-c', 'logging_collector=on', '-c', 'log_directory=log', '-c', 'log_filename=postgresql.log', '-c', 'log_min_error_statement=error');
   }
