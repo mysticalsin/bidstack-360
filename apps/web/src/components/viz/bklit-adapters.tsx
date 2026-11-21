@@ -67,23 +67,52 @@ export function WinRateLine({ data }: { data: Array<{ x: string; date: Date; rat
   );
 }
 
+export type ForecastBarPoint = {
+  label: string;
+  won: number;
+  weighted: number;
+  wonLabel?: string;
+  weightedLabel?: string;
+};
+
+/** The stored label when forecastPoint produced one. Otherwise the numeric format. */
+export function forecastTipText(
+  point: { won?: unknown; weighted?: unknown; wonLabel?: unknown; weightedLabel?: unknown },
+  key: 'won' | 'weighted',
+  format: Fmt,
+): string {
+  const label = key === 'won' ? point.wonLabel : point.weightedLabel;
+  if (typeof label === 'string' && label.length > 0) return label;
+  const numeric = point[key];
+  return format(typeof numeric === 'number' ? numeric : Number(numeric ?? 0));
+}
+
 /** Won actuals and weighted forecast per quarter. */
-export function QuarterBars({ data, format }: { data: Array<{ label: string; won: number; weighted: number }>; format: Fmt }) {
+export function QuarterBars({ data, format }: { data: ForecastBarPoint[]; format: Fmt }) {
   const reduced = useReducedMotion();
   if (!data.length) return null;
   return (
-    <div aria-hidden className="viz-bk">
-      <BarChart data={data} xDataKey="label" aspectRatio="2.6 / 1" margin={{ ...MARGIN, top: 24, left: 28, right: 28 }} barGap={0.3}
-        animationDuration={reduced ? 0 : 900} enterTransition={reduced ? { duration: 0 } : undefined}>
-        <Grid horizontal numTicksRows={3} strokeDasharray="0" stroke="var(--viz-line)" />
-        <Bar dataKey="won" fill={WON} lineCap="round" animate={!reduced} staggerDelay={reduced ? 0 : 0.06} />
-        <Bar dataKey="weighted" fill={`color-mix(in srgb, ${BRAND} 45%, transparent)`} lineCap="round" animate={!reduced} staggerDelay={reduced ? 0 : 0.06} />
-        <BarXAxis />
-        <ChartTooltip rows={(p) => [
-          { color: WON, label: 'Won', value: format(Number(p.won ?? 0)) },
-          { color: BRAND, label: 'Weighted forecast', value: format(Number(p.weighted ?? 0)) },
-        ]} />
-      </BarChart>
+    <div>
+      <div aria-hidden className="viz-bk">
+        <BarChart data={data} xDataKey="label" aspectRatio="2.6 / 1" margin={{ ...MARGIN, top: 24, left: 28, right: 28 }} barGap={0.3}
+          animationDuration={reduced ? 0 : 900} enterTransition={reduced ? { duration: 0 } : undefined}>
+          <Grid horizontal numTicksRows={3} strokeDasharray="0" stroke="var(--viz-line)" />
+          <Bar dataKey="won" fill={WON} lineCap="round" animate={!reduced} staggerDelay={reduced ? 0 : 0.06} />
+          <Bar dataKey="weighted" fill={`color-mix(in srgb, ${BRAND} 45%, transparent)`} lineCap="round" animate={!reduced} staggerDelay={reduced ? 0 : 0.06} />
+          <BarXAxis />
+          <ChartTooltip rows={(p) => [
+            { color: WON, label: 'Won', value: forecastTipText(p, 'won', format) },
+            { color: BRAND, label: 'Weighted forecast', value: forecastTipText(p, 'weighted', format) },
+          ]} />
+        </BarChart>
+      </div>
+      <ul className="viz-meta" data-testid="forecast-tip" style={{ listStyle: 'none', margin: '8px 0 0', padding: 0 }}>
+        {data.map((d) => (
+          <li key={d.label}>
+            {d.label} <span>{forecastTipText(d, 'won', format)}</span> <span>{forecastTipText(d, 'weighted', format)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
