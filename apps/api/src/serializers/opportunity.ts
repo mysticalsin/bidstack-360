@@ -16,6 +16,7 @@ type SerializedPipelineStage = {
   color: string | null;
   isWon: boolean;
   isLost: boolean;
+  deletedAt?: string;
 };
 type SerializedOpportunity = {
   id: string;
@@ -55,7 +56,15 @@ export interface OpportunityCounts {
 }
 
 function serializePipelineStage(
-  ps: { id: string; name: string; probability: number | bigint | unknown; color: string | null; isWon?: boolean; isLost?: boolean } | null | undefined,
+  ps: {
+    id: string;
+    name: string;
+    probability: number | bigint | unknown;
+    color: string | null;
+    isWon?: boolean;
+    isLost?: boolean;
+    deletedAt?: Date | null;
+  } | null | undefined,
 ): SerializedPipelineStage | null {
   if (!ps) return null;
   return {
@@ -65,6 +74,7 @@ function serializePipelineStage(
     color: ps.color ?? null,
     isWon: ps.isWon ?? false,
     isLost: ps.isLost ?? false,
+    ...(ps.deletedAt ? { deletedAt: ps.deletedAt.toISOString() } : {}),
   };
 }
 

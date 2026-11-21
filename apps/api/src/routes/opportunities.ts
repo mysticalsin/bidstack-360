@@ -115,6 +115,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                   color: true,
                   isWon: true,
                   isLost: true,
+                  deletedAt: true,
                 },
               },
               _count: { select: { tasks: true } },

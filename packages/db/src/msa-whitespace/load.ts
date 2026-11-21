@@ -4,6 +4,7 @@
 import {
   detectBusinessLines,
   evaluateWhitespace,
+  excludeLostOutcomeWhere,
   rankWhitespace,
   resolveWhitespaceDecision,
   whitespaceHeadline,
@@ -42,6 +43,24 @@ function lines(text: string | null | undefined): string[] {
 
 const DRAFT_STAGE = 's1_lead';
 
+/** Open or won pursuits. A live lost stage is not current activity. A drafted lead stays out. */
+export function accountActivityOpportunityWhere(
+  orgId: string,
+  companyIds: string[],
+  draftedIds: string[],
+): Prisma.OpportunityWhereInput {
+  const and: Prisma.OpportunityWhereInput[] = [excludeLostOutcomeWhere()];
+  if (draftedIds.length) {
+    and.push({ NOT: { id: { in: draftedIds }, stage: DRAFT_STAGE } });
+  }
+  return {
+    orgId,
+    companyId: { in: companyIds },
+    deletedAt: null,
+    AND: and,
+  };
+}
+
 /** Lines the account already buys: open opportunities, projects, revenue. */
 export async function loadAccountActivityLines(
   db: PrismaClient,
@@ -62,13 +81,7 @@ export async function loadAccountActivityLines(
   const draftedIds = drafted.map((d) => d.opportunityId).filter((id): id is string => Boolean(id));
   const [opps, projects, subscriptions] = await Promise.all([
     db.opportunity.findMany({
-      where: {
-        orgId,
-        companyId: { in: companyIds },
-        deletedAt: null,
-        stage: { not: 'closed_lost' },
-        ...(draftedIds.length ? { NOT: { id: { in: draftedIds }, stage: DRAFT_STAGE } } : {}),
-      },
+      where: accountActivityOpportunityWhere(orgId, companyIds, draftedIds),
       select: { companyId: true, name: true, industry: true },
       take: 1000,
     }),
