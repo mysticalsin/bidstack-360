@@ -30,6 +30,7 @@ import {
   type SignatureStatus,
 } from '@bidstack/shared';
 import { htmlToPdf } from './document.service.js';
+import { fetchSigningDocumentBytes } from './signing-document-fetch.js';
 import { getEnv } from '../../env.js';
 
 const log = pino({ name: 'signature', level: process.env.LOG_LEVEL ?? 'info' });
@@ -254,12 +255,15 @@ async function sendDocuSignEnvelope(params: {
   const accountId = env.DOCUSIGN_ACCOUNT_ID;
   if (!accountId) throw credentialError('DOCUSIGN_ACCOUNT_ID not configured');
 
-  const token = await getDocuSignAccessToken();
+  // Refuse a metadata or off-bucket URL before the DocuSign token request.
+  let docBytes: string;
+  try {
+    docBytes = Buffer.from(await fetchSigningDocumentBytes(doc.storageUrl)).toString('base64');
+  } catch (err) {
+    throw credentialError(err instanceof Error ? err.message : 'Failed to fetch document for signing');
+  }
 
-  // Fetch the document bytes from S3 storage URL
-  const docRes = await fetch(doc.storageUrl);
-  if (!docRes.ok) throw credentialError(`Failed to fetch document for signing: ${docRes.status}`);
-  const docBytes = Buffer.from(await docRes.arrayBuffer()).toString('base64');
+  const token = await getDocuSignAccessToken();
 
   const signers = recipients.map((r, i) => ({
     email: r.email,
