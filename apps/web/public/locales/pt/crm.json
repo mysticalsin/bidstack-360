@@ -1166,6 +1166,8 @@
       "statusStalled": "Importação interrompida",
       "reasonStalled": "A importação parou antes de gravar alguma linha.",
       "reasonEnqueue": "A importação não começou. Tente novamente.",
+      "reasonCouldNotQueue": "Não foi possível colocar a importação na fila. Tente novamente.",
+      "reasonAlreadyRunning": "Esta importação já está em andamento.",
       "reasonRowsExpired": "Essas linhas expiraram. Envie o arquivo de novo.",
       "reasonConflict": "A importação entrou em conflito com outra gravação.",
       "reasonEnqueueStopped": "A importação parou antes de gravar as linhas restantes.",

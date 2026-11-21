@@ -1167,6 +1167,8 @@
       "statusStalled": "Import stalled",
       "reasonStalled": "The import stalled before any rows were saved.",
       "reasonEnqueue": "The import did not start. Try again.",
+      "reasonCouldNotQueue": "The import could not be queued. Try again.",
+      "reasonAlreadyRunning": "This import is already running.",
       "reasonRowsExpired": "Those rows expired. Upload the file again.",
       "reasonConflict": "The import conflicted with another write.",
       "reasonEnqueueStopped": "The import stopped before the remaining rows were saved.",

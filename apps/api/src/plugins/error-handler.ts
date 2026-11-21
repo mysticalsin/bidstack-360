@@ -102,10 +102,12 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       // or ORM internals — 4xx messages are always crafted by our own code and are
       // safe to return verbatim. Exposing them gives API callers actionable feedback
       // (e.g. "Unknown permissionId(s): ...") without leaking internals.
+      const migrationCode = (err as { migrationCode?: unknown }).migrationCode;
       return reply.status(err.statusCode).send({
         statusCode: err.statusCode,
         error: err.name,
         message: err.message,
+        ...(typeof migrationCode === 'string' ? { code: migrationCode } : {}),
       });
     }
 

@@ -31,6 +31,9 @@ import {
   DedupStrategyEnum,
   type MigrationJobError,
   MIGRATION,
+  MIGRATION_CANCEL_REQUESTED,
+  MIGRATION_NO_LONGER_FAILED,
+  RETRY_LOST,
   migrationAttemptId,
   migrationFrom,
   migrationProgressAt,
@@ -67,7 +70,80 @@ function stalledFlag(job: {
   });
 }
 
+/** Jobs whose live attempt still has a cancel mark the chunk has not applied. */
+async function jobsWithPendingCancel(orgId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT job.id::text AS id
+    FROM migration_jobs AS job
+    WHERE job.org_id = ${orgId}::uuid
+      AND job.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
+      AND job.status::text IN ('PENDING', 'RUNNING')
+      AND EXISTS (
+        SELECT 1
+        FROM audit_log AS mark
+        WHERE mark.org_id = job.org_id
+          AND mark.target_id = job.id::text
+          AND mark.target_type = 'MigrationJob'
+          AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+          AND mark.deleted_at IS NULL
+          AND (
+            (
+              (
+                ((job.meta->>'attemptId') IS NULL AND (mark.diff->>'attemptId') IS NULL)
+                OR mark.diff->>'attemptId' = job.meta->>'attemptId'
+              )
+            )
+            OR (
+              (mark.diff->>'attemptId') IS NULL
+              AND (job.meta->>'attemptId') IS NOT NULL
+              AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
+            )
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM audit_log AS resolved
+            WHERE resolved.org_id = mark.org_id
+              AND resolved.target_id = mark.target_id
+              AND resolved.target_type = 'MigrationJob'
+              AND resolved.action = 'migration.cancel.resolved'
+              AND resolved.deleted_at IS NULL
+              AND resolved.at >= mark.at
+          )
+      )
+  `;
+  return new Set(rows.map((row) => row.id));
+}
+
 const ACTIVE_IMPORT_MESSAGE = 'This import is already running.';
+
+/** How long Cancel waits for the job-row lock a chunk holds with FOR UPDATE. */
+const CANCEL_LOCK_TIMEOUT = '2s';
+
+/** One bucket per signed-in user. A request with no user falls back to the socket address. */
+function csvStartRateKey(req: { auth?: { userId?: string; orgId?: string }; ip: string }): string {
+  const auth = req.auth;
+  if (auth?.userId) return `u:${auth.orgId ?? 'no-org'}:${auth.userId}`;
+  return `ip:${req.ip}`;
+}
+
+const LOCK_TIMEOUT_CODE = /PostgresError \{\s*code:\s*"55P03"/;
+
+export function isLockTimeout(err: unknown, seen?: Set<unknown>): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const visited = seen ?? new Set<unknown>();
+  if (visited.has(err)) return false;
+  visited.add(err);
+  const row = err as {
+    code?: unknown;
+    meta?: { code?: unknown };
+    message?: unknown;
+    cause?: unknown;
+  };
+  if (row.code === '55P03' || row.meta?.code === '55P03') return true;
+  if (typeof row.message === 'string' && LOCK_TIMEOUT_CODE.test(row.message)) return true;
+  return row.cause !== undefined && isLockTimeout(row.cause, visited);
+}
 
 const ACTIVE_IMPORT_INDEX = 'migration_jobs_one_active_per_file';
 
@@ -330,7 +406,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: { createdAt: 'desc' },
         take: limit,
       });
-      return { items: jobs.map((job) => ({ ...serializeJob(job), stalled: stalledFlag(job) })) };
+      const pending = await jobsWithPendingCancel(orgId, jobs.map((job) => job.id));
+      return {
+        items: jobs.map((job) => ({
+          ...serializeJob(job),
+          stalled: stalledFlag(job),
+          ...(pending.has(job.id) ? { cancelRequested: true as const } : {}),
+        })),
+      };
     },
   );
 
@@ -351,9 +434,15 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
-      // Read-only. The worker persists RUNNING → FAILED. This flag is derived
-      // so a poll can show the stall before that write lands.
-      return { ...serializeJob(job), stalled: stalledFlag(job) };
+      // Read-only. The worker persists RUNNING → FAILED. These flags are derived
+      // so a poll can show the stall, or a cancel that is still waiting on the
+      // chunk, before that write lands. A second tab has no local click.
+      const pending = await jobsWithPendingCancel(orgId, [job.id]);
+      return {
+        ...serializeJob(job),
+        stalled: stalledFlag(job),
+        ...(pending.has(job.id) ? { cancelRequested: true as const } : {}),
+      };
     },
   );
 
@@ -362,7 +451,14 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/start-csv',
     {
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+          keyGenerator: (req: { auth?: { userId?: string; orgId?: string }; ip: string }) =>
+            csvStartRateKey(req),
+        },
+      },
       schema: {
         body: z.object({
           source: z.enum(['SALESFORCE_CSV', 'CSV']),
@@ -466,7 +562,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
               action: 'migration.start',
               targetType: 'MigrationJob',
               targetId: job.id,
-              diff: { source, entityType, totalRows: rows.length },
+              diff: { source, entityType, totalRows: rows.length, attemptId },
             },
           });
         } catch (err) {
@@ -474,18 +570,99 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           throw err;
         }
 
-        let claimed: number;
+        let claimed: 'running' | 'cancelled' | 'lost';
         try {
-          claimed = (
-            await prisma.migrationJob.updateMany({
-              where: { id: job.id, orgId, status: { in: [...migrationFrom('start')] } },
-              data: {
-                status: 'RUNNING',
-                startedAt: new Date(),
-                meta: { entityType, dedupStrategy, externalIdColumn: externalIdColumn ?? null, mappings, attemptId },
-              },
-            })
-          ).count;
+          // NOW() is read before the claim waits on the row. A cancel that
+          // times out during that wait is newer than this clock, so the
+          // claim has to see the mark by identity, not by time.
+          const [clock] = await prisma.$queryRaw<Array<{ now: Date }>>`SELECT NOW() AS now`;
+          const startedAt = clock?.now ?? new Date();
+          const meta = {
+            entityType,
+            dedupStrategy,
+            externalIdColumn: externalIdColumn ?? null,
+            mappings,
+            attemptId,
+            progressAt: startedAt.toISOString(),
+          };
+          const updated = await prisma.$transaction(
+            async (tx) => {
+              // Touch the row first. A lock held across this statement is the
+              // same wait the route used to do inside the claim. The pre-start
+              // mark is written while that wait is outstanding, so it is read
+              // after the wait returns.
+              const touched = await tx.$executeRaw`
+                UPDATE migration_jobs
+                SET updated_at = updated_at
+                WHERE id = ${job.id}::uuid
+                  AND org_id = ${orgId}::uuid
+                  AND status::text = 'PENDING'
+              `;
+              if (Number(touched) !== 1) return 'lost' as const;
+              const pre = await tx.$queryRaw<Array<{ id: string }>>`
+                SELECT mark.id::text AS id
+                FROM audit_log AS mark
+                WHERE mark.org_id = ${orgId}::uuid
+                  AND mark.target_id = ${job.id}
+                  AND mark.target_type = 'MigrationJob'
+                  AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+                  AND mark.deleted_at IS NULL
+                  AND (mark.diff->>'attemptId') IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM audit_log AS resolved
+                    WHERE resolved.org_id = mark.org_id
+                      AND resolved.target_id = mark.target_id
+                      AND resolved.target_type = 'MigrationJob'
+                      AND resolved.action = 'migration.cancel.resolved'
+                      AND resolved.deleted_at IS NULL
+                      AND resolved.at >= mark.at
+                  )
+                LIMIT 1
+              `;
+              return pre.length === 1 ? ('cancelled' as const) : ('running' as const);
+            },
+            { maxWait: 5_000, timeout: 20_000 },
+          );
+          if (updated === 'lost') {
+            claimed = 'lost';
+          } else if (updated === 'cancelled') {
+            const wrote = await prisma.migrationJob.updateMany({
+              where: { id: job.id, orgId, status: 'PENDING' },
+              data: { status: 'CANCELLED', startedAt, completedAt: new Date(), meta },
+            });
+            if (wrote.count !== 1) {
+              claimed = 'lost';
+            } else {
+              await prisma.auditLog.create({
+                data: {
+                  orgId,
+                  userId,
+                  action: 'migration.cancel',
+                  targetType: 'MigrationJob',
+                  targetId: job.id,
+                  diff: { attemptId },
+                },
+              });
+              await prisma.auditLog.create({
+                data: {
+                  orgId,
+                  userId,
+                  action: 'migration.cancel.resolved',
+                  targetType: 'MigrationJob',
+                  targetId: job.id,
+                  diff: { reason: 'cancelled' },
+                },
+              });
+              claimed = 'cancelled';
+            }
+          } else {
+            const wrote = await prisma.migrationJob.updateMany({
+              where: { id: job.id, orgId, status: 'PENDING' },
+              data: { status: 'RUNNING', startedAt, meta },
+            });
+            claimed = wrote.count === 1 ? 'running' : 'lost';
+          }
         } catch (err) {
           await releaseUnclaimedStart({ jobId: job.id, orgId, log: req.log });
           if (isActiveImportConflict(err)) {
@@ -493,7 +670,13 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           }
           throw err;
         }
-        if (claimed !== 1) {
+        if (claimed === 'cancelled') {
+          const cancelled = await prisma.migrationJob.findFirstOrThrow({
+            where: { id: job.id, orgId },
+          });
+          return reply.code(201).send(serializeJob(cancelled));
+        }
+        if (claimed !== 'running') {
           const current = await prisma.migrationJob.findFirst({
             where: { id: job.id, orgId },
             select: { status: true },
@@ -576,6 +759,13 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
         externalIdColumn?: string | null;
         mappings?: Record<string, string | null>;
       };
+      if (job.status === 'RUNNING' || job.status === 'COMPLETE') {
+        const lost = server.httpErrors.conflict(MIGRATION_NO_LONGER_FAILED) as Error & {
+          migrationCode?: string;
+        };
+        lost.migrationCode = RETRY_LOST;
+        throw lost;
+      }
       if (
         job.status !== 'FAILED' ||
         !migrationRetryOffered(
@@ -648,11 +838,27 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       let claimed: number;
       try {
         claimed = await prisma.$transaction(async (tx) => {
+          // The cancel mark is stamped by the database. startedAt has to be
+          // that same clock, or an API clock that is ahead drops the mark.
+          // A retry is a new intent. Marks already committed are resolved
+          // here, before the new attempt is published. app_role cannot
+          // update audit_log, so the resolve is an insert.
+          const [clock] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT NOW() AS now`;
+          await tx.auditLog.create({
+            data: {
+              orgId,
+              userId,
+              action: 'migration.cancel.resolved',
+              targetType: 'MigrationJob',
+              targetId: job.id,
+              diff: { reason: 'retry' },
+            },
+          });
           const moved = await tx.migrationJob.updateMany({
             where: { id: job.id, orgId, status: { in: [...migrationFrom('retry')] } },
             data: {
               status: 'RUNNING',
-              startedAt: new Date(),
+              startedAt: clock?.now ?? new Date(),
               completedAt: null,
               errorSummary: [],
               meta: fresh as Prisma.InputJsonValue,
@@ -686,7 +892,11 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           { migrationJobId: job.id, orgId, from: current?.status ?? null, to: 'RUNNING' },
           'illegal migration transition',
         );
-        throw server.httpErrors.conflict('Migration job is no longer failed');
+        const lost = server.httpErrors.conflict(MIGRATION_NO_LONGER_FAILED) as Error & {
+          migrationCode?: string;
+        };
+        lost.migrationCode = RETRY_LOST;
+        throw lost;
       }
 
       try {
@@ -838,23 +1048,123 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        response: { 200: MigrationJobResponse },
+        response: { 200: MigrationJobResponse, 202: MigrationJobResponse },
       },
     },
-    async (req) => {
+    async (req, reply) => {
       const { orgId, userId } = req.auth;
       const job = await prisma.migrationJob.findFirst({
         where: { id: req.params.id, orgId },
       });
       if (!job) throw server.httpErrors.notFound('Migration job not found');
+      if (
+        (job.status === 'RUNNING' || job.status === 'PENDING') &&
+        job.totalRows > 0 &&
+        job.processedRows + job.errorRows >= job.totalRows
+      ) {
+        await prisma.migrationJob.updateMany({
+          where: { id: job.id, orgId, status: { in: ['PENDING', 'RUNNING'] } },
+          data: { status: 'COMPLETE', completedAt: new Date() },
+        });
+        const finished = server.httpErrors.conflict('This import already finished.') as Error & {
+          migrationCode?: string;
+        };
+        finished.migrationCode = 'IMPORT_FINISHED';
+        throw finished;
+      }
       // The read above can be stale. Only PENDING or RUNNING may become CANCELLED.
-      const moved = await prisma.migrationJob.updateMany({
-        where: { id: job.id, orgId, status: { in: [...migrationFrom('cancel')] } },
-        data: { status: 'CANCELLED', completedAt: new Date() },
-      });
-      if (moved.count !== 1) {
-        const current = await prisma.migrationJob.findFirst({
-          where: { id: job.id, orgId },
+      // A chunk holds this row FOR UPDATE for the whole import transaction. Wait
+      // at most CANCEL_LOCK_TIMEOUT, then record a mark the chunk checks.
+      let outcome: 'cancelled' | 'lost' | 'locked';
+      try {
+        outcome = await prisma.$transaction(
+          async (tx) => {
+            await tx.$executeRaw`SELECT set_config('lock_timeout', ${CANCEL_LOCK_TIMEOUT}, true)`;
+            const moved = await tx.migrationJob.updateMany({
+              where: { id: job.id, orgId, status: { in: [...migrationFrom('cancel')] } },
+              data: { status: 'CANCELLED', completedAt: new Date() },
+            });
+            if (moved.count !== 1) return 'lost';
+            await tx.auditLog.create({
+              data: {
+                orgId,
+                userId,
+                action: 'migration.cancel',
+                targetType: 'MigrationJob',
+                targetId: job.id,
+              },
+            });
+            // The attempt this mark applied to is over. A later attempt on
+            // the same job must not inherit it.
+            await tx.auditLog.create({
+              data: {
+                orgId,
+                userId,
+                action: 'migration.cancel.resolved',
+                targetType: 'MigrationJob',
+                targetId: job.id,
+                diff: { reason: 'cancelled' },
+              },
+            });
+            return 'cancelled';
+          },
+          { maxWait: 2_000, timeout: 10_000 },
+        );
+      } catch (err) {
+        if (!isLockTimeout(err)) throw err;
+        outcome = 'locked';
+      }
+      if (outcome === 'locked' || outcome === 'lost') {
+        // One statement. A plain SELECT of the committed row does not wait on
+        // the chunk's FOR UPDATE, and the INSERT happens only when that row is
+        // still PENDING or RUNNING. A finished job matches nothing, so a stale
+        // in-memory read cannot turn it into 202.
+        const decided = await prisma.$queryRaw<Array<{ live: number; inserted: number }>>`
+          WITH live AS (
+            SELECT id, org_id, meta
+            FROM migration_jobs
+            WHERE id = ${job.id}::uuid
+              AND org_id = ${orgId}::uuid
+              AND status::text IN ('PENDING', 'RUNNING')
+          ),
+          ins AS (
+            INSERT INTO audit_log (org_id, user_id, action, target_type, target_id, diff)
+            SELECT
+              live.org_id,
+              ${userId}::uuid,
+              ${MIGRATION_CANCEL_REQUESTED},
+              'MigrationJob',
+              live.id::text,
+              jsonb_build_object('attemptId', live.meta->>'attemptId')
+            FROM live
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM audit_log AS mark
+              WHERE mark.org_id = live.org_id
+                AND mark.target_id = live.id::text
+                AND mark.target_type = 'MigrationJob'
+                AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+                AND mark.deleted_at IS NULL
+                AND (
+                  (live.meta->>'attemptId' IS NULL AND (mark.diff->>'attemptId') IS NULL)
+                  OR mark.diff->>'attemptId' = live.meta->>'attemptId'
+                )
+            )
+            RETURNING id
+          )
+          SELECT
+            (SELECT count(*)::int FROM live) AS live,
+            (SELECT count(*)::int FROM ins) AS inserted
+        `;
+        if (Number(decided[0]?.live) === 1) {
+          const current = await prisma.migrationJob.findUnique({
+            where: { id: job.id },
+          });
+          if (!current) throw server.httpErrors.notFound('Migration job not found');
+          return reply.code(202).send({ ...serializeJob(current), cancelRequested: true as const });
+        }
+        const current = await prisma.migrationJob.findUnique({
+          where: { id: job.id },
           select: { status: true },
         });
         req.log.warn(
@@ -862,20 +1172,11 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           'illegal migration transition',
         );
         throw server.httpErrors.conflict(
-          `Cannot cancel a job with status ${current?.status ?? job.status}`,
+          `Cannot cancel a job with status ${current?.status ?? 'unknown'}`,
         );
       }
       const updated = await prisma.migrationJob.findFirstOrThrow({
         where: { id: job.id, orgId },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId,
-          userId,
-          action: 'migration.cancel',
-          targetType: 'MigrationJob',
-          targetId: job.id,
-        },
       });
       return serializeJob(updated);
     },

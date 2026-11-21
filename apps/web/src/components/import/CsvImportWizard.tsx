@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MIGRATION_CONFLICT,
+  RETRY_LOST,
   MIGRATION_ENQUEUE_FAILED,
   MIGRATION_ENQUEUE_STOPPED,
   MIGRATION_LEGACY_CONFLICT,
@@ -27,6 +28,7 @@ import {
   downloadMigrationErrors,
   useCancelMigration,
   useMigrationJob,
+  useMigrations,
   useParseSpreadsheet,
   usePreviewCsvImport,
   useRetryMigration,
@@ -37,6 +39,38 @@ import {
 
 type Step = 'upload' | 'map' | 'preview' | 'run';
 type Dedup = 'skip' | 'update' | 'duplicate';
+
+const ACTIVE_IMPORT_STORAGE = 'bidstack.csvImport.activeJob';
+const TERMINAL_IMPORT = new Set(['COMPLETE', 'FAILED', 'CANCELLED']);
+
+type StoredImport = { orgId: string; jobId: string };
+
+function readStoredImport(): StoredImport | null {
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_IMPORT_STORAGE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredImport>;
+    if (!parsed || typeof parsed.jobId !== 'string' || typeof parsed.orgId !== 'string') return null;
+    return { orgId: parsed.orgId, jobId: parsed.jobId };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredImport(value: StoredImport | null): void {
+  try {
+    if (!value) sessionStorage.removeItem(ACTIVE_IMPORT_STORAGE);
+    else sessionStorage.setItem(ACTIVE_IMPORT_STORAGE, JSON.stringify(value));
+  } catch {
+    // Private mode. The list still rehydrates this tab.
+  }
+}
+
+function newestLiveImport(items: MigrationJob[] | undefined): MigrationJob | undefined {
+  return (items ?? [])
+    .filter((job) => !TERMINAL_IMPORT.has(job.status))
+    .sort((a, b) => ((a.createdAt ?? '') < (b.createdAt ?? '') ? 1 : -1))[0];
+}
 const MAX_ROWS = 10_000;
 
 const IMPORT_ERROR_KEYS: Record<string, readonly [string, string]> = {
@@ -111,6 +145,51 @@ function importErrorCopy(
   return t('csvImport.progress.reasonUnknown', 'The import could not be completed.');
 }
 
+/** A retry 409 whose job has already moved on. The poll shows the new status. */
+function retryConflictSettled(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 409) return false;
+  const body = error.body;
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === RETRY_LOST
+  );
+}
+
+function importAlreadyFinished(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 409) return false;
+  const body = error.body;
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === 'IMPORT_FINISHED'
+  );
+}
+
+function retryConflictCopy(
+  t: (key: string, fallback: string) => string,
+  error: unknown,
+): string | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  if (retryConflictSettled(error)) return null;
+  if (error.message === 'The import could not be queued. Try again.') {
+    return t(
+      'csvImport.progress.reasonCouldNotQueue',
+      'The import could not be queued. Try again.',
+    );
+  }
+  if (
+    error.message === MIGRATION_ROWS_EXPIRED ||
+    error.message === 'Those rows expired. Upload the file again.'
+  ) {
+    return t('csvImport.progress.reasonRowsExpired', 'Those rows expired. Upload the file again.');
+  }
+  if (error.message === 'This import is already running.') {
+    return t('csvImport.progress.reasonAlreadyRunning', 'This import is already running.');
+  }
+  return t('csvImport.progress.actionFailed', 'That did not work. Try again.');
+}
+
 export function CsvImportWizard() {
   const { t } = useTranslation('crm');
   const startFailureCopy = (error: unknown): string => {
@@ -135,17 +214,54 @@ export function CsvImportWizard() {
   const [mappings, setMappings] = useState<Record<string, string | null>>({});
   const [dedup, setDedup] = useState<Dedup>('update');
   const [jobId, setJobId] = useState<string | null>(null);
+  const [adoptedId, setAdoptedId] = useState<string | null>(null);
+  const migrations = useMigrations();
+  const storedImport = readStoredImport();
+  const liveFromList = newestLiveImport(migrations.data);
+  const items = migrations.data ?? [];
+  const listOrg = items.find((row) => row.orgId)?.orgId;
+  const storedId =
+    storedImport && (!listOrg || storedImport.orgId === listOrg) ? storedImport.jobId : null;
+  const candidateId = jobId ?? storedId ?? liveFromList?.id ?? null;
   const fileInput = useRef<HTMLInputElement>(null);
   const starting = useRef(false);
+  const retrying = useRef(false);
+  const retryTapAt = useRef(0);
 
   const start = useStartCsvImport();
   const cancel = useCancelMigration();
   const retry = useRetryMigration();
   const preview = usePreviewCsvImport();
   const parseSheet = useParseSpreadsheet();
-  const job = useMigrationJob(jobId);
+  const job = useMigrationJob(candidateId);
   const fields = TARGET_FIELDS[entity];
   const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const loaded = job.data && job.data.id === candidateId ? job.data : null;
+  const foreign = Boolean(loaded?.orgId && listOrg && loaded.orgId !== listOrg);
+  const terminalOnArrival = Boolean(
+    loaded && adoptedId !== loaded.id && TERMINAL_IMPORT.has(loaded.status),
+  );
+  const resumed =
+    Boolean(loaded) &&
+    !foreign &&
+    !terminalOnArrival &&
+    !job.isError &&
+    !job.isLoading &&
+    !migrations.isLoading;
+  if (resumed && loaded && adoptedId !== loaded.id) setAdoptedId(loaded.id);
+  const showRun = Boolean(loaded) && !foreign && !job.isError && (adoptedId === loaded?.id || resumed);
+  if (
+    storedImport &&
+    !job.isLoading &&
+    !migrations.isLoading &&
+    (job.isError || foreign || terminalOnArrival)
+  ) {
+    writeStoredImport(null);
+  } else if (showRun && loaded?.orgId) {
+    writeStoredImport({ orgId: loaded.orgId, jobId: loaded.id });
+  }
+  const visibleStep: Step = showRun ? 'run' : step;
 
   const requiredMissing = useMemo(() => {
     const mapped = new Set(Object.values(mappings).filter(Boolean) as string[]);
@@ -223,6 +339,7 @@ export function CsvImportWizard() {
         onSuccess: (created) => {
           setJobId(created.id);
           setStep('run');
+          if (created.orgId) writeStoredImport({ orgId: created.orgId, jobId: created.id });
         },
         onSettled: () => {
           starting.current = false;
@@ -239,13 +356,35 @@ export function CsvImportWizard() {
     setJobId(null);
     setParseError(null);
     setPreviewResult(null);
+    setCancelRequested(false);
+    setAdoptedId(null);
+    writeStoredImport(null);
+  }
+
+  function mapControl(header: string) {
+    return (
+      <select
+        className="input min-h-11 w-full min-w-44"
+        aria-label={t('csvImport.map.mapColumnAria', 'Map column {{header}}', { header })}
+        value={mappings[header] ?? ''}
+        onChange={(e) => setMappings((m) => ({ ...m, [header]: e.target.value || null }))}
+      >
+        <option value="">{t('csvImport.map.dontImport', 'Don’t import')}</option>
+        {fields.map((f) => (
+          <option key={f.key} value={f.key}>
+            {f.label}
+            {f.required ? ' *' : ''}
+          </option>
+        ))}
+      </select>
+    );
   }
 
   return (
     <div>
-      <StepHeader step={step} />
+      <StepHeader step={visibleStep} />
 
-      {step === 'upload' && (
+      {visibleStep === 'upload' && (
         <div className="space-y-4">
           <div>
             <label
@@ -298,7 +437,7 @@ export function CsvImportWizard() {
         </div>
       )}
 
-      {step === 'map' && parsed && (
+      {visibleStep === 'map' && parsed && (
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
             <span className="font-medium text-[var(--fg-primary)]">{fileName}</span> —{' '}
@@ -315,8 +454,27 @@ export function CsvImportWizard() {
                 )}
           </p>
 
-          <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)]">
-            <table className="w-full text-sm">
+          <div className="rounded-lg border border-[var(--border-subtle)]">
+            <ul className="divide-y divide-[var(--border-subtle)] md:hidden">
+              {parsed.headers.map((header) => (
+                <li key={header} className="space-y-2 px-3 py-3">
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate font-medium text-[var(--fg-primary)]">{header}</span>
+                    <span className="max-w-[45%] truncate text-[var(--fg-tertiary)]">
+                      {parsed.rows[0]?.[header] || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-xs font-medium text-[var(--fg-tertiary)]">
+                      {t('csvImport.map.colMapsTo', 'Maps to')}
+                    </span>
+                    {mapControl(header)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
               <thead className="bg-[var(--surface-sunken)] text-left text-[var(--fg-tertiary)]">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">
@@ -337,30 +495,12 @@ export function CsvImportWizard() {
                     <td className="max-w-[12rem] truncate px-3 py-2 text-[var(--fg-tertiary)]">
                       {parsed.rows[0]?.[header] || '—'}
                     </td>
-                    <td className="px-3 py-2">
-                      <select
-                        className="input"
-                        aria-label={t('csvImport.map.mapColumnAria', 'Map column {{header}}', {
-                          header,
-                        })}
-                        value={mappings[header] ?? ''}
-                        onChange={(e) =>
-                          setMappings((m) => ({ ...m, [header]: e.target.value || null }))
-                        }
-                      >
-                        <option value="">{t('csvImport.map.dontImport', 'Don’t import')}</option>
-                        {fields.map((f) => (
-                          <option key={f.key} value={f.key}>
-                            {f.label}
-                            {f.required ? ' *' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                    <td className="min-w-44 px-3 py-2">{mapControl(header)}</td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
 
           <div>
@@ -423,7 +563,7 @@ export function CsvImportWizard() {
         </div>
       )}
 
-      {step === 'preview' && previewResult && (
+      {visibleStep === 'preview' && previewResult && (
         <div className="space-y-4">
           <p className="text-sm text-[var(--fg-secondary)]">
             {previewResult.rowCount === 1
@@ -486,20 +626,36 @@ export function CsvImportWizard() {
         </div>
       )}
 
-      {step === 'run' && (
+      {visibleStep === 'run' && (
         <ImportProgress
           job={job.data ?? null}
           isLoading={job.isLoading}
           onDone={reset}
           onCancel={() => {
-            if (jobId) cancel.mutate(jobId);
+            // A double-tap on Retry can land on Cancel once the job flips to
+            // RUNNING and the button swaps. That tap is not a cancel.
+            if (Date.now() - retryTapAt.current < 750) return;
+            if (!candidateId || cancel.isPending) return;
+            cancel.mutate(candidateId, {
+              onSuccess: (updated) => {
+                if (updated.cancelRequested) setCancelRequested(true);
+              },
+            });
           }}
           onRetry={() => {
-            if (jobId) retry.mutate(jobId);
+            if (!jobId || retrying.current || retry.isPending) return;
+            retryTapAt.current = Date.now();
+            retrying.current = true;
+            retry.mutate(jobId, {
+              onSettled: () => {
+                retrying.current = false;
+              },
+            });
           }}
           cancelPending={cancel.isPending}
+          cancelRequested={cancelRequested}
           retryPending={retry.isPending}
-          actionFailed={cancel.isError || retry.isError}
+          actionFailed={(cancel.isError && !importAlreadyFinished(cancel.error)) || retry.isError}
           retryError={retry.error}
         />
       )}
@@ -556,6 +712,7 @@ function ImportProgress({
   onCancel,
   onRetry,
   cancelPending,
+  cancelRequested,
   retryPending,
   actionFailed,
   retryError,
@@ -566,6 +723,7 @@ function ImportProgress({
   onCancel: () => void;
   onRetry: () => void;
   cancelPending: boolean;
+  cancelRequested: boolean;
   retryPending: boolean;
   actionFailed: boolean;
   retryError: unknown;
@@ -580,6 +738,10 @@ function ImportProgress({
   }
 
   const done = job.status === 'COMPLETE' || job.status === 'FAILED' || job.status === 'CANCELLED';
+  // This tab's click is local. A reload or another tab restores the job id
+  // from session storage or from the org's job list, then reads
+  // cancelRequested only from the server job.
+  const cancelling = cancelPending || cancelRequested || job.cancelRequested === true;
   const failure = importErrorCopy(
     t,
     job.status === 'FAILED'
@@ -592,10 +754,12 @@ function ImportProgress({
     job.processedRows,
     job.errorRows,
   );
-  // A 409 is the request's own reason. A stalled job already has a sentence,
-  // so the generic alert would stay hidden and this refusal would vanish.
-  const refusal =
-    retryError instanceof ApiError && retryError.status === 409 ? retryError.message : null;
+  // A 409 is the request's own reason, rendered through i18n. A stalled job
+  // already has a sentence, so the generic alert would stay hidden and this
+  // refusal would vanish. A "no longer failed" 409 is the loser of a double
+  // retry: the job has moved on, and that sentence is not an error.
+  const settled = retryConflictSettled(retryError);
+  const refusal = settled ? null : retryConflictCopy(t, retryError);
   const pct =
     job.totalRows > 0 ? Math.round((job.processedRows / job.totalRows) * 100) : done ? 100 : 0;
 
@@ -636,7 +800,7 @@ function ImportProgress({
         </p>
       ) : null}
 
-      {actionFailed && !failure && !refusal ? (
+      {actionFailed && !failure && !refusal && !settled ? (
         <p className="text-sm text-[var(--danger)]" role="alert">
           {t('csvImport.progress.actionFailed', 'That did not work. Try again.')}
         </p>
@@ -648,10 +812,10 @@ function ImportProgress({
         <button
           type="button"
           className="btn btn-secondary"
-          disabled={cancelPending}
+          disabled={cancelling}
           onClick={onCancel}
         >
-          {cancelPending
+          {cancelling
             ? t('csvImport.progress.cancelling', 'Cancelling…')
             : t('csvImport.progress.cancel', 'Cancel import')}
         </button>

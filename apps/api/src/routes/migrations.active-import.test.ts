@@ -1,7 +1,7 @@
 import { Prisma } from '@bidstack/db';
 import { describe, expect, it } from 'vitest';
 
-import { isActiveImportConflict } from './migrations.js';
+import { isActiveImportConflict, isLockTimeout } from './migrations.js';
 
 const INDEX = 'migration_jobs_one_active_per_file';
 
@@ -25,5 +25,20 @@ describe('active import conflict', () => {
     expect(isActiveImportConflict(unique(['org_id', 'source', 'source_entity']))).toBe(false);
     expect(isActiveImportConflict(unique('migration_mappings_org_source_entity_key'))).toBe(false);
     expect(isActiveImportConflict(new Error('P2002'))).toBe(false);
+  });
+});
+
+describe('cancel lock timeout', () => {
+  it('rejects a lock-timeout sentence that is not SQLSTATE 55P03', () => {
+    // WHY: Undo, retry, and the reaper can surface the words "lock timeout"
+    // without holding the chunk's row. Only the Postgres code may take the
+    // cancel-mark path.
+    expect(isLockTimeout(new Error('canceling statement due to lock timeout'))).toBe(false);
+    expect(isLockTimeout({ code: '55P03' })).toBe(true);
+    expect(
+      isLockTimeout({
+        message: 'PostgresError { code: "55P03", message: "canceling statement due to lock timeout" }',
+      }),
+    ).toBe(true);
   });
 });

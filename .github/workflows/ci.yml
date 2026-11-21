@@ -99,6 +99,8 @@ jobs:
           --exclude src/queues/migration.orphan-rows.test.ts
           --exclude src/queues/migration.savepoint.test.ts
           --exclude src/queues/migration.stale.test.ts
+          --exclude src/queues/migration.cancel-request.test.ts
+          --exclude src/queues/migration.cancel-gap.test.ts
 
       # kam-tools.test.ts is fail-loud when Postgres is missing (intentional
       # "do not silently skip"). It belongs in the integration job below.
