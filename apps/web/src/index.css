@@ -1751,9 +1751,10 @@ select:focus-visible {
   }
 }
 
-/* WCAG: skip link visible only on focus */
+/* WCAG: skip link visible only on focus. Fixed so it paints at the
+   viewport corner even though it is the first child of the shell grid. */
 .skip-link {
-  position: absolute;
+  position: fixed;
   left: 12px;
   top: 8px;
   transform: translateY(-200%);
