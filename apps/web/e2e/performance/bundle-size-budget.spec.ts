@@ -167,6 +167,19 @@ test.describe('@bundle - JS chunk size budgets', () => {
     expect(initialGz).toBeLessThanOrEqual(INITIAL_LIMIT_BYTES);
   });
 
+  test('the shell does not statically import the recharts chunk', async () => {
+    // WHY: recharts is only needed by lazy routes. A circular chunk
+    // (charts -> vendor -> charts) makes index.html import charts on every
+    // page, so Tasks and Pipeline download ~120 KB gzip they never paint.
+    if (!existsSync(MANIFEST_PATH)) {
+      test.skip(true, 'Vite manifest not found - run `pnpm build` first');
+    }
+    const charts = collectInitialJsAssets().filter((file) =>
+      (file.split(/[\\/]/).pop() ?? '').startsWith('charts-'),
+    );
+    expect(charts, `shell statically imports ${charts.join(', ')}`).toEqual([]);
+  });
+
   test('Vite manifest lists expected chunk names', async () => {
     if (!existsSync(MANIFEST_PATH)) {
       test.skip(true, 'Vite manifest not found - run `pnpm build` first');
