@@ -56,7 +56,9 @@
     "agentStudio": "Studio agenti",
     "calendar": "Calendario",
     "customObjects": "Oggetti personalizzati",
-    "analyticsReports": "Analisi e report"
+    "analyticsReports": "Analisi e report",
+    "agreements": "Accordi",
+    "meetings": "Riunioni"
   },
   "crumbs": {
     "portfolio": "Portfolio",
@@ -357,6 +359,8 @@
     "settings": "Impostazioni",
     "auditLog": "Registro di controllo",
     "login": "Accedi",
+    "agreements": "Accordi",
+    "meetings": "Riunioni",
     "ariaLabel": "Percorso di navigazione"
   },
   "progressRing": {
