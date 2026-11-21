@@ -1,5 +1,7 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
+import { stageOutcome } from '@bidstack/shared';
+
 import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -32,10 +34,12 @@ export interface OppRow {
   name?: string | null;
   code?: string | null;
   owner?: string | null;
+  /** Live stage flags. A deleted stage row is not a close. */
+  pipelineStage?: { isWon?: boolean; isLost?: boolean; deletedAt?: string | Date | null } | null;
 }
 
-const isWon = (o: OppRow) => stageKey(o.stage) === 'closed_won';
-const isLost = (o: OppRow) => stageKey(o.stage) === 'closed_lost';
+const isWon = (o: OppRow) => stageOutcome(o) === 'won';
+const isLost = (o: OppRow) => stageOutcome(o) === 'lost';
 const isClosed = (o: OppRow) => isWon(o) || isLost(o);
 /** When a closed bid closed: closedAt when recorded, else its due date. */
 export const closeDate = (o: OppRow): string | null => o.closedAt ?? o.dueDate;
@@ -46,11 +50,42 @@ export function quarterOf(iso: string): string {
   return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
 }
 
-export function stageFunnel(rows: OppRow[]) {
-  return OPEN_STAGES.map((id) => {
-    const inStage = rows.filter((o) => stageKey(o.stage) === id);
-    return { label: stageText(id), value: inStage.reduce((n, o) => n + (o.value ?? 0), 0), count: inStage.length };
-  }).filter((s) => s.count > 0);
+export interface StageBucket {
+  id: string;
+  label: string;
+  value: number;
+  count: number;
+}
+
+const STAGE_RANK = new Map<string, number>([
+  ...OPEN_STAGES.map((id, index) => [id, index] as const),
+  ['closed_won', 200],
+  ['closed_lost', 201],
+]);
+
+/** One bar per stage that has rows. Legacy open keys stay in pipeline order, a named stage follows, then won and lost. */
+export function stageBuckets(rows: OppRow[]): StageBucket[] {
+  const buckets = new Map<string, StageBucket & { rank: number }>();
+  for (const row of rows) {
+    const id = stageKey(row.stage);
+    const current = buckets.get(id) ?? {
+      id,
+      label: stageText(id),
+      value: 0,
+      count: 0,
+      rank: STAGE_RANK.get(id) ?? 100,
+    };
+    current.value += row.value ?? 0;
+    current.count += 1;
+    buckets.set(id, current);
+  }
+  return [...buckets.values()]
+    .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
+    .map(({ rank: _rank, ...bucket }) => bucket);
+}
+
+export function stageFunnel(rows: OppRow[]): StageBucket[] {
+  return stageBuckets(rows.filter((row) => stageOutcome(row) === 'open'));
 }
 
 export function statusMix(rows: OppRow[]) {
