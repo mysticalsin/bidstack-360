@@ -48,15 +48,16 @@ export function accountActivityOpportunityWhere(
   orgId: string,
   companyIds: string[],
   draftedIds: string[],
-) {
+): Prisma.OpportunityWhereInput {
+  const and: Prisma.OpportunityWhereInput[] = [excludeLostOutcomeWhere()];
+  if (draftedIds.length) {
+    and.push({ NOT: { id: { in: draftedIds }, stage: DRAFT_STAGE } });
+  }
   return {
     orgId,
     companyId: { in: companyIds },
     deletedAt: null,
-    AND: [
-      excludeLostOutcomeWhere(),
-      ...(draftedIds.length ? [{ NOT: { id: { in: draftedIds }, stage: DRAFT_STAGE } }] : []),
-    ],
+    AND: and,
   };
 }
 
