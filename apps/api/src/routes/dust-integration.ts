@@ -248,7 +248,11 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/api-keys',
     {
-      preHandler: server.requirePermission('integrations:write'),
+      // integrations:write is also held by Sales, AE, SDR, Sales Manager, and
+      // Customer Success so they can send mail and SMS. A key created here can
+      // carry settings:write with readOnly:false, which is an org-admin
+      // credential. Same Admin gate as the Dust credential routes.
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         body: ApiKeyCreateBody.superRefine((body, ctx) => {
@@ -345,7 +349,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
     '/api-keys/:id',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('integrations:write'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {

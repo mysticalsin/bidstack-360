@@ -63,7 +63,9 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // GET /integrations/slack/oauth/start
   app.get('/integrations/slack/oauth/start', {
+    // The callback upserts SlackWorkspace by orgId, so this replaces the org bot.
     config: { permission: 'integrations:write' },
+    preHandler: server.requireRole('admin'),
     schema: {
       response: { 200: z.object({ authUrl: z.string().url() }) },
     },
@@ -350,10 +352,11 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
 
   // DELETE /integrations/slack/disconnect — revoke token and delete workspace.
   // Org-level: SlackWorkspace is one row per org, deleted unconditionally on
-  // orgId (not scoped to the caller), so any member without this gate could
-  // tear down the whole org's Slack integration.
+  // orgId (not scoped to the caller). integrations:write is not enough: Sales,
+  // AE, SDR, Sales Manager, and Customer Success hold it so they can send mail
+  // and SMS. Tearing down the workspace is an Admin action.
   app.delete('/integrations/slack/disconnect', {
-    preHandler: server.requirePermission('integrations:write'),
+    preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
     schema: { response: { 204: z.null() } },
     handler: async (req, reply) => {
       const { orgId, userId } = req.auth;

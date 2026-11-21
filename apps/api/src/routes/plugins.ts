@@ -41,7 +41,8 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
     '/plugins',
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('integrations:write'),
+      // Org-wide row. integrations:write is the seller send grant, not this.
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: {
         body: PluginInstall,
         response: { 201: Plugin },
@@ -103,7 +104,7 @@ export const pluginRoutes: FastifyPluginAsyncZod = async (server) => {
     '/plugins/:id',
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
-      preHandler: server.requirePermission('integrations:write'),
+      preHandler: [server.requirePermission('integrations:write'), server.requireRole('admin')],
       schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
