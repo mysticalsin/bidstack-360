@@ -286,10 +286,19 @@ describe('migration status races', () => {
     const blocked = new Promise<never>((_resolve, reject) => {
       rejectNext = reject;
     });
+    let releaseEntered: () => void = () => undefined;
+    const entered = new Promise<void>((resolve) => {
+      releaseEntered = resolve;
+    });
     let jobId = '';
     const add = vi.spyOn(Queue.prototype, 'addBulk').mockImplementation(async (jobs) => {
+      // Longer than vitest's default waitFor (1s). Under load the handler
+      // reaches addBulk after that poll has given up. The test waits on this
+      // mock instead of a deadline, so the claim is observed whenever it lands.
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
       calls += 1;
       jobId = (jobs[0]?.data as { migrationJobId?: string } | undefined)?.migrationJobId ?? '';
+      releaseEntered();
       return blocked;
     });
     try {
@@ -304,7 +313,8 @@ describe('migration status races', () => {
           mappings: { name: 'company.name' },
         },
       });
-      await vi.waitFor(() => expect(calls).toBe(1));
+      await entered;
+      expect(calls).toBe(1);
       const claimed = await prisma.migrationJob.findUniqueOrThrow({ where: { id: jobId } });
       expect(claimed.status).toBe('RUNNING');
       expect((claimed.meta as { attemptId?: string }).attemptId).toEqual(expect.any(String));
