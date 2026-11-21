@@ -186,6 +186,21 @@ describe('CsvImportWizard', () => {
     expect(screen.queryByText(/Match each column/)).toBeNull();
   });
 
+  it('rejects a file over 8 MB before reading it into the mapper', async () => {
+    // WHY: an 11 MB upload was accepted as one row and the sample showed the
+    // raw bytes. The API body limit then fails with a framework message.
+    stubHooks();
+    render(<CsvImportWizard />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = csvFile('name\nNorthwind Labs');
+    Object.defineProperty(file, 'size', { value: 8 * 1024 * 1024 + 1 });
+    Object.defineProperty(input, 'files', { value: [file] });
+    fireEvent.change(input);
+
+    await screen.findByText('That file is too large to import.');
+    expect(screen.queryByText(/Match each column/)).toBeNull();
+  });
+
   it('uses the singular when the file has one row', async () => {
     // WHY: a one-row file was labelled "1 rows" on the map step and the preview button.
     stubHooks();
