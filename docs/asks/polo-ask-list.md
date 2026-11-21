@@ -30,10 +30,10 @@ APP-FIT is judged against the apps as they are on `main`, plus the open pull req
 | P-03 Company revenue, margin, open jobs | Partial | ADAPT | [#67](https://github.com/mysticalsin/bidstack-360/pull/67), [#354](https://github.com/mysticalsin/bidstack-360/pull/354), [#356](https://github.com/mysticalsin/bidstack-360/pull/356) |
 | P-04 Preview container boot | In PR #353 | FIT | [#353](https://github.com/mysticalsin/bidstack-360/pull/353), state machine [#365](https://github.com/mysticalsin/bidstack-360/pull/365) |
 | P-05 README with clips | In PR #388 | ADAPT | [#388](https://github.com/mysticalsin/bidstack-360/pull/388) |
-| P-06 Floor plan before a new screen | Not started | FIT | Built from this audit. No owner in #348–#441. |
+| P-06 Floor plan before a new screen | In PR #486 | FIT | [#486](https://github.com/mysticalsin/bidstack-360/pull/486). No owner in #348–#441 before this audit. |
 | P-07 Deep sweeps, physical E2E, stress | Partial | FIT | Twelve sweep docs in open pull requests. None are on `main`. |
 | P-08 Arabic catalogs | Partial | FIT | Catalogs and `isRtl` are on `main`. Finish and the switcher are [#418](https://github.com/mysticalsin/bidstack-360/pull/418). |
-| P-09 Review comments | Partial | FIT | Inventory [#408](https://github.com/mysticalsin/bidstack-360/pull/408). Dockerfile rows are [#409](https://github.com/mysticalsin/bidstack-360/pull/409). |
+| P-09 Review comments | Partial | FIT | Inventory [#408](https://github.com/mysticalsin/bidstack-360/pull/408). Dockerfile rows are [#409](https://github.com/mysticalsin/bidstack-360/pull/409). Chart rows are [#487](https://github.com/mysticalsin/bidstack-360/pull/487) and [#489](https://github.com/mysticalsin/bidstack-360/pull/489). |
 
 ## P-01 — Real mode, a demo toggle, and an install guide
 
@@ -115,11 +115,11 @@ Source: container boot failures on the preview Worker and Container. See #353 an
 
 ## P-06 — Floor plan before any new screen
 
-**Status: Not started** on `main` and in pull requests #348–#441. A search of open pull request titles and of the tree found no floor plan, wireframe, or mock-up gate.
+**Status: In PR #486.** Not on `main`. At audit time, pull requests #348–#441 and the tree had no floor plan. [#486](https://github.com/mysticalsin/bidstack-360/pull/486) `cursor/polo-floor-plan-81b9` adds `docs/floor-plans/polo-app-floor-plan.md` and `apps/web/src/components/layout/navConfig.floor-plan.test.ts`. Red commit `53091acb` (the plan file was missing). Green commit `aa4a0b7b` (the test passed).
 
 **APP-FIT: FIT.** `NAV_SECTIONS` in `apps/web/src/components/layout/navConfig.ts` is the shell. New screens are still landing (the open UI pull requests from #358 through #472). A floor plan of that shell is the artifact Tony asked for before another screen is drawn. It is a document, not a new product route, so it does not collide with those pull requests.
 
-Built from this audit in its own pull request.
+The pull request is [#486](https://github.com/mysticalsin/bidstack-360/pull/486).
 
 ## P-07 — 10–20 deep sweeps, physical E2E, and stress
 
@@ -167,8 +167,8 @@ Of the 21 unaddressed items, 12 sit on pull requests Tony parked (#189 and #280)
 | Inventory row | Where | What this audit does |
 | --- | --- | --- |
 | 5, 16, and the later-head part of 6 | `apps/marketing/Dockerfile` has no `USER`. `apps/api/Dockerfile` has no `HEALTHCHECK`. The API image on current `main` already has `USER bidstack` (`apps/api/Dockerfile`). | Owned by [#409](https://github.com/mysticalsin/bidstack-360/pull/409) `cursor/preview-image-scan-fixes-ffb6`. Not copied. |
-| 7 | [#73](https://github.com/mysticalsin/bidstack-360/pull/73) comment on `apps/web/src/components/viz/charts.tsx`: stage bars still format `Number(value)` and ignore `amount`. | Fixed in a pull request stacked on #73. |
-| 8 | [#74](https://github.com/mysticalsin/bidstack-360/pull/74) comment on `apps/web/src/components/viz/bklit-adapters.tsx`: forecast tooltips still format `Number(won)` and `Number(weighted)`. | Fixed in a pull request stacked on #74. |
+| 7 | [#73](https://github.com/mysticalsin/bidstack-360/pull/73) comment on `apps/web/src/components/viz/charts.tsx`: stage bars still format `Number(value)` and ignore `amount`. | [#487](https://github.com/mysticalsin/bidstack-360/pull/487) `cursor/stage-bar-exact-labels-81b9`, stacked on #73. Red `413eb22c`. Green `df9d5363`. |
+| 8 | [#74](https://github.com/mysticalsin/bidstack-360/pull/74) comment on `apps/web/src/components/viz/bklit-adapters.tsx`: forecast tooltips still format `Number(won)` and `Number(weighted)`. | [#489](https://github.com/mysticalsin/bidstack-360/pull/489) `cursor/forecast-tooltip-labels-81b9`, stacked on #74. Red `d4527cf2`. Green `248ebc51`. |
 | 9 | [#64](https://github.com/mysticalsin/bidstack-360/pull/64). Codex asked to keep EUR conversion on the open-pipeline tile. The reply on that thread says `Opportunity` has no currency column, so the sum stays unspecified until a source currency exists. | Not changed. Doing what Codex asked would invent a currency. |
 | 11–13 | [#389](https://github.com/mysticalsin/bidstack-360/pull/389) Semgrep on a Google OAuth prefix in `apps/api/src/lib/oauth-failure.test.ts`. | Already answered on the thread: commit `7370356f2f6f9d4d11b21c92c262e1d2d768ce09` replaced the prefix with `fixture-oauth-access-not-a-credential`. The review threads are outdated (`line` is null). |
 
