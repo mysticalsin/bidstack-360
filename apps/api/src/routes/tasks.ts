@@ -243,23 +243,54 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       // for "we already checked." Two-step updateMany + findFirstOrThrow
       // gives us back the row plus the relation `include` (updateMany
       // doesn't support include).
-      const updateResult = await prisma.task.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
-        data: {
-          ...(req.body.title !== undefined ? { title: req.body.title } : {}),
-          ...(req.body.dueDate !== undefined
-            ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
-            : {}),
-          ...(req.body.status !== undefined ? { status: req.body.status } : {}),
-          ...(assigneeId !== undefined ? { assigneeId } : {}),
+      // Completing is a compare-and-set on the status we read. Two parallel
+      // "mark done" clicks both used to observe open and both emit
+      // task.completed. The loser still applies title, due date, and assignee.
+      const completing = req.body.status === 'done' && existing.status !== 'done';
+      const patchData = {
+        ...(req.body.title !== undefined ? { title: req.body.title } : {}),
+        ...(req.body.dueDate !== undefined
+          ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
+          : {}),
+        ...(req.body.status !== undefined ? { status: req.body.status } : {}),
+        ...(assigneeId !== undefined ? { assigneeId } : {}),
+      };
+      const claimed = await prisma.task.updateMany({
+        where: {
+          id: existing.id,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          ...(completing ? { status: existing.status } : {}),
         },
+        data: patchData,
       });
-      if (updateResult.count === 0) throw server.httpErrors.notFound('Task not found');
+      // Only the update that matched the previous status may emit. A count of
+      // 1 on the retry below means "the other fields landed", not "we completed".
+      const didComplete = completing && claimed.count === 1;
+      if (claimed.count === 0 && completing) {
+        const rest: typeof patchData = { ...patchData };
+        delete rest.status;
+        if (Object.keys(rest).length > 0) {
+          const retried = await prisma.task.updateMany({
+            where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+            data: rest,
+          });
+          if (retried.count === 0) throw server.httpErrors.notFound('Task not found');
+        } else {
+          const still = await prisma.task.findFirst({
+            where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+            select: { id: true },
+          });
+          if (!still) throw server.httpErrors.notFound('Task not found');
+        }
+      } else if (claimed.count === 0) {
+        throw server.httpErrors.notFound('Task not found');
+      }
       const updated = await prisma.task.findFirstOrThrow({
         where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         include: { assignee: true },
       });
-      if (existing.status !== 'done' && updated.status === 'done') {
+      if (didComplete) {
         emitTaskAccountEventSafe({
           orgId: req.auth.orgId,
           taskId: updated.id,
@@ -303,7 +334,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
 
       // Fan-out task.completed when status transitions to 'done' — fire-and-forget.
       // WHY 'done': TaskStatus enum uses 'done', not 'completed'; map to the published event name.
-      if (req.body.status === 'done' && updated.status === 'done') {
+      if (didComplete) {
         void fanOutWebhookEvent(req.auth.orgId, 'task.completed', {
           id: updated.id,
           title: updated.title,

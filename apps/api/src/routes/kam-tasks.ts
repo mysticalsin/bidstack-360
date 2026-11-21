@@ -138,20 +138,46 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
       if (existing.accountId) await assertCompanyVisible(server, req, existing.accountId);
       const body = req.body;
       if (body.assigneeId) await assertUserInOrg(server, req, body.assigneeId);
-      const updated = await prisma.task.update({
-        where: { id: existing.id },
-        data: {
-          ...(body.title !== undefined ? { title: body.title } : {}),
-          ...(body.status !== undefined ? { status: body.status } : {}),
-          ...(body.type !== undefined ? { type: body.type } : {}),
-          ...(body.assigneeId !== undefined ? { assigneeId: body.assigneeId } : {}),
-          ...(body.dueDate !== undefined
-            ? { dueDate: body.dueDate ? new Date(body.dueDate) : null }
-            : {}),
+      const completing = body.status === 'done' && existing.status !== 'done';
+      const patchData = {
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.type !== undefined ? { type: body.type } : {}),
+        ...(body.assigneeId !== undefined ? { assigneeId: body.assigneeId } : {}),
+        ...(body.dueDate !== undefined
+          ? { dueDate: body.dueDate ? new Date(body.dueDate) : null }
+          : {}),
+      };
+      // Same compare-and-set as PATCH /tasks/:id. update() by id alone lets
+      // two parallel completes both observe open and both emit task_completed.
+      const claimed = await prisma.task.updateMany({
+        where: {
+          id: existing.id,
+          orgId: req.auth.orgId,
+          deletedAt: null,
+          ...(completing ? { status: existing.status } : {}),
         },
+        data: patchData,
+      });
+      const didComplete = completing && claimed.count === 1;
+      if (claimed.count === 0 && completing) {
+        const rest: typeof patchData = { ...patchData };
+        delete rest.status;
+        if (Object.keys(rest).length > 0) {
+          const retried = await prisma.task.updateMany({
+            where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+            data: rest,
+          });
+          if (retried.count === 0) throw server.httpErrors.notFound('KAM task not found');
+        }
+      } else if (claimed.count === 0) {
+        throw server.httpErrors.notFound('KAM task not found');
+      }
+      const updated = await prisma.task.findFirstOrThrow({
+        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
       });
       await bumpInitiative(existing.initiativeId, req.auth.orgId);
-      if (existing.status !== 'done' && updated.status === 'done') {
+      if (didComplete) {
         emitTaskAccountEventSafe({ orgId: req.auth.orgId, taskId: updated.id, kind: 'task_completed', actorUserId: req.auth.userId });
       }
       return toTaskDetail(updated);
