@@ -252,6 +252,12 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
       ) {
         return reply.notFound('Activity owner not found');
       }
+      if (
+        req.body.actorId &&
+        !(await tenantEntityBelongsToOrg('user', req.body.actorId, req.auth.orgId))
+      ) {
+        return reply.notFound('Activity actor not found');
+      }
 
       const item = await logActivity({
         orgId: req.auth.orgId,
