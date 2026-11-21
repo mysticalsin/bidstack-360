@@ -58,7 +58,7 @@ const clerkState = vi.hoisted(
       firstName: 'Real',
       lastName: 'User',
       fullName: 'Real User',
-      primaryEmailAddress: { emailAddress: 'real@mantu.com' },
+      primaryEmailAddress: { emailAddress: 'real@example.test' },
     },
   }),
 );
@@ -107,7 +107,7 @@ beforeEach(() => {
     firstName: 'Real',
     lastName: 'User',
     fullName: 'Real User',
-    primaryEmailAddress: { emailAddress: 'real@mantu.com' },
+    primaryEmailAddress: { emailAddress: 'real@example.test' },
   };
 });
 
@@ -151,7 +151,7 @@ describe('AuthProvider — stub mode (no publishableKey)', () => {
     // doesn't briefly redirect to /login during dev.
     expect(screen.getByTestId('loaded').textContent).toBe('true');
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
-    expect(screen.getByTestId('email').textContent).toBe('jane@mantu.com');
+    expect(screen.getByTestId('email').textContent).toBe('jane@example.test');
   });
 
   it('defaults to the stub user when no explicit signed-out marker exists', () => {
@@ -163,7 +163,7 @@ describe('AuthProvider — stub mode (no publishableKey)', () => {
 
     expect(screen.getByTestId('loaded').textContent).toBe('true');
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
-    expect(screen.getByTestId('email').textContent).toBe('jane@mantu.com');
+    expect(screen.getByTestId('email').textContent).toBe('jane@example.test');
   });
 
   it('preserves explicit stub sign-out across reloads', async () => {
@@ -203,7 +203,7 @@ describe('AuthProvider — stub mode (no publishableKey)', () => {
 
     expect(screen.getByTestId('loaded').textContent).toBe('true');
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
-    expect(screen.getByTestId('email').textContent).toBe('jane@mantu.com');
+    expect(screen.getByTestId('email').textContent).toBe('jane@example.test');
   });
 });
 
@@ -278,7 +278,7 @@ describe('AuthProvider — clerk mode (publishableKey set)', () => {
     // the bridged Clerk context to surface. The bridged user identity
     // proves we went through ClerkAuthBridge, not StubAuthProvider.
     await waitFor(() => {
-      expect(screen.getByTestId('email').textContent).toBe('real@mantu.com');
+      expect(screen.getByTestId('email').textContent).toBe('real@example.test');
     });
     expect(screen.getByTestId('loaded').textContent).toBe('true');
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
@@ -299,7 +299,7 @@ describe('AuthProvider — clerk mode (publishableKey set)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('email').textContent).toBe('real@mantu.com');
+      expect(screen.getByTestId('email').textContent).toBe('real@example.test');
     });
 
     await expect(api('/api/session-check')).resolves.toEqual({ ok: true });
@@ -316,7 +316,7 @@ describe('AuthProvider — clerk mode (publishableKey set)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('email').textContent).toBe('real@mantu.com');
+      expect(screen.getByTestId('email').textContent).toBe('real@example.test');
     });
 
     expect(localStorage.getItem('bidstack:session')).toBe('clerk-user-1:org-a:org:admin');
@@ -377,7 +377,7 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
       if (url.includes('/api/v1/me') || url.includes('/api/me')) {
         return jsonResponse({
           id: 'user-ada',
-          email: 'ada@mantu.com',
+          email: 'ada@example.test',
           name: 'Ada Lovelace',
           role: 'admin',
           roles: ['Admin'],
@@ -396,10 +396,10 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('email').textContent).toBe('ada@mantu.com');
+      expect(screen.getByTestId('email').textContent).toBe('ada@example.test');
     });
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
-    expect(screen.getByTestId('email').textContent).not.toBe('jane@mantu.com');
+    expect(screen.getByTestId('email').textContent).not.toBe('jane@example.test');
   });
 
   it('retries /me while the box is waking up instead of showing the sign-in screen', async () => {
@@ -410,7 +410,7 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
       if (url.includes('/api/v1/me')) {
         meCalls += 1;
         if (meCalls === 1) return jsonResponse({ message: 'Service Unavailable' }, 503);
-        return jsonResponse({ id: 'user-ada', email: 'ada@mantu.com', name: 'Ada Lovelace', role: 'admin' });
+        return jsonResponse({ id: 'user-ada', email: 'ada@example.test', name: 'Ada Lovelace', role: 'admin' });
       }
       return jsonResponse({ ok: true });
     });
@@ -424,7 +424,7 @@ describe('AuthProvider — Cloudflare Access (VITE_AUTH_MODE=cf-access)', () => 
 
     await waitFor(
       () => {
-        expect(screen.getByTestId('email').textContent).toBe('ada@mantu.com');
+        expect(screen.getByTestId('email').textContent).toBe('ada@example.test');
       },
       { timeout: 4000 },
     );

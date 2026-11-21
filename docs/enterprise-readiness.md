@@ -38,11 +38,11 @@ The remaining P0 is **identity on the Access-gated preview** plus **operator-own
 
 | ID | Pri | Status | Gap |
 |----|-----|--------|-----|
-| A1 | **P0** | **Fixed** | Preview visitors all share stub admin Jane Smith (`jane@mantu.com` UI / `jane.smith@mantu.com` DB). Cloudflare Access only gates the Worker. |
+| A1 | **P0** | **Fixed** | Preview visitors all share stub admin Jane Smith (`jane@example.test` UI / `alex.example@example.test` DB). Cloudflare Access only gates the Worker. |
 | A2 | **P0** | **Fixed** | Access JWT/email was stripped before the box API. Polo now maps `Cf-Access-Authenticated-User-Email` (loopback, Worker-verified) or a re-verified Access JWT to a per-user Polo user + system role. |
 | A3 | **P0** | **Fixed** | No application allowlist. `POLO_ALLOWED_USERS=email:Role,…` is required when `CF_ACCESS_AUTH=true`. Unlisted emails get 403. |
 | A4 | **P0** | **Fixed** | `POLO_DATA_MODE=real` refuses stub and demo. Default remains `demo`. |
-| A5 | P1 | Open | SPA stub persona email (`jane@mantu.com`) still differs from the seed user in demo/stub. Harmless in demo; do not use stub for real data. |
+| A5 | P1 | Open | SPA stub persona email (`jane@example.test`) still differs from the seed user in demo/stub. Harmless in demo; do not use stub for real data. |
 | A6 | P2 | Open | No direct Entra OIDC adapter (Clerk remains the corporate IdP path if Access is not used). |
 
 ### (b) Per-role RBAC (accounts, MSAs, financials, settings)
@@ -134,7 +134,7 @@ v24 cockpit, MARS sync, and MSA intake (HEMA leverage flags) are unchanged.
 
 ## Owner decisions before loading real data
 
-1. **Allowed users and roles** — set `POLO_ALLOWED_USERS` (and keep Cloudflare Access `ALLOWED_EMAILS` in sync). Example: `tony@mantu.com:Admin,colleague@amaris.com:Account Executive`.
+1. **Allowed users and roles** — set `POLO_ALLOWED_USERS` (and keep Cloudflare Access `ALLOWED_EMAILS` in sync). Example: `tony@example.test:Admin,colleague@amaris.com:Account Executive`.
 2. **Auth path** — Cloudflare Access (`CF_ACCESS_AUTH=true`, `VITE_AUTH_MODE=cf-access`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`) **or** Clerk. Not both. Not stub.
 3. **Empty real org id** — `POLO_REAL_ORG_CLERK` (default `org_polo_real`) and `pnpm db:seed:prod -- --clerk-org … --name "Mantu Sales"`.
 4. **Backup destination** — `POLO_BACKUP_DIR` or a managed Postgres snapshot. Run `pnpm db:backup:selftest` once, then a real restore drill.

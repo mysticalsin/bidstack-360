@@ -23,7 +23,7 @@ const CHAT = {
   topic: 'Acme RFP',
   chatType: 'group',
   members: [
-    { userId: 'aad-tony', email: 'tony@mantu.com', displayName: 'Tony' },
+    { userId: 'aad-tony', email: 'tony@example.test', displayName: 'Tony' },
     { userId: 'aad-jane', email: 'jane@acme.com', displayName: 'Jane' },
   ],
 };
@@ -89,7 +89,7 @@ function setup(opts: { scope?: string[]; links?: ReturnType<typeof link>[]; grap
         accessTokenEncrypted: 'enc',
         refreshTokenEncrypted: null,
         expiresAt: null,
-        externalAccountEmail: 'Tony@mantu.com',
+        externalAccountEmail: 'Tony@example.test',
       })),
     },
     teamsChatLink: {
@@ -140,7 +140,7 @@ describe('syncTeamsLinksForToken', () => {
     const messagesCall = decodeURIComponent(calls.find((c) => c.includes('/messages'))!);
     expect(messagesCall).toContain('lastModifiedDateTime gt 2026-11-08T08:00:00.000Z');
     const input = file.mock.calls[0]![0];
-    expect(input).toMatchObject({ actorUserId: null, ownerUserId: USER, ownerEmail: 'tony@mantu.com', companyId: ACME });
+    expect(input).toMatchObject({ actorUserId: null, ownerUserId: USER, ownerEmail: 'tony@example.test', companyId: ACME });
     expect(input.thread.title).toBe('Acme RFP');
     expect(input.messages.map((m) => m.id)).toEqual(['m2', 'm3']);
     expect(digests).toHaveLength(1);

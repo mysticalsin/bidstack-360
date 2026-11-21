@@ -316,14 +316,14 @@ describe('auth plugin', () => {
         sub: 'user_clerk',
         sid: 'sess_1',
         org_role: 'org:member',
-        email: 'bob@mantu.com',
+        email: 'bob@example.test',
       } as never);
       mockedOrgFindUnique.mockResolvedValue({ id: 'org-uuid-1' } as never);
       mockedUserFindUnique.mockResolvedValue(null as never); // first sign-in
       mockedUserUpsert.mockResolvedValue({
         id: 'user-uuid-1',
         role: 'member',
-        email: 'bob@mantu.com',
+        email: 'bob@example.test',
       } as never);
 
       const server = await buildClerkServer();
@@ -362,7 +362,7 @@ describe('auth plugin', () => {
         sub: 'user_x',
         sid: 'sess_x',
         org_role: 'org:member',
-        email: 'x@mantu.com',
+        email: 'x@example.test',
       } as never);
       mockedOrgFindUnique.mockResolvedValue(null as never);
 
@@ -383,7 +383,7 @@ describe('auth plugin', () => {
         sub: 'user_crossorg',
         sid: 'sess_c',
         org_role: 'org:member',
-        email: 'c@mantu.com',
+        email: 'c@example.test',
       } as never);
       mockedOrgFindUnique.mockResolvedValue({ id: 'org-uuid-1' } as never);
       // Existing clerkUser belongs to a DIFFERENT org → cross-org attempt.
@@ -416,7 +416,7 @@ describe('auth plugin', () => {
         sub: 'user_badrole',
         sid: 'sess_r',
         org_role: 'org:wizard',
-        email: 'r@mantu.com',
+        email: 'r@example.test',
       } as never);
       mockedOrgFindUnique.mockResolvedValue({ id: 'org-uuid-1' } as never);
 
@@ -445,18 +445,18 @@ describe('auth plugin', () => {
           sub: 'user_alpha',
           sid: 'sess_a',
           org_role: 'org:member',
-          email: 'alpha@mantu.com',
+          email: 'alpha@example.test',
         } as never)
         .mockResolvedValueOnce({
           org_id: 'org_clerk',
           sub: 'user_beta',
           sid: 'sess_b',
           org_role: 'org:member',
-          email: 'beta@mantu.com',
+          email: 'beta@example.test',
         } as never);
       mockedUserUpsert
-        .mockResolvedValueOnce({ id: 'u-alpha', role: 'member', email: 'alpha@mantu.com' } as never)
-        .mockResolvedValueOnce({ id: 'u-beta', role: 'member', email: 'beta@mantu.com' } as never);
+        .mockResolvedValueOnce({ id: 'u-alpha', role: 'member', email: 'alpha@example.test' } as never)
+        .mockResolvedValueOnce({ id: 'u-beta', role: 'member', email: 'beta@example.test' } as never);
 
       const server = await buildClerkServer();
       try {

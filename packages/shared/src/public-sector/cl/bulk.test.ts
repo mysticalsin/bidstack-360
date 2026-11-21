@@ -53,7 +53,7 @@ describe('bulk file plan', () => {
   });
 });
 
-describe('tender bulk file with offers received (real lic-da 2025-7 head)', () => {
+describe('tender bulk file with offers received (synthetic lic-da 2025-7 head)', () => {
   it('decodes Latin-1 and maps codes to stages', async () => {
     const n = await loadLicitacionesCsv(chunked(fixtureBytes('lic-da-2025-7.head.csv')), CTX);
     const opp = n.opportunities.find((o) => o.externalId === '5184-102-LP24');
@@ -92,7 +92,7 @@ describe('tender bulk file with offers received (real lic-da 2025-7 head)', () =
   });
 });
 
-describe('purchase orders and the erroneous list (real oc-da 2025-7 head)', () => {
+describe('purchase orders and the erroneous list (synthetic oc-da 2025-7 head)', () => {
   const erroneous = () =>
     parseErroneousPoList(fixtureBytes('hist_OC_erroneas.head.csv'));
 
@@ -148,6 +148,6 @@ describe('purchase orders and the erroneous list (real oc-da 2025-7 head)', () =
     const companies = n.suppliers.filter((s) => !s.isNaturalPerson);
     expect(companies.length).toBeGreaterThan(0);
     for (const s of companies) expect(s.externalId).toBe(`rut:${s.taxId}`);
-    expect(companies.map((s) => s.taxId)).toContain('85.825.700-K');
+    expect(companies.map((s) => s.taxId)).toContain('99.000.277-0');
   });
 });

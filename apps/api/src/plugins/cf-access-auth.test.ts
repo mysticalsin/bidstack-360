@@ -55,7 +55,7 @@ function fakeReq(headers: Record<string, string>, ip = '127.0.0.1') {
 
 describe('Cloudflare Access identity mapping', () => {
   beforeEach(() => {
-    process.env.POLO_ALLOWED_USERS = 'ada@mantu.com:Admin';
+    process.env.POLO_ALLOWED_USERS = 'ada@example.test:Admin';
     process.env.POLO_REAL_ORG_CLERK = 'org_polo_real';
     process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
     orgFind.mockResolvedValue({ id: 'org-1' } as never);
@@ -63,7 +63,7 @@ describe('Cloudflare Access identity mapping', () => {
     userUpsert.mockResolvedValue({
       id: 'user-1',
       role: 'admin',
-      email: 'ada@mantu.com',
+      email: 'ada@example.test',
     } as never);
     roleFind.mockResolvedValue({ id: 'role-admin' } as never);
     vi.mocked(prisma.userRole.updateMany).mockResolvedValue({ count: 0 } as never);
@@ -80,15 +80,15 @@ describe('Cloudflare Access identity mapping', () => {
 
   it('provisions an allowlisted loopback Access email as its own Polo user', async () => {
     const auth = await verifyCfAccessAuth(
-      fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'Ada@Mantu.com' }),
+      fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'Ada@example.test' }),
     );
     expect(auth.userId).toBe('user-1');
-    expect(auth.email).toBe('ada@mantu.com');
+    expect(auth.email).toBe('ada@example.test');
     expect(userUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
-          clerkUser: 'cfaccess:ada@mantu.com',
-          email: 'ada@mantu.com',
+          clerkUser: 'cfaccess:ada@example.test',
+          email: 'ada@example.test',
           role: 'admin',
         }),
       }),
@@ -98,11 +98,11 @@ describe('Cloudflare Access identity mapping', () => {
   it('links a seeded or imported user with the same email instead of inserting a duplicate', async () => {
     userFind.mockImplementation((async (args: { where: { email?: string } }) =>
       args.where.email ? { id: 'seeded-ada', orgId: 'org-1' } : null) as never);
-    await verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' }));
+    await verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@example.test' }));
     expect(userUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'seeded-ada' },
-        update: expect.objectContaining({ clerkUser: 'cfaccess:ada@mantu.com' }),
+        update: expect.objectContaining({ clerkUser: 'cfaccess:ada@example.test' }),
       }),
     );
   });
@@ -111,21 +111,21 @@ describe('Cloudflare Access identity mapping', () => {
     userFind.mockImplementation((async (args: { where: { email?: string } }) =>
       args.where.email ? { id: 'other-ada', orgId: 'org-2' } : null) as never);
     await expect(
-      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@example.test' })),
     ).rejects.toMatchObject({ statusCode: 403 });
     expect(userUpsert).not.toHaveBeenCalled();
   });
 
   it('refuses an Access email that is not on the Polo allowlist', async () => {
     await expect(
-      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'stranger@mantu.com' })),
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'stranger@example.test' })),
     ).rejects.toMatchObject({ statusCode: 403, message: CF_ACCESS_NOT_ALLOWLISTED });
     expect(userUpsert).not.toHaveBeenCalled();
   });
 
   it('does not trust the Access email header from a non-loopback client', async () => {
     await expect(
-      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' }, '203.0.113.9')),
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@example.test' }, '203.0.113.9')),
     ).rejects.toMatchObject({ statusCode: 401 });
   });
 
@@ -136,7 +136,7 @@ describe('Cloudflare Access identity mapping', () => {
     process.env.NODE_ENV = 'production';
     process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
     await expect(
-      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@example.test' })),
     ).rejects.toMatchObject({ statusCode: 401 });
     expect(userUpsert).not.toHaveBeenCalled();
     process.env.NODE_ENV = 'test';
@@ -147,7 +147,7 @@ describe('Cloudflare Access identity mapping', () => {
     delete process.env.NODE_ENV;
     process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL = 'true';
     await expect(
-      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@example.test' })),
     ).rejects.toMatchObject({ statusCode: 401 });
     expect(userUpsert).not.toHaveBeenCalled();
     process.env.NODE_ENV = previous;
@@ -157,7 +157,7 @@ describe('Cloudflare Access identity mapping', () => {
     process.env.NODE_ENV = 'development';
     delete process.env.CF_ACCESS_TRUST_LOOPBACK_EMAIL;
     await expect(
-      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com' })),
+      verifyCfAccessAuth(fakeReq({ [CF_ACCESS_EMAIL_HEADER]: 'ada@example.test' })),
     ).rejects.toMatchObject({ statusCode: 401 });
     expect(userUpsert).not.toHaveBeenCalled();
     process.env.NODE_ENV = 'test';
@@ -177,7 +177,7 @@ describe('Cloudflare Access identity mapping', () => {
       verifyCfAccessAuth(
         fakeReq({
           [CF_ACCESS_JWT_HEADER]: 'header.payload.sig',
-          [CF_ACCESS_EMAIL_HEADER]: 'ada@mantu.com',
+          [CF_ACCESS_EMAIL_HEADER]: 'ada@example.test',
         }),
       ),
     ).rejects.toMatchObject({ statusCode: 401 });
@@ -197,7 +197,7 @@ describe('Cloudflare Access identity mapping', () => {
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'nbf-key' })).toString('base64url');
     const body = Buffer.from(
       JSON.stringify({
-        email: 'ada@mantu.com',
+        email: 'ada@example.test',
         aud: 'aud-1',
         iss: 'https://team.cloudflareaccess.com',
         exp: now + 600,

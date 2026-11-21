@@ -43,7 +43,7 @@ swaps to a Getting-Started screen with first-move links on an all-zero org.
 
 | Pathway | Off when | Notes |
 | --- | --- | --- |
-| `pnpm db:seed` (fixture org `org_seed_mantu` — fake @mantu.com users, OP-* opps) | just don't run it | Refuses to run with `NODE_ENV=production` unless `BIDSTACK_ALLOW_FIXTURE_SEED=true`. Also auto-runs from `pnpm db:migrate` / `db:reset` (prisma seed hook) — use `db:migrate:deploy` against prod, never `db:migrate`/`db:reset`. |
+| `pnpm db:seed` (fixture org `org_seed_mantu` — fake @example.test users, OP-* opps) | just don't run it | Refuses to run with `NODE_ENV=production` unless `BIDSTACK_ALLOW_FIXTURE_SEED=true`. Also auto-runs from `pnpm db:migrate` / `db:reset` (prisma seed hook) — use `db:migrate:deploy` against prod, never `db:migrate`/`db:reset`. |
 | `pnpm db:seed:demo` (demo_org_* with curated Siemens/IKEA/Sanofi data) | just don't run it | Demo rows carry NO per-row marker — the org's `demo_org_` prefix is the only gate key. |
 | DEMO_MODE public sign-in (provisions a seeded demo org per visitor email) | `DEMO_MODE` unset/false | Mutually exclusive with Clerk at boot; production additionally requires `DEMO_PUBLIC_DEPLOYMENT_ACK=true` to even start in demo mode. |
 | E2E/stub auth (writes E2E fixtures into `org_seed_mantu`) | prod boot refuses stub auth | Only reachable when `CLERK_SECRET_KEY` is absent AND NODE_ENV is development/test, loopback-only. |

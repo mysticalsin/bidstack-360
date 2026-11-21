@@ -107,13 +107,13 @@
                 - img [ref=e136]
             - button "Help and keyboard shortcuts" [ref=e138] [cursor=pointer]:
                 - img [ref=e139]
-            - generic "jane@mantu.com" [ref=e142]:
+            - generic "jane@example.test" [ref=e142]:
                 - generic [ref=e143]: JS
                 - generic [ref=e144]:
                     - generic [ref=e145]: Jane Smith
                     - generic [ref=e146]:
                         - generic [ref=e147]: admin
-                        - text: jane@mantu.com
+                        - text: jane@example.test
                 - button "Sign out" [ref=e148] [cursor=pointer]: ↩
         - main [ref=e149]:
             - generic [ref=e164]:

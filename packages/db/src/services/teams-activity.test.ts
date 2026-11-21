@@ -85,8 +85,8 @@ function fixture() {
     activityAttendee: table(),
     contact: table([{ id: CONTACT, orgId: ORG, email: 'jane@acme.com', companyId: ACME, deletedAt: null }]),
     user: table([
-      { id: OWNER, orgId: ORG, email: 'tony@mantu.com', microsoftEmail: null },
-      { id: COLLEAGUE, orgId: ORG, email: 'sam@mantu.com', microsoftEmail: null },
+      { id: OWNER, orgId: ORG, email: 'tony@example.test', microsoftEmail: null },
+      { id: COLLEAGUE, orgId: ORG, email: 'sam@example.test', microsoftEmail: null },
     ]),
     company: table([
       { id: ACME, orgId: ORG, name: 'Acme', domain: 'acme.com', deletedAt: null },
@@ -123,7 +123,7 @@ function input(over: Partial<FileTeamsMessagesInput> = {}): FileTeamsMessagesInp
   return {
     orgId: ORG,
     ownerUserId: OWNER,
-    ownerEmail: 'tony@mantu.com',
+    ownerEmail: 'tony@example.test',
     actorUserId: OWNER,
     companyId: ACME,
     opportunityId: null,
@@ -131,7 +131,7 @@ function input(over: Partial<FileTeamsMessagesInput> = {}): FileTeamsMessagesInp
       ref: { kind: 'chat', chatId: '19:acme@thread.v2' },
       title: 'Chat with Jane Doe',
       members: [
-        { aadUserId: 'aad-tony', email: 'tony@mantu.com', displayName: 'Tony' },
+        { aadUserId: 'aad-tony', email: 'tony@example.test', displayName: 'Tony' },
         { aadUserId: 'aad-jane', email: 'jane@acme.com', displayName: 'Jane Doe' },
         { aadUserId: 'aad-bob', email: 'bob@acme.com', displayName: 'Bob' },
       ],
@@ -151,11 +151,11 @@ describe('teams thread helpers', () => {
 
   it('titles a chat by topic, else by the other members', () => {
     const members = [
-      { aadUserId: '1', email: 'tony@mantu.com', displayName: 'Tony' },
+      { aadUserId: '1', email: 'tony@example.test', displayName: 'Tony' },
       { aadUserId: '2', email: 'jane@acme.com', displayName: 'Jane' },
     ];
-    expect(teamsThreadTitle('Acme RFP', members, 'tony@mantu.com')).toBe('Acme RFP');
-    expect(teamsThreadTitle(null, members, 'tony@mantu.com')).toBe('Chat with Jane');
+    expect(teamsThreadTitle('Acme RFP', members, 'tony@example.test')).toBe('Acme RFP');
+    expect(teamsThreadTitle(null, members, 'tony@example.test')).toBe('Chat with Jane');
     expect(teamsThreadTitle(null, [], null)).toBe('Teams chat');
   });
 
@@ -208,7 +208,7 @@ describe('fileTeamsMessages', () => {
 
   it('leaves a message another person filed to another account where it is', async () => {
     const { t, svc } = fixture();
-    await svc.fileMessages(input({ ownerUserId: COLLEAGUE, actorUserId: COLLEAGUE, ownerEmail: 'sam@mantu.com' }));
+    await svc.fileMessages(input({ ownerUserId: COLLEAGUE, actorUserId: COLLEAGUE, ownerEmail: 'sam@example.test' }));
     const res = await svc.fileMessages(input({ companyId: GLOBEX }));
     expect(res).toMatchObject({ alreadyFiled: 1, created: 0, updated: 0 });
     expect(t.activity.rows[0]!.entityId).toBe(ACME);
@@ -301,8 +301,8 @@ describe('suggestTeamsAccounts', () => {
     const { svc } = fixture();
     const out = await svc.suggestAccounts({
       orgId: ORG,
-      ownerEmail: 'tony@mantu.com',
-      emails: ['sam@mantu.com', 'ops@globex.io', 'jane@acme.com', 'friend@gmail.com'],
+      ownerEmail: 'tony@example.test',
+      emails: ['sam@example.test', 'ops@globex.io', 'jane@acme.com', 'friend@gmail.com'],
     });
     expect(out.map((s) => [s.name, s.reason, s.match])).toEqual([
       ['Acme', 'contact', 'jane@acme.com'],
@@ -331,7 +331,7 @@ describe('suggestTeamsAccounts', () => {
 
   it('returns nothing for an internal-only chat', async () => {
     const { svc } = fixture();
-    expect(await svc.suggestAccounts({ orgId: ORG, ownerEmail: 'tony@mantu.com', emails: ['sam@mantu.com'] })).toEqual(
+    expect(await svc.suggestAccounts({ orgId: ORG, ownerEmail: 'tony@example.test', emails: ['sam@example.test'] })).toEqual(
       [],
     );
   });
