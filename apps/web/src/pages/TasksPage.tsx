@@ -12,11 +12,12 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useTasks } from '@/hooks/useTasks';
+import { useTaskSummary, useTasks } from '@/hooks/useTasks';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
-import { daysUntil, formatDate } from '@/lib/format';
+import { formatDate } from '@/lib/format';
+import { civilDay } from '@bidstack/shared';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { useTaskOrder } from '@/stores/taskOrder';
 import { Select } from '@/components/ui/Select';
@@ -67,7 +68,10 @@ export function TasksPage() {
   const serverStatus =
     filter === 'all' || filter === 'overdue' || filter === 'today' ? undefined : filter;
   const pager = useCursorPagination(filter);
+  const taskSummary = useTaskSummary();
   const { data, isLoading, isError, error } = useTasks({
+    // Default list is the nav badge's set. Status chips narrow it further.
+    scope: 'mine',
     ...(serverStatus ? { status: serverStatus } : {}),
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
@@ -78,23 +82,25 @@ export function TasksPage() {
   const [isFilterPending, startFilterTransition] = useTransition();
   const [taskOrderMessage, setTaskOrderMessage] = useState('');
 
+  const today =
+    taskSummary.data?.civilToday ?? civilDay(new Date(), taskSummary.data?.timeZone);
   const filteredItems = useMemo(() => {
     const all = data?.items ?? [];
     return all.filter((t) => {
       if (filter === 'all') return true;
       if (filter === 'today') {
-        const d = daysUntil(t.dueDate);
-        return d !== null && d === 0 && t.status !== 'done';
+        // Same civil day the summary counted. 22:00 in São Paulo is still
+        // that local date even though UTC has moved to the next day.
+        return t.dueDate === today && t.status !== 'done';
       }
       if (filter === 'overdue') {
-        const d = daysUntil(t.dueDate);
-        return d !== null && d < 0 && t.status !== 'done';
+        return t.dueDate !== null && t.dueDate < today && t.status !== 'done';
       }
       // Concrete statuses are already narrowed server-side; this is a no-op
       // guard for the loaded page.
       return t.status === filter;
     });
-  }, [data?.items, filter]);
+  }, [data?.items, filter, today]);
 
   // Sort. Default 'natural' = server order (createdAt desc on the backend).
   // 'due' sorts asc with nulls last so overdue surfaces at the top of the
@@ -195,7 +201,10 @@ export function TasksPage() {
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
             {t('tasks.subtitle', '{{count}} active follow-ups.', {
-              count: data?.items.length ?? 0,
+              count:
+                filter === 'all'
+                  ? (taskSummary.data?.openForUser ?? data?.items.length ?? 0)
+                  : items.length,
             })}
           </p>
         </div>

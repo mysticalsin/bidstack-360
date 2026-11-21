@@ -1,22 +1,25 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useTasks, useUpdateTask } from '@/hooks/useTasks';
+import { useDeleteTask, useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatDate } from '@/lib/format';
 
 export function TaskDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const tasks = useTasks();
   const update = useUpdateTask();
+  const remove = useDeleteTask();
   // PATCH /api/tasks/:id is gated server-side behind tasks:write — disable the
   // Edit entry point instead of letting the user fill out a form that 403s on
   // save (matches CompanyDetailsForm's canWrite convention).
@@ -52,6 +55,33 @@ export function TaskDetailPage() {
     setTitle(task.title);
     setStatus(task.status);
     setEditing(true);
+  };
+
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: t('taskDetail.deleteConfirmTitle', 'Delete task?'),
+      description: t(
+        'taskDetail.deleteConfirmDescription',
+        'This removes "{{title}}" from your open tasks.',
+        { title: task.title },
+      ),
+      confirmLabel: t('taskDetail.deleteConfirmLabel', 'Delete'),
+      destructive: true,
+    });
+    if (!ok) return;
+    remove.mutate(task.id, {
+      onSuccess: () => {
+        toast.success(t('taskDetail.toastDeleted', 'Task deleted'));
+        navigate('/tasks');
+      },
+      onError: (err) =>
+        toast.error(t('taskDetail.toast.deleteFailedTitle', 'Could not delete task'), {
+          description:
+            err instanceof Error
+              ? err.message
+              : t('taskDetail.toast.serverRejected', 'The server rejected the request.'),
+        }),
+    });
   };
 
   const save = () => {
@@ -134,18 +164,34 @@ export function TaskDetailPage() {
               </Button>
             </>
           ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={startEdit}
-              disabled={!canWrite}
-              title={canWrite ? undefined : readOnlyHint}
-              aria-label={
-                canWrite ? undefined : `${t('taskDetail.edit', 'Edit')} — ${readOnlyHint}`
-              }
-            >
-              {t('taskDetail.edit', 'Edit')}
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void handleDelete()}
+                disabled={!canWrite || remove.isPending}
+                title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite
+                    ? t('taskDetail.deleteAction', 'Delete task')
+                    : `${t('taskDetail.deleteAction', 'Delete task')} — ${readOnlyHint}`
+                }
+              >
+                {t('taskDetail.deleteAction', 'Delete task')}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={startEdit}
+                disabled={!canWrite}
+                title={canWrite ? undefined : readOnlyHint}
+                aria-label={
+                  canWrite ? undefined : `${t('taskDetail.edit', 'Edit')} — ${readOnlyHint}`
+                }
+              >
+                {t('taskDetail.edit', 'Edit')}
+              </Button>
+            </>
           )}
         </div>
       </header>

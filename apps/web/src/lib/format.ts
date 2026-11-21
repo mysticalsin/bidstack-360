@@ -57,19 +57,32 @@ export function formatMoney(value: number, currency?: string, locale?: string): 
   }).format(value);
 }
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
 export function formatDate(iso: string | null | undefined, locale?: string): string {
   if (!iso) return '—';
   const resolvedLocale = locale ?? detectLocale();
-  return new Date(iso).toLocaleDateString(resolvedLocale, {
+  // Date-only values are UTC calendar days (Postgres `date`, wire YYYY-MM-DD).
+  // `new Date('YYYY-MM-DD')` is UTC midnight, which America/Sao_Paulo renders
+  // as the previous evening unless the formatter is pinned to UTC.
+  const dateOnly = DATE_ONLY.test(iso);
+  return new Date(dateOnly ? `${iso}T00:00:00Z` : iso).toLocaleDateString(resolvedLocale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    ...(dateOnly ? { timeZone: 'UTC' } : {}),
   });
 }
 
-export function daysUntil(iso: string | null | undefined): number | null {
+export function daysUntil(iso: string | null | undefined, now: Date = new Date()): number | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
+  if (DATE_ONLY.test(iso)) {
+    const due = new Date(`${iso}T00:00:00Z`);
+    const nowDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const dueDay = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+    return Math.round((dueDay - nowDay) / 86_400_000);
+  }
+  const ms = new Date(iso).getTime() - now.getTime();
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 

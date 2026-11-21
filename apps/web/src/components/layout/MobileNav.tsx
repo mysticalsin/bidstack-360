@@ -164,7 +164,7 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
   const favorites = useAccountHistory((s) => s.favorites);
 
   const openBids = oppsCount.data?.count ?? 0;
-  const overdueTasks = taskSummary.data?.overdue ?? 0;
+  const overdueTasks = taskSummary.data?.openForUser ?? 0;
 
   const badges = { openBids, overdueTasks };
   const { data: appModules } = useAppModules();
