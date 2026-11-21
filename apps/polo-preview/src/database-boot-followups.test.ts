@@ -156,4 +156,14 @@ describe('database boot follow-ups', () => {
     expect(assignsDrillFlag("process.env.POLO_RESTORE_DRILL !== '1'")).toBe(false);
     expect(assignsDrillFlag("process.env.POLO_RESTORE_DRILL === '1'")).toBe(false);
   });
+
+  it('catches an object-form drill flag in the container sources', () => {
+    // WHY: POLO_RESTORE_DRILL: '1' is an assignment the equals-only scan misses,
+    // and container-env.js plus polo-container.js were not in the file list.
+    expect(assignsDrillFlag("{ POLO_RESTORE_DRILL: '1' }")).toBe(true);
+    expect(assignsDrillFlag('{ POLO_RESTORE_DRILL: "1" }')).toBe(true);
+    for (const file of ['container-env.js', 'polo-container.js']) {
+      expect(assignsDrillFlag(readFileSync(join(here, file), 'utf8')), file).toBe(false);
+    }
+  });
 });
