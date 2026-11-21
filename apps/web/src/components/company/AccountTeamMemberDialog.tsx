@@ -69,7 +69,7 @@ function MemberForm({ companyId, open, onOpenChange, member, excludeUserIds = []
 
   const userOptions = (users.data ?? [])
     .filter((u) => !excludeUserIds.includes(u.id))
-    .map((u) => ({ value: u.id, label: u.name ?? u.email }));
+    .map((u) => ({ value: u.id, label: u.name ?? u.email ?? '' }));
 
   const pending = add.isPending || update.isPending;
   const canSave = !!userId && !pctError && !dateError && !pending;

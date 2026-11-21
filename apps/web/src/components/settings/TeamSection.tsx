@@ -85,7 +85,7 @@ export function TeamSection() {
                         <OnlineDot
                           online={isOnline}
                           label={t('team.presence.label', '{{name}} {{status}}', {
-                            name: u.name ?? u.email,
+                            name: u.name ?? u.email ?? '',
                             status: isOnline
                               ? t('team.presence.online', 'online')
                               : t('team.presence.offline', 'offline'),
@@ -139,7 +139,7 @@ export function TeamSection() {
                     {expanded ? (
                       <tr>
                         <td colSpan={expandedColSpan} className="px-2 pb-3">
-                          <UserRolesManager userId={u.id} userName={u.name ?? u.email} />
+                          <UserRolesManager userId={u.id} userName={u.name ?? u.email ?? ''} />
                         </td>
                       </tr>
                     ) : null}
