@@ -149,8 +149,8 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     }
   }, [isAdmin, companyId, companyName, companyDomain, companyIndustry, companyWebsite, enrich, strategicIntelFreshness]);
 
-  // Truly overdue (daysUntil < 0) only — matches the Sidebar badge so the two
-  // counts can't disagree. Tasks with no dueDate are excluded.
+  // Truly overdue (daysUntil < 0) only. The nav Tasks badge counts open tasks
+  // for the signed-in user, not this overdue slice. Tasks with no dueDate are excluded.
   const overdueCount = useMemo(
     () =>
       tasks.data?.items.filter((t) => {

@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-21 BUG: Tasks badge counted overdue while the page listed every task
+
+- **What went wrong:** The nav badge showed 7 and the Tasks page listed 8. The extra row was a task due on the UTC calendar day. `formatDate` parsed `YYYY-MM-DD` as UTC midnight, so America/Sao_Paulo rendered it as the previous evening, and `daysUntil` rounded it to overdue after 12:00 UTC. The badge's SQL (`due_date < today`) left it out.
+- **Root cause:** Two predicates. `buildTaskSummary` counted org-wide overdue. `GET /api/tasks` returned every non-deleted task, and the page printed that length. Neither was "open tasks for this user".
+- **Prevention rule:** The badge and the Tasks page must both call `openTasksForUserWhere`. Do not give one surface its own status, assignee, or due-date filter. Date-only values format and compare on the UTC calendar day, not elapsed milliseconds from UTC midnight.
+- **Files affected:** `apps/api/src/routes/tasks.ts`, `apps/api/src/routes/open-tasks-for-user.ts`, `apps/web/src/components/layout/Sidebar.tsx`, `apps/web/src/pages/TasksPage.tsx`, `apps/web/src/lib/format.ts`.
+
+---
+
 ### 2026-11-02 TESTING: B2 `readOnly` default 403'd write-scoped integration keys
 
 - **What went wrong:** M2 defaulted new `ApiKey.readOnly` to true. Integration tests that insert write-scoped keys via `prisma.apiKey.create` did not set `readOnly: false`, so `requirePermission` returned "API key is read-only" before the intended admin / human-actor / missing-scope message. CI Integration failed on 7 assertions.

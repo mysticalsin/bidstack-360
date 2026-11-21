@@ -30,6 +30,9 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/hooks/useTasks', () => ({
   useTasks: vi.fn(),
+  useTaskSummary: vi.fn(() => ({
+    data: { total: 1, open: 1, overdue: 0, dueSoon: 0, openForUser: 1 },
+  })),
   useCreateTask: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useUpdateTask: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
@@ -94,6 +97,7 @@ describe('TasksPage — tasks:write gating', () => {
 
     renderPage();
 
+    expect(vi.mocked(useTasks)).toHaveBeenCalledWith(expect.objectContaining({ scope: 'mine' }));
     expect(screen.getByRole('button', { name: /New task/i })).toBeTruthy();
     expect(screen.getByLabelText('Quick-add task title')).toBeTruthy();
 

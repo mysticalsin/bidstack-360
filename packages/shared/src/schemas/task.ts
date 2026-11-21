@@ -39,6 +39,9 @@ export type TaskPatch = z.infer<typeof TaskPatch>;
 export const TaskFilter = z.object({
   oppId: z.string().uuid().optional(),
   status: TaskStatus.optional(),
+  // `mine` is the nav-badge set: open tasks assigned to the caller.
+  // Omit it to keep the org-wide list other screens already request.
+  scope: z.enum(['org', 'mine']).optional(),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -55,5 +58,8 @@ export const TaskSummary = z.object({
   open: z.number().int().nonnegative(),
   overdue: z.number().int().nonnegative(),
   dueSoon: z.number().int().nonnegative(),
+  // Open tasks assigned to the caller. The nav badge and the Tasks page
+  // both read this, so a due-today row cannot land on only one of them.
+  openForUser: z.number().int().nonnegative(),
 });
 export type TaskSummary = z.infer<typeof TaskSummary>;

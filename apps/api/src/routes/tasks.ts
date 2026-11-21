@@ -7,27 +7,33 @@ import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
+import { openTasksForUserWhere } from './open-tasks-for-user.js';
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
+type TaskRollup = Omit<TaskSummaryPayload, 'openForUser'>;
 
-async function buildTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
+async function buildTaskSummary(orgId: string, userId: string): Promise<TaskSummaryPayload> {
   const today = new Date().toISOString().slice(0, 10);
   const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const rows = await prisma.$queryRaw<Array<TaskSummaryPayload>>`
-    SELECT
-      COUNT(*)::int AS total,
-      COUNT(*) FILTER (WHERE status <> 'done')::int AS open,
-      COUNT(*) FILTER (WHERE status <> 'done' AND due_date < ${today}::date)::int AS overdue,
-      COUNT(*) FILTER (
-        WHERE status <> 'done'
-          AND due_date >= ${today}::date
-          AND due_date < ${nextWeek}::date
-      )::int AS "dueSoon"
-    FROM tasks
-    WHERE org_id = ${orgId}::uuid
-      AND deleted_at IS NULL
-  `;
-  return rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 };
+  const where = openTasksForUserWhere(orgId, userId);
+  const [rows, openForUser] = await Promise.all([
+    prisma.$queryRaw<Array<TaskRollup>>`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status <> 'done')::int AS open,
+        COUNT(*) FILTER (WHERE status <> 'done' AND due_date < ${today}::date)::int AS overdue,
+        COUNT(*) FILTER (
+          WHERE status <> 'done'
+            AND due_date >= ${today}::date
+            AND due_date < ${nextWeek}::date
+        )::int AS "dueSoon"
+      FROM tasks
+      WHERE org_id = ${orgId}::uuid
+        AND deleted_at IS NULL
+    `,
+    prisma.task.count({ where }),
+  ]);
+  return { ...(rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 }), openForUser };
 }
 
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -41,14 +47,25 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { oppId, status, cursor, limit } = req.query;
+      const { oppId, status, cursor, limit, scope } = req.query;
+      // The Tasks page asks for scope=mine with no status. That is the same
+      // where-clause as the nav badge (openTasksForUserWhere). A status chip
+      // still narrows to that caller, but it is no longer the badge set.
+      const where =
+        scope === 'mine' && !status
+          ? {
+              ...openTasksForUserWhere(req.auth.orgId, req.auth.userId),
+              ...(oppId ? { oppId } : {}),
+            }
+          : {
+              orgId: req.auth.orgId,
+              deletedAt: null,
+              ...(scope === 'mine' ? { assigneeId: req.auth.userId } : {}),
+              ...(oppId ? { oppId } : {}),
+              ...(status ? { status } : {}),
+            };
       const items = await prisma.task.findMany({
-        where: {
-          orgId: req.auth.orgId,
-          deletedAt: null,
-          ...(oppId ? { oppId } : {}),
-          ...(status ? { status } : {}),
-        },
+        where,
         include: { assignee: { select: { email: true } } },
         orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
         take: limit + 1,
@@ -84,7 +101,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       // Tasks are also created by kam, opportunity transitions, and the
       // worker. A process cache or a tagged response cache kept the badge
       // behind the uncached list. The count is one query.
-      return buildTaskSummary(req.auth.orgId);
+      return buildTaskSummary(req.auth.orgId, req.auth.userId);
     },
   );
 

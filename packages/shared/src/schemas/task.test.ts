@@ -41,6 +41,7 @@ describe('TaskSummary schema', () => {
       open: 8,
       overdue: 2,
       dueSoon: 4,
+      openForUser: 8,
     });
 
     expect(result.success).toBe(true);

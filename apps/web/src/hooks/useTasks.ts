@@ -6,7 +6,13 @@ import { api } from '@/lib/api';
 import type { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch } from '@bidstack/shared';
 
 type TasksPayload = TaskPage;
-type TaskSummaryPayload = { total: number; open: number; overdue: number; dueSoon: number };
+type TaskSummaryPayload = {
+  total: number;
+  open: number;
+  overdue: number;
+  dueSoon: number;
+  openForUser: number;
+};
 
 // Cursor-paginated like the other operational lists. /api/tasks defaults to
 // limit 50; calling useTasks() with no filter loads the first page only — the
@@ -18,6 +24,7 @@ export function useTasks(filter: Partial<TaskFilter> = {}) {
     queryFn: ({ signal }) => {
       const params = new URLSearchParams();
       if (filter.status) params.set('status', filter.status);
+      if (filter.scope) params.set('scope', filter.scope);
       if (filter.oppId) params.set('oppId', filter.oppId);
       if (filter.cursor) params.set('cursor', filter.cursor);
       if (filter.limit) params.set('limit', String(filter.limit));
@@ -102,6 +109,19 @@ export function useUpdateTask() {
       void qc.invalidateQueries({ queryKey: ['tasks', 'summary'] });
       void qc.invalidateQueries({ queryKey: ['opportunity'] });
       // P2 #30: task completion affects dashboard activity counters
+      void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
+    },
+  });
+}
+
+export function useDeleteTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<null>(`/api/tasks/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+      void qc.invalidateQueries({ queryKey: ['tasks', 'summary'] });
+      void qc.invalidateQueries({ queryKey: ['opportunity'] });
       void qc.invalidateQueries({ queryKey: ['crm-dashboard'] });
     },
   });

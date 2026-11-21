@@ -12,11 +12,12 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useTasks } from '@/hooks/useTasks';
+import { useTaskSummary, useTasks } from '@/hooks/useTasks';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
-import { daysUntil, formatDate } from '@/lib/format';
+import { daysUntilDueUtc } from '@/components/ui/DueDateChip';
+import { formatDate } from '@/lib/format';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { useTaskOrder } from '@/stores/taskOrder';
 import { Select } from '@/components/ui/Select';
@@ -67,7 +68,10 @@ export function TasksPage() {
   const serverStatus =
     filter === 'all' || filter === 'overdue' || filter === 'today' ? undefined : filter;
   const pager = useCursorPagination(filter);
+  const taskSummary = useTaskSummary();
   const { data, isLoading, isError, error } = useTasks({
+    // Default list is the nav badge's set. Status chips narrow it further.
+    scope: 'mine',
     ...(serverStatus ? { status: serverStatus } : {}),
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
@@ -83,12 +87,13 @@ export function TasksPage() {
     return all.filter((t) => {
       if (filter === 'all') return true;
       if (filter === 'today') {
-        const d = daysUntil(t.dueDate);
-        return d !== null && d === 0 && t.status !== 'done';
+        // UTC calendar day, same boundary as the server date column. A
+        // YYYY-MM-DD parsed as UTC midnight must not flip to "overdue"
+        // after 12:00 UTC or in America/Sao_Paulo.
+        return t.dueDate !== null && daysUntilDueUtc(t.dueDate) === 0 && t.status !== 'done';
       }
       if (filter === 'overdue') {
-        const d = daysUntil(t.dueDate);
-        return d !== null && d < 0 && t.status !== 'done';
+        return t.dueDate !== null && daysUntilDueUtc(t.dueDate) < 0 && t.status !== 'done';
       }
       // Concrete statuses are already narrowed server-side; this is a no-op
       // guard for the loaded page.
@@ -195,7 +200,10 @@ export function TasksPage() {
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
             {t('tasks.subtitle', '{{count}} active follow-ups.', {
-              count: data?.items.length ?? 0,
+              count:
+                filter === 'all'
+                  ? (taskSummary.data?.openForUser ?? data?.items.length ?? 0)
+                  : items.length,
             })}
           </p>
         </div>

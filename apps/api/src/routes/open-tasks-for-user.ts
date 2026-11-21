@@ -1,15 +1,11 @@
 // Open-task counting for the nav badge and the Tasks page.
 //
-// These two functions still mirror the production split (the bug):
-// - navigationBadgeCount: org-wide overdue, apps/api/src/routes/tasks.ts
-//   buildTaskSummary (`status <> 'done' AND due_date < todayUtc`). The sidebar
-//   reads that number (apps/web/src/components/layout/Sidebar.tsx).
-// - tasksPageCount: every non-deleted task in the org, the GET /tasks list
-//   whose length the Tasks page prints (apps/web/src/pages/TasksPage.tsx).
-//
-// `userId` is part of the signature because both call sites must share one
-// "open tasks for this user" predicate. The implementations below ignore it,
-// which is why a due-today task is listed and not badged.
+// One predicate — openTasksForUserWhere — decides membership. The badge count
+// and the Tasks page count both filter with isOpenTaskForUser, which reads
+// that where-clause. Due date is not part of the predicate: a task due on the
+// UTC day (which formatDate used to render as the previous evening in
+// America/Sao_Paulo) is still open work. `todayUtc` stays on the count
+// signatures so callers can pass the clock; it does not change membership.
 
 export type CountableTaskStatus = 'open' | 'in_progress' | 'blocked' | 'done';
 
@@ -50,24 +46,17 @@ export function isOpenTaskForUser(row: CountableTask, orgId: string, userId: str
 export function navigationBadgeCount(
   rows: readonly CountableTask[],
   orgId: string,
-  _userId: string,
-  todayUtc: string,
+  userId: string,
+  _todayUtc: string,
 ): number {
-  return rows.filter(
-    (row) =>
-      row.orgId === orgId &&
-      row.deletedAt === null &&
-      row.status !== 'done' &&
-      row.dueDate !== null &&
-      row.dueDate < todayUtc,
-  ).length;
+  return rows.filter((row) => isOpenTaskForUser(row, orgId, userId)).length;
 }
 
 export function tasksPageCount(
   rows: readonly CountableTask[],
   orgId: string,
-  _userId: string,
-  _todayUtc: string,
+  userId: string,
+  todayUtc: string,
 ): number {
-  return rows.filter((row) => row.orgId === orgId && row.deletedAt === null).length;
+  return navigationBadgeCount(rows, orgId, userId, todayUtc);
 }

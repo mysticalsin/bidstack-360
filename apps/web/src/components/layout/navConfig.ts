@@ -135,6 +135,8 @@ export const NAV_SECTIONS: NavSection[] = [
     titleKey: 'nav.workspace',
     icon: 'tasks',
     items: [
+      // badgeKey stays `overdueTasks` (the Badges field name). The value is
+      // open tasks for the signed-in user, not the org-wide overdue rollup.
       { to: '/tasks', label: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks', badgeKey: 'overdueTasks' },
       { to: '/workload', label: 'Team Workload', labelKey: 'nav.workload', icon: 'contacts' },
       { to: '/calendar', label: 'Calendar', labelKey: 'nav.calendar', icon: 'clock' },
