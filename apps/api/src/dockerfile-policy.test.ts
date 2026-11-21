@@ -23,5 +23,19 @@ describe('standalone API Dockerfile policy', () => {
     );
     expect(runtime).toContain('USER bidstack');
     expect(runtime.lastIndexOf('USER bidstack')).toBeLessThan(runtime.indexOf('CMD ['));
+    expect(runtime.lastIndexOf('USER ')).toBeGreaterThan(-1);
+    expect(runtime.slice(runtime.lastIndexOf('USER '))).not.toMatch(/^USER\s+root\b/);
+  });
+
+  it('makes Checkov fail the supply-chain job when the user or the healthcheck is missing', () => {
+    const workflow = readFileSync(
+      path.resolve(process.cwd(), '../../.github/workflows/supply-chain.yml'),
+      'utf8',
+    );
+    // WHY: inventory #408 rows 5 and 16. Checkov already reports CKV_DOCKER_3 and
+    // CKV_DOCKER_2, and soft_fail lets the job conclude success. Those two rules
+    // have to fail the job. Other findings stay advisory.
+    expect(workflow).toMatch(/hard_fail_on:\s*CKV_DOCKER_2,CKV_DOCKER_3/);
+    expect(workflow).toMatch(/soft_fail:\s*true/);
   });
 });

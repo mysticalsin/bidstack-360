@@ -19,5 +19,9 @@ describe('marketing Dockerfile policy', () => {
     // not the nginx-unprivileged default. A missing USER is reported as root.
     const users = [...runtime.matchAll(/^USER\s+(\S+)/gm)].map((match) => match[1]);
     expect(users, 'CKV_DOCKER_3 / DS-0002: the runtime stage needs a non-root USER').toEqual(['nginx']);
+    expect(users.at(-1)).not.toBe('root');
+    // WHY: inventory #408 row 5 is the missing user. The runtime also has to keep
+    // a HEALTHCHECK, the same pair the API image is held to.
+    expect(runtime).toMatch(/^HEALTHCHECK /m);
   });
 });
