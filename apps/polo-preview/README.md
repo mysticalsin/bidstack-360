@@ -2,7 +2,7 @@
 
 Internal preview: `https://polo-preview.tony-walteur.workers.dev`
 
-Cloudflare Access (Tony, `alex.example@example.test`, `blake.sample@example.test`) sits
+Cloudflare Access (`alex.example@example.test`, `sam.example@example.test`) sits
 in front. The Worker is only a front door. It relays HTTP over a Durable Object
 WebSocket to a box that runs the Polo API on `:4020` and `vite preview` on
 `:4180`. That box must serve **`main`**.

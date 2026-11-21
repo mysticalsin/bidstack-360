@@ -244,7 +244,7 @@ describe('Gmail capture honours the SERUM connector policy', () => {
     provider: 'gmail',
     status: 'active',
     scope: ['https://www.googleapis.com/auth/gmail.readonly'],
-    externalAccountEmail: 'owner@amaris.com',
+    externalAccountEmail: 'owner@example.test',
     deltaState: {},
   };
 

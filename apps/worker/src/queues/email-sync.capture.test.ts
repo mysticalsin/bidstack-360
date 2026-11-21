@@ -56,7 +56,7 @@ function tokenRow(provider: 'microsoft_graph' | 'gmail', deltaState: Record<stri
     userId,
     provider,
     status: 'active',
-    externalAccountEmail: 'tony@amaris.com',
+    externalAccountEmail: 'tony@example.test',
     accessTokenEncrypted: 'x',
     refreshTokenEncrypted: 'y',
     expiresAt: null,
@@ -87,7 +87,7 @@ describe('Outlook inbox capture', () => {
               id: 'm-1',
               conversationId: 'conv-1',
               from: { emailAddress: { address: 'buyer@acme.com', name: 'Buyer' } },
-              toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+              toRecipients: [{ emailAddress: { address: 'tony@example.test' } }],
               subject: 'RFP questions',
               receivedDateTime: '2026-11-06T14:00:00Z',
               body: { contentType: 'html', content: '<p>Hello</p>' },
@@ -104,7 +104,7 @@ describe('Outlook inbox capture', () => {
           {
             id: 'm-2',
             conversationId: 'conv-1',
-            from: { emailAddress: { address: 'tony@amaris.com' } },
+            from: { emailAddress: { address: 'tony@example.test' } },
             toRecipients: [{ emailAddress: { address: 'buyer@acme.com' } }],
             subject: 'Re: RFP questions',
             sentDateTime: '2026-11-06T15:00:00Z',
@@ -152,7 +152,7 @@ describe('Outlook inbox capture', () => {
             {
               id: 'm-x',
               from: { emailAddress: { address: 'buyer@acme.com' } },
-              toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+              toRecipients: [{ emailAddress: { address: 'tony@example.test' } }],
               subject: 'Hello',
               receivedDateTime: '2026-11-06T14:00:00Z',
             },
@@ -182,7 +182,7 @@ describe('Outlook inbox capture', () => {
     const poison = {
       id: 'm-poison',
       from: { emailAddress: { address: 'buyer@acme.com' } },
-      toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+      toRecipients: [{ emailAddress: { address: 'tony@example.test' } }],
       subject: 'Secret subject',
       receivedDateTime: '2026-11-06T14:00:00Z',
     };
@@ -229,8 +229,8 @@ describe('Outlook inbox capture', () => {
             {
               id: 'm-hr',
               conversationId: 'conv-hr',
-              from: { emailAddress: { address: 'hr@amaris.com' } },
-              toRecipients: [{ emailAddress: { address: 'tony@amaris.com' } }],
+              from: { emailAddress: { address: 'hr@example.test' } },
+              toRecipients: [{ emailAddress: { address: 'tony@example.test' } }],
               subject: 'Your pay slip',
               receivedDateTime: '2026-11-06T14:00:00Z',
               body: { contentType: 'text', content: 'Private' },
@@ -272,7 +272,7 @@ function b64(s: string): string {
 describe('Gmail inbox capture', () => {
   it('seeds from the profile history id, pages the message list and stores bodies', async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+      if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@example.test', historyId: '900' });
       if (url.includes('/messages?') && !url.includes('pageToken')) {
         return json({ messages: [{ id: 'g-1', threadId: 't-1' }], nextPageToken: 'p2' });
       }
@@ -287,8 +287,8 @@ describe('Gmail inbox capture', () => {
         payload: {
           mimeType: 'multipart/alternative',
           headers: [
-            { name: 'From', value: id === 'g-1' ? 'Buyer <buyer@acme.com>' : 'Tony <tony@amaris.com>' },
-            { name: 'To', value: id === 'g-1' ? 'tony@amaris.com' : 'buyer@acme.com' },
+            { name: 'From', value: id === 'g-1' ? 'Buyer <buyer@acme.com>' : 'Tony <tony@example.test>' },
+            { name: 'To', value: id === 'g-1' ? 'tony@example.test' : 'buyer@acme.com' },
             { name: 'Cc', value: 'Ops <ops@acme.com>' },
             { name: 'Subject', value: 'Pricing' },
           ],
@@ -329,7 +329,7 @@ describe('Gmail inbox capture', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '901' });
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@example.test', historyId: '901' });
         if (url.includes('/messages?')) return json({ messages: [{ id: 'g-hr', threadId: 't-hr' }] });
         return json({
           id: 'g-hr',
@@ -338,8 +338,8 @@ describe('Gmail inbox capture', () => {
           payload: {
             mimeType: 'text/plain',
             headers: [
-              { name: 'From', value: 'HR <hr@amaris.com>' },
-              { name: 'To', value: 'tony@amaris.com' },
+              { name: 'From', value: 'HR <hr@example.test>' },
+              { name: 'To', value: 'tony@example.test' },
               { name: 'Subject', value: 'Your pay slip' },
             ],
             body: { data: b64('Private') },
@@ -371,7 +371,7 @@ describe('Gmail inbox capture', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@example.test', historyId: '900' });
         if (url.includes('/messages?')) return json({ messages: [{ id: 'g-poison', threadId: 't-1' }] });
         return json({
           id: 'g-poison',
@@ -381,7 +381,7 @@ describe('Gmail inbox capture', () => {
             mimeType: 'text/plain',
             headers: [
               { name: 'From', value: 'Buyer <buyer@acme.com>' },
-              { name: 'To', value: 'tony@amaris.com' },
+              { name: 'To', value: 'tony@example.test' },
               { name: 'Subject', value: 'Secret subject' },
             ],
             body: { data: b64('Plain body') },
@@ -404,7 +404,7 @@ describe('Gmail inbox capture', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@example.test', historyId: '900' });
         if (url.includes('/messages?')) return json({ messages: [{ id: 'g-500', threadId: 't-1' }] });
         return json({ error: 'unavailable' }, 500);
       }),
@@ -423,7 +423,7 @@ describe('Gmail inbox capture', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@example.test', historyId: '900' });
         if (url.includes('/messages?')) return json({ messages: [{ id: 'g-gone', threadId: 't-1' }] });
         return json({ error: 'gone' }, status);
       }),
@@ -439,7 +439,7 @@ describe('Gmail inbox capture', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) => {
-        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@amaris.com', historyId: '900' });
+        if (url.endsWith('/users/me/profile')) return json({ emailAddress: 'tony@example.test', historyId: '900' });
         if (url.includes('/messages?') && !url.includes('pageToken')) {
           return json({ messages: [{ id: 'g-1' }], nextPageToken: 'p2' });
         }
@@ -455,7 +455,7 @@ describe('Gmail inbox capture', () => {
             mimeType: 'text/plain',
             headers: [
               { name: 'From', value: 'Buyer <buyer@acme.com>' },
-              { name: 'To', value: 'tony@amaris.com' },
+              { name: 'To', value: 'tony@example.test' },
               { name: 'Subject', value: id },
             ],
             body: { data: b64('body') },
@@ -486,7 +486,7 @@ describe('Gmail inbox capture', () => {
           mimeType: 'text/plain',
           headers: [
             { name: 'From', value: 'Buyer <buyer@acme.com>' },
-            { name: 'To', value: 'tony@amaris.com' },
+            { name: 'To', value: 'tony@example.test' },
             { name: 'Subject', value: id },
           ],
           body: { data: b64('body') },
