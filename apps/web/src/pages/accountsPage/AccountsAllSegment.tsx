@@ -10,6 +10,7 @@ import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/compo
 import { toast } from '@/components/ui/Toast';
 import { AUTOPOPULATE_MAX, useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
+import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { springSoft } from '@/lib/motion';
@@ -50,6 +51,7 @@ export function AccountsAllSegment() {
   const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
   const dashboard = useCrmDashboard();
+  const orgSummary = useOrgSummary();
   const autopopulate = useAutopopulateSalesCompanies();
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
@@ -240,7 +242,14 @@ export function AccountsAllSegment() {
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
-  const snapshotCapped = loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP;
+  // The snapshot is the latest opportunities (100) plus enrichments (200). A
+  // tenant can sit under the enrichment ceiling and still be missing thousands
+  // of accounts. The org summary count is the table, so compare it. While that
+  // count is unknown, keep the old ceiling so a small complete snapshot is quiet.
+  const orgAccountCount = orgSummary.data?.companies;
+  const snapshotCapped =
+    loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP ||
+    (orgAccountCount !== undefined && orgAccountCount > loadedAccountCount);
   const filtersActive = Boolean(search || industry || technology || segment !== 'all' || leverageOnly);
   // True first-run org state: no search/filter narrowing the view AND the
   // underlying snapshot itself has zero rows. Distinct from "filters matched
@@ -275,11 +284,16 @@ export function AccountsAllSegment() {
           title={t('accounts.title', 'Accounts')}
           subtitle={
             <>
-              {rows.length === 1
-                ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
-                : t('accounts.summary.companyCount_other', '{{count}} companies', {
+              {orgAccountCount !== undefined && orgAccountCount > rows.length
+                ? t('accounts.summary.companyCountOfTotal', '{{count}} of {{total}} companies', {
                     count: rows.length,
-                  })}{' '}
+                    total: orgAccountCount,
+                  })
+                : rows.length === 1
+                  ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
+                  : t('accounts.summary.companyCount_other', '{{count}} companies', {
+                      count: rows.length,
+                    })}{' '}
               · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
                 amount: formatMoneyMicros(totalPipeline, 'EUR'),
@@ -557,8 +571,13 @@ export function AccountsAllSegment() {
           <Icon name="info" size={14} />
           {t(
             'accounts.cap.notice',
-            'Showing your most active {{count}} accounts from the live dashboard — this view can’t list the full portfolio yet. Search filters the accounts loaded here; use global search to open one that isn’t. Full account search is on the roadmap.',
-            { count: loadedAccountCount },
+            orgAccountCount !== undefined && orgAccountCount > loadedAccountCount
+              ? 'Showing {{count}} of {{total}} accounts from the live dashboard — this view can’t list the full portfolio yet. Search filters the accounts loaded here; use global search to open one that isn’t.'
+              : 'Showing your most active {{count}} accounts from the live dashboard — this view can’t list the full portfolio yet. Search filters the accounts loaded here; use global search to open one that isn’t. Full account search is on the roadmap.',
+            {
+              count: loadedAccountCount,
+              total: orgAccountCount ?? loadedAccountCount,
+            },
           )}
         </p>
       ) : null}
