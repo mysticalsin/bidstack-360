@@ -5,5 +5,6 @@ export {
   hopCountTrust,
   isInternalPeer,
   parseTrustProxy,
+  productionTrustProxyError,
   type TrustProxyValue,
 } from '@bidstack/shared/server';

@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 
-import { hopCountTrust, parseTrustProxy } from './trust-proxy.js';
+import { hopCountTrust, parseTrustProxy, productionTrustProxyError } from './trust-proxy.js';
 
 async function ipSeen(trustProxy: string, remoteAddress: string, xff?: string): Promise<string> {
   const app = Fastify({ trustProxy: parseTrustProxy(trustProxy) });
@@ -25,6 +25,15 @@ describe('parseTrustProxy', () => {
     expect(parseTrustProxy('true')).toBe(true);
     expect(parseTrustProxy('10.0.0.0/8, 127.0.0.1')).toEqual(['10.0.0.0/8', '127.0.0.1']);
     expect(typeof parseTrustProxy('2')).toBe('function');
+  });
+
+  it('allows a hop count or CIDR list in production and rejects trust-all', () => {
+    expect(productionTrustProxyError('true')).toMatch(/TRUSTED_PROXIES=true is not allowed in production/);
+    expect(productionTrustProxyError('yes')).toMatch(/hop count/);
+    expect(productionTrustProxyError(undefined)).toBeNull();
+    expect(productionTrustProxyError('false')).toBeNull();
+    expect(productionTrustProxyError('2')).toBeNull();
+    expect(productionTrustProxyError('10.0.0.0/8, 192.168.0.0/16')).toBeNull();
   });
 
   it('hop count trusts hops only behind an internal peer', () => {
