@@ -111,6 +111,7 @@ apps/web/scripts/_i18n_*
 
 # Root-level screenshot dumps (from Playwright QA passes)
 *.png
+!docs/sweeps/**/*.png
 *.mjs
 !scripts/*.mjs
 !apps/polo-preview/**/*.mjs
