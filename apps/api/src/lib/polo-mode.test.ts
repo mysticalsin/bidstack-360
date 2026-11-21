@@ -47,6 +47,18 @@ describe('polo data mode', () => {
     expect(resolvePoloAuthProvider({ CF_ACCESS_AUTH: 'true', NODE_ENV: 'production' })).toBe('cf-access');
   });
 
+  it('does not report stub when boot is refused', () => {
+    expect(() => resolvePoloAuthProvider({ NODE_ENV: 'development' })).toThrow(
+      /Stub auth cannot boot with real data/,
+    );
+  });
+
+  it('refuses local deployment plus production through the same boot path', () => {
+    expect(() =>
+      assertPoloAuthBoot({ POLO_DEPLOYMENT_ENV: 'local', NODE_ENV: 'production', POLO_DATA_MODE: 'demo' }),
+    ).toThrow(/POLO_DEPLOYMENT_ENV=local/);
+  });
+
   it('keeps demo and Access mutually exclusive', () => {
     expect(() =>
       assertPoloAuthBoot({ DEMO_MODE: 'true', CF_ACCESS_AUTH: 'true' }),
