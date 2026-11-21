@@ -45,8 +45,43 @@ export function Spark({ values, mode = 'line', hotFrom, label, width = 96, heigh
 }
 
 /* ---------- horizontal stage bars (pipeline funnel) ---------- */
+export type StageBarPoint = { label: string; value: number; count: number; amount?: string };
+
+/** The table's exact amount when the caller has one. Otherwise the numeric format. */
+export function stageAmountText(
+  point: { value?: number; amount?: string } | undefined,
+  format: (v: number) => string,
+): string {
+  if (typeof point?.amount === 'string' && point.amount.length > 0) return point.amount;
+  return format(Number(point?.value ?? 0));
+}
+
+export function StageBarTip({
+  active,
+  payload,
+  format,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number | string; payload?: StageBarPoint }>;
+  format?: (v: number) => string;
+}) {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload;
+  const fmt = format ?? ((v: number) => String(v));
+  return (
+    <div className="viz-tip" data-testid="stage-bar-tip">
+      {point?.label ? (
+        <div>
+          <b>{point.label}</b>
+        </div>
+      ) : null}
+      <div>Value: {stageAmountText(point, fmt)}</div>
+    </div>
+  );
+}
+
 export function StageBars({ data, format, height, onSelect }: {
-  data: Array<{ label: string; value: number; count: number }>; format: (v: number) => string; height?: number;
+  data: StageBarPoint[]; format: (v: number) => string; height?: number;
   /** Pointer shortcut; callers must also offer a keyboard path (chips, table). */
   onSelect?: (label: string) => void;
 }) {
@@ -54,21 +89,46 @@ export function StageBars({ data, format, height, onSelect }: {
   const h = height ?? Math.max(72, data.length * 44 + 16);
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
-    <ResponsiveContainer width="100%" height={h}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 64, bottom: 0, left: 0 }} barCategoryGap={10}
-        style={onSelect ? { cursor: 'pointer' } : undefined}
-        onClick={onSelect ? (st: { activeLabel?: string | number } | null) => { if (st?.activeLabel !== undefined) onSelect(String(st.activeLabel)); } : undefined}>
-        <XAxis type="number" hide domain={[0, max]} />
-        <YAxis type="category" dataKey="label" width={132} tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }} />
-        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={<ChartTip format={format} />} />
-        <Bar dataKey="value" name="Value" radius={[0, 4, 4, 0]} maxBarSize={28} {...anim(reduced)}
-          label={{ position: 'right', formatter: (v: unknown) => format(Number(v)), fill: 'var(--viz-muted)', fontSize: 12 }}>
-          {data.map((d, i) => (
-            <Cell key={d.label} fill={`color-mix(in srgb, var(--brand-primary, #006b4f) ${90 - i * (50 / Math.max(1, data.length - 1))}%, transparent)`} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div>
+      <ResponsiveContainer width="100%" height={h}>
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 64, bottom: 0, left: 0 }} barCategoryGap={10}
+          style={onSelect ? { cursor: 'pointer' } : undefined}
+          onClick={onSelect ? (st: { activeLabel?: string | number } | null) => { if (st?.activeLabel !== undefined) onSelect(String(st.activeLabel)); } : undefined}>
+          <XAxis type="number" hide domain={[0, max]} />
+          <YAxis type="category" dataKey="label" width={132} tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }} />
+          <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={<StageBarTip format={format} />} />
+          <Bar dataKey="value" name="Value" radius={[0, 4, 4, 0]} maxBarSize={28} {...anim(reduced)}
+            label={{
+              position: 'right',
+              content: (props: { index?: number; x?: number; y?: number; width?: number; height?: number }) => {
+                const point = data[props.index ?? -1];
+                if (!point) return null;
+                const x = Number(props.x ?? 0) + Number(props.width ?? 0) + 6;
+                const y = Number(props.y ?? 0) + Number(props.height ?? 0) / 2;
+                return (
+                  <text x={x} y={y} fill="var(--viz-muted)" fontSize={12} dominantBaseline="middle">
+                    {stageAmountText(point, format)}
+                  </text>
+                );
+              },
+            }}>
+            {data.map((d, i) => (
+              <Cell key={d.label} fill={`color-mix(in srgb, var(--brand-primary, #006b4f) ${90 - i * (50 / Math.max(1, data.length - 1))}%, transparent)`} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      {/* Recharts does not paint the SVG label when the container width is 0,
+          and the formatter only received the unit number. This list is the
+          same string the bar label and the tooltip use. */}
+      <ul className="viz-meta" data-testid="stage-bar-amounts" style={{ listStyle: 'none', margin: '8px 0 0', padding: 0 }}>
+        {data.map((d) => (
+          <li key={d.label}>
+            {d.label} <span>{stageAmountText(d, format)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
