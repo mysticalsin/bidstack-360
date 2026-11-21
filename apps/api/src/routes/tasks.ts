@@ -5,6 +5,7 @@ import { prisma } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
 import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '@bidstack/shared';
 
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
 
@@ -237,24 +238,39 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         }
       }
 
+      if (req.body.customFieldValues?.length) {
+        const foreign = await foreignCustomFieldDefinitions(
+          req.auth.orgId,
+          'task',
+          req.body.customFieldValues.map((v) => v.definitionId),
+        );
+        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
+      }
+
       // BS-4: org-scope the update where clause. Even though `existing` was
       // found via an org-scoped findFirst, code-quality rule 7 mandates that
       // EVERY Prisma where on a tenant table includes orgId — no exceptions
       // for "we already checked." Two-step updateMany + findFirstOrThrow
       // gives us back the row plus the relation `include` (updateMany
       // doesn't support include).
-      const updateResult = await prisma.task.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
-        data: {
-          ...(req.body.title !== undefined ? { title: req.body.title } : {}),
-          ...(req.body.dueDate !== undefined
-            ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
-            : {}),
-          ...(req.body.status !== undefined ? { status: req.body.status } : {}),
-          ...(assigneeId !== undefined ? { assigneeId } : {}),
-        },
-      });
-      if (updateResult.count === 0) throw server.httpErrors.notFound('Task not found');
+      // A body of only customFieldValues has no scalar data. updateMany with
+      // an empty data object matches 0 rows and was reported as "not found",
+      // so the values were never written.
+      const scalarData = {
+        ...(req.body.title !== undefined ? { title: req.body.title } : {}),
+        ...(req.body.dueDate !== undefined
+          ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }
+          : {}),
+        ...(req.body.status !== undefined ? { status: req.body.status } : {}),
+        ...(assigneeId !== undefined ? { assigneeId } : {}),
+      };
+      if (Object.keys(scalarData).length > 0) {
+        const updateResult = await prisma.task.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          data: scalarData,
+        });
+        if (updateResult.count === 0) throw server.httpErrors.notFound('Task not found');
+      }
       const updated = await prisma.task.findFirstOrThrow({
         where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
         include: { assignee: true },
