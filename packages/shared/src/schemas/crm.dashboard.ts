@@ -103,13 +103,7 @@ export const BidOpportunity = z.object({
 });
 export type BidOpportunity = z.infer<typeof BidOpportunity>;
 
-export const ProviderStatus = z.enum([
-  'healthy',
-  'degraded',
-  'disabled',
-  'down',
-  'unverified',
-]);
+export const ProviderStatus = z.enum(['healthy', 'degraded', 'disabled', 'down', 'unverified']);
 export type ProviderStatus = z.infer<typeof ProviderStatus>;
 
 export const ProviderHealth = z.object({
@@ -244,7 +238,9 @@ export type AccountCockpitSnapshot = z.infer<typeof AccountCockpitSnapshot>;
  * data for it, so it carries `health: null` instead of another company's score.
  * An AccountCockpitSnapshot is always assignable to this type.
  */
-export const AccountCockpitMaybeScored = AccountCockpitBase.extend({ health: CompanyHealth.nullable() });
+export const AccountCockpitMaybeScored = AccountCockpitBase.extend({
+  health: CompanyHealth.nullable(),
+});
 export type AccountCockpitMaybeScored = z.infer<typeof AccountCockpitMaybeScored>;
 
 export const CrmDashboardSnapshot = z.object({
@@ -252,6 +248,8 @@ export const CrmDashboardSnapshot = z.object({
   cockpit: AccountCockpitSnapshot,
   companies: z.array(CrmCompany),
   deals: z.array(CrmDeal),
+  /** True when the org deal sample stopped at 100 and at least one more deal exists. */
+  dealsSampleCapped: z.boolean().optional(),
   activities: z.array(CrmActivity),
   insights: z.array(AiInsight),
   widgets: z.array(DashboardWidget),

@@ -51,7 +51,12 @@ import {
   serializeReleaseScore,
   serializeWidget,
 } from './dashboard.queries.js';
-import { normalizeName, parseAttribution } from './dashboard.utils.js';
+import {
+  capDealSample,
+  DASHBOARD_DEAL_SAMPLE,
+  normalizeName,
+  parseAttribution,
+} from './dashboard.utils.js';
 
 // ─── Logger type ───────────────────────────────────────────────────────────────
 
@@ -64,15 +69,34 @@ export type LoggerLike = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The Company row for `?account=` (id or exact name), honouring the access scope. */
-async function findSparseAccount(prisma: PrismaClient, orgId: string, accountId: string, scope?: AccessScope) {
+async function findSparseAccount(
+  prisma: PrismaClient,
+  orgId: string,
+  accountId: string,
+  scope?: AccessScope,
+) {
   const base = {
     orgId,
     deletedAt: null,
-    OR: [...(UUID.test(accountId) ? [{ id: accountId }] : []), { name: { equals: accountId, mode: 'insensitive' as const } }],
+    OR: [
+      ...(UUID.test(accountId) ? [{ id: accountId }] : []),
+      { name: { equals: accountId, mode: 'insensitive' as const } },
+    ],
   };
   return prisma.company.findFirst({
     where: scope ? applyCompanyScope(base, scope) : base,
-    select: { id: true, name: true, legalName: true, domain: true, website: true, industry: true, employeeCount: true, logoUrl: true, confidence: true, updatedAt: true },
+    select: {
+      id: true,
+      name: true,
+      legalName: true,
+      domain: true,
+      website: true,
+      industry: true,
+      employeeCount: true,
+      logoUrl: true,
+      confidence: true,
+      updatedAt: true,
+    },
     orderBy: { updatedAt: 'desc' },
   });
 }
@@ -95,7 +119,7 @@ export async function buildDashboardSnapshot(
     : { orgId, deletedAt: null };
 
   const [
-    opportunities,
+    opportunityRows,
     contacts,
     tasks,
     enrichments,
@@ -138,8 +162,8 @@ export async function buildDashboardSnapshot(
           },
         },
       },
-      orderBy: { updatedAt: 'desc' },
-      take: 100,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+      take: DASHBOARD_DEAL_SAMPLE + 1,
     }),
     prisma.contact.findMany({
       where: { orgId, deletedAt: null },
@@ -320,6 +344,7 @@ export async function buildDashboardSnapshot(
     }),
   ]);
 
+  const { rows: opportunities, capped: dealsSampleCapped } = capDealSample(opportunityRows);
   const visibleCompanyKeys =
     scope && !scope.unrestricted
       ? new Set(opportunities.map((opportunity) => normalizeName(opportunity.customer)))
@@ -394,6 +419,7 @@ export async function buildDashboardSnapshot(
     }),
     companies,
     deals,
+    dealsSampleCapped,
     activities,
     insights,
     widgets: dashboardWidgets,

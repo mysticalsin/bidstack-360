@@ -101,7 +101,11 @@ vi.mock('@/hooks/useCrmDashboard', () => ({
   useCrmDashboard: () => dashboardState.current,
 }));
 vi.mock('@/hooks/useMsaLeverage', () => ({
-  useMsaLeverage: () => ({ isLoading: false, isError: false, data: { items: [], hemaPharmaCount: 0 } }),
+  useMsaLeverage: () => ({
+    isLoading: false,
+    isError: false,
+    data: { items: [], hemaPharmaCount: 0 },
+  }),
 }));
 
 function company(i: number): CrmCompany {
@@ -167,9 +171,7 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     setDashboard(CAP);
     renderSegment();
 
-    expect(
-      screen.getByText(/most active 200 accounts from the live dashboard/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/most active 200 accounts from the live dashboard/i)).toBeTruthy();
   });
 
   it('does not warn when the snapshot is complete (small org) — no false alarm', () => {
@@ -231,8 +233,6 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
 
     expect(screen.getByText('No accounts yet')).toBeTruthy();
     expect(screen.queryByText('No accounts match your filters')).toBeNull();
-    expect(
-      screen.getByRole('link', { name: /import accounts from csv/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: /import accounts from csv/i })).toBeTruthy();
   });
 });
