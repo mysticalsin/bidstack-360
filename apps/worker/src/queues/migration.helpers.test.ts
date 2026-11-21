@@ -22,6 +22,17 @@ describe('migration value coercion', () => {
     expect(asMicros('n/a')).toBeNull();
   });
 
+  it('keeps European decimals, accounting losses, and cents past the float boundary', () => {
+    // WHY: stripping every comma turns "1.234,56" into 1.23456 and "(1,234.50)"
+    // into a profit. Number()*1e6 also rounds a trillion-and-a-cent. The
+    // stored micros have to be the amount the cell wrote.
+    expect(asMicros('1.234,56')).toBe(1_234_560_000n);
+    expect(asMicros('1,50')).toBe(1_500_000n);
+    expect(asMicros('(1,234.50)')).toBe(-1_234_500_000n);
+    expect(asMicros('1000000000000.01')).toBe(1_000_000_000_000_010_000n);
+    expect(asMicros("'-1.50")).toBe(-1_500_000n);
+  });
+
   it('strips separators from integers', () => {
     expect(asInt('1,234')).toBe(1234);
     expect(asInt('42')).toBe(42);
