@@ -6,7 +6,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '@/lib/api';
-import { useSendForSignature } from './useSignatureRequests';
+import { useSendForSignature, useSignatureRequest, useSignatureRequests } from './useSignatureRequests';
 
 vi.mock('@/lib/api', () => ({
   api: vi.fn(),
@@ -27,6 +27,41 @@ function createHarness() {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe('signature list and detail', () => {
+  it('reads /api/v1/signatures/requests, the route the API registers', async () => {
+    // WHY: GET /api/signatures normalizes to /api/v1/signatures, which is not
+    // a route. The list and the detail live under /api/v1/signatures/requests.
+    const { wrapper } = createHarness();
+    vi.mocked(api).mockResolvedValue({ items: [], nextCursor: null, total: 0 });
+    const list = renderHook(
+      () => useSignatureRequests({ status: 'SENT', dateFrom: '2026-01-01', limit: 10 }),
+      { wrapper },
+    );
+    await act(async () => {
+      await list.result.current.refetch();
+    });
+    expect(api).toHaveBeenCalledWith(
+      '/api/v1/signatures/requests?status=SENT&dateFrom=2026-01-01&limit=10',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+
+    vi.mocked(api).mockResolvedValueOnce({ id: 'sig-1' });
+    const one = renderHook(() => useSignatureRequest('sig-1'), { wrapper });
+    await act(async () => {
+      await one.result.current.refetch();
+    });
+    expect(api).toHaveBeenCalledWith(
+      '/api/v1/signatures/requests/sig-1',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
+  it('does not post resend to an unregistered /api/signatures path', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/hooks/useSignatureRequests.ts'), 'utf8');
+    expect(source).not.toMatch(/\/api\/signatures\/\$\{[^}]*\}\/resend/);
+  });
 });
 
 describe('signature void hooks', () => {
