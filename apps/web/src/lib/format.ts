@@ -67,9 +67,9 @@ export function formatDate(iso: string | null | undefined, locale?: string): str
   });
 }
 
-export function daysUntil(iso: string | null | undefined): number | null {
+export function daysUntil(iso: string | null | undefined, now: Date = new Date()): number | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
+  const ms = new Date(iso).getTime() - now.getTime();
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
