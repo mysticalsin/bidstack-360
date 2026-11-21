@@ -54,6 +54,41 @@ describe('viz-data', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
   });
 
+  it('prints the full chart total when a compact label would move it', () => {
+    // WHY: 12m is not 12,015,000, and a stored micros amount of 0 units
+    // must still count. Stage names stay as they are. Supersedes PR #73.
+    expect(fmtCompact(7_860_000)).toContain('7.86');
+    expect(fmtCompact(7_860_000)).not.toMatch(/7\.9/);
+    expect(fmtCompact(12_015_000)).toBe('12,015,000');
+    const fromMicros = stageFunnel([
+      row({ stage: 's2_sent', value: 0, valueMicros: '7860000000000' }),
+      row({ stage: 's2_sent', value: 0, valueMicros: '12015000000000' }),
+    ]);
+    expect(fromMicros[0]).toMatchObject({ value: 19_875_000, count: 2 });
+  });
+
+  it('reads a forecast bar from integer micros', () => {
+    // WHY: dividing a micros digit string through a JavaScript number
+    // moved the bar. A value past the safe integer is not drawn as a guess.
+    // Supersedes PR #74. This does not rename stages.
+    const point = forecastAmount({
+      wonMicros: '7860000000000',
+      weightedMicros: '12015000000000',
+      openMicros: '0',
+    });
+    expect(point.won).toBe(7_860_000);
+    expect(point.wonLabel).toContain('7.86');
+    expect(point.wonLabel).not.toMatch(/7\.9/);
+    expect(point.weightedLabel).toBe('12,015,000');
+    const unread = forecastAmount({
+      wonMicros: Number.MAX_SAFE_INTEGER + 2,
+      weightedMicros: '0',
+      openMicros: '0',
+    });
+    expect(unread.wonLabel).toBe('amount not readable');
+    expect(unread.won).toBe(0);
+  });
+
   it('keeps two compact digits when they name the same amount', () => {
     // WHY: 7,860,000 was 7.9m, and an exact 11,890,000 stays 11.89m rather than 11.9m.
     // A non-exact amount uses one digit, so it does not spill the full figure.
