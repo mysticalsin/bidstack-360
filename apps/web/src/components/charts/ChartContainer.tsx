@@ -90,9 +90,9 @@ export function ChartContainer({
         <div className="flex items-start justify-between px-4 pt-4 pb-2">
           <div>
             {title && (
-              <h3 className="text-sm font-semibold text-[var(--fg-primary)] leading-tight">
+              <h2 className="text-sm font-semibold text-[var(--fg-primary)] leading-tight">
                 {title}
-              </h3>
+              </h2>
             )}
             {subtitle && <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{subtitle}</p>}
           </div>
