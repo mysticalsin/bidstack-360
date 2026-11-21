@@ -1,5 +1,7 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
+import { formatMicrosDecimal, microsToUnits, unitsToMicros } from '@bidstack/shared';
+
 import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -63,10 +65,54 @@ export function quarterOf(iso: string): string {
   return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
 }
 
+/** Integer micros for a row. The digit string wins. A unit number is used only when it converts exactly. */
+function rowMicros(row: { value?: number | null; valueMicros?: string | null }): bigint | null {
+  const raw = row.valueMicros;
+  if (raw != null && raw !== '' && /^-?\d+$/.test(raw)) return BigInt(raw);
+  if (row.value == null || !Number.isFinite(row.value)) return 0n;
+  if (Math.abs(row.value) > Number.MAX_SAFE_INTEGER) return null;
+  try {
+    return unitsToMicros(row.value);
+  } catch {
+    return null;
+  }
+}
+
+/** Bar length. Zero when the micros total does not fit in a JavaScript number. */
+function layoutUnits(micros: bigint): number {
+  const whole = micros / 1_000_000n;
+  const abs = whole < 0n ? -whole : whole;
+  if (abs > BigInt(Number.MAX_SAFE_INTEGER)) return 0;
+  return microsToUnits(micros);
+}
+
+/** Exact major-unit text. A total that fits keeps the compact chart label. */
+function stageAmount(micros: bigint): string {
+  const whole = micros / 1_000_000n;
+  const abs = whole < 0n ? -whole : whole;
+  if (abs > BigInt(Number.MAX_SAFE_INTEGER)) return formatMicrosDecimal(micros);
+  return fmtCompact(layoutUnits(micros));
+}
+
 export function stageFunnel(rows: OppRow[]) {
   return OPEN_STAGES.map((id) => {
     const inStage = rows.filter((o) => stageKey(o.stage) === id);
-    return { label: stageText(id), value: inStage.reduce((n, o) => n + chartUnits(o), 0), count: inStage.length };
+    let micros = 0n;
+    let readable = true;
+    for (const row of inStage) {
+      const part = rowMicros(row);
+      if (part == null) {
+        readable = false;
+        break;
+      }
+      micros += part;
+    }
+    return {
+      label: stageText(id),
+      value: readable ? layoutUnits(micros) : inStage.reduce((n, o) => n + chartUnits(o), 0),
+      amount: readable ? stageAmount(micros) : 'amount not readable',
+      count: inStage.length,
+    };
   }).filter((s) => s.count > 0);
 }
 
@@ -207,7 +253,7 @@ export function forecastAmount(period: {
     const whole = micros / 1_000_000n;
     const absWhole = whole < 0n ? -whole : whole;
     if (absWhole > BigInt(Number.MAX_SAFE_INTEGER)) {
-      return { units: 0, label: 'amount not readable' };
+      return { units: 0, label: formatMicrosDecimal(micros) };
     }
     const remainder = micros % 1_000_000n;
     const units = Number(whole) + Number(remainder) / 1_000_000;

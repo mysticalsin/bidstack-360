@@ -194,23 +194,39 @@ export function ForecastCard({ rows, projection, headingLevel }: {
   const future = (projection?.periods ?? [])
     .filter((p) => {
       const point = forecastAmount(p);
-      return point.open !== 0 || point.weighted !== 0;
+      return point.open !== 0 || point.weighted !== 0 || point.openLabel !== '0' || point.weightedLabel !== '0';
     })
     .map((p) => {
       const point = forecastAmount(p);
-      return { label: p.label, won: point.won, weighted: point.weighted, open: point.open };
+      return {
+        label: p.label,
+        won: point.won,
+        weighted: point.weighted,
+        open: point.open,
+        wonLabel: point.wonLabel,
+        weightedLabel: point.weightedLabel,
+        openLabel: point.openLabel,
+      };
     });
   const seen = new Set(future.map((f) => f.label));
-  const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
+  const data: Array<{
+    label: string;
+    won: number;
+    weighted: number;
+    open: number;
+    wonLabel?: string;
+    weightedLabel?: string;
+    openLabel?: string;
+  }> = [...actuals.filter((a) => !seen.has(a.label)), ...future];
   const target = (projection?.periods ?? [])
     .map((p) => p.manualCommitMicros)
     .filter((micros): micros is string | number => micros != null && micros !== 0 && micros !== '0')
     .map((micros) => forecastAmount({ wonMicros: micros, weightedMicros: 0, openMicros: 0 }))
-    .find((point) => point.won > 0);
+    .find((point) => point.won > 0 || point.wonLabel !== '0');
   return (
     <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${target.wonLabel} per quarter` : 'No target set yet · add a commit forecast to compare'}
-      summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
-      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
+      summary={data.map((d) => `${d.label}: won ${d.wonLabel ?? fmtCompact(d.won)}${d.weighted || d.weightedLabel ? `, weighted ${d.weightedLabel ?? fmtCompact(d.weighted)}` : ''}`).join('; ')}
+      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, d.wonLabel ?? fmtCompact(d.won), d.weightedLabel ?? fmtCompact(d.weighted), d.openLabel ?? fmtCompact(d.open)]) }}>
       <QuarterBars data={data} format={fmtCompact} />
       <ul className="viz-legend" aria-hidden>
         <li><i className="dash-key" style={{ background: 'var(--success, #177048)' }} />Won</li>
