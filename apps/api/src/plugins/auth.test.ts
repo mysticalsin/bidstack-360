@@ -275,6 +275,42 @@ describe('auth plugin', () => {
     }
   });
 
+  it('rejects a Clerk JWT on the WebSocket query string', async () => {
+    // The session JWT must not be a URL credential. Edge logs, history, and
+    // Referer keep the query string after the app has scrubbed its own logs.
+    process.env.NODE_ENV = 'production';
+    process.env.CLERK_SECRET_KEY = 'sk_test_query_token';
+    process.env.PUBLIC_BASE_URL = 'https://app.bidstack.test';
+    vi.mocked(verifyToken).mockReset();
+    vi.mocked(verifyToken).mockResolvedValue({
+      org_id: 'org_clerk',
+      sub: 'user_clerk',
+      email: 'ada@example.test',
+    } as never);
+
+    const server = Fastify({ logger: false });
+    await server.register(sensible);
+    await server.register(authPlugin);
+    // Same upgrade the yjs and realtime sockets send. verifyClerkAuth runs
+    // for every non-public route, including /api/v1/yjs-sync.
+    server.get('/private-probe', async () => ({ ok: true }));
+    await server.ready();
+
+    try {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/private-probe?access_token=clerk-session-jwt',
+        headers: { upgrade: 'websocket', connection: 'Upgrade' },
+      });
+      expect(verifyToken).not.toHaveBeenCalled();
+      expect(response.statusCode).toBe(401);
+      expect(response.json().message).toBe('Missing Authorization header');
+      expect(response.body).not.toContain('clerk-session-jwt');
+    } finally {
+      await server.close();
+    }
+  });
+
   describe('verified-session cache (scale fix)', () => {
     // WHY this matters: the onRequest hook runs verifyClerkAuth on EVERY
     // authenticated request. Before the cache, each one did 3 reads + a
