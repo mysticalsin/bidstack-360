@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { serializeCompany } from './company-enrichment.service.js';
+import { buildCompanies, serializeCompany } from './company-enrichment.service.js';
 import { canQueueApolloEnrichment } from './enrichment.service.js';
 
 describe('canQueueApolloEnrichment', () => {
@@ -31,6 +31,33 @@ describe('canQueueApolloEnrichment', () => {
       }),
     ).toBe(true);
     expect(canQueueApolloEnrichment({ env: { APOLLO_API_KEY: 'apollo-key' } })).toBe(false);
+  });
+});
+
+describe('buildCompanies', () => {
+  // A brand-new org has no opportunities and no enrichments. The accounts page
+  // renders this list as the book, so a hardcoded home account would look like
+  // a real customer (headcount, revenue, confidence) before the first import.
+  it('does not invent a Mantu account when the org has no companies', () => {
+    const companies = buildCompanies([], [], []);
+    expect(companies.map((company) => company.name)).toEqual([]);
+  });
+
+  it('keeps a real customer named Mantu when that account is actually in the book', () => {
+    const companies = buildCompanies(
+      [
+        {
+          customer: 'Mantu',
+          industry: 'consulting',
+          logoUrl: null,
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ],
+      [],
+      [],
+    );
+    expect(companies.map((company) => company.name)).toEqual(['Mantu']);
+    expect(companies[0]?.employeeCount).toBeNull();
   });
 });
 
