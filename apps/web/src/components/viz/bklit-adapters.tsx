@@ -67,8 +67,18 @@ export function WinRateLine({ data }: { data: Array<{ x: string; date: Date; rat
   );
 }
 
+function labelledAmount(point: Record<string, unknown>, key: 'won' | 'weighted', format: Fmt): string {
+  const label = point[`${key}Label`];
+  if (typeof label === 'string') return label;
+  const raw = point[key];
+  return format(typeof raw === 'number' ? raw : 0);
+}
+
 /** Won actuals and weighted forecast per quarter. */
-export function QuarterBars({ data, format }: { data: Array<{ label: string; won: number; weighted: number }>; format: Fmt }) {
+export function QuarterBars({ data, format }: {
+  data: Array<{ label: string; won: number; weighted: number; wonLabel?: string; weightedLabel?: string }>;
+  format: Fmt;
+}) {
   const reduced = useReducedMotion();
   if (!data.length) return null;
   return (
@@ -80,8 +90,8 @@ export function QuarterBars({ data, format }: { data: Array<{ label: string; won
         <Bar dataKey="weighted" fill={`color-mix(in srgb, ${BRAND} 45%, transparent)`} lineCap="round" animate={!reduced} staggerDelay={reduced ? 0 : 0.06} />
         <BarXAxis />
         <ChartTooltip rows={(p) => [
-          { color: WON, label: 'Won', value: format(Number(p.won ?? 0)) },
-          { color: BRAND, label: 'Weighted forecast', value: format(Number(p.weighted ?? 0)) },
+          { color: WON, label: 'Won', value: labelledAmount(p, 'won', format) },
+          { color: BRAND, label: 'Weighted forecast', value: labelledAmount(p, 'weighted', format) },
         ]} />
       </BarChart>
     </div>

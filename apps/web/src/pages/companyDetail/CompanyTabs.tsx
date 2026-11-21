@@ -86,10 +86,9 @@ export function OpportunityTab({
     dueDate: string | null;
   }>;
 }) {
-  // WHY useFormatMoney instead of bare formatMoneyMicros('CAD'): the hook
-  // converts from the org base currency (CAD) to the user's selected display
-  // currency and respects the currency store, so the value column stays
-  // consistent with every other money figure in the app.
+  // WHY useFormatMoney with no source currency: this row stores micros and
+  // does not store a currency. The hook must not stamp CAD or the header
+  // symbol onto that number.
   const { formatMoneyMicros } = useFormatMoney();
   const { t } = useTranslation('crm');
   if (opportunities.length === 0)

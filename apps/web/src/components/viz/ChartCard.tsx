@@ -114,9 +114,11 @@ export function ChartTip({ active, payload, label, format }: {
   return (
     <div className="viz-tip">
       {label !== undefined ? <div style={{ marginBottom: 4 }}><b>{label}</b></div> : null}
-      {payload.map((p, i) => (
-        <div key={i}>{p.name}: {typeof p.value === 'number' && format ? format(p.value) : p.value}</div>
-      ))}
+      {payload.map((p, i) => {
+        const amount = (p as { payload?: { amount?: string } }).payload?.amount;
+        const text = amount ?? (typeof p.value === 'number' && format ? format(p.value) : p.value);
+        return <div key={i}>{p.name}: {text}</div>;
+      })}
     </div>
   );
 }

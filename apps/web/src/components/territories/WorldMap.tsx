@@ -346,7 +346,7 @@ export const WorldMap = memo(function WorldMap({
   const legendItems = Array.from({ length: legendSteps }, (_, i) => {
     const t = i / (legendSteps - 1);
     const value = Math.round(maxValue * t);
-    return { color: interpolateBrand(t), label: formatMoneyMicros(String(value)) };
+    return { color: interpolateBrand(t), label: formatMoneyMicros(String(value), 'EUR') };
   });
 
   return (
@@ -440,7 +440,7 @@ export const WorldMap = memo(function WorldMap({
                 const countryLabel = item
                   ? t('worldMap.country.ariaLabel', '{{country}}: {{value}}', {
                       country: item.countryCode,
-                      value: formatMoneyMicros(item.totalValueMicros),
+                      value: formatMoneyMicros(item.totalValueMicros, 'EUR'),
                     })
                   : undefined;
 
@@ -681,7 +681,7 @@ export const WorldMap = memo(function WorldMap({
             </span>
             <span className="text-[var(--border-subtle)]">·</span>
             <span className="font-semibold text-[var(--brand-primary)]">
-              {formatMoneyMicros(hovered.item.totalValueMicros)}
+              {formatMoneyMicros(hovered.item.totalValueMicros, 'EUR')}
             </span>
           </div>
           <div className="text-[10px] font-medium tabular-nums text-[var(--fg-tertiary)] mt-0.5">

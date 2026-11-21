@@ -297,7 +297,7 @@ export function PipelinePage() {
               <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 {kpi.label}
               </div>
-              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
+              <div className="mt-1 truncate text-lg font-bold text-[var(--fg-primary)] tabular-nums">
                 {kpi.value}
               </div>
             </div>
