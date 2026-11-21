@@ -81,7 +81,8 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(opportunityId ? { opportunityId } : {}),
           ...(recommendation ? { recommendation } : {}),
         },
-        orderBy: { createdAt: 'desc' },
+        // createdAt is not unique. id keeps an offset page from repeating a tie.
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit,
         skip: offset,
       });
