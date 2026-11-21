@@ -1,5 +1,6 @@
-import type { KeyNumber } from '@bidstack/shared';
+import { aggregateMoney, moneyFromMicros, presentMoney, type KeyNumber } from '@bidstack/shared';
 
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { fmtMoney } from '@/components/financials/financials-format';
 import { formatMoneyMicros } from '@/lib/format';
 
@@ -27,7 +28,36 @@ export function sentimentWord(v: number): string {
 
 export type MicrosFormatter = (micros: string | number) => string;
 
-export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
+export type PipelineDeal = { micros: string | bigint; currency: string | null };
+
+/**
+ * One display total only when every deal shares a recorded currency.
+ * There is no approved rate, so mixed or missing currencies stay unconverted
+ * and say so, instead of a selector symbol on a summed figure.
+ */
+export function formatPipelineDeals(
+  deals: readonly PipelineDeal[],
+  selectorCurrency?: string | null,
+): string {
+  const rows = [];
+  for (const deal of deals) {
+    const code = deal.currency?.trim() ?? '';
+    if (!/^[A-Za-z]{3}$/.test(code)) return UNSPECIFIED_CURRENCY_BASIS;
+    let micros: bigint;
+    try {
+      micros = typeof deal.micros === 'bigint' ? deal.micros : BigInt(deal.micros);
+    } catch {
+      return UNSPECIFIED_CURRENCY_BASIS;
+    }
+    rows.push(moneyFromMicros(micros, code));
+  }
+  if (rows.length === 0) return UNSPECIFIED_CURRENCY_BASIS;
+  const rollup = aggregateMoney(rows);
+  if (rollup.kind !== 'single') return UNSPECIFIED_CURRENCY_BASIS;
+  return presentMoney(rollup.total, selectorCurrency, { locale: 'en-GB', compact: true }).text;
+}
+
+export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter, selectorCurrency?: string | null): string {
   if (n.value === null) return 'No data';
   switch (n.unit) {
     case 'money': {
@@ -38,6 +68,12 @@ export function formatValue(n: KeyNumber, fmtMicros?: MicrosFormatter): string {
       return amount;
     }
     case 'money_micros':
+      if (n.id === 'pipeline') {
+        return formatPipelineDeals(
+          [{ micros: BigInt(Math.round(n.value)), currency: n.currency }],
+          selectorCurrency,
+        );
+      }
       return fmtMicros ? fmtMicros(Math.round(n.value)) : formatMoneyMicros(Math.round(n.value), undefined, { compact: true });
     case 'pct':
       return `${n.value.toFixed(1)}%`;
