@@ -85,6 +85,22 @@ describe('CsvImportWizard', () => {
     hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false });
   }
 
+  it('downloads a template for the selected entity instead of leaving the first import blank', async () => {
+    stubHooks();
+    const blobs: Blob[] = [];
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+      blobs.push(blob as Blob);
+      return 'blob:template';
+    });
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    render(<CsvImportWizard />);
+    fireEvent.click(screen.getByRole('button', { name: 'Download a template' }));
+    expect(blobs).toHaveLength(1);
+    const text = await blobs[0]!.text();
+    expect(text).toContain('Harbor Synthetic');
+    expect(text.split('\n')[0]).toContain('Name');
+  });
+
   it('auto-maps recognizable headers and blocks preview while a required target field is unmapped', async () => {
     // WHY: 'company' is the default entity and its Name field is required.
     // A CSV with an unrecognized header for the name column must leave that
