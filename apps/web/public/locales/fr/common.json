@@ -56,7 +56,9 @@
     "agentStudio": "Studio d'agents",
     "calendar": "Calendrier",
     "customObjects": "Objets personnalisés",
-    "analyticsReports": "Analyses & rapports"
+    "analyticsReports": "Analyses & rapports",
+    "agreements": "Accords",
+    "meetings": "Réunions"
   },
   "crumbs": {
     "portfolio": "Portefeuille",
@@ -357,6 +359,8 @@
     "settings": "Paramètres",
     "auditLog": "Journal d'audit",
     "login": "Se connecter",
+    "agreements": "Accords",
+    "meetings": "Réunions",
     "ariaLabel": "Fil d'Ariane"
   },
   "progressRing": {
