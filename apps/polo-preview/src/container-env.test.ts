@@ -52,6 +52,14 @@ describe('container env', () => {
     expect(() => containerEnv({ ALLOWED_EMAILS: 'a@x.com' })).toThrow(/POLO_PII_ENCRYPTION_MASTER_KEY/);
   });
 
+  it('refuses to boot when admin and Access settings are absent instead of demoting admins', () => {
+    const base: Record<string, string> = { ...SECRETS, ALLOWED_EMAILS: 'a@example.test' };
+    delete base.ACCESS_AUD;
+    delete base.POLO_ADMIN_EMAILS;
+    expect(() => containerEnv(base)).toThrow(/ACCESS_AUD/);
+    expect(() => containerEnv({ ...base, ACCESS_AUD: 'aud' })).toThrow(/POLO_ADMIN_EMAILS/);
+  });
+
   it('names the app database secret and does not repeat a password in the error', () => {
     expect(() => containerEnv({ ...SECRETS, POLO_APP_DB_PASSWORD: '' })).toThrow(
       /^polo-preview is missing Worker secrets: POLO_APP_DB_PASSWORD$/,
