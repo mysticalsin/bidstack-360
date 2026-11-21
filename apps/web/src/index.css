@@ -1384,7 +1384,9 @@ select:focus-visible {
    rule whose tokens resolve to dark values. */
 [data-theme='dark'] .sb-item[aria-current='page'] {
   background: var(--brand-primary-tint);
-  color: var(--brand-primary);
+  /* --brand-primary is the fill (#00805e, 3.07:1 on this tint). Text uses the
+     foreground accent, which clears 4.5:1 on the same pill. */
+  color: var(--brand-deep);
 }
 [data-theme='dark'] .sb-item[aria-current='page'] .sb-badge {
   background: var(--brand-primary);
@@ -4065,6 +4067,10 @@ select:focus-visible {
 .account-segment-bar strong {
   color: var(--brand-primary);
   font-variant-numeric: tabular-nums;
+}
+[data-theme='dark'] .account-segment-bar strong {
+  /* Same fill-vs-text split as the active nav item. #00805e on the card is 3.95:1. */
+  color: var(--brand-deep);
 }
 .account-filter:hover {
   background: var(--surface-sunken);
