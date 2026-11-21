@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import * as databaseBoot from './database-boot.js';
@@ -42,10 +43,60 @@ function spawnCall(name: string): string {
   return callBody(body, body.indexOf('(', spawnAt));
 }
 
-function assignsDrillFlag(source: string): boolean {
-  const withoutComparisons = source.replace(/POLO_RESTORE_DRILL\s*(?:===|!==|==|!=)/g, 'COMPARED');
-  if (/POLO_RESTORE_DRILL\s*=/.test(withoutComparisons)) return true;
-  return /POLO_RESTORE_DRILL\s*:\s*['"]1['"]/.test(source);
+const DRILL_FLAG = 'POLO_RESTORE_DRILL';
+
+function staticText(node: ts.Node | undefined): string | null {
+  if (!node) return null;
+  if (ts.isIdentifier(node) || ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    return node.text;
+  }
+  if (ts.isParenthesizedExpression(node)) return staticText(node.expression);
+  return null;
+}
+
+function propertyKey(name: ts.PropertyName): string | null {
+  if (ts.isComputedPropertyName(name)) return staticText(name.expression);
+  return staticText(name);
+}
+
+function treeSetsDrillFlag(source: string): boolean {
+  const file = ts.createSourceFile('probe.js', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  let found = false;
+  const visit = (node: ts.Node) => {
+    if (found) return;
+    if (
+      (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
+      propertyKey(node.name) === DRILL_FLAG
+    ) {
+      found = true;
+      return;
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      const left = node.left;
+      if (staticText(left) === DRILL_FLAG) found = true;
+      else if (ts.isPropertyAccessExpression(left) && left.name.text === DRILL_FLAG) found = true;
+      else if (ts.isElementAccessExpression(left) && staticText(left.argumentExpression) === DRILL_FLAG) {
+        found = true;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}
+
+function assignsDrillFlag(source: string, file?: string): boolean {
+  if (!source.includes(DRILL_FLAG)) return false;
+  const js = !file || /\.(?:[cm]?js|tsx?)$/.test(file);
+  // Dockerfile and wrangler are not JavaScript. A mention there is an assignment
+  // the container would read. JavaScript is decided by the syntax tree, so a
+  // comparison or a comment does not count.
+  if (!js) return true;
+  if (treeSetsDrillFlag(source)) return true;
+  // `{ key: value }` is a block when parsed as a script. Wrap a snippet so the
+  // braces are an object literal. A whole source file is parsed as itself.
+  if (!file && source.trim().startsWith('{')) return treeSetsDrillFlag(`void (${source});`);
+  return false;
 }
 
 describe('database boot follow-ups', () => {
@@ -156,7 +207,7 @@ describe('database boot follow-ups', () => {
     ];
     for (const file of files) {
       const source = readFileSync(join(here, file), 'utf8');
-      expect(assignsDrillFlag(source), file).toBe(false);
+      expect(assignsDrillFlag(source, file), file).toBe(false);
     }
     expect(assignsDrillFlag('process.env.POLO_RESTORE_DRILL = "1"')).toBe(true);
     expect(assignsDrillFlag("POLO_RESTORE_DRILL='1'")).toBe(true);
@@ -170,7 +221,7 @@ describe('database boot follow-ups', () => {
     expect(assignsDrillFlag("{ POLO_RESTORE_DRILL: '1' }")).toBe(true);
     expect(assignsDrillFlag('{ POLO_RESTORE_DRILL: "1" }')).toBe(true);
     for (const file of ['container-env.js', 'polo-container.js']) {
-      expect(assignsDrillFlag(readFileSync(join(here, file), 'utf8')), file).toBe(false);
+      expect(assignsDrillFlag(readFileSync(join(here, file), 'utf8'), file), file).toBe(false);
     }
   });
 
