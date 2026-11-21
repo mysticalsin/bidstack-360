@@ -25,7 +25,7 @@ Three official channels, all run by Dirección ChileCompra.
 | Base | `https://api.mercadopublico.cl/servicios/v1/publico/` | verified |
 | Tenders | `licitaciones.json?codigo=` / `?fecha=DDMMYYYY` / `?estado=activas` / `?estado=<estado>&fecha=` / `?fecha=&CodigoOrganismo=` / `?fecha=&CodigoProveedor=` | verified (docs) |
 | Purchase orders | `ordenesdecompra.json` with the same `codigo`, `fecha`, `estado=todos`, organismo and proveedor filters | verified (docs) |
-| Directory | `Publico/Empresas/BuscarProveedor?rutempresaproveedor=70.017.820-k`, `Publico/Empresas/BuscarComprador` | verified (docs) |
+| Directory | `Publico/Empresas/BuscarProveedor?rutempresaproveedor=99.000.139-1`, `Publico/Empresas/BuscarComprador` | verified (docs) |
 | Formats | `.json`, `.jsonp` (`callback=`), `.xml` | verified (docs) |
 | Auth | `ticket=` query parameter. One ticket per person, requested with Clave Única after accepting the terms; code arrives by email. Real name, RUT and email required | verified |
 | Rate limit | 10,000 requests per ticket per day, not negotiable. IP-based monitoring with possible per-IP restriction. Bulk work recommended 22:00 to 07:00 (Chile time) | verified |
@@ -491,9 +491,12 @@ through `buildAgentUserMessage` before any LLM call, as in `competitor-research.
   file; the raw bucket is restricted to `public-sector:admin` and has a shorter
   retention.
 - Public officials' names in documents are not extracted into structured fields.
-- Fixtures: recorded from real responses, then scrubbed by a script that replaces
-  natural-person names, RUT/cédula/CPF, emails and phones with stable fakes. A test
-  fails if a fixture matches the RUT, CPF or email regex for a non-institution.
+- Fixtures: recorded responses are scrubbed before commit (natural-person names,
+  RUT/cédula/CPF, emails and phones become stable fakes). The committed
+  `lic-da-2025-7.head.csv` and `oc-da-2025-7.head.csv` heads are synthetic:
+  every RUT comes from the seeded `syntheticRut()` generator, person-name labels
+  are marked synthetic, and row shape is unchanged. A test fails if a fixture
+  matches the natural-person RUT, CPF or email regex.
 
 ### 6.4 Legal angles (for review by Mantu legal, not legal advice)
 
@@ -558,7 +561,9 @@ flag. CI gate list must match the repo's CI exactly (lesson from 2026-11-06).
 **8b.0 Fixtures and contracts (Chile).** Record real responses (OCDS list and
 tender, one `licitaciones.json` day, one `ordenesdecompra.json` day, first 200 rows
 of `lic-da` and `oc-da`, `hist_OC_erroneas.csv` head), scrub PII, commit under
-`packages/shared/src/public-sector/__fixtures__/cl/`.
+`packages/shared/src/public-sector/__fixtures__/cl/`. The committed lic-da and oc-da
+heads in that directory are synthetic derivatives (seeded RUTs, synthetic person
+labels, same row shape).
 Tests: fixture scrubber rejects an unscrubbed RUT; Zod parsers accept every
 fixture; parser rejects `{"Codigo":203}` as `TicketInvalid`.
 

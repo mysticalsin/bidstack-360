@@ -31,7 +31,7 @@ export function parseAllowedUsers(raw: string | undefined): AllowedUser[] {
     const sep = trimmed.lastIndexOf(':');
     if (sep <= 0 || sep === trimmed.length - 1) {
       throw new Error(
-        `Invalid POLO_ALLOWED_USERS entry "${trimmed}". Expected email:Role (e.g. ada@mantu.com:Admin).`,
+        `Invalid POLO_ALLOWED_USERS entry "${trimmed}". Expected email:Role (e.g. ada@example.test:Admin).`,
       );
     }
     const email = trimmed.slice(0, sep).trim().toLowerCase();

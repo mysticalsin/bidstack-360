@@ -4,7 +4,7 @@ We take the security of BidStack 360° seriously. This document tells you what i
 
 ## Reporting a vulnerability
 
-Email **security@mantu.com** with a clear description of the issue.
+Open a [private security advisory](https://github.com/mysticalsin/bidstack-360/security/advisories/new) with a clear description of the issue.
 
 Please include:
 
@@ -72,7 +72,7 @@ We will not pursue civil action, file a criminal complaint, or alert law enforce
 
 1. Acts in good faith.
 2. Avoids data destruction, service disruption, and access to data that does not belong to you.
-3. Reports the issue to us privately at security@mantu.com before any public disclosure.
+3. Reports the issue to us privately via a [private security advisory](https://github.com/mysticalsin/bidstack-360/security/advisories/new) before any public disclosure.
 4. Stays within the scope defined above.
 5. Gives us a reasonable opportunity (the 90-day SLA above, or as we mutually agree) to fix the issue before disclosing.
 
@@ -101,4 +101,4 @@ We maintain a public hall of fame in the project documentation. If you would pre
 
 ---
 
-This policy is loosely modelled on the [disclose.io](https://disclose.io) template and is intended to be unambiguous to both the researcher and our team. If anything here is unclear, email **security@mantu.com** and we will clarify and (if appropriate) update this document.
+This policy is loosely modelled on the [disclose.io](https://disclose.io) template and is intended to be unambiguous to both the researcher and our team. If anything here is unclear, open a [private security advisory](https://github.com/mysticalsin/bidstack-360/security/advisories/new) and we will clarify and (if appropriate) update this document.

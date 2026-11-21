@@ -217,7 +217,7 @@ describe('erp-integration route', () => {
                 vat: 'FR123',
                 duns: '123456789',
                 phone: '+33 1 00 00 00 00',
-                email: 'hello@mantu.com',
+                email: 'hello@example.test',
               },
             ],
           },

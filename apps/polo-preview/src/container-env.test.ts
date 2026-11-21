@@ -16,8 +16,8 @@ describe('container env', () => {
   });
 
   it('passes @domain entries through as Sales Manager domain rules', () => {
-    expect(allowedUsersFromEmails('a@x.com,@Amaris.com,@mantu.com', ['a@x.com'])).toBe(
-      'a@x.com:Admin,@amaris.com:Sales Manager,@mantu.com:Sales Manager',
+    expect(allowedUsersFromEmails('a@x.com,@Amaris.com,@example.test', ['a@x.com'])).toBe(
+      'a@x.com:Admin,@amaris.com:Sales Manager,@example.test:Sales Manager',
     );
   });
 

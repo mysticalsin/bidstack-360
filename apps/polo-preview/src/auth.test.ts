@@ -50,9 +50,9 @@ describe('email and allowlist', () => {
   });
 
   it('matches an @domain entry by exact domain only', () => {
-    const list = 'a@x.com, @Amaris.com,@mantu.com';
+    const list = 'a@x.com, @Amaris.com,@example.test';
     expect(isAllowed('tmassin@amaris.com', list)).toBe(true);
-    expect(isAllowed('someone@mantu.com', list)).toBe(true);
+    expect(isAllowed('someone@example.test', list)).toBe(true);
     expect(isAllowed('a@x.com', list)).toBe(true);
     expect(isAllowed('b@x.com', list)).toBe(false);
     expect(isAllowed('x@evil-amaris.com', list)).toBe(false);

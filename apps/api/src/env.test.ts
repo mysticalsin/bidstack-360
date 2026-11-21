@@ -270,10 +270,10 @@ describe('boot environment validation', () => {
 
     const env = await loadEnvWith({
       CF_ACCESS_AUTH: 'true',
-      POLO_ALLOWED_USERS: 'ada@mantu.com:Admin',
+      POLO_ALLOWED_USERS: 'ada@example.test:Admin',
     });
     expect(env.CF_ACCESS_AUTH).toBe('true');
-    expect(env.POLO_ALLOWED_USERS).toBe('ada@mantu.com:Admin');
+    expect(env.POLO_ALLOWED_USERS).toBe('ada@example.test:Admin');
   });
 
   it('refuses the Access loopback email trust in production and defaults it off', async () => {

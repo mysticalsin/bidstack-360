@@ -41,15 +41,17 @@ describe('Latin-1 semicolon CSV (ChileCompra bulk files)', () => {
 
 describe('Chile RUT', () => {
   it('parses dotted, plain and OCDS forms and checks the verifier digit', () => {
-    expect(parseRut('76.853.950-2')).toEqual({ body: 76853950, dv: '2', formatted: '76.853.950-2' });
-    expect(parseRut('81.494.400-k')?.formatted).toBe('81.494.400-K');
-    expect(parseRut('876067005')?.formatted).toBe('87.606.700-5');
-    expect(parseRut('76.853.950-3')).toBeNull();
+    // Seeded synthetic bodies (synthetic-rut.ts indexes 500 / 513 / 502).
+    expect(parseRut('99.000.600-8')).toEqual({ body: 99000600, dv: '8', formatted: '99.000.600-8' });
+    expect(parseRut('99.000.613-k')?.formatted).toBe('99.000.613-K');
+    expect(parseRut('990006024')?.formatted).toBe('99.000.602-4');
+    expect(parseRut('99.000.600-9')).toBeNull();
     expect(parseRut('NA')).toBeNull();
   });
 
   it('treats RUT bodies under 50,000,000 as natural persons', () => {
-    expect(isNaturalPersonRut('12.345.678-5')).toBe(true);
-    expect(isNaturalPersonRut('61.606.917-9')).toBe(false);
+    // Person index 500 stays in the scrubber fake window; institution index 500 does not.
+    expect(isNaturalPersonRut('1.000.600-7')).toBe(true);
+    expect(isNaturalPersonRut('61.000.600-0')).toBe(false);
   });
 });

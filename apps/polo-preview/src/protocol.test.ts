@@ -110,17 +110,17 @@ describe('polo-preview header contract', () => {
     // WHY: the API used to trust this header from loopback. The client copy
     // must not survive, and a code-login session must not invent a JWT.
     const headers = filterRequestHeaders([
-      ['cf-access-authenticated-user-email', 'ada@mantu.com'],
+      ['cf-access-authenticated-user-email', 'ada@example.test'],
       ['cf-access-jwt-assertion', 'client-jwt'],
     ]);
     const names = headers.map(([name]) => name.toLowerCase());
     expect(names).not.toContain('cf-access-authenticated-user-email');
     expect(names).not.toContain('cf-access-jwt-assertion');
-    expect(identityHeaders({ via: 'access', email: 'ada@mantu.com' }, 'verified-jwt')).toEqual([
+    expect(identityHeaders({ via: 'access', email: 'ada@example.test' }, 'verified-jwt')).toEqual([
       ['cf-access-jwt-assertion', 'verified-jwt'],
     ]);
-    expect(identityHeaders({ via: 'code', email: 'ada@mantu.com' }, 'client-jwt')).toEqual([]);
-    expect(identityHeaders({ via: 'access', email: 'ada@mantu.com' }, '')).toEqual([]);
+    expect(identityHeaders({ via: 'code', email: 'ada@example.test' }, 'client-jwt')).toEqual([]);
+    expect(identityHeaders({ via: 'access', email: 'ada@example.test' }, '')).toEqual([]);
   });
 
   it('strips hop-by-hop and content-encoding from reconstructed responses', () => {

@@ -226,7 +226,7 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                     id={textareaId}
                     value={pasted}
                     onChange={(e) => setPasted(e.target.value)}
-                    placeholder={'name,customer,email\nAlice Singh,Mantu,alice@mantu.com'}
+                    placeholder={'name,customer,email\nAlice Singh,Mantu,alice@example.test'}
                     rows={8}
                     spellCheck={false}
                     aria-describedby={invalidRows > 0 ? `${guidanceId} ${errorId}` : guidanceId}

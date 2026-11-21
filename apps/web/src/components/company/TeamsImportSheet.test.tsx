@@ -49,7 +49,7 @@ const q = <T,>(data: T | undefined, over: Record<string, unknown> = {}) =>
   ({ data, isLoading: false, isError: false, error: null, refetch: vi.fn(), ...over }) as never;
 
 function access(state: TeamsAccess['state'], channels: TeamsAccess['channels'] = 'needs_admin_consent') {
-  vi.mocked(useTeamsAccess).mockReturnValue(q<TeamsAccess>({ state, channels, accountEmail: 'tony@mantu.com' }));
+  vi.mocked(useTeamsAccess).mockReturnValue(q<TeamsAccess>({ state, channels, accountEmail: 'tony@example.test' }));
 }
 
 const MESSAGES: TeamsThreadMessages = {
