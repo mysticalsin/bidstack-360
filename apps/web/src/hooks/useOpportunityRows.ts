@@ -5,11 +5,15 @@ import type { OppRow } from '@/components/viz/viz-data';
 
 import { fetchAllCursorPages } from './useInsightsData';
 
+/** Chart snapshot size. The hero must say the monthly bars are this sample. */
+export const OPPORTUNITY_VIZ_LIMIT = 100;
+
 /** Up to 100 opportunity rows for chart derivations (read-only snapshot). */
 export function useOpportunityRows() {
   return useQuery({
     queryKey: ['opportunity-rows:viz'],
-    queryFn: ({ signal }) => api<{ items: OppRow[] }>('/api/opportunities?limit=100', { signal }),
+    queryFn: ({ signal }) =>
+      api<{ items: OppRow[] }>(`/api/opportunities?limit=${OPPORTUNITY_VIZ_LIMIT}`, { signal }),
     staleTime: 60_000,
   });
 }
