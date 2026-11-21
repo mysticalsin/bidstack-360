@@ -20,6 +20,7 @@ describe('import preview validation', () => {
   it('requires ISO dates so locale-formatted close dates cannot silently shift', () => {
     expect(parseIsoDate('31/12/2026').ok).toBe(false);
     expect(parseIsoDate('2026-12-31')).toEqual({ ok: true, iso: '2026-12-31' });
+    expect(parseIsoDate('2026-03-15T00:00:00+05:00')).toEqual({ ok: true, iso: '2026-03-15' });
   });
 
   it('reports financial rows that lack currency or account without writing', () => {
