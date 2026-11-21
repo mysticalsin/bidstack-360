@@ -135,7 +135,7 @@ export function CurrencySelector() {
           </span>
           <span className="tb-currency-code leading-none">
             <span className="block text-[10px] font-medium text-[var(--fg-tertiary)]">
-              {t('currencySelector.triggerHint', 'Not converted')}
+              {t('currencySelector.triggerLabel', 'Currency')}
             </span>
             <span className="block text-xs font-semibold text-[var(--fg-primary)]">{currency}</span>
           </span>
