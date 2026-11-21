@@ -44,7 +44,8 @@ function spawnCall(name: string): string {
 
 function assignsDrillFlag(source: string): boolean {
   const withoutComparisons = source.replace(/POLO_RESTORE_DRILL\s*(?:===|!==|==|!=)/g, 'COMPARED');
-  return /POLO_RESTORE_DRILL\s*=/.test(withoutComparisons);
+  if (/POLO_RESTORE_DRILL\s*=/.test(withoutComparisons)) return true;
+  return /POLO_RESTORE_DRILL\s*:\s*['"]1['"]/.test(source);
 }
 
 describe('database boot follow-ups', () => {
@@ -146,6 +147,8 @@ describe('database boot follow-ups', () => {
       'worker.js',
       'index.js',
       'start-box.mjs',
+      'container-env.js',
+      'polo-container.js',
     ];
     for (const file of files) {
       const source = readFileSync(join(here, file), 'utf8');
