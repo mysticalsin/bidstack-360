@@ -82,7 +82,7 @@ export function normalizeEntity(entityType: string): TargetEntity | null {
 
 // ─── Value coercion ────────────────────────────────────────────────────────
 
-function asTrimmed(v: unknown): string | null {
+export function asTrimmed(v: unknown): string | null {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
   return s.length > 0 ? s : null;
