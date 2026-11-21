@@ -142,7 +142,12 @@ export function useAddWidget(dashboardId: string) {
 export function useUpdateWidget(dashboardId: string, widgetId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<CreateWidgetInput> & { position?: DashboardWidget['position'] }) =>
+    mutationFn: (
+      body: Partial<CreateWidgetInput> & {
+        position?: DashboardWidget['position'];
+        expectedUpdatedAt?: string;
+      },
+    ) =>
       api<DashboardWidget>(`/api/dashboards/${dashboardId}/widgets/${widgetId}`, {
         method: 'PATCH',
         body,

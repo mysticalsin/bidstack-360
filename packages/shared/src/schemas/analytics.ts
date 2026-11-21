@@ -259,10 +259,15 @@ export const AnalyticsWidgetPatch = z
     type: AnalyticsWidgetType.optional(),
     config: z.record(z.unknown()).optional(),
     position: AnalyticsWidgetPosition.optional(),
+    // The updatedAt from the widget the editor loaded. When set, the write
+    // matches that version and returns 409 if another save landed first.
+    expectedUpdatedAt: z.string().datetime().optional(),
   })
-  .refine((v) => Object.keys(v).length > 0, {
-    message: 'PATCH body must contain at least one field',
-  });
+  .refine(
+    (v) =>
+      Object.entries(v).some(([key, value]) => key !== 'expectedUpdatedAt' && value !== undefined),
+    { message: 'PATCH body must contain at least one field' },
+  );
 export type AnalyticsWidgetPatch = z.infer<typeof AnalyticsWidgetPatch>;
 
 export const AnalyticsFieldDef = z.object({

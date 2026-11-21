@@ -6,8 +6,12 @@ import { DashboardWidget } from '@bidstack/shared';
 
 import { persistWidgets } from '../../services/crm/widget.service.js';
 
+const WidgetWrite = DashboardWidget.extend({
+  expectedUpdatedAt: z.string().datetime().optional(),
+});
+
 const WidgetsPatchBody = z.object({
-  widgets: z.array(DashboardWidget).max(50),
+  widgets: z.array(WidgetWrite).max(50),
 });
 
 const DashboardWidgetsResponse = z.object({
