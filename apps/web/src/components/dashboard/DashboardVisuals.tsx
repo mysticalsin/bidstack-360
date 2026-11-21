@@ -28,8 +28,11 @@ import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false }: {
-  rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
+export function DashboardHero({ rows, openValue, weighted, openCount, wonThisYear, feed, onDrill, rowsPending = false, feedPending = false }: {
+  rows: OppRow[]; openValue: number; weighted: number; openCount: number;
+  /** Full-org won value for the current UTC year. The row sample is not the book. */
+  wonThisYear?: number;
+  feed?: WatchdogFeed; onDrill?: OnDrill;
   /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
   rowsPending?: boolean;
   /** Watchdog feed still loading: hold the pulse slot so the figures row does not grow. */
@@ -42,7 +45,7 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
     ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
     : 'Watchdog: all quiet';
   const [now] = useState(() => Date.now());
-  const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
+  const wonTotal = wonThisYear ?? cumulativeWon(rows).at(-1)?.y ?? 0;
   const months = pipelineByCloseMonth(rows, now);
   const fullLabels = months.keys.map(closeMonthLabel);
   return (

@@ -8,6 +8,7 @@ export interface OrgSummary {
   opportunities: number;
   openOpportunities: number;
   pipelineValue: number;
+  wonThisYear: number;
   tasks: number;
   overdueTasks: number;
   serviceCases: number;
