@@ -36,7 +36,7 @@ describe('Opportunity', () => {
     value: 1_240_000,
     probability: 65,
     dueDate: '2026-07-22',
-    owner: 'jane.smith@mantu.com',
+    owner: 'jane.smith@example.test',
     industry: 'financial_services',
     logo: null,
     country: 'CA',

@@ -41,7 +41,7 @@ const openapiPluginImpl: FastifyPluginAsync = async (server) => {
         version: '1.0.0',
         contact: {
           name: 'Polo PreSales Platform Team',
-          email: 'platform@mantu.com',
+          email: 'platform@example.test',
         },
         license: {
           name: 'Proprietary',

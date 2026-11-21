@@ -179,7 +179,7 @@ export function ScheduleReviewDialog({ entityType, entityId, defaultTopic, trigg
                 type="text"
                 value={attendees}
                 onChange={(e) => setAttendees(e.target.value)}
-                placeholder="ceo@acme.com, bid.lead@mantu.com"
+                placeholder="ceo@acme.com, bid.lead@example.test"
                 className="dialog-input"
               />
             </Field>
