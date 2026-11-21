@@ -26,7 +26,7 @@ APP-FIT is judged against the apps as they are on `main`, plus the open pull req
 | Ask | Status | APP-FIT | Where it lives |
 | --- | --- | --- | --- |
 | P-01 Real mode, demo toggle, install guide | Partial | FIT | [#364](https://github.com/mysticalsin/bidstack-360/pull/364), [#363](https://github.com/mysticalsin/bidstack-360/pull/363), [#367](https://github.com/mysticalsin/bidstack-360/pull/367) |
-| P-02 Analytics Add widget | In PR #355 | FIT | [#355](https://github.com/mysticalsin/bidstack-360/pull/355), phone follow-ups [#468](https://github.com/mysticalsin/bidstack-360/pull/468), [#469](https://github.com/mysticalsin/bidstack-360/pull/469) |
+| P-02 Analytics Add widget | Partial | FIT | Desktop save persists on `main`. Empty chart is [#355](https://github.com/mysticalsin/bidstack-360/pull/355). Sweep 13 is [#468](https://github.com/mysticalsin/bidstack-360/pull/468), [#469](https://github.com/mysticalsin/bidstack-360/pull/469), [#470](https://github.com/mysticalsin/bidstack-360/pull/470). |
 | P-03 Company revenue, margin, open jobs | Partial | ADAPT | [#67](https://github.com/mysticalsin/bidstack-360/pull/67), [#354](https://github.com/mysticalsin/bidstack-360/pull/354), [#356](https://github.com/mysticalsin/bidstack-360/pull/356). Sweep 09 figures are a synthetic seed, not a live filing. |
 | P-04 Preview container boot | In PR #353 | FIT | [#353](https://github.com/mysticalsin/bidstack-360/pull/353), state machine [#365](https://github.com/mysticalsin/bidstack-360/pull/365) |
 | P-05 README with clips | In PR #388 | ADAPT | [#388](https://github.com/mysticalsin/bidstack-360/pull/388) |
@@ -61,15 +61,33 @@ On `main`, unset `POLO_DATA_MODE` is demo. `getPoloDataMode` in `apps/api/src/li
 
 Source, t1661u.
 
-**Status: In PR #355.** Not Done-main.
+**Status: Partial.** Desktop add-and-persist is on `main`. The empty chart and the sweep 13 layout bugs are open pull requests. This audit does not open another one, and it does not stack a second dialog fix on #468.
 
-On `main` the button is real: `apps/web/src/pages/AnalyticsDashboardPage.tsx` opens `WidgetConfigModal`, and `useAddWidget` in `apps/web/src/hooks/useDashboards.ts` POSTs `/api/dashboards/:id/widgets`. The API in `apps/api/src/routes/analytics-dashboards.ts` stores a widget with `reportId` null when the body omits it. The modal offers "None (static demo)" (`apps/web/src/components/widgets/WidgetConfigModal.tsx`). A widget saved that way has no report run to draw.
+### Desktop add and persist, checked on `main`
 
-[#355](https://github.com/mysticalsin/bidstack-360/pull/355) `cursor/shared-dashboard-widgets-1143` (ready) makes POST without `reportId` return 400, seeds two synthetic reports with finished runs (`packages/db/src/seed-analytics-dashboard.ts`), and shows Add widget only to the owner or a system admin who also has `reports:write`. Tests on that branch include `apps/api/src/routes/analytics-dashboards.integration.test.ts`, `apps/web/src/components/widgets/WidgetConfigModal.test.tsx`, and `packages/db/src/seed-analytics-dashboard.test.ts`.
+Saving a widget on a desktop session does create a row and the next read returns it.
 
-Phone layout of the same dialog is [#468](https://github.com/mysticalsin/bidstack-360/pull/468) and [#469](https://github.com/mysticalsin/bidstack-360/pull/469). Sweep 13 ([#472](https://github.com/mysticalsin/bidstack-360/pull/472)) already screenshots the 390px dialog. Those three sit outside #348–#441 and already own the phone screen, so this audit does not add another one.
+| Step | Evidence |
+| --- | --- |
+| Save waits for the POST | `apps/web/src/components/widgets/WidgetConfigModal.tsx` awaits `onSave`. `apps/web/src/components/widgets/WidgetConfigModal.test.tsx` keeps the dialog open when that promise rejects. |
+| The page sends the body | `handleAddWidget` in `apps/web/src/pages/AnalyticsDashboardPage.tsx` calls `useAddWidget` (`apps/web/src/hooks/useDashboards.ts`), which POSTs `/api/dashboards/:id/widgets` and invalidates the widget query on success. A rejection toasts the server message (`apps/web/src/hooks/useDashboards.test.tsx`). |
+| The API stores the row | `POST /dashboards/:id/widgets` in `apps/api/src/routes/analytics-dashboards.ts` inserts `analytics_dashboard_widgets`. `position` defaults in `packages/db/prisma/schema.prisma` (`AnalyticsDashboardWidget`). |
+| The row is still there on the next read | `apps/api/src/routes/analytics-dashboards.integration.test.ts`, case `widget CRUD + computed config.latestRunId merge`. It expects 201, reads the row with Prisma, lists it on GET, patches it, and sees it gone after DELETE. The case is `skipIfNoDb`, so it runs when CI has Postgres. This environment has no Postgres, so that file was read and not re-executed here. |
+| The stub user may write the seeded board | `resolveStubAuth` uses the earliest user in the seed org. `packages/db/src/seed.ts` gives that user `Pre-sales Command Center` (`ownerId: seedUserId`, `isShared: true`). `requireDashboardEditor` allows the owner. |
 
-**APP-FIT: FIT.** `/analytics` is still a primary nav item (`apps/web/src/components/layout/navConfig.ts`, label "Analytics & Reports").
+A saved widget with no report still draws "No data available" (`apps/web/src/components/widgets/WidgetRenderer.tsx`, empty when there is no run). The modal's "None (static demo)" option sends no `reportId`. The row is real. The chart is empty. That is the gap [#355](https://github.com/mysticalsin/bidstack-360/pull/355) closes: POST without `reportId` returns 400, and the seed writes two synthetic reports with finished runs (`packages/db/src/seed-analytics-dashboard.ts`). Head `cursor/shared-dashboard-widgets-1143`.
+
+### Sweep 13, already in pull requests
+
+| Pull request | Head | What it owns |
+| --- | --- | --- |
+| [#468](https://github.com/mysticalsin/bidstack-360/pull/468) | `cursor/widget-dialog-onscreen-3d79` at `7ce59169` | Add widget dialog opened below the screen and scroll was locked. The form is the fixed scroller. Test `apps/web/e2e/responsive/widget-dialog-viewport.spec.ts`. |
+| [#469](https://github.com/mysticalsin/bidstack-360/pull/469) | `cursor/analytics-toolbar-phone-3d79` at `e858c8cb` | Add widget sat past the right edge at 390px. The header wraps. Test `apps/web/e2e/responsive/analytics-toolbar-phone.spec.ts`. |
+| [#470](https://github.com/mysticalsin/bidstack-360/pull/470) | `cursor/dashboard-delete-touch-3d79` at `0cf01488` | Delete dashboard was hover-only, so a touch screen never saw it. Test `apps/web/e2e/responsive/dashboard-delete-touch.spec.ts`. |
+
+#468, #469, and #470 are independent drafts from `main`. They do not change the POST. Sweep 13's write-up is [#472](https://github.com/mysticalsin/bidstack-360/pull/472).
+
+**APP-FIT: FIT.** `/analytics` is still a primary nav item (`apps/web/src/components/layout/navConfig.ts`, label "Analytics & Reports"). The dashboard list that #470 edits is the same analytics area.
 
 ## P-03 — Company revenue, margin, and open jobs
 
