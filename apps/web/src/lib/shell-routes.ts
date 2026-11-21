@@ -7,5 +7,10 @@
  * /login/*, so the prefix has to match, not only the exact /login path.
  */
 export function isShellLessPath(pathname: string): boolean {
-  return pathname === '/login' || pathname.startsWith('/sign/');
+  return (
+    pathname === '/login' ||
+    pathname.startsWith('/login/') ||
+    pathname.startsWith('/sign/') ||
+    pathname.startsWith('/book/')
+  );
 }
