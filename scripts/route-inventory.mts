@@ -107,6 +107,10 @@ function routeRegex(url: string): RegExp {
 }
 
 export async function collectRoutes(): Promise<RouteRow[]> {
+  // Stub auth refuses to boot on real data. This inventory only reads the
+  // route table, so an unset mode is the same synthetic fixture CI uses.
+  process.env.POLO_DATA_MODE ||= 'demo';
+  process.env.POLO_DEPLOYMENT_ENV ||= 'local';
   const { buildServer } = await import('../apps/api/src/server.ts');
   const { UNGATED_ALLOWLIST } = await import('../apps/api/src/security/route-authz-allowlist.ts');
   const pending: Array<{ instance: object; opts: RouteOptions; handlerSource: string }> = [];
