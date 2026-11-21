@@ -110,6 +110,8 @@ apps/web/scripts/_i18n_*
 
 # Root-level screenshot dumps (from Playwright QA passes)
 *.png
+# Sweep logs keep their before/after shots next to the markdown.
+!docs/sweeps/**/*.png
 *.mjs
 !scripts/*.mjs
 !apps/polo-preview/**/*.mjs
