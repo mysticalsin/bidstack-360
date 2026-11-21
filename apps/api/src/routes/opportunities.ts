@@ -245,10 +245,17 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               isLost: true,
             },
           },
-          tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
+          // Nested includes are not covered by the soft-delete middleware,
+          // which only rewrites the top-level where. A tombstoned task or
+          // file would otherwise reappear on the deal.
+          tasks: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 50 },
           // One row past the files the documents tab draws. The extra row is
           // the probe. It is not a shown file, and it is not a total.
-          documents: { orderBy: { createdAt: 'desc' }, take: opportunityDocumentTake() },
+          documents: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+            take: opportunityDocumentTake(),
+          },
         },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
