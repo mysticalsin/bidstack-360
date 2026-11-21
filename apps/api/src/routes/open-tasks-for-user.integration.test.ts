@@ -83,7 +83,13 @@ describe('open tasks for this user, over HTTP', () => {
 
     const summaryRes = await server.inject({ method: 'GET', url: '/api/tasks/summary' });
     expect(summaryRes.statusCode).toBe(200);
-    const summary = summaryRes.json() as { openForUser: number; overdue: number };
+    const summary = summaryRes.json() as {
+      openForUser: number;
+      overdue: number;
+      civilToday: string;
+      timeZone: string;
+    };
+    expect(summary.timeZone).toBe('America/Sao_Paulo');
 
     const pageRes = await server.inject({ method: 'GET', url: '/api/tasks?scope=mine&limit=100' });
     expect(pageRes.statusCode).toBe(200);

@@ -3,18 +3,37 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
-import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '@bidstack/shared';
+import {
+  addCivilDays,
+  resolveTaskTimeZone,
+  summaryToday,
+  Task,
+  TaskCreate,
+  TaskFilter,
+  TaskPage,
+  TaskPatch,
+  TaskSummary,
+} from '@bidstack/shared';
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
 import { openTasksForUserWhere } from './open-tasks-for-user.js';
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
-type TaskRollup = Omit<TaskSummaryPayload, 'openForUser'>;
+type TaskRollup = Omit<TaskSummaryPayload, 'openForUser' | 'civilToday' | 'timeZone'>;
+
+async function taskClock(orgId: string, now = new Date()): Promise<{ timeZone: string; today: string }> {
+  const row = await prisma.orgSettings.findFirst({
+    where: { orgId, deletedAt: null },
+    select: { timezone: true },
+  });
+  const timeZone = resolveTaskTimeZone(row?.timezone);
+  return { timeZone, today: summaryToday(now, timeZone) };
+}
 
 async function buildTaskSummary(orgId: string, userId: string): Promise<TaskSummaryPayload> {
-  const today = new Date().toISOString().slice(0, 10);
-  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { timeZone, today } = await taskClock(orgId);
+  const nextWeek = addCivilDays(today, 7);
   const where = openTasksForUserWhere(orgId, userId);
   const [rows, openForUser] = await Promise.all([
     prisma.$queryRaw<Array<TaskRollup>>`
@@ -33,7 +52,12 @@ async function buildTaskSummary(orgId: string, userId: string): Promise<TaskSumm
     `,
     prisma.task.count({ where }),
   ]);
-  return { ...(rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 }), openForUser };
+  return {
+    ...(rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 }),
+    openForUser,
+    civilToday: today,
+    timeZone,
+  };
 }
 
 export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {

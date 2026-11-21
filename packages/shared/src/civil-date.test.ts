@@ -33,4 +33,10 @@ describe('task clock at 22:00 America/Sao_Paulo', () => {
     expect(dueToday).toBe(1);
     expect(overdue + dueToday).toBe(DATES.length);
   });
+
+  it('follows a stored org timezone, and falls back to Sao Paulo for an unknown zone', () => {
+    // 01:00 UTC is 02:00 in Paris, so that org's civil day is already the 22nd.
+    expect(summaryToday(AT_22_LOCAL, 'Europe/Paris')).toBe('2026-11-22');
+    expect(summaryToday(AT_22_LOCAL, 'Not/AZone')).toBe('2026-11-21');
+  });
 });

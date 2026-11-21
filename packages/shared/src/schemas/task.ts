@@ -61,5 +61,9 @@ export const TaskSummary = z.object({
   // Open tasks assigned to the caller. The nav badge and the Tasks page
   // both read this, so a due-today row cannot land on only one of them.
   openForUser: z.number().int().nonnegative(),
+  // Civil day the overdue / due-today counts were measured against, and the
+  // zone that produced it. The Tasks page filters with this same day.
+  civilToday: z.string().date(),
+  timeZone: z.string().min(1),
 });
 export type TaskSummary = z.infer<typeof TaskSummary>;

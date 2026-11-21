@@ -10,7 +10,7 @@ The navigation badge and the Tasks page each counted tasks with their own filter
 - `GET /api/tasks/summary` returns that count as `openForUser`. The sidebar and the mobile nav read it.
 - `GET /api/tasks?scope=mine` lists that same where-clause. The Tasks page requests `scope=mine` and shows `openForUser` as the active-task count.
 - Create, complete, and delete invalidate `['tasks', 'summary']`.
-- Date-only strings format and compare as UTC calendar days. Do not use elapsed milliseconds from UTC midnight, and do not format them in the viewer's zone.
+- Overdue and due-today use `summaryToday` from `@bidstack/shared`: the org timezone, or America/Sao_Paulo when none is stored. At 22:00 there, UTC is already the next date. Draft #379's `plain-date.ts` should call this helper instead of a second parser.
 
 ## Verification
 

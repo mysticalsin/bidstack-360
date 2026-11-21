@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-21 BUG: Task summary "today" was the UTC date at 22:00 in São Paulo
+
+- **What went wrong:** At 22:00 in America/Sao_Paulo the UTC date is already the next day. `/api/tasks/summary` sliced `toISOString()` for `today`, so a task due on the local day counted as overdue while the page's civil day still called it due today. That is an 8 vs 7 split on seven past-due tasks plus that one row.
+- **Root cause:** The summary clock ignored the org timezone. The default task clock is America/Sao_Paulo when `OrgSettings.timezone` is absent.
+- **Prevention rule:** Due-today and overdue go through `summaryToday` in `@bidstack/shared`. Do not compare a `YYYY-MM-DD` due date to `new Date().toISOString().slice(0, 10)`.
+- **Files affected:** `packages/shared/src/civil-date.ts`, `apps/api/src/routes/tasks.ts`, `apps/web/src/pages/TasksPage.tsx`.
+
+---
+
 ### 2026-11-21 BUG: Tasks badge counted overdue while the page listed every task
 
 - **What went wrong:** The nav badge showed 7 and the Tasks page listed 8. The extra row was a task due on the UTC calendar day. `formatDate` parsed `YYYY-MM-DD` as UTC midnight, so America/Sao_Paulo rendered it as the previous evening, and `daysUntil` rounded it to overdue after 12:00 UTC. The badge's SQL (`due_date < today`) left it out.

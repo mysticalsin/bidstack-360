@@ -12,6 +12,8 @@ type TaskSummaryPayload = {
   overdue: number;
   dueSoon: number;
   openForUser: number;
+  civilToday: string;
+  timeZone: string;
 };
 
 // Cursor-paginated like the other operational lists. /api/tasks defaults to

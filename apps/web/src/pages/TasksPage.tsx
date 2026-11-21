@@ -16,8 +16,8 @@ import { useTaskSummary, useTasks } from '@/hooks/useTasks';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
-import { daysUntilDueUtc } from '@/components/ui/DueDateChip';
 import { formatDate } from '@/lib/format';
+import { isDueOn, isOverdueOn, resolveTaskTimeZone, summaryToday } from '@bidstack/shared';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { useTaskOrder } from '@/stores/taskOrder';
 import { Select } from '@/components/ui/Select';
@@ -82,24 +82,26 @@ export function TasksPage() {
   const [isFilterPending, startFilterTransition] = useTransition();
   const [taskOrderMessage, setTaskOrderMessage] = useState('');
 
+  const civilDay =
+    taskSummary.data?.civilToday ??
+    summaryToday(new Date(), resolveTaskTimeZone(taskSummary.data?.timeZone));
   const filteredItems = useMemo(() => {
     const all = data?.items ?? [];
     return all.filter((t) => {
       if (filter === 'all') return true;
       if (filter === 'today') {
-        // UTC calendar day, same boundary as the server date column. A
-        // YYYY-MM-DD parsed as UTC midnight must not flip to "overdue"
-        // after 12:00 UTC or in America/Sao_Paulo.
-        return t.dueDate !== null && daysUntilDueUtc(t.dueDate) === 0 && t.status !== 'done';
+        // Same civil day the summary counted, including 22:00 in the org zone
+        // when UTC has already moved to the next date.
+        return isDueOn(t.dueDate, civilDay) && t.status !== 'done';
       }
       if (filter === 'overdue') {
-        return t.dueDate !== null && daysUntilDueUtc(t.dueDate) < 0 && t.status !== 'done';
+        return isOverdueOn(t.dueDate, civilDay) && t.status !== 'done';
       }
       // Concrete statuses are already narrowed server-side; this is a no-op
       // guard for the loaded page.
       return t.status === filter;
     });
-  }, [data?.items, filter]);
+  }, [civilDay, data?.items, filter]);
 
   // Sort. Default 'natural' = server order (createdAt desc on the backend).
   // 'due' sorts asc with nulls last so overdue surfaces at the top of the
