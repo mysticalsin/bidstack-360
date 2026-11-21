@@ -100,6 +100,7 @@
     "db:seed": "pnpm --filter @bidstack/db seed",
     "db:seed:demo": "pnpm --filter @bidstack/db seed:demo",
     "db:seed:prod": "pnpm --filter @bidstack/db seed:prod",
+    "db:seed:sweep09": "pnpm --filter @bidstack/db seed:sweep09",
     "db:bootstrap:real": "pnpm --filter @bidstack/db seed:prod",
     "db:purge:demo": "pnpm --filter @bidstack/db purge:demo",
     "db:backup": "bash scripts/backup-postgres.sh",
