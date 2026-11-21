@@ -241,6 +241,7 @@ export function TerritoryListPanel({
   onRetry,
   onEdit,
   onDelete,
+  onCreate,
   selectedCountryCode,
   canWrite,
   pageContinues = false,
@@ -252,6 +253,7 @@ export function TerritoryListPanel({
   onRetry: () => void;
   onEdit: (t: Territory) => void;
   onDelete: (t: Territory) => void;
+  onCreate?: () => void;
   selectedCountryCode?: string | null;
   canWrite: boolean;
   /** True when the list read one territory past this page and dropped it. */
@@ -283,7 +285,20 @@ export function TerritoryListPanel({
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
-        <EmptyState title={t('territoryPanels.noTerritories', 'No territories')} />
+        <EmptyState
+          title={t('territoryPanels.noTerritories', 'No territories')}
+          message={t(
+            'territoryPanels.noTerritoriesMessage',
+            'Territories group the countries you sell in.',
+          )}
+          action={
+            canWrite && onCreate ? (
+              <Button type="button" onClick={onCreate}>
+                {t('territoryPanels.newTerritory', 'New territory')}
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="space-y-2">
           {items.map((territory) => {
@@ -403,6 +418,7 @@ export function RoutingRuleListPanel({
   onRetry,
   onEdit,
   onDelete,
+  onCreate,
   selectedCountryCode,
   canWrite,
   pageContinues = false,
@@ -414,6 +430,7 @@ export function RoutingRuleListPanel({
   onRetry: () => void;
   onEdit: (r: LeadRoutingRule) => void;
   onDelete: (r: LeadRoutingRule) => void;
+  onCreate?: () => void;
   selectedCountryCode?: string | null;
   canWrite: boolean;
   /** True when the list read one routing rule past this page and dropped it. */
@@ -445,7 +462,20 @@ export function RoutingRuleListPanel({
       ) : isLoading ? (
         <TableSkeleton rows={4} />
       ) : items.length === 0 ? (
-        <EmptyState title={t('territoryPanels.noRoutingRules', 'No routing rules')} />
+        <EmptyState
+          title={t('territoryPanels.noRoutingRules', 'No routing rules')}
+          message={t(
+            'territoryPanels.noRoutingRulesMessage',
+            'Rules send a new lead to a person or a territory.',
+          )}
+          action={
+            canWrite && onCreate ? (
+              <Button type="button" onClick={onCreate}>
+                {t('territoryPanels.newRule', 'New rule')}
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="space-y-2">
           {items.map((r) => {

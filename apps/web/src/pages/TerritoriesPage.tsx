@@ -379,6 +379,10 @@ export function TerritoriesPage() {
             setTerritoryDialogOpen(true);
           }}
           onDelete={handleDeleteTerritory}
+          onCreate={() => {
+            setEditingTerritory(null);
+            setTerritoryDialogOpen(true);
+          }}
           selectedCountryCode={selected?.countryCode}
           canWrite={canWrite}
           pageContinues={pageContinues}
@@ -394,6 +398,10 @@ export function TerritoriesPage() {
             setRuleDialogOpen(true);
           }}
           onDelete={handleDeleteRule}
+          onCreate={() => {
+            setEditingRule(null);
+            setRuleDialogOpen(true);
+          }}
           selectedCountryCode={selected?.countryCode}
           canWrite={canWrite}
           pageContinues={rulesPageContinues}
