@@ -3,6 +3,7 @@
 import type { AuditLogEntry } from '@bidstack/shared';
 
 import { toast } from '@/components/ui/Toast';
+import { csvCell } from '@/lib/csv';
 
 import { actorLabel, classifyAudit, riskScore, safeStringify } from './audit-log-helpers';
 
@@ -63,7 +64,8 @@ export function exportCsv(rows: AuditLogEntry[]) {
 }
 
 function escapeCsv(value: unknown) {
-  const text = String(value ?? '');
-  const safeText = /^[=+\-@]/.test(text.trimStart()) ? `'${text}` : text;
+  // csvCell also covers a leading tab or CR. trimStart() used to hide those,
+  // so a cell of "\t=cmd" was written as a formula.
+  const safeText = csvCell(String(value ?? ''));
   return `"${safeText.replace(/"/g, '""')}"`;
 }

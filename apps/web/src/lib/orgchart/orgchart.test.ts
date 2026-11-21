@@ -62,6 +62,25 @@ describe('csv export', () => {
     expect(lines[2]).toBe('Bob,VP Data,,"Ann, CEO",unknown,,,,4');
     expect(lines).toHaveLength(3); // redacted people are not exported
   });
+
+  it('prefixes spreadsheet formula characters in names, titles, and emails', () => {
+    // WHY: a contact name is attacker-controlled free text. Excel, Sheets, and
+    // LibreOffice execute a cell whose first character is = + - @ tab or CR.
+    const out = exportCsv([
+      n('a', null, {
+        name: '=HYPERLINK("https://evil.example","ok")',
+        title: '+1+1',
+        email: '@SUM(1+1)',
+      }),
+      n('b', 'a', { name: 'Bob', title: '\t=cmd', email: '\r=cmd' }),
+    ]);
+    expect(out).toContain(`"'=HYPERLINK(""https://evil.example"",""ok"")"`);
+    expect(out).toContain("'+1+1");
+    expect(out).toContain("'@SUM(1+1)");
+    expect(out).toContain("'\t=cmd");
+    expect(out).toContain("'\r=cmd");
+    expect(out).not.toMatch(/(^|,)=HYPERLINK/m);
+  });
 });
 
 const meeting = (id: string, heldAt: string, people: Array<{ name: string; title?: string; internal?: boolean; contactId?: string | null }>, challenges: string[] = []) => ({
