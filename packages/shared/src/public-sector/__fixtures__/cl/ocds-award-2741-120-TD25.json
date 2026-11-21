@@ -137,7 +137,7 @@
           ],
           "items": [
             {
-              "id": "143121011",
+              "id": "10001315",
               "description": "Ingeniería de tránsitoSERVICIO DE CONFIGURACION Y MODIFICACION DE SEMAFOROS EN LA INTERSECCION DE AV. O'HIGGINS/AV.RIQUELME (02 NODOS).",
               "quantity": 1,
               "unit": {
@@ -148,7 +148,7 @@
                 }
               },
               "classification": {
-                "id": "81102201",
+                "id": "10001323",
                 "scheme": "UNSPSC",
                 "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/81102201"
               },

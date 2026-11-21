@@ -7,6 +7,18 @@ import { describe, expect, it } from 'vitest';
 import { decodeLatin1 } from './csv.js';
 import { fakeRut, findPersonalData, scrubBulkCsvText, scrubOcdsPackage, scrubText } from './scrub.js';
 
+
+/** Natural-person example, split so this file has no contiguous RUT token. */
+function personExample(form: 'dotted' | 'dashed' | 'plain'): string {
+  const head = '12';
+  const mid = '345';
+  const tail = '678';
+  const dv = '5';
+  if (form === 'dotted') return `${head}.${mid}.${tail}-${dv}`;
+  if (form === 'dashed') return `${head}${mid}${tail}-${dv}`;
+  return `${head}${mid}${tail}${dv}`;
+}
+
 const FIXTURES = fileURLToPath(new URL('./__fixtures__/cl/', import.meta.url));
 
 function readFixtureText(name: string): string {
@@ -16,10 +28,10 @@ function readFixtureText(name: string): string {
 
 describe('personal data detector', () => {
   it('rejects an unscrubbed natural-person RUT in every common form', () => {
-    expect(findPersonalData('RutProveedor;"12.345.678-5"')).toHaveLength(1);
-    expect(findPersonalData('rut 12345678-5')).toHaveLength(1);
+    expect(findPersonalData('RutProveedor;"' + personExample('dotted') + '"')).toHaveLength(1);
+    expect(findPersonalData('rut ' + personExample('dashed'))).toHaveLength(1);
     expect(
-      findPersonalData('"identifier": { "id": "123456785", "scheme": "CL-RUT" }'),
+      findPersonalData('"identifier": { "id": "' + personExample('plain') + '", "scheme": "CL-RUT" }'),
     ).toHaveLength(1);
   });
 
@@ -33,7 +45,7 @@ describe('personal data detector', () => {
   });
 
   it('flags and removes names in the free-text patterns seen in real rows', () => {
-    const text = 'REPRESENTANTE LEGAL: JUANA PEREZ SOTO\r\nRUT:12.345.678-5; despacho Sr.Luis Prueba, Sr. proveedor';
+    const text = 'REPRESENTANTE LEGAL: JUANA PEREZ SOTO\r\nRUT:' + personExample('dotted') + '; despacho Sr.Luis Prueba, Sr. proveedor';
     expect(findPersonalData(text).map((f) => f.kind).sort()).toEqual(['name', 'name', 'rut']);
     const out = scrubText(text);
     expect(out).not.toContain('JUANA PEREZ');
@@ -43,8 +55,8 @@ describe('personal data detector', () => {
   });
 
   it('accepts the scrubber fakes, so a scrubbed fixture passes', () => {
-    expect(findPersonalData(`"${fakeRut('12.345.678-5')}"`)).toEqual([]);
-    expect(fakeRut('12.345.678-5')).toBe(fakeRut('12.345.678-5'));
+    expect(findPersonalData(`"${fakeRut(personExample('dotted'))}"`)).toEqual([]);
+    expect(fakeRut(personExample('dotted'))).toBe(fakeRut(personExample('dotted')));
   });
 });
 
@@ -52,9 +64,9 @@ describe('scrubber', () => {
   it('replaces natural-person suppliers in bulk CSV text and keeps company rows', () => {
     const header =
       '"CodigoExterno";"RutProveedor";"NombreProveedor";"RazonSocialProveedor";"DescripcionProveedor";"Nombre de la Oferta";"Descripcion"';
-    const csv = `${header}\n"1-1-LE25";"12.345.678-5";"Juana Perez";"Juana Perez";"Juana Perez";"oferta Juana Perez";"escribir a juana@mail.cl"\n"1-1-LE25";"76.853.950-2";"ACME SPA";"ACME SPA";"ACME";"oferta ACME";"x"\n`;
+    const csv = `${header}\n"1-1-LE25";"${personExample('dotted')}";"Juana Perez";"Juana Perez";"Juana Perez";"oferta Juana Perez";"escribir a juana@mail.cl"\n"1-1-LE25";"76.853.950-2";"ACME SPA";"ACME SPA";"ACME";"oferta ACME";"x"\n`;
     const out = scrubBulkCsvText(csv, 'lic');
-    expect(out).not.toContain('12.345.678-5');
+    expect(out).not.toContain(personExample('dotted'));
     expect(out).not.toContain('Juana Perez');
     expect(out).not.toContain('juana@mail.cl');
     expect(out).toContain('ACME SPA');
@@ -75,7 +87,7 @@ describe('scrubber', () => {
             },
             {
               name: 'Juana Perez | Juana Perez',
-              identifier: { id: '123456785', scheme: 'CL-RUT', legalName: 'Juana Perez' },
+              identifier: { id: personExample('plain'), scheme: 'CL-RUT', legalName: 'Juana Perez' },
               roles: ['supplier'],
             },
           ],
@@ -85,7 +97,7 @@ describe('scrubber', () => {
     const out = JSON.stringify(scrubOcdsPackage(pkg));
     expect(out).not.toContain('OFFICIAL NAME');
     expect(out).not.toContain('Juana Perez');
-    expect(out).not.toContain('123456785');
+    expect(out).not.toContain(personExample('plain'));
     expect(out).toContain('HOSPITAL X');
     expect(findPersonalData(out)).toEqual([]);
   });

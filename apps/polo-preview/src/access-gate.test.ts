@@ -31,7 +31,7 @@ vi.mock('@cloudflare/containers', () => ({
   },
 }));
 
-const TEAM = 'https://tony-walteur.cloudflareaccess.com';
+const TEAM = 'https://example.cloudflareaccess.com';
 const USER = 'alex.example@example.test';
 const AUD = 'audience-under-test';
 const here = dirname(fileURLToPath(import.meta.url));

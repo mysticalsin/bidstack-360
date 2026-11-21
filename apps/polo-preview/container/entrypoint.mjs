@@ -93,7 +93,7 @@ function runtimeEnv(databaseUrl) {
     DATABASE_URL_UNPOOLED: databaseUrl,
     REDIS_URL: `redis://:${REDIS_PASS}@${redisHost}:6379`,
     CF_ACCESS_AUTH: 'true',
-    CF_ACCESS_TEAM_DOMAIN: 'tony-walteur.cloudflareaccess.com',
+    CF_ACCESS_TEAM_DOMAIN: 'example.cloudflareaccess.com',
     CF_ACCESS_TRUST_LOOPBACK_EMAIL: 'false',
     POLO_DATA_MODE: 'demo',
     POLO_REAL_ORG_CLERK: 'org_seed_mantu',

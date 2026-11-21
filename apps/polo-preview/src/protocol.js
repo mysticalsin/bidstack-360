@@ -5,7 +5,7 @@
 
 export const API_PATHS = ['/api', '/readyz', '/livez', '/health', '/metrics', '/webhooks'];
 
-export const PUBLIC_PREVIEW_ORIGIN = 'https://polo-preview.tony-walteur.workers.dev';
+export const PUBLIC_PREVIEW_ORIGIN = 'https://polo.example.workers.dev';
 
 export const DROP_REQUEST = [
   'host',

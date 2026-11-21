@@ -44,7 +44,7 @@ preview_urls = false
 [vars]
 # ALLOWED_EMAILS, POLO_ADMIN_EMAILS, and ACCESS_AUD are secrets. See the
 # header. Assigning them here would publish placeholders over the live values.
-PUBLIC_ORIGIN = "https://polo-preview.tony-walteur.workers.dev"
+PUBLIC_ORIGIN = "https://polo.example.workers.dev"
 # SEC EDGAR and public registries require a contact User-Agent.
 POLO_INTEL_USER_AGENT = "Polo account intelligence (Amaris Consulting) intel@example.test"
 

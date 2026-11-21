@@ -21,11 +21,11 @@ describe('cors origin allowlist', () => {
 
   it('treats the Cloudflare preview Worker origin as the only production origin when it is PUBLIC_BASE_URL', () => {
     const origins = buildAllowedCorsOrigins(
-      'https://polo-preview.tony-walteur.workers.dev',
+      'https://polo.example.workers.dev',
       'production',
     );
 
-    expect(origins).toEqual(['https://polo-preview.tony-walteur.workers.dev']);
+    expect(origins).toEqual(['https://polo.example.workers.dev']);
   });
 
   it('does not add loopback origins in production', () => {

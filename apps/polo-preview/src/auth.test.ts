@@ -143,7 +143,7 @@ describe('session cookie', () => {
 });
 
 describe('request guards', () => {
-  const url = new URL('https://polo-preview.tony-walteur.workers.dev/__auth/code');
+  const url = new URL('https://polo.example.workers.dev/__auth/code');
   const req = (headers: Record<string, string>) => new Request(url, { method: 'POST', headers });
 
   it('accepts only same-origin JSON writes', () => {

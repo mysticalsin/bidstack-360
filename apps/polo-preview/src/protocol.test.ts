@@ -72,7 +72,7 @@ describe('polo-preview header contract', () => {
 
   it('drops Access, forwarding, and e2e-impersonation request headers', () => {
     const headers = filterRequestHeaders([
-      ['Host', 'polo-preview.tony-walteur.workers.dev'],
+      ['Host', 'polo.example.workers.dev'],
       ['cf-access-jwt-assertion', 'jwt'],
       ['x-forwarded-for', '1.2.3.4'],
       ['x-bidstack-e2e-role', 'admin'],

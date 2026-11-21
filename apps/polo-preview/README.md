@@ -1,8 +1,8 @@
 # Polo Cloudflare preview
 
-Internal preview: `https://polo-preview.tony-walteur.workers.dev`
+Internal preview: `https://polo.example.workers.dev`
 
-Cloudflare Access (`alex.example@example.test`, `sam.example@example.test`) sits
+Cloudflare Access (the allowlist) sits
 in front. The Worker is only a front door. It relays HTTP over a Durable Object
 WebSocket to a box that runs the Polo API on `:4020` and `vite preview` on
 `:4180`. That box must serve **`main`**.
@@ -26,7 +26,7 @@ pnpm install --frozen-lockfile
 pnpm db:generate
 pnpm --filter @bidstack/shared --filter @bidstack/db --filter @bidstack/dust-client --filter @bidstack/odoo-mcp-client build
 pnpm --filter @bidstack/web build
-PUBLIC_BASE_URL=https://polo-preview.tony-walteur.workers.dev \
+PUBLIC_BASE_URL=https://polo.example.workers.dev \
   RELAY_KEY=... \
   node apps/polo-preview/src/start-box.mjs
 ```
