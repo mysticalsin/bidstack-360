@@ -147,6 +147,85 @@ describe('database boot review', () => {
     expect(databaseBoot.restoreFailure(1, glued)).not.toBeNull();
   });
 
+  it('rejects digit-led psql clusters and every non-allowlisted token', () => {
+    // WHY: psql 16 getopt reads -1cSELECT and -X1cSELECT as -c. A denylist of
+    // the leading letters misses them. The password argv is a fixed list of
+    // separate tokens, so anything else is rejected.
+    const reject = (args: string[]) => databaseBoot.assertPsqlArgsHaveNoCommand(args);
+    const banned = [
+      '-1cSELECT 1',
+      '-1c',
+      '-0cSELECT 1',
+      '-X1cSELECT 1',
+      '-a1cSELECT 1',
+      '-c',
+      '-cSQL',
+      '-Atc',
+      '--command',
+      '--comm',
+      '--command=SQL',
+      '-f',
+      '--file',
+    ];
+    for (const token of banned) {
+      expect(() => reject([token]), token).toThrow(/not allowed/);
+    }
+    expect(() => reject(['-1c', 'select 1'])).toThrow(/not allowed/);
+    expect(
+      reject([
+        '-h',
+        '127.0.0.1',
+        '-p',
+        '5432',
+        '-U',
+        'bidstack',
+        '-d',
+        'bidstack',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-v',
+        'VERBOSITY=verbose',
+        '-q',
+      ]),
+    ).toEqual([
+      '-h',
+      '127.0.0.1',
+      '-p',
+      '5432',
+      '-U',
+      'bidstack',
+      '-d',
+      'bidstack',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-v',
+      'VERBOSITY=verbose',
+      '-q',
+    ]);
+  });
+
+  it('property: random psql optstring clusters are rejected unless allowlisted', () => {
+    // psql 16 getopt_long optstring from src/bin/psql/startup.c (REL_16_STABLE).
+    const optstring = 'aAbc:d:eEf:F:h:HlL:no:p:P:qR:sStT:U:v:VwWxXz?01';
+    const shorts = [...optstring].filter((ch) => ch !== ':');
+    const allowed = new Set(['-h', '-p', '-U', '-d', '-v', '-q']);
+    let seed = 0x5eed;
+    const next = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed;
+    };
+    for (let i = 0; i < 200; i += 1) {
+      const length = 1 + (next() % 4);
+      let token = '-';
+      for (let k = 0; k < length; k += 1) token += shorts[next() % shorts.length];
+      if (allowed.has(token)) {
+        expect(databaseBoot.assertPsqlArgsHaveNoCommand([token, 'value'])).toEqual([token, 'value']);
+      } else {
+        expect(() => databaseBoot.assertPsqlArgsHaveNoCommand([token]), token).toThrow(/not allowed/);
+      }
+    }
+  });
+
   it('rejects bundled and prefixed psql command options', () => {
     // WHY: -c is not the only way to put SQL on argv. -cSQL, a cluster such
     // as -Atc, and a long-option prefix such as --comm do the same.
