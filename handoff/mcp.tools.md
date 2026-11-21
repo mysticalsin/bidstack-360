@@ -9,7 +9,7 @@ List opportunities matching filters.
 ```json
 {
   "stage":    "proposal",
-  "owner":    "jane.smith@mantu.com",
+  "owner":    "jane.smith@example.test",
   "industry": "financial_services",
   "search":   "Acme",
   "limit":    50
@@ -36,7 +36,7 @@ Patch an opportunity. Common use: agent updates `stage`, `probability`, or `inte
 ## `tasks.create`
 **Input:**
 ```json
-{ "oppId": "uuid", "title": "Send revised SoW", "dueDate": "2025-04-12", "assignee": "jane.smith@mantu.com" }
+{ "oppId": "uuid", "title": "Send revised SoW", "dueDate": "2025-04-12", "assignee": "jane.smith@example.test" }
 ```
 **Output:** created `Task`.
 

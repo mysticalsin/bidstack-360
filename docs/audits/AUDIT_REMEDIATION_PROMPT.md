@@ -185,7 +185,7 @@
 
 - `prisma migrate dev` generates a new migration without errors.
 - `pnpm -r typecheck` passes.
-- Case-insensitive email uniqueness works (`Jane@Mantu.com` and `jane@mantu.com` collide).
+- Case-insensitive email uniqueness works (`Jane@example.test` and `jane@example.test` collide).
 - Opportunity search uses the GIN index (verify with `EXPLAIN ANALYZE`).
 
 ---

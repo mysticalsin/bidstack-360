@@ -63,5 +63,5 @@ Best regards,
 
 **<Your Name>**  
 BidStack 360° / Mantu Group  
-<your.email@mantu.com>  
+<your.email@example.test>  
 +[Your phone]

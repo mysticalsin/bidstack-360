@@ -13,26 +13,26 @@ export interface FixtureUser {
 }
 
 export const fixtureUsers: FixtureUser[] = [
-  { initials: 'JS', name: 'Jane Smith', email: 'jane.smith@mantu.com', role: 'admin' },
-  { initials: 'MT', name: 'Mark Thompson', email: 'mark.thompson@mantu.com', role: 'bid_manager' },
+  { initials: 'JS', name: 'Alex Example', email: 'alex.example@example.test', role: 'admin' },
+  { initials: 'MT', name: 'Blake Sample', email: 'blake.sample@example.test', role: 'bid_manager' },
   {
     initials: 'SB',
-    name: 'Sarah Bennett',
-    email: 'sarah.bennett@mantu.com',
+    name: 'Casey Fixture',
+    email: 'casey.fixture@example.test',
     role: 'solution_arch',
   },
-  { initials: 'DL', name: 'David Lee', email: 'david.lee@mantu.com', role: 'solution_arch' },
-  { initials: 'MJ', name: 'Mike Johnson', email: 'mike.johnson@mantu.com', role: 'account_exec' },
-  { initials: 'RH', name: 'Riya Hassan', email: 'riya.hassan@mantu.com', role: 'account_exec' },
-  { initials: 'LB', name: 'Léon Bertrand', email: 'leon.bertrand@mantu.com', role: 'viewer' },
-  // Sales-module salespeople (Sprint 21) — match the reference dashboard
-  // screenshot so "Top Quotations / Top Sales Orders" credit the right name.
-  { initials: 'SP', name: 'Sarah Poncet', email: 'sarah.poncet@mantu.com', role: 'account_exec' },
-  { initials: 'TW', name: 'Tony Walteur', email: 'tony.walteur@mantu.com', role: 'account_exec' },
+  { initials: 'DL', name: 'Drew Placeholder', email: 'drew.placeholder@example.test', role: 'solution_arch' },
+  { initials: 'MJ', name: 'Evan Synthetic', email: 'evan.synthetic@example.test', role: 'account_exec' },
+  { initials: 'RH', name: 'Fran Demo', email: 'fran.demo@example.test', role: 'account_exec' },
+  { initials: 'LB', name: 'Gray Mock', email: 'gray.mock@example.test', role: 'viewer' },
+  // Sales-module salespeople. Names are synthetic. Initials stay the join key
+  // for ownerInitials on opportunities and leads.
+  { initials: 'SP', name: 'Harper Fixture', email: 'harper.fixture@example.test', role: 'account_exec' },
+  { initials: 'TW', name: 'Indie Sample', email: 'indie.sample@example.test', role: 'account_exec' },
   {
     initials: 'BR',
-    name: 'Benjamin Richer',
-    email: 'benjamin.richer@mantu.com',
+    name: 'Jules Placeholder',
+    email: 'jules.placeholder@example.test',
     role: 'account_exec',
   },
 ];
