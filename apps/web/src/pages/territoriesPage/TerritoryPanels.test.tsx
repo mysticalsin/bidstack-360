@@ -9,10 +9,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
-import { CountryDetailPanel } from './TerritoryPanels';
+import { CountryDetailPanel, RoutingRuleListPanel, TerritoryListPanel } from './TerritoryPanels';
 
 // framer-motion's layout machinery is irrelevant here — render plain DOM.
 vi.mock('framer-motion', () => ({
+  useReducedMotion: () => true,
   motion: new Proxy(
     {},
     {
@@ -59,5 +60,45 @@ describe('CountryDetailPanel global pipeline share row', () => {
     expect(label.querySelector('svg')).not.toBeNull();
     // And the computed share renders alongside it (100 of 400 → 25.0%).
     expect(screen.getByText('25.0%')).toBeDefined();
+  });
+});
+
+describe('empty territory lists', () => {
+  it('gives a sentence and a New territory action, not a title alone', () => {
+    const onCreate = vi.fn();
+    render(
+      <TerritoryListPanel
+        items={[]}
+        isLoading={false}
+        isError={false}
+        onRetry={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        canWrite
+        onCreate={onCreate}
+      />,
+    );
+    expect(screen.getByText(/group the countries you sell in/i)).toBeTruthy();
+    screen.getByRole('button', { name: /new territory/i }).click();
+    expect(onCreate).toHaveBeenCalled();
+  });
+
+  it('gives a sentence and a New rule action, not a title alone', () => {
+    const onCreate = vi.fn();
+    render(
+      <RoutingRuleListPanel
+        items={[]}
+        isLoading={false}
+        isError={false}
+        onRetry={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        canWrite
+        onCreate={onCreate}
+      />,
+    );
+    expect(screen.getByText(/send a new lead/i)).toBeTruthy();
+    screen.getByRole('button', { name: /new rule/i }).click();
+    expect(onCreate).toHaveBeenCalled();
   });
 });
