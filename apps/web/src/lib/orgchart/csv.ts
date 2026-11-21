@@ -1,9 +1,16 @@
 // CSV export of the chart in the org chart API's import columns, so an
 // exported file round-trips through Import CSV (parsing and validation of
 // imports happen server-side: all or nothing, with a dry-run preview).
+import { csvCell } from '../csv';
 import type { OrgNode } from './types';
 
-const esc = (v: string | null) => (v == null ? '' : /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+// csvCell prefixes = + - @ tab CR so a name or title cannot become a formula
+// when the file is opened in a spreadsheet. Quoting still covers commas.
+const esc = (v: string | null) => {
+  if (v == null) return '';
+  const safe = csvCell(v);
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
 /** Export in the API import columns, so the file round-trips through Import CSV. */
 export function exportCsv(nodes: OrgNode[]): string {
   const byId = new Map(nodes.map((n) => [n.id, n]));
