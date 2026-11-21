@@ -329,6 +329,9 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/org-settings/demo-data',
     {
+      // settings:write is the owner/Admin grant. The machine still refuses
+      // a member or an API key that reaches the handler.
+      config: { permission: 'settings:write' },
       schema: { response: { 200: OrgDemoDataSettings } },
     },
     async (req) => {
@@ -348,6 +351,7 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.put(
     '/org-settings/demo-data',
     {
+      config: { permission: 'settings:write' },
       schema: { body: OrgDemoDataSettingsUpdate, response: { 200: OrgDemoDataSettings } },
     },
     async (req) => {

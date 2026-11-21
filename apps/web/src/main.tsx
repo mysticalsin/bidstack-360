@@ -223,7 +223,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && !disableServiceWorke
   const scheduleWarm = () => {
     window.clearTimeout(warmTimer);
     warmTimer = window.setTimeout(() => {
-      void warmAppShellCache();
+      void warmAppShellCache().catch((error) => Sentry.captureException(error));
     }, 200);
   };
   new MutationObserver(scheduleWarm).observe(document.head, { childList: true, subtree: true });

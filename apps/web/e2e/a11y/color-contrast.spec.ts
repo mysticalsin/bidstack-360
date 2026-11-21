@@ -33,7 +33,13 @@ for (const theme of ['light', 'dark'] as const) {
       await page.waitForTimeout(300); // Let CSS vars settle
       // Arrive animations start at opacity 0. Finish them so axe measures the resting color.
       await page.evaluate(() => {
-        for (const animation of document.getAnimations()) animation.finish();
+        for (const animation of document.getAnimations()) {
+          try {
+            animation.finish();
+          } catch {
+            // A repeating effect has no end state to finish.
+          }
+        }
       });
 
       const results = await new AxeBuilder({ page })
