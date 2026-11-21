@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@bidstack/db';
-import { microsToUnits, quarterStart } from '@bidstack/shared';
+import { microsToUnits, quarterStart, taskOverdueBefore } from '@bidstack/shared';
 
 export interface PipelineKpis {
   byStage: Array<{ stage: string; count: number; valueSum: number }>;
@@ -158,8 +158,8 @@ export interface TasksReport {
   completionRate: number;
 }
 
-export async function getTasksReport(orgId: string): Promise<TasksReport> {
-  const now = new Date();
+export async function getTasksReport(orgId: string, now = new Date()): Promise<TasksReport> {
+  const overdueBefore = taskOverdueBefore(now);
   const [byStatus, total, completed, overdue] = await Promise.all([
     prisma.task.groupBy({
       by: ['status'],
@@ -169,7 +169,7 @@ export async function getTasksReport(orgId: string): Promise<TasksReport> {
     prisma.task.count({ where: { orgId, deletedAt: null } }),
     prisma.task.count({ where: { orgId, deletedAt: null, status: 'done' } }),
     prisma.task.count({
-      where: { orgId, deletedAt: null, status: { not: 'done' }, dueDate: { lt: now } },
+      where: { orgId, deletedAt: null, status: { not: 'done' }, dueDate: { lt: overdueBefore } },
     }),
   ]);
 
