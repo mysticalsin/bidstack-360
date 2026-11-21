@@ -9,7 +9,9 @@ import { z } from 'zod';
 
 import { prisma, Prisma } from '@bidstack/db';
 
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { validateFieldValue } from '../lib/custom-field-validation.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import {
   CustomFieldDefinition,
   CustomFieldDefinitionCreate,
@@ -227,6 +229,17 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      // A foreign or missing entity is 404, the same as GET /companies/:id.
+      // An empty list would tell the caller the id exists and has no values.
+      if (
+        !(await tenantEntityBelongsToOrg(
+          req.query.entityType,
+          req.query.entityId,
+          req.auth.orgId,
+        ))
+      ) {
+        throw server.httpErrors.notFound('Record not found');
+      }
       const items = await prisma.customFieldValue.findMany({
         where: {
           orgId: req.auth.orgId,
@@ -309,9 +322,24 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { entityType, entityId, values } = req.body;
 
-      // Verify the entity belongs to this org by checking definitions exist.
+      if (!(await tenantEntityBelongsToOrg(entityType, entityId, req.auth.orgId))) {
+        throw server.httpErrors.notFound('Record not found');
+      }
+
       const definitionIds = Object.keys(values);
       if (definitionIds.length === 0) return { items: [] };
+
+      // A definition from another org still satisfies the FK. Storing it would
+      // let that org's field delete cascade into this org, and a 200 vs 500
+      // would confirm the foreign id exists. Unknown ids are a 400, not a skip.
+      const foreign = await foreignCustomFieldDefinitions(
+        req.auth.orgId,
+        entityType,
+        definitionIds,
+      );
+      if (foreign.length > 0) {
+        throw server.httpErrors.badRequest('Unknown custom field definition');
+      }
 
       const defs = await prisma.customFieldDefinition.findMany({
         where: {
@@ -338,7 +366,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
 
       for (const [definitionId, rawValue] of Object.entries(values)) {
         const def = defById.get(definitionId);
-        if (!def) continue;
+        if (!def) throw server.httpErrors.badRequest('Unknown custom field definition');
         // Type-validate the value against its definition before persisting.
         const value = validateFieldValue(
           def.fieldKey,
