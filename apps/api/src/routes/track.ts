@@ -11,8 +11,8 @@
  *    scoped to that org. The endpoint never reveals which org owns the pixel.
  *  - IP is stored for first open only (GDPR/privacy consideration). Subsequent
  *    opens only increment openCount.
- *  - Redirect targets (click tracking) are validated against an allowlist to
- *    prevent open redirect abuse. In dev mode, all URLs are allowed.
+ *  - Click tracking does not redirect. The pixel stores no destination, so a
+ *    caller-supplied ?url= is never copied into Location.
  *
  * WHY BullMQ for DB writes: pixel hits are high-frequency and latency-sensitive
  * (client waits for the response). We return the GIF immediately and queue the
@@ -101,55 +101,18 @@ export function createTrackRoutes(emailTrackQueue?: Queue): FastifyPluginAsync {
     });
 
     // GET /track/email/click/:token?url=<encoded>
-    // Logs click and redirects to the target URL.
+    // The pixel row does not store a destination. A query-string URL is not a
+    // target: any recipient of an open-tracking mail holds a token, and
+    // honoring ?url= turned that token into an open redirect on this host.
+    // Click links are not produced today. Refuse every caller-supplied URL.
     app.get('/track/email/click/:token', {
-      config: { public: true },
+      config: { public: true, rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
         params: z.object({ token: z.string().min(8).max(128) }),
         querystring: z.object({ url: z.string().min(1).max(2048) }),
       },
-      handler: async (req, reply) => {
-        const { token } = req.params;
-        const { url } = req.query;
-
-        // SECURITY: the token MUST resolve before any redirect. Without this
-        // gate, /track/email/click/<junk>?url=https://evil.example was an
-        // anonymous open redirect on a trusted domain (the old fire-and-forget
-        // lookup redirected regardless). 24-byte tokens are not enumerable, so
-        // requiring a real one closes the gadget. NOTE for the future link
-        // producer: HMAC-sign the url param and verify it here so even a leaked
-        // token cannot redirect to attacker-chosen targets.
-        const pixel = await prisma.emailTrackingPixel.findUnique({
-          where: { token },
-          select: { emailMessageId: true },
-        });
-        if (!pixel) throw server.httpErrors.notFound();
-
-        // Log click (fire-and-forget)
-        setImmediate(async () => {
-          try {
-            await prisma.emailMessage.updateMany({
-              where: { id: pixel.emailMessageId, clickedAt: null },
-              data: { clickedAt: new Date() },
-            });
-          } catch (err) {
-            server.log.warn({ err, token }, 'Track-click DB update failed');
-          }
-        });
-
-        // Validate redirect target — must be an absolute http/https URL
-        let redirectUrl: URL;
-        try {
-          redirectUrl = new URL(url);
-        } catch {
-          throw server.httpErrors.badRequest('Invalid redirect URL');
-        }
-
-        if (!['http:', 'https:'].includes(redirectUrl.protocol)) {
-          throw server.httpErrors.badRequest('Only http/https URLs are allowed');
-        }
-
-        return reply.redirect(redirectUrl.toString(), 302);
+      handler: async () => {
+        throw server.httpErrors.notFound('Click tracking has no registered destination');
       },
     });
   };
