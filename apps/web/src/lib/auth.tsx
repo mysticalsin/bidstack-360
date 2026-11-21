@@ -168,7 +168,34 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
     cb?.();
   }, []);
 
-  const user = STUB_USERS[stubRole] ?? STUB_USER;
+  const fallback = STUB_USERS[stubRole] ?? STUB_USER;
+  const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    let cancelled = false;
+    api<{ id: string; email: string | null; name: string | null }>('/api/me')
+      .then((me) => {
+        if (cancelled || !me?.email) return;
+        const name = me.name?.trim() || null;
+        const parts = name ? name.split(/\s+/) : [];
+        setSessionUser({
+          id: me.id,
+          firstName: parts[0] ?? null,
+          lastName: parts.length > 1 ? parts.slice(1).join(' ') : null,
+          fullName: name,
+          primaryEmailAddress: { emailAddress: me.email },
+        });
+      })
+      .catch(() => {
+        // Keep the synchronous stub label if the session lookup fails.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn]);
+
+  const user = signedIn ? (sessionUser ?? fallback) : null;
   const role = stubRole === 'admin' ? 'admin' : stubRole;
 
   return (
