@@ -36,6 +36,27 @@ describe('parseCsv', () => {
     expect(parseCsv('')).toEqual({ headers: [], rows: [] });
   });
 
+  it('strips a UTF-8 BOM so the first header still matches Name', () => {
+    // WHY: downloadCsv writes a BOM so Excel reads UTF-8. The header trim
+    // drops U+FEFF. This locks that, including a non-Latin value beside it.
+    const { headers, rows } = parseCsv('\uFEFFname,note\nÅngström,"line\ntwo"');
+    expect(headers).toEqual(['name', 'note']);
+    expect(rows[0]).toEqual({ name: 'Ångström', note: 'line\ntwo' });
+  });
+
+  it('splits a semicolon file instead of gluing every column into one cell', () => {
+    // WHY: Excel in locales that use a comma decimal writes ';' between cells.
+    // Treating that as one column imports the header "name;email" and no email.
+    const { headers, rows } = parseCsv('name;email\nÅngström;a@example.com\n');
+    expect(headers).toEqual(['name', 'email']);
+    expect(rows).toEqual([{ name: 'Ångström', email: 'a@example.com' }]);
+  });
+
+  it('splits a tab-separated file', () => {
+    const { rows } = parseCsv('name\temail\nAda\ta@example.com\n');
+    expect(rows).toEqual([{ name: 'Ada', email: 'a@example.com' }]);
+  });
+
   it('rejects an unclosed quote instead of gluing the rest of the file into one cell', () => {
     // WHY: a missing closing quote used to swallow the following rows into the
     // first name, and the wizard offered to import that corrupted row.
