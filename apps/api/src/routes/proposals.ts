@@ -57,7 +57,9 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       const [items, total] = await Promise.all([
         prisma.proposal.findMany({
           where,
-          orderBy: { updatedAt: 'desc' },
+          // updatedAt is not unique. id keeps two rows that share a timestamp
+          // from landing on both pages of an offset walk.
+          orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
           take: limit,
           skip: offset,
         }),
