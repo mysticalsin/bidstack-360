@@ -104,6 +104,7 @@ describe('database boot transitions', () => {
     boot.send({ type: 'cluster-ready', ready: true });
     boot.send({ type: 'restore-result', status: 1, text: PUBLIC_NOTICE });
     boot.send({ type: 'apply-drill-hooks', env: {} });
+    boot.send({ type: 'app-role-gate', verdict: 'ok' });
     boot.send({ type: 'gate-passed', how: 'restore' });
     // WHY: one send of the restore result has to record the tolerate step,
     // not jump from the role straight to the drill.
@@ -142,6 +143,14 @@ describe('database boot transitions', () => {
       },
       {
         from: 'DrillHooks',
+        event: 'app-role-gate',
+        to: 'DrillHooks',
+        guard: true,
+        reason: 'app role gate verified',
+        infrastructure: false,
+      },
+      {
+        from: 'DrillHooks',
         event: 'gate-passed',
         to: 'Ready',
         guard: true,
@@ -165,9 +174,11 @@ describe('database boot transitions', () => {
     const seed = machine();
     seed.send({ type: 'cluster-ready', ready: true });
     seed.send({ type: 'skip-restore', how: 'seed' });
+    seed.send({ type: 'app-role-gate', verdict: 'ok' });
     seed.send({ type: 'gate-passed', how: 'seed' });
     expect(seed.transitions.map((entry) => entry.to)).toEqual([
       'AppRoleRestore',
+      'DrillHooks',
       'DrillHooks',
       'Ready',
     ]);
@@ -209,6 +220,7 @@ describe('database boot transitions', () => {
       'restore-result',
       'skip-restore',
       'apply-drill-hooks',
+      'app-role-gate',
       'gate-passed',
       'init-failed',
       'boot-failed',

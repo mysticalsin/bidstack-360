@@ -286,6 +286,7 @@ export function createDatabaseBoot({ log } = {}) {
   const transitions = [];
   let state = BOOT_STATES.Init;
   let reason = '';
+  let gateVerified = false;
 
   function emit(entry) {
     transitions.push(entry);
@@ -365,7 +366,21 @@ export function createDatabaseBoot({ log } = {}) {
       );
     }
 
+    if (from === BOOT_STATES.DrillHooks && name === 'app-role-gate') {
+      const verdict = blank(event && event.verdict);
+      if (verdict !== 'ok') {
+        return fail(
+          from,
+          name,
+          verdict ? `app role gate failed: ${verdict}` : 'app role gate was not verified',
+        );
+      }
+      gateVerified = true;
+      return emit(transitionRecord(from, name, from, true, 'app role gate verified', false));
+    }
+
     if (from === BOOT_STATES.DrillHooks && name === 'gate-passed') {
+      if (!gateVerified) return fail(from, name, 'app role gate was not verified');
       const how = event && (event.how === 'restore' || event.how === 'seed') ? event.how : '';
       if (!how) return fail(from, name, 'ready needs a restore or a seed');
       return move(from, name, BOOT_STATES.Ready, how);

@@ -73,7 +73,9 @@ describe('database boot review', () => {
     const finish = functionBody(entry, 'finishBoot');
     const gate = functionBody(entry, 'assertAppRoleGate');
     expect(finish).toContain('assertAppRoleGate()');
-    expect(finish.indexOf('assertAppRoleGate()')).toBeLessThan(finish.indexOf("type: 'gate-passed'"));
+    expect(finish.indexOf('assertAppRoleGate()')).toBeLessThan(
+      finish.indexOf("type: 'gate-passed'"),
+    );
     expect(gate).toContain("type: 'app-role-gate'");
     expect(finish).toMatch(/to !== 'Ready'/);
   });

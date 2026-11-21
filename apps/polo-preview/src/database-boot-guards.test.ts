@@ -114,6 +114,7 @@ describe('database boot guards', () => {
 
   it('refuses Ready without a restore or a seed', () => {
     const boot = atDrill();
+    boot.send({ type: 'app-role-gate', verdict: 'ok' });
     const entry = boot.send({ type: 'gate-passed', how: '' });
     expect(entry.guard).toBe(false);
     expect(boot.reason).toBe('ready needs a restore or a seed');
@@ -276,6 +277,7 @@ describe('database boot guards', () => {
 
   it('does not replace a Ready reason when a later event arrives', () => {
     const boot = atDrill();
+    boot.send({ type: 'app-role-gate', verdict: 'ok' });
     boot.send({ type: 'gate-passed', how: 'seed' });
     const entry = boot.send({ type: 'boot-failed', reason: 'later' });
     expect(entry).toMatchObject({ from: 'Ready', to: 'Ready', guard: false, reason: 'terminal' });

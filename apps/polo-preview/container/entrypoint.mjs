@@ -287,7 +287,12 @@ function assertAppRoleGate() {
   );
   if (res.status !== 0) throw new Error('could not check the app role');
   const verdict = (res.stdout || '').trim();
-  if (verdict !== 'ok') throw new Error(`app role gate failed: ${verdict || 'unknown'}`);
+  const verified = bootMachine().send({ type: 'app-role-gate', verdict: verdict || 'unknown' });
+  if (verdict !== 'ok' || verified.to === 'Failed') {
+    throw new Error(
+      verdict !== 'ok' ? `app role gate failed: ${verdict || 'unknown'}` : bootMachine().reason,
+    );
+  }
 }
 
 function startDatabase() {
@@ -513,7 +518,8 @@ async function finishBoot(how) {
     await waitForApi();
     apiRestarts = 0;
     startWorker();
-    bootMachine().send({ type: 'gate-passed', how });
+    const ready = bootMachine().send({ type: 'gate-passed', how });
+    if (ready.to !== 'Ready') throw new Error(bootMachine().reason || 'boot did not reach ready');
     setPhase('ready', how);
   } catch (err) {
     if (!bootMachine().terminal) {
