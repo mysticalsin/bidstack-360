@@ -86,7 +86,10 @@ describe('Table', () => {
         </Table>
       </TableScrollArea>,
     );
-    expect(container.querySelector('.scroll-wrap')).not.toBeNull();
+    const wrap = container.querySelector('.scroll-wrap');
+    expect(wrap).not.toBeNull();
+    // The scroll box is a tab stop so a keyboard user can move overflowed columns.
+    expect(wrap?.getAttribute('tabindex')).toBe('0');
     expect(screen.getByText('ScrollCell')).toBeDefined();
   });
 });
