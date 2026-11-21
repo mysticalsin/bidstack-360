@@ -187,8 +187,9 @@ export function scrubChildEnv(env) {
   return next;
 }
 
-// The password psql must print `ERROR:  42601:` rather than a bare ERROR line.
-// LC_ALL=C keeps that text stable. The caller still scrubs the secret.
+// LC_ALL=C keeps psql's error text stable. psql 16 does not print a SQLSTATE
+// from PGVERBOSITY; the argv has to pass -v VERBOSITY=verbose. The caller
+// still scrubs the secret, and the verifier stays on stdin.
 /**
  * @param {Record<string, string>} [extra]
  * @returns {Record<string, string>}

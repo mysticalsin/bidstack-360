@@ -251,7 +251,9 @@ function setAppRolePassword() {
   const verifier = scramSha256Verifier(password);
   const res = spawnSync(
     'psql',
-    assertPsqlArgsHaveNoCommand(pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'])),
+    assertPsqlArgsHaveNoCommand(
+      pgCli(['-d', DB, '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose', '-q']),
+    ),
     {
       encoding: 'utf8',
       input: alterRolePasswordSql(hooks.passwordRole, verifier),
