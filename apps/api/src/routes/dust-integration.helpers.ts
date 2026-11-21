@@ -11,7 +11,7 @@ import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.j
 
 import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
-import { assertUrlResolvesPublic } from '@bidstack/shared/server';
+import { assertUrlResolvesPublic, pinnedFetch } from '@bidstack/shared/server';
 import {
   type DustStatusPayload,
   type DustStatusCacheEntry,
@@ -181,9 +181,18 @@ export async function cachedDustStatus(
 
 // Probe helpers
 
-function isLocalDevelopmentHostname(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return h === 'localhost' || h.startsWith('127.') || h === '::1' || h === '[::1]';
+/** Dev carve-out: localhost, ::1, and the single address 127.0.0.1. Parsed, not a "127." prefix. */
+export function isLocalDevelopmentHostname(hostname: string): boolean {
+  let bare = hostname.trim().toLowerCase();
+  if (bare.startsWith('[') && bare.endsWith(']')) bare = bare.slice(1, -1);
+  const zone = bare.indexOf('%');
+  if (zone !== -1) bare = bare.slice(0, zone);
+  if (bare === 'localhost' || bare === '::1') return true;
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(bare);
+  if (!match) return false;
+  const octets = [match[1], match[2], match[3], match[4]].map((part) => Number(part));
+  if (octets.some((n) => n > 255)) return false;
+  return octets[0] === 127 && octets[1] === 0 && octets[2] === 0 && octets[3] === 1;
 }
 
 function sanitizeProbeUrl(value: string): string {
@@ -237,30 +246,36 @@ export async function probeIntegrationEndpoint(
   const startedAt = Date.now();
 
   try {
-    // Close the DNS-rebind gap for PUBLIC hosts: assertProbeUrlAllowed is a
-    // string-only check, so resolve the host and reject if it points at an
-    // internal address. SKIP it for the dev-only localhost carve-out that
-    // assertProbeUrlAllowed deliberately permits (probing a local MCP server) —
-    // assertUrlResolvesPublic would otherwise hard-reject localhost/127.x.
+    // The dev carve-out is localhost / ::1 / 127.0.0.1 only. Every other name
+    // is resolved, and the socket is pinned to that address. A "127." prefix
+    // is not loopback.
     const probeHostname = new URL(checkedUrl).hostname;
     const isLocalDevProbe =
       isLocalDevelopmentHostname(probeHostname) && process.env.NODE_ENV !== 'production';
-    if (!isLocalDevProbe) {
+    const headers = {
+      Accept:
+        kind === 'mcp'
+          ? 'application/json, text/event-stream;q=0.9, */*;q=0.1'
+          : 'application/json, */*;q=0.1',
+      Range: 'bytes=0-0',
+    };
+    let status: number;
+    if (isLocalDevProbe) {
+      const res = await fetch(checkedUrl, { method: 'GET', redirect: 'manual', signal: controller.signal, headers });
+      status = res.status;
+    } else {
       await assertUrlResolvesPublic(checkedUrl);
+      const res = await pinnedFetch(checkedUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        maxHops: 0,
+        signal: controller.signal,
+        timeoutMs: INTEGRATION_PROBE_TIMEOUT_MS,
+        maxBytes: 1024,
+        headers,
+      });
+      status = res.status;
     }
-    const res = await fetch(checkedUrl, {
-      method: 'GET',
-      redirect: 'manual',
-      signal: controller.signal,
-      headers: {
-        Accept:
-          kind === 'mcp'
-            ? 'application/json, text/event-stream;q=0.9, */*;q=0.1'
-            : 'application/json, */*;q=0.1',
-        Range: 'bytes=0-0',
-      },
-    });
-    const status = res.status;
     if (status === 401 || status === 403) {
       warnings.push('Authentication is required, which is expected for protected MCP/API targets.');
     }
