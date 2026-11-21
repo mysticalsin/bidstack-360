@@ -17,20 +17,27 @@ const CONTRAST_ROUTES = [
   '/contacts',
   '/settings',
   '/opportunities',
+  // Account segment counts are brand-colored numerals, not body text.
+  '/accounts',
 ] as const;
 
 for (const theme of ['light', 'dark'] as const) {
   for (const route of CONTRAST_ROUTES) {
     test(`${route} (${theme}): color-contrast axe rule passes`, async ({ page }) => {
-      // Set theme before navigation so CSS variables are applied on load.
-      await page.addInitScript((t) => {
-        document.documentElement.setAttribute('data-theme', t);
-        localStorage.setItem('theme', t);
-      }, theme);
-
+      // Playwright restores storageState after init scripts, which drops any
+      // theme key set before the first load. index.html then paints light.
+      // Set the key the pre-paint script actually reads, then reload.
       await page.goto(route, { waitUntil: 'load' });
+      await page.evaluate((t) => {
+        localStorage.setItem('bidstack-theme', t);
+      }, theme);
+      await page.reload({ waitUntil: 'load' });
       await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
-      await page.waitForTimeout(300); // Let CSS vars settle
+      await page
+        .waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'), null, {
+          timeout: 4_000,
+        })
+        .catch(() => undefined);
 
       const results = await new AxeBuilder({ page })
         .withRules(['color-contrast'])
@@ -58,12 +65,11 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 test('dark mode: CSS variables produce valid contrast for primary text', async ({ page }) => {
-  await page.addInitScript(() => {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    localStorage.setItem('theme', 'dark');
-  });
-
   await page.goto('/dashboard', { waitUntil: 'load' });
+  await page.evaluate(() => {
+    localStorage.setItem('bidstack-theme', 'dark');
+  });
+  await page.reload({ waitUntil: 'load' });
   await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
   await page.waitForTimeout(300);
 
