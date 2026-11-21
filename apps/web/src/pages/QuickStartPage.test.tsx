@@ -69,7 +69,9 @@ describe('QuickStartPage deep links', () => {
     ['Run your first bid/no-bid', '/bid-matrix'],
     ['Start your first RFP response', '/proposals'],
     ['Create your first deal', '/pipeline'],
-    ['Invite your team', '/settings?tab=groups'],
+    // Identity holds the team list and role assignment. Access groups share
+    // records; they are not how a person joins the workspace.
+    ['Invite your team', '/settings?tab=identity'],
   ])('routes "%s" to %s', (label, destination) => {
     renderPage();
     fireEvent.click(screen.getByText(label));

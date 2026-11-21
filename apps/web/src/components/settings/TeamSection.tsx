@@ -35,6 +35,14 @@ export function TeamSection() {
         caption={t('team.caption', 'Members of your workspace. Admins can manage roles.')}
       />
       <div className="p-5">
+        {isAdmin && users.data && users.data.items.length < 2 ? (
+          <p className="mb-4 text-sm text-[var(--fg-secondary)]">
+            {t(
+              'team.inviteHint',
+              'You are the only member. People appear here after they sign in to this workspace. Then use Manage roles. Access groups share records; they do not send invitations.',
+            )}
+          </p>
+        ) : null}
         {users.isLoading ? (
           <LoadingSkeleton rows={3} />
         ) : !users.data || users.data.items.length === 0 ? (
