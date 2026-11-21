@@ -243,6 +243,7 @@ const ImportPreviewResponse = z.object({
 const ParsedSpreadsheetResponse = z.object({
   headers: z.array(z.string()),
   rows: z.array(z.record(z.string())),
+  truncated: z.boolean(),
 });
 
 export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -780,7 +781,12 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
       if (buf.length > 8 * 1024 * 1024) {
         throw server.httpErrors.payloadTooLarge('Spreadsheet must be 8 MB or smaller');
       }
-      return parseSpreadsheetBuffer(buf, name);
+      try {
+        return parseSpreadsheetBuffer(buf, name);
+      } catch (err) {
+        if (err instanceof SpreadsheetRejected) throw server.httpErrors.badRequest(err.message);
+        throw err;
+      }
     },
   );
 
@@ -1054,15 +1060,56 @@ export class SpreadsheetRejected extends Error {
   }
 }
 
+const SPREADSHEET_ROW_CAP = 10_000;
+const SPREADSHEET_UNCOMPRESSED_CAP = 8 * 1024 * 1024;
+
+function looksLikeWorkbook(buf: Buffer): boolean {
+  if (buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b) return true;
+  if (buf.length >= 8 && buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0) return true;
+  return false;
+}
+
+/** A zip can declare a huge entry and stay under the compressed cap. */
+function zipDeclaresTooMuch(buf: Buffer): boolean {
+  let offset = 0;
+  while (offset + 30 <= buf.length) {
+    const sig = buf.readUInt32LE(offset);
+    if (sig === 0x04034b50) {
+      const compressed = buf.readUInt32LE(offset + 18);
+      const uncompressed = buf.readUInt32LE(offset + 22);
+      const nameLen = buf.readUInt16LE(offset + 26);
+      const extra = buf.readUInt16LE(offset + 28);
+      if (uncompressed > SPREADSHEET_UNCOMPRESSED_CAP) return true;
+      const next = offset + 30 + nameLen + extra + compressed;
+      if (next <= offset) return true;
+      offset = next;
+      continue;
+    }
+    if (sig === 0x02014b50 && offset + 46 <= buf.length) {
+      const uncompressed = buf.readUInt32LE(offset + 24);
+      const nameLen = buf.readUInt16LE(offset + 28);
+      const extra = buf.readUInt16LE(offset + 30);
+      const comment = buf.readUInt16LE(offset + 32);
+      if (uncompressed > SPREADSHEET_UNCOMPRESSED_CAP) return true;
+      offset += 46 + nameLen + extra + comment;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
 export function parseSpreadsheetBuffer(
   buf: Buffer,
   filename: string,
-): { headers: string[]; rows: Record<string, string>[] } {
+): { headers: string[]; rows: Record<string, string>[]; truncated: boolean } {
   if (filename.endsWith('.csv')) {
     const text = buf.toString('utf8');
     const lines = text.split(/\r?\n/).filter((line) => line.length > 0);
     const headers = (lines[0] ?? '').split(',').map((h) => h.trim());
-    const rows = lines.slice(1).map((line) => {
+    const dataLines = lines.slice(1);
+    const truncated = dataLines.length > SPREADSHEET_ROW_CAP;
+    const rows = dataLines.slice(0, SPREADSHEET_ROW_CAP).map((line) => {
       const cells = line.split(',');
       const row: Record<string, string> = {};
       headers.forEach((header, i) => {
@@ -1070,24 +1117,36 @@ export function parseSpreadsheetBuffer(
       });
       return row;
     });
-    return { headers, rows: rows.slice(0, 10_000) };
+    return { headers, rows, truncated };
   }
 
-  const workbook = XLSX.read(buf, { type: 'buffer', cellDates: true });
+  if (!looksLikeWorkbook(buf)) {
+    throw new SpreadsheetRejected('Spreadsheet could not be read');
+  }
+  if (buf[0] === 0x50 && zipDeclaresTooMuch(buf)) {
+    throw new SpreadsheetRejected('Spreadsheet must be 8 MB or smaller');
+  }
+  let workbook: XLSX.WorkBook;
+  try {
+    workbook = XLSX.read(buf, { type: 'buffer', cellDates: true });
+  } catch {
+    throw new SpreadsheetRejected('Spreadsheet could not be read');
+  }
   const sheetName = workbook.SheetNames[0];
   const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
-  if (!sheet) return { headers: [], rows: [] };
+  if (!sheet) return { headers: [], rows: [], truncated: false };
   const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: '',
     raw: false,
   });
   const headers = records[0] ? Object.keys(records[0]) : [];
-  const rows = records.slice(0, 10_000).map((record) => {
+  const truncated = records.length > SPREADSHEET_ROW_CAP;
+  const rows = records.slice(0, SPREADSHEET_ROW_CAP).map((record) => {
     const row: Record<string, string> = {};
     for (const header of headers) {
       row[header] = String(record[header] ?? '').trim();
     }
     return row;
   });
-  return { headers, rows };
+  return { headers, rows, truncated };
 }
