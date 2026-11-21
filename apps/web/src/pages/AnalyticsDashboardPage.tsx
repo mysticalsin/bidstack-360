@@ -126,7 +126,7 @@ export function AnalyticsDashboardPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Topbar */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--surface-card)] dark:bg-[var(--surface-glass)]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 border-b border-[var(--border-subtle)] bg-[var(--surface-card)] dark:bg-[var(--surface-glass)]">
         <BarChart2 size={18} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" aria-hidden />
         <h1 className="text-sm font-semibold text-[var(--fg-primary)]">{t('analyticsDashboard.title', 'Analytics')}</h1>
 
@@ -192,7 +192,7 @@ export function AnalyticsDashboardPage() {
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
           <Link
             to="/reports/list"
             className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] px-2 min-h-[44px] flex items-center"
