@@ -33,6 +33,7 @@ import { sendViaGmail, pullGmail } from './email-integration.gmail.js';
 import { sendViaMsGraph, pullMsGraphMail } from './email-integration.graph.js';
 import { assertSerumConnectorAllowed } from '../lib/serum-connector-policy.js';
 import { reserveOutboundCommunication } from '../lib/outbound-communication-guard.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 
 // Re-export types so callers don't need to import from helpers directly
 export type {
@@ -43,10 +44,33 @@ export type {
 
 // ─── Send email ────────────────────────────────────────────────────────────────
 
+function httpError(statusCode: number, message: string): Error {
+  return Object.assign(new Error(message), { statusCode });
+}
+
+async function assertEmailEntity(
+  orgId: string,
+  entityType: string | undefined,
+  entityId: string | undefined,
+): Promise<void> {
+  if (!entityType && !entityId) return;
+  if (!entityType || !entityId) {
+    throw httpError(400, 'entityType and entityId are both required');
+  }
+  const kind = entityType === 'deal' ? 'opportunity' : entityType;
+  if (!(await tenantEntityBelongsToOrg(kind, entityId, orgId))) {
+    throw httpError(404, 'Record not found');
+  }
+}
+
 export async function sendEmail(
   params: SendEmailParams,
   log: ServiceLogger,
 ): Promise<{ messageId: string }> {
+  // The linked deal, contact, or lead is a global id. Reject another org
+  // before the mailbox lookup so a missing grant cannot hide the 404.
+  await assertEmailEntity(params.orgId, params.entityType, params.entityId);
+
   // Find the user's active integration token (prefer gmail, fallback microsoft_graph)
   const token = await prisma.integrationToken.findFirst({
     where: {
@@ -91,22 +115,8 @@ export async function sendEmail(
     log,
   );
 
-  let providerAccepted = false;
-  let providerResult: { externalMessageId: string; threadId?: string };
-  try {
-    const accessToken = await getAccessToken(token, log);
-    providerResult = isGmail
-      ? await sendViaGmail(accessToken, params, pixelToken, log)
-      : await sendViaMsGraph(accessToken, params, pixelToken, log);
-    providerAccepted = true;
-  } catch (err) {
-    if (!providerAccepted) await reservation.rollback();
-    throw err;
-  }
-
-  const { externalMessageId, threadId } = providerResult;
-
-  // Persist EmailMessage + tracking pixel in a transaction
+  // The CRM link is stored before Gmail or Graph is called. A crash after the
+  // provider accepts still leaves the row; the provider id is filled in after.
   const message = await prisma.$transaction(async (tx) => {
     const msg = await tx.emailMessage.create({
       data: {
@@ -114,15 +124,13 @@ export async function sendEmail(
         userId: params.userId,
         integrationTokenId: token.id,
         provider: isGmail ? EmailProvider.GMAIL : EmailProvider.OUTLOOK,
-        externalMessageId,
-        threadId: threadId ?? null,
+        externalMessageId: `pending:${pixelToken}`,
         fromEmail: token.externalAccountEmail ?? '',
         toEmails: params.to as object[],
         ccEmails: (params.cc ?? []) as object[],
         subject: params.subject,
         bodyHtml: params.html ?? null,
         bodyText: params.text ?? null,
-        sentAt: new Date(),
         isOutbound: true,
         entityType: params.entityType ?? null,
         entityId: params.entityId ?? null,
@@ -140,7 +148,32 @@ export async function sendEmail(
     return msg;
   });
 
-  log.info({ messageId: message.id, externalMessageId }, 'Email sent and persisted');
+  let providerAccepted = false;
+  try {
+    const accessToken = await getAccessToken(token, log);
+    const providerResult = isGmail
+      ? await sendViaGmail(accessToken, params, pixelToken, log)
+      : await sendViaMsGraph(accessToken, params, pixelToken, log);
+    providerAccepted = true;
+    await prisma.emailMessage.update({
+      where: { id: message.id },
+      data: {
+        externalMessageId: providerResult.externalMessageId,
+        threadId: providerResult.threadId ?? null,
+        sentAt: new Date(),
+      },
+    });
+  } catch (err) {
+    if (!providerAccepted) {
+      await prisma.emailMessage.delete({ where: { id: message.id } }).catch((deleteErr: unknown) => {
+        log.warn({ err: deleteErr, messageId: message.id }, 'Failed to drop unsent email row');
+      });
+      await reservation.rollback();
+    }
+    throw err;
+  }
+
+  log.info({ messageId: message.id }, 'Email sent and persisted');
   return { messageId: message.id };
 }
 
