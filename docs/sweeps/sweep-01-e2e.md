@@ -149,9 +149,9 @@ Journeys that behaved correctly are not counted as findings.
 
 ## Fixes
 
-| Finding | PR | What changed |
-| --- | --- | --- |
-| 1 | opportunity create words | Stage and industry options use `formatStage`. An empty customer says "Choose a customer." |
-| 2 | mobile sign out | Sign out keeps `tb-signout-keep` so the phone and tablet rules no longer set `display: none` on it |
+| Finding | PR | Head | What changed |
+| --- | --- | --- | --- |
+| 1 | https://github.com/mysticalsin/bidstack-360/pull/401 | `021d420e` | Stage and industry options use `formatStage`. An empty customer says "Choose a customer." |
+| 2 | https://github.com/mysticalsin/bidstack-360/pull/402 | `b60efc31` | Sign out keeps `tb-signout-keep` so the phone and tablet rules no longer set `display: none` on it |
 
 The journey gate is `pnpm e2e:journeys`.
