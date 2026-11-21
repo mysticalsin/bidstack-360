@@ -112,4 +112,15 @@ describe('database boot review', () => {
     expect(databaseBoot.secretLeakKind('SCRAM-SHA-256$abc', secret)).toBe('verifier');
     expect(databaseBoot.secretLeakKind('clean log', secret)).toBe('clean');
   });
+
+  it('rejects a public schema notice that has trailing text on the same line', () => {
+    // WHY: includes() treats the sentence plus another failure as the one
+    // tolerated notice. The line has to be exactly that pg_restore error.
+    const exact =
+      'pg_restore: error: could not execute query: ERROR:  42P06: schema "public" already exists';
+    const trailed = `${exact}; permission denied for table audit_log`;
+    expect(databaseBoot.restoreFailure(1, exact)).toBeNull();
+    expect(databaseBoot.restoreFailure(1, trailed)).not.toBeNull();
+    expect(databaseBoot.restoreFailure(1, trailed)).toMatch(/permission denied/);
+  });
 });
