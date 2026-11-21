@@ -397,6 +397,7 @@ export function OpportunitiesPage() {
         stageFilter={stageFilter}
         stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
+        countReady={!isLoading && !isError}
         hasData={Boolean(data && data.items.length > 0)}
         isExporting={isExporting}
         onClearSearch={clearSearch}
