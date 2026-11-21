@@ -20,6 +20,13 @@ test('skip link is the first tab stop and moves focus to main', async ({ page })
   });
   expect(first.skip, `first tab stop was "${first.name}"`).toBe(true);
 
+  // A route announcer used to move focus to <main> 60ms after any keyboard
+  // event once translations settled, so the skip link never stayed focused
+  // long enough to activate.
+  await page.waitForTimeout(250);
+  const still = await page.evaluate(() => document.activeElement?.classList.contains('skip-link') ?? false);
+  expect(still, 'skip link lost focus before it could be activated').toBe(true);
+
   await page.keyboard.press('Enter');
   await expect.poll(async () => page.evaluate(() => document.activeElement?.id ?? '')).toBe('main');
 });
