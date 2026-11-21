@@ -9,19 +9,36 @@
  * streams the bytes same-origin with long cache headers.
  *
  * Security: logos are public brand assets, so this is intentionally public
- * (config.public). It only fetches from a FIXED provider host using the
- * company's stored domain as a parameter — no user-supplied URL — so there is no
- * SSRF surface. Reserved/dev domains are rejected.
+ * (config.public). The domain is a query parameter, not a URL. Fetches go only
+ * to a fixed provider host list, through pinnedFetch, and a redirect is
+ * accepted only when the next host is still on that list. SVG is an attachment.
+ * Reserved/dev domains are rejected.
  */
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+
+import { PinnedFetchError, pinnedFetch, type PinnedFetchResponse } from '@bidstack/shared/server';
 
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 3500;
 const MAX_CACHE = 500;
 const MIN_IMAGE_BYTES = 128;
+const MAX_IMAGE_BYTES = 512 * 1024;
+const MAX_PROVIDER_REDIRECTS = 2;
 
-type Hit = { buf: Buffer; contentType: string; ts: number } | null; // null = negative cache
+/** Hosts this route is allowed to contact. A redirect off this set is a miss. */
+const PROVIDER_HOSTS = new Set([
+  'img.logo.dev',
+  'cdn.brandfetch.io',
+  'www.google.com',
+  'icons.duckduckgo.com',
+  'cdn.simpleicons.org',
+  'cdn.jsdelivr.net',
+]);
+
+const RASTER_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/x-icon', 'image/vnd.microsoft.icon']);
+
+type Hit = { buf: Buffer; contentType: string; attachment: boolean; ts: number } | null; // null = negative cache
 const cache = new Map<string, Hit>();
 
 function cacheGet(key: string): Hit | undefined {
@@ -74,34 +91,89 @@ function providerUrls(domain: string): string[] {
 }
 
 type FetchResult =
-  | { kind: 'image'; buf: Buffer; contentType: string }
+  | { kind: 'image'; buf: Buffer; contentType: string; attachment: boolean }
   | { kind: 'miss' }
   | { kind: 'unavailable' };
+
+function mediaType(contentType: string | null): string {
+  return (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+}
+
+/**
+ * Raster types are served inline under a forced type. SVG is an attachment
+ * with a locked CSP: tech icons are SVG, and an inline SVG document on this
+ * origin can run script where the page CSP allows it (F-13).
+ */
+function classifyLogo(contentType: string | null): { contentType: string; attachment: boolean } | null {
+  const base = mediaType(contentType);
+  if (base === 'image/svg+xml') return { contentType: 'image/svg+xml', attachment: true };
+  if (base === 'image/jpg') return { contentType: 'image/jpeg', attachment: false };
+  if (base === 'image/vnd.microsoft.icon') return { contentType: 'image/x-icon', attachment: false };
+  if (RASTER_TYPES.has(base)) return { contentType: base, attachment: false };
+  return null;
+}
+
+function providerHost(raw: string): URL | null {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return PROVIDER_HOSTS.has(url.hostname.toLowerCase()) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchProvider(url: string): Promise<PinnedFetchResponse> {
+  return pinnedFetch(url, {
+    method: 'GET',
+    redirect: 'manual',
+    maxHops: 0,
+    timeoutMs: FETCH_TIMEOUT_MS,
+    maxBytes: MAX_IMAGE_BYTES,
+  });
+}
 
 /**
  * First provider image wins. `miss` means every provider answered and none had
  * an image; `unavailable` means at least one timed out, failed or answered 429
  * or 5xx, so the miss may be transient and must not be negative-cached.
  */
+async function readProvider(start: string): Promise<FetchResult> {
+  let current = start;
+  for (let hop = 0; hop <= MAX_PROVIDER_REDIRECTS; hop++) {
+    if (!providerHost(current)) return { kind: 'miss' };
+    let res: PinnedFetchResponse;
+    try {
+      res = await fetchProvider(current);
+    } catch (err) {
+      const code = err instanceof PinnedFetchError ? err.code : 'network';
+      return code === 'timeout' || code === 'network' || code === 'dns' ? { kind: 'unavailable' } : { kind: 'miss' };
+    }
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location || hop === MAX_PROVIDER_REDIRECTS) return { kind: 'miss' };
+      try {
+        current = new URL(location, current).toString();
+      } catch {
+        return { kind: 'miss' };
+      }
+      continue;
+    }
+    if (res.status === 429 || res.status >= 500) return { kind: 'unavailable' };
+    if (res.status < 200 || res.status >= 300) return { kind: 'miss' };
+    const kind = classifyLogo(res.headers.get('content-type'));
+    if (!kind || res.body.byteLength < MIN_IMAGE_BYTES) return { kind: 'miss' };
+    return { kind: 'image', buf: Buffer.from(res.body), contentType: kind.contentType, attachment: kind.attachment };
+  }
+  return { kind: 'miss' };
+}
+
 async function fetchFirstImage(urls: string[]): Promise<FetchResult> {
   let transient = false;
   for (const url of urls) {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const res = await fetch(url, { signal: ctl.signal, redirect: 'follow' });
-      const ct = res.headers.get('content-type') ?? '';
-      if (res.ok && ct.startsWith('image/')) {
-        const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.byteLength >= MIN_IMAGE_BYTES) return { kind: 'image', buf, contentType: ct };
-      } else if (res.status === 429 || res.status >= 500) {
-        transient = true;
-      }
-    } catch {
-      transient = true;
-    } finally {
-      clearTimeout(timer);
-    }
+    const result = await readProvider(url);
+    if (result.kind === 'image') return result;
+    if (result.kind === 'unavailable') transient = true;
   }
   return transient ? { kind: 'unavailable' } : { kind: 'miss' };
 }
@@ -153,11 +225,18 @@ export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
         urls = providerUrls(domain);
       }
 
-      const serve = (hit: NonNullable<Hit>) =>
-        reply
+      const serve = (hit: NonNullable<Hit>) => {
+        const sent = reply
           .header('content-type', hit.contentType)
-          .header('cache-control', 'public, max-age=604800, immutable')
-          .send(hit.buf);
+          .header('x-content-type-options', 'nosniff')
+          .header('cache-control', 'public, max-age=604800, immutable');
+        if (hit.attachment) {
+          sent
+            .header('content-disposition', 'attachment')
+            .header('content-security-policy', "default-src 'none'; sandbox");
+        }
+        return sent.send(hit.buf);
+      };
 
       const cached = cacheGet(cacheKey);
       if (cached !== undefined) {
@@ -167,7 +246,7 @@ export const companyLogoRoutes: FastifyPluginAsyncZod = async (server) => {
       if (fetched.kind === 'unavailable') return reply.code(404).send();
       const hit: Hit =
         fetched.kind === 'image'
-          ? { buf: fetched.buf, contentType: fetched.contentType, ts: Date.now() }
+          ? { buf: fetched.buf, contentType: fetched.contentType, attachment: fetched.attachment, ts: Date.now() }
           : null;
       cacheSet(cacheKey, hit);
       return hit ? serve(hit) : reply.code(404).send();
