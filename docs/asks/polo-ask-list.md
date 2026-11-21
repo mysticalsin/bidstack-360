@@ -27,7 +27,7 @@ APP-FIT is judged against the apps as they are on `main`, plus the open pull req
 | --- | --- | --- | --- |
 | P-01 Real mode, demo toggle, install guide | Partial | FIT | [#364](https://github.com/mysticalsin/bidstack-360/pull/364), [#363](https://github.com/mysticalsin/bidstack-360/pull/363), [#367](https://github.com/mysticalsin/bidstack-360/pull/367) |
 | P-02 Analytics Add widget | In PR #355 | FIT | [#355](https://github.com/mysticalsin/bidstack-360/pull/355), phone follow-ups [#468](https://github.com/mysticalsin/bidstack-360/pull/468), [#469](https://github.com/mysticalsin/bidstack-360/pull/469) |
-| P-03 Company revenue, margin, open jobs | Partial | ADAPT | [#67](https://github.com/mysticalsin/bidstack-360/pull/67), [#354](https://github.com/mysticalsin/bidstack-360/pull/354), [#356](https://github.com/mysticalsin/bidstack-360/pull/356) |
+| P-03 Company revenue, margin, open jobs | Partial | ADAPT | [#67](https://github.com/mysticalsin/bidstack-360/pull/67), [#354](https://github.com/mysticalsin/bidstack-360/pull/354), [#356](https://github.com/mysticalsin/bidstack-360/pull/356). Sweep 09 figures are a synthetic seed, not a live filing. |
 | P-04 Preview container boot | In PR #353 | FIT | [#353](https://github.com/mysticalsin/bidstack-360/pull/353), state machine [#365](https://github.com/mysticalsin/bidstack-360/pull/365) |
 | P-05 README with clips | In PR #388 | ADAPT | [#388](https://github.com/mysticalsin/bidstack-360/pull/388) |
 | P-06 Floor plan before a new screen | In PR #486 | FIT | [#486](https://github.com/mysticalsin/bidstack-360/pull/486). No owner in #348–#441 before this audit. |
@@ -87,7 +87,34 @@ Source, t1662u. The customer/company section's revenue, margin, and open-jobs da
 
 **APP-FIT: ADAPT.** The tiles belong on the account page. Sample margin and fixture job postings are demo data. After #364 or #367, a real org with the demo switch off must keep showing the missing state (`No public revenue figure found yet`, `No margin in the filed numbers`, `No job postings tracked yet`) instead of those fixtures. #364 already blanks a sample key number when the switch is off. Merge #354 and #356 only onto that rule.
 
-**Needs Tony:** an approved filings or enrichment source, if the tiles should fill in real mode. No provider is added here.
+### Where sweep 09's 1,700,000,000 EUR came from
+
+[#456](https://github.com/mysticalsin/bidstack-360/pull/456) `docs/sweeps/sweep-09.md` says Sweep Sentinel (`3e99d956-fdfd-4658-85b8-2e2e4b8fe9c6` in that run) "matched its filings": FY2024 revenue 1,700,000,000 EUR, operating margin 18% (19.1% the year before), four job postings seen in 45 days. `GET /api/v1/accounts/{id}/key-numbers` returned revenue 1700000000 EUR, margin 18, open jobs 4.
+
+That read is a seed fixture. It is not a provider call and not a scrape of a public filing.
+
+| | |
+| --- | --- |
+| Writer | `packages/db/scripts/seed-sweep-09.ts` on [#456](https://github.com/mysticalsin/bidstack-360/pull/456) (`cursor/sweep-09-report-2258`). The file is not on `main`. |
+| Company | `Sweep Sentinel`, entity id `LEI-SWEEP-SENTINEL`. The script refuses `NODE_ENV=production` and `POLO_DATA_MODE=real`. |
+| Revenue and margin | Hardcoded `account_financial_periods` rows. FY2024 revenue `1_700_000_000` EUR, operating income `306_000_000` (18%). FY2023 revenue `1_500_000_000`, operating income `286_500_000` (19.1%). `source` is the string `esef`. `source_url` is `https://example.test/sweep09/sentinel`. Nothing fetches filings.xbrl.org or EDGAR. |
+| Open jobs | Four `company_job_postings` rows titled `Open role 0`–`Open role 3`, `source` string `greenhouse`, `last_seen_at` set to now. Two older rows are outside the 45-day window. Nothing calls Greenhouse. |
+| Reader | `loadKeyNumbers` in `apps/api/src/services/account-positioning/load.ts` via `loadAccountFinancials` in `apps/api/src/routes/account-financials.ts`. The route reads stored periods. The worker can pull EDGAR or ESEF on a schedule, and this seed does not go through that worker. |
+| Not the figure on screen | The same seed writes `company_firmographics.annual_revenue_usd` of `125_000_000_000` for Sweep Sentinel. Filings rank above that cache, so the key-numbers read stays on the 1.7bn EUR row. |
+
+**Not needs Tony for these three numbers.** They are synthetic. New UI for this ask stays on seed values like these. Do not replace them with a live ESEF, EDGAR, or Greenhouse pull.
+
+**Needs Tony:** an approved filings or enrichment source, if the tiles should fill from a real feed in real mode. No provider is added here.
+
+### Sweep 09 leftovers still open
+
+[#456](https://github.com/mysticalsin/bidstack-360/pull/456) recorded these and did not change them. They are still the code on `main`. They are not the Sweep Sentinel filing. Any fix uses the synthetic sweep seed (year `0001-01-01`, the huge org's bids), not a customer book.
+
+| Leftover | APP-FIT | Where |
+| --- | --- | --- |
+| Territories and Service desk empty states are a title and nothing else | FIT | `apps/web/src/pages/territoriesPage/TerritoryPanels.tsx` (`No territories`, and the routing-rules title). `apps/web/src/pages/ServiceDeskPage.tsx` (`No cases yet`). Sweep 09 section 10. |
+| A year-0001 task reads as 739,940 days late | FIT | The seed writes `due_date` `0001-01-01` (`dueDate`, band 9, in `packages/db/scripts/seed-sweep-09.ts`). `apps/web/src/components/task/TaskRow.tsx` renders `Overdue: {{count}}d late` from the day distance. Sweep 09 section 11. |
+| Monthly bars under the hero are still the latest 100 bids | FIT | `apps/web/src/components/dashboard/DashboardVisuals.tsx` sets `months` from `pipelineByCloseMonth(rows)`. Those `rows` are the loaded opportunity page. [#453](https://github.com/mysticalsin/bidstack-360/pull/453) replaced the won-this-year total and left the bars. Sweep 09 section 12. The bars are not labelled as a sample. |
 
 ## P-04 — Preview container boot failures
 
