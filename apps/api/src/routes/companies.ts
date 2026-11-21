@@ -521,18 +521,33 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Company not found');
 
-      await prisma.company.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId },
-        data: { deletedAt: new Date() },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'company.delete',
-          targetType: 'company',
-          targetId: req.params.id,
-        },
+      // company_id has no onDelete action on a soft delete. Clear it in the
+      // same transaction as the tombstone so rollups stop attributing deals
+      // to a deleted account. Tombstoned deals are included: the soft-delete
+      // middleware would otherwise leave their company_id set.
+      await prisma.$transaction(async (tx) => {
+        await tx.opportunity.updateMany({
+          where: { orgId: req.auth.orgId, companyId: existing.id, deletedAt: null },
+          data: { companyId: null },
+        });
+        await tx.opportunity.updateMany({
+          where: { orgId: req.auth.orgId, companyId: existing.id, deletedAt: { not: null } },
+          data: { companyId: null },
+        });
+        const updated = await tx.company.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
+        if (updated.count !== 1) throw server.httpErrors.notFound('Company not found');
+        await tx.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'company.delete',
+            targetType: 'company',
+            targetId: req.params.id,
+          },
+        });
       });
       return reply.code(204).send(null);
     },
