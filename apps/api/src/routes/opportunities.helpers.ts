@@ -5,7 +5,7 @@
  * and are used from create, import, and lead conversion handlers.
  */
 import { Prisma } from '@bidstack/db';
-import { normalizeName } from '@bidstack/shared';
+import { normalizeName, stageOutcome, type StageClassification } from '@bidstack/shared';
 
 type MaxOpportunityCodeRow = {
   maxCode: number | bigint | null;
@@ -118,6 +118,69 @@ export async function resolveCompanyIdByName(
   if (!key) return null;
   const index = await loadCompanyNameIndex(db, orgId);
   return index.get(key) ?? null;
+}
+
+export interface OpportunityListFilter {
+  orgId: string;
+  pipelineStageId?: string;
+  stage?: Prisma.OpportunityWhereInput['stage'];
+  industry?: string;
+  companyId?: string;
+  ownerEmail?: string;
+  search?: string;
+  dueDate?: Prisma.OpportunityWhereInput['dueDate'];
+}
+
+/** The list predicate, without access scope or pagination. The summary uses the same object. */
+export function opportunityListWhere(input: OpportunityListFilter): Prisma.OpportunityWhereInput {
+  return {
+    orgId: input.orgId,
+    deletedAt: null,
+    ...(input.pipelineStageId ? { pipelineStageId: input.pipelineStageId } : {}),
+    ...(input.stage ? { stage: input.stage } : {}),
+    ...(input.industry ? { industry: input.industry } : {}),
+    ...(input.companyId ? { companyId: input.companyId } : {}),
+    ...(input.ownerEmail ? { owner: { email: input.ownerEmail } } : {}),
+    ...(input.dueDate ? { dueDate: input.dueDate } : {}),
+    ...(input.search
+      ? {
+          OR: [
+            { customer: { contains: input.search, mode: 'insensitive' as const } },
+            { name: { contains: input.search, mode: 'insensitive' as const } },
+            { code: { contains: input.search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
+}
+
+type WeightedRow = StageClassification & { valueMicros: bigint; probability: number };
+
+/**
+ * Value × stored probability for open rows. A non-positive probability adds
+ * nothing. Integer division, so a 1% slice of 1 micro is 0.
+ */
+export function matchMicros(rows: readonly WeightedRow[]): {
+  wonMicros: bigint;
+  openMicros: bigint;
+  weightedMicros: bigint;
+} {
+  let wonMicros = 0n;
+  let openMicros = 0n;
+  let weightedMicros = 0n;
+  for (const row of rows) {
+    const outcome = stageOutcome(row);
+    if (outcome === 'won') wonMicros += row.valueMicros;
+    if (outcome === 'open') {
+      openMicros += row.valueMicros;
+      if (row.probability > 0) weightedMicros += (row.valueMicros * BigInt(row.probability)) / 100n;
+    }
+  }
+  return { wonMicros, openMicros, weightedMicros };
+}
+
+export function weightedOpenMicros(rows: readonly WeightedRow[]): bigint {
+  return matchMicros(rows).weightedMicros;
 }
 
 /**

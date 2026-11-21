@@ -43,6 +43,33 @@ export function useOpportunities(filter: Partial<OpportunityFilter> = {}) {
   return query;
 }
 
+export type OpportunityMatchTotals = {
+  count: number;
+  wonMicros: string;
+  openMicros: string;
+  weightedMicros: string;
+};
+
+/** Full totals for the active filter. The list itself is only one cursor page. */
+export function useOpportunityMatchSummary(filter: Partial<OpportunityFilter> | undefined) {
+  return useQuery({
+    enabled: filter !== undefined,
+    queryKey: ['opportunities', 'summary', filter],
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(filter ?? {})) {
+        if (v !== undefined && v !== null && v !== '' && k !== 'cursor' && k !== 'limit') {
+          params.set(k, String(v));
+        }
+      }
+      return api<OpportunityMatchTotals>(`/api/opportunities/summary?${params.toString()}`, {
+        signal,
+      });
+    },
+    staleTime: 0,
+  });
+}
+
 /** Lightweight count for badges / KPIs — avoids fetching 200 rows just for a number. */
 export function useOpportunityCount(opts: { excludeClosed?: boolean } = {}) {
   return useQuery({

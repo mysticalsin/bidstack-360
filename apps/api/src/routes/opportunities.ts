@@ -23,18 +23,55 @@ import {
   QueryBoolean,
 } from '@bidstack/shared';
 
-import {
-  applyOpportunityScope,
-  getAccessScope,
-  scopeCacheTag,
-} from '../lib/access-scope.js';
+import { applyOpportunityScope, getAccessScope, scopeCacheTag } from '../lib/access-scope.js';
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
-import { opportunityDueDateWhere, resolveCompanyIdByName } from './opportunities.helpers.js';
+import {
+  matchMicros,
+  opportunityDueDateWhere,
+  opportunityListWhere,
+  resolveCompanyIdByName,
+} from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
+
+const MATCH_PAGE = 500;
+
+async function sumOpportunityMatch(where: Prisma.OpportunityWhereInput) {
+  let cursor: string | undefined;
+  let count = 0;
+  let wonMicros = 0n;
+  let openMicros = 0n;
+  let weightedMicros = 0n;
+  for (;;) {
+    const page = await prisma.opportunity.findMany({
+      where,
+      select: {
+        id: true,
+        valueMicros: true,
+        probability: true,
+        stage: true,
+        pipelineStage: { select: { isWon: true, isLost: true, deletedAt: true } },
+      },
+      orderBy: { id: 'asc' },
+      take: MATCH_PAGE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    count += page.length;
+    const folded = matchMicros(page);
+    wonMicros += folded.wonMicros;
+    openMicros += folded.openMicros;
+    weightedMicros += folded.weightedMicros;
+    if (page.length < MATCH_PAGE) {
+      return { count, wonMicros, openMicros, weightedMicros };
+    }
+    const last = page[page.length - 1];
+    if (!last) return { count, wonMicros, openMicros, weightedMicros };
+    cursor = last.id;
+  }
+}
 
 export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
   // GET /api/opportunities
@@ -48,8 +85,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
-      const { pipelineStageId, stage, owner, industry, companyId, search, cursor, limit, dueWithinDays, overdue } =
-        req.query;
+      const {
+        pipelineStageId,
+        stage,
+        owner,
+        industry,
+        companyId,
+        search,
+        cursor,
+        limit,
+        dueWithinDays,
+        overdue,
+      } = req.query;
       // M7 access scoping: group-restricted users only see opportunities in
       // their countries (or that they own). See lib/access-scope.ts.
       const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
@@ -58,25 +105,16 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         async () => {
           const items = await prisma.opportunity.findMany({
             where: applyOpportunityScope(
-              {
+              opportunityListWhere({
                 orgId: req.auth.orgId,
-                deletedAt: null,
-                ...(pipelineStageId ? { pipelineStageId } : {}),
-                ...(stage ? { stage } : {}),
-                ...(industry ? { industry } : {}),
-                ...(companyId ? { companyId } : {}),
-                ...(owner ? { owner: { email: owner } } : {}),
-                ...(dueDateFilter ? { dueDate: dueDateFilter } : {}),
-                ...(search
-                  ? {
-                      OR: [
-                        { customer: { contains: search, mode: 'insensitive' } },
-                        { name: { contains: search, mode: 'insensitive' } },
-                        { code: { contains: search, mode: 'insensitive' } },
-                      ],
-                    }
-                  : {}),
-              },
+                pipelineStageId,
+                stage,
+                industry,
+                companyId,
+                ownerEmail: owner,
+                search,
+                dueDate: dueDateFilter,
+              }),
               accessScope,
             ),
             // Explicit select (not include) so the large `intel` JSONB column
@@ -207,6 +245,56 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           return { count };
         },
         { ttlSeconds: 20, tags: ['opportunities-count', scopeCacheTag(accessScope)] },
+      );
+    },
+  );
+
+  // GET /api/opportunities/summary — full filtered totals, not the cursor page.
+  const OpportunityMatchSummary = z.object({
+    count: z.number().int().nonnegative(),
+    wonMicros: z.string().regex(/^\d+$/),
+    openMicros: z.string().regex(/^\d+$/),
+    weightedMicros: z.string().regex(/^\d+$/),
+  });
+  server.get(
+    '/opportunities/summary',
+    {
+      config: { permission: 'opportunities:read' },
+      schema: {
+        querystring: OpportunityFilter.omit({ cursor: true, limit: true }),
+        response: { 200: OpportunityMatchSummary },
+      },
+    },
+    async (req) => {
+      const { pipelineStageId, stage, owner, industry, companyId, search, dueWithinDays, overdue } =
+        req.query;
+      const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
+      const dueDate = opportunityDueDateWhere({ dueWithinDays, overdue }).dueDate;
+      const where = applyOpportunityScope(
+        opportunityListWhere({
+          orgId: req.auth.orgId,
+          pipelineStageId,
+          stage,
+          industry,
+          companyId,
+          ownerEmail: owner,
+          search,
+          dueDate,
+        }),
+        accessScope,
+      );
+      return req.cache(
+        async () => {
+          const totals = await sumOpportunityMatch(where);
+          const text = (value: bigint) => value.toString();
+          return {
+            count: totals.count,
+            wonMicros: text(totals.wonMicros),
+            openMicros: text(totals.openMicros),
+            weightedMicros: text(totals.weightedMicros),
+          };
+        },
+        { ttlSeconds: 20, tags: ['opportunities-summary', scopeCacheTag(accessScope)] },
       );
     },
   );
@@ -402,11 +490,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // clears the stale link so companyId always reflects the current customer.
       let companyIdUpdate: string | null | undefined = undefined;
       if (req.body.customer !== undefined) {
-        companyIdUpdate = await resolveCompanyIdByName(
-          prisma,
-          req.auth.orgId,
-          req.body.customer,
-        );
+        companyIdUpdate = await resolveCompanyIdByName(prisma, req.auth.orgId, req.body.customer);
       }
 
       const dataPatch = {
@@ -537,7 +621,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
 
       if (updated.companyId) {
         const stageName = updated.pipelineStage?.name ?? updated.stage;
-        const ownerNotified = updated.ownerId && updated.ownerId !== req.auth.userId ? [updated.ownerId] : [];
+        const ownerNotified =
+          updated.ownerId && updated.ownerId !== req.auth.userId ? [updated.ownerId] : [];
         if (stageChanged) {
           emitAccountEventSafe({
             orgId: req.auth.orgId,

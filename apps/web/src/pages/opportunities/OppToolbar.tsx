@@ -24,7 +24,7 @@ import { cn } from '@/lib/cn';
 import { formatStage } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 
-import type { Opportunity, PipelineStage } from '@bidstack/shared';
+import { microsToUnits, type Opportunity, type PipelineStage } from '@bidstack/shared';
 
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
@@ -32,64 +32,112 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
  * Headline KPIs. Tenant-wide counts/pipeline come from the server aggregate
  * (`/api/crm/summary`) so they reflect the whole org, not just the current 50-row
  * cursor page — at 100k-company scale a page-derived total under-reports the
- * pipeline by orders of magnitude. Weighted revenue has no server aggregate, so
- * it stays page-derived and is explicitly labelled "(page)" to avoid
- * misrepresenting it as a tenant total.
+ * pipeline by orders of magnitude. A filtered view uses
+ * `/api/opportunities/summary` for every matching row. Until that returns,
+ * and for the unfiltered weighted tile, the figure stays page-derived and
+ * is labelled "(page)".
  */
-export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
+export type OpportunityMatchTotals = {
+  count: number;
+  wonMicros: string;
+  openMicros: string;
+  weightedMicros: string;
+};
+
+export function OppKpiBar({
+  opps,
+  summary,
+  partial = false,
+  match,
+}: {
+  opps: Opportunity[];
+  summary?: OrgSummary;
+  /** True when this cursor page is not the whole filtered result. */
+  partial?: boolean;
+  /** Server totals for the active filter. Present only after that request resolves. */
+  match?: OpportunityMatchTotals;
+}) {
   const { t } = useTranslation('crm');
   const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
   const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
-  const kpis = summary
+  const matchAmount = (micros: string) => formatUnspecifiedAmount(microsToUnits(BigInt(micros)));
+  const kpis = match
     ? [
         {
-          label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
-          value: summary.opportunities.toLocaleString(),
+          label: t('oppToolbar.kpiMatchCount', 'Matching'),
+          value: match.count.toLocaleString(),
         },
         {
-          label: t('oppToolbar.kpiOpenCount', 'Open'),
-          value: summary.openOpportunities.toLocaleString(),
-        },
-        {
-          label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: `${formatUnspecifiedAmount(summary.pipelineValue)}`,
+          label: t('oppToolbar.kpiMatchWon', 'Won'),
+          value: matchAmount(match.wonMicros),
           basis: true,
         },
         {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)}`,
+          label: t('oppToolbar.kpiMatchWeighted', 'Weighted'),
+          value: matchAmount(match.weightedMicros),
+          basis: true,
+        },
+        {
+          label: t('oppToolbar.kpiMatchOpen', 'Open'),
+          value: matchAmount(match.openMicros),
           basis: true,
         },
       ]
-    : [
-        // Fallback before the summary resolves: page-derived totals, all labelled
-        // "(page)" so they are never mistaken for tenant-wide figures.
-        {
-          label: t('oppToolbar.kpiOpportunitiesPage', 'Opportunities (page)'),
-          value: String(opps.length),
-        },
-        {
-          label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
-          value: `${formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0))}`,
-          basis: true,
-        },
-        {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)}`,
-          basis: true,
-        },
-        {
-          label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))}`,
-          basis: true,
-        },
-      ];
+    : summary
+      ? [
+          {
+            label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
+            value: summary.opportunities.toLocaleString(),
+          },
+          {
+            label: t('oppToolbar.kpiOpenCount', 'Open'),
+            value: summary.openOpportunities.toLocaleString(),
+          },
+          {
+            label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
+            value: `${formatUnspecifiedAmount(summary.pipelineValue)}`,
+            basis: true,
+          },
+          {
+            label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
+            value: `${formatUnspecifiedAmount(weighted)}`,
+            basis: true,
+          },
+        ]
+      : [
+          // Fallback before the summary resolves: page-derived totals, all labelled
+          // "(page)" so they are never mistaken for tenant-wide figures.
+          {
+            label: t('oppToolbar.kpiOpportunitiesPage', 'Opportunities (page)'),
+            value: String(opps.length),
+          },
+          {
+            label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
+            value: `${formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0))}`,
+            basis: true,
+          },
+          {
+            label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
+            value: `${formatUnspecifiedAmount(weighted)}`,
+            basis: true,
+          },
+          {
+            label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
+            value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))}`,
+            basis: true,
+          },
+        ];
   return (
     <div
       role="region"
       aria-label={t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')}
       className="grid grid-cols-2 gap-3 sm:grid-cols-4"
     >
+      {!summary && !match && partial ? (
+        <p className="col-span-2 text-sm text-[var(--fg-secondary)] sm:col-span-4">
+          {t('oppToolbar.pageNotFullMatch', 'This page is not the full match.')}
+        </p>
+      ) : null}
       {kpis.map((kpi) => (
         <div
           key={kpi.label}
@@ -177,9 +225,13 @@ export function OppPageHeader({
             </>
           ) : (
             <>
-              {t('oppToolbar.bidsInFlight', '{{count}} bids in flight · click any cell to edit inline.', {
-                count: itemCount,
-              })}
+              {t(
+                'oppToolbar.bidsInFlight',
+                '{{count}} bids in flight · click any cell to edit inline.',
+                {
+                  count: itemCount,
+                },
+              )}
             </>
           )}
         </p>

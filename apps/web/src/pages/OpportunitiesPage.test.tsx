@@ -9,6 +9,7 @@ import { useHasPermission } from '@/hooks/useCapabilities';
 
 vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunities: vi.fn(),
+  useOpportunityMatchSummary: vi.fn(() => ({ data: undefined, isLoading: false })),
   usePatchOpportunity: vi.fn(() => ({ mutate: vi.fn() })),
   useCreateOpportunity: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
