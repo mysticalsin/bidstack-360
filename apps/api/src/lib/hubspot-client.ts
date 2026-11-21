@@ -1,3 +1,5 @@
+import { discardUpstreamBody } from './upstream-body.js';
+
 // HubSpot API v3 client for the migration connector.
 //
 // Why a thin wrapper instead of the official @hubspot/api-client SDK:
@@ -80,8 +82,8 @@ export async function exchangeHubSpotCode(
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`HubSpot token exchange failed (${res.status}): ${body}`);
+    await discardUpstreamBody(res);
+    throw new Error(`HubSpot token exchange failed (${res.status})`);
   }
 
   const data = (await res.json()) as {
@@ -117,8 +119,8 @@ export async function refreshHubSpotToken(
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`HubSpot token refresh failed (${res.status}): ${body}`);
+    await discardUpstreamBody(res);
+    throw new Error(`HubSpot token refresh failed (${res.status})`);
   }
 
   const data = (await res.json()) as {
@@ -171,8 +173,8 @@ async function hubspotFetch<T>(
   }
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`HubSpot API ${res.status} for ${path}: ${body}`);
+    await discardUpstreamBody(res);
+    throw new Error(`HubSpot API ${res.status} for ${path}`);
   }
 
   return res.json() as Promise<T>;

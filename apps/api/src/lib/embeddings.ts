@@ -12,6 +12,7 @@
 
 import crypto from 'node:crypto';
 import { createLogger } from './logger.js';
+import { discardUpstreamBody } from './upstream-body.js';
 
 const log = createLogger({ name: 'embeddings' });
 
@@ -65,8 +66,8 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult> 
   });
 
   if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`Cohere embed API error ${resp.status}: ${body.slice(0, 200)}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Cohere embed API error ${resp.status}`);
   }
 
   // WHY cast: Cohere response shape is stable but fetch returns unknown

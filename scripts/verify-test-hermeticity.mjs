@@ -215,4 +215,13 @@ if (args.has('--selftest')) {
   const result = scanTestHermeticity();
   printResult(result);
   if (!result.ok) process.exitCode = 1;
+  const { scanUpstreamErrorBodies } = await import('./scan-upstream-error-body.mjs');
+  const leaks = scanUpstreamErrorBodies(process.cwd());
+  if (leaks.length > 0) {
+    console.error(`[upstream-body] FAIL found ${leaks.length} provider body leak(s).`);
+    for (const leak of leaks) console.error(`- ${leak.file}:${leak.line} ${leak.message}`);
+    process.exitCode = 1;
+  } else {
+    console.log('[upstream-body] PASS no not-ok branch throws or logs the response body.');
+  }
 }

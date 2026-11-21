@@ -2,6 +2,7 @@
 // Used by migrations.ts (core) and migrations-hubspot.routes.ts.
 
 import {
+  migrationPublicMessage,
   type MigrationJobResponse,
   type MigrationMappingResponse,
   type MigrationJobError,
@@ -35,12 +36,24 @@ export function serializeJob(row: {
     errorRows: row.errorRows,
     startedAt: row.startedAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
-    errorSummary: (row.errorSummary as MigrationJobError[]) ?? [],
+    errorSummary: publicErrorSummary(row.errorSummary),
     meta: (row.meta as Record<string, unknown>) ?? {},
     undoableUntil: row.undoableUntil?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function publicErrorSummary(value: unknown): MigrationJobError[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    const error = (entry ?? {}) as Partial<MigrationJobError>;
+    return {
+      row: typeof error.row === 'number' ? error.row : 0,
+      field: typeof error.field === 'string' ? error.field.slice(0, 100) : null,
+      message: migrationPublicMessage(typeof error.message === 'string' ? error.message : ''),
+    };
+  });
 }
 
 export function serializeMapping(row: {

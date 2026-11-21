@@ -18,6 +18,8 @@
  * encrypted client-side before storage.
  */
 
+import { discardUpstreamBody } from '../../lib/upstream-body.js';
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface TranscriptWord {
@@ -154,8 +156,8 @@ export async function transcribeAudioUrl(
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Deepgram transcription failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Deepgram transcription failed (${resp.status})`);
   }
 
   const data = (await resp.json()) as DeepgramResponse;
@@ -218,8 +220,8 @@ export async function transcribeAudioBuffer(
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Deepgram buffer transcription failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Deepgram buffer transcription failed (${resp.status})`);
   }
 
   const data = (await resp.json()) as DeepgramResponse;

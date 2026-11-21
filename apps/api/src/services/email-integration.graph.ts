@@ -13,6 +13,7 @@ import {
   type ServiceLogger,
 } from './email-integration.helpers.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../lib/upstream-body.js';
 
 // ─── Send via MS Graph ─────────────────────────────────────────────────────────
 
@@ -62,8 +63,8 @@ export async function sendViaMsGraph(
   });
 
   if (!res.ok) {
-    const resBody = await res.text();
-    log.error({ status: res.status, body: resBody }, 'MS Graph sendMail failed');
+    await discardUpstreamBody(res);
+    log.error({ status: res.status }, 'MS Graph sendMail failed');
     throw new Error(`MS Graph sendMail failed: ${res.status}`);
   }
 

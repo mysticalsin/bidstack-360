@@ -11,6 +11,7 @@ import { prisma } from '@bidstack/db';
 import { verifyDustSignature } from '@bidstack/dust-client';
 import { hashWebhookSigningSecret } from '@bidstack/shared/server-crypto';
 
+import { throwIntegrationNotConfigured } from '../lib/integration-not-configured.js';
 import { redis } from '../redis.js';
 
 // Webhook dedup. Redis is authoritative — `SET key 1 EX 7d NX` is the
@@ -133,11 +134,11 @@ export const webhooksRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req, _reply) => {
       const secret = process.env.DUST_WEBHOOK_SECRET;
       if (!secret) {
-        req.log.warn('webhook dropped — DUST_WEBHOOK_SECRET unset');
         // 503 is the right status, but we constrain the response schema to 200
         // for the success case. Throw a sensible 503 instead so the framework
-        // serializes the right shape and our schema stays honest.
-        throw server.httpErrors.serviceUnavailable('DUST_WEBHOOK_SECRET not configured');
+        // serializes the right shape and our schema stays honest. The env var
+        // name stays in the log; this route is unauthenticated.
+        throwIntegrationNotConfigured(req, 'DUST_WEBHOOK_SECRET');
       }
 
       const sig = req.headers['x-dust-signature'];

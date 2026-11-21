@@ -20,6 +20,8 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+import { discardUpstreamBody } from '../../lib/upstream-body.js';
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface ZoomMeeting {
@@ -92,8 +94,8 @@ async function fetchAccessToken(): Promise<string> {
   );
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Zoom token fetch failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Zoom token fetch failed (${resp.status})`);
   }
 
   const data = (await resp.json()) as { access_token: string; expires_in: number };
@@ -141,8 +143,8 @@ export async function createZoomMeeting(params: CreateZoomMeetingParams): Promis
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Zoom createMeeting failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Zoom createMeeting failed (${resp.status})`);
   }
 
   return (await resp.json()) as ZoomMeeting;
@@ -162,8 +164,8 @@ export async function getZoomRecordings(meetingUuid: string): Promise<ZoomRecord
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Zoom getRecordings failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Zoom getRecordings failed (${resp.status})`);
   }
 
   const data = (await resp.json()) as { recording_files?: ZoomRecordingFile[] };

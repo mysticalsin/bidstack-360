@@ -13,6 +13,12 @@ import type { SignatureStatus } from '@bidstack/shared';
 import { buildServer } from '../server.js';
 import { htmlToPdf } from '../services/documents/document.service.js';
 import { SIGN_LINK_TTL_DAYS } from '../services/documents/signature.service.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+  type IsolatedOrg,
+} from '../test-support/isolated-org.js';
 
 vi.mock('../services/documents/document.service.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/documents/document.service.js')>()),
@@ -24,26 +30,31 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('public sign routes', () => {
   let server: Awaited<ReturnType<typeof buildServer>>;
+  let isolated: IsolatedOrg;
+  let restoreAuth: () => void;
   let orgId: string;
   let documentId: string;
   const requestIds: string[] = [];
 
   beforeAll(async () => {
+    isolated = await createIsolatedOrg('public-sign');
+    restoreAuth = useIsolatedOrgAuth(isolated.clerkOrg);
     server = await buildServer();
     await server.ready();
-    const org = await prisma.org.findFirstOrThrow({ where: { clerkOrg: 'org_seed_mantu' } });
-    orgId = org.id;
+    orgId = isolated.orgId;
     const doc = await prisma.document.create({
       data: { orgId, name: `Sign test ${randomUUID().slice(0, 8)}`, kind: 'proposal', storageUrl: 'local://sign-test.pdf' },
     });
     documentId = doc.id;
-  });
+  }, 120_000);
 
   afterAll(async () => {
     await prisma.signatureEvent.deleteMany({ where: { signatureRequestId: { in: requestIds } } });
     await prisma.signatureRequest.deleteMany({ where: { id: { in: requestIds } } });
-    await prisma.document.deleteMany({ where: { id: documentId } });
-    await server.close();
+    if (documentId) await prisma.document.deleteMany({ where: { id: documentId } });
+    if (server) await server.close();
+    restoreAuth?.();
+    if (isolated) await dropIsolatedOrg(isolated.orgId);
   });
 
   async function makeRequest(

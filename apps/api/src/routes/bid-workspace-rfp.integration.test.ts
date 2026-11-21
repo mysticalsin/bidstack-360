@@ -9,31 +9,42 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@bidstack/db';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+  type IsolatedOrg,
+} from '../test-support/isolated-org.js';
 
 describe('bid workspace draft section PATCH', () => {
   let server: Awaited<ReturnType<typeof buildServer>>;
+  let isolated: IsolatedOrg;
+  let restoreAuth: () => void;
   let orgId: string;
   let opportunityId: string;
   const proposalIds: string[] = [];
   const foreignOrgIds: string[] = [];
 
   beforeAll(async () => {
+    isolated = await createIsolatedOrg('bid-workspace-rfp');
+    restoreAuth = useIsolatedOrgAuth(isolated.clerkOrg);
     server = await buildServer();
     await server.ready();
-    const org = await prisma.org.findFirstOrThrow({ where: { clerkOrg: 'org_seed_mantu' } });
-    orgId = org.id;
+    orgId = isolated.orgId;
     const opp = await prisma.opportunity.findFirstOrThrow({
       where: { orgId, deletedAt: null },
       select: { id: true },
     });
     opportunityId = opp.id;
-  });
+  }, 120_000);
 
   afterAll(async () => {
     await prisma.proposalSection.deleteMany({ where: { proposalId: { in: proposalIds } } });
     await prisma.proposal.deleteMany({ where: { id: { in: proposalIds } } });
     await prisma.org.deleteMany({ where: { id: { in: foreignOrgIds } } });
-    await server.close();
+    if (server) await server.close();
+    restoreAuth?.();
+    if (isolated) await dropIsolatedOrg(isolated.orgId);
   });
 
   async function makeProposal(status: 'draft' | 'approved' | 'submitted' | 'won' | 'lost') {
