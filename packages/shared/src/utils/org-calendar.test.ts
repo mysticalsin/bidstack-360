@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { dateOnlyRange, quarterBounds, resolveTimeZone } from './org-calendar.js';
+import {
+  civilDay,
+  civilDayAsUtcDate,
+  dateOnlyRange,
+  isBeforeCivilDay,
+  quarterBounds,
+  resolveTimeZone,
+} from './org-calendar.js';
 
 const SAO_PAULO = 'America/Sao_Paulo';
 
@@ -34,6 +41,16 @@ describe('org calendar quarters', () => {
     expect(range.gte && inside >= range.gte && range.lt && inside < range.lt).toBe(true);
     expect(range.lt && nextDay < range.lt).toBe(false);
     expect(range.gte && previousEvening >= range.gte).toBe(false);
+  });
+
+  it('keeps 22:00 in São Paulo on that civil day, which is 01:00 UTC the next day', () => {
+    // 2026-11-21 01:00 UTC is 2026-11-20 22:00 in America/Sao_Paulo (UTC−3).
+    const evening = new Date('2026-11-21T01:00:00.000Z');
+    expect(civilDay(evening, SAO_PAULO)).toBe('2026-11-20');
+    expect(isBeforeCivilDay('2026-11-20', evening, SAO_PAULO)).toBe(false);
+    expect(isBeforeCivilDay('2026-11-19', evening, SAO_PAULO)).toBe(true);
+    expect(isBeforeCivilDay(null, evening, SAO_PAULO)).toBe(false);
+    expect(civilDayAsUtcDate(evening, SAO_PAULO).toISOString()).toBe('2026-11-20T00:00:00.000Z');
   });
 
   it('falls back when the stored zone is missing or not a real IANA name', () => {
