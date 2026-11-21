@@ -5,6 +5,9 @@
 // (enableOfflineQueue + maxRetriesPerRequest null). The create must now
 // answer inside CREATE_DEADLINE_MS with the company committed and enrichment
 // marked failed when Redis is down, or queued when Redis is up.
+// Named *.integration.test.ts because the unit CI job has no Postgres and
+// excludes that glob. makeSkipIfNoDb throws when the database is unreachable,
+// so this file must run only in the integration job.
 import { randomUUID } from 'node:crypto';
 
 import IORedis from 'ioredis';
