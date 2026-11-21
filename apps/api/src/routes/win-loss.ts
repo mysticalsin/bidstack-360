@@ -11,6 +11,8 @@ import {
   WinLossPatterns,
   WinLossOutcome,
   WinLossReasonCode,
+  dateOnlyRange,
+  quarterBounds,
 } from '@bidstack/shared';
 
 import { visibleOpportunityRelation, visibleOpportunityWhere } from '../lib/visible-opportunity.js';
@@ -112,8 +114,8 @@ interface AnalysisScanRow {
   };
 }
 
-function quarterKey(d: Date): string {
-  return `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`;
+function quarterKey(d: Date, timeZone: string): string {
+  return quarterBounds(d, timeZone).key;
 }
 
 function bump(map: Map<string, { won: number; lost: number }>, key: string, won: boolean): void {
@@ -138,7 +140,11 @@ function serializeRecent(r: AnalysisScanRow): WinLossAnalysisBody['recent'][numb
   };
 }
 
-function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLossAnalysisBody {
+function aggregateAnalysis(
+  rows: AnalysisScanRow[],
+  truncated: boolean,
+  timeZone: string,
+): WinLossAnalysisBody {
   const quarters = new Map<string, { won: number; lost: number }>();
   const reasons = new Map<string, { won: number; lost: number }>();
   const competitors = new Map<string, { won: number; lost: number }>();
@@ -151,7 +157,7 @@ function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLoss
     const won = r.outcome === 'won';
     if (won) totalWon += 1;
     else totalLost += 1;
-    bump(quarters, quarterKey(r.createdAt), won);
+    bump(quarters, quarterKey(r.createdAt, timeZone), won);
     bump(reasons, r.reason, won);
     const competitor = r.competitor?.trim();
     if (competitor) bump(competitors, competitor, won);
@@ -233,14 +239,22 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const { from, to, ownerId } = req.query;
       const scoped = await visibleOpportunityRelation(req.auth);
+      const settings = await prisma.orgSettings.findUnique({
+        where: { orgId: req.auth.orgId },
+        select: { timezone: true },
+      });
+      const timeZone = settings?.timezone;
+      const recorded = dateOnlyRange(from, to, timeZone);
       // Backed by win_loss_records_org_created_idx (orgId, createdAt desc).
+      // Date bounds are the org civil day (#384). The read walks every page
+      // so the total is not the first 1 000 rows.
       const where = {
         orgId: req.auth.orgId,
         ...(from || to
           ? {
               createdAt: {
-                ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
-                ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+                ...(recorded.gte ? { gte: recorded.gte } : {}),
+                ...(recorded.lt ? { lt: recorded.lt } : {}),
               },
             }
           : {}),
@@ -274,7 +288,7 @@ export const winLossRoutes: FastifyPluginAsyncZod = async (server) => {
           select,
         }),
       );
-      return aggregateAnalysis(rows, false);
+      return aggregateAnalysis(rows, false, timeZone ?? 'America/Toronto');
     },
   );
 
