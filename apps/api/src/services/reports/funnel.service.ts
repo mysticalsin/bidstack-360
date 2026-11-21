@@ -1,5 +1,5 @@
 import { Prisma, prisma } from '@bidstack/db';
-import { microsToUnits, quarterBounds, taskOverdueBefore } from '@bidstack/shared';
+import { civilDayAsUtcDate, microsToUnits, quarterBounds } from '@bidstack/shared';
 
 export interface PipelineKpis {
   byStage: Array<{ stage: string; count: number; valueSum: number }>;
@@ -174,7 +174,14 @@ export interface TasksReport {
 }
 
 export async function getTasksReport(orgId: string, now = new Date()): Promise<TasksReport> {
-  const overdueBefore = taskOverdueBefore(now);
+  // Overdue follows the org's civil day, the same calendar as quarter bounds.
+  // 22:00 in America/Sao_Paulo is 01:00 UTC the next day; that evening is still
+  // today locally, so a task due that civil day is not overdue.
+  const settings = await prisma.orgSettings.findUnique({
+    where: { orgId },
+    select: { timezone: true },
+  });
+  const overdueBefore = civilDayAsUtcDate(now, settings?.timezone);
   const [byStatus, total, completed, overdue] = await Promise.all([
     prisma.task.groupBy({
       by: ['status'],
