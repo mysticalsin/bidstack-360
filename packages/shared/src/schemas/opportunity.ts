@@ -22,6 +22,8 @@ export const PipelineStage = z.object({
   color: z.string().nullable(),
   isWon: z.boolean().default(false),
   isLost: z.boolean().default(false),
+  /** Set when the stage row is soft-deleted. A deleted row does not close the deal. */
+  deletedAt: z.string().datetime().nullable().optional(),
 });
 export type PipelineStage = z.infer<typeof PipelineStage>;
 
