@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { readOnlyScopes } from '@bidstack/shared';
 import { encryptToken } from '@bidstack/shared/token-crypto';
+import { oauthFailureFields } from '../../lib/oauth-failure.js';
 import {
   NotConfigured,
   WorkspaceNotConfiguredError,
@@ -141,7 +142,7 @@ export const gmailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (!tokenRes.ok) {
         const body = await tokenRes.text();
-        server.log.error({ status: tokenRes.status, body }, 'Gmail token exchange failed');
+        server.log.error(oauthFailureFields(tokenRes.status, body), 'Gmail token exchange failed');
         return reply.redirect(
           `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=gmail_token_failed`,
         );
