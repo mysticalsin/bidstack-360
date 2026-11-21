@@ -34,7 +34,10 @@ export function useSignatureRequests(filter: Partial<SignatureRequestFilter> = {
       if (filter.cursor) params.set('cursor', filter.cursor);
       if (filter.limit) params.set('limit', String(filter.limit));
       const qs = params.toString();
-      return api<SignatureRequestPage>(`/api/signatures${qs ? `?${qs}` : ''}`, { signal });
+      return api<SignatureRequestPage>(
+        `/api/v1/signatures/requests${qs ? `?${qs}` : ''}`,
+        { signal },
+      );
     },
   });
 }
@@ -44,7 +47,7 @@ export function useSignatureRequests(filter: Partial<SignatureRequestFilter> = {
 export function useSignatureRequest(id: string) {
   return useQuery<SignatureRequest>({
     queryKey: [SIG_KEY, id],
-    queryFn: ({ signal }) => api<SignatureRequest>(`/api/signatures/${id}`, { signal }),
+    queryFn: ({ signal }) => api<SignatureRequest>(`/api/v1/signatures/requests/${id}`, { signal }),
     enabled: Boolean(id),
   });
 }
@@ -62,19 +65,6 @@ export function useSendForSignature() {
       api<SignatureRequest>('/api/v1/signatures/requests', { method: 'POST', body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [SIG_KEY] });
-    },
-  });
-}
-
-// ─── Resend ───────────────────────────────────────────────────────────────────
-
-export function useResendSignature(id: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      api<SignatureRequest>(`/api/signatures/${id}/resend`, { method: 'POST' }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [SIG_KEY, id] });
     },
   });
 }

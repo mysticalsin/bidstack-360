@@ -13,9 +13,13 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 import {
+  SignatureEvent,
+  SignatureRequest,
   SignatureRequestCreate,
+  SignatureRequestFilter,
+  SignatureRequestPage,
   SignatureRequestVoid,
   SignatureStatus,
   SignatureProvider,
@@ -30,38 +34,19 @@ import {
 
 // ─── Response shapes ─────────────────────────────────────────────────────────
 
-const RecipientSchema = z.object({
-  email: z.string(),
-  name: z.string(),
-  role: z.string(),
-  signedAt: z.string().nullable().optional(),
-});
-
-const SignatureRequestResponse = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  documentId: z.string().uuid(),
-  provider: SignatureProvider,
-  providerRequestId: z.string().nullable(),
-  status: SignatureStatus,
-  recipients: z.array(RecipientSchema),
+/** Create still returns the signing link. The shared request schema does not. */
+const SignatureRequestCreated = SignatureRequest.extend({
   signingUrl: z.string().nullable().optional(),
-  sentAt: z.string().nullable(),
-  completedAt: z.string().nullable(),
-  voidedAt: z.string().nullable(),
-  voidReason: z.string().nullable(),
-  completedDocumentS3Key: z.string().nullable(),
-  createdAt: z.string(),
 });
 
-const EventResponse = z.object({
-  id: z.string().uuid(),
-  type: SignatureEventType,
-  recipientEmail: z.string().nullable(),
-  occurredAt: z.string(),
-  ipAddress: z.string().nullable(),
-  payload: z.record(z.unknown()),
-});
+function recipientRole(value: unknown): 'SIGNER' | 'CC' {
+  return String(value ?? '').trim().toUpperCase() === 'CC' ? 'CC' : 'SIGNER';
+}
+
+function isoOrNull(value: unknown): string | null {
+  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) return null;
+  return new Date(value).toISOString();
+}
 
 function serializeRequest(
   row: {
@@ -80,7 +65,7 @@ function serializeRequest(
     createdAt: Date;
   },
   signingUrl?: string,
-): z.infer<typeof SignatureRequestResponse> {
+): z.infer<typeof SignatureRequestCreated> {
   return {
     id: row.id,
     orgId: row.orgId,
@@ -90,11 +75,11 @@ function serializeRequest(
     status: row.status as z.infer<typeof SignatureStatus>,
     recipients: (row.recipients as Array<Record<string, unknown>>).map((r) => ({
       email: String(r['email'] ?? ''),
-      name: String(r['name'] ?? ''),
-      role: String(r['role'] ?? 'signer'),
-      signedAt: r['signedAt'] ? String(r['signedAt']) : null,
+      name: String(r['name'] ?? 'Signer'),
+      role: recipientRole(r['role']),
+      signedAt: isoOrNull(r['signedAt']),
     })),
-    signingUrl: signingUrl ?? null,
+    ...(signingUrl !== undefined ? { signingUrl } : {}),
     sentAt: row.sentAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
     voidedAt: row.voidedAt?.toISOString() ?? null,
@@ -133,31 +118,37 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { permission: 'documents:read' },
       schema: {
-        querystring: z.object({
-          status: SignatureStatus.optional(),
-          documentId: z.string().uuid().optional(),
-          recipientEmail: z.string().email().optional(),
-          page: z.coerce.number().int().min(1).default(1),
-          limit: z.coerce.number().int().min(1).max(100).default(20),
+        // limit is a number on the shared filter and a string on the query
+        // string. Coerce it; every other field is the shared schema.
+        querystring: SignatureRequestFilter.extend({
+          limit: z.coerce.number().int().min(1).max(100).default(25),
         }),
-        response: {
-          200: z.object({
-            items: z.array(SignatureRequestResponse),
-            total: z.number().int(),
-          }),
-        },
+        response: { 200: SignatureRequestPage },
       },
     },
     async (req, reply) => {
       const { orgId } = req.auth;
-      const { status, documentId, recipientEmail, page, limit } = req.query;
-      const skip = (page - 1) * limit;
+      const { status, recipientEmail, dateFrom, dateTo, cursor, limit } = req.query;
+      if (cursor && !z.string().uuid().safeParse(cursor).success) {
+        throw server.httpErrors.badRequest('Invalid cursor');
+      }
+      const createdAt: Prisma.DateTimeFilter = {};
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        if (Number.isNaN(from.getTime())) throw server.httpErrors.badRequest('Invalid dateFrom');
+        createdAt.gte = from;
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        if (Number.isNaN(to.getTime())) throw server.httpErrors.badRequest('Invalid dateTo');
+        createdAt.lte = to;
+      }
 
       const where = {
         orgId,
         deletedAt: null,
         ...(status ? { status } : {}),
-        ...(documentId ? { documentId } : {}),
+        ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
         // Filter by recipient email uses JSON contains — only supported on pg with jsonb
         ...(recipientEmail
           ? {
@@ -169,17 +160,24 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
           : {}),
       };
 
-      const [items, total] = await Promise.all([
+      const [rows, total] = await Promise.all([
         prisma.signatureRequest.findMany({
           where,
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: limit,
+          // createdAt is not unique. id keeps a tied pair on one page only.
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: limit + 1,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         }),
         prisma.signatureRequest.count({ where }),
       ]);
+      const hasMore = rows.length > limit;
+      const page = hasMore ? rows.slice(0, limit) : rows;
 
-      return reply.send({ items: items.map((r) => serializeRequest(r)), total });
+      return reply.send({
+        items: page.map((r) => serializeRequest(r)),
+        nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+        total,
+      });
     },
   );
 
@@ -195,7 +193,7 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         body: SignatureRequestCreate,
         response: {
-          201: SignatureRequestResponse,
+          201: SignatureRequestCreated,
         },
       },
     },
@@ -224,8 +222,8 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: {
-          200: SignatureRequestResponse.extend({
-            events: z.array(EventResponse),
+          200: SignatureRequest.extend({
+            events: z.array(SignatureEvent),
           }),
         },
       },
@@ -249,11 +247,19 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
         ...serializeRequest(request),
         events: request.events.map((e) => ({
           id: e.id,
+          signatureRequestId: e.signatureRequestId,
           type: e.type as z.infer<typeof SignatureEventType>,
-          recipientEmail: e.recipientEmail,
+          recipientEmail:
+            e.recipientEmail && z.string().email().safeParse(e.recipientEmail).success
+              ? e.recipientEmail
+              : null,
           occurredAt: e.occurredAt.toISOString(),
           ipAddress: e.ipAddress,
-          payload: e.payload as Record<string, unknown>,
+          userAgent: e.userAgent,
+          payload:
+            e.payload && typeof e.payload === 'object' && !Array.isArray(e.payload)
+              ? (e.payload as Record<string, unknown>)
+              : {},
         })),
       });
     },
