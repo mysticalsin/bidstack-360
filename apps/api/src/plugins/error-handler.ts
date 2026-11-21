@@ -13,6 +13,15 @@ import { clientAbortLogFields, isExpectedClientAbortError } from '../lib/http-cl
 import { isOAuthRefreshLockError } from '../lib/oauth-refresh-lock.js';
 import { captureSentryServerError } from './sentry.js';
 
+function isFrameworkValidation(err: FastifyError): boolean {
+  if (err.code === 'FST_ERR_VALIDATION') return true;
+  return Array.isArray(err.validation);
+}
+
+function isFrameworkPayloadTooLarge(err: FastifyError): boolean {
+  return err.code === 'FST_ERR_CTP_BODY_TOO_LARGE';
+}
+
 function stampDeliberate503(err: unknown): void {
   if (typeof err === 'object' && err !== null) {
     Object.defineProperty(err, DELIBERATE_503, { value: true });
@@ -64,13 +73,20 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       });
     }
 
-    if (err instanceof ZodError) {
-      req.log.warn({ issues: err.issues }, 'validation failed');
+    if (err instanceof ZodError || isFrameworkValidation(err)) {
+      // The compiler message is "body/name Required" / "Expected array, received
+      // string". Log the detail; the client only gets a stable code.
+      req.log.warn(
+        {
+          issues: err instanceof ZodError ? err.issues : err.validation,
+        },
+        'validation failed',
+      );
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
+        code: 'validation',
         message: 'Validation failed',
-        issues: err.issues,
       });
     }
 
@@ -145,12 +161,20 @@ const plugin: FastifyPluginAsync = fp(async (server) => {
       });
     }
 
+    if (isFrameworkPayloadTooLarge(err)) {
+      return reply.status(413).send({
+        statusCode: 413,
+        error: 'Payload Too Large',
+        code: 'payload_too_large',
+        message: 'That upload is too large.',
+      });
+    }
+
     if (err.statusCode && err.statusCode < 500) {
       // WHY: 4xx errors are application-generated (route handlers, httpErrors.*).
-      // Unlike 5xx errors — which may contain DB connection strings, stack traces,
-      // or ORM internals — 4xx messages are always crafted by our own code and are
-      // safe to return verbatim. Exposing them gives API callers actionable feedback
-      // (e.g. "Unknown permissionId(s): ...") without leaking internals.
+      // Framework schema failures and the default body-limit error are handled
+      // above. What remains was written by our own code and is safe to return
+      // verbatim (e.g. "Unknown permissionId(s): ...").
       return reply.status(err.statusCode).send({
         statusCode: err.statusCode,
         error: err.name,
