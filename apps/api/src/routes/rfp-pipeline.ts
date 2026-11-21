@@ -24,7 +24,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
-import { proposalFrom } from '@bidstack/shared';
+import { isIllegalTransition, proposalFrom, rfpTransition } from '@bidstack/shared';
 import { logAiInvocation } from '../lib/ai-audit.js';
 import {
   RfpOrchestrateLoopPolicyError,
@@ -549,11 +549,21 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const orchestration = await prisma.rfpOrchestration.findFirst({
         where: { id: orchestrationId, orgId, deletedAt: null },
-        select: { id: true, state: true, proposalId: true, documentVersionId: true },
+        select: {
+          id: true,
+          state: true,
+          proposalId: true,
+          documentVersionId: true,
+          completedPhases: true,
+        },
       });
       if (!orchestration) throw server.httpErrors.notFound('RFP orchestration not found');
 
-      if (orchestration.state !== 'awaiting_approval') {
+      if (
+        isIllegalTransition(
+          rfpTransition(orchestration.state, 'resume_drafting', orchestration.completedPhases),
+        )
+      ) {
         throw server.httpErrors.conflict(
           `Pipeline is not awaiting drafting approval. Current state: '${orchestration.state}'`,
         );
@@ -576,13 +586,23 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
         : [];
       const requirementIds = requirements.map((req) => req.id);
 
-      // Resume pipeline state to 'running'
-      await prisma.$executeRaw`
+      // Compare-and-set. A final approval that lands between the read and this
+      // write must not be pulled back to running, and the final gate
+      // (qa_review already done) is not a drafting resume.
+      const resumed = await prisma.$executeRaw`
         UPDATE rfp_orchestrations
         SET state = 'running',
             updated_at = now()
-        WHERE id = ${orchestration.id}::uuid AND org_id = ${orgId}::uuid
+        WHERE id = ${orchestration.id}::uuid
+          AND org_id = ${orgId}::uuid
+          AND state = 'awaiting_approval'
+          AND NOT ('qa_review' = ANY(completed_phases))
       `;
+      if (resumed !== 1) {
+        throw server.httpErrors.conflict(
+          'RFP orchestration changed state during drafting approval; please retry',
+        );
+      }
 
       let jobsDispatched = 0;
       for (const section of sections) {
