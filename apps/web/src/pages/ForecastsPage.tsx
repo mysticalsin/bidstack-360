@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogTrigger } from '@/components/ui/Dialog';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
@@ -21,6 +20,7 @@ import { staggerChild, staggerParent } from '@/lib/motion';
 import type { Forecast } from '@bidstack/shared';
 
 import { ForecastChart } from './forecasts/ForecastChart';
+import { PeriodChoice } from './forecasts/PeriodChoice';
 import { ForecastProjection } from './forecasts/ForecastProjection';
 import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
@@ -217,15 +217,17 @@ export function ForecastsPage() {
 
       {/* ── Period filter ── */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
-        <Tabs value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
-          <TabsList aria-label={t('forecasts.periodFilterLabel', 'Period filter')}>
-            <TabsTrigger value="monthly">{t('forecasts.periodMonthly', 'Monthly')}</TabsTrigger>
-            <TabsTrigger value="quarterly">
-              {t('forecasts.periodQuarterly', 'Quarterly')}
-            </TabsTrigger>
-            <TabsTrigger value="yearly">{t('forecasts.periodYearly', 'Yearly')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <PeriodChoice
+          label={t('forecasts.periodFilterLabel', 'Period filter')}
+          name="forecast-period-filter"
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          options={[
+            { value: 'monthly', label: t('forecasts.periodMonthly', 'Monthly') },
+            { value: 'quarterly', label: t('forecasts.periodQuarterly', 'Quarterly') },
+            { value: 'yearly', label: t('forecasts.periodYearly', 'Yearly') },
+          ]}
+        />
       </motion.div>
 
       {totalsNote ? (

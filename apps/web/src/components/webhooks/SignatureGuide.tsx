@@ -69,7 +69,11 @@ export function SignatureGuide() {
         </div>
 
         <div className="relative">
-          <pre className="max-h-[420px] overflow-auto rounded-xl bg-[var(--surface-sunken)] p-4 text-xs leading-relaxed text-[var(--fg-primary)]">
+          <pre
+            tabIndex={0}
+            aria-label={t('signatureGuide.codeRegion', 'Signature verification example')}
+            className="max-h-[420px] overflow-auto rounded-xl bg-[var(--surface-sunken)] p-4 text-xs leading-relaxed text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+          >
             <code>{SIGNATURE_SNIPPETS[lang]}</code>
           </pre>
           <button

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { EmptyState, LoadingSkeleton, ErrorState } from '@/components/ui/StateMessages';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { PeriodChoice } from './PeriodChoice';
 import {
   Table,
   TableHeader,
@@ -78,15 +78,13 @@ export function ForecastProjection() {
             format={fmtCompact}
             onActivate={(i) => setSelected(bars.periods[i]?.period ?? null)}
           />
-          <Tabs value={activePeriod.period} onValueChange={setSelected}>
-            <TabsList aria-label={t('forecastProjection.periodLabel', 'Forecast period')}>
-              {periods.map((p) => (
-                <TabsTrigger key={p.period} value={p.period}>
-                  {p.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <PeriodChoice
+            label={t('forecastProjection.periodLabel', 'Forecast period')}
+            name="forecast-projection-period"
+            value={activePeriod.period}
+            onChange={setSelected}
+            options={periods.map((p) => ({ value: p.period, label: p.label }))}
+          />
 
           <ProjectionTotals period={activePeriod} formatMoneyMicros={formatMoneyMicros} t={t} />
           <ProjectionOwnerTable period={activePeriod} formatMoneyMicros={formatMoneyMicros} t={t} />

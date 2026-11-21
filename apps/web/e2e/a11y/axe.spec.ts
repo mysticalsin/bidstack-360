@@ -36,6 +36,20 @@ const ROUTES = [
   { name: 'search', path: '/search' },
   { name: 'intake', path: '/intake' },
   { name: 'new-lead', path: '/leads/new' },
+  // Detail and settings surfaces the list routes do not render: the notes
+  // editor, the custom-field select, the import file input, forecast period
+  // controls, the reference table, the identity definition list, the webhook
+  // code sample, and the public booking calendar.
+  { name: 'contact-detail', path: '/contacts/00000000-0000-4000-8000-0000000000aa' },
+  { name: 'lead-detail', path: '/leads/00000000-0000-4000-8000-000000000101' },
+  { name: 'opportunity-detail', path: '/opportunities/9e962498-dfe1-4006-953c-6e48f932d56d' },
+  { name: 'settings-crm', path: '/settings?tab=crm' },
+  { name: 'settings-data-import', path: '/settings?tab=data-import' },
+  { name: 'settings-webhooks', path: '/settings?tab=webhooks' },
+  { name: 'settings-identity', path: '/settings?tab=identity' },
+  { name: 'references', path: '/references' },
+  { name: 'forecasts', path: '/forecasts' },
+  { name: 'public-booking', path: '/book/test-slug' },
 ] as const;
 
 /** Impact levels that fail the build — critical and serious are spec-mandated. */
