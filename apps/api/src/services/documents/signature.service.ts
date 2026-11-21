@@ -19,6 +19,7 @@
  */
 
 import { createHmac, createSign, randomBytes } from 'node:crypto';
+import { oauthFailureMessage } from '../../lib/oauth-failure.js';
 import type { FastifyError } from 'fastify';
 import pino from 'pino';
 import { prisma, type Prisma } from '@bidstack/db';
@@ -109,7 +110,7 @@ async function getDocuSignAccessToken(): Promise<string> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw credentialError(`DocuSign OAuth token exchange failed: ${res.status} ${body}`);
+    throw credentialError(oauthFailureMessage('DocuSign', res.status, body));
   }
 
   const json = (await res.json()) as { access_token: string; expires_in: number };

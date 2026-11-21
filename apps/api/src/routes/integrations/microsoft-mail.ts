@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { prisma, IntegrationProvider } from '@bidstack/db';
 import { readOnlyScopes } from '@bidstack/shared';
 import { encryptToken } from '@bidstack/shared/token-crypto';
+import { oauthFailureFields } from '../../lib/oauth-failure.js';
 import { outlookHistoricalQueue } from '../../queues/email-outlook.js';
 import { emailDomainForTelemetry } from '../../lib/email-privacy.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
@@ -141,7 +142,10 @@ export const microsoftMailOAuthRoutes: FastifyPluginAsync = async (server) => {
 
       if (!tokenRes.ok) {
         const body = await tokenRes.text();
-        server.log.error({ status: tokenRes.status, body }, 'MS Graph token exchange failed');
+        server.log.error(
+          oauthFailureFields(tokenRes.status, body),
+          'MS Graph token exchange failed',
+        );
         return reply.redirect(
           `${process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173'}/settings?tab=integrations&error=outlook_token_failed`,
         );
