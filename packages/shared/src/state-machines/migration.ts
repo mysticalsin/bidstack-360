@@ -21,6 +21,18 @@ export const MIGRATION_ROWS_EXPIRED = 'rows_expired';
 /** Stored when a chunk conflict is not going to be retried. */
 export const MIGRATION_CONFLICT = 'import_conflict';
 
+/** 409 when retry loses the race and the job is no longer FAILED. Not an error to show. */
+export const MIGRATION_NO_LONGER_FAILED = 'Migration job is no longer failed';
+
+/** Stable code on that 409. The client matches this, not the sentence. */
+export const RETRY_LOST = 'RETRY_LOST';
+
+/**
+ * Audit action written when cancel cannot take the job-row lock within its
+ * wait. The chunk reads this and stops. It does not lock migration_jobs.
+ */
+export const MIGRATION_CANCEL_REQUESTED = 'migration.cancel.requested';
+
 /** Stored when a later page could not be queued after some rows were saved. */
 export const MIGRATION_ENQUEUE_STOPPED = 'enqueue_stopped';
 

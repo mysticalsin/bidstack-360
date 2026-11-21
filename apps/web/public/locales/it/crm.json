@@ -1166,6 +1166,8 @@
       "statusStalled": "Importazione bloccata",
       "reasonStalled": "L'importazione si è bloccata prima di salvare le righe.",
       "reasonEnqueue": "L'importazione non è partita. Riprova.",
+      "reasonCouldNotQueue": "Non è stato possibile mettere l'importazione in coda. Riprova.",
+      "reasonAlreadyRunning": "Questa importazione è già in corso.",
       "reasonRowsExpired": "Quelle righe sono scadute. Carica di nuovo il file.",
       "reasonConflict": "L'importazione è entrata in conflitto con un'altra scrittura.",
       "reasonEnqueueStopped": "L'importazione si è fermata prima di salvare le righe rimanenti.",

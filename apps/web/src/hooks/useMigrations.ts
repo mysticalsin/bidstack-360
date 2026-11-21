@@ -13,6 +13,7 @@ export interface MigrationJobError {
 
 export interface MigrationJob {
   id: string;
+  orgId?: string;
   source: string;
   status: MigrationStatus;
   totalRows: number;
@@ -27,6 +28,8 @@ export interface MigrationJob {
   updatedAt: string;
   /** Derived by GET. The worker is what persists FAILED. */
   stalled?: boolean;
+  /** On the cancel response, and on the polled job while the mark is pending. */
+  cancelRequested?: boolean;
 }
 
 export interface StartCsvImportInput {

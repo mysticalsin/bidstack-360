@@ -1,15 +1,21 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const i18nState = vi.hoisted(() => ({
+  t: (key: string, fallback: string, vars?: Record<string, unknown>) => {
+    void key;
+    if (!vars) return fallback;
+    return Object.entries(vars).reduce(
+      (out, [name, value]) => out.replace(`{{${name}}}`, String(value)),
+      fallback,
+    );
+  },
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback: string, vars?: Record<string, unknown>) => {
-      if (!vars) return fallback;
-      return Object.entries(vars).reduce(
-        (out, [k, v]) => out.replace(`{{${k}}}`, String(v)),
-        fallback,
-      );
-    },
+    t: (key: string, fallback: string, vars?: Record<string, unknown>) =>
+      i18nState.t(key, fallback, vars),
   }),
 }));
 
@@ -24,6 +30,7 @@ const hookMocks = vi.hoisted(() => ({
   usePreviewCsvImport: vi.fn(),
   useParseSpreadsheet: vi.fn(),
   useMigrationJob: vi.fn(),
+  useMigrations: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
   downloadMigrationErrors: vi.fn(),
 }));
 
@@ -34,6 +41,7 @@ vi.mock('@/hooks/useMigrations', () => ({
   usePreviewCsvImport: hookMocks.usePreviewCsvImport,
   useParseSpreadsheet: hookMocks.useParseSpreadsheet,
   useMigrationJob: hookMocks.useMigrationJob,
+  useMigrations: hookMocks.useMigrations,
   downloadMigrationErrors: hookMocks.downloadMigrationErrors,
 }));
 
@@ -54,10 +62,13 @@ async function uploadFile(text: string) {
   await screen.findByText(/rows?\. Match each column/);
 }
 
+const defaultTranslate = i18nState.t;
+
 describe('CsvImportWizard', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    i18nState.t = defaultTranslate;
   });
 
   function stubHooks() {
@@ -82,7 +93,23 @@ describe('CsvImportWizard', () => {
     hookMocks.useParseSpreadsheet.mockReturnValue({
       mutateAsync: vi.fn(),
     });
-    hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false });
+    hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false, isError: false });
+    hookMocks.useMigrations.mockReturnValue({ data: [], isLoading: false, isError: false });
+  }
+
+  function runningJob(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'job-1',
+      orgId: 'org-a',
+      status: 'RUNNING',
+      totalRows: 120,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [],
+      createdAt: '2026-11-20T00:00:00.000Z',
+      cancelRequested: true,
+      ...overrides,
+    };
   }
 
   it('auto-maps recognizable headers and blocks preview while a required target field is unmapped', async () => {
@@ -256,7 +283,175 @@ describe('CsvImportWizard', () => {
     });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel import' })).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
-    expect(hookMocks.cancelMutate).toHaveBeenCalledWith('job-1');
+    expect(hookMocks.cancelMutate).toHaveBeenCalledTimes(1);
+    expect(hookMocks.cancelMutate.mock.calls[0]?.[0]).toBe('job-1');
+  });
+
+  it('shows Cancelling while a locked cancel is only requested', async () => {
+    // WHY: a 200 with the job still running looked like Cancel did nothing.
+    // The locked branch says cancel was requested, and the button keeps the
+    // translated Cancelling sentence until the poll reaches a final status.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'RUNNING',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel import' }));
+    const [, opts] = hookMocks.cancelMutate.mock.calls[0]!;
+    opts.onSuccess({ id: 'job-1', status: 'RUNNING', cancelRequested: true });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancelling…' })).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
+  });
+
+  it('a reload and a second tab show Cancelling, then Import cancelled', async () => {
+    // WHY: the job id lived only in this component. A reload and a second
+    // tab opened on Upload and never asked for the job, so a cancel finished
+    // unseen.
+    sessionStorage.clear();
+    stubHooks();
+    const job = runningJob();
+    render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm import' }));
+    const [, startOpts] = hookMocks.mutate.mock.calls[0]!;
+    startOpts.onSuccess({ id: 'job-1', orgId: 'org-a' });
+    hookMocks.useMigrationJob.mockReturnValue({ data: job, isLoading: false, isError: false });
+    hookMocks.useMigrations.mockReturnValue({ data: [job], isLoading: false, isError: false });
+
+    cleanup();
+    sessionStorage.setItem(
+      'bidstack.csvImport.activeJob',
+      JSON.stringify({ orgId: 'org-a', jobId: 'job-1', cancelRequested: false }),
+    );
+    const reloaded = render(<CsvImportWizard />);
+    const cancelling = await screen.findByRole('button', { name: 'Cancelling…' });
+    expect(cancelling).toHaveProperty('disabled', true);
+
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: { ...job, status: 'CANCELLED', cancelRequested: false },
+      isLoading: false,
+      isError: false,
+    });
+    hookMocks.useMigrations.mockReturnValue({
+      data: [{ ...job, status: 'CANCELLED', cancelRequested: false }],
+      isLoading: false,
+      isError: false,
+    });
+    reloaded.rerender(<CsvImportWizard />);
+    expect(await screen.findByText('Import cancelled')).toBeTruthy();
+
+    cleanup();
+    sessionStorage.clear();
+    hookMocks.useMigrationJob.mockReturnValue({ data: job, isLoading: false, isError: false });
+    hookMocks.useMigrations.mockReturnValue({ data: [job], isLoading: false, isError: false });
+    render(<CsvImportWizard />);
+    const second = await screen.findByRole('button', { name: 'Cancelling…' });
+    expect(second).toHaveProperty('disabled', true);
+    expect(hookMocks.cancelMutate).not.toHaveBeenCalled();
+  });
+
+  it('a stored cancel flag does not override the server, and a foreign id returns to upload', async () => {
+    // WHY: sessionStorage is only a pointer. Cancel state comes from the
+    // server. An id for another org, or one the server no longer has, must
+    // not open the progress step.
+    sessionStorage.clear();
+    stubHooks();
+    const serverJob = runningJob({ cancelRequested: false });
+    sessionStorage.setItem(
+      'bidstack.csvImport.activeJob',
+      JSON.stringify({ orgId: 'org-a', jobId: 'job-1', cancelRequested: true }),
+    );
+    hookMocks.useMigrations.mockReturnValue({ data: [serverJob], isLoading: false, isError: false });
+    hookMocks.useMigrationJob.mockReturnValue({ data: serverJob, isLoading: false, isError: false });
+    render(<CsvImportWizard />);
+    expect(await screen.findByRole('button', { name: 'Cancel import' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancelling…' })).toBeNull();
+
+    cleanup();
+    sessionStorage.setItem(
+      'bidstack.csvImport.activeJob',
+      JSON.stringify({ orgId: 'org-b', jobId: 'job-foreign', cancelRequested: true }),
+    );
+    hookMocks.useMigrations.mockReturnValue({
+      data: [{ ...serverJob, id: 'done', status: 'COMPLETE' }],
+      isLoading: false,
+      isError: false,
+    });
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: runningJob({ id: 'job-foreign', orgId: 'org-b' }),
+      isLoading: false,
+      isError: false,
+    });
+    render(<CsvImportWizard />);
+    expect(await screen.findByText('Choose a CSV or Excel file')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancelling…' })).toBeNull();
+
+    cleanup();
+    sessionStorage.setItem(
+      'bidstack.csvImport.activeJob',
+      JSON.stringify({ orgId: 'org-a', jobId: 'job-gone' }),
+    );
+    hookMocks.useMigrations.mockReturnValue({ data: [], isLoading: false, isError: false });
+    hookMocks.useMigrationJob.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+    render(<CsvImportWizard />);
+    expect(await screen.findByText('Choose a CSV or Excel file')).toBeTruthy();
+  });
+
+  it('a cancel that finds the import already finished shows Import complete', async () => {
+    // WHY: every row was committed before cancel was applied. The job is
+    // complete. The wizard must not say the import was cancelled or that
+    // the click failed.
+    stubHooks();
+    hookMocks.useCancelMigration.mockReturnValue({
+      mutate: hookMocks.cancelMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('This import already finished.', 409, { code: 'IMPORT_FINISHED' }),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'COMPLETE',
+      totalRows: 1,
+      processedRows: 1,
+      errorRows: 0,
+      errorSummary: [],
+    });
+    expect(await screen.findByText('Import complete')).toBeTruthy();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+    expect(screen.queryByText('Import cancelled')).toBeNull();
+  });
+
+  it('disables Cancel when the polled job already has cancelRequested and nobody clicked', async () => {
+    // WHY: cancelRequested lived only in this tab's React state. A reload or
+    // a second tab polled a job that was already pending cancel and still
+    // offered Cancel.
+    stubHooks();
+    await reachRun({
+      id: 'job-1',
+      status: 'RUNNING',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [],
+      cancelRequested: true,
+    });
+    const button = await screen.findByRole('button', { name: 'Cancelling…' });
+    expect(button).toHaveProperty('disabled', true);
+    expect(hookMocks.cancelMutate).not.toHaveBeenCalled();
   });
 
   it('offers retry only after a failure that imported nothing', async () => {
@@ -274,7 +469,8 @@ describe('CsvImportWizard', () => {
     await waitFor(() => expect(screen.getByText('The import did not start. Try again.')).toBeTruthy());
     expect(screen.queryByText('enqueue_failed')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry import' }));
-    expect(hookMocks.retryMutate).toHaveBeenCalledWith('job-1');
+    expect(hookMocks.retryMutate).toHaveBeenCalledTimes(1);
+    expect(hookMocks.retryMutate.mock.calls[0]?.[0]).toBe('job-1');
     expect(screen.queryByRole('button', { name: 'Cancel import' })).toBeNull();
   });
 
@@ -655,5 +851,235 @@ describe('CsvImportWizard', () => {
     fireEvent.click(confirm);
     fireEvent.click(confirm);
     expect(hookMocks.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('two Retry clicks send one request and show no error when the job is no longer failed', async () => {
+    // WHY: a double click raced two retries. The loser got 409 because the
+    // winner had already moved the job, and that raw English was shown in red
+    // on a job that had completed.
+    stubHooks();
+    const view = render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const [, opts] = hookMocks.mutate.mock.calls[0]!;
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'FAILED',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        errorSummary: [{ row: 0, field: null, message: 'enqueue_failed' }],
+      },
+      isLoading: false,
+    });
+    opts.onSuccess({ id: 'job-1' });
+
+    const retry = await screen.findByRole('button', { name: 'Retry import' });
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+    expect(hookMocks.retryMutate).toHaveBeenCalledTimes(1);
+
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('retry lost', 409, { code: 'RETRY_LOST' }),
+    });
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'COMPLETE',
+        totalRows: 1,
+        processedRows: 1,
+        errorRows: 0,
+        errorSummary: [],
+      },
+      isLoading: false,
+    });
+    view.rerender(<CsvImportWizard />);
+    expect(screen.queryByText('Migration job is no longer failed')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('a losing retry that finds the job running leaves no alert after import complete', async () => {
+    // WHY: the early 409 has no code, so the wizard shows "That did not work"
+    // in red while the winning retry is still running and after it completes.
+    stubHooks();
+    const view = render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const [, opts] = hookMocks.mutate.mock.calls[0]!;
+    const lost = new ApiError('This import cannot be retried. Start it again from the file.', 409, {
+      code: 'RETRY_LOST',
+    });
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: lost,
+    });
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'RUNNING',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        errorSummary: [],
+      },
+      isLoading: false,
+    });
+    opts.onSuccess({ id: 'job-1' });
+    view.rerender(<CsvImportWizard />);
+    await waitFor(() => expect(screen.getByText('Importing…')).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'COMPLETE',
+        totalRows: 1,
+        processedRows: 1,
+        errorRows: 0,
+        errorSummary: [],
+      },
+      isLoading: false,
+    });
+    view.rerender(<CsvImportWizard />);
+    await waitFor(() => expect(screen.getByText('Import complete')).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+    expect(screen.queryByText('This import cannot be retried. Start it again from the file.')).toBeNull();
+  });
+
+  it('shows the job failure when the other retry lost and the winner did not enqueue', async () => {
+    // WHY: hiding the loser's 409 must not hide the failure the winner stored
+    // when the queue refused the new attempt. The match is the stable code.
+    stubHooks();
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('retry lost', 409, { code: 'RETRY_LOST' }),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'enqueue_failed' }],
+    });
+    await waitFor(() =>
+      expect(screen.getByText('The import did not start. Try again.')).toBeTruthy(),
+    );
+    expect(screen.queryByText('Migration job is no longer failed')).toBeNull();
+    expect(screen.queryByText('That did not work. Try again.')).toBeNull();
+  });
+
+  it('shows a 409 in the active locale when that text is not the server sentence', async () => {
+    // WHY: the English fallback equals the server string, so returning
+    // error.message still passed. The French copy does not.
+    i18nState.t = (key, fallback, vars) => {
+      if (key === 'csvImport.progress.reasonCouldNotQueue') {
+        return "L'importation n'a pas pu être mise en file. Réessayez.";
+      }
+      return defaultTranslate(key, fallback, vars);
+    };
+    stubHooks();
+    hookMocks.useRetryMigration.mockReturnValue({
+      mutate: hookMocks.retryMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError('The import could not be queued. Try again.', 409, null),
+    });
+    await reachRun({
+      id: 'job-1',
+      status: 'FAILED',
+      stalled: true,
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      errorSummary: [{ row: 0, field: null, message: 'stale' }],
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByText("L'importation n'a pas pu être mise en file. Réessayez."),
+      ).toBeTruthy(),
+    );
+    expect(screen.queryByText('The import could not be queued. Try again.')).toBeNull();
+  });
+
+  it('a second tap after Retry does not cancel the import', async () => {
+    // WHY: Retry and Cancel occupy the same spot. Once the job is running the
+    // second tap of a double-tap hits Cancel.
+    stubHooks();
+    const view = render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+    fireEvent.click(screen.getByRole('button', { name: /Preview \d+ rows?/ }));
+    const [, previewOpts] = hookMocks.previewMutate.mock.calls[0]!;
+    previewOpts.onSuccess({
+      entityType: 'company',
+      rowCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      issues: [],
+      sample: [],
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm import' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const [, opts] = hookMocks.mutate.mock.calls[0]!;
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'FAILED',
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        errorSummary: [{ row: 0, field: null, message: 'enqueue_failed' }],
+      },
+      isLoading: false,
+    });
+    opts.onSuccess({ id: 'job-1' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry import' }));
+    hookMocks.useMigrationJob.mockReturnValue({
+      data: {
+        id: 'job-1',
+        status: 'RUNNING',
+        totalRows: 120,
+        processedRows: 0,
+        errorRows: 0,
+        errorSummary: [],
+      },
+      isLoading: false,
+    });
+    view.rerender(<CsvImportWizard />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
+    expect(hookMocks.cancelMutate).not.toHaveBeenCalled();
   });
 });

@@ -341,10 +341,18 @@ async function resolveStubAuth(req: FastifyRequest): Promise<AuthContext> {
     return resolveStubRoleOverride(req, org.id, roleOverride);
   }
 
-  const user = await prisma.user.findFirst({
-    where: { orgId: org.id },
-    orderBy: { createdAt: 'asc' },
-  });
+  // The oldest row is not safe. A role-header user created in an earlier
+  // org keeps that createdAt when the header moves them here, and would
+  // become the default session. The seeded visitor is the admin.
+  const user =
+    (await prisma.user.findFirst({
+      where: { orgId: org.id, role: 'admin' },
+      orderBy: { createdAt: 'asc' },
+    })) ??
+    (await prisma.user.findFirst({
+      where: { orgId: org.id },
+      orderBy: { createdAt: 'asc' },
+    }));
   if (!user) {
     throw req.server.httpErrors.serviceUnavailable('Stub auth: no seed user — run `pnpm db:seed`');
   }

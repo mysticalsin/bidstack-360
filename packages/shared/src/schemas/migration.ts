@@ -64,6 +64,12 @@ export const MigrationJobResponse = z.object({
   updatedAt: z.string().datetime(),
   /** Derived on GET list and GET detail. Not a stored status. Absent on write responses. */
   stalled: z.boolean().optional(),
+  /**
+   * True when a cancel mark is waiting on the chunk. Set on the 202 from
+   * Cancel, and derived on GET list and GET detail so another tab sees it.
+   * Absent when no mark is pending.
+   */
+  cancelRequested: z.boolean().optional(),
 });
 export type MigrationJobResponse = z.infer<typeof MigrationJobResponse>;
 

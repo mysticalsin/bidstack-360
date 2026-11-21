@@ -1251,6 +1251,8 @@
       "statusStalled": "Importation bloquée",
       "reasonStalled": "L'importation s'est bloquée avant l'enregistrement des lignes.",
       "reasonEnqueue": "L'importation n'a pas démarré. Réessayez.",
+      "reasonCouldNotQueue": "L'importation n'a pas pu être mise en file. Réessayez.",
+      "reasonAlreadyRunning": "Cette importation est déjà en cours.",
       "reasonRowsExpired": "Ces lignes ont expiré. Téléversez à nouveau le fichier.",
       "reasonConflict": "L'importation a rencontré un conflit avec une autre écriture.",
       "reasonEnqueueStopped": "L'importation s'est arrêtée avant l'enregistrement des lignes restantes.",
