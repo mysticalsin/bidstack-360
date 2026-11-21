@@ -177,6 +177,30 @@ describe('deployment environment', () => {
     refusal(result, 'unknown-deployment');
   });
 
+  it('resolves a production host signal to production when NODE_ENV is missing', () => {
+    expect(transition('resolve-deployment', { env: { VERCEL_ENV: 'production' } })).toMatchObject({
+      ok: true,
+      deployment: 'production',
+    });
+    const booted = transition('boot', { env: { VERCEL_ENV: 'production', POLO_DATA_MODE: 'demo' } });
+    expect(booted.ok).toBe(false);
+    if (!booted.ok) expect(booted.guards).toContain('stub-in-production');
+  });
+
+  it('refuses POLO_DEPLOYMENT_ENV=local plus NODE_ENV=production', () => {
+    const result = transition('resolve-deployment', {
+      env: { POLO_DEPLOYMENT_ENV: 'local', NODE_ENV: 'production' },
+    });
+    refusal(result, 'local-claim-in-production');
+  });
+
+  it('refuses an inherited object key as a deployment value', () => {
+    const result = transition('resolve-deployment', {
+      env: { POLO_DEPLOYMENT_ENV: 'toString', NODE_ENV: 'development' },
+    });
+    refusal(result, 'preview-without-explicit-env');
+  });
+
   it('lets the explicit deployment value win over NODE_ENV', () => {
     expect(
       transition('resolve-deployment', { env: { POLO_DEPLOYMENT_ENV: 'local', NODE_ENV: 'production' } }),
@@ -317,6 +341,36 @@ describe('boot guards', () => {
       },
     });
     refusal(access, 'demo-door-with-cf-access');
+  });
+
+  it('treats a whitespace-only clerk secret as missing', () => {
+    const result = transition('boot', {
+      env: { CLERK_SECRET_KEY: '   ', NODE_ENV: 'production', POLO_DATA_MODE: 'real', POLO_DEPLOYMENT_ENV: 'production' },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.guards).toContain('real-without-auth');
+  });
+
+  it('requires the public deployment ack when the resolved deployment is production', () => {
+    const refused = transition('boot', {
+      env: {
+        DEMO_MODE: 'true',
+        POLO_DATA_MODE: 'demo',
+        POLO_DEPLOYMENT_ENV: 'production',
+        NODE_ENV: 'production',
+      },
+    });
+    refusal(refused, 'demo-door-without-ack');
+    const allowed = transition('boot', {
+      env: {
+        DEMO_MODE: 'true',
+        POLO_DATA_MODE: 'demo',
+        POLO_DEPLOYMENT_ENV: 'production',
+        NODE_ENV: 'production',
+        DEMO_PUBLIC_DEPLOYMENT_ACK: 'true',
+      },
+    });
+    expect(allowed.ok).toBe(true);
   });
 
   it('refuses Clerk and Cloudflare Access together', () => {
