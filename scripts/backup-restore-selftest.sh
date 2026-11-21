@@ -41,7 +41,7 @@ dump="$(ls -1 "$workdir"/polo-*.dump | head -n 1)"
 
 createdb_from "$dst"
 export POLO_RESTORE_DATABASE_URL="$dst_url"
-bash "$(dirname "$0")/restore-postgres.sh" "$dump"
+bash "$(dirname "$0")/restore-postgres.sh" -- "$dump"
 
 src_count="$(psql "$src_url" -tAc 'select count(*) from polo_selftest')"
 dst_count="$(psql "$dst_url" -tAc 'select count(*) from polo_selftest')"

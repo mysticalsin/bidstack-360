@@ -40,6 +40,9 @@ deploy-evidence/
 trace_extracted/
 *.err
 
+# Local pg_dump files from `pnpm db:backup`. These hold tenant rows.
+var/backups/
+
 # Logs
 logs/
 *.log
