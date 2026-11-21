@@ -9,8 +9,9 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { useCreateMeeting } from '@/hooks/useMeetingIntel';
 import { ApiError } from '@/lib/api';
 import { lines, parseAttendees } from '@/lib/meeting-intel/client';
+import { formatPlainDate, plainDateFromLocalDate } from '@/lib/plain-date';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => formatPlainDate(plainDateFromLocalDate(new Date()));
 
 export function LogMeetingDialog({ open, onOpenChange, companyId, companyName, onCreated }: {
   open: boolean; onOpenChange: (o: boolean) => void; companyId: string; companyName?: string; onCreated?: (id: string) => void;

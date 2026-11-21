@@ -22,6 +22,7 @@ import { useDeleteLead, useLeads, useUpdateLeadById } from '@/hooks/useLeads';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
+import { localPlainDateOfInstant } from '@/lib/plain-date';
 import { LeadStatus, LeadPriority } from '@bidstack/shared';
 import { LeadRow } from './leadsPage/LeadRow';
 
@@ -196,7 +197,7 @@ export function LeadsPage() {
         priority: l.priority,
         score: l.score.toString(),
         source: l.source ?? '',
-        createdAt: l.createdAt.slice(0, 10),
+        createdAt: localPlainDateOfInstant(l.createdAt) ?? '',
       })),
       [
         { key: 'name', label: t('leads.csv.name', 'Name') },
@@ -265,7 +266,7 @@ export function LeadsPage() {
                   status: l.status,
                   score: l.score,
                   source: l.source ?? '',
-                  createdAt: l.createdAt.slice(0, 10),
+                  createdAt: localPlainDateOfInstant(l.createdAt) ?? '',
                 })),
                 [
                   { key: 'name', label: t('leads.csv.name', 'Name') },

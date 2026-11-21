@@ -1,7 +1,17 @@
-const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+import { formatPlainDateDisplay, isDateOnlyString } from '@/lib/plain-date';
 
-/** Short UTC date, or null. */
-export const fmtDate = (iso: string | null | undefined): string | null => (iso ? dateFmt.format(new Date(iso)) : null);
+const instantFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const civilDisplay = { day: 'numeric', month: 'short', year: 'numeric' } as const;
+
+/** Calendar day for a date-only string; UTC civil day for an instant. */
+export const fmtDate = (iso: string | null | undefined): string | null => {
+  if (!iso) return null;
+  if (isDateOnlyString(iso)) {
+    const shown = formatPlainDateDisplay(iso, 'en-GB', civilDisplay);
+    return shown === '—' ? null : shown;
+  }
+  return instantFmt.format(new Date(iso));
+};
 
 /** The URL when it is http or https, else undefined, so stored links can never run script. */
 export function safeHref(url: string | null | undefined): string | undefined {

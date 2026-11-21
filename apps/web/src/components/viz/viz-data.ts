@@ -1,5 +1,6 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
+import { chronologicalKey, civilParts, daysUntilPlainDate } from '@/lib/plain-date';
 import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -40,10 +41,12 @@ const isClosed = (o: OppRow) => isWon(o) || isLost(o);
 /** When a closed bid closed: closedAt when recorded, else its due date. */
 export const closeDate = (o: OppRow): string | null => o.closedAt ?? o.dueDate;
 
-/** Dates are calendar days: bucket on the UTC date so "2026-10-01" stays in Q4. */
+/** Dates are calendar days. A date-only string keeps its written quarter; an instant keeps its UTC day so "2026-10-01T00:00:00Z" stays in Q4. */
 export function quarterOf(iso: string): string {
-  const d = new Date(iso);
-  return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
+  const parts = civilParts(iso);
+  const monthIndex = parts ? parts.month - 1 : Number.NaN;
+  const year = parts ? parts.year : Number.NaN;
+  return `Q${Math.floor(monthIndex / 3) + 1} ${year}`;
 }
 
 export function stageFunnel(rows: OppRow[]) {
@@ -65,9 +68,9 @@ export function winRateByQuarter(rows: OppRow[]) {
     const at = isClosed(o) ? closeDate(o) : null;
     if (!at) continue;
     const q = quarterOf(at);
-    const cur = by.get(q) ?? { won: 0, lost: 0, t: new Date(at).getTime() };
+    const cur = by.get(q) ?? { won: 0, lost: 0, t: chronologicalKey(at) };
     if (isWon(o)) cur.won += 1; else cur.lost += 1;
-    cur.t = Math.min(cur.t, new Date(at).getTime());
+    cur.t = Math.min(cur.t, chronologicalKey(at));
     by.set(q, cur);
   }
   return [...by.entries()]
@@ -86,7 +89,7 @@ export function wonByQuarter(rows: OppRow[]) {
     const at = closeDate(o);
     if (!at) continue;
     const q = quarterOf(at);
-    const cur = by.get(q) ?? { v: 0, t: new Date(at).getTime() };
+    const cur = by.get(q) ?? { v: 0, t: chronologicalKey(at) };
     cur.v += o.value ?? 0;
     by.set(q, cur);
   }
@@ -98,11 +101,11 @@ const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC
 export function cumulativeWon(rows: OppRow[]) {
   const won = rows.filter(isWon).map((o) => ({ at: closeDate(o), v: o.value ?? 0 })).filter((r): r is { at: string; v: number } => Boolean(r.at));
   if (!won.length) return [];
-  const year = Math.max(...won.map((r) => new Date(r.at).getUTCFullYear()));
-  const lastMonth = Math.max(...won.filter((r) => new Date(r.at).getUTCFullYear() === year).map((r) => new Date(r.at).getUTCMonth()));
+  const year = Math.max(...won.map((r) => civilParts(r.at)?.year ?? Number.NaN));
+  const lastMonth = Math.max(...won.filter((r) => civilParts(r.at)?.year === year).map((r) => (civilParts(r.at)?.month ?? 1) - 1));
   let run = 0;
   return Array.from({ length: lastMonth + 1 }, (_, m) => {
-    run += won.filter((r) => { const d = new Date(r.at); return d.getUTCFullYear() === year && d.getUTCMonth() === m; }).reduce((n, r) => n + r.v, 0);
+    run += won.filter((r) => { const d = civilParts(r.at); return d?.year === year && d.month - 1 === m; }).reduce((n, r) => n + r.v, 0);
     const date = new Date(year, m, 1); // local midnight, for axis display only
     return { x: monFmt.format(date), date, y: run };
   });
@@ -125,12 +128,18 @@ export function accountBars(rows: OppRow[], n = 6) {
 
 /** Open bids whose due date has already passed. */
 export function pastDueOpen(rows: OppRow[], now = Date.now()) {
-  return rows.filter((o) => !isClosed(o) && o.dueDate && new Date(o.dueDate).getTime() < now);
+  const at = new Date(now);
+  return rows.filter((o) => {
+    if (isClosed(o) || !o.dueDate) return false;
+    const days = daysUntilPlainDate(o.dueDate, at);
+    if (days !== null) return days < 0;
+    return new Date(o.dueDate).getTime() < now;
+  });
 }
 
 /** Running win rate after each closed bid, in close order (sparkline). */
 export function runningWinRate(rows: OppRow[]) {
-  const closed = rows.filter((o) => isClosed(o) && closeDate(o)).sort((a, b) => new Date(closeDate(a)!).getTime() - new Date(closeDate(b)!).getTime());
+  const closed = rows.filter((o) => isClosed(o) && closeDate(o)).sort((a, b) => chronologicalKey(closeDate(a)!) - chronologicalKey(closeDate(b)!));
   let won = 0;
   return closed.map((o, i) => { if (isWon(o)) won += 1; return Math.round((won / (i + 1)) * 100); });
 }

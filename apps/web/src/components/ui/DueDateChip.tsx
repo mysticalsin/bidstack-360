@@ -18,6 +18,7 @@ import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
+import { daysUntilPlainDate } from '@/lib/plain-date';
 
 export type DueDateUrgency = 'none' | 'neutral' | 'warning' | 'danger';
 
@@ -35,18 +36,14 @@ export interface DueDateUrgencyInfo {
 const WARNING_WINDOW_DAYS = 7;
 
 /**
- * Whole calendar days from `now` to `dueDateIso`, UTC-bounded. dueDate is a
- * Postgres `date` (midnight UTC, no zone) — comparing on the UTC day (not raw
- * elapsed ms) keeps "today" / "7 days out" stable across the viewer's local
- * timezone and time-of-day. Mirrors
- * apps/worker/src/queues/bid-deadline-alerts.helpers.ts's daysUntilDue;
- * duplicated (not imported) because apps/web cannot depend on apps/worker.
+ * Whole calendar days from the viewer's local day to a date-only due date.
+ * dueDate is a civil day (YYYY-MM-DD), not UTC midnight — comparing elapsed
+ * ms flagged "due today" as overdue for most of that day west of UTC, and
+ * the printed date slipped to the day before. The name is kept so every
+ * surface still shares this one count.
  */
 export function daysUntilDueUtc(dueDateIso: string, now: Date = new Date()): number {
-  const due = new Date(dueDateIso);
-  const nowDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const dueDay = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
-  return Math.round((dueDay - nowDay) / 86_400_000);
+  return daysUntilPlainDate(dueDateIso, now) ?? Number.NaN;
 }
 
 /**

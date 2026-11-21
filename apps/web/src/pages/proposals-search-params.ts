@@ -20,6 +20,7 @@
 
 import type { ProposalStatus } from '@/components/rfp/shared/ProposalStatusChip';
 import type { StatusTone } from '@/components/table-kit/status-indicator';
+import { daysUntilPlainDate } from '@/lib/plain-date';
 import {
   ALL_SEGMENT,
   createListSearchParams,
@@ -96,18 +97,14 @@ export const proposalsSearchParams = createListSearchParams<'status', ProposalFa
   pageSize: 25,
 });
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /**
  * Which deadline bucket a proposal sits in. Compared date-only: a bid due today
  * is "this week", not "overdue", whatever the clock says.
  */
 export function dueWindowOf(dueDate: string | null, now: Date = new Date()): DueWindow {
   if (!dueDate) return 'none';
-  const due = Date.parse(`${dueDate}T00:00:00`);
-  if (Number.isNaN(due)) return 'none';
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const days = Math.round((due - today) / DAY_MS);
+  const days = daysUntilPlainDate(dueDate, now);
+  if (days === null) return 'none';
   if (days < 0) return 'overdue';
   if (days <= 7) return 'week';
   if (days <= 30) return 'month';

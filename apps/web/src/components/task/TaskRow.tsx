@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/Toast';
 import { useUpdateTask } from '@/hooks/useTasks';
 import { cn } from '@/lib/cn';
 import { daysUntil, formatDate } from '@/lib/format';
+import { formatPlainDate, plainDateFromLocalDate } from '@/lib/plain-date';
 
 import type { Task } from '@bidstack/shared';
 
@@ -124,18 +125,15 @@ export const TaskRow = memo(function TaskRow({
 
   const snoozeOptions = () => {
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    const nextWeek = new Date(now);
-    nextWeek.setDate(now.getDate() + 7);
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const plusDays = (days: number) => {
+      const next = new Date(now);
+      next.setDate(now.getDate() + days);
+      return formatPlainDate(plainDateFromLocalDate(next));
+    };
     return [
-      { label: t('taskRow.snooze.tomorrow', 'Tomorrow'), value: iso(tomorrow) },
-      {
-        label: t('taskRow.snooze.inThreeDays', 'In 3 days'),
-        value: iso(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)),
-      },
-      { label: t('taskRow.snooze.nextWeek', 'Next week'), value: iso(nextWeek) },
+      { label: t('taskRow.snooze.tomorrow', 'Tomorrow'), value: plusDays(1) },
+      { label: t('taskRow.snooze.inThreeDays', 'In 3 days'), value: plusDays(3) },
+      { label: t('taskRow.snooze.nextWeek', 'Next week'), value: plusDays(7) },
     ];
   };
 

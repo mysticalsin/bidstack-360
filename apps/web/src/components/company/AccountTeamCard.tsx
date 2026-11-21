@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useAccountTeam, useRemoveTeamMember } from '@/hooks/useAccountTeam';
 import { useHasPermission } from '@/hooks/useCapabilities';
+import { formatPlainDateDisplay } from '@/lib/plain-date';
 
 import { ROLE_LABELS } from './accountTeam';
 import { AccountTeamMemberDialog } from './AccountTeamMemberDialog';
@@ -18,12 +19,7 @@ function initials(name: string | null, email: string | null): string {
 }
 
 function day(iso: string): string {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  return formatPlainDateDisplay(iso, 'en-US');
 }
 
 function dateRange(m: AccountTeamMember): string | null {

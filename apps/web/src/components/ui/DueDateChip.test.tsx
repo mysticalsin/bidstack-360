@@ -57,9 +57,11 @@ describe('dueDateUrgency boundaries', () => {
     expect(info.tone).toBe('tomato');
   });
 
-  it('is stable across time-of-day — 11pm vs 1am on the due date both read as "today"', () => {
-    const lateNight = new Date('2026-07-10T23:45:00.000Z');
-    const earlyMorning = new Date('2026-07-10T00:15:00.000Z');
+  it('is stable across local time-of-day — late evening and early morning on the due date both read as today', () => {
+    // Local constructors, not UTC instants: 00:15Z on the due date is still
+    // the previous evening in São Paulo, and that must not count as overdue.
+    const lateNight = new Date(2026, 6, 10, 23, 45, 0);
+    const earlyMorning = new Date(2026, 6, 10, 0, 15, 0);
     expect(daysUntilDueUtc('2026-07-10', lateNight)).toBe(0);
     expect(daysUntilDueUtc('2026-07-10', earlyMorning)).toBe(0);
   });

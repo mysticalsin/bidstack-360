@@ -12,6 +12,7 @@ import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { fmtMoney } from '@/components/financials/financials-format';
 import { useAccountPositioning } from '@/hooks/useAccountPositioning';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
+import { formatPlainDateDisplay, isDateOnlyString } from '@/lib/plain-date';
 
 const CONF_LABEL: Record<PositioningPlay['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
 const CONF_BARS: Record<PositioningPlay['confidence'], number> = { high: 3, medium: 2, low: 1 };
@@ -27,7 +28,11 @@ const KIND_LABEL: Record<EvidenceChip['kind'], string> = {
 };
 const SEN_LABEL: Record<string, string> = { c_level: 'C-level', vp: 'VP', director: 'Director', manager: 'Manager', ic: 'Individual contributor', unknown: 'Level unknown' };
 const dateFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
-const fmtDate = (iso: string | null) => (iso ? dateFmt.format(new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso)) : null);
+const fmtDate = (iso: string | null) => {
+  if (!iso) return null;
+  if (isDateOnlyString(iso)) return formatPlainDateDisplay(iso, 'en-GB', { month: 'short', year: 'numeric' });
+  return dateFmt.format(new Date(iso));
+};
 
 function Chip({ e }: { e: EvidenceChip }) {
   const ext = Boolean(e.url);
