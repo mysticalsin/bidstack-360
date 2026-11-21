@@ -45,9 +45,20 @@ const project = (id: string, confidence: 'high' | 'medium' | 'low') => ({
   method: 'rules',
 });
 
+async function setDemoFixture(orgId: string, on: boolean) {
+  await prisma.orgSettings.upsert({
+    where: { orgId },
+    create: { orgId, demoData: on },
+    update: { demoData: on, deletedAt: null },
+  });
+}
+
 beforeAll(async () => {
   prevRoleHeader = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
   process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+  // Explicit demo process. Stub auth cannot boot when the process is real.
+  process.env.POLO_DATA_MODE = 'demo';
+  process.env.POLO_DEPLOYMENT_ENV = 'local';
   orgA = await createIsolatedOrg('enr-a');
   orgB = await createIsolatedOrg('enr-b');
   restoreAuth = useIsolatedOrgAuth(orgA.clerkOrg);
@@ -101,6 +112,7 @@ beforeAll(async () => {
       { orgId: orgB.orgId, provider: 'apollo', operation: 'organizations.enrich', credits: 50, at: new Date() },
     ],
   });
+  await setDemoFixture(orgA.orgId, true);
   server = await buildServer();
   await server.ready();
 });
@@ -152,10 +164,33 @@ describe('GET /companies/:id/enrichment', () => {
     expect(audit).toMatchObject({ targetType: 'company', userId: adminId });
   });
 
-  it('a never-enriched company answers not_enriched and stale', async () => {
+  it('a never-enriched company answers not_enriched and stale when the demo-data fixture is on', async () => {
+    // WHY: demo mode still says the account has not been enriched. Real mode
+    // must not reuse that status, so this expectation stays on the fixture.
+    await setDemoFixture(orgA.orgId, true);
     const res = await call('GET', `/companies/${c.bare}/enrichment`);
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: 'not_enriched', employeeCount: null, industries: [], openJobs: 0, stale: true, fetchedAt: null });
+  });
+
+  it('a never-enriched company answers not_connected in real mode', async () => {
+    await setDemoFixture(orgA.orgId, false);
+    try {
+      const res = await call('GET', `/companies/${c.bare}/enrichment`);
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        status: 'not_connected',
+        employeeCount: null,
+        industries: [],
+        openJobs: 0,
+        stale: true,
+        fetchedAt: null,
+      });
+      const refresh = await call('POST', `/companies/${c.bare}/enrichment/refresh`);
+      expect(refresh.json()).toMatchObject({ queued: true, status: 'not_connected' });
+    } finally {
+      await setDemoFixture(orgA.orgId, true);
+    }
   });
 
   it('Read-Only (companies:read) can read', async () => {
@@ -219,6 +254,7 @@ describe('POST /companies/:id/enrichment/refresh', () => {
     expect(queued).toEqual([{ kind: 'enrich', orgId: orgA.orgId, companyId: c.fr, force: true, requestedById: adminId }]);
     const audit = await prisma.auditLog.findFirst({ where: { orgId: orgA.orgId, action: 'enrichment.refresh', targetId: c.fr } });
     expect(audit?.diff).toMatchObject({ force: true, queued: true });
+    await setDemoFixture(orgA.orgId, true);
     expect((await call('POST', `/companies/${c.bare}/enrichment/refresh`)).json()).toMatchObject({ queued: true, status: 'not_enriched' });
     clearRbacDecisionCacheForTest();
     expect((await call('POST', `/companies/${c.fr}/enrichment/refresh`, { payload: {}, role: 'read-only' })).statusCode).toBe(403);

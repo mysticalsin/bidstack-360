@@ -26,6 +26,10 @@
       "types": "./dist/server/index.d.ts",
       "default": "./dist/server/index.js"
     },
+    "./runtime-mode": {
+      "types": "./dist/runtime-mode/index.d.ts",
+      "default": "./dist/runtime-mode/index.js"
+    },
     "./public-sector": {
       "types": "./dist/public-sector/index.d.ts",
       "default": "./dist/public-sector/index.js"

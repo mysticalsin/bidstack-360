@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const ORIGINAL_ENV = { ...process.env };
 const COMPLETE_PRODUCTION_ENV = {
   NODE_ENV: 'production',
+  POLO_DEPLOYMENT_ENV: 'production',
+  POLO_DATA_MODE: 'real',
+  CLERK_SECRET_KEY: 'clerk-test-key',
   STORAGE_DRIVER: 's3',
   S3_BUCKET: 'bidstack-prod-files',
   S3_REGION: 'us-east-1',
@@ -126,6 +129,8 @@ describe('boot environment validation', () => {
   it('requires an explicit acknowledgement before public demo mode can run in production', async () => {
     const productionDemo = {
       NODE_ENV: 'production',
+      POLO_DEPLOYMENT_ENV: 'production',
+      POLO_DATA_MODE: 'demo',
       STORAGE_DRIVER: 'local',
       STORAGE_SCAN_REQUIRED: 'true',
       INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
@@ -253,13 +258,12 @@ describe('boot environment validation', () => {
     expect(env.BIDSTACK_TENANT_SCOPE_GUARD).toBe('warn');
   });
 
-  it('defaults to demo data mode and refuses real mode without an identity source', async () => {
-    const env = await loadEnvWith({});
-    expect(env.POLO_DATA_MODE).toBe('demo');
-    expect(env.CF_ACCESS_AUTH).toBe('false');
-
-    await expect(loadEnvWith({ POLO_DATA_MODE: 'real' })).rejects.toThrow(
-      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true',
+  it('defaults to real data and refuses stub auth when no provider is configured', async () => {
+    await expect(
+      loadEnvWith({ POLO_DATA_MODE: undefined, POLO_DEPLOYMENT_ENV: undefined, NODE_ENV: 'test' }),
+    ).rejects.toThrow('Stub auth cannot boot with real data');
+    await expect(loadEnvWith({ POLO_DATA_MODE: 'demo', NODE_ENV: 'production', POLO_DEPLOYMENT_ENV: 'production' })).rejects.toThrow(
+      'Stub auth cannot boot in production',
     );
   });
 

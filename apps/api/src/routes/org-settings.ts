@@ -19,7 +19,12 @@ import {
   type StageGateMode,
   OpportunityFilterRules,
   OpportunityFilterRulesUpdate,
+  OrgDemoDataSettings,
+  OrgDemoDataSettingsUpdate,
+  transition,
 } from '@bidstack/shared';
+
+import { demoDataActor, orgDemoDataEnabled } from '../lib/runtime-request.js';
 
 function parseAppModules(value: unknown): AppModules {
   const parsed = AppModules.safeParse(value ?? {});
@@ -316,6 +321,66 @@ export const orgSettingsRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       });
       return residencyView(req.body.region);
+    },
+  );
+
+  // Demo data is off until an owner or a system Admin turns it on.
+  // Members cannot read the switch. The machine is the guard.
+  server.get(
+    '/org-settings/demo-data',
+    {
+      // settings:write is the owner/Admin grant. The machine still refuses
+      // a member or an API key that reaches the handler.
+      config: { permission: 'settings:write' },
+      schema: { response: { 200: OrgDemoDataSettings } },
+    },
+    async (req) => {
+      const actor = await demoDataActor(req);
+      const decision = transition('toggle-demo-data', {
+        actor,
+        orgDemoData: false,
+        next: false,
+        processData: req.server.runtimeMode.processData,
+        rows: [],
+      });
+      if (!decision.ok) throw server.httpErrors.forbidden(decision.error);
+      return { demoData: await orgDemoDataEnabled(req.auth.orgId) };
+    },
+  );
+
+  server.put(
+    '/org-settings/demo-data',
+    {
+      config: { permission: 'settings:write' },
+      schema: { body: OrgDemoDataSettingsUpdate, response: { 200: OrgDemoDataSettings } },
+    },
+    async (req) => {
+      const actor = await demoDataActor(req);
+      const current = await orgDemoDataEnabled(req.auth.orgId);
+      const decision = transition('toggle-demo-data', {
+        actor,
+        orgDemoData: current,
+        next: req.body.demoData,
+        processData: req.server.runtimeMode.processData,
+        rows: [],
+      });
+      if (!decision.ok) throw server.httpErrors.forbidden(decision.error);
+      await prisma.orgSettings.upsert({
+        where: { orgId: req.auth.orgId },
+        create: { orgId: req.auth.orgId, demoData: req.body.demoData },
+        update: { demoData: req.body.demoData, deletedAt: null },
+      });
+      await prisma.auditLog.create({
+        data: {
+          orgId: req.auth.orgId,
+          userId: req.auth.userId,
+          action: 'org_settings.demo_data.update',
+          targetType: 'org_settings',
+          targetId: req.auth.orgId,
+          diff: { demoData: req.body.demoData },
+        },
+      });
+      return { demoData: req.body.demoData };
     },
   );
 };

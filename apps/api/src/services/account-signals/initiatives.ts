@@ -13,6 +13,7 @@ import {
 } from '@bidstack/shared';
 
 import type { AccessScope } from '../../lib/access-scope.js';
+import { showsDemoNumbers } from '../../lib/runtime-request.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
 import { groupMap } from './load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from './live-signals.js';
@@ -29,6 +30,8 @@ export async function loadInitiatives(
 ): Promise<Initiative[]> {
   const ids = (await groupMap(orgId, [company.id])).get(company.id) ?? [company.id];
   const live = await companiesWithLiveSignals(orgId, ids);
+  const demo = await showsDemoNumbers(orgId);
+  const sampleGate = demo ? hideSampleWhere(live) : { sample: false as const };
   const [firmo, events, solutions, meetings] = await Promise.all([
     prisma.companyFirmographics.findFirst({
       where: { orgId, companyId: company.id },
@@ -40,7 +43,7 @@ export async function loadInitiatives(
         companyId: { in: ids },
         status: { not: 'DISMISSED' },
         occurredAt: { gte: new Date(now.getTime() - 365 * DAY) },
-        ...hideSampleWhere(live),
+        ...sampleGate,
         kind: {
           in: [
             'STRATEGIC_INITIATIVE',

@@ -13,6 +13,7 @@ export * from './tech-stack/index.js';
 export * from './bid-classification/index.js';
 export * from './stage-transitions/index.js';
 export * from './state-machines/index.js';
+export * from './runtime-mode/index.js';
 // OAuth refresh lock uses node:crypto. It stays behind '@bidstack/shared/server'
 // and must never enter the web bundle.
 export * from './document-category.js';

@@ -2,14 +2,28 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// No provider configured locally: the API says so, and the cards show Sample data.
+// The API status is not_configured in every case. Sample figures are legal
+// only when the server-resolved data mode is demo.
+const resolved = vi.hoisted(() => ({ dataMode: 'demo' as 'demo' | 'real' }));
+
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
   api: vi.fn(async () => ({ companyId: 'acct-1', status: 'not_configured', stale: false, providers: {}, provenance: {} })),
 }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ isSignedIn: true }),
+}));
+vi.mock('@/hooks/usePoloIdentity', () => ({
+  usePoloMe: () => ({
+    data: { dataMode: resolved.dataMode },
+    isLoading: false,
+    isFetched: true,
+    isError: false,
+  }),
+}));
 
 import { mockEnrichment } from '@/lib/enrichment/mock';
 
@@ -23,6 +37,9 @@ function wrap(ui: ReactNode, path = '/accounts/acct-1') {
 }
 
 describe('enrichment cards', () => {
+  beforeEach(() => {
+    resolved.dataMode = 'demo';
+  });
   afterEach(cleanup);
   it('firmographics strip shows four facts, each with source and date, labelled Sample', async () => {
     wrap(<FirmographicsStrip companyId="acct-1" />);
@@ -59,5 +76,40 @@ describe('enrichment cards', () => {
     expect(within(card).getByText('Evidence postings')).toBeTruthy();
     fireEvent.click(btn);
     expect(within(card).queryByText('Evidence postings')).toBeNull();
+  });
+
+  it('real plus not_configured shows no sample', async () => {
+    resolved.dataMode = 'real';
+    wrap(
+      <>
+        <FirmographicsStrip companyId="acct-1" />
+        <HiringNowCard companyId="acct-1" />
+        <PotentialProjectsCard companyId="acct-1" />
+      </>,
+    );
+    const strip = await screen.findByTestId('account-firmographics');
+    expect(within(strip).queryByText('Sample')).toBeNull();
+    expect(within(strip).getByText('Not connected')).toBeTruthy();
+    expect(within(strip).queryByText('Toronto (HQ)')).toBeNull();
+    expect(within(strip).queryByText('Asset & wealth management')).toBeNull();
+    const hiring = await screen.findByTestId('account-hiring-now');
+    expect(within(hiring).queryByText('Sample')).toBeNull();
+    expect(within(hiring).getByText('No open roles found.')).toBeTruthy();
+    expect(within(hiring).queryByText(String(mockEnrichment('acct-1').hiring.total))).toBeNull();
+    const projects = await screen.findByTestId('account-potential-projects');
+    expect(within(projects).queryByText('Sample')).toBeNull();
+    expect(within(projects).getByText('No initiatives inferred from current hiring.')).toBeTruthy();
+    expect(within(projects).queryByText(/confidence ·/)).toBeNull();
+  });
+
+  it('demo plus not_configured shows the labelled sample', async () => {
+    resolved.dataMode = 'demo';
+    wrap(<FirmographicsStrip companyId="acct-1" />);
+    const strip = await screen.findByTestId('account-firmographics');
+    expect(within(strip).getByText('Sample')).toBeTruthy();
+    expect(within(strip).getByText(/not configured/)).toBeTruthy();
+    expect(within(strip).getByText('Toronto (HQ)')).toBeTruthy();
+    expect(within(strip).getByText('Asset & wealth management')).toBeTruthy();
+    expect(within(strip).queryByText('Not connected')).toBeNull();
   });
 });

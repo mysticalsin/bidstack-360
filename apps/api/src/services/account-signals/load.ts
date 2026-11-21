@@ -13,6 +13,7 @@ import {
 } from '@bidstack/shared';
 
 import type { AccessScope } from '../../lib/access-scope.js';
+import { showsDemoNumbers } from '../../lib/runtime-request.js';
 import { companiesWithLiveSignals, hideSampleWhere, newsIdentifiers } from './live-signals.js';
 import { scopedMeetingWhere } from '../../meeting-intel/access.js';
 
@@ -107,6 +108,8 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
   for (const [root, ids] of groups) for (const id of ids) owner.set(id, root);
   const all = [...owner.keys()];
   const live = await companiesWithLiveSignals(orgId, all);
+  const demo = await showsDemoNumbers(orgId);
+  const sampleGate = demo ? hideSampleWhere(live) : { sample: false as const };
   const since = new Date(now.getTime() - 400 * DAY);
   const [opps, meetings, postings, events, firmo] = await Promise.all([
     prisma.opportunity.findMany({ where: { orgId, companyId: { in: all }, deletedAt: null }, select: OPP_SELECT, orderBy: { updatedAt: 'desc' }, take: TAKE }),
@@ -123,7 +126,7 @@ async function loadChunk(orgId: string, scope: AccessScope, rootIds: string[], n
       take: TAKE,
     }),
     prisma.accountWatchEvent.findMany({
-      where: { orgId, companyId: { in: all }, status: { not: 'DISMISSED' }, occurredAt: { gte: since, lte: now }, ...hideSampleWhere(live) },
+      where: { orgId, companyId: { in: all }, status: { not: 'DISMISSED' }, occurredAt: { gte: since, lte: now }, ...sampleGate },
       select: { companyId: true, occurredAt: true, importance: true, severity: true, sentiment: true, implication: true, kind: true, sample: true },
       orderBy: { occurredAt: 'desc' },
       take: TAKE,

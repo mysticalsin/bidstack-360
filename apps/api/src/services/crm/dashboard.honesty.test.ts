@@ -9,13 +9,13 @@ describe('provider health is not a configured-means-healthy probe', () => {
     // WHY: Dust and the dashboard were reading "healthy / 42ms" from the
     // default row whenever the process was up or DUST_API_KEY was set.
     // Configuration is not a live probe, so the default must say unverified.
+    // WHY: Tony has not approved a provider. Configuration must not look connected.
     const rows = defaultProviderHealth();
-    for (const provider of ['External CRM GraphQL', 'Dust REST']) {
+    for (const provider of ['External CRM GraphQL', 'Dust REST', 'MERX/Sovra']) {
       const row = rows.find((item) => item.provider === provider);
-      expect(row?.status).toBe('unverified');
+      expect(row?.status).toBe('disabled');
       expect(row?.latencyMs).toBeNull();
-      expect(row?.message?.toLowerCase()).toContain('not a live probe');
-      expect(row?.message).not.toMatch(/normal health response/i);
+      expect(row?.message).toBe('Not connected');
     }
   });
 

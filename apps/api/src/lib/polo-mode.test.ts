@@ -21,16 +21,19 @@ afterEach(() => {
 });
 
 describe('polo data mode', () => {
-  it('defaults to demo so main stays a fixture preview', () => {
+  it('defaults to real and refuses stub auth with that real data', () => {
     delete process.env.POLO_DATA_MODE;
-    expect(getPoloDataMode({})).toBe('demo');
-    expect(resolvePoloAuthProvider({})).toBe('stub');
+    expect(getPoloDataMode({})).toBe('real');
+    expect(() => assertPoloAuthBoot({ NODE_ENV: 'development' })).toThrow(
+      /Stub auth cannot boot with real data/,
+    );
   });
 
-  it('refuses real mode without Clerk or Cloudflare Access — that is the shared Jane Smith path', () => {
+  it('allows stub auth only for local synthetic data', () => {
     expect(() =>
-      assertPoloAuthBoot({ POLO_DATA_MODE: 'real', NODE_ENV: 'development' }),
-    ).toThrow(/stub\/shared Jane Smith is disabled/);
+      assertPoloAuthBoot({ POLO_DATA_MODE: 'demo', NODE_ENV: 'development' }),
+    ).not.toThrow();
+    expect(resolvePoloAuthProvider({ POLO_DATA_MODE: 'demo', NODE_ENV: 'development' })).toBe('stub');
   });
 
   it('allows Cloudflare Access as the real-mode identity source', () => {
@@ -41,7 +44,19 @@ describe('polo data mode', () => {
         NODE_ENV: 'production',
       }),
     ).not.toThrow();
-    expect(resolvePoloAuthProvider({ CF_ACCESS_AUTH: 'true' })).toBe('cf-access');
+    expect(resolvePoloAuthProvider({ CF_ACCESS_AUTH: 'true', NODE_ENV: 'production' })).toBe('cf-access');
+  });
+
+  it('does not report stub when boot is refused', () => {
+    expect(() => resolvePoloAuthProvider({ NODE_ENV: 'development' })).toThrow(
+      /Stub auth cannot boot with real data/,
+    );
+  });
+
+  it('refuses local deployment plus production through the same boot path', () => {
+    expect(() =>
+      assertPoloAuthBoot({ POLO_DEPLOYMENT_ENV: 'local', NODE_ENV: 'production', POLO_DATA_MODE: 'demo' }),
+    ).toThrow(/POLO_DEPLOYMENT_ENV=local/);
   });
 
   it('keeps demo and Access mutually exclusive', () => {

@@ -15,6 +15,7 @@ vi.mock('@/hooks/useCompanies', () => ({
 
 import { AgreementsSummaryCard } from '@/components/agreements/AgreementsSummaryCard';
 import { ApiError, api } from '@/lib/api';
+import { setResolvedDataMode } from '@/lib/msa/client';
 import { sampleDetail, sampleRows } from '@/lib/msa/sample';
 import type { MsaDetail } from '@/lib/msa/types';
 
@@ -55,7 +56,11 @@ function renderAt(path: string) {
   );
 }
 
-beforeEach(() => vi.mocked(api).mockImplementation(async () => { throw missing(); }));
+beforeEach(() => {
+  setResolvedDataMode('demo');
+  vi.mocked(api).mockImplementation(async () => { throw missing(); });
+});
+afterEach(() => setResolvedDataMode('real'));
 afterEach(() => { cleanup(); vi.mocked(api).mockReset(); });
 
 describe('headline / applyView', () => {
@@ -73,6 +78,13 @@ describe('headline / applyView', () => {
 });
 
 describe('AgreementsPage', () => {
+  it('real mode does not substitute the sample agreement list', async () => {
+    setResolvedDataMode('real');
+    renderAt('/agreements');
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.queryByTestId('agreements-sample-banner')).toBeNull();
+  });
+
   it('shows Sample banner, headline numbers, strip and table; a number filters the table via the URL', async () => {
     renderAt('/agreements');
     expect(await screen.findByTestId('agreements-sample-banner')).toBeTruthy();

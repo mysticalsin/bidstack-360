@@ -17,7 +17,17 @@ let orgB = { orgId: '', clerkOrg: '' };
 let restoreAuth: (() => void) | null = null;
 const c: Record<string, string> = {};
 
+async function setDemoFixture(on: boolean) {
+  await prisma.orgSettings.upsert({
+    where: { orgId: orgA.orgId },
+    create: { orgId: orgA.orgId, demoData: on },
+    update: { demoData: on, deletedAt: null },
+  });
+}
+
 beforeAll(async () => {
+  process.env.POLO_DATA_MODE = 'demo';
+  process.env.POLO_DEPLOYMENT_ENV = 'local';
   orgA = await createIsolatedOrg('sig-a');
   orgB = await createIsolatedOrg('sig-b');
   restoreAuth = useIsolatedOrgAuth(orgA.clerkOrg);
@@ -64,6 +74,7 @@ beforeAll(async () => {
   await ev('fund', 'FUNDING_ROUND', `${TAG} Acme raises $40M to scale its data platform`, 10, { importance: 85, sentiment: 0.8 });
   await ev('launch', 'PRODUCT_LAUNCH', 'Sample: Acme launches a new customer app', 20, { importance: 55, sentiment: 0.5, sample: true, source: 'sample', sourceUrl: '', companyId: c.child! });
   await ev('gone', 'NEWS_SIGNAL', 'Dismissed story', 5, { status: 'DISMISSED', importance: 90 });
+  await setDemoFixture(true);
   server = await buildServer();
   await server.ready();
 });
@@ -81,6 +92,7 @@ const get = (url: string) => server.inject({ method: 'GET', url: `/api/v1${url}`
 
 describe('GET /accounts/:id/pulse', () => {
   it('scores a growing account as gaining with drivers, coverage and sources', async () => {
+    await setDemoFixture(true);
     const res = await get(`/accounts/${c.acme}/pulse`);
     expect(res.statusCode).toBe(200);
     const p = res.json();
@@ -107,6 +119,7 @@ describe('GET /accounts/:id/pulse', () => {
 
 describe('GET /accounts/:id/timeline', () => {
   it('merges our activity and their events, children included, dismissed excluded', async () => {
+    await setDemoFixture(true);
     const res = await get(`/accounts/${c.acme}/timeline`);
     expect(res.statusCode).toBe(200);
     const t = res.json();
@@ -122,6 +135,21 @@ describe('GET /accounts/:id/timeline', () => {
     expect(t.counts.meeting).toBe(2);
   });
 
+  it('hides sample rows in real mode and keeps the live funding event', async () => {
+    await setDemoFixture(false);
+    try {
+      const pulse = (await get(`/accounts/${c.acme}/pulse`)).json();
+      expect(pulse.sample).toBe(false);
+      const timeline = (await get(`/accounts/${c.acme}/timeline`)).json();
+      expect(timeline.items.some((i: { title: string }) => i.title === 'Acme launches a new customer app')).toBe(false);
+      expect(timeline.items.some((i: { title: string }) => i.title.includes('raises $40M'))).toBe(true);
+      const initiatives = (await get(`/accounts/${c.acme}/initiatives`)).json().items as Array<{ theme: string; sample: boolean }>;
+      expect(initiatives.every((item) => item.sample === false)).toBe(true);
+    } finally {
+      await setDemoFixture(true);
+    }
+  });
+
   it('filters by category', async () => {
     const t = (await get(`/accounts/${c.acme}/timeline?categories=funding,meeting`)).json();
     expect(new Set(t.items.map((i: { category: string }) => i.category))).toEqual(new Set(['funding', 'meeting']));
@@ -131,6 +159,7 @@ describe('GET /accounts/:id/timeline', () => {
 
 describe('GET /accounts/:id/initiatives', () => {
   it('joins hiring, news and meetings into one initiative with a hook', async () => {
+    await setDemoFixture(true);
     const res = await get(`/accounts/${c.acme}/initiatives`);
     expect(res.statusCode).toBe(200);
     const items = res.json().items;

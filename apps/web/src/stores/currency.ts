@@ -355,7 +355,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
         if (Date.now() < ratesRetryAt) {
           set({
             ratesLoading: false,
-            ratesError: get().rates ? null : 'Exchange rates unavailable',
+            ratesError: get().rates ? null : 'Not connected',
           });
           return;
         }
@@ -375,7 +375,7 @@ export const useCurrencyStore = create<CurrencyStore>()(
                 ? retryAfterSeconds * 1000
                 : 60_000);
             throw new Error(
-              res.status === 429 ? 'Exchange rates rate limited' : `HTTP ${res.status}`,
+              res.status === 429 ? 'Exchange rates rate limited' : 'Not connected',
             );
           }
           const rates = normalizeExchangeRates(await res.json());

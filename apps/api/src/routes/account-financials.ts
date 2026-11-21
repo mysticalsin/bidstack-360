@@ -11,6 +11,7 @@ import {
   FINANCIALS_STATUS_COPY,
   FinancialSignal,
   GATE_COPY,
+  NOT_CONNECTED,
   SAMPLE_FINANCIAL_PERIODS,
   SAMPLE_FINANCIAL_SIGNALS,
   TrackFinancialsUpdate,
@@ -24,6 +25,7 @@ import {
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { showsDemoNumbers } from '../lib/runtime-request.js';
 import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
@@ -76,7 +78,9 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
   const signals = z.array(FinancialSignal).catch([]).parse(p?.signals ?? []);
   // Sample only for tracked accounts still waiting for real filings; General
   // accounts get the plain empty state instead.
-  const sample = periods.length === 0 && financialsEligible(c);
+  const demo = await showsDemoNumbers(orgId);
+  const waiting = periods.length === 0 && financialsEligible(c);
+  const sample = demo && waiting;
   return {
     companyId: c.id,
     tier: c.tier,
@@ -86,7 +90,7 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
     trackFinancials: c.trackFinancials,
     canToggle: toggle,
     status,
-    statusCopy: status === 'ok' ? null : (FINANCIALS_STATUS_COPY[status] ?? null),
+    statusCopy: !demo && waiting ? NOT_CONNECTED : status === 'ok' ? null : (FINANCIALS_STATUS_COPY[status] ?? null),
     entity: p?.source && p.entityId ? { source: SOURCE_NAME[p.source] ?? p.source, id: p.entityId, name: p.entityName ?? '' } : null,
     lastPulledAt: p?.lastPulledAt ? p.lastPulledAt.toISOString() : null,
     nextPullAt: p?.nextPullAt && financialsEligible(c) ? p.nextPullAt.toISOString() : null,

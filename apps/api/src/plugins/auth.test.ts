@@ -47,6 +47,7 @@ const ORIGINAL_CLERK_KEY = process.env.CLERK_SECRET_KEY;
 const ORIGINAL_PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
 const ORIGINAL_SSO_ALLOWED_EMAIL_DOMAINS = process.env.SSO_ALLOWED_EMAIL_DOMAINS;
 const ORIGINAL_POLO_DATA_MODE = process.env.POLO_DATA_MODE;
+const ORIGINAL_POLO_DEPLOYMENT_ENV = process.env.POLO_DEPLOYMENT_ENV;
 const ORIGINAL_CF_ACCESS_AUTH = process.env.CF_ACCESS_AUTH;
 
 describe('auth plugin', () => {
@@ -56,6 +57,7 @@ describe('auth plugin', () => {
     delete process.env.PUBLIC_BASE_URL;
     delete process.env.SSO_ALLOWED_EMAIL_DOMAINS;
     delete process.env.POLO_DATA_MODE;
+    delete process.env.POLO_DEPLOYMENT_ENV;
     delete process.env.CF_ACCESS_AUTH;
     vi.clearAllMocks();
   });
@@ -86,6 +88,11 @@ describe('auth plugin', () => {
     } else {
       process.env.POLO_DATA_MODE = ORIGINAL_POLO_DATA_MODE;
     }
+    if (ORIGINAL_POLO_DEPLOYMENT_ENV === undefined) {
+      delete process.env.POLO_DEPLOYMENT_ENV;
+    } else {
+      process.env.POLO_DEPLOYMENT_ENV = ORIGINAL_POLO_DEPLOYMENT_ENV;
+    }
     if (ORIGINAL_CF_ACCESS_AUTH === undefined) {
       delete process.env.CF_ACCESS_AUTH;
     } else {
@@ -96,7 +103,7 @@ describe('auth plugin', () => {
   it('refuses to start when NODE_ENV is unset and CLERK_SECRET_KEY is missing', async () => {
     const server = Fastify({ logger: false });
     await expect(server.register(authPlugin)).rejects.toThrow(
-      'CLERK_SECRET_KEY required in production',
+      'Deployment environment is not explicit',
     );
   });
 
@@ -105,7 +112,7 @@ describe('auth plugin', () => {
     process.env.POLO_DATA_MODE = 'real';
     const server = Fastify({ logger: false });
     await expect(server.register(authPlugin)).rejects.toThrow(
-      'POLO_DATA_MODE=real requires CLERK_SECRET_KEY or CF_ACCESS_AUTH=true',
+      'Stub auth cannot boot with real data',
     );
   });
 
@@ -118,14 +125,16 @@ describe('auth plugin', () => {
     await server.close();
   });
 
-  it('allows stub auth when NODE_ENV=development and CLERK_SECRET_KEY is missing', async () => {
+  it('allows stub auth when NODE_ENV=development and the data is synthetic', async () => {
     process.env.NODE_ENV = 'development';
+    process.env.POLO_DATA_MODE = 'demo';
     const server = Fastify({ logger: false });
     await expect(server.register(authPlugin)).resolves.not.toThrow();
   });
 
   it('does not resolve auth for routes explicitly marked public', async () => {
     process.env.NODE_ENV = 'development';
+    process.env.POLO_DATA_MODE = 'demo';
     const server = Fastify({ logger: false });
 
     await server.register(authPlugin);
@@ -145,7 +154,7 @@ describe('auth plugin', () => {
     process.env.NODE_ENV = 'production';
     const server = Fastify({ logger: false });
     await expect(server.register(authPlugin)).rejects.toThrow(
-      'CLERK_SECRET_KEY required in production',
+      'Stub auth cannot boot in production',
     );
   });
 
@@ -153,6 +162,7 @@ describe('auth plugin', () => {
   // the fire-and-forget catch would hide it: lastUsedAt would never move.
   it('scopes the API key lastUsedAt write to the key org', async () => {
     process.env.NODE_ENV = 'development';
+    process.env.POLO_DATA_MODE = 'demo';
     mockedApiKeyFindFirst.mockResolvedValue({
       id: 'key-1',
       orgId: 'org-1',

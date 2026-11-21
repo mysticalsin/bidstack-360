@@ -12,6 +12,8 @@ import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
 import { ApiError } from '@/lib/api';
 import { initAccent } from '@/lib/accent';
 import { AuthProvider } from '@/lib/auth';
+import { RuntimeModeProvider } from '@/lib/runtime-mode';
+import type { PoloPublicIdentity } from '@/hooks/usePoloIdentity';
 import { initSentry, Sentry } from '@/lib/sentry';
 import { logVitalsToConsole, reportWebVitals } from '@/lib/web-vitals';
 import { persistCache, hydrateCache, watchAuthForCacheClear } from '@/lib/queryCache';
@@ -98,11 +100,6 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const authMode = import.meta.env.VITE_AUTH_MODE;
-
-if (!clerkKey && authMode === 'clerk') {
-  throw new Error('VITE_CLERK_PUBLISHABLE_KEY is missing while VITE_AUTH_MODE=clerk.');
-}
 
 const APP_SHELL_CACHE_NAME = 'bidstack-v4-network-owned-routes';
 type ViteManifestEntry = {
@@ -218,13 +215,95 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && !disableServiceWorke
   } else {
     window.addEventListener('load', registerServiceWorker, { once: true });
   }
+
+  // Identity resolves after load, and the dashboard chunk's modulepreload
+  // links land after that. Re-warm when those links appear so the offline
+  // shell includes every asset the document is actually using.
+  let warmTimer = 0;
+  const scheduleWarm = () => {
+    window.clearTimeout(warmTimer);
+    warmTimer = window.setTimeout(() => {
+      void warmAppShellCache().catch((error) => Sentry.captureException(error));
+    }, 200);
+  };
+  new MutationObserver(scheduleWarm).observe(document.head, { childList: true, subtree: true });
 }
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
 
+const RUNTIME_IDENTITY_KEY = 'polo:runtime-identity';
+
+function readStoredRuntime(): PoloPublicIdentity | null {
+  try {
+    const raw = sessionStorage.getItem(RUNTIME_IDENTITY_KEY);
+    return raw ? (JSON.parse(raw) as PoloPublicIdentity) : null;
+  } catch {
+    return null;
+  }
+}
+
+function RuntimeAuthRoot({ children }: { children: React.ReactNode }) {
+  const [runtime, setRuntime] = React.useState<PoloPublicIdentity | null>(null);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/identity', { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`identity ${response.status}`);
+        return (await response.json()) as PoloPublicIdentity;
+      })
+      .then((body) => {
+        sessionStorage.setItem(RUNTIME_IDENTITY_KEY, JSON.stringify(body));
+        if (!cancelled) setRuntime(body);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const stored = readStoredRuntime();
+        if (stored) setRuntime(stored);
+        else setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!runtime && !failed) {
+    return (
+      <p role="status" style={{ padding: 24, color: '#171717', background: '#ffffff' }}>
+        Loading Polo…
+      </p>
+    );
+  }
+  if (!runtime) {
+    // Identity is unreachable (static preview, offline reload). Keep the
+    // sign-in usable, and paint the notice with a pair that clears 4.5:1.
+    return (
+      <div style={{ color: '#171717', background: '#ffffff' }}>
+        <p role="alert" style={{ padding: 24 }}>
+          Polo could not read its runtime mode.
+        </p>
+        <AuthProvider publishableKey={clerkKey} runtime={{ auth: 'stub', publicDemoDoor: false }}>
+          {children}
+        </AuthProvider>
+      </div>
+    );
+  }
+  return (
+    <RuntimeModeProvider value={runtime}>
+      <AuthProvider
+        publishableKey={clerkKey}
+        runtime={{ auth: runtime.auth, publicDemoDoor: runtime.publicDemoDoor }}
+      >
+        {children}
+      </AuthProvider>
+    </RuntimeModeProvider>
+  );
+}
+
 root.render(
   <React.StrictMode>
-    <AuthProvider publishableKey={clerkKey}>
+    <RuntimeAuthRoot>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
           <ErrorBoundary>
@@ -241,6 +320,6 @@ root.render(
           </ErrorBoundary>
         </BrowserRouter>
       </QueryClientProvider>
-    </AuthProvider>
+    </RuntimeAuthRoot>
   </React.StrictMode>,
 );

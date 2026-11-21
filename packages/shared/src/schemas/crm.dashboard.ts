@@ -182,6 +182,8 @@ export const ReleaseScore = z.object({
   total: z.number().int().min(0).max(100),
   passed: z.boolean(),
   scoredAt: z.string().datetime(),
+  /** Absent on older rows. False means the score was not recorded. */
+  recorded: z.boolean().optional(),
 });
 export type ReleaseScore = z.infer<typeof ReleaseScore>;
 

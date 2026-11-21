@@ -146,6 +146,11 @@ jobs:
         # Boots the API route table without a database and fails on any route
         # that lacks a permission gate or input schema and is not already in
         # scripts/route-inventory.baseline.json (shrink-only).
+        # Stub auth only boots with synthetic data, so the inventory process
+        # opts into the same demo fixture as the rest of CI.
+        env:
+          POLO_DATA_MODE: demo
+          POLO_DEPLOYMENT_ENV: local
         run: pnpm routes:inventory --check
 
       - name: Verify PWA manifest exists
@@ -260,6 +265,8 @@ jobs:
         run: |
           pnpm db:migrate:deploy
           pnpm db:seed
+        env:
+          POLO_DATA_MODE: demo
 
       - name: API integration tests
         run: pnpm --filter @bidstack/api test
@@ -340,6 +347,8 @@ jobs:
         run: |
           pnpm db:migrate:deploy
           pnpm db:seed
+        env:
+          POLO_DATA_MODE: demo
 
       - name: Build web
         run: pnpm --filter @bidstack/web build
@@ -365,6 +374,8 @@ jobs:
           PORT_API: '4000'
           DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
           REDIS_URL: redis://localhost:6379
+          POLO_DATA_MODE: demo
+          POLO_DEPLOYMENT_ENV: local
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
           BIDSTACK_ALLOW_STUB_ROLE_HEADER: 'true'
 

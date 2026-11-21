@@ -6,9 +6,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { useMeetingDetails, useMeetingList } from '@/hooks/useMeetingIntel';
+import { usePoloMe } from '@/hooks/usePoloIdentity';
+import { useAuth } from '@/lib/auth';
+import { accountOrgChart } from '@/lib/orgchart/account-chart';
 import { fetchOrgChart, fetchOrgChartCoverage, fetchOrgChartNode } from '@/lib/orgchart/client';
 import { coverageFor, coverageFromMeetings, covFromPerson } from '@/lib/orgchart/coverage';
-import { sampleChart } from '@/lib/orgchart/sample';
+import { useRuntimeMode } from '@/lib/runtime-mode';
 import { normalise } from '@/lib/orgchart/tree';
 import type { NodeCov, OrgChart, OrgNode } from '@/lib/orgchart/types';
 
@@ -16,6 +19,10 @@ const MAX_DETAILS = 30;
 export const orgChartKey = (companyId: string | undefined) => ['orgchart', companyId] as const;
 
 export function useOrgChart(companyId: string | undefined) {
+  const { isSignedIn } = useAuth();
+  const me = usePoloMe(isSignedIn);
+  const runtime = useRuntimeMode();
+  const dataMode = (isSignedIn ? me.data?.dataMode : runtime?.dataMode) === 'demo' ? 'demo' : 'real';
   const saved = useQuery({
     queryKey: orgChartKey(companyId),
     queryFn: ({ signal }) => fetchOrgChart(companyId!, signal),
@@ -45,9 +52,10 @@ export function useOrgChart(companyId: string | undefined) {
   const chart: OrgChart | null = useMemo(() => {
     if (!companyId || saved.isLoading) return null;
     if (saved.data) return { ...saved.data, ...normalise(saved.data.nodes, saved.data.rootId) };
+    if (dataMode !== 'demo') return null;
     if (list.isLoading || !detailsDone) return null;
-    return sampleChart(companyId, people);
-  }, [companyId, saved.isLoading, saved.data, list.isLoading, detailsDone, people]);
+    return accountOrgChart({ dataMode, saved: null, companyId, people });
+  }, [companyId, saved.isLoading, saved.data, dataMode, list.isLoading, detailsDone, people]);
 
   const metById = useMemo(() => new Map((cov.data?.nodes ?? []).map((n) => [n.nodeId, n])), [cov.data]);
   const unmetSenior = useMemo(() => new Set(cov.data?.unmetSenior ?? []), [cov.data]);

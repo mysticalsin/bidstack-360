@@ -16,7 +16,15 @@
 import { type z } from 'zod';
 
 import { type PrismaClient } from '@bidstack/db';
-import type { AiInsight, CrmDashboardSnapshot } from '@bidstack/shared';
+import {
+  applyOrgOverride,
+  intelIsFixture,
+  metadataIsFixture,
+  resolveProcessData,
+  type AiInsight,
+  type CrmDashboardSnapshot,
+  type RuntimeEnv,
+} from '@bidstack/shared';
 
 import { defaultProviderHealth, mergeProviderHealth } from './dashboard.providers.js';
 import {
@@ -42,6 +50,7 @@ import {
   defaultBidOpportunities,
   defaultQueueHealth,
   defaultReleaseScore,
+  unrecordedReleaseScore,
 } from './dashboard.defaults.js';
 import {
   fetchAccountPerformance,
@@ -125,6 +134,7 @@ export async function buildDashboardSnapshot(
         updatedAt: true,
         industry: true,
         logoUrl: true,
+        intel: true,
         owner: { select: { name: true, email: true } },
         pipelineStage: {
           select: {
@@ -315,7 +325,7 @@ export async function buildDashboardSnapshot(
     // derived companies so manual edits win and the cockpit resolves by real id.
     prisma.company.findMany({
       where: { orgId, deletedAt: null },
-      select: { id: true, name: true, domain: true, logoUrl: true },
+      select: { id: true, name: true, domain: true, logoUrl: true, source: true },
       take: 500,
     }),
   ]);
@@ -328,7 +338,28 @@ export async function buildDashboardSnapshot(
     scope && !scope.unrestricted
       ? new Set(opportunities.map((opportunity) => opportunity.id))
       : null;
-  const companies = buildCompanies(opportunities, enrichments, companyRows).filter(
+  let showSamples = false;
+  try {
+    const settings = await prisma.orgSettings.findFirst({
+      where: { orgId, deletedAt: null },
+      select: { demoData: true },
+    });
+    showSamples =
+      applyOrgOverride(resolveProcessData(process.env as RuntimeEnv), settings?.demoData === true).effectiveData ===
+      'demo';
+  } catch {
+    // A failed settings read stays hidden. Sample numbers are not the fallback.
+  }
+  const liveOpportunities = showSamples
+    ? opportunities
+    : opportunities.filter((opportunity) => !intelIsFixture(opportunity.intel));
+  const liveEnrichments = showSamples
+    ? enrichments
+    : enrichments.filter((row) => !metadataIsFixture(row.providerMetadata));
+  const liveCompanyRows = showSamples
+    ? companyRows
+    : companyRows.filter((row) => row.source !== 'fixture');
+  const companies = buildCompanies(liveOpportunities, liveEnrichments, liveCompanyRows, showSamples).filter(
     (company) => !visibleCompanyKeys || visibleCompanyKeys.has(normalizeName(company.name)),
   );
   // A requested account with no opportunity or enrichment yet (new, imported or sparse) still
@@ -337,7 +368,7 @@ export async function buildDashboardSnapshot(
     const sparse = await findSparseAccount(prisma, orgId, accountId, scope);
     if (sparse) companies.push(companyFromRow(sparse));
   }
-  const deals = opportunities.map((opportunity) => serializeDeal(opportunity));
+  const deals = liveOpportunities.map((opportunity) => serializeDeal(opportunity));
   const activities = buildActivities(tasks).slice(0, DASHBOARD_ACTIVITY_LIMIT);
   const visibleInsights = visibleCompanyKeys
     ? persistedInsights.filter(
@@ -359,14 +390,17 @@ export async function buildDashboardSnapshot(
         sourceAttribution: parseAttribution(insight.sourceAttribution),
         createdAt: insight.createdAt.toISOString(),
       }))
-    : buildDefaultInsights(opportunities);
-  const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : DEFAULT_WIDGETS;
-  const selectedCompany =
-    findSelectedCompany(companies, accountId) ??
-    companies.find((company) => company.name === 'CI Financial') ??
-    companies.find((company) => company.name === 'Mantu') ??
-    companies[0] ??
-    fallbackCompany('Mantu');
+    : showSamples
+      ? buildDefaultInsights(opportunities)
+      : [];
+  const dashboardWidgets = widgets.length ? widgets.map(serializeWidget) : showSamples ? DEFAULT_WIDGETS : [];
+  const selectedCompany = showSamples
+    ? (findSelectedCompany(companies, accountId) ??
+      companies.find((company) => company.name === 'CI Financial') ??
+      companies.find((company) => company.name === 'Mantu') ??
+      companies[0] ??
+      fallbackCompany('Mantu'))
+    : (findSelectedCompany(companies, accountId) ?? companies[0] ?? fallbackCompany('Workspace'));
   const [fieldOverrides, performance] = await Promise.all([
     prisma.companyFieldOverride.findMany({
       where: { orgId, companyKey: normalizeName(selectedCompany.name) },
@@ -383,7 +417,7 @@ export async function buildDashboardSnapshot(
     cockpit: buildCockpit({
       company: selectedCompany,
       companies,
-      opportunities,
+      opportunities: liveOpportunities,
       contacts,
       tasks,
       risks: riskRows,
@@ -391,6 +425,7 @@ export async function buildDashboardSnapshot(
       fieldOverrides,
       winLossAvailable: process.env.WIN_LOSS_DATA_AVAILABLE === 'true',
       performance,
+      includeSampleStack: showSamples,
     }),
     companies,
     deals,
@@ -399,12 +434,18 @@ export async function buildDashboardSnapshot(
     widgets: dashboardWidgets,
     bidOpportunities: bidRows.length
       ? bidRows.map(serializeBidOpportunity)
-      : defaultBidOpportunities(),
+      : showSamples
+        ? defaultBidOpportunities()
+        : [],
     providerHealth: providerRows.length
       ? mergeProviderHealth(providerRows.map(serializeProviderHealth))
       : defaultProviderHealth(),
     queueHealth: queueRows.length ? queueRows.map(serializeQueueHealth) : defaultQueueHealth(),
-    releaseScore: releaseScoreRow ? serializeReleaseScore(releaseScoreRow) : defaultReleaseScore(),
+    releaseScore: releaseScoreRow
+      ? serializeReleaseScore(releaseScoreRow)
+      : showSamples
+        ? defaultReleaseScore()
+        : unrecordedReleaseScore(),
   };
 }
 

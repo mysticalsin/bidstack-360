@@ -32,6 +32,8 @@ import {
 } from '@bidstack/shared';
 
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
+import { showsDemoNumbers } from '../lib/runtime-request.js';
+import { firmographicsForMode } from '../lib/sample-reads.js';
 import { enqueueAccountEnrichment } from '../queues/account-enrichment.js';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -214,8 +216,14 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
         prisma.companyFirmographics.findUnique({ where: { companyId: company.id } }),
         prisma.companyJobPosting.count({ where: { orgId: req.auth.orgId, companyId: company.id } }),
       ]);
-      await audit(req, 'enrichment.view', company.id, { status: row?.status ?? 'not_enriched' });
-      return toFirmographics(company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date());
+      const demo = await showsDemoNumbers(req.auth.orgId);
+      const body = firmographicsForMode(
+        demo ? 'demo' : 'real',
+        toFirmographics(company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date()),
+      );
+      const status = demo || body.status !== 'not_enriched' ? body.status : 'not_connected';
+      await audit(req, 'enrichment.view', company.id, { status });
+      return { ...body, status };
     },
   );
 
@@ -297,10 +305,12 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
       });
       await audit(req, 'enrichment.refresh', company.id, { force, queued: jobId !== null });
       reply.code(202);
+      const rawStatus = row?.status ?? 'not_enriched';
+      const demo = await showsDemoNumbers(req.auth.orgId);
       return {
         queued: jobId !== null,
         jobId,
-        status: row?.status ?? 'not_enriched',
+        status: demo || rawStatus !== 'not_enriched' ? rawStatus : 'not_connected',
         expiresAt: row?.expiresAt?.toISOString() ?? null,
       };
     },

@@ -1,2 +1,5 @@
 # RFC 6455 sample Sec-WebSocket-Key ("the sample nonce") in a proxy test, not a credential.
 67ac0d0290c2a259ec04b4f98b6b72981ea74c68:apps/polo-preview/src/container-proxy.test.ts:generic-api-key:91
+# Clerk fixture in an older commit of this branch. HEAD uses clerk-test-key.
+# The pull-request scan still reads that commit, so the fingerprint stays ignored.
+65e6eccf1f75fdaa56b7c1772a038c12e31aa92d:apps/api/src/env.test.ts:stripe-access-token:8

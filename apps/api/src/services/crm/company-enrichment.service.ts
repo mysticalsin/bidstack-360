@@ -455,6 +455,7 @@ export function buildCompanies(
     updatedAt: Date;
   }>,
   companyRows: Array<{ id: string; name: string; domain: string | null; logoUrl: string | null }> = [],
+  includeHouseAccount = false,
 ) {
   const byName = new Map<string, z.infer<typeof CrmCompany>>();
   for (const enrichment of enrichments) {
@@ -511,6 +512,6 @@ export function buildCompanies(
     }
   }
 
-  if (!byName.has('mantu')) byName.set('mantu', fallbackCompany('Mantu'));
+  if (includeHouseAccount && !byName.has('mantu')) byName.set('mantu', fallbackCompany('Mantu'));
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

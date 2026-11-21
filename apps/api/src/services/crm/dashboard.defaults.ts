@@ -300,6 +300,19 @@ export function defaultQueueHealth(): Array<z.infer<typeof QueueHealth>> {
 
 // ─── Release score fallback ───────────────────────────────────────────────────
 
+export function unrecordedReleaseScore(): z.infer<typeof ReleaseScore> {
+  return {
+    functional: 0,
+    code: 0,
+    design: 0,
+    infra: 0,
+    total: 0,
+    passed: false,
+    scoredAt: new Date().toISOString(),
+    recorded: false,
+  };
+}
+
 export function defaultReleaseScore(): z.infer<typeof ReleaseScore> {
   const functional = 24;
   const code = 24;

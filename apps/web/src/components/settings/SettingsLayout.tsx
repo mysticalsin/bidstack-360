@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useIsAdmin } from '@/lib/auth';
+import { usePoloMe } from '@/hooks/usePoloIdentity';
+import { actorMayToggle, type ToggleActor } from '@bidstack/shared';
+import { useAuth, useIsAdmin } from '@/lib/auth';
 
 export type SettingsSection =
   | 'overview'
@@ -29,6 +31,7 @@ export type SettingsSection =
   | 'webhooks'
   | 'audit-log'
   | 'identity'
+  | 'demo-data'
   | 'developer';
 
 interface Group {
@@ -40,6 +43,8 @@ interface Group {
     admin?: boolean;
     /** Shown when the user holds this permission even without settings:write. */
     permission?: string;
+    /** Demo data is owners and Admins only. Members never see the item. */
+    demoData?: boolean;
   }[];
 }
 
@@ -67,6 +72,7 @@ const GROUPS: Group[] = [
     items: [
       { id: 'workspace', label: 'Workspace', icon: 'settings' },
       { id: 'identity', label: 'Identity & roles', icon: 'contacts', admin: true },
+      { id: 'demo-data', label: 'Demo data', icon: 'sliders', demoData: true },
       { id: 'crm', label: 'Data configuration', icon: 'sliders', admin: true },
       { id: 'data-import', label: 'Data import', icon: 'upload', admin: true },
       { id: 'top-accounts', label: 'Top accounts', icon: 'star', admin: true },
@@ -99,6 +105,9 @@ export function SettingsLayout({ active, children }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const canReadAudit = useHasPermission('audit-log:read');
+  const { isSignedIn } = useAuth();
+  const me = usePoloMe(isSignedIn);
+  const canToggleDemo = me.data ? actorMayToggle(me.data.toggleActor as ToggleActor) : false;
   const [menuOpen, setMenuOpen] = useState(false);
   const navId = 'settings-section-nav';
 
@@ -133,6 +142,8 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemWorkspace', 'Workspace');
       case 'identity':
         return t('settingsLayout.itemIdentity', 'Identity & roles');
+      case 'demo-data':
+        return t('settingsLayout.itemDemoData', 'Demo data');
       case 'crm':
         return t('settingsLayout.itemCrm', 'Data configuration');
       case 'data-import':
@@ -186,7 +197,11 @@ export function SettingsLayout({ active, children }: Props) {
             menuOpen ? 'block' : 'hidden',
           )}
         >
-          <nav className="sticky top-0 px-3 py-4">
+          <nav
+            className="sticky top-0 px-3 py-4"
+            data-demo-toggle={canToggleDemo ? 'yes' : 'no'}
+            data-demo-actor={me.data?.toggleActor ?? 'none'}
+          >
             {GROUPS.map((group) => (
               <div key={group.label} className="mb-5">
                 <span className="px-3 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
@@ -195,6 +210,7 @@ export function SettingsLayout({ active, children }: Props) {
                 <ul className="mt-1 space-y-0.5">
                   {group.items
                     .filter((item) => {
+                      if (item.demoData) return canToggleDemo;
                       if (!item.admin) return true;
                       if (isAdmin) return true;
                       return item.permission === 'audit-log:read' && canReadAudit;
