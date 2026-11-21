@@ -130,6 +130,11 @@
     "clearAll": "Cancella tutto ({{count}})",
     "dismiss": "Ignora"
   },
+  "errors": {
+    "validation": "Alcuni campi vanno corretti. Controllali e riprova.",
+    "sessionExpired": "La sessione è scaduta. Accedi per continuare.",
+    "tooLarge": "Questo file è troppo grande per essere caricato."
+  },
   "validation": {
     "required": "Questo campo è obbligatorio",
     "invalidEmail": "Inserisci un indirizzo email valido",

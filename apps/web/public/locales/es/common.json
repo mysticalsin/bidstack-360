@@ -130,6 +130,11 @@
     "clearAll": "Borrar todo ({{count}})",
     "dismiss": "Descartar"
   },
+  "errors": {
+    "validation": "Hay campos que hay que corregir. Revísalos e inténtalo de nuevo.",
+    "sessionExpired": "Tu sesión ha caducado. Inicia sesión para continuar.",
+    "tooLarge": "Ese archivo es demasiado grande para subirlo."
+  },
   "validation": {
     "required": "Este campo es obligatorio",
     "invalidEmail": "Introduce un correo electrónico válido",

@@ -132,6 +132,11 @@
     "clearAll": "全部清除 ({{count}})",
     "dismiss": "关闭"
   },
+  "errors": {
+    "validation": "有些字段需要修改。请检查后再试。",
+    "sessionExpired": "会话已过期。请重新登录后继续。",
+    "tooLarge": "文件太大，无法上传。"
+  },
   "validation": {
     "required": "此字段为必填项",
     "invalidEmail": "请输入有效的电子邮件地址",

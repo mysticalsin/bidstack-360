@@ -107,6 +107,26 @@ describe('api fetch wrapper', () => {
     );
   });
 
+  it('replaces schema compiler text with the translated validation sentence', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse(
+          {
+            statusCode: 400,
+            message: 'body/name Required, body/rows Expected array, received string',
+          },
+          400,
+        ),
+      ),
+    );
+
+    await expect(api('/api/companies', { method: 'POST', body: {} })).rejects.toMatchObject({
+      message: 'Some fields need attention. Check them and try again.',
+      status: 400,
+    });
+  });
+
   it('surfaces auth errors after one forced-refresh retry', async () => {
     const fetchMock = vi
       .fn()

@@ -130,6 +130,11 @@
     "clearAll": "Tout effacer ({{count}})",
     "dismiss": "Fermer"
   },
+  "errors": {
+    "validation": "Certains champs sont à corriger. Vérifiez-les et réessayez.",
+    "sessionExpired": "Votre session a expiré. Connectez-vous pour continuer.",
+    "tooLarge": "Ce fichier est trop volumineux pour être envoyé."
+  },
   "validation": {
     "required": "Ce champ est obligatoire",
     "invalidEmail": "Saisissez une adresse e-mail valide",
