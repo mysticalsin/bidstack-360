@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { containerEnv } from './container-env.js';
 import * as databaseBoot from './database-boot.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -78,5 +79,37 @@ describe('database boot review', () => {
     );
     expect(gate).toContain("type: 'app-role-gate'");
     expect(finish).toMatch(/to !== 'Ready'/);
+  });
+
+  it('refuses drill hooks when the production deployment marker is set', () => {
+    // WHY: the supervisor has no NODE_ENV, so a NODE_ENV check never fires in
+    // the container. Path overrides were still gated by the flag alone.
+    expect(
+      databaseBoot.drillHooksAllowed({
+        POLO_RESTORE_DRILL: '1',
+        POLO_DEPLOYMENT: 'production',
+      }),
+    ).toBe(false);
+    expect(databaseBoot.drillHooksAllowed({ POLO_RESTORE_DRILL: '1' })).toBe(true);
+    const secrets = {
+      POLO_INTERNAL_KEY: 'k',
+      POLO_INTEGRATION_TOKEN_KEY: 'a'.repeat(64),
+      POLO_PII_ENCRYPTION_MASTER_KEY: 'b'.repeat(64),
+      POLO_JOB_SIGNING_SECRET: 's',
+      POLO_APP_DB_PASSWORD: 'fixture-password',
+    };
+    expect(containerEnv({ ...secrets, ALLOWED_EMAILS: 'a@x.com' }).POLO_DEPLOYMENT).toBe(
+      'production',
+    );
+    for (const name of ['overrideInDrill', 'startDatabase']) {
+      expect(functionBody(entry, name)).toContain('drillHooksAllowed(');
+    }
+    const secret = "fix'ture\\pass";
+    const escaped = secret.replaceAll("'", "''");
+    expect(escaped).not.toContain(secret);
+    expect(databaseBoot.secretLeakKind(`note ${escaped}`, secret)).toBe('plaintext');
+    expect(databaseBoot.secretLeakKind(`note ${secret}`, secret)).toBe('plaintext');
+    expect(databaseBoot.secretLeakKind('SCRAM-SHA-256$abc', secret)).toBe('verifier');
+    expect(databaseBoot.secretLeakKind('clean log', secret)).toBe('clean');
   });
 });
