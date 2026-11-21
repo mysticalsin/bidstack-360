@@ -120,7 +120,7 @@ export function readOpportunityValue(raw: unknown): bigint | undefined {
   return parsed;
 }
 
-function asDate(v: unknown): Date | null {
+export function asDate(v: unknown): Date | null {
   const s = asTrimmed(v);
   if (!s) return null;
   const d = new Date(s);
