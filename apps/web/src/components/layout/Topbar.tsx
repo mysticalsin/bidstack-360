@@ -228,7 +228,7 @@ export function Topbar() {
         <button
           type="button"
           onClick={() => signOut(() => navigate('/login'))}
-          className="tb-signout"
+          className="tb-signout tb-signout-keep"
           aria-label={t('topbar.signOut', 'Sign out')}
           title={t('topbar.signOut', 'Sign out')}
         >
