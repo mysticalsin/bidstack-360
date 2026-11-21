@@ -214,15 +214,17 @@ const AccountCockpitBase = z.object({
   // is on AND points exist, so an account with no won deals shows nothing
   // rather than an empty chart.
   revenueEvolution: z
-    .array(z.object({ period: z.string().min(1), revenueMicros: z.number().int().nonnegative() }))
+    .array(z.object({ period: z.string().min(1), revenueMicros: z.number().int() }))
     .optional(),
   // Won/lost summary derived from the account's own opportunity pipeline.
+  // Values may be negative: a credit note on a won deal is still a won deal,
+  // and a negative month must not 500 the cockpit.
   winLoss: z
     .object({
       wonCount: z.number().int().nonnegative(),
       lostCount: z.number().int().nonnegative(),
-      wonValueMicros: z.number().int().nonnegative(),
-      lostValueMicros: z.number().int().nonnegative(),
+      wonValueMicros: z.number().int(),
+      lostValueMicros: z.number().int(),
       winRate: z.number().int().min(0).max(100),
     })
     .optional(),
