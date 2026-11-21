@@ -8,7 +8,7 @@ import { closeMonthLabel } from '@/components/charts/bid-chart-data';
 
 import { DrillSheet, type DrillCrumb } from './DrillSheet';
 import { filterOpps, type OppDrillFilter } from './filterOpps';
-import { closeDate, fmtCompact, OPEN_STAGES, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
+import { closeDate, fmtCompact, OPEN_STAGES, stageBuckets, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
 
 export type { OppDrillFilter } from './filterOpps';
 
@@ -32,15 +32,16 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
   // Stage breakdown when no stage is chosen yet: the next level down.
   const byStage = useMemo(() => {
     if (f.stage) return [];
-    const base = filterOpps(rows, { ...f, stage: null }, q);
-    const ids = [...OPEN_STAGES, 'closed_won', 'closed_lost'];
-    return ids
-      .map((id) => {
-        const inStage = base.filter((o) => stageKey(o.stage) === id);
-        return { id, label: stageText(id), count: inStage.length, value: inStage.reduce((n, o) => n + (o.value ?? 0), 0) };
-      })
-      .filter((s) => s.count > 0);
+    return stageBuckets(filterOpps(rows, { ...f, stage: null }, q));
   }, [rows, f, q]);
+  const stageChoices = useMemo(() => {
+    const fixed = new Set<string>([...OPEN_STAGES, 'closed_won', 'closed_lost']);
+    const extra = stageBuckets(rows).filter((stage) => !fixed.has(stage.id));
+    return [
+      ...[...OPEN_STAGES, 'closed_won', 'closed_lost'].map((id) => ({ id, label: stageText(id) })),
+      ...extra.map((stage) => ({ id: stage.id, label: stage.label })),
+    ];
+  }, [rows]);
   const maxStage = Math.max(1, ...byStage.map((s) => s.value));
 
   const month = f.closeMonth ? closeMonthLabel(f.closeMonth) : null;
@@ -78,7 +79,7 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
           </div>
           <select aria-label="Stage" value={f.stage ?? ''} onChange={(e) => onFilterChange({ ...f, stage: e.target.value || null })}>
             <option value="">Any stage</option>
-            {[...OPEN_STAGES, 'closed_won', 'closed_lost'].map((id) => <option key={id} value={id}>{stageText(id)}</option>)}
+            {stageChoices.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
           </select>
         </>
       }

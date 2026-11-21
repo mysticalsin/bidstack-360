@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageBuckets, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -81,6 +81,35 @@ describe('viz-data', () => {
     expect(fmtCompact(Number.NEGATIVE_INFINITY)).toBe('-∞');
     // Half a unit is what a micros remainder looks like once it is no longer a whole unit.
     expect(fmtCompact(1_500_000.5)).toBe('1.5m');
+  });
+
+  it('shows a named open stage after the legacy stages and before won', () => {
+    // WHY: the funnel only drew the five legacy keys, so a bid in "Proposal
+    // review" was missing and the open count on the chart was short.
+    // A live lost flag, including on a legacy key, stays off this funnel.
+    const named = row({ stage: 'Proposal review', value: 30, customer: 'C' });
+    const funnel = stageFunnel([...rows, named]);
+    expect(funnel.map((stage) => stage.label)).toEqual(['S1 lead', 'S4 negotiation', 'Proposal review']);
+    expect(funnel.find((stage) => stage.id === 'Proposal review')).toMatchObject({ value: 30, count: 1 });
+    expect(stageBuckets([named, row({ stage: 'closed_won', value: 9 })]).map((stage) => stage.id)).toEqual([
+      'Proposal review',
+      'closed_won',
+    ]);
+    expect(stageFunnel([row({
+      stage: 'Proposal review',
+      value: 12,
+      pipelineStage: { isLost: true, deletedAt: null },
+    })])).toEqual([]);
+    expect(stageFunnel([row({
+      stage: 's4_negotiation',
+      value: 5,
+      pipelineStage: { isLost: true },
+    })])).toEqual([]);
+    const names = ['Zeta review', 'Alpha review'];
+    expect(stageBuckets(names.map((stage) => row({ stage, value: 1 }))).map((stage) => stage.id)).toEqual([
+      'Alpha review',
+      'Zeta review',
+    ]);
   });
 
   it('keeps a live lost stage out of the open charts', () => {
