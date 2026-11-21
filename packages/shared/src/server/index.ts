@@ -3,6 +3,7 @@
 // via the '@bidstack/shared/server' subpath (not re-exported from the root).
 export * from './dust-credentials.js';
 export * from './open-tech-stack.js';
+export * from './pinned-fetch.js';
 export * from './safe-outbound-fetch.js';
 export * from './trust-proxy.js';
 export * from '../oauth-refresh-lock.js';
