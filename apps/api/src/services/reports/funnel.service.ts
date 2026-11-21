@@ -34,16 +34,20 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   });
 
   // Weighted pipeline + avg-open-age over the FULL open set, not a take:1000
-  // sample. WHY raw SQL: weighted = SUM(value/1e6 * prob/100) is a row-wise
-  // product reduced to a scalar, and avg-open-age floors fractional days PER ROW
-  // (matching the prior daysBetween → Math.floor) before averaging — neither is
-  // expressible via prisma.aggregate. floor(epoch/86400) mirrors Math.floor on
+  // sample. WHY raw SQL: weighted micros are value_micros * probability / 100,
+  // and avg-open-age floors fractional days PER ROW (matching the prior
+  // daysBetween → Math.floor) before averaging — neither is expressible via
+  // prisma.aggregate. floor(epoch/86400) mirrors Math.floor on
   // (now - created_at) in whole days.
+  // Weighted micros stay in numeric, then bigint. float8 cannot represent
+  // every integer past 2^53, so value_micros::float8 / 1e6 is already short
+  // a micro before the probability multiply. round() is half-away-from-zero
+  // on an exact numeric quotient, then ::bigint drops the scale.
   const [agg] = await prisma.$queryRaw<
-    Array<{ weighted: number | null; avgDaysOpen: number | null; openCount: number }>
+    Array<{ weightedMicros: string | null; avgDaysOpen: number | null; openCount: number }>
   >(Prisma.sql`
     SELECT
-      SUM((o.value_micros::float8 / 1000000.0) * (o.probability::float8 / 100.0)) AS "weighted",
+      COALESCE(SUM(round((o.value_micros::numeric * o.probability::numeric) / 100)), 0)::bigint::text AS "weightedMicros",
       AVG(floor(EXTRACT(EPOCH FROM (now() - o.created_at)) / 86400.0)) AS "avgDaysOpen",
       COUNT(*)::int AS "openCount"
     FROM opportunities o
@@ -51,14 +55,14 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
       AND o.deleted_at IS NULL
       AND o.stage NOT IN ('closed_won', 'closed_lost')
   `);
-  const weighted = agg?.weighted ?? 0;
+  const weighted = microsToUnits(BigInt(agg?.weightedMicros ?? '0'));
   const avgDaysOpen = agg && agg.openCount > 0 ? Math.round(agg.avgDaysOpen ?? 0) : 0;
 
   return {
     byStage,
     totalOpen: open.reduce((acc, s) => acc + s.count, 0),
     totalValueOpen: open.reduce((acc, s) => acc + s.valueSum, 0),
-    weightedPipeline: Math.round(weighted * 100) / 100,
+    weightedPipeline: weighted,
     velocity: { avgDaysOpen, closedThisQuarter },
   };
 }
