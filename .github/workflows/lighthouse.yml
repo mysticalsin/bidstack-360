@@ -56,8 +56,9 @@ jobs:
       - name: Build web
         run: pnpm --filter @bidstack/web build
         env:
-          # Stub auth token for preview mode — no real backend needed for LHCI
-          VITE_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          # Stub auth, same as the E2E build. A non-empty publishable key
+          # selects Clerk even when VITE_AUTH_MODE=stub, and pk_test_placeholder
+          # is not a Clerk key. Leave the key unset.
           VITE_AUTH_MODE: stub
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
 
@@ -74,15 +75,16 @@ jobs:
         id: lhci
         # Root package.json is "type": "module", so Node loads .lighthouserc.js
         # as ESM and rejects its module.exports. LHCI needs that file as CJS.
-        # Headless Chrome, including Playwright's headless shell, loaded /login
-        # and returned NO_FCP ("keep the browser window in the foreground").
-        # headful skips LHCI's --headless=new. xvfb is the foreground window.
-        # chromeFlags stays one string: an array is joined with commas.
+        # Headless Chrome and headful Chrome under xvfb both loaded /login and
+        # returned NO_FCP. xvfb windows are treated as occluded, so Chrome
+        # never paints. These flags keep that window in the foreground and
+        # rasterize with SwiftShader. chromeFlags stays one string: an array
+        # is joined with commas. headful skips LHCI's --headless=new.
         # The ready pattern is localhost: because Vite puts an ANSI code
         # between Local and the colon. The product lighthouserc.js is not edited.
         run: |
           cp .lighthouserc.js "${RUNNER_TEMP}/lighthouserc.cjs"
-          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.headful=true; config.ci.collect.startServerReadyPattern="localhost:"; config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:"--no-sandbox --disable-dev-shm-usage"}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
+          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.headful=true; config.ci.collect.startServerReadyPattern="localhost:"; config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:"--no-sandbox --disable-dev-shm-usage --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-features=CalculateNativeWinOcclusion --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=1280,800"}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
           export CHROME_PATH="$(pnpm --filter @bidstack/web exec node --input-type=commonjs -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())' | tail -n 1)"
           echo "CHROME_PATH=$CHROME_PATH"
           test -x "$CHROME_PATH"
