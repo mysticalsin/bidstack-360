@@ -26,7 +26,7 @@
           "name": "I MUNICIPALIDAD DE SAN FELIPE | SECPLA - MUNISANFE",
           "id": "CL-MP-3730",
           "identifier": {
-            "id": "690506009",
+            "id": "990006202",
             "legalName": "I MUNICIPALIDAD DE SAN FELIPE",
             "scheme": "CL-RUT"
           },
@@ -137,7 +137,7 @@
           ],
           "items": [
             {
-              "id": "143121011",
+              "id": "1000621K",
               "description": "Ingeniería de tránsitoSERVICIO DE CONFIGURACION Y MODIFICACION DE SEMAFOROS EN LA INTERSECCION DE AV. O'HIGGINS/AV.RIQUELME (02 NODOS).",
               "quantity": 1,
               "unit": {
@@ -148,9 +148,9 @@
                 }
               },
               "classification": {
-                "id": "81102201",
+                "id": "10006228",
                 "scheme": "UNSPSC",
-                "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/81102201"
+                "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/10006228"
               },
               "valueBreakdown": [
                 {

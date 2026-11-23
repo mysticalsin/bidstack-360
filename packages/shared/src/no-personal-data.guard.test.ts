@@ -30,6 +30,9 @@ interface HitCounts {
 const REWRITTEN = [
   'packages/shared/src/public-sector/__fixtures__/cl/oc-da-2025-7.head.csv',
   'packages/shared/src/public-sector/__fixtures__/cl/lic-da-2025-7.head.csv',
+  'packages/shared/src/public-sector/__fixtures__/cl/ocds-tender-3951-19-LE25.json',
+  'packages/shared/src/public-sector/__fixtures__/cl/ocds-award-3951-19-LE25.json',
+  'packages/shared/src/public-sector/__fixtures__/cl/ocds-award-2741-120-TD25.json',
   'packages/shared/src/public-sector/csv.test.ts',
   'packages/shared/src/public-sector/cl/ocds-api.test.ts',
   'packages/shared/src/public-sector/cl/bulk.test.ts',
@@ -173,6 +176,42 @@ describe('personal-data guard', () => {
     expect(hits).toEqual({ mantu: 1, gmail: 1, ruts: 1 });
   });
 
+  it('flags a dashed RUT that the dotted pattern cannot see', () => {
+    const dashed = syntheticRut(7, 'person').dashed;
+    expect(dashed.includes('.')).toBe(false);
+    expect(dashed.includes('-')).toBe(true);
+    expect(scanText(dashed, 'sample.txt', empty, false).ruts).toBe(1);
+  });
+
+  it('flags a quoted plain RUT that the dotted and dashed patterns cannot see', () => {
+    const plain = syntheticRut(8, 'company').plain;
+    expect(/[-.]/.test(plain)).toBe(false);
+    const quoted = `"${plain}"`;
+    expect(scanText(quoted, 'sample.txt', empty, true).ruts).toBe(1);
+    expect(scanText(plain, 'sample.txt', empty, true).ruts).toBe(0);
+  });
+
+  it('an empty allowlist fails closed on this tree', () => {
+    const report = scanRepo(repoRoot(), empty);
+    let gmail = 0;
+    let ruts = 0;
+    for (const hit of report.values()) {
+      gmail += hit.gmail;
+      ruts += hit.ruts;
+    }
+    expect(report.size).toBeGreaterThan(0);
+    expect(gmail).toBeGreaterThan(0);
+    expect(ruts).toBeGreaterThan(0);
+  });
+
+  it('the parent of the cleanup commit fails the guard on seed fixtures', () => {
+    const text = execFileSync('git', ['show', 'f54ec4d1^:packages/db/src/seed-data.ts'], {
+      cwd: repoRoot(),
+      encoding: 'utf8',
+    });
+    expect(scanText(text, 'packages/db/src/seed-data.ts', empty, true).mantu).toBeGreaterThan(0);
+  });
+
   it('ignores an allowlisted gmail fixture and a seeded RUT body', () => {
     const rut = syntheticRut(4, 'person');
     const allow: Allowlist = {
@@ -187,6 +226,9 @@ describe('personal-data guard', () => {
 
   it('does not path-allow the fixtures this change rewrote', () => {
     const allow = loadAllowlist(repoRoot());
+    expect(REWRITTEN.length).toBeGreaterThanOrEqual(9);
+    expect(allow.rutBodies.length).toBeGreaterThan(0);
+    expect(allow.gmailAddresses.length).toBeGreaterThan(0);
     expect(allow.mantuPaths).toEqual([]);
     for (const rel of REWRITTEN) expect(allow.rutPaths, rel).not.toContain(rel);
   });

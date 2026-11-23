@@ -38,7 +38,7 @@ preview_urls = false
 
 [vars]
 # Exact emails, or @domain to admit a whole domain (exact match) as Sales Manager.
-ALLOWED_EMAILS = "alex.example@example.test,@amaris.com"
+ALLOWED_EMAILS = "alex.example@example.test,@example.test"
 POLO_ADMIN_EMAILS = "alex.example@example.test"
 PUBLIC_ORIGIN = "https://polo-preview.tony-walteur.workers.dev"
 # SEC EDGAR and public registries require a contact User-Agent.
