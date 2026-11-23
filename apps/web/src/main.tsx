@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { NuqsAdapter } from 'nuqs/adapters/react-router/v6';
 
-import { ApiError } from '@/lib/api';
+import { retryMutationOnce, retryQueryOnce } from '@/lib/query-retry';
 import { initAccent } from '@/lib/accent';
 import { AuthProvider } from '@/lib/auth';
 import { initSentry, Sentry } from '@/lib/sentry';
@@ -32,15 +32,9 @@ reportWebVitals(logVitalsToConsole);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Retry once for transient 5xx / network errors; don't retry on 4xx
-      // (user error — retrying won't fix anything and wastes a roundtrip).
-      retry: (failureCount, error) => {
-        if (failureCount >= 2) return false;
-        if (error instanceof ApiError) {
-          return error.status >= 500 || error.status === 0;
-        }
-        return true;
-      },
+      // One retry for transient 5xx / network errors, then the panel shows
+      // its error state. 4xx is not retried.
+      retry: retryQueryOnce,
       // Long-lived CRM tabs must heal after laptop sleep/token rotation.
       // With a 2 minute staleTime this stays quiet on quick tab switches,
       // but a page left open will refetch instead of forcing a relogin.
@@ -52,13 +46,7 @@ const queryClient = new QueryClient({
     mutations: {
       // Mutations retry exactly once on a 5xx/network drop. 4xx surfaces
       // immediately so the optimistic rollback fires without delay.
-      retry: (failureCount, error) => {
-        if (failureCount >= 1) return false;
-        if (error instanceof ApiError) {
-          return error.status >= 500 || error.status === 0;
-        }
-        return true;
-      },
+      retry: retryMutationOnce,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     },
   },

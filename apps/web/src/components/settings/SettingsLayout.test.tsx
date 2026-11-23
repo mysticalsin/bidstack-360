@@ -48,6 +48,8 @@ describe('SettingsLayout', () => {
     renderLayout();
 
     expect(screen.queryByRole('link', { name: 'Top accounts' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Product reports' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Appearance & Language' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Feedback' })).toBeTruthy();
   });
 });

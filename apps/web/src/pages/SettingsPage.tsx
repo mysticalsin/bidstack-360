@@ -21,6 +21,8 @@ import { AccessGroupsSection } from '@/components/settings/AccessGroupsSection';
 import { OpportunityFiltersSection } from '@/components/settings/OpportunityFiltersSection';
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
+import { FeedbackSection } from '@/components/settings/FeedbackSection';
+import { ProductReportsSection } from '@/components/settings/ProductReportsSection';
 import { useIsAdmin } from '@/lib/auth';
 
 // Each entry maps a section code to its [i18n key suffix, English default].
@@ -45,6 +47,8 @@ const SECTION_TITLES: Record<SettingsSection, [string, string]> = {
   webhooks: ['sectionWebhooks', 'Webhooks'],
   'audit-log': ['sectionAuditLog', 'Audit log'],
   developer: ['sectionDeveloper', 'Developer access'],
+  feedback: ['sectionFeedback', 'Feedback'],
+  reports: ['sectionReports', 'Product reports'],
 };
 
 const SETTINGS_SECTIONS = new Set<SettingsSection>(
@@ -63,6 +67,7 @@ const ADMIN_SETTINGS_SECTIONS = new Set<SettingsSection>([
   'webhooks',
   'audit-log',
   'developer',
+  'reports',
 ]);
 
 function resolveSettingsTab(tab: string | null, isAdmin: boolean): SettingsSection {
@@ -122,6 +127,8 @@ export function SettingsPage() {
     webhooks: <WebhooksSection />,
     'audit-log': <AuditLogSection />,
     developer: <DeveloperAccessSection />,
+    feedback: <FeedbackSection />,
+    reports: <ProductReportsSection />,
   };
 
   return (

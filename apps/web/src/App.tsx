@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { useUser } from '@/lib/auth';
 import { CommandPalette } from '@/components/command/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 import { LiveAnnouncer } from '@/components/a11y/LiveAnnouncer';
 import { ConfettiHost } from '@/components/delight/Confetti';
 import { WebVitalsHud } from '@/components/dev/WebVitalsHud';
@@ -28,6 +29,7 @@ import { usePreferences } from '@/stores/preferences';
 import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { useGlobalUndoHotkey } from '@/stores/undoStack';
+import { recordClientAction } from '@/lib/client-log';
 import { AppRoutes } from '@/routes/AppRoutes';
 
 export function App() {
@@ -38,6 +40,10 @@ export function App() {
   useGlobalUndoHotkey();
   const location = useLocation();
   const isShellLess = location.pathname === '/login' || location.pathname.startsWith('/sign/');
+
+  useEffect(() => {
+    recordClientAction(`Opened ${location.pathname}${location.search}`);
+  }, [location.pathname, location.search]);
 
   const { user } = useUser();
   const scopePreferences = usePreferences((s) => s.scopeToUser);
@@ -78,11 +84,13 @@ export function App() {
               fades+rises the new page in. No exit animation (avoids router
               location-freezing complexity); reduced-motion → opacity only. */}
           <PageTransition pageKey={location.pathname}>
-            <ErrorBoundary>
+            {/* A page that fails to render stays inside the shell. This boundary
+                resets only itself and does not reload the window. */}
+            <SectionErrorBoundary>
               <Suspense fallback={<LoadingSkeleton rows={6} />}>
                 <AppRoutes />
               </Suspense>
-            </ErrorBoundary>
+            </SectionErrorBoundary>
           </PageTransition>
           <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
           <QuickAddMenu />

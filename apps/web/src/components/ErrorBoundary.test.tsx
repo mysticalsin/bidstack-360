@@ -1,13 +1,42 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+
+import { resetCrashGuardForTests } from '@/lib/crash-guard';
+
+const apiMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ ok: true, duplicate: false, id: '1' }),
+);
+const reload = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/api', () => ({
+  api: apiMock,
+  ApiError: class ApiError extends Error {
+    status = 0;
+    body = null;
+  },
+}));
+
 import { ErrorBoundary } from './ErrorBoundary';
 
 function ThrowError(): never {
   throw new Error('Test error');
 }
 
+beforeEach(() => {
+  apiMock.mockClear();
+  reload.mockClear();
+  sessionStorage.clear();
+  resetCrashGuardForTests();
+  vi.stubGlobal('location', {
+    pathname: '/dashboard',
+    search: '',
+    reload,
+  });
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('ErrorBoundary', () => {
@@ -19,10 +48,11 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByTestId('child')).toBeDefined();
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
-  it('renders fallback UI when a child throws', () => {
-    // Suppress console.error for this test to keep output clean
+  it('renders a dashboard way out when a child throws', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
@@ -32,14 +62,46 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeDefined();
+    const dashboard = screen.getByRole('link', { name: /back to dashboard/i });
+    expect(dashboard.getAttribute('href')).toBe('/dashboard');
     expect(screen.getByRole('button', { name: /reload page/i })).toBeDefined();
 
     consoleError.mockRestore();
   });
 
-  it('calls window.location.reload when reload button is clicked', () => {
+  it('sends one crash log and reloads once, then stays on the fallback', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubGlobal('location', { reload: vi.fn() });
+
+    render(
+      <ErrorBoundary>
+        <ThrowError />
+      </ErrorBoundary>,
+    );
+    cleanup();
+    render(
+      <ErrorBoundary>
+        <ThrowError />
+      </ErrorBoundary>,
+    );
+
+    // WHY: the same crash must not notify admins twice or restart the app
+    // twice. The second time the fallback stays so the user can leave.
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(apiMock.mock.calls[0]?.[0]).toBe('/api/product-reports');
+    const body = (
+      apiMock.mock.calls[0]?.[1] as { body: { kind: string; page: string; signature: string } }
+    ).body;
+    expect(body.kind).toBe('crash');
+    expect(body.page).toBe('/dashboard');
+    expect(body.signature).toMatch(/^[a-f0-9]{8}$/);
+    expect(screen.getByRole('link', { name: /back to dashboard/i })).toBeTruthy();
+
+    consoleError.mockRestore();
+  });
+
+  it('still reloads when the reload button is clicked', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
       <ErrorBoundary>
@@ -47,12 +109,10 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>,
     );
 
-    const reloadBtn = screen.getByRole('button', { name: /reload page/i });
-    reloadBtn.click();
+    expect(reload).toHaveBeenCalledTimes(1);
+    screen.getByRole('button', { name: /reload page/i }).click();
+    expect(reload).toHaveBeenCalledTimes(2);
 
-    expect(window.location.reload).toHaveBeenCalled();
-
-    vi.unstubAllGlobals();
     consoleError.mockRestore();
   });
 });
