@@ -74,14 +74,20 @@ jobs:
         id: lhci
         # Root package.json is "type": "module", so Node loads .lighthouserc.js
         # as ESM and rejects its module.exports. LHCI needs that file as CJS.
-        # chromeFlags must be one string. LHCI concatenates an array with
-        # commas, so --no-sandbox never reached Chrome and the zygote aborted
-        # with "No usable sandbox". Vite preview prints "Local:", not "ready in".
+        # chromium.executablePath() is the full Chrome binary. LHCI then adds
+        # --headless=new, and that process returned NO_FCP. The shards paint
+        # with Playwright's Chrome headless shell, so that binary is CHROME_PATH.
+        # chromeFlags stays one string: an array is joined with commas.
+        # Vite's "Local:" line has an ANSI code before the colon, so the ready
+        # pattern is the contiguous "localhost:" in the printed URL.
         # The product lighthouserc.js is not edited.
         run: |
           cp .lighthouserc.js "${RUNNER_TEMP}/lighthouserc.cjs"
-          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.startServerReadyPattern="Local:"; config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:"--no-sandbox --disable-dev-shm-usage"}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
-          export CHROME_PATH="$(pnpm --filter @bidstack/web exec node --input-type=commonjs -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())' | tail -n 1)"
+          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.startServerReadyPattern="localhost:"; config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:"--no-sandbox --disable-dev-shm-usage"}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
+          full="$(pnpm --filter @bidstack/web exec node --input-type=commonjs -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())' | tail -n 1)"
+          cache="$(dirname "$(dirname "$(dirname "$full")")")"
+          export CHROME_PATH="$(find "$cache" -type f -path '*chromium_headless_shell*' -name chrome-headless-shell | head -n 1)"
+          echo "CHROME_PATH=$CHROME_PATH"
           test -x "$CHROME_PATH"
           lhci autorun --config="${RUNNER_TEMP}/lighthouserc-ci.cjs"
         env:
