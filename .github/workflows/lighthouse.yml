@@ -59,7 +59,10 @@ jobs:
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
 
       - name: Install Lighthouse CI
-        run: npm install -g @lhci/cli@0.14.x
+        # 0.14.x bundles Lighthouse 12.1.0. Against the runner's Chrome 157
+        # that build reports NO_FCP and never scores the page. 0.16.1
+        # bundles Lighthouse 13.6.0, which speaks this Chrome.
+        run: npm install -g @lhci/cli@0.16.1
 
       - name: Run Lighthouse CI
         id: lhci
