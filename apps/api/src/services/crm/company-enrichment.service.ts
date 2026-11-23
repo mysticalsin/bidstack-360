@@ -511,6 +511,5 @@ export function buildCompanies(
     }
   }
 
-  if (!byName.has('mantu')) byName.set('mantu', fallbackCompany('Mantu'));
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
