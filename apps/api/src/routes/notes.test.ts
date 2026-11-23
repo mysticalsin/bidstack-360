@@ -8,8 +8,9 @@
 //      future change loosened them.
 //
 //   2. In-process integration test — boots Fastify with the real auth stub
-//      and Prisma client, hits /api/notes via server.inject. Skipped when
-//      DATABASE_URL isn't reachable so the suite stays green in offline CI.
+//      pointed at a throwaway org (not org_seed_mantu) and the Prisma
+//      client, then hits /api/notes via server.inject. Fails loud when
+//      DATABASE_URL isn't reachable.
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -17,6 +18,11 @@ import { prisma } from '@bidstack/db';
 import { MeetingNotesImportRequest, Note, NoteCreate, NotePatch } from '@bidstack/shared';
 
 import { buildServer } from '../server.js';
+import {
+  createIsolatedOrg,
+  dropIsolatedOrg,
+  useIsolatedOrgAuth,
+} from '../test-support/isolated-org.js';
 import { makeSkipIfNoDb } from '../test-support/skip-if-no-db.js';
 
 describe('Note schemas', () => {
@@ -81,12 +87,15 @@ describe('Note schemas', () => {
 
 let server: Awaited<ReturnType<typeof buildServer>>;
 let dbReachable = false;
+let orgId = '';
+let restoreAuth: (() => void) | null = null;
 
-async function cleanupMeetingImportArtifacts(): Promise<void> {
+async function cleanupMeetingImportArtifacts(targetOrgId: string): Promise<void> {
   const now = new Date();
   await prisma.$transaction([
     prisma.contact.updateMany({
       where: {
+        orgId: targetOrgId,
         deletedAt: null,
         OR: [
           { name: 'E2E Buyer' },
@@ -98,19 +107,35 @@ async function cleanupMeetingImportArtifacts(): Promise<void> {
       data: { deletedAt: now },
     }),
     prisma.note.updateMany({
-      where: { deletedAt: null, accountId: { startsWith: 'meeting import ' } },
+      where: {
+        orgId: targetOrgId,
+        deletedAt: null,
+        accountId: { startsWith: 'meeting import ' },
+      },
       data: { deletedAt: now },
     }),
     prisma.riskRegisterItem.updateMany({
-      where: { deletedAt: null, companyName: { startsWith: 'Meeting Import' } },
+      where: {
+        orgId: targetOrgId,
+        deletedAt: null,
+        companyName: { startsWith: 'Meeting Import' },
+      },
       data: { deletedAt: now },
     }),
     prisma.task.updateMany({
-      where: { deletedAt: null, title: { startsWith: 'Send Jamf deployment plan' } },
+      where: {
+        orgId: targetOrgId,
+        deletedAt: null,
+        title: { startsWith: 'Send Jamf deployment plan' },
+      },
       data: { deletedAt: now },
     }),
     prisma.companyEnrichment.updateMany({
-      where: { deletedAt: null, normalizedName: { startsWith: 'meeting-import-' } },
+      where: {
+        orgId: targetOrgId,
+        deletedAt: null,
+        normalizedName: { startsWith: 'meeting-import-' },
+      },
       data: { deletedAt: now },
     }),
   ]);
@@ -124,23 +149,52 @@ beforeAll(async () => {
     dbReachable = false;
     return;
   }
-  await cleanupMeetingImportArtifacts();
+  // Own org, same as the other route suites. Stub auth otherwise resolves
+  // org_seed_mantu and 500s with "seed org missing" when that row is absent.
+  const org = await createIsolatedOrg('notes');
+  orgId = org.orgId;
+  restoreAuth = useIsolatedOrgAuth(org.clerkOrg);
+  await cleanupMeetingImportArtifacts(orgId);
   server = await buildServer();
   await server.ready();
-});
+}, 60_000);
 
 afterAll(async () => {
   if (server) await server.close();
-  if (dbReachable) {
-    await cleanupMeetingImportArtifacts();
-    await prisma.$disconnect();
-  }
+  if (dbReachable && orgId) await cleanupMeetingImportArtifacts(orgId);
+  restoreAuth?.();
+  if (orgId) await dropIsolatedOrg(orgId);
+  if (dbReachable) await prisma.$disconnect();
 });
 
 const skipIfNoDb = makeSkipIfNoDb(() => dbReachable);
 
 describe('notes routes (integration)', () => {
   const accountId = `test-account-${Date.now()}`;
+
+  skipIfNoDb(
+    'stores the note on this file’s isolated org, not the shared seed org',
+    async () => {
+      // Why: stub auth falls back to org_seed_mantu. An empty database then
+      // returns 500 "Stub auth: seed org missing" and this file never
+      // exercises the notes contract. The row has to land on a throwaway
+      // org even when that seed org is absent.
+      const isolatedAccountId = `isolated-note-${Date.now()}`;
+      const created = await server.inject({
+        method: 'POST',
+        url: '/api/notes',
+        payload: { accountId: isolatedAccountId, title: 'Isolated', bodyMd: 'not the seed org' },
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      const noteId = (created.json() as { id: string }).id;
+      const row = await prisma.note.findUnique({
+        where: { id: noteId },
+        select: { org: { select: { clerkOrg: true } } },
+      });
+      expect(row?.org.clerkOrg.startsWith('org_notes_')).toBe(true);
+      expect(row?.org.clerkOrg).not.toBe('org_seed_mantu');
+    },
+  );
 
   skipIfNoDb('POST → GET → PATCH → DELETE round-trips a note', async () => {
     const created = await server.inject({
@@ -225,7 +279,7 @@ describe('notes routes (integration)', () => {
     expect(json.created.techStackItems).toBeGreaterThanOrEqual(4);
 
     const enrichment = await prisma.companyEnrichment.findFirst({
-      where: { normalizedName },
+      where: { orgId, normalizedName },
       select: { providerMetadata: true },
     });
     expect(enrichment).not.toBeNull();
