@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
+import { decidePipelineStageSoftDelete } from './pipeline-stage-softdelete.js';
+
 interface DefaultStage {
   key: string;
   name: string;
@@ -168,6 +170,57 @@ export const pipelineStageRoutes: FastifyPluginAsyncZod = async (server) => {
       ]);
 
       return serializeStage(updated);
+    },
+  );
+
+  server.delete(
+    '/pipeline-stages/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: {
+          200: z.object({
+            id: z.string().uuid(),
+            deletedAt: z.string().datetime(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const existing = await prisma.pipelineStage.findFirst({
+        where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+      });
+      if (!existing) throw server.httpErrors.notFound('Pipeline stage not found');
+
+      const liveDealCount = await prisma.opportunity.count({
+        where: {
+          orgId: req.auth.orgId,
+          pipelineStageId: existing.id,
+          deletedAt: null,
+        },
+      });
+      const decision = decidePipelineStageSoftDelete(liveDealCount);
+      if (!decision.allowed) throw server.httpErrors.conflict(decision.message);
+
+      const deletedAt = new Date();
+      await prisma.$transaction([
+        prisma.pipelineStage.update({
+          where: { id: existing.id },
+          data: { deletedAt },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'pipeline_stage.soft_delete',
+            targetType: 'pipeline_stage',
+            targetId: existing.id,
+            diff: { deletedAt: deletedAt.toISOString() },
+          },
+        }),
+      ]);
+
+      return { id: existing.id, deletedAt: deletedAt.toISOString() };
     },
   );
 };
