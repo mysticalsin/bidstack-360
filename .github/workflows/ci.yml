@@ -12,7 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: '10'
+  # Must equal package.json packageManager. A major-only pin ("10") makes
+  # pnpm/action-setup abort before install when that field is pnpm@10.27.0.
+  PNPM_VERSION: '10.27.0'
 
 # Least-privilege default token — no job here writes to the repo.
 permissions:
@@ -192,7 +194,9 @@ jobs:
   # E2E smoke against a built preview + a running API.
   e2e:
     name: E2E smoke (Playwright)
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04. Playwright 1.59.1 has no Chromium build for
+    # ubuntu26.04-x64, so `playwright install` exits before any test.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     if: github.event_name == 'pull_request'
     needs: integration
@@ -244,7 +248,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
 
       - name: Install Playwright Chromium (with deps)
-        run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium
+        run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium firefox webkit
 
       - name: Migrate + seed
         run: |
@@ -252,24 +256,19 @@ jobs:
           pnpm db:migrate:deploy
           pnpm db:seed
 
+      - name: Build packages the API loads
+        # tsx resolves workspace libs to dist/. Without this the API exits
+        # before Playwright collects any spec.
+        run: pnpm --filter "@bidstack/api^..." build
+
       - name: Build web
         run: pnpm --filter @bidstack/web build
 
-      - name: Start API in background
-        run: |
-          pnpm --filter @bidstack/api dev &
-          # Wait up to 30s for /health.
-          for i in {1..30}; do
-            if curl -sf http://localhost:4000/health > /dev/null; then
-              echo "API up after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-
       - name: Run Playwright smoke suite
         env:
-          E2E_API_URL: http://localhost:4000
+          # Playwright starts the API. E2E_API_PORT must match the URL.
+          E2E_API_PORT: '4000'
+          E2E_API_URL: http://127.0.0.1:4000
         run: pnpm --filter @bidstack/web e2e
 
       - name: Upload Playwright report on failure
