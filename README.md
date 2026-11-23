@@ -5,6 +5,26 @@
 
 This monorepo ships the standalone build of BidStack 360°. A future migration path to Twenty CRM as an overlay package is preserved verbatim under `packages/twenty-bidstack/`.
 
+## Where the code lives
+
+| Path | What it is |
+| --- | --- |
+| `apps/web` | React app. `pnpm dev:web` → http://localhost:5173 |
+| `apps/api` | Fastify API. `pnpm dev:api` → http://localhost:4000 |
+| `apps/worker` | BullMQ workers. `pnpm dev:worker` |
+| `apps/mcp-server` | MCP server. `pnpm dev:mcp` → http://localhost:4001 |
+| `apps/marketing` | Marketing site |
+| `apps/chrome-extension` | Chrome extension. Not a pnpm workspace package |
+| `packages/shared` | Shared Zod schemas and types (`@bidstack/shared`) |
+| `packages/db` | Prisma schema and client (`@bidstack/db`) |
+| `packages/dust-client` | Dust API client (`@bidstack/dust-client`) |
+| `packages/*` | Other libraries. Import them as `@bidstack/<folder>` |
+| `docs/` | Architecture, ADRs, runbooks, and public API guides (`docs/public-api/`) |
+| `integrations/` | Zapier app and Slack manifest. TypeScript connectors are `packages/integrations` |
+| `handoff/` | Original backend handoff. Shift notes are in `handoff/relay/` |
+
+`packages/twenty-bidstack/` is excluded from the workspace. `BIDCRM-design/` is a pinned design-snapshot submodule, not the running app.
+
 ---
 
 ## Feature matrix
@@ -144,6 +164,8 @@ Full diagram and module documentation: [`docs/ARCHITECTURE.md`](./docs/ARCHITECT
 | [`docs/security/pii-field-encryption.md`](./docs/security/pii-field-encryption.md) | PII encryption runbook |
 | [`docs/DUST.md`](./docs/DUST.md)                | Dust integration patterns                       |
 | [`docs/MCP.md`](./docs/MCP.md)                  | MCP server design                               |
+| [`docs/public-api/`](./docs/public-api/)        | Customer-facing API guides                      |
+| [`docs/production-readiness/`](./docs/production-readiness/) | Release-gate notes and runbooks      |
 | [`load-tests/README.md`](./load-tests/README.md)| k6 load test instructions                       |
 
 ---

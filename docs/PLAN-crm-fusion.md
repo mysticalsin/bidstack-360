@@ -1,6 +1,6 @@
 # PLAN — Compai fusion (full re-IA + sheet model + Carbon icons)
 
-Branch `feat/crm-design-fusion`. Companion to [`DESIGN.md`](./DESIGN.md).
+Branch `feat/crm-design-fusion`. Companion to [`polo-presales-visual-system.md`](./design-system/polo-presales-visual-system.md).
 Reference: `github.com/trycompai/crm` (cloned and read, not paraphrased).
 
 ## Outcome
@@ -110,7 +110,7 @@ Each step ships green and is verifiable in the live demo before the next starts.
 
 1. **Token layer** — accent, neutrals, radius, shadows, type. Highest leverage:
    changes every screen at once with no structural risk. *(Contrast re-verified
-   per DESIGN.md §1, including the dark-mode accent trap.)*
+   per docs/design-system/polo-presales-visual-system.md §1, including the dark-mode accent trap.)*
 2. **Shell** — icon rail + page skeleton. *Done, with one revision to ADR-1
    recorded below.*
 3. **Sheet infrastructure** — `ui/Sheet` + `lib/use-sheet-param` URL binding.

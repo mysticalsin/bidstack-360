@@ -20,11 +20,11 @@
 .claire/**
 .clone/**
 .forge/**
-.planning/**
+docs/planning/**
 BIDCRM-design/**
 deploy-evidence/**
 load-test-report/**
-production-readiness/evidence/**
+docs/production-readiness/evidence/**
 scratch/**
 scratch_img/**
 scratch_skills/**
