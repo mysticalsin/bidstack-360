@@ -8,6 +8,8 @@ import {
   line as d3Line,
 } from "d3-shape";
 
+import { compactKeepsUnits } from "@/lib/compact-units";
+
 export type SparklineCurve = "linear" | "monotone" | "natural" | "step";
 
 export type SparklineDataKey<T> =
@@ -257,18 +259,6 @@ export function sparklineIndexAtX(
   const raw =
     kind === "band" ? Math.floor(t * count) : Math.round(t * (count - 1));
   return Math.min(count - 1, Math.max(0, raw));
-}
-
-function compactKeepsUnits(units: number): boolean {
-  const abs = Math.abs(units);
-  for (const div of [1e9, 1e6, 1e3]) {
-    if (abs < div) continue;
-    for (let digits = 0; digits <= 2; digits += 1) {
-      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
-    }
-    return false;
-  }
-  return false;
 }
 
 function formatCompact(value: number): string {

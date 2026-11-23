@@ -1,5 +1,6 @@
 // Plain-language labels and tones for the Agreements screens.
 import type { BadgeTone } from '@/components/ui/Badge';
+import { compactKeepsUnits } from '@/lib/compact-units';
 
 import type { MsaKind, MsaStatus } from './types';
 
@@ -37,19 +38,6 @@ export function fmtBytes(n: number): string {
 function groupedUnits(micros: bigint): string {
   const units = micros / 1_000_000n;
   return units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-}
-
-/** Compact in en-GB only when two fraction digits still name this unit count. */
-function compactKeepsUnits(units: number): boolean {
-  const abs = Math.abs(units);
-  for (const div of [1e9, 1e6, 1e3]) {
-    if (abs < div) continue;
-    for (let digits = 0; digits <= 2; digits += 1) {
-      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
-    }
-    return false;
-  }
-  return false;
 }
 
 /** Whole units plus the micros remainder. Integer division alone turns 1.50 into 1. */
