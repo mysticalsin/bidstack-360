@@ -8,7 +8,7 @@ describe('Contact schema', () => {
       customer: 'Mantu',
       name: 'Tony Walteur',
       role: 'CEO',
-      email: 'tony@mantu.com',
+      email: 'tony@example.test',
       phone: null,
       influence: 5,
       sentiment: 'hot',

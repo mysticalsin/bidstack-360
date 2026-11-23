@@ -8,6 +8,7 @@
 #   worker  polo-preview
 #   DO      RELAY / Relay / namespace 0d921e2b3ba74386afdb1147745866d0
 #   secret  RELAY_KEY (set once on the Worker; never committed)
+#   secret  ACCESS_AUD (wrangler secret put ACCESS_AUD) Cloudflare Access audience
 #
 # Container secrets (names only; values in the macOS Keychain, service toto-os):
 #   POLO_INTERNAL_KEY               Worker <-> container control endpoints
@@ -36,13 +37,12 @@ workers_dev = true
 preview_urls = false
 
 [vars]
-ACCESS_AUD = "826c47f72e2aa2bb7973d533363fcc2b536137578c33a3f1972afb90584e686c"
 # Exact emails, or @domain to admit a whole domain (exact match) as Sales Manager.
-ALLOWED_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com,marc.bisiou@amaris.com,acamaret@amaris.com,tmassin@amaris.com,@amaris.com,@mantu.com"
-POLO_ADMIN_EMAILS = "tony.walteur@gmail.com,twalteur@amaris.com"
+ALLOWED_EMAILS = "alex.example@example.test,@example.test"
+POLO_ADMIN_EMAILS = "alex.example@example.test"
 PUBLIC_ORIGIN = "https://polo-preview.tony-walteur.workers.dev"
 # SEC EDGAR and public registries require a contact User-Agent.
-POLO_INTEL_USER_AGENT = "Polo account intelligence (Amaris Consulting) twalteur@amaris.com"
+POLO_INTEL_USER_AGENT = "Polo account intelligence (Amaris Consulting) intel@example.test"
 
 [[durable_objects.bindings]]
 name = "RELAY"

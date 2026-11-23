@@ -22,7 +22,8 @@ export interface PersonalDataFinding {
 }
 
 const DOTTED_RUT = /\b\d{1,2}\.\d{3}\.\d{3}-[\dkK](?![\w])/g;
-const DASHED_RUT = /\b\d{7,8}-[\dkK](?![\w])/g;
+// The hyphen before a ChileCompra type suffix (`-SE25`, `-LR24`, `-PC25`) is not a RUT boundary.
+const DASHED_RUT = /\b\d{7,8}-[\dkK](?![\w]|-[A-Za-z]{2}\d{2})/g;
 const OCDS_RUT = /("identifier":\s*\{[^}]*?"id":\s*")(\d{7,9}[\dkK])"/g;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
 const REP_NAME = /(REPRESENTANTE LEGAL\s*:\s*)[^\s\r\n";[][^\r\n";]{1,79}/gi;

@@ -25,7 +25,7 @@ const connectedGoogle = {
   provider: 'google',
   configured: true,
   status: 'connected',
-  accountEmail: 'rep@mantu.com',
+  accountEmail: 'rep@example.test',
   scopes: [
     { key: 'identity', label: 'See your email address', access: 'read' },
     { key: 'mail_read', label: 'Read your email', access: 'read' },
@@ -81,7 +81,7 @@ describe('WorkspaceAccountsCard', () => {
     renderCard();
     const card = await screen.findByTestId('integration-card-gmail');
     expect(within(card).getByText('Connected')).toBeTruthy();
-    expect(within(card).getByText('rep@mantu.com')).toBeTruthy();
+    expect(within(card).getByText('rep@example.test')).toBeTruthy();
     expect(within(card).getByText('Read your email')).toBeTruthy();
     expect(within(card).getByText('Read your calendar')).toBeTruthy();
     expect(within(card).getByText(/Last sync/)).toBeTruthy();

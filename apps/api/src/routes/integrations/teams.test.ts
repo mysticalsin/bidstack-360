@@ -58,7 +58,7 @@ const CHAT = {
   webUrl: 'https://teams.microsoft.com/l/chat/19%3Aacme/0',
   lastMessagePreview: { createdDateTime: '2026-11-07T15:00:00Z' },
   members: [
-    { userId: 'aad-tony', email: 'tony@mantu.com', displayName: 'Tony' },
+    { userId: 'aad-tony', email: 'tony@example.test', displayName: 'Tony' },
     { userId: 'aad-jane', email: 'jane@acme.com', displayName: 'Jane Doe' },
   ],
 };
@@ -104,7 +104,7 @@ function grant(scope: string[], status = 'active') {
     accessTokenEncrypted: 'enc',
     refreshTokenEncrypted: 'enc',
     expiresAt: new Date(Date.now() + 3600_000),
-    externalAccountEmail: 'tony@mantu.com',
+    externalAccountEmail: 'tony@example.test',
   };
 }
 const READY = grant([`${G}Mail.Read`, `${G}Calendars.Read`, `${G}Chat.Read`]);
@@ -177,7 +177,7 @@ describe('GET /integrations/teams/access', () => {
     });
     expect((await app.inject({ url: '/api/v1/integrations/teams/access' })).json()).toMatchObject({
       state: 'ready',
-      accountEmail: 'tony@mantu.com',
+      accountEmail: 'tony@example.test',
     });
   });
 });
@@ -236,7 +236,7 @@ describe('GET /integrations/teams/chats and /messages', () => {
     expect(body.items[1]).toMatchObject({ preview: 'Scope looks good', attachmentNames: ['Scope.docx'] });
     expect(body.suggestions[0].name).toBe('Acme');
     expect(vi.mocked(suggestTeamsAccounts).mock.calls[0]![0]).toMatchObject({
-      emails: ['tony@mantu.com', 'jane@acme.com'],
+      emails: ['tony@example.test', 'jane@acme.com'],
       companyWhere: { AND: [{ orgId: ORG, deletedAt: null }, { id: { in: [ACME] } }] },
     });
   });
@@ -282,7 +282,7 @@ describe('POST /integrations/teams/import', () => {
     const input = vi.mocked(fileTeamsMessages).mock.calls[0]![0];
     expect(input.messages.map((m) => m.id)).toEqual(['m2']);
     expect(input).toMatchObject({ actorUserId: USER, ownerUserId: USER, companyId: ACME });
-    expect(input.thread.members.map((m) => m.email)).toEqual(['tony@mantu.com', 'jane@acme.com']);
+    expect(input.thread.members.map((m) => m.email)).toEqual(['tony@example.test', 'jane@acme.com']);
     expect(digests).toHaveLength(1);
     expect(digests[0]!.activityIds).toEqual(['a1', 'a2']);
     expect(db.teamsChatLink.create).not.toHaveBeenCalled();

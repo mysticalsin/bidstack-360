@@ -28,7 +28,7 @@ function message(over: Record<string, unknown>) {
     externalMessageId: 'm1',
     threadId: 't1',
     fromEmail: 'buyer@client.example',
-    toEmails: [{ email: 'rep@mantu.com' }],
+    toEmails: [{ email: 'rep@example.test' }],
     ccEmails: [],
     subject: 'RFP questions',
     bodyText: 'Can you confirm the deadline?',

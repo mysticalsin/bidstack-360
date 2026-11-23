@@ -9,8 +9,8 @@ import type {
 
 const DAY = 86_400_000;
 const CI = 'c0000000-0000-4000-8000-000000000001';
-const owner: MsaUserRef = { id: '00000000-0000-4000-8000-0000000000a1', email: 'jane@mantu.com', name: 'Jane Smith' };
-const legal: MsaUserRef = { id: '00000000-0000-4000-8000-0000000000a2', email: 'legal@mantu.com', name: 'Rita Legal' };
+const owner: MsaUserRef = { id: '00000000-0000-4000-8000-0000000000a1', email: 'jane@example.test', name: 'Jane Smith' };
+const legal: MsaUserRef = { id: '00000000-0000-4000-8000-0000000000a2', email: 'legal@example.test', name: 'Rita Legal' };
 
 function iso(offsetDays: number, now: number): string {
   const d = new Date(now + offsetDays * DAY);

@@ -53,7 +53,7 @@ describe('bulk file plan', () => {
   });
 });
 
-describe('tender bulk file with offers received (real lic-da 2025-7 head)', () => {
+describe('tender bulk file with offers received (synthetic lic-da 2025-7 head)', () => {
   it('decodes Latin-1 and maps codes to stages', async () => {
     const n = await loadLicitacionesCsv(chunked(fixtureBytes('lic-da-2025-7.head.csv')), CTX);
     const opp = n.opportunities.find((o) => o.externalId === '5184-102-LP24');
@@ -92,7 +92,7 @@ describe('tender bulk file with offers received (real lic-da 2025-7 head)', () =
   });
 });
 
-describe('purchase orders and the erroneous list (real oc-da 2025-7 head)', () => {
+describe('purchase orders and the erroneous list (synthetic oc-da 2025-7 head)', () => {
   const erroneous = () =>
     parseErroneousPoList(fixtureBytes('hist_OC_erroneas.head.csv'));
 
@@ -148,6 +148,37 @@ describe('purchase orders and the erroneous list (real oc-da 2025-7 head)', () =
     const companies = n.suppliers.filter((s) => !s.isNaturalPerson);
     expect(companies.length).toBeGreaterThan(0);
     for (const s of companies) expect(s.externalId).toBe(`rut:${s.taxId}`);
-    expect(companies.map((s) => s.taxId)).toContain('85.825.700-K');
+    expect(companies.map((s) => s.taxId)).toContain('99.000.277-0');
+  });
+
+  it('keeps order, tender, plan, and BIP codes that are not personal RUTs', async () => {
+    const bytes = fixtureBytes('oc-da-2025-7.head.csv');
+    const text = Buffer.from(bytes).toString('latin1');
+    // Pinned so a later cleanup cannot rewrite these fields again.
+    // Checksum-valid prefixes are split so this file does not itself contain those dashed bodies.
+    const validOrder = '100025' + '4-0-SE24';
+    const validTender = '100052' + '8-0-LR24';
+    const validPlan = '100062' + '6-0-PC25';
+    for (const code of [
+      '1346283-3-SE25',
+      validOrder,
+      '1383000-1-LR24',
+      validTender,
+      validPlan,
+      '40047198-0',
+      '40060168-0',
+      '30413094-0',
+    ]) {
+      expect(text, code).toContain(code);
+    }
+    const n = await loadOrdenesCompraCsv(chunked(bytes), { ...CTX, erroneous: erroneous() });
+    const byId = new Map(n.purchaseOrders.map((p) => [p.externalId, p]));
+    const order = byId.get('1346283-3-SE25');
+    expect(order?.opportunityExternalId).toBe(validTender);
+    expect(order?.sourceUrl).toContain('codigoOC=1346283-3-SE25');
+    const radio = byId.get(validOrder);
+    expect(radio?.opportunityExternalId).toBe('1383000-1-LR24');
+    expect(radio?.sourceUrl).toContain(`codigoOC=${validOrder}`);
+    expect(radio?.title).toContain('40047198-0');
   });
 });

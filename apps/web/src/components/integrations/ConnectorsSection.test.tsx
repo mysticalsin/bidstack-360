@@ -71,7 +71,7 @@ beforeEach(() => {
   hookMocks.canWriteIntegrations = false;
   hookMocks.integrations = [
     { provider: 'slack', status: 'CONNECTED', connectedEmail: null, lastSyncedAt: null, errorMessage: null, scopes: [] },
-    { provider: 'gmail', status: 'CONNECTED', connectedEmail: 'rep@mantu.com', lastSyncedAt: null, errorMessage: null, scopes: [] },
+    { provider: 'gmail', status: 'CONNECTED', connectedEmail: 'rep@example.test', lastSyncedAt: null, errorMessage: null, scopes: [] },
   ];
 });
 

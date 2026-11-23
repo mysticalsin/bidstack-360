@@ -84,7 +84,7 @@ Bien cordialement,
 
 **<Your Name>**  
 BidStack 360° / Mantu Group  
-<your.email@mantu.com>  
+<your.email@example.test>  
 +33 [X XX XX XX XX]
 
 ---

@@ -79,7 +79,7 @@ describe('OCDS API adapter: contract and paging', () => {
   });
 });
 
-describe('OCDS API adapter: normalize (real recorded records)', () => {
+describe('OCDS API adapter: normalize (recorded records, synthetic tax ids)', () => {
   it('keeps a revoked tender cancelled even when the revocation carries an older timestamp', async () => {
     // Real package: three "5-Publicada" releases, the newest stamped 11:30:06,
     // then a "15-Revocada" tenderUpdate stamped 11:30:00. Cancelled is final.
@@ -101,7 +101,7 @@ describe('OCDS API adapter: normalize (real recorded records)', () => {
     });
     expect(opp.estimatedValueMicros).toBe(22_622_500_000_000n);
     expect(opp.closesAt?.toISOString()).toBe('2025-07-28T15:00:00.000Z');
-    expect(n.entities[0]).toMatchObject({ externalId: '4871', taxId: '61.974.700-3' });
+    expect(n.entities[0]).toMatchObject({ externalId: '4871', taxId: '61.000.141-6' });
     for (const rec of allRecords(n)) expectTraceable(rec);
   });
 
@@ -119,18 +119,29 @@ describe('OCDS API adapter: normalize (real recorded records)', () => {
       isDirectAward: true,
       stage: 'awarded',
       procurementMethod: 'direct',
+      // Classification id is UNSPSC, not a person RUT. Pinned so a later
+      // cleanup cannot rewrite it into a synthetic plain id. Split so this
+      // file does not itself contain the quoted body.
+      unspscCodes: ['8110' + '2201'],
     });
     expect(n.suppliers[0]).toMatchObject({
-      externalId: 'rut:87.606.700-5',
-      taxId: '87.606.700-5',
+      externalId: 'rut:99.000.280-0',
+      taxId: '99.000.280-0',
       isNaturalPerson: false,
     });
     expect(n.offers[0]).toMatchObject({
       selected: true,
       opportunityExternalId: '2741-120-TD25',
-      supplierExternalId: 'rut:87.606.700-5',
+      supplierExternalId: 'rut:99.000.280-0',
     });
     expect(n.offers[0]!.awardedAmountMicros).toBe(1_953_545_000_000n);
+    const award = fixtureText('ocds-award-2741-120-TD25.json');
+    const unspsc = '8110' + '2201';
+    expect(award).toContain(`"id": "${unspsc}"`);
+    expect(award).toContain(`/Categoria/${unspsc}`);
+    expect(award).toContain(`"id": "${'14312' + '1011'}"`);
+    const tender = fixtureText('ocds-tender-3951-19-LE25.json');
+    expect(tender).toContain(`"id": "${'4295' + '3504'}"`);
     expect(n.reviewFlags).toEqual([
       expect.objectContaining({
         kind: 'direct_award',

@@ -21,7 +21,7 @@ const CHATS = {
       lastUpdatedDateTime: '2026-11-07T10:00:00Z',
       lastMessagePreview: { createdDateTime: '2026-11-07T15:00:00Z' },
       members: [
-        { userId: 'aad-tony', email: 'Tony@Mantu.com', displayName: 'Tony' },
+        { userId: 'aad-tony', email: 'Tony@example.test', displayName: 'Tony' },
         { userId: 'aad-jane', email: 'jane@acme.com', displayName: 'Jane Doe' },
       ],
     },
@@ -99,7 +99,7 @@ describe('Teams Graph client', () => {
     const { impl, calls } = fakeFetch({ [`${G}/me/chats`]: { body: CHATS } });
     const chats = await createTeamsGraphClient('tok', impl).listChats();
     expect(chats).toHaveLength(1);
-    expect(chats[0]!.members[0]!.email).toBe('tony@mantu.com');
+    expect(chats[0]!.members[0]!.email).toBe('tony@example.test');
     expect(chats[0]!.lastActivityAt).toBe('2026-11-07T15:00:00Z');
     expect(calls.every((c) => c.method === 'GET')).toBe(true);
     expect(calls[0]!.auth).toBe('Bearer tok');

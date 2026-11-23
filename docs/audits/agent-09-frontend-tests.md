@@ -231,7 +231,7 @@ it('lazy-loads Clerk and bridges its hooks into the unified context', async () =
     </AuthProvider>,
   );
   await waitFor(() => {
-    expect(screen.getByTestId('email').textContent).toBe('real@mantu.com');
+    expect(screen.getByTestId('email').textContent).toBe('real@example.test');
   });
   expect(screen.getByTestId('loaded').textContent).toBe('true');
 });
