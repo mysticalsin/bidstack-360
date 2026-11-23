@@ -63,6 +63,20 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 <!-- New entries appended at the top of this section. -->
 
+### 2026-11-20 TESTING: Polo restore drill rewrote the host
+
+- **What went wrong:** The restore drill ran under plain `pnpm test` whenever Postgres tools were installed, created `/data` and `/app` with sudo, appended `/etc/hosts`, used fixed ports, and `pkill`ed every redis-server.
+- **Root cause:** The entrypoint's paths and ports were constants, so the drill pointed the real process at the machine instead of a temp directory.
+- **Prevention rule:** `POLO_RESTORE_DRILL=1` is the only way to run that drill, and the message when it is unset says so. Paths and ports come from env with the production defaults. The drill tracks the pids it started and signals only those. An order assertion must reject a missing call (`-1`) before it compares positions.
+- **Files affected:** `apps/polo-preview/container/entrypoint.mjs`, `apps/polo-preview/src/restore-migrated-snapshot.integration.test.ts`, `apps/polo-preview/src/database-boot.test.ts`.
+
+### 2026-11-20 BUG: Polo boot ALTER ROLE failed after a database-only restore
+
+- **What went wrong:** Every Polo container boot died in `migrating: after restore` with `could not set the app role password`. The API never reached ready.
+- **Root cause:** `snapshotFile()` dumps one database. `app_role` is a cluster role, so it is not in the dump. `pg_restore` then failed the GRANTs and the exit status was ignored. `_prisma_migrations` already listed the role migrations, so `prisma migrate deploy` did not create the role, and `ALTER ROLE` failed.
+- **Prevention rule:** Before restore and before migrate, create `app_role` idempotently (LOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE). Fail the boot on a `pg_restore` error other than schema public already existing. Prove it with a fresh initdb, a dump made the way `snapshotFile()` does, and the real restore path.
+- **Files affected:** `apps/polo-preview/container/entrypoint.mjs`, `apps/polo-preview/src/database-boot.js`.
+
 ### 2026-11-02 TESTING: Caption fold dropped financials schedule sync and tripped the query guard
 
 - **What went wrong:** #279 Integration failed on `account-financials` (GET left `accountFinancialProfile` null) and `kam-tasks` (GET `/todos` 400). E2E smoke skipped.
