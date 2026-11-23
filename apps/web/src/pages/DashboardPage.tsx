@@ -1,6 +1,6 @@
 import '../styles/cockpit.css';
 
-import { useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
@@ -19,7 +19,6 @@ import {
   RecentOpportunitiesCard,
   RevenueEvolutionCard,
   WinLossCard,
-  TechStackCard,
   FundingEligibilityCard,
   UpsellFilesCard,
 } from '@/components/cockpit';
@@ -52,6 +51,12 @@ import { ApiError } from '@/lib/api';
 import { useIsAdmin } from '@/lib/auth';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import type { CrmDashboardSnapshot } from '@bidstack/shared';
+
+// TechStackCard is the account-cockpit module that pushed this chunk over
+// the 200KB app budget. It loads with the account view, not the org dashboard.
+const TechStackCard = lazy(() =>
+  import('@/components/cockpit/TechStackCard').then((m) => ({ default: m.TechStackCard })),
+);
 
 // DashboardPage doubles as both the org-wide /dashboard view (no
 // accountId) and the per-customer /accounts/:accountId cockpit. The
@@ -222,7 +227,9 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
           {show('techStack') && (
             <Reveal>
-              <TechStackCard cockpit={cockpit} />
+              <Suspense fallback={null}>
+                <TechStackCard cockpit={cockpit} />
+              </Suspense>
             </Reveal>
           )}
 

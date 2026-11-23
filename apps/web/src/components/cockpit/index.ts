@@ -17,6 +17,8 @@ export { OpenIssuesCard } from './OpenIssuesCard';
 export { PageHead } from './PageHead';
 export { PipelineByStageCard } from './PipelineByStageCard';
 export { RecentOpportunitiesCard } from './RecentOpportunitiesCard';
-export { TechStackCard } from './TechStackCard';
+// TechStackCard is loaded by DashboardPage directly. Re-exporting it here
+// pulls the card into every cockpit chunk, which puts the dashboard file
+// over the 200KB app-chunk budget.
 export { FundingEligibilityCard } from './FundingEligibilityCard';
 export { UpsellFilesCard } from './UpsellFilesCard';

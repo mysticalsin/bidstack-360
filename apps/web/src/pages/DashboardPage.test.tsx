@@ -26,6 +26,10 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@/components/cockpit/TechStackCard', () => ({
+  TechStackCard: () => <div data-testid="tech-card" />,
+}));
+
 vi.mock('@/components/cockpit', () => ({
   ActivityTimelineCard: () => <div data-testid="activity-card" />,
   BusinessSnapshotCard: () => <div data-testid="business-card" />,

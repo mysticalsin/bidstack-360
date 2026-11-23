@@ -125,19 +125,25 @@ jobs:
           test -f apps/web/dist/icon-512.png || (echo "::error::icon-512.png missing from dist" && exit 1)
 
       - name: Bundle size guard (web)
-        # Same ceiling as apps/web/vite.config.ts chunkSizeWarningLimit.
-        # The manual vendor splits (charts, editor, motion, react) are larger
-        # than 200KB raw on purpose. 700KB is the regression line: a new
-        # chunk past that is an accidental bundle, not one of those splits.
-        # React stays excluded; react-dom's production floor is already
-        # ~145KB and Clerk pulls it further.
+        # App chunks stay on the 200KB raw budget this job has always
+        # enforced: any JS chunk over 200KB fails, except react-* (React's
+        # own floor) and the manual vendor splits that vite.config.ts names
+        # charts, editor, motion, and vendor. Those four are larger than
+        # 200KB on purpose. They may grow only up to chunkSizeWarningLimit
+        # in apps/web/vite.config.ts, which is 700KB raw.
         run: |
           set -e
           cd apps/web
-          BIG=$(find dist/assets -name "*.js" -size +700k 2>/dev/null | grep -v "react-" || true)
-          if [ -n "$BIG" ]; then
-            echo "::error::Web chunk over 700KB (excluding react-*):"
-            echo "$BIG" | xargs ls -lah
+          APP=$(find dist/assets -name "*.js" -size +200k 2>/dev/null | grep -Ev "/(react-|charts-|editor-|motion-|vendor-)" || true)
+          if [ -n "$APP" ]; then
+            echo "::error::Web app chunk over 200KB:"
+            echo "$APP" | xargs ls -lah
+            exit 1
+          fi
+          VENDOR=$(find dist/assets -name "*.js" -size +700k 2>/dev/null | grep -E "/(charts-|editor-|motion-|vendor-)" || true)
+          if [ -n "$VENDOR" ]; then
+            echo "::error::Named vendor chunk over 700KB (vite chunkSizeWarningLimit):"
+            echo "$VENDOR" | xargs ls -lah
             exit 1
           fi
 

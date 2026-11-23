@@ -1,22 +1,17 @@
 import { MotionConfig } from 'framer-motion';
-import { Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import { useUser } from '@/lib/auth';
-import { CommandPalette } from '@/components/command/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LiveAnnouncer } from '@/components/a11y/LiveAnnouncer';
 import { ConfettiHost } from '@/components/delight/Confetti';
 import { WebVitalsHud } from '@/components/dev/WebVitalsHud';
-import { HelpDrawer } from '@/components/help/HelpDrawer';
 import { useHelpDrawerHotkey } from '@/components/help/useHelpDrawer';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { RouteProgress } from '@/components/layout/RouteProgress';
-import { ProductTour } from '@/components/onboarding/ProductTour';
 import { SampleDataBanner } from '@/components/onboarding/SampleDataBanner';
-import { TemplatePicker } from '@/components/onboarding/TemplatePicker';
-import { QuickAddMenu } from '@/components/quickadd/QuickAddMenu';
 import { GlobalInteractionSound } from '@/components/sound/GlobalInteractionSound';
 import { ConfirmHost, PromptHost } from '@/components/ui/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -29,6 +24,26 @@ import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { useGlobalUndoHotkey } from '@/stores/undoStack';
 import { AppRoutes } from '@/routes/AppRoutes';
+
+// These overlays are not the first paint. Loading them as their own chunks
+// keeps the entry under the 200KB app-chunk budget. The hotkey stores stay
+// eager, so a shortcut pressed before the chunk arrives still opens the
+// overlay once it mounts.
+const CommandPalette = lazy(() =>
+  import('@/components/command/CommandPalette').then((m) => ({ default: m.CommandPalette })),
+);
+const HelpDrawer = lazy(() =>
+  import('@/components/help/HelpDrawer').then((m) => ({ default: m.HelpDrawer })),
+);
+const ProductTour = lazy(() =>
+  import('@/components/onboarding/ProductTour').then((m) => ({ default: m.ProductTour })),
+);
+const TemplatePicker = lazy(() =>
+  import('@/components/onboarding/TemplatePicker').then((m) => ({ default: m.TemplatePicker })),
+);
+const QuickAddMenu = lazy(() =>
+  import('@/components/quickadd/QuickAddMenu').then((m) => ({ default: m.QuickAddMenu })),
+);
 
 export function App() {
   const palette = useCommandPalette();
@@ -87,9 +102,13 @@ export function App() {
               </Suspense>
             </ErrorBoundary>
           </PageTransition>
-          <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
-          <QuickAddMenu />
-          <HelpDrawer />
+          <Suspense fallback={null}>
+            <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
+            <QuickAddMenu />
+            <HelpDrawer />
+            <ProductTour />
+            <TemplatePicker />
+          </Suspense>
           {/* Global hosts — mount once so any component can dispatch without prop-drilling */}
           <Toaster />
           <ConfirmHost />
@@ -97,10 +116,7 @@ export function App() {
           <ConfettiHost />
           <LiveAnnouncer />
           <WebVitalsHud />
-          {/* Onboarding overlays */}
-          <ProductTour />
           <SampleDataBanner />
-          <TemplatePicker />
         </AppShell>
       )}
     </MotionConfig>

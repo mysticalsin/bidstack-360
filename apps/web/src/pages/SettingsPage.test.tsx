@@ -113,7 +113,7 @@ describe('SettingsPage routing guard', () => {
     renderPage('/settings?tab=does-not-exist');
 
     expect(screen.getByTestId('active-tab').textContent).toBe('overview');
-    expect(screen.getByText('Overview panel')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Overview panel')).toBeTruthy());
     await waitFor(() =>
       expect(screen.getByTestId('location').textContent).toBe('/settings?tab=overview'),
     );
@@ -125,18 +125,18 @@ describe('SettingsPage routing guard', () => {
     renderPage('/settings?tab=groups');
 
     expect(screen.getByTestId('active-tab').textContent).toBe('overview');
-    expect(screen.getByText('Overview panel')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Overview panel')).toBeTruthy());
     expect(screen.queryByText('Access groups panel')).toBeNull();
     await waitFor(() =>
       expect(screen.getByTestId('location').textContent).toBe('/settings?tab=overview'),
     );
   });
 
-  it('keeps admin-only deep links available for admins', () => {
+  it('keeps admin-only deep links available for admins', async () => {
     renderPage('/settings?tab=groups');
 
     expect(screen.getByTestId('active-tab').textContent).toBe('groups');
-    expect(screen.getByText('Access groups panel')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Access groups panel')).toBeTruthy());
     expect(screen.getByTestId('location').textContent).toBe('/settings?tab=groups');
   });
 });
