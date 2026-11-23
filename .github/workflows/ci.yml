@@ -12,7 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: '10'
+  # Must equal package.json packageManager. A major-only pin ("10") makes
+  # pnpm/action-setup abort before install when that field is pnpm@10.27.0.
+  PNPM_VERSION: '10.27.0'
 
 # Least-privilege default token — no job here writes to the repo.
 permissions:
