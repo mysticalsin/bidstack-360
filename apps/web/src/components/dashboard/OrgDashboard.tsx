@@ -211,7 +211,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
 
       {/* Cinematic hero band — ports the account cockpit's command-center
           language to portfolio level (replaces the old flat stat strip). */}
-      {s && <OrgCommandHero summary={s} />}
+      {s && phase >= 1 && <OrgCommandHero summary={s} />}
 
       {/* Main cockpit grid. Later phases mount on subsequent frames in
           production so the first commit stays the hero. */}

@@ -77,7 +77,10 @@ export function App() {
           {/* Enter-only page transition keyed on the path: each navigation
               fades+rises the new page in. No exit animation (avoids router
               location-freezing complexity); reduced-motion → opacity only. */}
-          <PageTransition pageKey={location.pathname}>
+          <PageTransition
+            pageKey={location.pathname}
+            visibleOnMount={location.pathname === '/dashboard'}
+          >
             <ErrorBoundary>
               <Suspense fallback={<LoadingSkeleton rows={6} />}>
                 <AppRoutes />

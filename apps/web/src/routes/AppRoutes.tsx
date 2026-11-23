@@ -78,7 +78,7 @@ export function AppRoutes() {
   const segmentKey = '/' + (location.pathname.split('/')[1] ?? '');
   return (
     <AnimatePresence mode="wait" initial={false}>
-      <PageTransition pageKey={segmentKey || '/'}>
+      <PageTransition pageKey={segmentKey || '/'} visibleOnMount={segmentKey === '/dashboard'}>
         <Routes location={location}>
           {/* ── Public ──────────────────────────────────────────────────── */}
           <Route path="/login" element={<LoginPage />} />

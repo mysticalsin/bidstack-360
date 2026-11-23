@@ -69,8 +69,10 @@ jobs:
         # in the integration job. This step has no database.
         run: |
           pnpm --filter '!@bidstack/api' --filter '!@bidstack/mcp-server' --filter '!@bidstack/worker' -r test
-          pnpm --filter @bidstack/mcp-server test -- --exclude src/tools/kam-tools.test.ts
-          pnpm --filter @bidstack/worker test -- --exclude src/queues/tenant-export.contract.test.ts
+          # exec, not `pnpm test --`, because pnpm inserts an extra `--` and
+          # vitest then treats --exclude as a file name.
+          pnpm --filter @bidstack/mcp-server exec vitest run --passWithNoTests --exclude src/tools/kam-tools.test.ts
+          pnpm --filter @bidstack/worker exec vitest run --passWithNoTests --exclude src/queues/tenant-export.contract.test.ts
 
       # api's DB-touching suites now FAIL LOUD (not self-skip) when Postgres is
       # unreachable — makeSkipIfNoDb (src/test-support/skip-if-no-db.ts) throws

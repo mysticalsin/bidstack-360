@@ -1756,10 +1756,17 @@ select:focus-visible {
    shell bundle; see DashboardFirstPaint. */
 .dashboard-lead {
   color: var(--fg-primary);
-  font-size: 22px;
-  line-height: 1.35;
+  font-size: 20px;
+  line-height: 1.45;
   margin: 12px 0 0;
-  max-width: 18ch;
+  max-width: 240px;
+}
+/* Keep the hero focus line smaller than .dashboard-lead so a later widget
+   paint cannot replace the shell paragraph as Largest Contentful Paint. */
+.command-center-hero p {
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 36ch;
 }
 .page-actions {
   display: flex;
