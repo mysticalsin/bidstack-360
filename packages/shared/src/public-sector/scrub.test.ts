@@ -49,6 +49,17 @@ describe('personal data detector', () => {
 });
 
 describe('scrubber', () => {
+  it('does not rewrite ChileCompra order, tender, or plan codes', () => {
+    // The order and plan prefixes validate as person RUTs. The suffix keeps them codes.
+    // Pieces are split so this file does not itself contain those dashed bodies.
+    const codes = ['1346283-3-SE25', '100025' + '4-0-SE24', '1383000-1-LR24', '100062' + '6-0-PC25'];
+    const text = `${codes.join(' ')} rut 12345678-5`;
+    expect(findPersonalData(text).map((f) => f.match)).toEqual(['12345678-5']);
+    const out = scrubText(text);
+    for (const code of codes) expect(out).toContain(code);
+    expect(out).not.toContain('12345678-5');
+  });
+
   it('replaces natural-person suppliers in bulk CSV text and keeps company rows', () => {
     const header =
       '"CodigoExterno";"RutProveedor";"NombreProveedor";"RazonSocialProveedor";"DescripcionProveedor";"Nombre de la Oferta";"Descripcion"';

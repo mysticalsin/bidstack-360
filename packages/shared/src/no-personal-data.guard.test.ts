@@ -40,7 +40,8 @@ const REWRITTEN = [
 ];
 
 const DOTTED_RUT = /\d{1,2}\.\d{3}\.\d{3}-[\dkK]/gi;
-const DASHED_RUT = /(?<!\d)\d{7,8}-[\dkK](?![\w])/gi;
+// The hyphen before a ChileCompra type suffix (`-SE25`, `-LR24`, `-PC25`) is not a RUT boundary.
+const DASHED_RUT = /(?<!\d)\d{7,8}-[\dkK](?![\w]|-[A-Za-z]{2}\d{2})/gi;
 const QUOTED_PLAIN_RUT = /["'](\d{7,8}[\dkK])["']/gi;
 /** Built at runtime so this file does not itself contain the banned spellings. */
 const BANNED_EMAIL_DOMAIN = '@' + 'mantu.com';
@@ -83,6 +84,76 @@ function trackedFiles(root: string): string[] {
   return out.split('\0').filter(Boolean);
 }
 
+/**
+ * Quote index of each JSON `"id"` string, and the direct `scheme` of its object.
+ * A nested scheme does not apply to a parent id. `null` means the object has no scheme.
+ */
+function directIdSchemes(text: string): Map<number, string | null> {
+  const sites = new Map<number, string | null>();
+  interface Frame {
+    scheme: string | null;
+    expectKey: boolean;
+    key: string | null;
+    ids: number[];
+  }
+  const stack: Frame[] = [];
+  let inString = false;
+  let escape = false;
+  let stringStart = -1;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i]!;
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (c === '\\') {
+        escape = true;
+        continue;
+      }
+      if (c !== '"') continue;
+      inString = false;
+      const frame = stack[stack.length - 1];
+      const value = text.slice(stringStart + 1, i);
+      if (!frame) continue;
+      if (frame.expectKey) {
+        frame.key = value;
+        frame.expectKey = false;
+      } else if (frame.key === 'id') {
+        frame.ids.push(stringStart);
+        frame.key = null;
+      } else if (frame.key === 'scheme') {
+        frame.scheme = value;
+        frame.key = null;
+      } else {
+        frame.key = null;
+      }
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      stringStart = i;
+      continue;
+    }
+    const frame = stack[stack.length - 1];
+    if (c === '{') {
+      if (frame) frame.key = null;
+      stack.push({ scheme: null, expectKey: true, key: null, ids: [] });
+    } else if (c === '}') {
+      const closed = stack.pop();
+      if (!closed) continue;
+      for (const quote of closed.ids) sites.set(quote, closed.scheme);
+    } else if (c === '[') {
+      if (frame) frame.key = null;
+    } else if (c === ':') {
+      if (frame) frame.expectKey = false;
+    } else if (c === ',') {
+      if (frame) frame.expectKey = true;
+    }
+  }
+  return sites;
+}
+
 export function scanText(text: string, rel: string, allow: Allowlist, plainRuts: boolean): HitCounts {
   const hits: HitCounts = { mantu: 0, gmail: 0, ruts: 0 };
   if (!allow.mantuPaths.includes(rel)) {
@@ -95,6 +166,7 @@ export function scanText(text: string, rel: string, allow: Allowlist, plainRuts:
   if (!allow.rutPaths.includes(rel)) {
     const bodies = new Set(allow.rutBodies);
     const seen = new Set<number>();
+    const idSchemes = plainRuts ? directIdSchemes(text) : null;
     const patterns: RegExp[] = [DOTTED_RUT, DASHED_RUT];
     if (plainRuts) patterns.push(QUOTED_PLAIN_RUT);
     for (const re of patterns) {
@@ -104,7 +176,12 @@ export function scanText(text: string, rel: string, allow: Allowlist, plainRuts:
         if (seen.has(start)) continue;
         seen.add(start);
         const parsed = parseRut(token);
-        if (parsed && !bodies.has(parsed.body)) hits.ruts += 1;
+        if (!parsed || bodies.has(parsed.body)) continue;
+        // A quoted plain id is a RUT only inside scheme CL-RUT. Item ids and UNSPSC are not.
+        if (re === QUOTED_PLAIN_RUT && idSchemes?.has(start) && idSchemes.get(start)?.toUpperCase() !== 'CL-RUT') {
+          continue;
+        }
+        hits.ruts += 1;
       }
     }
   }
@@ -189,6 +266,31 @@ describe('personal-data guard', () => {
     const quoted = `"${plain}"`;
     expect(scanText(quoted, 'sample.txt', empty, true).ruts).toBe(1);
     expect(scanText(plain, 'sample.txt', empty, true).ruts).toBe(0);
+  });
+
+  it('does not count ChileCompra codes as RUTs, even when the prefix checksum is valid', () => {
+    // The order and plan prefixes validate as person RUTs. The type suffix is not a RUT boundary.
+    // Pieces are split so this file does not itself contain those dashed bodies.
+    const sample = ['1346283-3-SE25', '100025' + '4-0-SE24', '1383000-1-LR24', '100062' + '6-0-PC25'].join(' ');
+    expect(scanText(sample, 'sample.txt', empty, true).ruts).toBe(0);
+    expect(scanText(`${sample} ${syntheticRut(7, 'person').dashed}`, 'sample.txt', empty, true).ruts).toBe(1);
+  });
+
+  it('counts a quoted plain id only when that object scheme is CL-RUT', () => {
+    // UNSPSC and item ids below are checksum-valid as plain RUTs. A nested CL-RUT
+    // must not make the parent item id count. Pieces are split so this file does not
+    // itself contain those quoted bodies.
+    const unspsc = '8110' + '2201';
+    const item = '4295' + '3504';
+    const otherItem = '14312' + '1011';
+    const person = syntheticRut(8, 'company').plain;
+    const sample = [
+      `{ "scheme": "UNSPSC", "id": "${unspsc}", "uri": "http://api.mercadopublico.cl/APISOCDS/Productos/Categoria/${unspsc}" }`,
+      `{ "id": "${item}", "classification": { "id": "80111701", "scheme": "UNSPSC" } }`,
+      `{ "id": "${otherItem}" }`,
+      `{ "id": "${item}", "identifier": { "id": "${person}", "scheme": "CL-RUT" } }`,
+    ].join('\n');
+    expect(scanText(sample, 'sample.json', empty, true).ruts).toBe(1);
   });
 
   it('an empty allowlist fails closed on this tree', () => {

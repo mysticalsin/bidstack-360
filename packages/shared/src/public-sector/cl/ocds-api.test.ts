@@ -119,6 +119,10 @@ describe('OCDS API adapter: normalize (recorded records, synthetic tax ids)', ()
       isDirectAward: true,
       stage: 'awarded',
       procurementMethod: 'direct',
+      // Classification id is UNSPSC, not a person RUT. Pinned so a later
+      // cleanup cannot rewrite it into a synthetic plain id. Split so this
+      // file does not itself contain the quoted body.
+      unspscCodes: ['8110' + '2201'],
     });
     expect(n.suppliers[0]).toMatchObject({
       externalId: 'rut:99.000.280-0',
@@ -131,6 +135,13 @@ describe('OCDS API adapter: normalize (recorded records, synthetic tax ids)', ()
       supplierExternalId: 'rut:99.000.280-0',
     });
     expect(n.offers[0]!.awardedAmountMicros).toBe(1_953_545_000_000n);
+    const award = fixtureText('ocds-award-2741-120-TD25.json');
+    const unspsc = '8110' + '2201';
+    expect(award).toContain(`"id": "${unspsc}"`);
+    expect(award).toContain(`/Categoria/${unspsc}`);
+    expect(award).toContain(`"id": "${'14312' + '1011'}"`);
+    const tender = fixtureText('ocds-tender-3951-19-LE25.json');
+    expect(tender).toContain(`"id": "${'4295' + '3504'}"`);
     expect(n.reviewFlags).toEqual([
       expect.objectContaining({
         kind: 'direct_award',
