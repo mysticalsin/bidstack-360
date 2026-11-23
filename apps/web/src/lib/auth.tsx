@@ -128,7 +128,9 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
       localStorage.getItem(STUB_SIGNED_OUT_KEY) === null
     );
   });
-  const [stubRole, setStubRole] = useState(() => normalizeStubRole(localStorage.getItem(STUB_ROLE_KEY)));
+  const [stubRole, setStubRole] = useState(() =>
+    normalizeStubRole(localStorage.getItem(STUB_ROLE_KEY)),
+  );
 
   useEffect(() => {
     setApiTokenProvider(null);
@@ -184,32 +186,36 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Demo mode (VITE_AUTH_MODE=demo): public passwordless "try the demo" flow.
-// The DemoSignIn screen POSTs an email to /api/v1/demo/session, stores the
-// returned signed Bearer token in localStorage, then calls signIn() to flip
-// state. Here we simply read that token: the API client sends it as
-// `Authorization: Bearer`, and each visitor lands in their own seeded org.
-// The visitor is always an org admin in their demo workspace.
+// Demo mode (VITE_AUTH_MODE=demo): there is no separate "no signup" screen.
+// Sign-in uses the same login page as every other mode and then navigates to
+// /dashboard. A previously issued demo Bearer token, if present, is still sent
+// as `Authorization: Bearer`. The visitor is always an org admin.
 export const DEMO_TOKEN_KEY = 'bidstack:demo-token';
 export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
 
+function hasDemoSession(): boolean {
+  return (
+    localStorage.getItem(DEMO_TOKEN_KEY) !== null ||
+    localStorage.getItem(STUB_SESSION_KEY) === 'demo'
+  );
+}
+
 function DemoAuthProvider({ children }: { children: ReactNode }) {
-  const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
+  const [signedIn, setSignedIn] = useState(() => hasDemoSession());
 
   useEffect(() => {
     // The token is a plain string in localStorage (the app has no cookie layer;
     // this matches the existing Bearer-token model used for Clerk).
     setApiTokenProvider(() => localStorage.getItem(DEMO_TOKEN_KEY));
-    if (signedIn && localStorage.getItem(DEMO_TOKEN_KEY)) {
+    if (signedIn) {
       writeSessionMarker('demo');
     }
     return () => setApiTokenProvider(null);
   }, [signedIn]);
 
   const signIn = useCallback((cb?: () => void) => {
-    const hasToken = localStorage.getItem(DEMO_TOKEN_KEY) !== null;
-    setSignedIn(hasToken);
-    if (hasToken) writeSessionMarker('demo');
+    setSignedIn(true);
+    writeSessionMarker('demo');
     cb?.();
   }, []);
 
