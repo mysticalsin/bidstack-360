@@ -89,3 +89,12 @@ Verification:
   `deploy-evidence/browser-regression-latest.json` with `preflightDiagnostic`.
 - `pnpm deploy:evidence:production`: expected block, 44 pass / 77 fail with
   browser evidence present and 10 concrete browser failures.
+
+## Mac package preview
+
+Linux CI installs Chromium only, and `pnpm e2e` lets Playwright boot its own
+API on port 4010. The Safari/WebKit pass against the package `build` and
+`preview` scripts (API on 4000, one worker, WebKit then Chromium, stop under
+6 GiB free) is `node scripts/run-mac-playwright-preview.mjs` on a Mac. See
+`docs/solutions/mac-playwright-package-preview.md`. The workflow files are
+unchanged; that doc holds the proposed Mac job.
