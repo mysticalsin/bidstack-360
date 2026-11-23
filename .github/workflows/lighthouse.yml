@@ -24,7 +24,10 @@ permissions:
 jobs:
   lighthouse:
     name: Lighthouse CI
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04. Playwright 1.59 has no Chromium build there, and
+    # the image's Chrome 157 returns NO_FCP for this app. Shards on 24.04
+    # painted the same pages with Playwright's Chromium.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       pull-requests: write # needed for PR comment
@@ -58,23 +61,26 @@ jobs:
           VITE_AUTH_MODE: stub
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
 
+      - name: Install Playwright Chromium
+        # Use the same browser that painted these pages in the E2E shards.
+        # The image Chrome still reported NO_FCP after SwiftShader flags.
+        run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium
+
       - name: Install Lighthouse CI
-        # 0.14.x bundles Lighthouse 12.1.0. Against the runner's Chrome 157
-        # that build reports NO_FCP and never scores the page. 0.16.1
-        # bundles Lighthouse 13.6.0, which speaks this Chrome.
+        # 0.14.x bundles Lighthouse 12.1.0. 0.16.1 bundles Lighthouse 13.6.0.
         run: npm install -g @lhci/cli@0.16.1
 
       - name: Run Lighthouse CI
         id: lhci
         # Root package.json is "type": "module", so Node loads .lighthouserc.js
         # as ESM and rejects its module.exports. LHCI needs that file as CJS.
-        # Chrome 157 on this runner has no GPU. Headless Chrome will not paint
-        # unless SwiftShader is turned back on, and Lighthouse then reports
-        # NO_FCP without scoring the page. Flags are applied here so the
-        # product lighthouserc.js stays unchanged.
+        # --no-sandbox is required for the CI user. The product lighthouserc.js
+        # is not edited.
         run: |
           cp .lighthouserc.js "${RUNNER_TEMP}/lighthouserc.cjs"
-          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:["--no-sandbox","--disable-dev-shm-usage","--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
+          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:["--no-sandbox","--disable-dev-shm-usage"]}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
+          export CHROME_PATH="$(pnpm --filter @bidstack/web exec node --input-type=commonjs -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())' | tail -n 1)"
+          test -x "$CHROME_PATH"
           lhci autorun --config="${RUNNER_TEMP}/lighthouserc-ci.cjs"
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
