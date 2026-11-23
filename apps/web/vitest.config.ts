@@ -9,6 +9,7 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
+    setupFiles: ['./src/test/happy-dom-animations.ts'],
     globals: false,
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
