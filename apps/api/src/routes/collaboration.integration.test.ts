@@ -121,6 +121,23 @@ afterAll(async () => {
 
 const t = makeSkipIfNoDb(() => dbReachable && !!orgId);
 
+// Holds the first N UserPresence upserts at the query boundary so two
+// heartbeats enter the unique constraint together. Later retries (the fix)
+// are not held. A no-op unless a test sets the counter.
+let holdPresenceUpserts = 0;
+let releasePresenceUpserts: Promise<void> = Promise.resolve();
+prisma.$use(async (params, next) => {
+  if (
+    holdPresenceUpserts > 0 &&
+    params.model === 'UserPresence' &&
+    params.action === 'upsert'
+  ) {
+    holdPresenceUpserts -= 1;
+    await releasePresenceUpserts;
+  }
+  return next(params);
+});
+
 describe('POST /comments — FK-graft guard on the polymorphic target', () => {
   t('accepts a comment on a record in the caller org (control)', async () => {
     const res = await server.inject({
@@ -213,6 +230,55 @@ describe('POST /comments — RBAC gate (comments:write)', () => {
       payload: { status: 'online' },
     });
     expect(res.statusCode).toBe(200);
+  });
+
+  t('two in-flight presence heartbeats both return 200, not 409', async () => {
+    // WHY: opening a deal posts presence twice before either insert commits.
+    // The loser used to surface as 409 (unique userId → P2002). Both callers
+    // are the same user announcing "I am here", so neither response may be a
+    // conflict. The gate forces the race; without the retry this assertion fails.
+    let release!: () => void;
+    releasePresenceUpserts = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    holdPresenceUpserts = 2;
+    const recordId = randomUUID();
+    try {
+      const pending = [
+        server.inject({
+          method: 'POST',
+          url: '/api/v1/presence',
+          payload: { status: 'online', currentRecordType: 'opportunity', currentRecordId: recordId },
+        }),
+        server.inject({
+          method: 'POST',
+          url: '/api/v1/presence',
+          payload: { status: 'online', currentRecordType: 'opportunity', currentRecordId: recordId },
+        }),
+      ];
+      const deadline = Date.now() + 5_000;
+      while (holdPresenceUpserts !== 0) {
+        if (Date.now() > deadline) {
+          throw new Error('presence upserts did not both reach the unique-constraint gate');
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      release();
+      const results = await Promise.all(pending);
+      for (const res of results) {
+        expect(res.statusCode).not.toBe(409);
+        expect(res.statusCode).toBe(200);
+      }
+      expect(
+        await prisma.userPresence.count({
+          where: { orgId, currentRecordId: recordId, deletedAt: null },
+        }),
+      ).toBe(1);
+    } finally {
+      holdPresenceUpserts = 0;
+      release();
+      releasePresenceUpserts = Promise.resolve();
+    }
   });
 });
 

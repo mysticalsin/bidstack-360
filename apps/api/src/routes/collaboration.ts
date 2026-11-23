@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { Prisma, prisma } from '@bidstack/db';
 import {
   Comment,
   CommentCreate,
@@ -89,6 +89,34 @@ async function cachedMentionSummary(orgId: string, userId: string): Promise<Ment
   } catch (err) {
     mentionSummaryCache.delete(key);
     throw err;
+  }
+}
+
+type PresenceWrite = {
+  status: string;
+  currentRecordType: string | null;
+  currentRecordId: string | null;
+};
+
+function isUniqueConflict(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+}
+
+// Two heartbeats for the same user can both observe "no row" and insert.
+// The loser hits @@unique(userId). That conflict is the other request's
+// success, so retry once: the row exists and the retry updates it.
+async function upsertOwnPresence(orgId: string, userId: string, write: PresenceWrite) {
+  const run = () =>
+    prisma.userPresence.upsert({
+      where: { userId },
+      create: { orgId, userId, ...write },
+      update: { orgId, ...write, lastSeenAt: new Date() },
+    });
+  try {
+    return await run();
+  } catch (err) {
+    if (!isUniqueConflict(err)) throw err;
+    return await run();
   }
 }
 
@@ -431,22 +459,10 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       // WHY: userId is known before the upsert result — run user lookup in
       // parallel to cut two sequential DB round-trips to one.
       const [upserted, user] = await Promise.all([
-        prisma.userPresence.upsert({
-          where: { userId: req.auth.userId },
-          create: {
-            orgId: req.auth.orgId,
-            userId: req.auth.userId,
-            status: req.body.status ?? 'online',
-            currentRecordType: req.body.currentRecordType ?? null,
-            currentRecordId: req.body.currentRecordId ?? null,
-          },
-          update: {
-            orgId: req.auth.orgId,
-            status: req.body.status ?? 'online',
-            currentRecordType: req.body.currentRecordType ?? null,
-            currentRecordId: req.body.currentRecordId ?? null,
-            lastSeenAt: new Date(),
-          },
+        upsertOwnPresence(req.auth.orgId, req.auth.userId, {
+          status: req.body.status ?? 'online',
+          currentRecordType: req.body.currentRecordType ?? null,
+          currentRecordId: req.body.currentRecordId ?? null,
         }),
         prisma.user.findUnique({
           where: { id: req.auth.userId },
