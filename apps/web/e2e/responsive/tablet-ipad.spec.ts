@@ -10,6 +10,7 @@
 import { test, expect, devices } from '@playwright/test';
 import { cleanupVisualRegressionArtifacts } from '../fixtures/test-data-cleanup.js';
 import { chromiumDeviceUse, stabilizeResponsiveScreenshot } from './device-emulation.js';
+import { pinSyntheticDashboard } from './synthetic-dashboard.js';
 
 const IPAD_MINI = devices['iPad Mini'];
 
@@ -71,9 +72,21 @@ for (const route of KEY_ROUTES) {
     if (route.name === 'contacts') {
       await cleanupVisualRegressionArtifacts(request);
     }
+    // WHY: Only the dashboard shot failed, and it failed on CAD versus USD
+    // plus a seed company-count drift. Pin that one shot. Leave the other
+    // routes on the shared seed; their baselines already matched.
+    if (route.name === 'dashboard') {
+      await pinSyntheticDashboard(page);
+    }
     await page.goto(route.path, { waitUntil: 'load' });
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
     await stabilizeResponsiveScreenshot(page);
+    if (route.name === 'dashboard') {
+      await expect(page.getByRole('button', { name: 'Select currency, current: USD' })).toBeVisible();
+      await expect(page.getByText('4 companies · 2 open deals · 4.2m pipeline')).toBeVisible();
+      await expect(page.getByText('Overdue bids hang below the line. Select a month or a number to see the bids.')).toBeVisible();
+      await expect(page.getByText('Contoso Synthetic')).toBeVisible();
+    }
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot(`${route.name}-ipad-mini.png`, {
