@@ -50,6 +50,51 @@ describe('CRM schemas', () => {
     expect(company.domain).toBe('mantu.com');
   });
 
+  it('accepts revenue micros past the safe-integer line and rejects fractions', () => {
+    // 78 billion EUR in micros. Zod 4 .int() rejects this and the companies
+    // route then fails response serialization with a 500.
+    const revenueMicros = 78_000_000_000_000_000;
+    const company = CrmCompany.parse({
+      id: 'large',
+      name: 'Large',
+      legalName: null,
+      domain: null,
+      website: null,
+      industry: null,
+      employeeCount: null,
+      annualRevenueMicros: revenueMicros,
+      status: null,
+      registryIds: {},
+      formerNames: [],
+      incorporationDate: null,
+      logo: null,
+      confidence: 0.5,
+      sourceAttribution: [],
+      updatedAt: fetchedAt,
+    });
+    expect(company.annualRevenueMicros).toBe(revenueMicros);
+    expect(
+      CrmCompany.safeParse({
+        id: 'large',
+        name: 'Large',
+        legalName: null,
+        domain: null,
+        website: null,
+        industry: null,
+        employeeCount: null,
+        annualRevenueMicros: 1.5,
+        status: null,
+        registryIds: {},
+        formerNames: [],
+        incorporationDate: null,
+        logo: null,
+        confidence: 0.5,
+        sourceAttribution: [],
+        updatedAt: fetchedAt,
+      }).success,
+    ).toBe(false);
+  });
+
   it('keeps the requested Dust MCP crm_* tool names stable', () => {
     expect(DustCrmToolName.options).toEqual([
       'crm_search_companies',

@@ -7,6 +7,18 @@
 import { z } from 'zod';
 import { CrmObjectSource, SourceAttribution, CrmLogo, TechnicalStackCategory } from './crm.base.js';
 
+// Annual revenue is stored in micros (EUR × 1e6). A company above about €9B
+// lands past Number.MAX_SAFE_INTEGER, and the seeded demo companies do.
+// Zod 4's .int() rejects those values and the companies list 500s. The
+// number is still a nonnegative integer; it is just not a safe integer.
+const annualRevenueMicrosSchema = z
+  .number()
+  .nonnegative()
+  .refine((value) => Number.isInteger(value), {
+    message: 'Expected an integer number of micros',
+  })
+  .nullable();
+
 export const CompanyStrategicSignalKind = z.enum([
   'intent',
   'hiring',
@@ -48,7 +60,7 @@ export const CompanyStrategicIntel = z.object({
   freshness: z.enum(['fresh', 'stale', 'never']),
   employeeTrend: z.enum(['hiring', 'contracting', 'flat', 'unknown']),
   employeeCount: z.number().int().nonnegative().nullable(),
-  annualRevenueMicros: z.number().int().nonnegative().nullable(),
+  annualRevenueMicros: annualRevenueMicrosSchema,
   intentTopics: z.array(z.string()).default([]),
   hiringSignals: z.array(CompanyStrategicSignal).default([]),
   leadershipSignals: z.array(CompanyStrategicSignal).default([]),
@@ -70,7 +82,7 @@ export const CrmCompany = z.object({
   industry: z.string().nullable(),
   imageUrl: z.string().url().nullable().optional(),
   employeeCount: z.number().int().nonnegative().nullable(),
-  annualRevenueMicros: z.number().int().nonnegative().nullable(),
+  annualRevenueMicros: annualRevenueMicrosSchema,
   status: z.string().nullable(),
   registryIds: z.record(z.string(), z.string()).default({}),
   formerNames: z.array(z.string()).default([]),
