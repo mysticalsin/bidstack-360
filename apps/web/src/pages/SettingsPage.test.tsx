@@ -83,6 +83,12 @@ vi.mock('@/components/settings/SerumControlPlaneSection', () => ({
 vi.mock('@/components/settings/ModulesSection', () => ({
   ModulesSection: () => <div>Modules panel</div>,
 }));
+vi.mock('@/components/settings/FeedbackSection', () => ({
+  FeedbackSection: () => <div>Feedback panel</div>,
+}));
+vi.mock('@/components/settings/ProductReportsSection', () => ({
+  ProductReportsSection: () => <div>Product reports panel</div>,
+}));
 
 import { SettingsPage } from './SettingsPage';
 

@@ -24,7 +24,9 @@ export type SettingsSection =
   | 'integrations'
   | 'webhooks'
   | 'audit-log'
-  | 'developer';
+  | 'developer'
+  | 'feedback'
+  | 'reports';
 
 interface Group {
   label: string;
@@ -47,6 +49,7 @@ const GROUPS: Group[] = [
       { id: 'appearance', label: 'Appearance & Language', icon: 'palette' },
       { id: 'notifications', label: 'Notifications', icon: 'bell' },
       { id: 'security', label: 'Profile & Security', icon: 'shield' },
+      { id: 'feedback', label: 'Feedback', icon: 'help' },
     ],
   },
   {
@@ -70,6 +73,7 @@ const GROUPS: Group[] = [
       { id: 'webhooks', label: 'Webhooks', icon: 'webhook', admin: true },
       { id: 'developer', label: 'Developer access', icon: 'zap', admin: true },
       { id: 'audit-log', label: 'Audit log', icon: 'shield', admin: true },
+      { id: 'reports', label: 'Product reports', icon: 'reports', admin: true },
     ],
   },
 ];
@@ -134,6 +138,10 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemDeveloper', 'Developer access');
       case 'audit-log':
         return t('settingsLayout.itemAuditLog', 'Audit log');
+      case 'feedback':
+        return t('settingsLayout.itemFeedback', 'Feedback');
+      case 'reports':
+        return t('settingsLayout.itemReports', 'Product reports');
       default:
         return label;
     }

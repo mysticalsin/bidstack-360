@@ -115,6 +115,7 @@ import { slackCommandsPlugin } from './routes/integrations/slack-commands.js';
 import { onboardingRoutes } from './routes/onboarding.js';
 // Wave 5 — Help center feedback
 import { helpRoutes } from './routes/help.js';
+import { productReportRoutes } from './routes/product-reports.js';
 // Wave 7 — Custom Objects (Salesforce parity)
 import { customObjectRoutes } from './routes/custom-objects.js';
 // Wave 7 — Twilio SMS (webhook = unauthenticated, sms routes = authenticated)
@@ -280,6 +281,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   await server.register(onboardingRoutes, { prefix: '/api/v1' });
   // Wave 5 — Help center article feedback
   await server.register(helpRoutes, { prefix: '/api/v1' });
+  await server.register(productReportRoutes, { prefix: '/api/v1' });
 
   // Wave 7 — Custom Objects (Salesforce parity)
   await server.register(customObjectRoutes, { prefix: '/api/v1' });

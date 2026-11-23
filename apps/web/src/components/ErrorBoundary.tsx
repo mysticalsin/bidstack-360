@@ -1,6 +1,10 @@
 import { ErrorBoundary as SentryErrorBoundary } from '@sentry/react';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { api } from '@/lib/api';
+import { currentClientLog, currentRoute } from '@/lib/client-log';
+import { consumeCrash, crashSignature } from '@/lib/crash-guard';
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -13,6 +17,34 @@ interface FallbackProps {
 
 function FallbackComponent({ error, componentStack }: FallbackProps) {
   const { t } = useTranslation('crm');
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? (error.stack ?? componentStack) : componentStack;
+
+  useEffect(() => {
+    const route = currentRoute();
+    const signature = crashSignature(message, stack, route);
+    const decision = consumeCrash(signature, window.sessionStorage);
+    if (decision.report) {
+      const clientLog = currentClientLog(route, { includeActions: true });
+      void api('/api/product-reports', {
+        method: 'POST',
+        body: {
+          kind: 'crash',
+          whatDoing: (message || 'Unknown crash').slice(0, 2000),
+          page: route.slice(0, 500),
+          clientLog,
+          error: (message || 'Unknown crash').slice(0, 2000),
+          ...(stack ? { stack: stack.slice(0, 8000) } : {}),
+          signature,
+        },
+      }).catch(() => {
+        // Claimed before send. A failed delivery must not send again on the next paint.
+      });
+    }
+    if (decision.reload) {
+      window.location.reload();
+    }
+  }, [message, stack]);
 
   const handleReload = () => {
     window.location.reload();
@@ -32,7 +64,7 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
     console.error('ErrorBoundary caught:', error, componentStack);
   }
 
-  const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : message;
   // A lazy-chunk import that fails post-mount (a redeploy invalidated the old
   // hashed filenames) lands here. Offer a clean reload — not a scary crash.
   const isChunkError =
@@ -90,10 +122,16 @@ function FallbackComponent({ error, componentStack }: FallbackProps) {
         )}
 
         <div className="flex flex-wrap gap-2">
+          <a
+            href="/dashboard"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-fg-on-brand transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            {t('errorBoundary.dashboardButton', 'Back to dashboard')}
+          </a>
           <button
             type="button"
             onClick={handleReload}
-            className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-fg-on-brand transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border-default bg-surface-card px-4 py-2.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             {t('errorBoundary.reloadButton', 'Reload page')}
           </button>
