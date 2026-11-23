@@ -27,10 +27,20 @@ function centsFromIntegerMicros(micros: bigint, showCents = false): string {
   return micros < 0n && cents !== 0n ? `-${text}` : text;
 }
 
+/**
+ * Exact integer micros, including a cap past Number.MAX_SAFE_INTEGER.
+ * A fractional float, NaN, or Infinity is not a micros count.
+ */
+function exactIntegerMicros(micros: number): bigint | null {
+  if (!Number.isInteger(micros)) return null;
+  return BigInt(micros);
+}
+
 /** Integer micros. A missing currency stays unspecified instead of becoming a euro amount. */
 export function formatExtractedMicros(micros: number, currency?: string | null, showCents = false): string {
-  if (!Number.isSafeInteger(micros)) return 'amount not readable';
-  const amount = centsFromIntegerMicros(BigInt(micros), showCents);
+  const asInt = exactIntegerMicros(micros);
+  if (asInt === null) return 'amount not readable';
+  const amount = centsFromIntegerMicros(asInt, showCents);
   if (currency && /^[A-Za-z]{3}$/.test(currency)) return `${amount} ${currency.toUpperCase()}`;
   return `${amount} unspecified`;
 }
@@ -38,8 +48,10 @@ export function formatExtractedMicros(micros: number, currency?: string | null, 
 function rateRowHasCents(row: unknown): boolean {
   if (!row || typeof row !== 'object') return false;
   const item = row as { role?: string; rateMicros?: number };
-  if (!item.role || item.rateMicros == null || !Number.isSafeInteger(item.rateMicros)) return false;
-  return roundedAbsCents(BigInt(item.rateMicros)) % 100n !== 0n;
+  if (!item.role || item.rateMicros == null) return false;
+  const micros = exactIntegerMicros(item.rateMicros);
+  if (micros === null) return false;
+  return roundedAbsCents(micros) % 100n !== 0n;
 }
 
 /** One extracted list. A cent on any rate makes every rate in that list show two decimals. */
