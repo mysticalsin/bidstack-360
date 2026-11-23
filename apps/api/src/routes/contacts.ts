@@ -98,7 +98,12 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!contact) throw req.server.httpErrors.notFound('Contact not found');
       const customFieldValues = await prisma.customFieldValue.findMany({
-        where: { orgId: req.auth.orgId, entityType: 'contact', entityId: contact.id },
+        where: {
+          orgId: req.auth.orgId,
+          entityType: 'contact',
+          entityId: contact.id,
+          definition: { deletedAt: null },
+        },
         select: { id: true, definitionId: true, value: true },
         take: 100,
       });

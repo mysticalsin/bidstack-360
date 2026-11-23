@@ -126,7 +126,12 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!task) throw server.httpErrors.notFound('Task not found');
       const customFieldValues = await prisma.customFieldValue.findMany({
-        where: { orgId: req.auth.orgId, entityType: 'task', entityId: task.id },
+        where: {
+          orgId: req.auth.orgId,
+          entityType: 'task',
+          entityId: task.id,
+          definition: { deletedAt: null },
+        },
         select: { id: true, definitionId: true, value: true },
         take: 100, // query-guard requires a bound; matches contacts/opps/leads
       });

@@ -19,6 +19,7 @@ import {
   NotePatch,
 } from '@bidstack/shared';
 import { canReadAccount } from '../lib/account-access.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import {
   attribution,
   extractMeetingNotes,
@@ -66,6 +67,16 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
     accountId: string;
     companyId?: string | null;
   }) {
+    // canReadAccount returns immediately for an unrestricted admin, so it
+    // does not prove companyId belongs to this org. A note stores that id
+    // as a foreign key; without this check an admin can pin another org's
+    // company onto a note in this workspace.
+    if (
+      input.companyId &&
+      !(await tenantEntityBelongsToOrg('company', input.companyId, input.orgId))
+    ) {
+      throw server.httpErrors.notFound('Company not found');
+    }
     const access = await canReadAccount({
       orgId: input.orgId,
       userId: input.userId,

@@ -92,7 +92,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       const c = await prisma.company.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
-          parent: { select: { id: true, name: true } },
+          parent: { select: { id: true, name: true, deletedAt: true } },
           children: { where: { deletedAt: null }, select: { id: true, name: true } },
           contacts: {
             where: { deletedAt: null },
@@ -124,7 +124,14 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!c) throw server.httpErrors.notFound('Company not found');
 
-      return serializeCompanyDetail(c);
+      // The parent relation is a to-one include, so the soft-delete middleware
+      // does not hide a tombstoned parent. Drop it here; delete also clears
+      // live children's parentId so new reads do not depend on this filter.
+      const parent =
+        c.parent && c.parent.deletedAt == null
+          ? { id: c.parent.id, name: c.parent.name }
+          : null;
+      return serializeCompanyDetail({ ...c, parent });
     },
   );
 
@@ -396,19 +403,29 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Company not found');
 
-      await prisma.company.updateMany({
-        where: { id: existing.id, orgId: req.auth.orgId },
-        data: { deletedAt: new Date() },
-      });
-      await prisma.auditLog.create({
-        data: {
-          orgId: req.auth.orgId,
-          userId: req.auth.userId,
-          action: 'company.delete',
-          targetType: 'company',
-          targetId: req.params.id,
-        },
-      });
+      const deletedAt = new Date();
+      // One transaction: the tombstone, the children's parent link, and the
+      // audit row commit together. A crash after the tombstone must not leave
+      // a child still naming a company the org can no longer open.
+      await prisma.$transaction([
+        prisma.company.updateMany({
+          where: { id: existing.id, orgId: req.auth.orgId },
+          data: { deletedAt },
+        }),
+        prisma.company.updateMany({
+          where: { orgId: req.auth.orgId, parentId: existing.id },
+          data: { parentId: null },
+        }),
+        prisma.auditLog.create({
+          data: {
+            orgId: req.auth.orgId,
+            userId: req.auth.userId,
+            action: 'company.delete',
+            targetType: 'company',
+            targetId: req.params.id,
+          },
+        }),
+      ]);
       return reply.code(204).send(null);
     },
   );
