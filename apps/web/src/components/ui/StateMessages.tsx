@@ -76,12 +76,24 @@ export function EmptyStateLink({ to, children }: { to: string; children: ReactNo
   );
 }
 
-export function ErrorState({ title, message, action }: BaseProps) {
+export function ErrorState({
+  title,
+  message,
+  action,
+  visibleOnMount = false,
+}: BaseProps & {
+  /**
+   * Paint the alert on the first frame. The default fade starts at opacity 0,
+   * which is correct for an inline error but makes the alert the LCP element
+   * when it is the first real text on the page (the dashboard summary failure).
+   */
+  visibleOnMount?: boolean;
+}) {
   const reduced = useReducedMotion();
   return (
     <motion.div
       role="alert"
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      initial={visibleOnMount ? false : reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
       animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={springSoft}
       className="flex flex-col items-center justify-center py-16 text-center"

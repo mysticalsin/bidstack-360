@@ -10,6 +10,7 @@ import { ConfettiHost } from '@/components/delight/Confetti';
 import { WebVitalsHud } from '@/components/dev/WebVitalsHud';
 import { HelpDrawer } from '@/components/help/HelpDrawer';
 import { useHelpDrawerHotkey } from '@/components/help/useHelpDrawer';
+import { DashboardPageTitle } from '@/components/dashboard/DashboardPageTitle';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { RouteProgress } from '@/components/layout/RouteProgress';
@@ -78,6 +79,10 @@ export function App() {
               fades+rises the new page in. No exit animation (avoids router
               location-freezing complexity); reduced-motion → opacity only. */}
           <PageTransition pageKey={location.pathname}>
+            {/* Outside Suspense so the node is created by the shell bundle
+                and stays mounted after the route chunk arrives. See
+                DashboardPageTitle. */}
+            {location.pathname === '/dashboard' ? <DashboardPageTitle /> : null}
             <ErrorBoundary>
               <Suspense fallback={<LoadingSkeleton rows={6} />}>
                 <AppRoutes />

@@ -183,10 +183,27 @@ const warmViteManifestCache = async (cache: Cache) => {
   await Promise.allSettled(paths.map((path) => cacheAppShellPath(cache, path)));
 };
 
+// Paths already being copied into the Cache API. The warmer runs twice
+// (before and after the service worker claims), and cache:'reload' used to
+// re-download every script on that pair of passes. Those duplicate requests
+// sat on the Lighthouse critical chain.
+const shellPathsInFlight = new Set<string>();
+
 const cacheAppShellPath = async (cache: Cache, path: string) => {
-  const response = await fetch(path, { cache: 'reload' });
-  if (response.ok) {
-    await cache.put(path, response.clone());
+  if (shellPathsInFlight.has(path)) return;
+  shellPathsInFlight.add(path);
+  try {
+    const existing = await cache.match(path);
+    if (existing) return;
+    // Default cache mode. The browser already fetched these URLs to render
+    // the page; a reload bypasses that and transfers them again under the
+    // simulated slow-4G budget.
+    const response = await fetch(path);
+    if (response.ok) {
+      await cache.put(path, response.clone());
+    }
+  } finally {
+    shellPathsInFlight.delete(path);
   }
 };
 
@@ -197,7 +214,14 @@ const warmAppShellCache = async () => {
   await Promise.allSettled(
     collectAppShellAssetPaths().map((path) => cacheAppShellPath(cache, path)),
   );
-  await warmViteManifestCache(cache);
+  // The manifest walk prefetches the whole route graph. On /dashboard that
+  // is every widget chunk, and it kept the network busy long enough for
+  // Lighthouse to keep the trace open. The shell itself is already warming
+  // above; the offline spec only asserts those shell URLs. Do the rest once
+  // the page has been quiet.
+  window.setTimeout(() => {
+    void warmViteManifestCache(cache).catch((error) => Sentry.captureException(error));
+  }, 8000);
 };
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
