@@ -94,7 +94,12 @@ export const leadRoutesRead: FastifyPluginAsyncZod = async (server) => {
       });
       if (!lead) throw server.httpErrors.notFound('Lead not found');
       const customFieldValues = await prisma.customFieldValue.findMany({
-        where: { orgId: req.auth.orgId, entityType: 'lead', entityId: lead.id },
+        where: {
+          orgId: req.auth.orgId,
+          entityType: 'lead',
+          entityId: lead.id,
+          definition: { deletedAt: null },
+        },
         select: { id: true, definitionId: true, value: true },
         take: 100,
       });

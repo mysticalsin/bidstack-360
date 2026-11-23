@@ -20,6 +20,7 @@ import {
   OpportunityImport,
   OpportunityImportResult,
 } from '@bidstack/shared';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { serializeOpportunity } from '../serializers/opportunity.js';
@@ -80,6 +81,17 @@ export const opportunityMutationsRoutes: FastifyPluginAsyncZod = async (server) 
         ownerId = ownerUser.id;
       } else if (body.owner === null) {
         ownerId = null;
+      }
+
+      // A client-supplied territory id is a foreign key, not a label. The
+      // country lookup above is already org-scoped; an explicit id is not.
+      // 404 (not 400) matches a missing id so a caller cannot probe which
+      // territories exist outside this org.
+      if (
+        typeof body.territoryId === 'string' &&
+        !(await tenantEntityBelongsToOrg('territory', body.territoryId, req.auth.orgId))
+      ) {
+        throw server.httpErrors.notFound('Territory not found');
       }
 
       // Auto-assign territory from country if not explicitly provided

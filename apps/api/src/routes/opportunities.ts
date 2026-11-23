@@ -23,6 +23,7 @@ import {
   getAccessScope,
   scopeCacheTag,
 } from '../lib/access-scope.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
 import { resolveCompanyIdByName } from './opportunities.helpers.js';
@@ -118,7 +119,9 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                   isLost: true,
                 },
               },
-              _count: { select: { tasks: true } },
+              // Relation counts do not pass through the soft-delete middleware,
+              // so a tombstoned task would still inflate the list badge.
+              _count: { select: { tasks: { where: { deletedAt: null } } } },
             },
             // When a due-date window is requested, order by soonest-due-first
             // (or oldest-overdue-first) instead of updatedAt — otherwise a
@@ -243,8 +246,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               isLost: true,
             },
           },
-          tasks: { orderBy: { createdAt: 'desc' }, take: 50 },
-          documents: { orderBy: { createdAt: 'desc' }, take: 50 },
+          tasks: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 50 },
+          documents: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 50 },
         },
       });
       if (!opp) throw server.httpErrors.notFound('Opportunity not found');
@@ -261,7 +264,12 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         },
       );
       const customFieldValues = await prisma.customFieldValue.findMany({
-        where: { orgId: req.auth.orgId, entityType: 'opportunity', entityId: opp.id },
+        where: {
+          orgId: req.auth.orgId,
+          entityType: 'opportunity',
+          entityId: opp.id,
+          definition: { deletedAt: null },
+        },
         select: { id: true, definitionId: true, value: true },
         take: 100,
       });
@@ -339,7 +347,15 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           : Promise.resolve(null),
       ]);
 
-      // Resolve territory
+      // Resolve territory. An explicit id must belong to this org; null
+      // clears the link. 404 matches a missing id so the response does not
+      // confirm that another org's territory exists.
+      if (
+        typeof req.body.territoryId === 'string' &&
+        !(await tenantEntityBelongsToOrg('territory', req.body.territoryId, req.auth.orgId))
+      ) {
+        throw server.httpErrors.notFound('Territory not found');
+      }
       let territoryId: string | null | undefined = req.body.territoryId;
       if (needsTerritoryLookup) {
         territoryId = patchTerritory?.id ?? null;
@@ -438,7 +454,10 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           });
           if (cas.count === 0) return { conflict: true as const };
         } else {
-          await tx.opportunity.update({ where: { id: before.id }, data: dataPatch });
+          await tx.opportunity.update({
+            where: { id: before.id, orgId: req.auth.orgId },
+            data: dataPatch,
+          });
         }
 
         // CF upserts included in the same transaction so a CF failure rolls back

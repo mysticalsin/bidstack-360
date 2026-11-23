@@ -88,7 +88,12 @@ export async function serializeCompanyDetail(
   },
 ): Promise<z.infer<typeof CompanyDetail>> {
   const customFieldValues = await prisma.customFieldValue.findMany({
-    where: { orgId: c.orgId, entityType: 'company', entityId: c.id },
+    where: {
+      orgId: c.orgId,
+      entityType: 'company',
+      entityId: c.id,
+      definition: { deletedAt: null },
+    },
     select: { id: true, definitionId: true, value: true },
     take: 100, // query-guard requires a bound; matches contacts/opps/leads
   });

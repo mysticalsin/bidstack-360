@@ -28,7 +28,7 @@ const { getPipelineKpis } = await import('./funnel.service.js');
 beforeEach(() => {
   opportunityGroupBy.mockReset();
   opportunityCount.mockReset().mockResolvedValue(0);
-  queryRaw.mockReset().mockResolvedValue([{ weighted: 0, avgDaysOpen: 0, openCount: 0 }]);
+  queryRaw.mockReset().mockResolvedValue([{ weightedMicros: '0', avgDaysOpen: 0, openCount: 0 }]);
 });
 
 describe('getPipelineKpis money precision', () => {
@@ -60,5 +60,21 @@ describe('getPipelineKpis money precision', () => {
 
     const args = opportunityGroupBy.mock.calls[0]![0] as { where?: Record<string, unknown> };
     expect(args.where).toMatchObject({ orgId: 'org-42', deletedAt: null });
+  });
+
+  it('converts a weighted micros total above the float64 safe range exactly', async () => {
+    // WHY: the SQL used to divide value_micros in float8 before summing.
+    // 600_000_000_001 currency units at probability 100 is
+    // 6.00000000001e17 micros, which a float64 sum cannot hold. The query
+    // now returns that integer as text and microsToUnits splits it in BigInt.
+    opportunityGroupBy.mockResolvedValue([]);
+    queryRaw.mockResolvedValue([
+      { weightedMicros: '600000000001000000', avgDaysOpen: 0, openCount: 1 },
+    ]);
+
+    const result = await getPipelineKpis('org-1');
+
+    expect(result.weightedPipeline).toBe(600_000_000_001);
+    expect(Number(600_000_000_001_000_000n) / 1_000_000).not.toBe(600_000_000_001);
   });
 });

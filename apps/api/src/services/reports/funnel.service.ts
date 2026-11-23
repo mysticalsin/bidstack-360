@@ -39,11 +39,14 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
   // (matching the prior daysBetween → Math.floor) before averaging — neither is
   // expressible via prisma.aggregate. floor(epoch/86400) mirrors Math.floor on
   // (now - created_at) in whole days.
+  // Weighted micros stay in numeric/BigInt. float8 is exact only to 2^53
+  // (~$9.0B); a larger open book silently corrupts the KPI. TRUNC drops a
+  // sub-micro remainder from probability/100, which is below one cent.
   const [agg] = await prisma.$queryRaw<
-    Array<{ weighted: number | null; avgDaysOpen: number | null; openCount: number }>
+    Array<{ weightedMicros: string | null; avgDaysOpen: number | null; openCount: number }>
   >(Prisma.sql`
     SELECT
-      SUM((o.value_micros::float8 / 1000000.0) * (o.probability::float8 / 100.0)) AS "weighted",
+      COALESCE(TRUNC(SUM(o.value_micros::numeric * o.probability::numeric / 100)), 0)::text AS "weightedMicros",
       AVG(floor(EXTRACT(EPOCH FROM (now() - o.created_at)) / 86400.0)) AS "avgDaysOpen",
       COUNT(*)::int AS "openCount"
     FROM opportunities o
@@ -51,7 +54,7 @@ export async function getPipelineKpis(orgId: string): Promise<PipelineKpis> {
       AND o.deleted_at IS NULL
       AND o.stage NOT IN ('closed_won', 'closed_lost')
   `);
-  const weighted = agg?.weighted ?? 0;
+  const weighted = microsToUnits(BigInt(agg?.weightedMicros ?? '0'));
   const avgDaysOpen = agg && agg.openCount > 0 ? Math.round(agg.avgDaysOpen ?? 0) : 0;
 
   return {

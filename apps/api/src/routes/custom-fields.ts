@@ -184,9 +184,17 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!existing) throw server.httpErrors.notFound('Definition not found');
 
+      // @@unique([orgId, entityType, fieldKey]) includes tombstones. Leaving
+      // the key in place makes the next create of the same key a 409, so the
+      // field can never be re-added after a delete. Rename the tombstone;
+      // values stay on this id and are hidden by the live-definition filter.
       const updated = await prisma.customFieldDefinition.update({
         where: { id: existing.id },
-        data: { active: false, deletedAt: new Date() },
+        data: {
+          active: false,
+          deletedAt: new Date(),
+          fieldKey: `deleted:${existing.id}`,
+        },
       });
       return {
         id: updated.id,
@@ -228,6 +236,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: req.query.entityType,
           entityId: req.query.entityId,
           deletedAt: null,
+          definition: { deletedAt: null },
         },
         include: { definition: true },
         take: 500,
@@ -273,6 +282,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: req.query.entityType,
           entityId: { in: ids },
           deletedAt: null,
+          definition: { deletedAt: null },
         },
         take: 500,
       });
@@ -314,6 +324,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           entityType,
           active: true,
+          deletedAt: null,
         },
         select: { id: true, fieldKey: true, fieldType: true, options: true },
         take: 500,
