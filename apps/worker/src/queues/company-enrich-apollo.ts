@@ -18,7 +18,7 @@ import type pino from 'pino';
 import { z } from 'zod';
 
 import { prisma, type Prisma } from '@bidstack/db';
-import { COMPANY_ENRICH_APOLLO } from '@bidstack/shared';
+import { annualRevenueOnWire, COMPANY_ENRICH_APOLLO } from '@bidstack/shared';
 
 export const QUEUE_NAME = COMPANY_ENRICH_APOLLO.name;
 
@@ -176,6 +176,7 @@ interface ApolloStrategicIntel {
   employeeTrend: 'hiring' | 'contracting' | 'flat' | 'unknown';
   employeeCount: number | null;
   annualRevenueMicros: number | null;
+  annualRevenueReadable?: boolean;
   intentTopics: string[];
   hiringSignals: ApolloStrategicSignal[];
   leadershipSignals: ApolloStrategicSignal[];
@@ -209,17 +210,18 @@ export function mapApolloOrganization(
 ): MappedEnrichment {
   const now = context.now ?? new Date();
   const employees = coerceInt(org.estimated_num_employees);
-  const revenue = coerceNumber(org.annual_revenue ?? org.organization_revenue);
+  const revenue = exactEuroMicros(coerceNumber(org.annual_revenue ?? org.organization_revenue));
   const foundedYear = coerceInt(org.founded_year);
   const jobPostings = context.jobPostings ?? org.job_postings;
   const executives = context.executives ?? org.senior_leadership ?? org.leadership_changes;
   const technicalStack = extractTechnologyStack(org);
-  const annualRevenueMicros = revenue === null ? null : BigInt(Math.round(revenue * 1_000_000));
+  const annualRevenueMicros = revenue.micros;
   const strategicIntel = buildApolloStrategicIntel({
     org,
     now,
     employeeCount: employees,
     annualRevenueMicros,
+    revenueExact: revenue.exact,
     syncMode: context.syncMode ?? 'apollo_api_organization_enrich',
     creditPolicy: context.creditPolicy ?? 'uses_credits',
     jobPostings,
@@ -257,6 +259,7 @@ function buildApolloStrategicIntel({
   now,
   employeeCount,
   annualRevenueMicros,
+  revenueExact,
   syncMode,
   creditPolicy,
   jobPostings,
@@ -267,6 +270,7 @@ function buildApolloStrategicIntel({
   now: Date;
   employeeCount: number | null;
   annualRevenueMicros: bigint | null;
+  revenueExact: boolean;
   syncMode: ApolloSyncMode;
   creditPolicy: ApolloCreditPolicy;
   jobPostings: unknown;
@@ -311,6 +315,9 @@ function buildApolloStrategicIntel({
     ...technologySignals,
   ];
   const employeeTrend = deriveEmployeeTrend(hiringSignals, org);
+  const revenueWire = revenueExact
+    ? annualRevenueOnWire(annualRevenueMicros)
+    : { annualRevenueMicros: null, annualRevenueReadable: false };
   const summaryParts = [
     intentTopics.length ? `${intentTopics.length} intent topic(s)` : null,
     employeeCount ? `${employeeCount.toLocaleString()} employees` : null,
@@ -327,7 +334,8 @@ function buildApolloStrategicIntel({
     freshness: 'fresh',
     employeeTrend,
     employeeCount,
-    annualRevenueMicros: annualRevenueMicros === null ? null : Number(annualRevenueMicros),
+    annualRevenueMicros: revenueWire.annualRevenueMicros,
+    ...(revenueWire.annualRevenueReadable ? {} : { annualRevenueReadable: false }),
     intentTopics,
     hiringSignals,
     leadershipSignals,
@@ -339,6 +347,7 @@ function buildApolloStrategicIntel({
     limitations: [
       'Apollo account intelligence follows the connected Apollo plan and tool limits; credit-sensitive enrichment is opt-in in Polo PreSales.',
       'Emails and phone numbers are intentionally excluded from Polo PreSales Apollo account intelligence.',
+      ...(revenueWire.annualRevenueReadable ? [] : ['amount not readable']),
     ],
     signals,
   };
@@ -380,6 +389,21 @@ export function verifyApolloEnrichJobSignature(
   return (
     actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
   );
+}
+
+function exactEuroMicros(revenue: number | null): { micros: bigint | null; exact: boolean } {
+  if (revenue === null) return { micros: null, exact: true };
+  if (!Number.isFinite(revenue) || revenue < 0) return { micros: null, exact: false };
+  // Integer euros are exact as a bigint even when micros pass the safe line.
+  if (Number.isSafeInteger(revenue)) {
+    return { micros: BigInt(revenue) * 1_000_000n, exact: true };
+  }
+  const scaled = revenue * 1_000_000;
+  const rounded = Math.round(scaled);
+  if (Number.isSafeInteger(rounded) && rounded >= 0 && Math.abs(scaled - rounded) < 1e-6) {
+    return { micros: BigInt(rounded), exact: true };
+  }
+  return { micros: null, exact: false };
 }
 
 function coerceNumber(value: unknown): number | null {
@@ -533,15 +557,20 @@ function extractRevenueSignals(
 ): ApolloStrategicSignal[] {
   const signals: ApolloStrategicSignal[] = [];
   if (annualRevenueMicros !== null) {
+    const revenueWire = annualRevenueOnWire(annualRevenueMicros);
     signals.push(
       signal({
         id: 'apollo-revenue-annual',
         kind: 'revenue',
         label: 'Annual revenue returned',
-        detail: 'Apollo returned company annual revenue.',
+        detail: revenueWire.annualRevenueReadable
+          ? 'Apollo returned company annual revenue.'
+          : 'amount not readable',
         observedAt,
         confidence: 0.78,
-        metadata: { annualRevenueMicros: Number(annualRevenueMicros) },
+        metadata: revenueWire.annualRevenueReadable
+          ? { annualRevenueMicros: revenueWire.annualRevenueMicros }
+          : {},
       }),
     );
   }

@@ -112,10 +112,23 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
-      value: c.annualRevenueMicros
-        ? formatMoney(c.annualRevenueMicros / 1_000_000, 'EUR')
-        : notVerified,
-      source: cockpitKpiSource(
+      value:
+        c.annualRevenueReadable === false
+          ? t('businessSnapshot.row.annualRevenueNotReadable', 'amount not readable')
+          : c.annualRevenueMicros
+            ? formatMoney(c.annualRevenueMicros / 1_000_000, 'EUR')
+            : notVerified,
+      source:
+        c.annualRevenueReadable === false
+          ? {
+              label: t('businessSnapshot.source.externalIntel', 'External'),
+              state: 'crm',
+              hint: t(
+                'businessSnapshot.source.revenueNotReadable',
+                'Stored revenue micros are past the exact integer range.',
+              ),
+            }
+          : cockpitKpiSource(
         cockpit.kpis,
         'annualRevenueMicros',
         Boolean(c.annualRevenueMicros),

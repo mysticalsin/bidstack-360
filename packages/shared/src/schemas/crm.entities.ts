@@ -5,19 +5,31 @@
  * Import via @bidstack/shared (re-exported from crm.ts barrel).
  */
 import { z } from 'zod';
+import { safeJsonMicros } from '../utils/money.js';
 import { CrmObjectSource, SourceAttribution, CrmLogo, TechnicalStackCategory } from './crm.base.js';
 
-// Annual revenue is stored in micros (EUR × 1e6). A company above about €9B
-// lands past Number.MAX_SAFE_INTEGER, and the seeded demo companies do.
-// Zod 4's .int() rejects those values and the companies list 500s. The
-// number is still a nonnegative integer; it is just not a safe integer.
-const annualRevenueMicrosSchema = z
-  .number()
-  .nonnegative()
-  .refine((value) => Number.isInteger(value), {
-    message: 'Expected an integer number of micros',
-  })
-  .nullable();
+// Annual revenue is integer micros. Zod .int() rejects a JS number past
+// Number.MAX_SAFE_INTEGER, the same line the liability-cap schema keeps
+// (#547): the number would already be rounded. A stored bigint that does not
+// fit is omitted and annualRevenueReadable is false ("amount not readable").
+const annualRevenueMicrosSchema = z.number().int().nonnegative().nullable();
+
+export function annualRevenueOnWire(micros: bigint | null): {
+  annualRevenueMicros: number | null;
+  annualRevenueReadable: boolean;
+} {
+  if (micros === null) {
+    return { annualRevenueMicros: null, annualRevenueReadable: true };
+  }
+  if (micros < 0n) {
+    return { annualRevenueMicros: null, annualRevenueReadable: false };
+  }
+  const annualRevenueMicros = safeJsonMicros(micros);
+  if (annualRevenueMicros === null) {
+    return { annualRevenueMicros: null, annualRevenueReadable: false };
+  }
+  return { annualRevenueMicros, annualRevenueReadable: true };
+}
 
 export const CompanyStrategicSignalKind = z.enum([
   'intent',
@@ -61,6 +73,7 @@ export const CompanyStrategicIntel = z.object({
   employeeTrend: z.enum(['hiring', 'contracting', 'flat', 'unknown']),
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: annualRevenueMicrosSchema,
+  annualRevenueReadable: z.boolean().optional(),
   intentTopics: z.array(z.string()).default([]),
   hiringSignals: z.array(CompanyStrategicSignal).default([]),
   leadershipSignals: z.array(CompanyStrategicSignal).default([]),
@@ -83,6 +96,7 @@ export const CrmCompany = z.object({
   imageUrl: z.string().url().nullable().optional(),
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: annualRevenueMicrosSchema,
+  annualRevenueReadable: z.boolean().optional(),
   status: z.string().nullable(),
   registryIds: z.record(z.string(), z.string()).default({}),
   formerNames: z.array(z.string()).default([]),

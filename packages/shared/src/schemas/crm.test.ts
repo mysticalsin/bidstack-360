@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CompanyLookupResponse,
+  annualRevenueOnWire,
   CrmCompany,
   CrmConnector,
   CrmDashboardSnapshot,
@@ -50,11 +51,17 @@ describe('CRM schemas', () => {
     expect(company.domain).toBe('mantu.com');
   });
 
-  it('accepts revenue micros past the safe-integer line and rejects fractions', () => {
-    // 78 billion EUR in micros. Zod 4 .int() rejects this and the companies
-    // route then fails response serialization with a 500.
-    const revenueMicros = 78_000_000_000_000_000;
-    const company = CrmCompany.parse({
+  it('rejects revenue micros past the safe-integer line instead of accepting a rounded number', () => {
+    // WHY: €78B micros sit past Number.MAX_SAFE_INTEGER. The double happens to
+    // be that integer, but the next micro collapses onto it. #547 still rejects
+    // a write above this line; the wire field does too, and the exact bigint is
+    // flagged not readable instead of being sent as a rounded number.
+    const siemensMicros = 78n * 1_000_000_000_000_000n;
+    const wire = annualRevenueOnWire(siemensMicros);
+    expect(wire).toEqual({ annualRevenueMicros: null, annualRevenueReadable: false });
+    expect(BigInt(Number(siemensMicros + 1n))).toBe(siemensMicros);
+
+    const company = {
       id: 'large',
       name: 'Large',
       legalName: null,
@@ -62,7 +69,6 @@ describe('CRM schemas', () => {
       website: null,
       industry: null,
       employeeCount: null,
-      annualRevenueMicros: revenueMicros,
       status: null,
       registryIds: {},
       formerNames: [],
@@ -71,28 +77,22 @@ describe('CRM schemas', () => {
       confidence: 0.5,
       sourceAttribution: [],
       updatedAt: fetchedAt,
-    });
-    expect(company.annualRevenueMicros).toBe(revenueMicros);
+    };
+    expect(
+      CrmCompany.safeParse({ ...company, annualRevenueMicros: Number(siemensMicros) }).success,
+    ).toBe(false);
+    expect(CrmCompany.safeParse({ ...company, annualRevenueMicros: 1.5 }).success).toBe(false);
     expect(
       CrmCompany.safeParse({
-        id: 'large',
-        name: 'Large',
-        legalName: null,
-        domain: null,
-        website: null,
-        industry: null,
-        employeeCount: null,
-        annualRevenueMicros: 1.5,
-        status: null,
-        registryIds: {},
-        formerNames: [],
-        incorporationDate: null,
-        logo: null,
-        confidence: 0.5,
-        sourceAttribution: [],
-        updatedAt: fetchedAt,
+        ...company,
+        annualRevenueMicros: null,
+        annualRevenueReadable: false,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
+    expect(annualRevenueOnWire(1_000_000_000_000_000n)).toEqual({
+      annualRevenueMicros: 1_000_000_000_000_000,
+      annualRevenueReadable: true,
+    });
   });
 
   it('keeps the requested Dust MCP crm_* tool names stable', () => {

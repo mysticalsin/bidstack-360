@@ -508,7 +508,12 @@ function eur(value: number): bigint {
   return BigInt(Math.round(value * 1_000_000));
 }
 
-/** EUR billions → micros (×1e6), via integer BigInt math to avoid float drift. */
+/**
+ * EUR billions → micros (×1e6) as an exact bigint.
+ * 13 billion EUR and above is past Number.MAX_SAFE_INTEGER in micros, so this
+ * must stay a bigint. The API does not coerce it with Number(); a value that
+ * does not fit a JS number is flagged "amount not readable".
+ */
 function revenueMicros(billions: number): bigint {
   return BigInt(billions) * 1_000_000_000_000_000n;
 }

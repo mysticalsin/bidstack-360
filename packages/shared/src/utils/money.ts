@@ -17,6 +17,24 @@
  */
 
 const MICROS_PER_UNIT = 1_000_000n;
+const MAX_SAFE_MICROS = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_MICROS = BigInt(Number.MIN_SAFE_INTEGER);
+
+/**
+ * Integer micros a JSON number can carry without rounding.
+ *
+ * Returns null past Number.MAX_SAFE_INTEGER. Some of those integers are
+ * exact doubles, but the next integer collapses onto the same number, so
+ * callers must not send them. Display code that needs the exact amount
+ * should keep the bigint and use `microsToUnits` only when the whole-unit
+ * half is still a safe integer.
+ */
+export function safeJsonMicros(micros: bigint): number | null {
+  if (micros > MAX_SAFE_MICROS || micros < MIN_SAFE_MICROS) return null;
+  const asNumber = Number(micros);
+  if (!Number.isSafeInteger(asNumber) || BigInt(asNumber) !== micros) return null;
+  return asNumber;
+}
 
 function toBigIntMicros(micros: bigint | number): bigint {
   return typeof micros === 'bigint' ? micros : BigInt(Math.trunc(micros));

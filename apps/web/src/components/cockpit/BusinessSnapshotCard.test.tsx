@@ -158,4 +158,15 @@ describe('BusinessSnapshotCard provenance', () => {
     expect(screen.getByText('External fresh')).toBeTruthy();
     expect(screen.getAllByText('Company Registry').length).toBeGreaterThan(0);
   });
+
+  it('shows amount not readable instead of a rounded revenue figure', () => {
+    render(
+      <BusinessSnapshotCard
+        cockpit={cockpit({ annualRevenueMicros: null, annualRevenueReadable: false })}
+      />,
+    );
+
+    expect(screen.getByText('amount not readable')).toBeTruthy();
+    expect(screen.queryByText(/EUR 78/)).toBeNull();
+  });
 });
