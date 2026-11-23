@@ -150,13 +150,22 @@ function cleanParty(raw: string): string {
     .trim();
 }
 
-function detectLiability(pages: TextPage[]): { amountMicros: number; currency: string; citation: MsaCitation; confidenceBps: number } | null {
+function detectLiability(pages: TextPage[]): { amountMicros: number; currency: string | null; citation: MsaCitation; confidenceBps: number } | null {
   const hit = findInPages(pages, /liability[^.%]{0,120}?(?:capped at|cap(?:ped)? of|not exceed)\s*([€£$])?\s*([\d,.\s]{3,16})\s*(EUR|USD|GBP|CHF)?/i);
   if (!hit) return null;
   const amount = Number((hit.match[2] ?? '').replace(/[,\s]/g, ''));
   if (!Number.isFinite(amount) || amount <= 0) return null;
   const symbol = hit.match[1];
-  const code = (hit.match[3] ?? (symbol === '€' ? 'EUR' : symbol === '£' ? 'GBP' : symbol === '$' ? 'USD' : 'EUR')).toUpperCase();
+  const written = hit.match[3];
+  const code = written
+    ? written.toUpperCase()
+    : symbol === '€'
+      ? 'EUR'
+      : symbol === '£'
+        ? 'GBP'
+        : symbol === '$'
+          ? 'USD'
+          : null;
   return {
     amountMicros: Math.round(amount * 1_000_000),
     currency: code,
