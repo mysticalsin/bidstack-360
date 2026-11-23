@@ -125,16 +125,18 @@ jobs:
           test -f apps/web/dist/icon-512.png || (echo "::error::icon-512.png missing from dist" && exit 1)
 
       - name: Bundle size guard (web)
-        # Hard-fail if any non-react chunk exceeds 200 KB minified — catches
-        # accidental bundling of heavy deps in app code. React itself
-        # (~340-360 KB) is whitelisted because react-dom production has a
-        # ~145 KB intrinsic floor and Clerk pulls extras.
+        # Same ceiling as apps/web/vite.config.ts chunkSizeWarningLimit.
+        # The manual vendor splits (charts, editor, motion, react) are larger
+        # than 200KB raw on purpose. 700KB is the regression line: a new
+        # chunk past that is an accidental bundle, not one of those splits.
+        # React stays excluded; react-dom's production floor is already
+        # ~145KB and Clerk pulls it further.
         run: |
           set -e
           cd apps/web
-          BIG=$(find dist/assets -name "*.js" -size +200k 2>/dev/null | grep -v "react-" || true)
+          BIG=$(find dist/assets -name "*.js" -size +700k 2>/dev/null | grep -v "react-" || true)
           if [ -n "$BIG" ]; then
-            echo "::error::Web chunk over 200KB (excluding react-*):"
+            echo "::error::Web chunk over 700KB (excluding react-*):"
             echo "$BIG" | xargs ls -lah
             exit 1
           fi
