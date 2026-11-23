@@ -39,7 +39,7 @@ const real = (text: string | null | undefined): string | null => {
   return t && !/^(n\/a|none)$/i.test(t) ? t : null;
 };
 
-function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormatter; company: TileCompany }) {
+function Tile({ n, fmtMicros, selectorCurrency, company }: { n: KeyNumber; fmtMicros: MicrosFormatter; selectorCurrency: string; company: TileCompany }) {
   const tipId = useId();
   const dir = directionOf(n);
   const tone = toneOf(n);
@@ -49,14 +49,15 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
   const tipSource = real(n.source);
   const tipPeriod = real(n.period);
   const hasTip = Boolean(tipSource || tipPeriod);
+  const shown = formatValue(n, fmtMicros, selectorCurrency);
   return (
     <li className="kn-tile" data-missing={missing} data-testid={`kn-${n.id}`} tabIndex={0} aria-describedby={hasTip ? tipId : undefined}>
       <span className="kn-label">
         {n.label}
         {n.sample ? <span className="sg-sample">Sample</span> : null}
       </span>
-      <span className="kn-value" title={missing ? undefined : formatValue(n, fmtMicros)}>
-        {missing && n.editKey ? 'Not found yet' : formatValue(n, fmtMicros)}
+      <span className="kn-value" title={missing ? undefined : shown}>
+        {missing && n.editKey ? 'Not found yet' : shown}
       </span>
       <span className="kn-foot">
         {Arrow && delta ? (
@@ -106,7 +107,8 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
 
 export function KeyNumbersStrip({ companyId }: { companyId: string }) {
   const money = useFormatMoney();
-  // Pipeline micros are EUR at rest; show them in the user's display currency like the rest of the page.
+  // Other micros tiles that record EUR still name EUR. The open pipeline tile
+  // does not: it goes through formatPipelineDeals, which will not invent a currency.
   const fmtMicros: MicrosFormatter = (m) => money.formatMoneyMicros(m, 'EUR', { compact: true });
   const q = useAccountKeyNumbers(companyId);
   if (q.isLoading) return <div className="kn" aria-busy="true"><div className="sg-skel" style={{ minHeight: 196 }} /></div>;
@@ -129,13 +131,13 @@ export function KeyNumbersStrip({ companyId }: { companyId: string }) {
       <div className="kn-group">
         <p className="kn-eyebrow">Company</p>
         <ul className="kn-row" data-count={company.length}>
-          {company.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} company={tileCompany} />)}
+          {company.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} selectorCurrency={money.currency} company={tileCompany} />)}
         </ul>
       </div>
       <div className="kn-group">
         <p className="kn-eyebrow">Account health</p>
         <ul className="kn-row" data-count={health.length}>
-          {health.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} company={tileCompany} />)}
+          {health.map((n) => <Tile key={n.id} n={n} fmtMicros={fmtMicros} selectorCurrency={money.currency} company={tileCompany} />)}
         </ul>
       </div>
     </section>

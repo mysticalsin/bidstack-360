@@ -8,8 +8,11 @@
 // numbers, dates, and currency symbols all rendered in English format regardless
 // of the user's selected language. Switched to Intl with explicit locale param.
 
+import { formatMicrosDecimal, moneyFromMicros, presentMoney, unitsToMicros } from '@bidstack/shared';
+
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
+
 const DEFAULT_LOCALE = 'en';
-const DEFAULT_CURRENCY = 'EUR';
 
 // Read the stored locale without importing i18next (keeps this module
 // tree-shakable for non-React callers and avoids circular deps).
@@ -26,35 +29,37 @@ function detectLocale(): string {
     : DEFAULT_LOCALE;
 }
 
-function detectCurrency(): string {
-  if (typeof window === 'undefined') return DEFAULT_CURRENCY;
+/** Header selection, persisted by the currency store. Not an amount currency. */
+function selectorCurrency(): string | null {
+  if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem('bidstack:currency-locale');
-    if (raw) {
-      const parsed = JSON.parse(raw) as { currency?: string };
-      if (parsed.currency) return parsed.currency;
-    }
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { currency?: string; state?: { currency?: string } };
+    const code = parsed.state?.currency ?? parsed.currency;
+    return typeof code === 'string' && code.trim() ? code : null;
   } catch {
-    /* ignore */
+    return null;
   }
-  return DEFAULT_CURRENCY;
+}
+
+function unspecifiedAmount(micros: bigint): string {
+  return `${formatMicrosDecimal(micros)} · ${UNSPECIFIED_CURRENCY_BASIS}`;
 }
 
 export function formatMoney(value: number, currency?: string, locale?: string): string {
-  const resolvedCurrency = currency ?? detectCurrency();
-  const resolvedLocale = locale ?? detectLocale();
-  if (value >= 1_000_000)
-    return new Intl.NumberFormat(resolvedLocale, {
-      style: 'currency',
-      currency: resolvedCurrency,
-      maximumFractionDigits: 2,
-      notation: 'compact',
-    }).format(value);
-  return new Intl.NumberFormat(resolvedLocale, {
-    style: 'currency',
-    currency: resolvedCurrency,
-    maximumFractionDigits: 0,
-  }).format(value);
+  const code = currency?.trim();
+  if (!code) return UNSPECIFIED_CURRENCY_BASIS;
+  let micros: bigint;
+  try {
+    micros = unitsToMicros(value);
+  } catch {
+    return UNSPECIFIED_CURRENCY_BASIS;
+  }
+  return presentMoney(moneyFromMicros(micros, code), selectorCurrency(), {
+    locale: locale ?? detectLocale(),
+    compact: Math.abs(value) >= 1_000_000,
+  }).text;
 }
 
 export function formatDate(iso: string | null | undefined, locale?: string): string {
@@ -90,25 +95,25 @@ export function formatMoneyMicros(
   currency?: string,
   options: { compact?: boolean; locale?: string } = {},
 ): string {
-  const resolvedCurrency = currency ?? detectCurrency();
-  const resolvedLocale = options.locale ?? detectLocale();
-  const asBigInt =
-    typeof micros === 'bigint'
-      ? micros
-      : typeof micros === 'number'
-        ? BigInt(Math.trunc(micros))
-        : BigInt(micros);
-  const million = BigInt(1_000_000);
-  const whole = asBigInt / million;
-  const remainder = asBigInt % million;
-  const value = Number(whole) + Number(remainder) / 1_000_000;
-  const compact = options.compact ?? Math.abs(value) >= 1000;
-  return new Intl.NumberFormat(resolvedLocale, {
-    style: 'currency',
-    currency: resolvedCurrency,
-    notation: compact ? 'compact' : 'standard',
-    maximumFractionDigits: compact ? 1 : 2,
-  }).format(value);
+  let asBigInt: bigint;
+  try {
+    asBigInt =
+      typeof micros === 'bigint'
+        ? micros
+        : typeof micros === 'number'
+          ? BigInt(Math.trunc(micros))
+          : BigInt(micros);
+  } catch {
+    return UNSPECIFIED_CURRENCY_BASIS;
+  }
+  const code = currency?.trim();
+  if (!code) return unspecifiedAmount(asBigInt);
+  const major = asBigInt < 0n ? -asBigInt : asBigInt;
+  const compact = options.compact ?? major / 1_000_000n >= 1000n;
+  return presentMoney(moneyFromMicros(asBigInt, code), selectorCurrency(), {
+    locale: options.locale ?? detectLocale(),
+    compact,
+  }).text;
 }
 
 /** Same as formatMoneyMicros but always returns full-precision (e.g. tooltips). */

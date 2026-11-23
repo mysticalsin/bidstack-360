@@ -16,7 +16,7 @@ import { QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bkl
 import { closeMonthLabel, pipelineByCloseMonth } from '@/components/charts/bid-chart-data';
 import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import {
-  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
+  accountBars, cumulativeWon, fmtCompact, forecastAmount, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
@@ -188,20 +188,45 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
 export function ForecastCard({ rows, projection, headingLevel }: {
   rows: OppRow[];
   headingLevel?: 2 | 3;
-  projection?: { periods: Array<{ label: string; weightedMicros: number; wonMicros: number; openMicros: number; manualCommitMicros: number | null }> };
+  projection?: { periods: Array<{ label: string; weightedMicros: string | number; wonMicros: string | number; openMicros: string | number; manualCommitMicros: string | number | null }> };
 }) {
   const actuals = wonByQuarter(rows).map((q) => ({ label: q.label, won: q.won, weighted: 0, open: 0 }));
   const future = (projection?.periods ?? [])
-    .filter((p) => p.openMicros > 0 || p.weightedMicros > 0)
-    .map((p) => ({ label: p.label, won: p.wonMicros / 1e6, weighted: p.weightedMicros / 1e6, open: p.openMicros / 1e6 }));
+    .filter((p) => {
+      const point = forecastAmount(p);
+      return point.open !== 0 || point.weighted !== 0 || point.openLabel !== '0' || point.weightedLabel !== '0';
+    })
+    .map((p) => {
+      const point = forecastAmount(p);
+      return {
+        label: p.label,
+        won: point.won,
+        weighted: point.weighted,
+        open: point.open,
+        wonLabel: point.wonLabel,
+        weightedLabel: point.weightedLabel,
+        openLabel: point.openLabel,
+      };
+    });
   const seen = new Set(future.map((f) => f.label));
-  const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
-  const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
-  const target = commits.length ? commits[0]! / 1e6 : null;
+  const data: Array<{
+    label: string;
+    won: number;
+    weighted: number;
+    open: number;
+    wonLabel?: string;
+    weightedLabel?: string;
+    openLabel?: string;
+  }> = [...actuals.filter((a) => !seen.has(a.label)), ...future];
+  const target = (projection?.periods ?? [])
+    .map((p) => p.manualCommitMicros)
+    .filter((micros): micros is string | number => micros != null && micros !== 0 && micros !== '0')
+    .map((micros) => forecastAmount({ wonMicros: micros, weightedMicros: 0, openMicros: 0 }))
+    .find((point) => point.won > 0 || point.wonLabel !== '0');
   return (
-    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
-      summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
-      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
+    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${target.wonLabel} per quarter` : 'No target set yet · add a commit forecast to compare'}
+      summary={data.map((d) => `${d.label}: won ${d.wonLabel ?? fmtCompact(d.won)}${d.weighted || d.weightedLabel ? `, weighted ${d.weightedLabel ?? fmtCompact(d.weighted)}` : ''}`).join('; ')}
+      table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, d.wonLabel ?? fmtCompact(d.won), d.weightedLabel ?? fmtCompact(d.weighted), d.openLabel ?? fmtCompact(d.open)]) }}>
       <QuarterBars data={data} format={fmtCompact} />
       <ul className="viz-legend" aria-hidden>
         <li><i className="dash-key" style={{ background: 'var(--success, #177048)' }} />Won</li>

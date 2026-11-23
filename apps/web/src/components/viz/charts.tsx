@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 // isAnimationActive=false under prefers-reduced-motion.
 import { useReducedMotion } from 'framer-motion';
 import {
-  Area, AreaChart, Bar, BarChart, Cell, Line, LineChart, Pie, PieChart, ReferenceLine,
+  Area, AreaChart, Bar, BarChart, Cell, LabelList, Line, LineChart, Pie, PieChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 
@@ -45,30 +45,40 @@ export function Spark({ values, mode = 'line', hotFrom, label, width = 96, heigh
 }
 
 /* ---------- horizontal stage bars (pipeline funnel) ---------- */
+function stageBarText(row: { value: number; amount?: string }, format: (v: number) => string): string {
+  return row.amount ?? format(row.value);
+}
+
 export function StageBars({ data, format, height, onSelect }: {
-  data: Array<{ label: string; value: number; count: number }>; format: (v: number) => string; height?: number;
+  data: Array<{ label: string; value: number; count: number; amount?: string }>; format: (v: number) => string; height?: number;
   /** Pointer shortcut; callers must also offer a keyboard path (chips, table). */
   onSelect?: (label: string) => void;
 }) {
   const reduced = useReducedMotion();
   const h = height ?? Math.max(72, data.length * 44 + 16);
   const max = Math.max(...data.map((d) => d.value), 1);
+  const labelled = data.map((row) => ({ ...row, amount: stageBarText(row, format) }));
   return (
-    <ResponsiveContainer width="100%" height={h}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 64, bottom: 0, left: 0 }} barCategoryGap={10}
-        style={onSelect ? { cursor: 'pointer' } : undefined}
-        onClick={onSelect ? (st: { activeLabel?: string | number } | null) => { if (st?.activeLabel !== undefined) onSelect(String(st.activeLabel)); } : undefined}>
-        <XAxis type="number" hide domain={[0, max]} />
-        <YAxis type="category" dataKey="label" width={132} tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }} />
-        <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={<ChartTip format={format} />} />
-        <Bar dataKey="value" name="Value" radius={[0, 4, 4, 0]} maxBarSize={28} {...anim(reduced)}
-          label={{ position: 'right', formatter: (v: unknown) => format(Number(v)), fill: 'var(--viz-muted)', fontSize: 12 }}>
-          {data.map((d, i) => (
-            <Cell key={d.label} fill={`color-mix(in srgb, var(--brand-primary, #006b4f) ${90 - i * (50 / Math.max(1, data.length - 1))}%, transparent)`} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div>
+      <ol className="sr-only">
+        {labelled.map((row) => <li key={row.label}>{row.label}: {row.amount}</li>)}
+      </ol>
+      <ResponsiveContainer width="100%" height={h}>
+        <BarChart data={labelled} layout="vertical" margin={{ top: 0, right: 64, bottom: 0, left: 0 }} barCategoryGap={10}
+          style={onSelect ? { cursor: 'pointer' } : undefined}
+          onClick={onSelect ? (st: { activeLabel?: string | number } | null) => { if (st?.activeLabel !== undefined) onSelect(String(st.activeLabel)); } : undefined}>
+          <XAxis type="number" hide domain={[0, max]} />
+          <YAxis type="category" dataKey="label" width={132} tickLine={false} axisLine={{ stroke: 'var(--viz-line)' }} />
+          <Tooltip cursor={{ fill: 'var(--surface-sunken, #f4f4f4)' }} content={<ChartTip />} />
+          <Bar dataKey="value" name="Value" radius={[0, 4, 4, 0]} maxBarSize={28} {...anim(reduced)}>
+            <LabelList dataKey="amount" position="right" fill="var(--viz-muted)" fontSize={12} />
+            {labelled.map((d, i) => (
+              <Cell key={d.label} fill={`color-mix(in srgb, var(--brand-primary, #006b4f) ${90 - i * (50 / Math.max(1, data.length - 1))}%, transparent)`} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 

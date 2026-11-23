@@ -422,7 +422,7 @@ describe('useFormatMoney hook integration', () => {
     vi.unstubAllGlobals();
   });
 
-  it('formats CAD to EUR correctly using useFormatMoney hook', () => {
+  it('keeps a CAD amount in CAD when the selector is EUR', () => {
     localStorage.setItem('bidstack:exchange-rates-ts', String(Date.now()));
     localStorage.setItem(
       'bidstack:exchange-rates',
@@ -443,11 +443,13 @@ describe('useFormatMoney hook integration', () => {
 
     const { result } = renderHook(() => useFormatMoney());
 
-    // 1.5M CAD in micros is '1500000000000'
+    // 1.5M CAD in micros is '1500000000000'. Rates are loaded on purpose:
+    // the hook must not spend them.
     const formatted = result.current.formatMoneyMicros('1500000000000', 'CAD');
 
-    expect(formatted).toContain('€');
-    expect(formatted).not.toContain('CA$');
+    expect(formatted).toContain('CAD');
+    expect(formatted).toMatch(/not converted to EUR/i);
+    expect(formatted).not.toContain('€');
   });
 });
 

@@ -1,9 +1,6 @@
-// Regression: the "Value" cell must convert the EUR-at-rest valueMicros into
-// the user's selected display currency, not just re-label the symbol. WHY: the
-// raw @/lib/format formatter reads the chosen currency for the symbol but never
-// applies the FX rate, so a €1M bid rendered '$1M' (unconverted) instead of the
-// true '$2M' — a figure silently wrong by the full FX delta on a win/loss
-// debrief table. Fails if the cell reverts to the non-converting formatter.
+// The closed-bid cell stores euros. A USD selector must not print a converted
+// dollar figure. WHY: a cached rate of 2 turned €1M into $2M with no approved
+// rate source. Fails if the cell shows $2M.
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -46,16 +43,16 @@ beforeEach(() => {
 });
 
 describe('WinLossRecentTable currency display', () => {
-  it('converts the EUR value into the selected display currency', () => {
+  it('keeps the EUR value in euros when the selector is USD', () => {
     render(
       <MemoryRouter>
         <WinLossRecentTable rows={[row]} />
       </MemoryRouter>,
     );
 
-    // €1M at USD rate 2.0 → $2M. The pre-fix non-converting formatter showed
-    // the unconverted '$1M' (right symbol, wrong number).
-    expect(screen.getByText(/\$2M/)).toBeDefined();
-    expect(screen.queryByText(/\$1M/)).toBeNull();
+    // €1M stays €1M. The loaded USD rate of 2 must not print $2M.
+    expect(screen.getByText(/€1M EUR/)).toBeDefined();
+    expect(screen.getByText(/not converted to USD/)).toBeDefined();
+    expect(screen.queryByText(/\$2M/)).toBeNull();
   });
 });

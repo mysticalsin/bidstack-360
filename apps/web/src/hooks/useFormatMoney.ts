@@ -1,47 +1,56 @@
-import { useEffect } from 'react';
+import { formatMicrosDecimal, moneyFromMicros, presentMoney, unitsToMicros } from '@bidstack/shared';
 
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { useCurrencyStore } from '@/stores/currency';
-import { formatMoney, formatMoneyMicros } from '@/lib/format';
 
-const SHOULD_AUTO_FETCH_RATES = import.meta.env.MODE !== 'test';
+function microsBigInt(micros: string | number | bigint): bigint {
+  if (typeof micros === 'bigint') return micros;
+  if (typeof micros === 'number') return BigInt(Math.trunc(micros));
+  return BigInt(micros);
+}
+
+function unspecified(micros: bigint): string {
+  return `${formatMicrosDecimal(micros)} · ${UNSPECIFIED_CURRENCY_BASIS}`;
+}
 
 /**
- * Hook that returns currency formatting functions with automatic conversion
- * based on the user's selected display currency.
+ * Format an amount in its own currency. The header currency is not applied:
+ * there is no approved rate source, so a different selector is named in the
+ * text instead of changing the symbol.
  */
 export function useFormatMoney() {
-  const { currency, convert, fetchRates } = useCurrencyStore();
-
-  useEffect(() => {
-    if (!SHOULD_AUTO_FETCH_RATES) return;
-    void fetchRates();
-  }, [fetchRates]);
+  const currency = useCurrencyStore((state) => state.currency);
+  const convert = useCurrencyStore((state) => state.convert);
 
   return {
     currency,
     convert,
-    formatMoney: (value: number, sourceCurrency = 'EUR') =>
-      formatMoney(convert(value, sourceCurrency), currency),
+    formatMoney: (value: number, sourceCurrency?: string | null) => {
+      const source = sourceCurrency?.trim();
+      if (!source) return UNSPECIFIED_CURRENCY_BASIS;
+      try {
+        const amount = moneyFromMicros(unitsToMicros(value), source);
+        return presentMoney(amount, currency, { compact: Math.abs(value) >= 1_000_000 }).text;
+      } catch {
+        return UNSPECIFIED_CURRENCY_BASIS;
+      }
+    },
     formatMoneyMicros: (
       micros: string | number | bigint,
-      // Micros are EUR-denominated at rest (CLAUDE.md money convention) — the
-      // default source must match or every dashboard figure gets FX-skewed.
-      sourceCurrency = 'EUR',
+      sourceCurrency?: string | null,
       options?: { compact?: boolean },
     ) => {
-      const asBigInt =
-        typeof micros === 'bigint'
-          ? micros
-          : typeof micros === 'number'
-            ? BigInt(Math.trunc(micros))
-            : BigInt(micros);
-      const million = BigInt(1_000_000);
-      const whole = asBigInt / million;
-      const remainder = asBigInt % million;
-      const value = Number(whole) + Number(remainder) / 1_000_000;
-      const converted = convert(value, sourceCurrency);
-      const convertedMicros = String(BigInt(Math.round(converted * 1_000_000)));
-      return formatMoneyMicros(convertedMicros, currency, options);
+      let asBigInt: bigint;
+      try {
+        asBigInt = microsBigInt(micros);
+      } catch {
+        return UNSPECIFIED_CURRENCY_BASIS;
+      }
+      const source = sourceCurrency?.trim();
+      if (!source) return unspecified(asBigInt);
+      const major = asBigInt < 0n ? -asBigInt : asBigInt;
+      const compact = options?.compact ?? major / 1_000_000n >= 1000n;
+      return presentMoney(moneyFromMicros(asBigInt, source), currency, { compact }).text;
     },
   };
 }

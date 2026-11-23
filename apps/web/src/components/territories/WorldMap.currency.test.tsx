@@ -1,10 +1,6 @@
-// Regression: the world map's legend/tooltip/aria-label money figures must
-// track the user's selected display currency (via useCurrencyStore), not a
-// hardcoded EUR. WHY: WorldMap is shared by Territories + Sector View, where
-// every other money surface already converts — the map showing '€1M' while the
-// KPI tiles show '$2M' for the same portfolio is a silently-wrong figure to a
-// bid director, not a cosmetic mismatch. Fails if the component reverts to the
-// module-level formatMoneyMicros with a hardcoded output currency.
+// The map stores euros. A USD selector must not relabel that figure as dollars.
+// WHY: multiplying by a cached rate and printing $2M claims a conversion Tony
+// has not approved. Fails if the legend shows a dollar amount.
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -55,12 +51,12 @@ beforeEach(() => {
 });
 
 describe('WorldMap currency display', () => {
-  it('renders the pipeline legend in the user-selected currency, converted from EUR', () => {
+  it('keeps the pipeline legend in euros when the selector is USD', () => {
     render(<WorldMap data={[item]} />);
 
-    // maxValue = €1,000,000 → at USD rate 2.0 the top legend bracket is $2M.
-    // The pre-fix code hardcoded 'EUR' and would render '€1M' regardless.
-    expect(screen.getByText(/\$2M/)).toBeDefined();
-    expect(screen.queryByText(/€1M/)).toBeNull();
+    // €1,000,000 stays €1M. The loaded USD rate of 2 must not print $2M.
+    expect(screen.getByText(/€1M EUR/)).toBeDefined();
+    expect(screen.getAllByText(/not converted to USD/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/\$2M/)).toBeNull();
   });
 });

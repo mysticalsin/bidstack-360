@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -21,16 +20,9 @@ export function CurrencySelector() {
     autoDetect,
     followOrg,
     followOrgDefault,
-    fetchRates,
-    rates,
     ratesLoading,
-    ratesError,
   } = useCurrencyStore();
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-
-  useEffect(() => {
-    fetchRates();
-  }, [fetchRates]);
 
   useEffect(() => {
     if (autoDetect) void enableAutoDetect();
@@ -48,11 +40,10 @@ export function CurrencySelector() {
 
   const selectedIndex = SUPPORTED_CURRENCIES.findIndex((c) => c.code === currency);
   const selected = SUPPORTED_CURRENCIES[selectedIndex];
-  const statusText = ratesLoading
-    ? t('currencySelector.statusUpdating', 'Updating live rates')
-    : ratesError
-      ? t('currencySelector.statusCached', 'Using cached rates')
-      : formatRateStatus(rates?.date, t);
+  const statusText = t(
+    'currencySelector.doesNotConvert',
+    'Does not convert amounts. Figures stay in the currency they were stored in.',
+  );
 
   // WHY useLayoutEffect: syncing visual keyboard-navigation highlight before
   // paint — classic useLayoutEffect use-case. setState-in-effect is flagged
@@ -121,15 +112,11 @@ export function CurrencySelector() {
   return (
     <div ref={ref} className="tb-currency relative">
       <Tooltip
-        content={
-          ratesError
-            ? t('currencySelector.tooltipRatesUnavailable', 'Rates unavailable: {{error}}', {
-                error: ratesError,
-              })
-            : t('currencySelector.tooltipCurrency', 'Currency: {{name}}', {
-                name: selected?.name ?? currency,
-              })
-        }
+        content={t(
+          'currencySelector.tooltipDoesNotConvert',
+          '{{name}}. Does not convert amounts.',
+          { name: selected?.name ?? currency },
+        )}
       >
         <button
           ref={triggerRef}
@@ -178,7 +165,7 @@ export function CurrencySelector() {
             <div className="mb-3 flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                  {t('currencySelector.displayCurrencyLabel', 'Display currency')}
+                  {t('currencySelector.selectorHeading', 'Stored currency shown')}
                 </span>
                 <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">
                   {selected?.name ?? currency}
@@ -285,17 +272,4 @@ export function CurrencySelector() {
       </AnimatePresence>
     </div>
   );
-}
-
-function formatRateStatus(date: string | undefined, t: TFunction): string {
-  if (!date) return t('currencySelector.statusLiveRates', 'Live rates');
-  const parsed = Date.parse(date);
-  if (!Number.isFinite(parsed)) return t('currencySelector.statusLiveRates', 'Live rates');
-  return t('currencySelector.statusRatesUpdated', 'Rates updated {{date}}', {
-    date: new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    }).format(parsed),
-  });
 }

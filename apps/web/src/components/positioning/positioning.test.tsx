@@ -46,6 +46,12 @@ describe('positioning-format', () => {
   it('formats values, deltas and direction tones', () => {
     expect(formatValue(kn({ value: 1234 }))).toBe('1,234');
     expect(formatValue(kn({ value: 1.7e9, unit: 'money', currency: 'EUR' }))).toBe('EUR 1.70bn');
+    // WHY: a key number with no currency was labelled USD. Supersedes PR #64.
+    const unspecified = formatValue(kn({ value: 1.7e9, unit: 'money', currency: null }));
+    expect(unspecified).toContain('unspecified');
+    expect(unspecified).not.toContain('USD');
+    const micros = formatValue(kn({ value: 1_500_000, unit: 'money_micros', currency: null }));
+    expect(micros).not.toMatch(/[$€]|USD|EUR|CAD/);
     expect(formatValue(kn({ value: 18.34, unit: 'pct' }))).toBe('18.3%');
     expect(formatValue(kn({ value: -0.4, unit: 'sentiment' }))).toBe('Negative');
     expect(formatValue(kn({ value: 12, unit: 'days' }))).toBe('12d ago');
@@ -162,8 +168,8 @@ describe('WhatToPosition', () => {
       brief: { ...pos.brief, pipeline: { openCount: 2, openMicros: '2400000000000', won24m: 0, lost24m: 0 } },
     };
     render(<WhatToPosition companyId="c1" />);
-    expect(screen.getByTestId('account-brief').textContent).toContain('worth EUR 2m');
-    expect(screen.getByTestId('wp-play-1').textContent).toContain('EUR 100,000 to EUR 300,000');
+    expect(screen.getByTestId('account-brief').textContent).toContain('worth EUR 2,400,000');
+    expect(screen.getByTestId('wp-play-1').textContent).toContain('EUR 100k to EUR 300k');
   });
 
   it('says what is needed when there is no play, and omits the deal range when not derived', () => {
