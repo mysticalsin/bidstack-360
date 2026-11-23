@@ -25,6 +25,7 @@ import {
 
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { detectMsaContentType, sha256Hex } from '../msa/file-checks.js';
+import { liabilityFields } from '../msa/liability-cap.js';
 import { createIntakeDraftFromBuffer, intakeKey } from '../msa/intake-draft.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
@@ -254,11 +255,13 @@ export const msaIntakeRoutes: FastifyPluginAsyncZod = async (server) => {
         signingEntityId = matches[0]?.entityId ?? null;
       }
 
-      const cap = overrides.liabilityCap !== undefined
-        ? overrides.liabilityCap
-        : fields.liabilityCap.found
-          ? (fields.liabilityCap.value as { amountMicros: number; currency: string })
-          : null;
+      const cap =
+        overrides.liabilityCap !== undefined
+          ? overrides.liabilityCap
+          : fields.liabilityCap.found
+            ? fields.liabilityCap.value
+            : null;
+      const capColumns = liabilityFields(cap);
       const contractId = randomUUID();
       const title =
         req.body.title ??
@@ -281,8 +284,7 @@ export const msaIntakeRoutes: FastifyPluginAsyncZod = async (server) => {
             autoRenew: overrides.autoRenew ?? fieldBool(fields.autoRenew),
             noticePeriodDays: overrides.noticePeriodDays ?? fieldNumber(fields.noticePeriodDays),
             governingLaw: overrides.governingLaw ?? fieldString(fields.governingLaw),
-            liabilityCapMicros: cap ? BigInt(cap.amountMicros) : null,
-            liabilityCapCurrency: cap?.currency ?? null,
+            ...capColumns,
             paymentTerms: overrides.paymentTerms ?? fieldString(fields.paymentTerms),
             termMonths: overrides.termMonths ?? fieldNumber(fields.termMonths),
             renewalTerms: overrides.renewalTerms ?? fieldString(fields.renewalTerms),
