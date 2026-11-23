@@ -63,7 +63,11 @@ jobs:
 
       - name: Run Lighthouse CI
         id: lhci
-        run: lhci autorun
+        # Root package.json is "type": "module", so Node loads .lighthouserc.js
+        # as ESM and rejects its module.exports. LHCI needs that file as CJS.
+        run: |
+          cp .lighthouserc.js "${RUNNER_TEMP}/lighthouserc.cjs"
+          lhci autorun --config="${RUNNER_TEMP}/lighthouserc.cjs"
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 

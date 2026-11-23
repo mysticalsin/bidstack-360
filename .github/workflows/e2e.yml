@@ -41,7 +41,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # rfp_vector_indexes creates extension "vector". Alpine Postgres has no pgvector.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: bidstack
           POSTGRES_PASSWORD: bidstack_test
@@ -121,7 +122,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # rfp_vector_indexes creates extension "vector". Alpine Postgres has no pgvector.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: bidstack
           POSTGRES_PASSWORD: bidstack_test
@@ -211,8 +213,12 @@ jobs:
           REDIS_URL: redis://localhost:6379
 
       - name: Run E2E shard ${{ matrix.shard }}/${{ matrix.total }}
+        # Blob reports are what merge-reports reads. Playwright 1.59 has no
+        # --output flag on that command, and an HTML report cannot be merged.
         run: >
           pnpm --filter @bidstack/web exec playwright test
+          --reporter=list
+          --reporter=blob
           --shard=${{ matrix.shard }}/${{ matrix.total }}
           ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
         env:
@@ -229,7 +235,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report-shard-${{ matrix.shard }}
-          path: apps/web/playwright-report/
+          path: apps/web/blob-report/*.zip
           retention-days: 14
 
       - name: Upload failure screenshots
@@ -272,13 +278,17 @@ jobs:
         with:
           pattern: playwright-report-shard-*
           path: all-reports/
+          merge-multiple: true
 
       - name: Merge reports
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+          # pnpm exec runs in apps/web, so this is apps/web/merged-playwright-report.
+          PLAYWRIGHT_HTML_OUTPUT_DIR: merged-playwright-report
         run: |
           pnpm --filter @bidstack/web exec playwright merge-reports \
             --reporter html \
-            --output apps/web/merged-playwright-report/ \
-            all-reports/
+            ../../all-reports
 
       - name: Upload merged report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
