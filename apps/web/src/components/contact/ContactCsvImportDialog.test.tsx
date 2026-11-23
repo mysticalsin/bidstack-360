@@ -69,7 +69,7 @@ describe('ContactCsvImportDialog', () => {
     pasteCsv(
       'name,customer,email,sentiment\n' +
         'Alice,Mantu,not-an-email,warm\n' +
-        'Bob,Mantu,bob@mantu.com,furious',
+        'Bob,Mantu,bob@example.test,furious',
     );
 
     // Both rows fail — the good name/customer pair doesn't rescue a bad

@@ -57,7 +57,7 @@ const STUB_USER: AuthUser = {
   firstName: 'Jane',
   lastName: 'Smith',
   fullName: 'Jane Smith',
-  primaryEmailAddress: { emailAddress: 'jane@mantu.com' },
+  primaryEmailAddress: { emailAddress: 'jane@example.test' },
 };
 
 const STUB_SESSION_KEY = 'bidstack:session';
