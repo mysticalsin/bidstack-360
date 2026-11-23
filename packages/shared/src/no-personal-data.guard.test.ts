@@ -205,10 +205,18 @@ describe('personal-data guard', () => {
   });
 
   it('the parent of the cleanup commit fails the guard on seed fixtures', () => {
-    const text = execFileSync('git', ['show', 'f54ec4d1^:packages/db/src/seed-data.ts'], {
-      cwd: repoRoot(),
-      encoding: 'utf8',
-    });
+    // f54ec4d1's parent. A full SHA, because CI checks out one commit and `f54ec4d1^` is not an object there.
+    const parent = '40b13242ebf18d715b67bb6133a9774bbd7d0c78';
+    const root = repoRoot();
+    const spec = `${parent}:packages/db/src/seed-data.ts`;
+    const show = () => execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
+    let text: string;
+    try {
+      text = show();
+    } catch {
+      execFileSync('git', ['fetch', '--depth', '1', 'origin', parent], { cwd: root, stdio: 'ignore' });
+      text = show();
+    }
     expect(scanText(text, 'packages/db/src/seed-data.ts', empty, true).mantu).toBeGreaterThan(0);
   });
 
