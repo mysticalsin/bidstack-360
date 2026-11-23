@@ -84,10 +84,10 @@ export default tseslint.config(
       'scratch_skills/**', // exploratory scratch directory
       'scratch_img/**', // exploratory scratch directory
       '.corepack/**', // vendored pnpm runtime, not source
-      '.planning/**',
+      'docs/planning/**',
       'apps/chrome-extension/**', // vanilla JS Chrome extension — not part of TS monorepo
       'apps/mobile/**', // React Native — has its own Babel/Metro config
-      'apps/docs/**', // Docusaurus / static docs site
+      'docs/public-api/**', // customer API guides, not an app
       'integrations/**', // Zapier app and other CJS/vanilla-JS integrations
       'load-tests/**', // k6 load-test scripts — not Node.js, use k6 globals
       'scripts/**', // one-off ops scripts — console is intentional there

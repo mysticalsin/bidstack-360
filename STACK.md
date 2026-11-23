@@ -94,25 +94,32 @@ Twenty fork).
 ```
 BIDCRM/
 ├── apps/
-│   ├── web/              # React 18 + Vite 6 frontend (port of the prototype)
+│   ├── web/              # React 18 + Vite 6 frontend
 │   ├── api/              # Fastify 5 REST API
 │   ├── worker/           # BullMQ workers (Dust poll, enrichment)
-│   └── mcp-server/       # @modelcontextprotocol/sdk
+│   ├── mcp-server/       # @modelcontextprotocol/sdk
+│   ├── marketing/        # marketing site
+│   └── chrome-extension/ # MV3 extension (not a workspace package)
 ├── packages/
 │   ├── db/               # Prisma schema + client
 │   ├── dust-client/      # Typed Dust workspace API wrapper
 │   ├── shared/           # Zod schemas, shared types
+│   ├── integrations/     # TypeScript connector package (@bidstack/integrations)
 │   ├── odoo-mcp-client/  # Odoo MCP client (built before test/typecheck)
 │   └── twenty-bidstack/  # Twenty overlay (preserved — NOT in workspace; see DO_NOT_TOUCH)
-├── integrations/         # external system glue (Dust, Odoo, etc.)
+├── integrations/         # Zapier app + Slack manifest (not packages/integrations)
 ├── load-tests/           # k6 scripts
-├── scripts/              # repo-wide scripts incl. scripts/merge/* helpers
-├── docs/                 # design docs, ADRs, solutions
-├── handoff/              # archived handoff artifacts (Dust integration, MCP tools, etc.)
-├── BIDCRM-design/        # design assets / mocks
-├── .claude/              # local hooks, agents, project rules
+├── scripts/              # repo-wide scripts
+├── docs/                 # architecture, ADRs, runbooks, public API guides
+│   ├── public-api/       # customer API guides (not an app)
+│   ├── production-readiness/
+│   ├── planning/
+│   └── audits/walteur-kit/
+├── handoff/              # archived handoff; relay notes in handoff/relay/
+├── BIDCRM-design/        # pinned design-snapshot submodule, not the running app
+├── infra/                # Azure Bicep
 ├── CLAUDE.md             # Software Factory operating contract
-├── AGENTS.md             # Codex equivalent of CLAUDE.md (see §AGENTS.md note)
+├── AGENTS.md             # Codex equivalent of CLAUDE.md
 ├── STACK.md              # this file
 ├── STACK_CHOICES.md      # 2026 greenfield reference
 ├── SPEC.md               # canonical product spec
@@ -121,8 +128,9 @@ BIDCRM/
 └── pnpm-workspace.yaml
 ```
 
-`apps/*` covers api, web, worker, mcp-server, plus marketing and mobile
-(Wave 7). `packages/twenty-bidstack` is excluded from the workspace.
+Workspace members are `apps/*` and `packages/*` that have a `package.json`.
+`packages/twenty-bidstack` and `apps/mobile` (when present) are excluded.
+`apps/chrome-extension` has no `package.json`, so it is not a workspace package.
 
 ---
 
