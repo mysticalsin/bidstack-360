@@ -38,12 +38,6 @@ export function DashboardFirstPaint() {
           <h1 className="page-title gradient-text">
             {t('orgDashboard.pageTitle', 'Workspace Command Center')}
           </h1>
-          <p className="dashboard-lead">
-            {t(
-              'orgDashboard.lead',
-              'Open bids, overdue follow-ups, and the work closing in the next seven days.',
-            )}
-          </p>
         </div>
         <div className="page-actions">
           <Link to="/accounts" className="btn btn-secondary">
@@ -56,6 +50,12 @@ export function DashboardFirstPaint() {
           </Link>
         </div>
       </header>
+      <p className="dashboard-lead">
+        {t(
+          'orgDashboard.lead',
+          'Open bids, overdue follow-ups, and the work closing in the next seven days.',
+        )}
+      </p>
       {/* Catch the lazy page here so this heading stays painted while the
           widget chunk loads. The shell-level Suspense would otherwise swap
           the whole route for a skeleton. */}

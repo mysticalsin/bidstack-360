@@ -1756,10 +1756,10 @@ select:focus-visible {
    shell bundle; see DashboardFirstPaint. */
 .dashboard-lead {
   color: var(--fg-primary);
-  font-size: 18px;
-  line-height: 1.45;
-  margin: 8px 0 0;
-  max-width: 34ch;
+  font-size: 22px;
+  line-height: 1.35;
+  margin: 12px 0 0;
+  max-width: 18ch;
 }
 .page-actions {
   display: flex;
