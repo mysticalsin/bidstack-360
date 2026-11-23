@@ -5,6 +5,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
+import {
+  recognizeWithUnlimitedOcr,
+  renderPdfPages,
+  unlimitedOcrConfigured,
+} from './unlimited-ocr.js';
+
 const require = createRequire(import.meta.url);
 const execFile = promisify(execFileCallback);
 
@@ -117,6 +123,11 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 
 async function ocrPdf(buffer: Buffer): Promise<string> {
   if (!ocrEnabled()) return '';
+  // Scanned PDFs go to Unlimited OCR when that server is configured. The local
+  // ocrmypdf binary remains the engine when BIDSTACK_UNLIMITED_OCR_URL is unset.
+  if (unlimitedOcrConfigured()) {
+    return recognizeWithUnlimitedOcr(await renderPdfPages(buffer));
+  }
   const input = await withTempFile(buffer, '.pdf');
   const output = path.join(
     tmpdir(),
@@ -139,8 +150,12 @@ async function ocrPdf(buffer: Buffer): Promise<string> {
   }
 }
 
-async function ocrImage(buffer: Buffer, ext: string): Promise<string> {
+async function ocrImage(buffer: Buffer, ext: string, contentType: string): Promise<string> {
   if (!ocrEnabled()) return '';
+  if (unlimitedOcrConfigured()) {
+    const mime = contentType.startsWith('image/') ? contentType : 'image/png';
+    return recognizeWithUnlimitedOcr([{ buffer, mime }]);
+  }
   const input = await withTempFile(buffer, ext && ext !== '.svg' ? ext : '.png');
   try {
     const result = await runOcrCommand(process.env.BIDSTACK_TESSERACT_BIN ?? 'tesseract', [
@@ -331,10 +346,12 @@ export async function extractTextFromBuffer(opts: ExtractOptions): Promise<strin
   }
 
   if (isImageContentType(ct, ext) && ext !== '.svg' && ct !== 'image/svg+xml') {
-    const text = await ocrImage(buffer, ext);
+    const text = await ocrImage(buffer, ext, ct);
     if (text) return text;
     throw new Error(
-      'Image OCR requires BIDSTACK_OCR_ENABLED=true plus Tesseract on the worker runtime',
+      unlimitedOcrConfigured()
+        ? 'Image OCR produced no text from Unlimited OCR'
+        : 'Image OCR requires BIDSTACK_OCR_ENABLED=true plus Tesseract on the worker runtime',
     );
   }
 
