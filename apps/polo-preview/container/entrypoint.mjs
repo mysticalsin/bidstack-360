@@ -17,12 +17,19 @@ import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
 import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
+import { resolveRestoreDrillPaths } from '../src/restore-drill-paths.js';
 
-const APP = '/app';
+const paths = resolveRestoreDrillPaths(process.env);
+const APP = paths.app;
 const WEB_ROOT = join(APP, 'apps/web/dist');
-const DATA = '/data';
+const DATA = paths.data;
 const PGDATA = join(DATA, 'pg');
 const STORAGE = join(DATA, 'storage');
+const PG_SOCKET = paths.pgSocket;
+const MIGRATE_STAGING = paths.migrateStaging;
+const SNAPSHOT_DIR = paths.snapshotDir;
+const SNAPSHOT_TGZ = paths.snapshotTgz;
+const RESTORE_DIR = paths.restoreDir;
 const API_PORT = 4020;
 const PORT = 8080;
 const SELF_SEED_AFTER_MS = 120_000;
@@ -186,11 +193,12 @@ function startDatabase() {
   const ids = asRoot ? pgUid() : {};
   mkdirSync(PGDATA, { recursive: true });
   mkdirSync(STORAGE, { recursive: true });
+  mkdirSync(PG_SOCKET, { recursive: true });
   if (asRoot) runSync('chown', ['-R', 'postgres:postgres', PGDATA]);
   if (!existsSync(join(PGDATA, 'PG_VERSION'))) {
     runSync('initdb', ['-D', PGDATA, '-U', PG_USER, '--auth=trust', '-E', 'UTF8'], ids);
   }
-  const pg = spawn('postgres', ['-D', PGDATA, '-h', '127.0.0.1', '-k', '/tmp', '-c', 'shared_buffers=256MB'], {
+  const pg = spawn('postgres', ['-D', PGDATA, '-h', '127.0.0.1', '-k', PG_SOCKET, '-c', 'shared_buffers=256MB'], {
     ...ids,
     stdio: 'inherit',
   });
@@ -243,13 +251,12 @@ function activeImportDuplicates() {
 }
 
 function stageMigrationsWithoutIndex() {
-  const staging = '/tmp/polo-migrate';
-  rmSync(staging, { recursive: true, force: true });
-  cpSync(join(APP, 'packages/db/prisma'), staging, {
+  rmSync(MIGRATE_STAGING, { recursive: true, force: true });
+  cpSync(join(APP, 'packages/db/prisma'), MIGRATE_STAGING, {
     recursive: true,
     filter: (src) => !src.includes(`/${ACTIVE_IMPORT_MIGRATION}`),
   });
-  return join(staging, 'schema.prisma');
+  return join(MIGRATE_STAGING, 'schema.prisma');
 }
 
 function migrate() {
@@ -369,31 +376,28 @@ function changeCounter() {
 }
 
 function snapshotFile() {
-  const dir = '/tmp/snapshot';
-  rmSync(dir, { recursive: true, force: true });
-  mkdirSync(dir, { recursive: true });
-  runSync('pg_dump', ['-h', '127.0.0.1', '-U', PG_USER, '-Fc', '-f', join(dir, 'db.dump'), DB]);
-  writeFileSync(join(dir, 'meta.json'), JSON.stringify({ at: new Date().toISOString(), bootId: BOOT_ID }));
-  const out = '/tmp/snapshot.tgz';
-  runSync('tar', ['-czf', out, '-C', dir, 'db.dump', 'meta.json', '-C', DATA, 'storage']);
-  return out;
+  rmSync(SNAPSHOT_DIR, { recursive: true, force: true });
+  mkdirSync(SNAPSHOT_DIR, { recursive: true });
+  runSync('pg_dump', ['-h', '127.0.0.1', '-U', PG_USER, '-Fc', '-f', join(SNAPSHOT_DIR, 'db.dump'), DB]);
+  writeFileSync(join(SNAPSHOT_DIR, 'meta.json'), JSON.stringify({ at: new Date().toISOString(), bootId: BOOT_ID }));
+  runSync('tar', ['-czf', SNAPSHOT_TGZ, '-C', SNAPSHOT_DIR, 'db.dump', 'meta.json', '-C', DATA, 'storage']);
+  return SNAPSHOT_TGZ;
 }
 
 async function restoreFrom(req) {
-  const dir = '/tmp/restore';
-  rmSync(dir, { recursive: true, force: true });
-  mkdirSync(dir, { recursive: true });
-  const file = join(dir, 'snapshot.tgz');
+  rmSync(RESTORE_DIR, { recursive: true, force: true });
+  mkdirSync(RESTORE_DIR, { recursive: true });
+  const file = join(RESTORE_DIR, 'snapshot.tgz');
   await pipeline(req, createWriteStream(file));
-  runSync('tar', ['-xzf', file, '-C', dir]);
+  runSync('tar', ['-xzf', file, '-C', RESTORE_DIR]);
   // The database is fresh on every boot, so restore without --clean. pg_restore
   // exits 1 on harmless warnings; the row check below is the real verdict.
-  spawnSync('pg_restore', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')], { stdio: 'inherit' });
+  spawnSync('pg_restore', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '--no-owner', join(RESTORE_DIR, 'db.dump')], { stdio: 'inherit' });
   const orgs = spawnSync('psql', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-tAc', 'SELECT count(*) FROM orgs'], { encoding: 'utf8' });
   if (!(Number(orgs.stdout.trim()) > 0)) throw new Error('restored database has no orgs');
-  if (existsSync(join(dir, 'storage'))) {
+  if (existsSync(join(RESTORE_DIR, 'storage'))) {
     rmSync(STORAGE, { recursive: true, force: true });
-    runSync('cp', ['-a', join(dir, 'storage'), STORAGE]);
+    runSync('cp', ['-a', join(RESTORE_DIR, 'storage'), STORAGE]);
   }
 }
 

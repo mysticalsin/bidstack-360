@@ -96,6 +96,31 @@ describe('restore drill temp paths', () => {
     }
   });
 
+  it('honors a drill override that stays under the temp directory', async () => {
+    const { resolveRestoreDrillPaths } = await import('./restore-drill-paths.js');
+    const root = mkdtempSync(join(tmpdir(), 'polo-restore-drill-'));
+    const restore = join(root, 'custom-restore');
+    try {
+      const paths = resolveRestoreDrillPaths({
+        POLO_RESTORE_DRILL: '1',
+        POLO_APP_ROOT: '/app',
+        POLO_DATA_DIR: join(root, 'data'),
+        POLO_PG_SOCKET: join(root, 'pg-socket'),
+        POLO_MIGRATE_STAGING: join(root, 'polo-migrate'),
+        POLO_SNAPSHOT_DIR: join(root, 'snapshot'),
+        POLO_SNAPSHOT_TGZ: join(root, 'snapshot.tgz'),
+        POLO_RESTORE_DIR: restore,
+      });
+      // WHY: the drill may name its own directories. Those are the ones rmSync runs on.
+      expect(paths.restoreDir).toBe(resolve(restore));
+      expect(paths.data).toBe(resolve(join(root, 'data')));
+      expect(paths.app).toBe('/app');
+      expect(resolve(paths.restoreDir)).not.toBe(resolve(SHARED_RESTORE));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects a drill path that is not under the temp directory', async () => {
     const { resolveRestoreDrillPaths } = await import('./restore-drill-paths.js');
     const root = mkdtempSync(join(tmpdir(), 'polo-restore-drill-'));
