@@ -65,11 +65,14 @@ export function canEditDashboard(ownerId: string, userId: string, isAdmin: boole
  * System Admin, the same predicate the dashboard canEdit flag uses.
  * A role that is only named Admin does not qualify (isSystem must be true),
  * and a revoked assignment (deletedAt set) does not count.
+ * orgId is on the assignment row itself. UserRole.count without it throws
+ * when BIDSTACK_TENANT_SCOPE_GUARD=enforce, and this check becomes a 500.
  */
 export async function userIsSystemAdmin(orgId: string, userId: string): Promise<boolean> {
   const adminRoleCount = await prisma.userRole.count({
     where: {
       userId,
+      orgId,
       deletedAt: null,
       user: { orgId, deletedAt: null },
       role: { orgId, name: 'Admin', isSystem: true, deletedAt: null },
