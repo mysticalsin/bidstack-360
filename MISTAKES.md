@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-23 BUG: Public booking availability hid morning reservations
+
+- **What went wrong:** After one successful booking of the first morning slot, the public page still offered that slot. Submitting it showed "That time is no longer available."
+- **Root cause:** Availability and create both anchor the calendar day at noon UTC, but `computeSlots` walks the whole local day. The blocker query started at that noon anchor, so a 09:00 UTC booking was never loaded and the slot stayed in the list. Create then recomputed with the overlapping row and rejected it.
+- **Prevention rule:** Blocker lookups for a booking day must cover every instant `computeSlots` can emit for that anchor, including hours before noon UTC. A regression test must book a slot and assert it disappears from availability.
+- **Files affected:** `apps/api/src/routes/bookings.helpers.ts`, `apps/api/src/routes/bookings-public.ts`, `apps/web/e2e/flows/calendar-booking.spec.ts`.
+
+---
+
 ### 2026-07-07 BUG: `rowsFromUnknown` envelope-unwrap recursed into `undefined` forever
 
 - **What went wrong:** Writing `sillage-signals.ts`'s envelope-unwrap helper (`rowsFromUnknown`, adapted from the same pattern already in `company-seamless-enrichment.ts`), a malformed vendor payload with none of the checked envelope keys (`signals`/`data`/`results`/`items`) caused `rowsFromUnknown(root[key])` to be called with `root[key] === undefined` on every iteration. Since `record(undefined)` returns `{}`, the recursive call re-enters with the exact same `undefined` argument every time — infinite recursion, RangeError: Maximum call stack size exceeded. Caught by the "coerces malformed REST JSON" test: the stack overflow was silently swallowed by the caller's outer try/catch and surfaced as a wrong result (`source: null` instead of `'rest'`) rather than a crash, which made it non-obvious from the stack trace alone.

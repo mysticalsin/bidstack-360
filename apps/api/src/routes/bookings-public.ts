@@ -26,7 +26,11 @@ import {
   CALENDAR_PUSH,
 } from '@bidstack/shared';
 import { redis } from '../redis.js';
-import { PublicBookingCreate, sendBookingConfirmationEmail } from './bookings.helpers.js';
+import {
+  blockingLookupBounds,
+  PublicBookingCreate,
+  sendBookingConfirmationEmail,
+} from './bookings.helpers.js';
 
 const BOOKING_BLOCKING_LOOKUP_LIMIT = 1000;
 const bookingCreateRateLimitMax = Number(process.env.PUBLIC_BOOKING_RATE_LIMIT_MAX ?? 5);
@@ -103,8 +107,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       const bufferMs = Math.max(page.bufferBeforeMinutes, page.bufferAfterMinutes) * 60 * 1000;
-      const fetchStart = new Date(rangeStart.getTime() - bufferMs);
-      const fetchEnd = new Date(rangeEnd.getTime() + bufferMs);
+      // rangeStart is noon UTC, but computeSlots emits the whole local day.
+      const { fetchStart, fetchEnd } = blockingLookupBounds(rangeStart, rangeEnd, bufferMs);
 
       const existingEvents = await prisma.calendarEvent.findMany({
         where: {
@@ -219,6 +223,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
       const dayStr = dateKeyInTz(startAt, tz);
       const rangeStart = new Date(`${dayStr}T12:00:00Z`);
       const rangeEnd = new Date(`${dayStr}T23:59:59Z`);
+      const bufferMs = Math.max(page.bufferBeforeMinutes, page.bufferAfterMinutes) * 60 * 1000;
+      const { fetchStart, fetchEnd } = blockingLookupBounds(rangeStart, rangeEnd, bufferMs);
 
       const blockingEvents = await prisma.calendarEvent.findMany({
         where: {
@@ -227,8 +233,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
           deletedAt: null,
           isCancelled: false,
           syncState: { not: 'DELETED_REMOTE' },
-          startAt: { lte: endAt },
-          endAt: { gte: startAt },
+          startAt: { lte: fetchEnd },
+          endAt: { gte: fetchStart },
         },
         orderBy: { startAt: 'asc' },
         take: BOOKING_BLOCKING_LOOKUP_LIMIT,
@@ -240,8 +246,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
           bookingPageId: page.id,
           status: 'CONFIRMED',
           deletedAt: null,
-          startAt: { lte: endAt },
-          endAt: { gte: startAt },
+          startAt: { lte: fetchEnd },
+          endAt: { gte: fetchStart },
         },
         orderBy: { startAt: 'asc' },
         take: BOOKING_BLOCKING_LOOKUP_LIMIT,

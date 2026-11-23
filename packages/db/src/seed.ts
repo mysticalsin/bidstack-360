@@ -858,14 +858,21 @@ async function main() {
       id: 'da5b0000-0000-4000-8000-000000000011',
       title: 'Weighted Pipeline',
       type: 'kpi',
-      config: { format: 'currency', subtitle: 'Open opportunities, probability-weighted' },
+      config: {
+        format: 'currency',
+        source: 'weighted-pipeline',
+        subtitle: 'Open opportunities, probability-weighted',
+      },
       position: { x: 0, y: 0, w: 3, h: 2 },
     },
     {
       id: 'da5b0000-0000-4000-8000-000000000012',
       title: 'Pipeline by Stage',
       type: 'bar',
-      config: { subtitle: 'Open opportunity value grouped by sales stage' },
+      config: {
+        source: 'pipeline-by-stage',
+        subtitle: 'Open opportunity value grouped by sales stage',
+      },
       position: { x: 3, y: 0, w: 6, h: 4 },
     },
   ];

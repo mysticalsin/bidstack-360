@@ -29,6 +29,10 @@ import {
 import { KpiCard } from '@/components/charts/KpiCard';
 import type { DashboardWidget } from '@/hooks/useDashboards';
 import { useReportRun, useRunReport, type ReportRun } from '@/hooks/useAnalyticsReports';
+import { usePipelineReport } from '@/hooks/usePipelineReport';
+import { formatMoney } from '@/lib/format';
+import { useCurrencyStore } from '@/stores/currency';
+import { builtinWidgetRows, resolveBuiltinSource } from './builtinWidgetData';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 
@@ -89,6 +93,7 @@ function ChartBody({
   widget: DashboardWidget;
   data: DataRow[];
 }) {
+  const { currency, convert } = useCurrencyStore();
   const cfg = widget.config as {
     xKey?: string;
     yKey?: string | string[];
@@ -98,6 +103,7 @@ function ChartBody({
     gaugeValue?: number;
     gaugeLabel?: string;
     columns?: number;
+    format?: string;
   };
 
   const xKey = cfg.xKey ?? 'name';
@@ -107,10 +113,17 @@ function ChartBody({
     case 'kpi': {
       const rows = data as { value?: number; current?: number }[];
       const val = Number(rows[0]?.value ?? rows[0]?.current ?? 0);
+      // Pipeline values arrive in major EUR units (micros already divided).
+      // Convert into the header currency so this KPI matches the rest of the app.
+      const format =
+        cfg.format === 'currency'
+          ? (n: number) => formatMoney(convert(n, 'EUR'), currency)
+          : undefined;
       return (
         <KpiCard
           title={widget.title}
           value={val}
+          format={format}
           aria-label={widget.title}
         />
       );
@@ -216,21 +229,36 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   const qc = useQueryClient();
   const runMutation = useRunReport();
 
-  // If the widget has a reportId, poll the latest run
+  // If the widget has a reportId, poll the latest run. Widgets with no report
+  // (the seeded pipeline cards) read the live pipeline snapshot instead.
+  const source = resolveBuiltinSource(widget);
+  const pipeline = usePipelineReport();
   const { data: run, isLoading, error } = useReportRun(
     widget.reportId ?? '',
     (widget.config as { latestRunId?: string }).latestRunId ?? '',
   );
 
+  const reportRows: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
+  const data: DataRow[] =
+    source && pipeline.data ? builtinWidgetRows(source, pipeline.data) : source ? [] : reportRows;
+  const loading = source ? pipeline.isLoading && !pipeline.data : isLoading;
+  const failure = source ? pipeline.error : error;
+  const empty = !loading && !(failure instanceof Error) && data.length === 0;
+
+  const refetchPipeline = pipeline.refetch;
   const handleRefresh = useCallback(async () => {
+    if (source) {
+      await refetchPipeline();
+      return;
+    }
     if (!widget.reportId) return;
     await runMutation.mutateAsync({ id: widget.reportId });
     // Invalidate the widget so consumers re-fetch the new runId
     qc.invalidateQueries({ queryKey: ['dashboards', 'widgets', widget.dashboardId] });
-  }, [widget.reportId, widget.dashboardId, runMutation, qc]);
+  }, [source, refetchPipeline, widget.reportId, widget.dashboardId, runMutation, qc]);
 
   const handleExportCsv = useCallback(() => {
-    const rows: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
+    const rows = data;
     if (rows.length === 0) return;
     const headers = Object.keys(rows[0]!);
     const lines = [
@@ -252,7 +280,7 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
     a.download = `${widget.title}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [run, widget.title]);
+  }, [data, widget.title]);
 
   const actions = [
     ...(onConfigure
@@ -267,16 +295,13 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
       : []),
   ];
 
-  const data: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
-  const empty = !isLoading && !error && data.length === 0;
-
   return (
     <ChartContainer
       title={widget.type !== 'kpi' ? widget.title : undefined}
-      loading={isLoading}
-      error={error instanceof Error ? error.message : null}
+      loading={loading}
+      error={failure instanceof Error ? failure.message : null}
       empty={empty}
-      onRefresh={widget.reportId ? handleRefresh : undefined}
+      onRefresh={source || widget.reportId ? handleRefresh : undefined}
       actions={actions}
       aria-label={widget.title}
     >

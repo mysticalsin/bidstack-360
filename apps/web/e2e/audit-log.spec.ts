@@ -27,7 +27,10 @@ test.describe('Audit log page', () => {
     await expect(page.getByPlaceholder('Search current page by action, actor, target or diff...')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Export visible' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Copy view link' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Refresh|Refreshing/ })).toBeVisible();
+    // WHY scoped + exact: a row target such as "Technical Stack Refresh" also
+    // matches a page-wide /Refresh/ substring and fails strict mode.
+    const filters = page.getByRole('search', { name: 'Audit log filters' });
+    await expect(filters.getByRole('button', { name: /^(Refresh|Refreshing)$/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Evidence quality' })).toBeVisible();
   });
 
