@@ -42,6 +42,25 @@ describe('extractMsaFields', () => {
     expect(Array.isArray(fields.rateCard.value)).toBe(true);
   });
 
+  it('does not invent EUR when a liability cap has no currency', () => {
+    // WHY: a cap with no symbol and no code was stored as EUR, so the review
+    // rendered "500,000 EUR" for an amount the MSA never denominated.
+    const fields = extractMsaFields(
+      'The aggregate liability of the Supplier is capped at 500,000 under this agreement.',
+    );
+    expect(fields.liabilityCap.found).toBe(true);
+    const cap = fields.liabilityCap.value as { amountMicros: number; currency: string | null };
+    expect(cap.amountMicros).toBe(500_000_000_000);
+    expect(cap.currency).toBeNull();
+  });
+
+  it('keeps a written currency code on a liability cap', () => {
+    const fields = extractMsaFields('Supplier aggregate liability is capped at 500,000 EUR.');
+    const cap = fields.liabilityCap.value as { amountMicros: number; currency: string | null };
+    expect(cap.currency).toBe('EUR');
+    expect(cap.amountMicros).toBe(500_000_000_000);
+  });
+
   it('returns blank not-found fields when the document has no commercial terms', () => {
     const fields = extractMsaFields('This is a cover letter. There is no agreement here.');
     expect(fields.governingLaw.found).toBe(false);
