@@ -74,11 +74,13 @@ jobs:
         id: lhci
         # Root package.json is "type": "module", so Node loads .lighthouserc.js
         # as ESM and rejects its module.exports. LHCI needs that file as CJS.
-        # --no-sandbox is required for the CI user. The product lighthouserc.js
-        # is not edited.
+        # chromeFlags must be one string. LHCI concatenates an array with
+        # commas, so --no-sandbox never reached Chrome and the zygote aborted
+        # with "No usable sandbox". Vite preview prints "Local:", not "ready in".
+        # The product lighthouserc.js is not edited.
         run: |
           cp .lighthouserc.js "${RUNNER_TEMP}/lighthouserc.cjs"
-          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:["--no-sandbox","--disable-dev-shm-usage"]}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
+          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.startServerReadyPattern="Local:"; config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:"--no-sandbox --disable-dev-shm-usage"}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
           export CHROME_PATH="$(pnpm --filter @bidstack/web exec node --input-type=commonjs -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())' | tail -n 1)"
           test -x "$CHROME_PATH"
           lhci autorun --config="${RUNNER_TEMP}/lighthouserc-ci.cjs"
