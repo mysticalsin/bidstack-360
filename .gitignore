@@ -115,6 +115,10 @@ apps/web/scripts/_i18n_*
 # Web app screenshot blobs (committed by QA runs, not source)
 apps/web/*.png
 apps/web/e2e/responsive/*-snapshots/
+# Pixel 7 runs on the Chromium project, so these linux baselines are the CI
+# contract. iPhone and iPad snapshots stay local.
+!apps/web/e2e/responsive/mobile-pixel-7.spec.ts-snapshots/
+!apps/web/e2e/responsive/mobile-pixel-7.spec.ts-snapshots/*-chromium-desktop-linux.png
 
 # Scratch / exploratory scripts at repo root
 screenshot-*.cjs
