@@ -7,8 +7,9 @@ import { HeroBadge } from './HeroBadge';
 import { BottomLeftCard } from './BottomLeftCard';
 import { BottomRightCorner } from './BottomRightCorner';
 
-const VIDEO_URL =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
+// Local loop of the cinematic background. The remote file is a 4K 11MB mp4,
+// which becomes the LCP element and misses the 2.5s budget on a slow phone.
+const VIDEO_URL = '/login-bg.mp4';
 
 export function Hero() {
   const { t } = useTranslation('auth');
@@ -16,9 +17,9 @@ export function Hero() {
 
   const h1Anim = reducedMotion
     ? {}
-    : { initial: { opacity: 0, scale: 0.98 }, animate: { opacity: 1, scale: 1 } };
+    : { initial: { scale: 0.98 }, animate: { scale: 1 } };
 
-  const pAnim = reducedMotion ? {} : { initial: { opacity: 0 }, animate: { opacity: 1 } };
+  const pAnim = reducedMotion ? {} : { initial: { y: 8 }, animate: { y: 0 } };
 
   return (
     <div className="w-full h-dvh flex items-center justify-center bg-[#f0f0f0]">
@@ -29,7 +30,8 @@ export function Hero() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
+          poster="/login-bg.jpg"
           className="absolute inset-0 w-full h-full object-cover object-[65%] lg:object-center z-0"
         >
           <source src={VIDEO_URL} type="video/mp4" />

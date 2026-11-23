@@ -28,7 +28,37 @@ jobs:
     # the image's Chrome 157 returns NO_FCP for this app. Shards on 24.04
     # painted the same pages with Playwright's Chromium.
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
+    services:
+      postgres:
+        # rfp_vector_indexes creates extension "vector". Alpine Postgres has no pgvector.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: bidstack
+          POSTGRES_PASSWORD: bidstack_test
+          POSTGRES_DB: bidstack_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bidstack"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # The audited dashboard calls /api. Without this API it paints
+      # "Could not load dashboard", and that error is the LCP element.
+      NODE_ENV: test
+      DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
+      REDIS_URL: redis://localhost:6379
+      VITE_AUTH_MODE: stub
+      BIDSTACK_ALLOW_STUB_AUTH: 'true'
     permissions:
       pull-requests: write # needed for PR comment
       contents: read
@@ -57,10 +87,36 @@ jobs:
         run: pnpm --filter @bidstack/web build
         env:
           # Stub auth, same as the E2E build. A non-empty publishable key
-          # selects Clerk even when VITE_AUTH_MODE=stub, and pk_test_placeholder
-          # is not a Clerk key. Leave the key unset.
+          # selects Clerk even when VITE_AUTH_MODE=stub. Leave the key unset.
+          # Leave VITE_API_URL unset so the built app calls relative /api and
+          # vite preview proxies that to the API started below.
           VITE_AUTH_MODE: stub
           BIDSTACK_ALLOW_STUB_AUTH: 'true'
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Build packages the API loads
+        run: pnpm --filter "@bidstack/api^..." build
+
+      - name: Migrate + seed database
+        run: |
+          pnpm db:migrate:deploy
+          pnpm db:seed
+
+      - name: Start API
+        run: |
+          pnpm --filter @bidstack/api exec tsx src/main.ts > "${RUNNER_TEMP}/api.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:4000/livez >/dev/null; then
+              echo "API is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become ready"
+          cat "${RUNNER_TEMP}/api.log"
+          exit 1
 
       - name: Install Playwright Chromium
         # Use the same browser that painted these pages in the E2E shards.
@@ -76,15 +132,16 @@ jobs:
         # Root package.json is "type": "module", so Node loads .lighthouserc.js
         # as ESM and rejects its module.exports. LHCI needs that file as CJS.
         # Headless Chrome and headful Chrome under xvfb both loaded /login and
-        # returned NO_FCP. xvfb windows are treated as occluded, so Chrome
-        # never paints. These flags keep that window in the foreground and
-        # rasterize with SwiftShader. chromeFlags stays one string: an array
-        # is joined with commas. headful skips LHCI's --headless=new.
-        # The ready pattern is localhost: because Vite puts an ANSI code
-        # between Local and the colon. The product lighthouserc.js is not edited.
+        # returned NO_FCP until the virtual window was marked visible. SwiftShader
+        # then painted, and its software rasterizer showed up as multi-second
+        # unattributable main-thread tasks. Keep the occlusion flags and let
+        # Chrome use the GPU. chromeFlags stays one string. headful skips
+        # LHCI's --headless=new. The ready pattern is localhost: because Vite
+        # puts an ANSI code between Local and the colon.
+        # The product lighthouserc.js is not edited.
         run: |
           cp .lighthouserc.js "${RUNNER_TEMP}/lighthouserc.cjs"
-          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.headful=true; config.ci.collect.startServerReadyPattern="localhost:"; config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:"--no-sandbox --disable-dev-shm-usage --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-features=CalculateNativeWinOcclusion --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --window-size=1280,800"}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
+          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.headful=true; config.ci.collect.startServerReadyPattern="localhost:"; config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:"--no-sandbox --disable-dev-shm-usage --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-features=CalculateNativeWinOcclusion --window-size=1280,800"}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
           export CHROME_PATH="$(pnpm --filter @bidstack/web exec node --input-type=commonjs -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())' | tail -n 1)"
           echo "CHROME_PATH=$CHROME_PATH"
           test -x "$CHROME_PATH"
