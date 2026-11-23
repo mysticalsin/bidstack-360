@@ -31,6 +31,27 @@ export function formatExtractedMicros(micros: number, currency?: string | null):
   return `${amount} unspecified`;
 }
 
+/** One extracted list, joined the way the review row prints it. */
+export function formatExtractedRowList(rows: readonly unknown[]): string {
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return JSON.stringify(row);
+      const item = row as {
+        name?: string;
+        role?: string;
+        rateMicros?: number;
+        unit?: string;
+        currency?: string;
+      };
+      if (item.role && item.rateMicros != null) {
+        return `${item.role}: ${formatExtractedMicros(item.rateMicros, item.currency)} / ${item.unit ?? 'day'}`;
+      }
+      if (item.name) return item.name;
+      return JSON.stringify(row);
+    })
+    .join(' · ');
+}
+
 function cite(field: MsaExtractedField): string {
   if (!field.found) return 'not found';
   if (!field.citation) return 'found, no clause cite';
@@ -47,25 +68,7 @@ function display(field: MsaExtractedField): string {
     const cap = field.value as { amountMicros?: number; currency?: string };
     if (cap.amountMicros != null) return formatExtractedMicros(cap.amountMicros, cap.currency);
   }
-  if (Array.isArray(field.value)) {
-    return field.value
-      .map((row) => {
-        if (!row || typeof row !== 'object') return JSON.stringify(row);
-        const item = row as {
-          name?: string;
-          role?: string;
-          rateMicros?: number;
-          unit?: string;
-          currency?: string;
-        };
-        if (item.role && item.rateMicros != null) {
-          return `${item.role}: ${formatExtractedMicros(item.rateMicros, item.currency)} / ${item.unit ?? 'day'}`;
-        }
-        if (item.name) return item.name;
-        return JSON.stringify(row);
-      })
-      .join(' · ');
-  }
+  if (Array.isArray(field.value)) return formatExtractedRowList(field.value);
   return JSON.stringify(field.value);
 }
 
