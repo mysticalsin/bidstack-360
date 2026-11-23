@@ -72,7 +72,9 @@ jobs:
           # exec, not `pnpm test --`, because pnpm inserts an extra `--` and
           # vitest then treats --exclude as a file name.
           pnpm --filter @bidstack/mcp-server exec vitest run --passWithNoTests --exclude src/tools/kam-tools.test.ts
-          pnpm --filter @bidstack/worker exec vitest run --passWithNoTests --exclude src/queues/tenant-export.contract.test.ts
+          # The worker runner isolates each file. These two suites throw when
+          # Postgres is absent and run for real in the integration job.
+          pnpm --filter @bidstack/worker test -- --exclude src/queues/tenant-export.contract.test.ts --exclude src/queues/queues.test.ts
 
       # api's DB-touching suites now FAIL LOUD (not self-skip) when Postgres is
       # unreachable — makeSkipIfNoDb (src/test-support/skip-if-no-db.ts) throws
