@@ -217,12 +217,8 @@ jobs:
       - name: Run E2E shard ${{ matrix.shard }}/${{ matrix.total }}
         # Blob reports are what merge-reports reads. Playwright 1.59 has no
         # --output flag on that command, and an HTML report cannot be merged.
-        run: >
-          pnpm --filter @bidstack/web exec playwright test
-          --reporter=list
-          --reporter=blob
-          --shard=${{ matrix.shard }}/${{ matrix.total }}
-          ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
+        # Shard and the snapshot input are env vars so they are not interpolated
+        # into this script (yaml.github-actions.security.run-shell-injection).
         env:
           CI: 'true'
           E2E_API_URL: http://localhost:4000
@@ -231,6 +227,19 @@ jobs:
           # Left empty in CI — those tests self-skip via test.skip() when blank.
           E2E_BOOKING_SLUG: ''
           E2E_SIGN_TOKEN: ''
+          SHARD: ${{ matrix.shard }}
+          SHARD_TOTAL: ${{ matrix.total }}
+          UPDATE_SNAPSHOTS: ${{ github.event.inputs.update_snapshots }}
+        run: |
+          args=(
+            --reporter=list
+            --reporter=blob
+            --shard="${SHARD}/${SHARD_TOTAL}"
+          )
+          if [ "$UPDATE_SNAPSHOTS" = "true" ]; then
+            args+=(--update-snapshots)
+          fi
+          pnpm --filter @bidstack/web exec playwright test "${args[@]}"
 
       - name: Upload Playwright report (always — for review even on pass)
         if: always()
