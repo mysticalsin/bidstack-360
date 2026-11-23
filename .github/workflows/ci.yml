@@ -55,7 +55,13 @@ jobs:
         run: pnpm -r lint
 
       - name: Typecheck
-        run: pnpm -r typecheck
+        # Apps import workspace libraries from dist/. `tsc --noEmit` does not
+        # emit that dist, so the libraries have to be built first or
+        # dependents fail with TS2307. twenty-bidstack is excluded; its build
+        # is an Nx target and this job does not compile it.
+        run: |
+          pnpm --filter @bidstack/shared --filter @bidstack/dust-client --filter @bidstack/odoo-mcp-client --filter @bidstack/db --filter @bidstack/memos --filter @bidstack/integrations build
+          pnpm -r typecheck
 
       - name: Test (no DB — all packages except api)
         run: pnpm --filter '!@bidstack/api' -r test
