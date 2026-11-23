@@ -60,6 +60,7 @@ export class YjsClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private destroyed = false;
+  private released = false;
   private connectionState: ConnectionState = 'disconnected';
   private readonly pendingUpdates: Uint8Array[] = [];
 
@@ -102,12 +103,16 @@ export class YjsClient {
 
   /** Tear down — call on component unmount. */
   destroy(): void {
+    if (this.released) return;
+    this.released = true;
     this.destroyed = true;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.ws?.close();
+    const socket = this.ws;
+    this.ws = null;
+    if (socket) this.releaseSocket(socket);
     this.idb?.destroy();
     this.doc.destroy();
   }
@@ -126,8 +131,10 @@ export class YjsClient {
 
     const socket = new WebSocket(url);
     this.ws = socket;
+    let handshakeOpen = false;
 
     socket.onopen = () => {
+      handshakeOpen = true;
       this.reconnectAttempts = 0;
       // Send auth token then init.
       // WHY header not supported in browser WS: we pass the token in the first
@@ -148,8 +155,11 @@ export class YjsClient {
 
     socket.onclose = () => {
       this.setConnectionState('disconnected');
-      this.ws = null;
-      if (!this.destroyed) this.scheduleReconnect();
+      if (this.ws === socket) this.ws = null;
+      // A close before OPEN is the browser's "closed before the connection
+      // was established" case. Retrying it opens another socket that dies
+      // the same way. Reconnect only after a socket that actually opened.
+      if (!this.destroyed && handshakeOpen) this.scheduleReconnect();
     };
 
     socket.onerror = () => {
@@ -221,6 +231,38 @@ export class YjsClient {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(obj));
     }
+  }
+
+  /**
+   * Drop a socket without making a still-connecting handshake look failed.
+   * close() while CONNECTING is logged by the browser as
+   * "WebSocket is closed before the connection is established." Wait until
+   * the handshake finishes, then close. Handlers are cleared so that close
+   * cannot schedule another connect.
+   */
+  private releaseSocket(socket: WebSocket): void {
+    if (socket.readyState === WebSocket.CONNECTING) {
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = () => {
+        socket.onopen = null;
+        socket.onclose = null;
+      };
+      socket.onopen = () => {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        socket.close();
+      };
+      return;
+    }
+
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    if (socket.readyState === WebSocket.OPEN) socket.close();
   }
 
   private scheduleReconnect(): void {
