@@ -125,9 +125,39 @@ Full diagram and module documentation: [`docs/ARCHITECTURE.md`](./docs/ARCHITECT
 
 ---
 
-## Screenshots
+## Platform
 
-> _Screenshots will be added when the production environment is provisioned._
+Captures from the running app with dev stub auth (no Clerk keys). The UI is Polo PreSales.
+
+### Sign in
+
+![Polo PreSales sign-in screen](./docs/media/sign-in.webp)
+
+Stub sign-in opens the workspace command center.
+
+![Sign in to the dashboard](./docs/media/sign-in-dashboard.gif)
+
+### Dashboard
+
+Light mode.
+
+![Dashboard in light mode](./docs/media/dashboard-light.webp)
+
+Dark mode, from the top-bar theme control.
+
+![Dashboard in dark mode](./docs/media/dashboard-dark.webp)
+
+![Switch to dark mode](./docs/media/dark-mode.gif)
+
+### Pipeline and a deal
+
+![Open pipeline board](./docs/media/pipeline.webp)
+
+Opening DNB Bank — Cloud landing zone from the opportunity list.
+
+![Open a deal](./docs/media/open-deal.gif)
+
+![DNB Bank deal detail](./docs/media/deal-detail.webp)
 
 ---
 
