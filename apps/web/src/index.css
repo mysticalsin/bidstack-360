@@ -3050,7 +3050,11 @@ select:focus-visible {
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
   box-shadow: var(--shadow-xs);
-  min-height: 100px;
+  /* Wrapped heads ("Closing within 7 days" + badge, "Weighted pipeline" +
+     coverage) settle at 137px. The pending skeleton is shorter, so the hero
+     grew ~22px once the report arrived and pushed the cockpit down the page
+     (CLS ~0.20). Reserve the wrapped height from the first paint. */
+  min-height: 140px;
   padding: 14px;
 }
 .command-signal-head {
@@ -3059,6 +3063,10 @@ select:focus-visible {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: space-between;
+  /* "Closing within 7 days" and "Weighted pipeline" wrap the badge onto a
+     second line (~46px). Reserve that height while the cell is still a
+     skeleton so the value below does not drop when the label arrives. */
+  min-height: 46px;
 }
 .command-signal-head > span {
   color: var(--fg-tertiary);

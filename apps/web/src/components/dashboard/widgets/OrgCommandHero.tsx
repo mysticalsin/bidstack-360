@@ -300,13 +300,19 @@ function weightedSignal({ report, reportPending, money, t }: SignalInputs): Hero
 
 function SignalCell({ signal, reduced }: { signal: HeroSignal; reduced: boolean }) {
   if (signal.pending) {
-    // Layout-matched skeleton (label, value, progress bar) — not a spinner —
-    // so the cell loads "in place" per the PageSkeletons doctrine.
+    // Same head / value / progress boxes as the loaded cell. A short bar in
+    // this slot was reused into `.command-signal-head` when the report
+    // arrived, and the wrapped label grew the hero (CLS ~0.20).
     return (
       <StaggerItem className="command-signal" aria-hidden>
-        <div data-testid="signal-skeleton" className="h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
-        <div className="mt-4 h-8 w-20 animate-pulse rounded bg-[var(--surface-sunken)]" />
-        <div className="mt-4 h-[7px] animate-pulse rounded-full bg-[var(--surface-sunken)]" />
+        <div className="command-signal-head" data-testid="signal-skeleton">
+          <span className="inline-block h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
+          <span className="inline-block h-5 w-16 animate-pulse rounded-full bg-[var(--surface-sunken)]" />
+        </div>
+        <strong>
+          <span className="inline-block h-7 w-16 animate-pulse rounded bg-[var(--surface-sunken)]" />
+        </strong>
+        <span className="command-progress" />
       </StaggerItem>
     );
   }

@@ -23,6 +23,15 @@ Categories: BUG, ARCHITECTURE, SECURITY, PERFORMANCE, UX, TESTING, INFRA, PROCES
 
 ---
 
+### 2026-11-23 PERFORMANCE: Dashboard command hero grew after the report arrived
+
+- **What went wrong:** `dashboard: CLS < 0.05` passed on two full Chromium runs and failed on the third (0.206). A fast API hid it. Delaying `/api` by 700ms reproduced 0.20 every time.
+- **Root cause:** The pending signal cell was a 12px bar. When "Closing within 7 days" and "Weighted pipeline" wrapped their badges, the hero grew from 314px to 336px and pushed the cockpit down. New skeleton nodes do not score; this move of an existing box did.
+- **Prevention rule:** A pending signal must use the same head, value, and progress boxes as the loaded cell, and those boxes must reserve the wrapped height. Do not raise the CLS budget to absorb it. Re-measure with a delayed API, not only a warm cache.
+- **Files affected:** `apps/web/src/components/dashboard/widgets/OrgCommandHero.tsx`, `apps/web/src/index.css`.
+
+---
+
 ### 2026-11-23 BUG: Public booking availability hid morning reservations
 
 - **What went wrong:** After one successful booking of the first morning slot, the public page still offered that slot. Submitting it showed "That time is no longer available."
