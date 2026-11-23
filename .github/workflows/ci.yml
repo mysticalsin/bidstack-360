@@ -256,24 +256,19 @@ jobs:
           pnpm db:migrate:deploy
           pnpm db:seed
 
+      - name: Build packages the API loads
+        # tsx resolves workspace libs to dist/. Without this the API exits
+        # before Playwright collects any spec.
+        run: pnpm --filter "@bidstack/api^..." build
+
       - name: Build web
         run: pnpm --filter @bidstack/web build
 
-      - name: Start API in background
-        run: |
-          pnpm --filter @bidstack/api dev &
-          # Wait up to 30s for /health.
-          for i in {1..30}; do
-            if curl -sf http://localhost:4000/health > /dev/null; then
-              echo "API up after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-
       - name: Run Playwright smoke suite
         env:
-          E2E_API_URL: http://localhost:4000
+          # Playwright starts the API. E2E_API_PORT must match the URL.
+          E2E_API_PORT: '4000'
+          E2E_API_URL: http://127.0.0.1:4000
         run: pnpm --filter @bidstack/web e2e
 
       - name: Upload Playwright report on failure

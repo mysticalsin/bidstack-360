@@ -68,9 +68,14 @@ jobs:
         id: lhci
         # Root package.json is "type": "module", so Node loads .lighthouserc.js
         # as ESM and rejects its module.exports. LHCI needs that file as CJS.
+        # Chrome 157 on this runner has no GPU. Headless Chrome will not paint
+        # unless SwiftShader is turned back on, and Lighthouse then reports
+        # NO_FCP without scoring the page. Flags are applied here so the
+        # product lighthouserc.js stays unchanged.
         run: |
           cp .lighthouserc.js "${RUNNER_TEMP}/lighthouserc.cjs"
-          lhci autorun --config="${RUNNER_TEMP}/lighthouserc.cjs"
+          node --input-type=commonjs -e 'const fs=require("fs"); const config=require(process.env.RUNNER_TEMP+"/lighthouserc.cjs"); config.ci.collect.settings=Object.assign({}, config.ci.collect.settings, {chromeFlags:["--no-sandbox","--disable-dev-shm-usage","--enable-unsafe-swiftshader","--use-gl=angle","--use-angle=swiftshader"]}); fs.writeFileSync(process.env.RUNNER_TEMP+"/lighthouserc-ci.cjs","module.exports="+JSON.stringify(config)+"\n");'
+          lhci autorun --config="${RUNNER_TEMP}/lighthouserc-ci.cjs"
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
