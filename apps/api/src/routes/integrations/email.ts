@@ -23,7 +23,7 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
     schema: {
       body: SendEmailRequest,
       response: {
-        200: z.object({ messageId: z.string().uuid() }),
+        200: z.object({ messageId: z.string().guid() }),
       },
     },
     handler: async (req, reply) => {
@@ -52,7 +52,7 @@ export const emailRoutes: FastifyPluginAsync = async (server) => {
     schema: {
       querystring: z.object({
         entityType: z.string().optional(),
-        entityId: z.string().uuid().optional(),
+        entityId: z.string().guid().optional(),
         page: z.coerce.number().int().min(1).default(1),
         limit: z.coerce.number().int().min(1).max(100).default(25),
       }),

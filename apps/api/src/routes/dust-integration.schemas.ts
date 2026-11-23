@@ -29,7 +29,7 @@ export type DustStatusCacheEntry = {
 };
 
 export const ApiKeySummary = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   prefix: z.string(),
   scopes: z.array(z.string()),

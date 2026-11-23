@@ -25,7 +25,7 @@ import {
 import { invalidateAccessScope } from '../lib/access-scope.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 
-const GroupIdParam = z.object({ id: z.string().uuid() });
+const GroupIdParam = z.object({ id: z.string().guid() });
 const WRITE_RATE_LIMIT = { rateLimit: { max: 30, timeWindow: '1 minute' } };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -299,7 +299,7 @@ export const userGroupRoutes: FastifyPluginAsyncZod = async (server) => {
       config: WRITE_RATE_LIMIT,
       preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid(), userId: z.string().uuid() }),
+        params: z.object({ id: z.string().guid(), userId: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

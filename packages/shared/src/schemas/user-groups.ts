@@ -13,8 +13,8 @@ const CountryCode = z
   .regex(/^[A-Z]{2}$/, 'Must be an ISO-2 country code');
 
 export const UserGroupMember = z.object({
-  id: z.string().uuid(),
-  userId: z.string().uuid(),
+  id: z.string().guid(),
+  userId: z.string().guid(),
   name: z.string().nullable(),
   email: z.string(),
   createdAt: z.string().datetime(),
@@ -22,8 +22,8 @@ export const UserGroupMember = z.object({
 export type UserGroupMember = z.infer<typeof UserGroupMember>;
 
 export const UserGroup = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string().min(1),
   description: z.string().nullable(),
   scopeCountries: z.array(z.string()),
@@ -56,7 +56,7 @@ export const UserGroupPatch = z.object({
 export type UserGroupPatch = z.infer<typeof UserGroupPatch>;
 
 export const UserGroupMemberAdd = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().guid(),
 });
 export type UserGroupMemberAdd = z.infer<typeof UserGroupMemberAdd>;
 

@@ -83,7 +83,7 @@ export const publicSignRoutes: FastifyPluginAsyncZod = async (server) => {
         params: z.object({ token: z.string().min(8).max(200) }),
         body: InternalSignSubmit,
         response: {
-          200: z.object({ requestId: z.string().uuid(), message: z.string() }),
+          200: z.object({ requestId: z.string().guid(), message: z.string() }),
         },
       },
     },

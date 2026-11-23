@@ -13,9 +13,9 @@ import { decryptToken, encryptToken } from '@bidstack/shared/token-crypto';
 // ─── Job data schema ─────────────────────────────────────────────────────────
 
 export const PullJobData = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
-  integrationTokenId: z.string().uuid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
+  integrationTokenId: z.string().guid(),
 });
 
 // ─── Typed error for rate-limit signalling ────────────────────────────────────

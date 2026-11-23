@@ -16,7 +16,7 @@ export type TopAccountsSource = z.infer<typeof TopAccountsSource>;
 
 export const TopAccountListUpdate = z.object({
   companyIds: z
-    .array(z.string().uuid())
+    .array(z.string().guid())
     .max(TOP_ACCOUNTS_MAX)
     .refine((ids) => new Set(ids).size === ids.length, {
       message: 'companyIds must not contain duplicates',

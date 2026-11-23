@@ -10,6 +10,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
+import { DashboardFirstPaint } from '@/components/dashboard/DashboardFirstPaint';
 import { PageTransition } from '@/components/motion/PageTransition';
 
 import { adminRouteElements } from './AdminRoutes';
@@ -91,7 +92,7 @@ export function AppRoutes() {
             path="/dashboard"
             element={
               <RequireAuth>
-                <DashboardPage />
+                <DashboardFirstPaint />
               </RequireAuth>
             }
           />

@@ -156,7 +156,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           targetType: z.string().max(50),
-          targetId: z.string().uuid(),
+          targetId: z.string().guid(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
         }),
         response: { 200: z.object({ items: z.array(Comment) }) },
@@ -312,7 +312,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/comments/:id',
     {
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const existing = await prisma.comment.findFirst({
@@ -381,7 +381,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/mentions/:id/read',
     {
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: Mention } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: Mention } },
     },
     async (req) => {
       const updated = await prisma.mention.updateMany({
@@ -411,7 +411,7 @@ export const collaborationRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           recordType: z.string().optional(),
-          recordId: z.string().uuid().optional(),
+          recordId: z.string().guid().optional(),
         }),
         response: { 200: z.object({ items: z.array(UserPresence) }) },
       },

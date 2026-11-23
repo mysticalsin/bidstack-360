@@ -14,7 +14,7 @@ import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 
 const KeyAccountResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   domain: z.string().nullable(),
   industry: z.string().nullable(),
@@ -44,18 +44,18 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       querystring: z.object({
         search: z.string().max(200).optional(),
         industry: z.string().max(100).optional(),
-        ownerId: z.string().uuid().optional(),
+        ownerId: z.string().guid().optional(),
         // WHY cursor pagination: the previous take:1000 ceiling silently dropped
         // key accounts past position 1,000 and loaded the full set on every
         // request even when the caller only needed a screenful. Cursor + limit
         // bounds both problems.
         limit: z.coerce.number().int().min(1).max(200).default(50),
-        cursor: z.string().uuid().optional(),
+        cursor: z.string().guid().optional(),
       }),
       response: {
         200: z.object({
           items: z.array(KeyAccountResponse),
-          nextCursor: z.string().uuid().nullable(),
+          nextCursor: z.string().guid().nullable(),
         }),
       },
     },
@@ -335,7 +335,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
     preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
     schema: {
       body: TopAccountListUpdate,
-      response: { 200: z.object({ companyIds: z.array(z.string().uuid()) }) },
+      response: { 200: z.object({ companyIds: z.array(z.string().guid()) }) },
     },
     handler: async (req, reply) => {
       const { orgId, userId } = req.auth;
@@ -395,17 +395,17 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
   app.patch('/companies/:id/tier', {
     preHandler: server.requirePermission('accounts:write'),
     schema: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       body: z.object({
         tier: z.enum(['key', 'top', 'standard']),
         // Optional = "leave unchanged"; explicit null = "clear". A tier-only
         // PATCH must never wipe the key-account owner/notes.
-        keyAccountOwnerId: z.string().uuid().nullable().optional(),
+        keyAccountOwnerId: z.string().guid().nullable().optional(),
         keyAccountNotes: z.string().max(2000).nullable().optional(),
       }),
       response: {
         200: z.object({
-          id: z.string().uuid(),
+          id: z.string().guid(),
           name: z.string(),
           tier: z.string().nullable(),
           keyAccountSince: z.string().nullable(),

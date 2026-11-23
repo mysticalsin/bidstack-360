@@ -83,7 +83,7 @@ export const leadRoutesRead: FastifyPluginAsyncZod = async (server) => {
     '/leads/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: LeadDetail },
       },
     },

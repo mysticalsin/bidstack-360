@@ -18,10 +18,10 @@ vi.mock('@bidstack/shared', () => ({
 }));
 vi.mock('../rfp-requirement-extract.helpers.js', () => ({
   JobData: z.object({
-    orgId: z.string().uuid(),
+    orgId: z.string().guid(),
     rfpRequestId: z.string(),
-    documentVersionId: z.string().uuid(),
-    orchestrationId: z.string().uuid(),
+    documentVersionId: z.string().guid(),
+    orchestrationId: z.string().guid(),
     chunkIndex: z.number().int().min(0).default(0),
     totalChunks: z.number().int().min(1).default(1),
   }),

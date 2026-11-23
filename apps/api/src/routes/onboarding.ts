@@ -24,7 +24,7 @@ const TemplateListItem = z.object({
 });
 
 const InstallResult = z.object({
-  pipelineId: z.string().uuid(),
+  pipelineId: z.string().guid(),
   stagesCreated: z.number().int(),
   leadsCreated: z.number().int(),
   dealsCreated: z.number().int(),

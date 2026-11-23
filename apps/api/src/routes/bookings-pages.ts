@@ -24,7 +24,7 @@ export const bookingsPagesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         body: BookingPageCreate,
         response: {
-          201: z.object({ id: z.string().uuid(), slug: z.string() }),
+          201: z.object({ id: z.string().guid(), slug: z.string() }),
         },
       },
     },
@@ -71,9 +71,9 @@ export const bookingsPagesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: BookingPagePatch,
-        response: { 200: z.object({ id: z.string().uuid() }) },
+        response: { 200: z.object({ id: z.string().guid() }) },
       },
     },
     async (req, reply) => {
@@ -147,7 +147,7 @@ export const bookingsPagesRoutes: FastifyPluginAsyncZod = async (server) => {
           200: z.object({
             items: z.array(
               z.object({
-                id: z.string().uuid(),
+                id: z.string().guid(),
                 slug: z.string(),
                 name: z.string(),
                 isActive: z.boolean(),

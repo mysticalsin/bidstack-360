@@ -66,7 +66,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     '/proposals/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: Proposal },
       },
     },
@@ -261,7 +261,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('proposals:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: ProposalPatch,
         response: { 200: Proposal },
       },
@@ -340,9 +340,9 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('proposals:write')],
       schema: {
-        params: z.object({ id: z.string().uuid(), sectionId: z.string().uuid() }),
+        params: z.object({ id: z.string().guid(), sectionId: z.string().guid() }),
         body: ProposalSectionPatch,
-        response: { 200: z.object({ id: z.string().uuid(), wordCount: z.number().int() }) },
+        response: { 200: z.object({ id: z.string().guid(), wordCount: z.number().int() }) },
       },
     },
     async (req, reply) => {
@@ -388,7 +388,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('proposals:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: ProposalDraftRequest,
         response: { 200: ProposalDraftResponse },
       },
@@ -478,7 +478,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('proposals:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

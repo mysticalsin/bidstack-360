@@ -68,16 +68,16 @@ If no solutions or products are found, return empty arrays. Categories should be
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   accountId: z.string().min(1),
-  documentId: z.string().uuid(),
-  extractionId: z.string().uuid(),
+  documentId: z.string().guid(),
+  extractionId: z.string().guid(),
   storageKey: z.string().min(1),
   contentType: z.string().min(1),
   name: z.string().min(1),
-  opportunityId: z.string().uuid().optional(),
-  bidDocumentId: z.string().uuid().optional(),
-  documentVersionId: z.string().uuid().optional(),
+  opportunityId: z.string().guid().optional(),
+  bidDocumentId: z.string().guid().optional(),
+  documentVersionId: z.string().guid().optional(),
   prompt: z.string().optional(),
   // 'contract' routes to the MSA/rate-card extractor and parks a reviewable
   // draft on the DocumentExtraction instead of upserting solutions/products.

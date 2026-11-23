@@ -47,8 +47,8 @@ import { getZoomRecordings } from '../services/calls/zoom.service.js';
 // ─── Job data schemas ──────────────────────────────────────────────────────
 
 const FetchRecordingJobData = z.object({
-  callSessionId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  callSessionId: z.string().guid(),
+  orgId: z.string().guid(),
   provider: z.enum(['ZOOM', 'TEAMS', 'GOOGLE_MEET', 'TWILIO_VOICE']),
   /** For Zoom: the double-encoded meeting UUID. */
   meetingUuid: z.string().optional(),
@@ -58,8 +58,8 @@ const FetchRecordingJobData = z.object({
 });
 
 const TranscribeJobData = z.object({
-  callSessionId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  callSessionId: z.string().guid(),
+  orgId: z.string().guid(),
   /** S3 object key for the recording — will be signed before sending to Deepgram. */
   s3Key: z.string(),
   /** Whether the recording has dual (stereo) channels (Twilio dual-channel). */
@@ -67,15 +67,15 @@ const TranscribeJobData = z.object({
 });
 
 const AnalyzeJobData = z.object({
-  callSessionId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  callSessionId: z.string().guid(),
+  orgId: z.string().guid(),
 });
 
 const UpdateDealJobData = z.object({
-  callSessionId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  callSessionId: z.string().guid(),
+  orgId: z.string().guid(),
   entityType: z.string(),
-  entityId: z.string().uuid(),
+  entityId: z.string().guid(),
   /** High-confidence suggestions from the analyze pass. */
   suggestions: z.array(
     z.object({

@@ -108,7 +108,7 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
           sector: z.string().trim().max(120).optional(),
           category: z.string().trim().max(40).optional(),
           source: z.string().trim().max(20).optional(),
-          cursor: z.string().uuid().optional(),
+          cursor: z.string().guid().optional(),
           limit: z.coerce.number().int().min(1).max(100).default(50),
         }),
         response: { 200: SalesToolkitList },
@@ -174,7 +174,7 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('documents:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: SalesToolkitPatch,
         response: { 200: SalesToolkit },
       },
@@ -210,7 +210,7 @@ export const salesToolkitsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/sales-toolkits/store/:id',
     {
       preHandler: server.requirePermission('documents:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const res = await prisma.salesToolkit.updateMany({

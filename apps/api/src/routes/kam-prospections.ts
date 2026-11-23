@@ -92,7 +92,7 @@ export const kamProspectionRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:read'),
       schema: {
-        querystring: z.object({ companyId: z.string().uuid() }),
+        querystring: z.object({ companyId: z.string().guid() }),
         response: { 200: KamProspectionList },
       },
     },

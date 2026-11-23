@@ -9,8 +9,8 @@ import { z } from 'zod';
  * binary admin/member flag, so the product reflects the real RBAC model.
  */
 export const CapabilityManifest = z.object({
-  userId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  userId: z.string().guid(),
+  orgId: z.string().guid(),
   // Legacy coarse role string on the user row (member | admin).
   legacyRole: z.string(),
   // Names of the granular Roles the user holds.
@@ -23,7 +23,7 @@ export type CapabilityManifest = z.infer<typeof CapabilityManifest>;
 
 /** A custom role currently granted to a user. */
 export const AssignedRole = z.object({
-  roleId: z.string().uuid(),
+  roleId: z.string().guid(),
   name: z.string(),
   description: z.string().nullable(),
   isSystem: z.boolean(),
@@ -36,6 +36,6 @@ export const AssignedRoleList = z.object({
 export type AssignedRoleList = z.infer<typeof AssignedRoleList>;
 
 export const AssignRoleInput = z.object({
-  roleId: z.string().uuid(),
+  roleId: z.string().guid(),
 });
 export type AssignRoleInput = z.infer<typeof AssignRoleInput>;

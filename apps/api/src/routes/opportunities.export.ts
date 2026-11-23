@@ -69,7 +69,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
         tags: ['opportunities'],
         querystring: z.object({
           stage: z.string().optional(),
-          pipelineStageId: z.string().uuid().optional(),
+          pipelineStageId: z.string().guid().optional(),
           owner: z.string().email().optional(),
           industry: z.string().optional(),
         }),

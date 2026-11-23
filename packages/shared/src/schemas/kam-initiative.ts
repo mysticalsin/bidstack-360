@@ -34,11 +34,11 @@ export const KAM_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
 const PriorityEnum = z.enum(KAM_PRIORITIES);
 
 export const KamInitiativeCreate = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   title: z.string().min(1).max(300),
   description: z.string().max(5000).optional(),
-  sessionId: z.string().uuid().optional(),
-  ownerId: z.string().uuid().optional(),
+  sessionId: z.string().guid().optional(),
+  ownerId: z.string().guid().optional(),
   priority: PriorityEnum.optional(),
   estimatedValueMicros: z.number().int().nonnegative().optional(),
 });
@@ -47,7 +47,7 @@ export type KamInitiativeCreate = z.infer<typeof KamInitiativeCreate>;
 export const KamInitiativePatch = z.object({
   title: z.string().min(1).max(300).optional(),
   description: z.string().max(5000).nullable().optional(),
-  ownerId: z.string().uuid().nullable().optional(),
+  ownerId: z.string().guid().nullable().optional(),
   priority: PriorityEnum.optional(),
   estimatedValueMicros: z.number().int().nonnegative().nullable().optional(),
 });
@@ -63,24 +63,24 @@ export const KamInitiativeTransitionBody = z.object({
   droppedReason: z.string().max(2000).optional(),
   estimatedValueMicros: z.number().int().nonnegative().optional(),
   opportunityName: z.string().min(1).max(300).optional(),
-  pipelineStageId: z.string().uuid().optional(),
+  pipelineStageId: z.string().guid().optional(),
 });
 export type KamInitiativeTransitionBody = z.infer<typeof KamInitiativeTransitionBody>;
 
 export const KamInitiativeDetail = z.object({
-  id: z.string().uuid(),
-  companyId: z.string().uuid(),
-  sessionId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  companyId: z.string().guid(),
+  sessionId: z.string().guid().nullable(),
   title: z.string(),
   description: z.string().nullable(),
   stage: z.enum(INITIATIVE_STAGES),
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   priority: PriorityEnum,
   estimatedValueMicros: z.number().nullable(),
   lastActivityAt: z.string(),
   droppedReason: z.string().nullable(),
-  convertedToOpportunityId: z.string().uuid().nullable(),
-  handoffId: z.string().uuid().nullable(),
+  convertedToOpportunityId: z.string().guid().nullable(),
+  handoffId: z.string().guid().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

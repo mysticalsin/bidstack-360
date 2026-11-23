@@ -15,11 +15,25 @@ const LOCK_TTL_MINUTES = 5;
 
 const entityParamsSchema = z.object({
   type: z.string().regex(/^[a-z_]+$/, 'entityType must be lowercase letters/underscores'),
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 
 const lockBodySchema = z.object({
   sessionId: z.string().min(1).max(128),
+});
+
+// Same shape getOrgPresence / getEntityPresence return. The previous
+// `{ userId, presence }` wrapper did not match that payload, and Zod 4's
+// response types now check the handler return against the schema.
+const presenceEntrySchema = z.object({
+  userId: z.string(),
+  orgId: z.string(),
+  name: z.string(),
+  avatarUrl: z.string().nullable(),
+  currentEntityType: z.string().nullable(),
+  currentEntityId: z.string().nullable(),
+  sessionId: z.string(),
+  lastSeenAt: z.number(),
 });
 
 export const realtimeRoutes: FastifyPluginAsync = async (server) => {
@@ -35,7 +49,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
         response: {
           200: z.object({
             entityType: z.string(),
-            entityId: z.string().uuid(),
+            entityId: z.string().guid(),
             userId: z.string(),
             sessionId: z.string(),
             acquiredAt: z.string(),
@@ -155,12 +169,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
       schema: {
         response: {
           200: z.object({
-            users: z.array(
-              z.object({
-                userId: z.string(),
-                presence: z.unknown(), // Using unknown or precise type if available
-              }),
-            ),
+            users: z.array(presenceEntrySchema),
           }),
         },
       },
@@ -180,12 +189,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
         params: entityParamsSchema,
         response: {
           200: z.object({
-            users: z.array(
-              z.object({
-                userId: z.string(),
-                presence: z.unknown(),
-              }),
-            ),
+            users: z.array(presenceEntrySchema),
           }),
         },
       },

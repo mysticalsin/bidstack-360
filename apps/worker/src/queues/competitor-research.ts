@@ -39,9 +39,9 @@ const DEFAULT_AGENT_ID = 'competitor-intel-agent';
 const MAX_DOCS = 6;
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  competitorProfileId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable().optional(),
+  orgId: z.string().guid(),
+  competitorProfileId: z.string().guid(),
+  opportunityId: z.string().guid().nullable().optional(),
   /** Optional caller-supplied public URLs to ground on (in addition to search). */
   seedUrls: z.array(z.string().url()).max(20).optional(),
 });

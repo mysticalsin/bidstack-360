@@ -20,8 +20,8 @@ export const ActivityStatus = z.enum(['planned', 'completed', 'cancelled']);
 export const ActivityActorType = z.enum(['user', 'system', 'agent']);
 
 export const Activity = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   type: ActivityType,
   subject: z.string().nullable(),
   description: z.string().nullable(),
@@ -29,12 +29,12 @@ export const Activity = z.object({
   endTime: z.string().datetime().nullable(),
   status: ActivityStatus,
   entityType: z.string(),
-  entityId: z.string().uuid(),
-  ownerId: z.string().uuid().nullable(),
-  metadata: z.record(z.unknown()).nullable(),
-  actorId: z.string().uuid().nullable(),
+  entityId: z.string().guid(),
+  ownerId: z.string().guid().nullable(),
+  metadata: z.record(z.string(), z.unknown()).nullable(),
+  actorId: z.string().guid().nullable(),
   actorType: ActivityActorType,
-  body: z.record(z.unknown()).nullable(),
+  body: z.record(z.string(), z.unknown()).nullable(),
   occurredAt: z.string().datetime(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -48,12 +48,12 @@ export const ActivityCreate = z.object({
   endTime: z.string().datetime().optional(),
   status: ActivityStatus.optional(),
   entityType: z.string().min(1).max(50),
-  entityId: z.string().uuid(),
-  ownerId: z.string().uuid().optional(),
-  metadata: z.record(z.unknown()).optional(),
-  actorId: z.string().uuid().optional(),
+  entityId: z.string().guid(),
+  ownerId: z.string().guid().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  actorId: z.string().guid().optional(),
   actorType: ActivityActorType.optional(),
-  body: z.record(z.unknown()).optional(),
+  body: z.record(z.string(), z.unknown()).optional(),
   occurredAt: z.string().datetime().optional(),
   idempotencyKey: z.string().min(8).max(160).optional(),
 });
@@ -65,8 +65,8 @@ export const ActivityPatch = z.object({
   startTime: z.string().datetime().optional().nullable(),
   endTime: z.string().datetime().optional().nullable(),
   status: ActivityStatus.optional(),
-  metadata: z.record(z.unknown()).optional(),
-  body: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  body: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Pagination cursor for activity feeds: either a bare ISO datetime (legacy
@@ -82,11 +82,11 @@ export const ActivityCursor = z
 
 export const ActivityFilter = z.object({
   entityType: z.string().optional(),
-  entityId: z.string().uuid().optional(),
+  entityId: z.string().guid().optional(),
   type: ActivityType.optional(),
   status: ActivityStatus.optional(),
-  ownerId: z.string().uuid().optional(),
-  actorId: z.string().uuid().optional(),
+  ownerId: z.string().guid().optional(),
+  actorId: z.string().guid().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   offset: z.coerce.number().int().min(0).optional().default(0),
   cursor: ActivityCursor.optional(),

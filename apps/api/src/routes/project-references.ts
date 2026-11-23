@@ -13,7 +13,7 @@ import {
   type IngestProjectReferenceInput,
 } from '../services/project-reference.service.js';
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 
 interface DbRow {
   id: string;

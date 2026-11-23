@@ -26,7 +26,7 @@ const Patch = z.object({
 });
 
 const Input = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   patch: Patch,
 });
 

@@ -44,7 +44,7 @@ export type DustDocument = z.infer<typeof DustDocument>;
 
 export const DustDocumentDetail = DustDocument.extend({
   text: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type DustDocumentDetail = z.infer<typeof DustDocumentDetail>;
 

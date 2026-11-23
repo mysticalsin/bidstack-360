@@ -332,7 +332,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           accountId: z.string().min(1).max(255),
-          companyId: z.string().uuid().optional(),
+          companyId: z.string().guid().optional(),
           limit: z.coerce.number().int().min(1).max(200).default(100),
         }),
         response: { 200: FileListResponse },
@@ -365,7 +365,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
   // 5. Download — 302 to a presigned URL (S3) OR stream local file inline.
   server.get<{ Params: { id: string } }>(
     '/files/:id/download',
-    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    { schema: { params: z.object({ id: z.string().guid() }) } },
     async (req, reply) => {
       const row = await prisma.fileAttachment.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
@@ -413,7 +413,7 @@ export const filesRoutes: FastifyPluginAsyncZod = async (server) => {
   // 6. Delete.
   server.delete<{ Params: { id: string } }>(
     '/files/:id',
-    { schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } } },
+    { schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } } },
     async (req, reply) => {
       const row = await prisma.fileAttachment.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },

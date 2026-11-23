@@ -73,8 +73,8 @@ export const rfpPipelineRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         params: UploadParams,
         body: z.object({
-          fileAttachmentId: z.string().uuid(),
-          rfpRequestId: z.string().uuid().optional(),
+          fileAttachmentId: z.string().guid(),
+          rfpRequestId: z.string().guid().optional(),
         }),
         response: { 202: UploadResponse },
       },

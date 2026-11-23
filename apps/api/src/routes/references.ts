@@ -76,7 +76,7 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
     schema: {
       querystring: z.object({
         industry: z.string().max(100).optional(),
-        companyId: z.string().uuid().optional(),
+        companyId: z.string().guid().optional(),
         tag: z.string().max(100).optional(),
         search: z.string().max(200).optional(),
         limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -115,7 +115,7 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
   app.post('/references', {
     schema: {
       body: z.object({
-        companyId: z.string().uuid().optional(),
+        companyId: z.string().guid().optional(),
         title: z.string().min(1).max(255),
         description: z.string().max(2000).optional(),
         industry: z.string().max(100).optional(),
@@ -168,7 +168,7 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
   // PATCH /api/v1/references/:id — update a reference
   app.patch('/references/:id', {
     schema: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       body: z.object({
         title: z.string().min(1).max(255).optional(),
         description: z.string().max(2000).optional(),
@@ -229,7 +229,7 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
   // DELETE /api/v1/references/:id
   app.delete('/references/:id', {
     schema: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
     },
     handler: async (req, reply) => {
       const { orgId } = req.auth;
@@ -256,7 +256,7 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
   // POST /api/v1/references/:id/use — mark reference as used
   app.post('/references/:id/use', {
     schema: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
     },
     handler: async (req, reply) => {
       const { orgId } = req.auth;

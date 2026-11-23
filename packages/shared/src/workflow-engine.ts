@@ -361,10 +361,10 @@ export function workflowMatchesEvent(
 
 /** Zod schema for the dispatch job payload (shared producer ↔ consumer). */
 export const WorkflowDispatchJob = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   triggerKind: z.enum(['record_created', 'stage_changed']),
   recordType: z.string(),
   recordId: z.string(),
-  changes: z.record(z.unknown()).default({}),
+  changes: z.record(z.string(), z.unknown()).default({}),
 });
 export type WorkflowDispatchJob = z.infer<typeof WorkflowDispatchJob>;

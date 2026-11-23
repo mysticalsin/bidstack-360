@@ -32,7 +32,7 @@ export const DealCreateInput = z.object({
 });
 
 export const DealUpdateInput = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   patch: z.object({
     stage: Stage.optional(),
     probability: z.number().int().min(0).max(100).optional(),
@@ -52,17 +52,17 @@ export const EnrichCompanyInput = z.object({
 
 export const ActivityListInput = z.object({
   company: z.string().optional(),
-  dealId: z.string().uuid().optional(),
+  dealId: z.string().guid().optional(),
   limit: z.number().int().min(1).max(100).default(25),
 });
 
 export const ActivityCreateInput = z.object({
-  dealId: z.string().uuid(),
+  dealId: z.string().guid(),
   subject: z.string().min(1).max(200),
   dueDate: z.string().date().nullable().optional(),
 });
 
 export const GenerateInsightsInput = z.object({
   company: z.string().optional(),
-  dealId: z.string().uuid().optional(),
+  dealId: z.string().guid().optional(),
 });

@@ -30,7 +30,7 @@ export const CompanyStrategicSignal = z.object({
   source: z.string().min(1),
   confidence: z.number().min(0).max(1),
   url: z.string().url().nullable(),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type CompanyStrategicSignal = z.infer<typeof CompanyStrategicSignal>;
 
@@ -72,7 +72,7 @@ export const CrmCompany = z.object({
   employeeCount: z.number().int().nonnegative().nullable(),
   annualRevenueMicros: z.number().int().nonnegative().nullable(),
   status: z.string().nullable(),
-  registryIds: z.record(z.string()).default({}),
+  registryIds: z.record(z.string(), z.string()).default({}),
   formerNames: z.array(z.string()).default([]),
   incorporationDate: z.string().date().nullable(),
   logo: CrmLogo.nullable(),

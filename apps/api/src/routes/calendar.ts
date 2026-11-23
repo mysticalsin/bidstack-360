@@ -34,7 +34,7 @@ type CalendarProvider = z.infer<typeof CalendarEventCreate>['provider'] extends 
   : never;
 
 const CalendarEventResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   subject: z.string(),
   startAt: z.string(),
   endAt: z.string(),
@@ -199,7 +199,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: CalendarEventPatch,
         response: { 200: CalendarEventResponse },
       },
@@ -270,7 +270,7 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

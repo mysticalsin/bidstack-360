@@ -38,7 +38,7 @@ function serialize(r: DbRow): z.infer<typeof Notification> {
   };
 }
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 
 export const notificationsRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(

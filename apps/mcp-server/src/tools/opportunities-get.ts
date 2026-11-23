@@ -6,7 +6,7 @@ import type { Tool } from './index.js';
 
 const Input = z
   .object({
-    id: z.string().uuid().optional(),
+    id: z.string().guid().optional(),
     code: z
       .string()
       .regex(/^OP-\d{4}$/)

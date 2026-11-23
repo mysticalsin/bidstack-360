@@ -16,13 +16,13 @@ export type TemplateKind = z.infer<typeof TemplateKind>;
 // ─── DocumentTemplate ───────────────────────────────────────────────────────
 
 export const DocumentTemplate = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string().min(1).max(200),
   kind: TemplateKind,
   description: z.string().max(500).nullable(),
   bodyHtml: z.string(),
-  defaultVariables: z.record(z.string()),
+  defaultVariables: z.record(z.string(), z.string()),
   createdAt: z.string().datetime(),
 });
 export type DocumentTemplate = z.infer<typeof DocumentTemplate>;
@@ -32,7 +32,7 @@ export const DocumentTemplateCreate = z.object({
   kind: TemplateKind,
   description: z.string().max(500).optional(),
   bodyHtml: z.string().min(1),
-  defaultVariables: z.record(z.string()).default({}),
+  defaultVariables: z.record(z.string(), z.string()).default({}),
 });
 export type DocumentTemplateCreate = z.infer<typeof DocumentTemplateCreate>;
 
@@ -40,19 +40,19 @@ export const DocumentTemplatePatch = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(500).nullable().optional(),
   bodyHtml: z.string().min(1).optional(),
-  defaultVariables: z.record(z.string()).optional(),
+  defaultVariables: z.record(z.string(), z.string()).optional(),
 });
 export type DocumentTemplatePatch = z.infer<typeof DocumentTemplatePatch>;
 
 // ─── DocumentTemplateVersion ─────────────────────────────────────────────────
 
 export const DocumentTemplateVersion = z.object({
-  id: z.string().uuid(),
-  templateId: z.string().uuid(),
+  id: z.string().guid(),
+  templateId: z.string().guid(),
   version: z.number().int().positive(),
   bodyHtml: z.string(),
   createdAt: z.string().datetime(),
-  createdBy: z.string().uuid(),
+  createdBy: z.string().guid(),
 });
 export type DocumentTemplateVersion = z.infer<typeof DocumentTemplateVersion>;
 
@@ -92,9 +92,9 @@ export const SignatureRecipient = z.object({
 export type SignatureRecipient = z.infer<typeof SignatureRecipient>;
 
 export const SignatureRequest = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  documentId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  documentId: z.string().guid(),
   provider: SignatureProvider,
   providerRequestId: z.string().nullable(),
   status: SignatureStatus,
@@ -112,12 +112,12 @@ export const SignatureRequest = z.object({
 export type SignatureRequest = z.infer<typeof SignatureRequest>;
 
 export const SignatureRequestCreate = z.object({
-  documentId: z.string().uuid(),
-  templateId: z.string().uuid().optional(),
+  documentId: z.string().guid(),
+  templateId: z.string().guid().optional(),
   recipients: z.array(SignatureRecipient).min(1).max(20),
   message: z.string().max(500).optional(),
   provider: SignatureProvider.default('DOCUSIGN'),
-  variables: z.record(z.string()).optional(),
+  variables: z.record(z.string(), z.string()).optional(),
 });
 export type SignatureRequestCreate = z.infer<typeof SignatureRequestCreate>;
 
@@ -129,14 +129,14 @@ export type SignatureRequestVoid = z.infer<typeof SignatureRequestVoid>;
 // ─── SignatureEvent ───────────────────────────────────────────────────────────
 
 export const SignatureEvent = z.object({
-  id: z.string().uuid(),
-  signatureRequestId: z.string().uuid(),
+  id: z.string().guid(),
+  signatureRequestId: z.string().guid(),
   type: SignatureEventType,
   recipientEmail: z.string().email().nullable(),
   occurredAt: z.string().datetime(),
   ipAddress: z.string().nullable(),
   userAgent: z.string().nullable(),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 export type SignatureEvent = z.infer<typeof SignatureEvent>;
 
@@ -144,7 +144,7 @@ export type SignatureEvent = z.infer<typeof SignatureEvent>;
 
 /** Shape returned by public GET /sign/:token */
 export const PublicSignatureRequest = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   status: SignatureStatus,
   templateName: z.string(),
   senderName: z.string(),
@@ -161,7 +161,7 @@ export const InternalSignSubmit = z.object({
   typedName: z.string().min(1).max(200),
   /** base64 data-URL of the canvas signature image */
   signatureDataUrl: z.string().startsWith('data:image/').max(500_000),
-  acceptedTerms: z.literal(true, { errorMap: () => ({ message: 'Must accept terms' }) }),
+  acceptedTerms: z.literal(true, { error: 'Must accept terms' }),
 });
 export type InternalSignSubmit = z.infer<typeof InternalSignSubmit>;
 

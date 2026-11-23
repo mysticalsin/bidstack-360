@@ -42,12 +42,12 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 function uuidOrNull(value: unknown): string | null {
-  const parsed = z.string().uuid().safeParse(value);
+  const parsed = z.string().guid().safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 
 function storedFieldSources(metadata: unknown): Record<string, AccountIntelFieldProvenanceType> {
-  const parsed = z.record(AccountIntelFieldProvenance).safeParse(record(metadata).fieldSources);
+  const parsed = z.record(z.string(), AccountIntelFieldProvenance).safeParse(record(metadata).fieldSources);
   return parsed.success ? parsed.data : {};
 }
 
@@ -345,7 +345,7 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ accountId: z.string().min(1).max(255), documentId: z.string().uuid() }),
+        params: z.object({ accountId: z.string().min(1).max(255), documentId: z.string().guid() }),
         body: ExtractDocumentRequest,
         response: { 200: DocumentExtraction },
       },
@@ -408,7 +408,7 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     '/accounts/:accountId/solutions/:solutionId',
     {
       schema: {
-        params: z.object({ accountId: z.string().min(1).max(255), solutionId: z.string().uuid() }),
+        params: z.object({ accountId: z.string().min(1).max(255), solutionId: z.string().guid() }),
       },
     },
     async (req) => {
@@ -434,7 +434,7 @@ export const accountIntelRoutes: FastifyPluginAsyncZod = async (server) => {
     '/accounts/:accountId/products/:productId',
     {
       schema: {
-        params: z.object({ accountId: z.string().min(1).max(255), productId: z.string().uuid() }),
+        params: z.object({ accountId: z.string().min(1).max(255), productId: z.string().guid() }),
       },
     },
     async (req) => {

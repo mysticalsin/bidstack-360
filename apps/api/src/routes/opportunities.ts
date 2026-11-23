@@ -178,7 +178,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       schema: {
         querystring: z.object({
-          pipelineStageId: z.string().uuid().optional(),
+          pipelineStageId: z.string().guid().optional(),
           excludeClosed: z.coerce.boolean().optional(),
         }),
         response: { 200: z.object({ count: z.number().int() }) },
@@ -215,7 +215,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     '/opportunities/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: OpportunityFull },
       },
     },
@@ -288,7 +288,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('opportunities:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: OpportunityPatch,
         response: { 200: Opportunity },
       },
@@ -538,7 +538,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('opportunities:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

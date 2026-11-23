@@ -10,7 +10,7 @@ const Section = z.enum(['executive_summary', 'scope', 'pricing', 'timeline', 'ri
 const Tone = z.enum(['consultative', 'concise', 'technical', 'executive']);
 
 const Input = z.object({
-  oppId: z.string().uuid(),
+  oppId: z.string().guid(),
   section: Section,
   tone: Tone.default('consultative'),
 });

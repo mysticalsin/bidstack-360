@@ -23,7 +23,7 @@ import {
 
 import { loadEntityTags, suggestTagsLocally, taggableOwnedBy } from './tags.helpers.js';
 
-const TagIdParam = z.object({ id: z.string().uuid() });
+const TagIdParam = z.object({ id: z.string().guid() });
 
 export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
   // RBAC: tags were previously ungated — any authenticated user could create,
@@ -275,7 +275,7 @@ export const tagRoutes: FastifyPluginAsyncZod = async (server) => {
     '/tags/entity/:type/:id',
     {
       schema: {
-        params: z.object({ type: TaggableEntityType, id: z.string().uuid() }),
+        params: z.object({ type: TaggableEntityType, id: z.string().guid() }),
         response: { 200: EntityTagsResponse },
       },
     },

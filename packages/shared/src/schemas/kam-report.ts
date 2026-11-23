@@ -14,7 +14,7 @@ import { z } from 'zod';
 // ─── KPIs ─────────────────────────────────────────────────────────────────
 
 export const KamAccountKpi = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   initiativesByStage: z.object({
     initiative: z.number().int(),
     lead: z.number().int(),
@@ -30,7 +30,7 @@ export const KamAccountKpi = z.object({
 export type KamAccountKpi = z.infer<typeof KamAccountKpi>;
 
 export const KamOwnerKpi = z.object({
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   ownerName: z.string().nullable(),
   prospectionsDone: z.number().int(),
   initiativesWorked: z.number().int(),
@@ -53,9 +53,9 @@ export const KamCountryRollupItem = z.object({
 export const KamRollup = z.object({ items: z.array(KamCountryRollupItem) });
 
 export const KamStaleInitiative = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   title: z.string(),
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   stage: z.enum(['initiative', 'lead', 'opportunity', 'dropped']),
   lastActivityAt: z.string(),
   daysStale: z.number().int(),
@@ -70,12 +70,12 @@ export const KamStaleList = z.object({
 
 export const KamProspectionImportRow = z.object({
   externalId: z.string().max(200).optional(),
-  companyId: z.string().uuid().optional(),
-  ownerId: z.string().uuid().optional(),
+  companyId: z.string().guid().optional(),
+  ownerId: z.string().guid().optional(),
   actionType: z.string().min(1).max(100),
   occurredAt: z.string().datetime(),
-  linkedTaskId: z.string().uuid().optional(),
-  linkedInitiativeId: z.string().uuid().optional(),
+  linkedTaskId: z.string().guid().optional(),
+  linkedInitiativeId: z.string().guid().optional(),
 });
 
 /** Bulk import / mirror sync from ABC. source='abc' rows MUST carry externalId
@@ -94,9 +94,9 @@ export const KamProspectionImportResult = z.object({
 });
 
 export const KamProspectionDetail = z.object({
-  id: z.string().uuid(),
-  companyId: z.string().uuid().nullable(),
-  ownerId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  companyId: z.string().guid().nullable(),
+  ownerId: z.string().guid().nullable(),
   externalId: z.string().nullable(),
   actionType: z.string(),
   occurredAt: z.string(),

@@ -37,7 +37,7 @@ const DustCredentialsSummary = z.object({
   workspaceId: z.string().nullable(),
   baseUrl: z.string().nullable(),
   dataSourceId: z.string().nullable(),
-  agentIds: z.record(z.string()),
+  agentIds: z.record(z.string(), z.string()),
   apiKeyMasked: z.string().nullable(),
 });
 
@@ -47,7 +47,7 @@ const PutCredentialsBody = z.object({
   baseUrl: z.string().url().max(300).optional(),
   dataSourceId: z.string().max(200).optional(),
   /** Optional purpose -> Dust agent id map (e.g. { crew, sectionDraft, qaReview }). */
-  agentIds: z.record(z.string().max(200)).optional(),
+  agentIds: z.record(z.string(), z.string().max(200)).optional(),
 });
 
 /** Shape the resolved credentials into a client-safe summary (never the key). */

@@ -34,7 +34,7 @@ export type ColumnMapping = z.infer<typeof ColumnMapping>;
 
 // The full mappings object stored in MigrationMapping.mappings.
 // Key is source column name; value is target field path (e.g. "company.name").
-export const MappingsRecord = z.record(z.string().nullable());
+export const MappingsRecord = z.record(z.string(), z.string().nullable());
 export type MappingsRecord = z.infer<typeof MappingsRecord>;
 
 // ─── MigrationJob (API response) ────────────────────────────────────────────
@@ -47,9 +47,9 @@ export const MigrationJobError = z.object({
 export type MigrationJobError = z.infer<typeof MigrationJobError>;
 
 export const MigrationJobResponse = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
   source: MigrationSourceEnum,
   status: MigrationStatusEnum,
   totalRows: z.number().int().nonnegative(),
@@ -58,7 +58,7 @@ export const MigrationJobResponse = z.object({
   startedAt: z.string().datetime().nullable(),
   completedAt: z.string().datetime().nullable(),
   errorSummary: z.array(MigrationJobError),
-  meta: z.record(z.unknown()),
+  meta: z.record(z.string(), z.unknown()),
   undoableUntil: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -68,8 +68,8 @@ export type MigrationJobResponse = z.infer<typeof MigrationJobResponse>;
 // ─── MigrationMapping (API response) ────────────────────────────────────────
 
 export const MigrationMappingResponse = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   source: MigrationSourceEnum,
   sourceEntity: z.string().min(1),
   mappings: MappingsRecord,
@@ -112,9 +112,9 @@ function rawSecretMetaPaths(value: unknown, path: string[] = []): string[] {
 // fan out into multiple jobs and the worker never times out.
 export const MigrationJobPayload = z
   .object({
-    migrationJobId: z.string().uuid(),
-    orgId: z.string().uuid(),
-    userId: z.string().uuid(),
+    migrationJobId: z.string().guid(),
+    orgId: z.string().guid(),
+    userId: z.string().guid(),
     source: MigrationSourceEnum,
     // Entity being imported: "Account", "Contact", "Lead", "Opportunity", "Activity"
     entityType: z.string().min(1),
@@ -136,7 +136,7 @@ export const MigrationJobPayload = z
     // Non-secret provider-specific state. Queue payloads may carry stable
     // references such as IntegrationConfig ids; raw provider tokens stay in the
     // encrypted credential store and are resolved by workers just in time.
-    meta: z.record(z.unknown()).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((payload, ctx) => {
     const secretPaths = rawSecretMetaPaths(payload.meta);
@@ -173,7 +173,7 @@ export const StartMigrationRequest = z.object({
   dedupStrategy: DedupStrategyEnum.default('update'),
   externalIdColumn: z.string().optional(),
   // Column mappings per entity (keyed by entity type).
-  mappings: z.record(MappingsRecord).optional(),
+  mappings: z.record(z.string(), MappingsRecord).optional(),
 });
 export type StartMigrationRequest = z.infer<typeof StartMigrationRequest>;
 
@@ -191,7 +191,7 @@ export const MigrationErrorRow = z.object({
   row: z.number().int().nonnegative(),
   field: z.string().nullable(),
   message: z.string(),
-  originalData: z.record(z.unknown()).optional(),
+  originalData: z.record(z.string(), z.unknown()).optional(),
 });
 export type MigrationErrorRow = z.infer<typeof MigrationErrorRow>;
 

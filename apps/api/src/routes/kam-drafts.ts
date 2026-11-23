@@ -78,7 +78,7 @@ export const kamDraftRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ sessionId: z.string().uuid() }),
+        params: z.object({ sessionId: z.string().guid() }),
         body: KamSessionDraftCreate,
         response: { 201: KamSessionDraftDetail },
       },
@@ -111,7 +111,7 @@ export const kamDraftRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/drafts/:id',
     {
       preHandler: server.requirePermission('kam:read'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamSessionDraftDetail } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: KamSessionDraftDetail } },
     },
     async (req) => toDraftDetail(await loadDraftOr404(req, req.params.id)),
   );
@@ -123,7 +123,7 @@ export const kamDraftRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: server.requirePermission('kam:read'),
       schema: {
         querystring: z.object({
-          companyId: z.string().uuid(),
+          companyId: z.string().guid(),
           status: z.enum(['pending', 'approved', 'rejected']).optional(),
         }),
         response: { 200: KamSessionDraftList },
@@ -151,7 +151,7 @@ export const kamDraftRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: KamSessionDraftPatch,
         response: { 200: KamSessionDraftDetail },
       },
@@ -174,7 +174,7 @@ export const kamDraftRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/drafts/:id/approve',
     {
       preHandler: server.requirePermission('kam:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamDraftApproveResult } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: KamDraftApproveResult } },
     },
     async (req) => {
       // B8.1: kam:write is not sufficient — an api-role caller (Dust agent / API
@@ -267,7 +267,7 @@ export const kamDraftRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/drafts/:id/reject',
     {
       preHandler: server.requirePermission('kam:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamSessionDraftDetail } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: KamSessionDraftDetail } },
     },
     async (req) => {
       const draft = await loadDraftOr404(req, req.params.id);

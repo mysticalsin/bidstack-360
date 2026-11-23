@@ -67,7 +67,7 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ initiativeId: z.string().uuid() }),
+        params: z.object({ initiativeId: z.string().guid() }),
         body: KamTaskCreate,
         response: { 201: KamTaskDetail },
       },
@@ -100,7 +100,7 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:read'),
       schema: {
-        params: z.object({ initiativeId: z.string().uuid() }),
+        params: z.object({ initiativeId: z.string().guid() }),
         response: { 200: KamTaskList },
       },
     },
@@ -121,7 +121,7 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: KamTaskPatch,
         response: { 200: KamTaskDetail },
       },
@@ -158,7 +158,7 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/tasks/:id',
     {
       preHandler: server.requirePermission('kam:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const existing = await prisma.task.findFirst({
@@ -181,7 +181,7 @@ export const kamTaskRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:read'),
       schema: {
-        params: z.object({ companyId: z.string().uuid() }),
+        params: z.object({ companyId: z.string().guid() }),
         response: { 200: KamAccountTodos },
       },
     },

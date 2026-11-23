@@ -22,8 +22,8 @@ export const LEAD_ROT_DEFAULTS: Record<z.infer<typeof LeadStatus>, number | null
 };
 
 export const LeadStageRotConfig = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   status: LeadStatus,
   rottenDays: z.number().int().min(0).max(365),
   createdAt: z.string().datetime(),
@@ -59,13 +59,13 @@ export const RecoveryPlay = z.object({
   kind: RecoveryPlayKind,
   rationale: z.string().max(280),
   /** Optional one-click hint payload (e.g. emailTemplateId for re-engagement). */
-  payload: z.record(z.unknown()).default({}),
+  payload: z.record(z.string(), z.unknown()).default({}),
   confidence: z.number().min(0).max(1),
 });
 export type RecoveryPlay = z.infer<typeof RecoveryPlay>;
 
 export const RecoverySuggestResponse = z.object({
-  leadId: z.string().uuid(),
+  leadId: z.string().guid(),
   daysInStage: z.number().int().nonnegative(),
   rottenDays: z.number().int().nonnegative().nullable(),
   isRotten: z.boolean(),

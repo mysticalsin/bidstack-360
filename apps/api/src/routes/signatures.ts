@@ -38,9 +38,9 @@ const RecipientSchema = z.object({
 });
 
 const SignatureRequestResponse = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  documentId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  documentId: z.string().guid(),
   provider: SignatureProvider,
   providerRequestId: z.string().nullable(),
   status: SignatureStatus,
@@ -55,12 +55,12 @@ const SignatureRequestResponse = z.object({
 });
 
 const EventResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   type: SignatureEventType,
   recipientEmail: z.string().nullable(),
   occurredAt: z.string(),
   ipAddress: z.string().nullable(),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 
 function serializeRequest(
@@ -134,7 +134,7 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           status: SignatureStatus.optional(),
-          documentId: z.string().uuid().optional(),
+          documentId: z.string().guid().optional(),
           recipientEmail: z.string().email().optional(),
           page: z.coerce.number().int().min(1).default(1),
           limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -220,7 +220,7 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
     '/signatures/requests/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: {
           200: SignatureRequestResponse.extend({
             events: z.array(EventResponse),
@@ -264,7 +264,7 @@ export const signaturesRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'documents:write' },
       preHandler: server.requirePermission('documents:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: SignatureRequestVoid,
         response: { 204: z.void() },
       },

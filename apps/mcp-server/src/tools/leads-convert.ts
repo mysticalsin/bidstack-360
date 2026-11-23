@@ -5,7 +5,7 @@ import { prisma, type OpportunityStage as PrismaStage } from '@bidstack/db';
 import type { Tool } from './index.js';
 
 const Input = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   opportunityName: z.string().min(1).max(255).optional(),
   opportunityValueMicros: z.number().min(0).optional(),
   stage: z

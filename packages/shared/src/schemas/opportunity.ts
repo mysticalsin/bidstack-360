@@ -15,7 +15,7 @@ export const OpportunityStage = z.enum([
 export type OpportunityStage = z.infer<typeof OpportunityStage>;
 
 export const PipelineStage = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   probability: z.number(),
   color: z.string().nullable(),
@@ -52,7 +52,7 @@ export const OpportunityCode = z.string().min(1).max(64);
 export const CanonicalOpportunityCode = z.string().regex(/^OP-\d{4}$/);
 
 export const Opportunity = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   // Existing CRM data may carry legacy/RFP/test identifiers. Keep reads broad
   // so dirty historical data cannot crash list/detail responses; create/import
   // schemas below still enforce the canonical OP-NNNN format for supplied codes.
@@ -60,7 +60,7 @@ export const Opportunity = z.object({
   customer: z.string().min(1).max(255),
   name: z.string().min(1).max(255),
   stage: z.string().nullable(),
-  pipelineStageId: z.string().uuid().nullable(),
+  pipelineStageId: z.string().guid().nullable(),
   pipelineStage: PipelineStage.nullable(),
   value: z.number().nonnegative().max(1_000_000_000_000),
   probability: z.number().int().min(0).max(100),
@@ -69,7 +69,7 @@ export const Opportunity = z.object({
   industry: Industry.nullable(),
   logo: z.string().url().nullable(),
   country: z.string().max(2).nullable(),
-  territoryId: z.string().uuid().nullable(),
+  territoryId: z.string().guid().nullable(),
   territoryName: z.string().nullable(),
   updatedAt: z.string().datetime(),
   taskCount: z.number().int().min(0).default(0),
@@ -89,7 +89,7 @@ export const OpportunityCreate = Opportunity.omit({
 }).extend({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
-  pipelineStageId: z.string().uuid().optional().nullable(),
+  pipelineStageId: z.string().guid().optional().nullable(),
 });
 export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 
@@ -132,12 +132,12 @@ export type OpportunityImportResult = z.infer<typeof OpportunityImportResult>;
 // Filter is consumed from query strings — coerce numerics so callers can pass
 // `?limit=20` without manual casting.
 export const OpportunityFilter = z.object({
-  pipelineStageId: z.string().uuid().optional(),
+  pipelineStageId: z.string().guid().optional(),
   stage: OpportunityStage.optional(),
   owner: z.string().optional(),
   industry: Industry.optional(),
   search: z.string().max(100).optional(),
-  cursor: z.string().uuid().optional(),
+  cursor: z.string().guid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   // A1 (bid clock): power the "Due <= 7d" / "Overdue" list quick-filters and
   // the dashboard "Closing this week" strip. Mutually exclusive in practice
@@ -159,7 +159,7 @@ export const OpportunityFull = Opportunity.extend({
   intel: IntelPayload.nullable().optional(),
   tasks: z.array(
     z.object({
-      id: z.string().uuid(),
+      id: z.string().guid(),
       title: z.string(),
       status: z.string(),
       dueDate: z.string().date().nullable(),
@@ -167,14 +167,14 @@ export const OpportunityFull = Opportunity.extend({
   ),
   documents: z.array(
     z.object({
-      id: z.string().uuid(),
+      id: z.string().guid(),
       name: z.string(),
       kind: z.string(),
       bytes: z.number().nullable(),
       createdAt: z.string().datetime(),
     }),
   ),
-  timeline: z.array(z.record(z.unknown())).default([]),
+  timeline: z.array(z.record(z.string(), z.unknown())).default([]),
   customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type OpportunityFull = z.infer<typeof OpportunityFull>;
@@ -187,6 +187,6 @@ export const DustStatus = z.object({
   lastError: z.string().nullable(),
   pulled24h: z.number().int(),
   pushed24h: z.number().int(),
-  agents: z.array(z.record(z.unknown())),
+  agents: z.array(z.record(z.string(), z.unknown())),
 });
 export type DustStatus = z.infer<typeof DustStatus>;

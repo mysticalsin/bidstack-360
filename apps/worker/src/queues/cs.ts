@@ -38,8 +38,8 @@ export const CS_RENEWAL_QUEUE = 'cs.create-renewal-opps';
 // ─── Job data schemas ─────────────────────────────────────────────────────
 
 // Schemas kept for future use when individual account/org jobs are enqueued.
-const _OrgJobData = z.object({ orgId: z.string().uuid() });
-const _AccountJobData = z.object({ orgId: z.string().uuid(), accountId: z.string().uuid() });
+const _OrgJobData = z.object({ orgId: z.string().guid() });
+const _AccountJobData = z.object({ orgId: z.string().guid(), accountId: z.string().guid() });
 type OrgJobData = z.infer<typeof _OrgJobData>;
 
 // Silence unused-var warnings — these are reference schemas.

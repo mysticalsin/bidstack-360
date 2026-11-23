@@ -16,7 +16,7 @@ export const SourceAttribution = z.object({
   sourceUrl: z.string().url().nullable(),
   fetchedAt: z.string().datetime(),
   confidence: z.number().min(0).max(1),
-  providerMetadata: z.record(z.unknown()).default({}),
+  providerMetadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type SourceAttribution = z.infer<typeof SourceAttribution>;
 

@@ -109,7 +109,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('territories:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: TerritoryPatch,
         response: { 200: Territory },
       },
@@ -153,7 +153,7 @@ export const territoryRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('territories:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
       },
     },
     async (req) => {

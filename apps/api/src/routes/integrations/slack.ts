@@ -389,7 +389,7 @@ export const slackOAuthRoutes: FastifyPluginAsync = async (server) => {
   app.post('/integrations/slack/events', {
     config: { public: true },
     schema: {
-      body: z.record(z.unknown()),
+      body: z.record(z.string(), z.unknown()),
       response: { 200: z.object({ challenge: z.string().optional() }) },
     },
     handler: async (req, reply) => {

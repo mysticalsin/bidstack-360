@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 export const OpportunityContact = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid(),
-  contactId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid(),
+  contactId: z.string().guid(),
   role: z.string().default('stakeholder'),
   isPrimary: z.boolean().default(false),
   influence: z.number().int().min(1).max(5).nullable(),
@@ -13,7 +13,7 @@ export const OpportunityContact = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   contact: z.object({
-    id: z.string().uuid(),
+    id: z.string().guid(),
     name: z.string(),
     email: z.string().nullable(),
     phone: z.string().nullable(),
@@ -23,7 +23,7 @@ export const OpportunityContact = z.object({
 export type OpportunityContact = z.infer<typeof OpportunityContact>;
 
 export const OpportunityContactCreate = z.object({
-  contactId: z.string().uuid(),
+  contactId: z.string().guid(),
   role: z.string().max(255).optional(),
   isPrimary: z.boolean().optional(),
 });

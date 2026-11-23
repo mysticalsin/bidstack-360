@@ -87,7 +87,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: [server.requirePermission('integrations:write')],
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: z.object({ dustDocId: z.string() }) },
       },
     },
@@ -300,7 +300,7 @@ export const dustRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       preHandler: server.requirePermission('integrations:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const key = await prisma.apiKey.findFirst({

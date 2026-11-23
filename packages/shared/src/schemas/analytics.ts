@@ -138,11 +138,11 @@ export const AnalyticsQuery = z.object({
 export type AnalyticsQuery = z.infer<typeof AnalyticsQuery>;
 
 export const AnalyticsReport = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string(),
   description: z.string().optional(),
-  ownerId: z.string().uuid(),
+  ownerId: z.string().guid(),
   query: AnalyticsQuery,
   chartType: AnalyticsChartType,
   schedule: z.string().optional(),
@@ -156,14 +156,14 @@ export const AnalyticsReportRunStatus = z.enum(['pending', 'running', 'done', 'e
 export type AnalyticsReportRunStatus = z.infer<typeof AnalyticsReportRunStatus>;
 
 export const AnalyticsReportRun = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   // '' for ephemeral preview runs (not persisted), per the frontend contract.
   reportId: z.string(),
   status: AnalyticsReportRunStatus,
   startedAt: z.string().datetime().optional(),
   finishedAt: z.string().datetime().optional(),
   rowCount: z.number().int().optional(),
-  result: z.array(z.record(z.unknown())).optional(),
+  result: z.array(z.record(z.string(), z.unknown())).optional(),
   error: z.string().optional(),
   createdAt: z.string().datetime(),
 });
@@ -200,12 +200,12 @@ export const AnalyticsWidgetPosition = z.object({
 export type AnalyticsWidgetPosition = z.infer<typeof AnalyticsWidgetPosition>;
 
 export const AnalyticsWidget = z.object({
-  id: z.string().uuid(),
-  dashboardId: z.string().uuid(),
-  reportId: z.string().uuid().optional(),
+  id: z.string().guid(),
+  dashboardId: z.string().guid(),
+  reportId: z.string().guid().optional(),
   title: z.string(),
   type: AnalyticsWidgetType,
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
   position: AnalyticsWidgetPosition,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -213,11 +213,11 @@ export const AnalyticsWidget = z.object({
 export type AnalyticsWidget = z.infer<typeof AnalyticsWidget>;
 
 export const AnalyticsDashboard = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string(),
   description: z.string().optional(),
-  ownerId: z.string().uuid(),
+  ownerId: z.string().guid(),
   isShared: z.boolean(),
   widgets: z.array(AnalyticsWidget).optional(),
   createdAt: z.string().datetime(),
@@ -244,20 +244,20 @@ export const AnalyticsDashboardPatch = z
 export type AnalyticsDashboardPatch = z.infer<typeof AnalyticsDashboardPatch>;
 
 export const AnalyticsWidgetCreate = z.object({
-  reportId: z.string().uuid().nullable().optional(),
+  reportId: z.string().guid().nullable().optional(),
   title: z.string().min(1).max(255),
   type: AnalyticsWidgetType,
-  config: z.record(z.unknown()).default({}),
+  config: z.record(z.string(), z.unknown()).default({}),
   position: AnalyticsWidgetPosition.default({ x: 0, y: 0, w: 4, h: 3 }),
 });
 export type AnalyticsWidgetCreate = z.infer<typeof AnalyticsWidgetCreate>;
 
 export const AnalyticsWidgetPatch = z
   .object({
-    reportId: z.string().uuid().nullable().optional(),
+    reportId: z.string().guid().nullable().optional(),
     title: z.string().min(1).max(255).optional(),
     type: AnalyticsWidgetType.optional(),
-    config: z.record(z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
     position: AnalyticsWidgetPosition.optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {

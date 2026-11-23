@@ -77,7 +77,7 @@ export const PublicBookingCreate = z.object({
   attendeePhone: z.string().max(30).optional(),
   startAt: z.string().datetime(),
   /** Answers keyed by customQuestion.id */
-  answers: z.record(z.unknown()).default({}),
+  answers: z.record(z.string(), z.unknown()).default({}),
   /** IANA timezone used to validate the selected slot against page availability. */
   tz: z.string().max(50).default('UTC'),
 });

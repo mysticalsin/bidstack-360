@@ -20,7 +20,7 @@ export const KAM_OWNER_MODELS = ['presales_driven', 'manager_driven'] as const;
 // Response schemas are lenient (no length constraints) so odd existing data
 // can't trip response validation.
 export const KamAccount = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   logoUrl: z.string().nullable(),
   domain: z.string().nullable(),
@@ -28,8 +28,8 @@ export const KamAccount = z.object({
   industry: z.string().nullable(),
   kamStatus: z.enum(KAM_ACCOUNT_STATUSES),
   kamOwnerModel: z.enum(KAM_OWNER_MODELS).nullable(),
-  directorSponsorId: z.string().uuid().nullable(),
-  keyAccountOwnerId: z.string().uuid().nullable(),
+  directorSponsorId: z.string().guid().nullable(),
+  keyAccountOwnerId: z.string().guid().nullable(),
   keyAccountSince: z.string().nullable(),
 });
 export type KamAccount = z.infer<typeof KamAccount>;
@@ -38,7 +38,7 @@ export const KamAccountList = z.object({ items: z.array(KamAccount) });
 export type KamAccountList = z.infer<typeof KamAccountList>;
 
 export const KamAccountCandidate = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   logoUrl: z.string().nullable(),
   domain: z.string().nullable(),
@@ -53,8 +53,8 @@ export const KamAccountDesignatePatch = z
   .object({
     kamStatus: z.enum(KAM_ACCOUNT_STATUSES).optional(),
     kamOwnerModel: z.enum(KAM_OWNER_MODELS).nullable().optional(),
-    directorSponsorId: z.string().uuid().nullable().optional(),
-    keyAccountOwnerId: z.string().uuid().nullable().optional(),
+    directorSponsorId: z.string().guid().nullable().optional(),
+    keyAccountOwnerId: z.string().guid().nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Provide at least one field to update' });
 export type KamAccountDesignatePatch = z.infer<typeof KamAccountDesignatePatch>;

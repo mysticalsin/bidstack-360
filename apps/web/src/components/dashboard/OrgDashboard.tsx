@@ -1,8 +1,7 @@
 import '../../styles/org-dashboard.css';
 
-import { memo, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { motion, useReducedMotion } from 'framer-motion';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
@@ -11,7 +10,6 @@ import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { Reveal } from '@/components/motion/Reveal';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
-import { springSoft } from '@/lib/motion';
 import { formatMoney } from '@/lib/format';
 import { useCurrencyStore } from '@/stores/currency';
 import type { OrgKpi } from './widgets/dashboard-types';
@@ -150,15 +148,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
     ] satisfies OrgKpi[];
   }, [closedLost, closedWon, pipelineStages, s, t]);
 
-  // Compute the greeting once per render instead of calling new Date() three
-  // times inline in the JSX below.
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return t('orgDashboard.greetingMorning', 'Good morning');
-    if (hour < 18) return t('orgDashboard.greetingAfternoon', 'Good afternoon');
-    return t('orgDashboard.greetingEvening', 'Good evening');
-  }, [t]);
-
   // A brand-new org has no records at all. Sum the core entity counts: when
   // every one is zero, the command center would just read "0 · 0 · 0", so we
   // show a getting-started branch that points at the first real moves instead.
@@ -168,6 +157,19 @@ export const OrgDashboard = memo(function OrgDashboard() {
     (s?.leads ?? 0) === 0 &&
     (s?.opportunities ?? 0) === 0 &&
     (s?.tasks ?? 0) === 0;
+
+  // Production staggers the widget tree across frames. One commit of the full
+  // cockpit was a 300ms+ React task; under Lighthouse's 4x CPU slowdown that
+  // single task failed total blocking time. Tests and dev render the full tree
+  // immediately so assertions don't depend on animation frames.
+  const immediate = !import.meta.env.PROD;
+  const ready = !summary.isLoading && !summary.isError && !isEmptyOrg;
+  const [phase, setPhase] = useState(immediate ? 3 : 0);
+  useEffect(() => {
+    if (immediate || !ready || phase >= 3) return;
+    const id = window.requestAnimationFrame(() => setPhase((current) => current + 1));
+    return () => window.cancelAnimationFrame(id);
+  }, [immediate, ready, phase]);
 
   if (summary.isLoading) return <DashboardSkeleton />;
   if (summary.isError) {
@@ -189,89 +191,76 @@ export const OrgDashboard = memo(function OrgDashboard() {
   }
   if (isEmptyOrg) return <GettingStarted />;
 
+  const showPrimary = phase >= 1;
+  const showMain = phase >= 2;
+  const showSide = phase >= 3;
+
   return (
     <div className="space-y-5">
-      {/* Page head — blur-in spring reveal */}
-      <motion.div
-        className="page-head motion-page-head"
-        initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(6px)' }}
-        animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
-        transition={springSoft}
-      >
-        <div>
-          <div className="text-xs font-medium text-[var(--brand-primary)] mb-1">{greeting}</div>
-          <h1 className="page-title gradient-text">
-            {t('orgDashboard.pageTitle', 'Workspace Command Center')}
-          </h1>
-          <div className="page-sub">
-            {t(
-              'orgDashboard.pageSubtitle',
-              '{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline',
-              {
-                companies: s?.companies ?? 0,
-                openDeals: s?.openOpportunities ?? 0,
-                pipeline: formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency),
-              },
-            )}
-          </div>
-        </div>
-        <div className="page-actions">
-          <Link to="/accounts" className="btn btn-secondary">
-            <Icon name="building" size={14} />
-            {t('orgDashboard.allAccounts', 'All accounts')}
-          </Link>
-          <Link to="/opportunities" className="btn btn-primary">
-            <Icon name="plus" size={14} />
-            {t('orgDashboard.opportunities', 'Opportunities')}
-          </Link>
-        </div>
-      </motion.div>
+      <div className="page-sub">
+        {t(
+          'orgDashboard.pageSubtitle',
+          '{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline',
+          {
+            companies: s?.companies ?? 0,
+            openDeals: s?.openOpportunities ?? 0,
+            pipeline: formatMoney(convert(s?.pipelineValue ?? 0, 'EUR'), currency),
+          },
+        )}
+      </div>
 
       {/* Cinematic hero band — ports the account cockpit's command-center
           language to portfolio level (replaces the old flat stat strip). */}
       {s && <OrgCommandHero summary={s} />}
 
-      {/* Main cockpit grid */}
+      {/* Main cockpit grid. Later phases mount on subsequent frames in
+          production so the first commit stays the hero. */}
       <section
         className="cockpit-grid"
         aria-label={t('orgDashboard.cockpitAriaLabel', 'Workspace cockpit')}
       >
         {/* Main column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-          <Reveal>
-            <KpiRow kpis={kpis} reduced={reduced} />
-          </Reveal>
+          {showPrimary && (
+            <Reveal>
+              <KpiRow kpis={kpis} reduced={reduced} />
+            </Reveal>
+          )}
 
-          <Reveal delay={0.06}>
-            <InsightsBar
-              overdueTasks={s?.overdueTasks ?? 0}
-              stalledOpps={(s?.opportunities ?? 0) - (s?.openOpportunities ?? 0)}
-              newLeads={s?.leads ?? 0}
-              pipelineValue={s?.pipelineValue ?? 0}
-            />
-          </Reveal>
+          {showMain && (
+            <>
+              <Reveal delay={0.06}>
+                <InsightsBar
+                  overdueTasks={s?.overdueTasks ?? 0}
+                  stalledOpps={(s?.opportunities ?? 0) - (s?.openOpportunities ?? 0)}
+                  newLeads={s?.leads ?? 0}
+                  pipelineValue={s?.pipelineValue ?? 0}
+                />
+              </Reveal>
 
-          <Reveal delay={0.07}>
-            <ClosingThisWeekCard />
-          </Reveal>
+              <Reveal delay={0.07}>
+                <ClosingThisWeekCard />
+              </Reveal>
 
-          <Reveal delay={0.08}>
-            <RecentActivityCard activity={s?.recentActivity ?? []} />
-          </Reveal>
+              <Reveal delay={0.08}>
+                <RecentActivityCard activity={s?.recentActivity ?? []} />
+              </Reveal>
 
-          <Reveal delay={0.1}>
-            <TopAccountsCard />
-          </Reveal>
+              <Reveal delay={0.1}>
+                <TopAccountsCard />
+              </Reveal>
 
-          <Reveal delay={0.12}>
-            <SalesFunnelCard
-              leads={s?.leads ?? 0}
-              opportunities={s?.opportunities ?? 0}
-              openOpps={s?.openOpportunities ?? 0}
-              pipelineValue={s?.pipelineValue ?? 0}
-              reduced={reduced}
-            />
-          </Reveal>
+              <Reveal delay={0.12}>
+                <SalesFunnelCard
+                  leads={s?.leads ?? 0}
+                  opportunities={s?.opportunities ?? 0}
+                  openOpps={s?.openOpportunities ?? 0}
+                  pipelineValue={s?.pipelineValue ?? 0}
+                  reduced={reduced}
+                />
+              </Reveal>
+            </>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -279,6 +268,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
           className="cockpit-side"
           aria-label={t('orgDashboard.detailsAriaLabel', 'Workspace details')}
         >
+          {showSide && (
+            <>
           <Reveal delay={0.04}>
             <PipelineCard
               value={convert(s?.pipelineValue ?? 0, 'EUR')}
@@ -320,6 +311,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <Reveal delay={0.16}>
             <QuickLinksCard />
           </Reveal>
+            </>
+          )}
         </aside>
       </section>
     </div>

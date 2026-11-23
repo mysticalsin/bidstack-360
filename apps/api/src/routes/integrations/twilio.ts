@@ -223,10 +223,10 @@ export const smsRoutes: FastifyPluginAsync = async (fastify) => {
           toNumber: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Must be E.164 format (+1234567890)'),
           body: z.string().min(1).max(1600),
           entityType: z.enum(['CONTACT', 'LEAD']).optional(),
-          entityId: z.string().uuid().optional(),
+          entityId: z.string().guid().optional(),
         }),
         response: {
-          200: z.object({ messageId: z.string().uuid() }),
+          200: z.object({ messageId: z.string().guid() }),
           403: z.object({ error: z.string() }),
         },
       },
@@ -263,15 +263,15 @@ export const smsRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['sms'],
         querystring: z.object({
           entityType: z.enum(['CONTACT', 'LEAD']).optional(),
-          entityId: z.string().uuid().optional(),
+          entityId: z.string().guid().optional(),
           limit: z.coerce.number().int().min(1).max(100).default(50),
-          cursor: z.string().uuid().optional(),
+          cursor: z.string().guid().optional(),
         }),
         response: {
           200: z.object({
             messages: z.array(
               z.object({
-                id: z.string().uuid(),
+                id: z.string().guid(),
                 fromNumber: z.string(),
                 toNumber: z.string(),
                 body: z.string(),
@@ -283,7 +283,7 @@ export const smsRoutes: FastifyPluginAsync = async (fastify) => {
                 createdAt: z.string(),
               }),
             ),
-            nextCursor: z.string().uuid().nullable(),
+            nextCursor: z.string().guid().nullable(),
           }),
         },
       },

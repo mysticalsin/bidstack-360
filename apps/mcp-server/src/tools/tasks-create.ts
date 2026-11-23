@@ -5,7 +5,7 @@ import { prisma } from '@bidstack/db';
 import type { Tool } from './index.js';
 
 const Input = z.object({
-  oppId: z.string().uuid(),
+  oppId: z.string().guid(),
   title: z.string().min(1).max(200),
   dueDate: z.string().date().optional(),
   assignee: z.string().email().optional(),

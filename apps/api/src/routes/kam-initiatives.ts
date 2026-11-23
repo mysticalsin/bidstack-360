@@ -87,9 +87,9 @@ export const kamInitiativeRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: server.requirePermission('kam:read'),
       schema: {
         querystring: z.object({
-          companyId: z.string().uuid(),
+          companyId: z.string().guid(),
           stage: z.enum(INITIATIVE_STAGES).optional(),
-          cursor: z.string().uuid().optional(),
+          cursor: z.string().guid().optional(),
           limit: z.coerce.number().int().min(1).max(100).default(50),
         }),
         response: { 200: KamInitiativeList },
@@ -116,7 +116,7 @@ export const kamInitiativeRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/initiatives/:id',
     {
       preHandler: server.requirePermission('kam:read'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamInitiativeDetail } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: KamInitiativeDetail } },
     },
     async (req) => toDetail(await loadInitiativeOr404(req, req.params.id)),
   );
@@ -160,7 +160,7 @@ export const kamInitiativeRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: KamInitiativePatch,
         response: { 200: KamInitiativeDetail },
       },
@@ -196,7 +196,7 @@ export const kamInitiativeRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: KamInitiativeTransitionBody,
         response: { 200: KamInitiativeDetail },
       },
@@ -312,7 +312,7 @@ export const kamInitiativeRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/initiatives/:id',
     {
       preHandler: server.requirePermission('kam:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const existing = await loadInitiativeOr404(req, req.params.id);

@@ -47,38 +47,38 @@ export const SSE_TERMINAL_STATES = new Set(['completed', 'failed', 'rejected']);
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
-export const UploadParams = z.object({ opportunityId: z.string().uuid() });
+export const UploadParams = z.object({ opportunityId: z.string().guid() });
 
 export const StreamParams = z.object({
-  workspaceId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
+  workspaceId: z.string().guid(),
+  orchestrationId: z.string().guid(),
 });
 
 export const AutofillParams = z.object({
-  workspaceId: z.string().uuid(),
-  rowId: z.string().uuid(),
+  workspaceId: z.string().guid(),
+  rowId: z.string().guid(),
 });
 export const AutofillBody = z.object({
-  orchestrationId: z.string().uuid(),
+  orchestrationId: z.string().guid(),
   sectionKey: z.string().min(1).max(100),
 });
 
-export const ApproveParams = z.object({ proposalId: z.string().uuid() });
+export const ApproveParams = z.object({ proposalId: z.string().guid() });
 export const ApproveBody = z.object({ notes: z.string().max(2000).optional() });
 
 export const ResumeDraftingParams = z.object({
-  workspaceId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
+  workspaceId: z.string().guid(),
+  orchestrationId: z.string().guid(),
 });
 
 export const UploadResponse = z.object({
-  orchestrationId: z.string().uuid(),
+  orchestrationId: z.string().guid(),
   // WHY bidWorkspaceId: the web client seeds its pipeline store from this field
   // so the SSE progress stream (GET /bid-workspaces/:workspaceId/rfp/:id/stream)
   // can open — without it the stream never connects. It equals the opportunityId
   // in this domain model. As a zod response schema, omitting it here also strips
   // the field during serialization even if the handler returns it.
-  bidWorkspaceId: z.string().uuid(),
+  bidWorkspaceId: z.string().guid(),
   status: z.literal('queued'),
 });
 
@@ -89,10 +89,10 @@ export const AutofillResponse = z.object({
 
 export const ApproveResponse = z.object({
   approvedAt: z.string().datetime(),
-  approvedByUserId: z.string().uuid(),
+  approvedByUserId: z.string().guid(),
   // RFP-GATE-001 — surface that the linked orchestration advanced so the client
   // can refresh the pipeline view. Always 'approved' on a successful gate pass.
-  orchestrationId: z.string().uuid(),
+  orchestrationId: z.string().guid(),
   orchestrationState: z.literal('approved'),
 });
 

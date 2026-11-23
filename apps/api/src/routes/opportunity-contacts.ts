@@ -60,7 +60,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     '/opportunities/:id/contacts',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: z.object({ items: z.array(OpportunityContact) }) },
       },
     },
@@ -81,7 +81,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     '/opportunities/:id/contacts',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: OpportunityContactCreate,
         response: { 201: OpportunityContact },
       },
@@ -128,7 +128,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     '/opportunities/:id/contacts/:contactId',
     {
       schema: {
-        params: z.object({ id: z.string().uuid(), contactId: z.string().uuid() }),
+        params: z.object({ id: z.string().guid(), contactId: z.string().guid() }),
         body: OpportunityContactPatch,
         response: { 200: OpportunityContact },
       },
@@ -170,7 +170,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     '/opportunities/:id/contacts/:contactId',
     {
       schema: {
-        params: z.object({ id: z.string().uuid(), contactId: z.string().uuid() }),
+        params: z.object({ id: z.string().guid(), contactId: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

@@ -56,7 +56,7 @@ export const zoomCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
         body: z.object({
           event: z.string(),
           event_ts: z.number().optional(),
-          payload: z.record(z.unknown()).optional(),
+          payload: z.record(z.string(), z.unknown()).optional(),
         }),
         response: {
           200: z.union([
@@ -178,7 +178,7 @@ export const teamsCallWebhookRoutes: FastifyPluginAsync = async (fastify) => {
                   clientState: z.string().optional(),
                   changeType: z.string().optional(),
                   resource: z.string().optional(),
-                  resourceData: z.record(z.unknown()).optional(),
+                  resourceData: z.record(z.string(), z.unknown()).optional(),
                 }),
               )
               .optional(),
@@ -349,8 +349,8 @@ export const twilioVoiceWebhookRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         description: 'TwiML generator for outbound voice calls',
         tags: ['webhooks', 'calls'],
-        params: z.object({ callSessionId: z.string().uuid() }),
-        body: z.record(z.string()).optional(),
+        params: z.object({ callSessionId: z.string().guid() }),
+        body: z.record(z.string(), z.string()).optional(),
         response: { 200: z.string(), 403: z.string() },
       },
     },

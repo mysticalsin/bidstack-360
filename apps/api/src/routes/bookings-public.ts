@@ -191,11 +191,11 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
         body: PublicBookingCreate,
         response: {
           201: z.object({
-            bookingId: z.string().uuid(),
+            bookingId: z.string().guid(),
             startAt: z.string(),
             endAt: z.string(),
             /** Public cancel URL token (must be sent in confirmation email) */
-            cancelToken: z.string().uuid(),
+            cancelToken: z.string().guid(),
           }),
         },
       },
@@ -388,8 +388,8 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
         rateLimit: { max: 20, timeWindow: '1 hour' },
       },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
-        querystring: z.object({ token: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
+        querystring: z.object({ token: z.string().guid() }),
         response: {
           200: z.object({ cancelled: z.boolean(), message: z.string() }),
         },

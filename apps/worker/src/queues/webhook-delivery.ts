@@ -58,18 +58,18 @@ const AUTO_DISABLE_AFTER = 10;
 
 const DeliveryJobSchema = z.object({
   /** WebhookSubscription.id */
-  subscriptionId: z.string().uuid(),
+  subscriptionId: z.string().guid(),
   /** The domain event type (e.g. "lead.created"). */
   event: z.string(),
   /** Full JSON payload to deliver. */
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
   /**
    * Stable event identity, stamped ONCE at enqueue (see fanOutWebhookEvent).
    * WHY optional: jobs enqueued before this field existed (or by the API-side
    * producer that hasn't been updated) fall back to job-derived stable values,
    * so dedup still holds across the 5 retries. Never regenerate per attempt.
    */
-  eventId: z.string().uuid().optional(),
+  eventId: z.string().guid().optional(),
   /** ISO-8601 timestamp of the originating event, stamped once at enqueue. */
   eventTimestamp: z.string().datetime().optional(),
 });

@@ -12,8 +12,8 @@ export const ProposalSectionKey = z.enum([
 ]);
 
 export const ProposalSection = z.object({
-  id: z.string().uuid(),
-  proposalId: z.string().uuid(),
+  id: z.string().guid(),
+  proposalId: z.string().guid(),
   key: ProposalSectionKey,
   title: z.string(),
   content: z.string(),
@@ -26,13 +26,13 @@ export const ProposalSection = z.object({
 });
 
 export const Proposal = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
   name: z.string().min(1).max(255),
   status: ProposalStatus,
   version: z.number().int().min(1),
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   complianceScore: z.number().int().min(0).max(100).nullable(),
   dueDate: z.string().date().nullable(),
   sections: z.array(ProposalSection).optional(),
@@ -41,7 +41,7 @@ export const Proposal = z.object({
 });
 
 export const ProposalCreate = z.object({
-  opportunityId: z.string().uuid().optional(),
+  opportunityId: z.string().guid().optional(),
   name: z.string().min(1).max(255),
   dueDate: z.string().date().optional(),
 });
@@ -59,7 +59,7 @@ export const ProposalSectionPatch = z.object({
 
 export const ProposalFilter = z.object({
   status: ProposalStatus.optional(),
-  opportunityId: z.string().uuid().optional(),
+  opportunityId: z.string().guid().optional(),
   search: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   offset: z.coerce.number().int().min(0).optional().default(0),

@@ -19,7 +19,7 @@ import { enqueueCompetitorResearch } from '../queues/competitor-research.js';
 const log = createLogger({ name: 'competitors' });
 
 const ProfileResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   domain: z.string().nullable(),
   aliases: z.array(z.string()),
@@ -27,9 +27,9 @@ const ProfileResponse = z.object({
 });
 
 const InsightResponse = z.object({
-  id: z.string().uuid(),
-  competitorProfileId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  competitorProfileId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
   category: z.string(),
   status: z.string(),
   title: z.string(),
@@ -114,9 +114,9 @@ export const competitorRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'opportunities:write' },
       preHandler: server.requirePermission('opportunities:write'),
       schema: {
-        params: z.object({ competitorId: z.string().uuid() }),
+        params: z.object({ competitorId: z.string().guid() }),
         body: z.object({
-          opportunityId: z.string().uuid().optional(),
+          opportunityId: z.string().guid().optional(),
           seedUrls: z.array(z.string().url()).max(20).optional(),
         }),
         response: { 202: z.object({ jobId: z.string().nullable(), status: z.literal('queued') }) },
@@ -158,8 +158,8 @@ export const competitorRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'opportunities:read' },
       preHandler: server.requirePermission('opportunities:read'),
       schema: {
-        params: z.object({ competitorId: z.string().uuid() }),
-        querystring: z.object({ opportunityId: z.string().uuid().optional() }),
+        params: z.object({ competitorId: z.string().guid() }),
+        querystring: z.object({ opportunityId: z.string().guid().optional() }),
         response: { 200: z.object({ items: z.array(InsightResponse) }) },
       },
     },
@@ -208,7 +208,7 @@ export const competitorRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'opportunities:read' },
       preHandler: server.requirePermission('opportunities:read'),
       schema: {
-        params: z.object({ opportunityId: z.string().uuid() }),
+        params: z.object({ opportunityId: z.string().guid() }),
         response: { 200: z.object({ items: z.array(InsightResponse) }) },
       },
     },

@@ -21,20 +21,20 @@ export const KAM_SESSION_SOURCES = [
 ] as const;
 
 export const KamSessionCreate = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   title: z.string().max(300).optional(),
   heldAt: z.string().datetime(),
   sourceType: z.enum(KAM_SESSION_SOURCES),
   sourceRef: z.string().max(2000).optional(),
   attendees: z.array(z.string().max(200)).max(100).optional(),
-  consultantIds: z.array(z.string().uuid()).max(100).optional(),
+  consultantIds: z.array(z.string().guid()).max(100).optional(),
   transcriptText: z.string().max(500_000).optional(),
 });
 export type KamSessionCreate = z.infer<typeof KamSessionCreate>;
 
 export const KamSessionDetail = z.object({
-  id: z.string().uuid(),
-  companyId: z.string().uuid(),
+  id: z.string().guid(),
+  companyId: z.string().guid(),
   title: z.string().nullable(),
   heldAt: z.string(),
   sourceType: z.enum(KAM_SESSION_SOURCES),
@@ -103,16 +103,16 @@ export const KamSessionDraftPatch = z.object({
 });
 
 export const KamSessionDraftDetail = z.object({
-  id: z.string().uuid(),
-  companyId: z.string().uuid(),
-  sessionId: z.string().uuid(),
+  id: z.string().guid(),
+  companyId: z.string().guid(),
+  sessionId: z.string().guid(),
   status: z.enum(['pending', 'approved', 'rejected']),
   source: z.string(),
   noteDraft: z.unknown(),
   initiativeDrafts: z.unknown(),
   taskDrafts: z.unknown(),
   lowConfidence: z.unknown(),
-  reviewedById: z.string().uuid().nullable(),
+  reviewedById: z.string().guid().nullable(),
   reviewedAt: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -123,8 +123,8 @@ export type KamSessionDraftList = z.infer<typeof KamSessionDraftList>;
 
 /** Result of approving a draft — the canonical rows it committed. */
 export const KamDraftApproveResult = z.object({
-  sessionId: z.string().uuid(),
-  createdInitiativeIds: z.array(z.string().uuid()),
-  createdTaskIds: z.array(z.string().uuid()),
+  sessionId: z.string().guid(),
+  createdInitiativeIds: z.array(z.string().guid()),
+  createdTaskIds: z.array(z.string().guid()),
 });
 export type KamDraftApproveResult = z.infer<typeof KamDraftApproveResult>;

@@ -15,16 +15,16 @@ export const CaseStatus = z.enum([
 export type CaseStatus = z.infer<typeof CaseStatus>;
 
 export const ServiceCase = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   number: z.string(),
   subject: z.string().min(1).max(255),
   description: z.string().max(5000).nullable(),
   priority: CasePriority,
   status: CaseStatus,
-  accountId: z.string().uuid().nullable(),
-  contactId: z.string().uuid().nullable(),
-  ownerId: z.string().uuid().nullable(),
+  accountId: z.string().guid().nullable(),
+  contactId: z.string().guid().nullable(),
+  ownerId: z.string().guid().nullable(),
   ownerName: z.string().nullable(),
   source: z.string().max(50),
   satisfaction: z.number().int().min(1).max(5).nullable(),
@@ -39,7 +39,7 @@ export type ServiceCase = z.infer<typeof ServiceCase>;
 export const ServiceCaseFilter = z.object({
   status: CaseStatus.optional(),
   priority: CasePriority.optional(),
-  ownerId: z.string().uuid().optional(),
+  ownerId: z.string().guid().optional(),
   search: z.string().max(100).optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),

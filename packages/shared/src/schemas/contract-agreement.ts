@@ -41,15 +41,15 @@ export const ContractFieldProvenance = z.object({
   label: z.string().min(1),
   hint: z.string().min(1),
   confidence: z.number().min(0).max(1).nullable(),
-  sourceFileId: z.string().uuid().nullable(),
+  sourceFileId: z.string().guid().nullable(),
   sourceFileName: z.string().nullable(),
-  sourceExtractionId: z.string().uuid().nullable(),
+  sourceExtractionId: z.string().guid().nullable(),
   updatedAt: z.string().datetime(),
 });
 export type ContractFieldProvenance = z.infer<typeof ContractFieldProvenance>;
 
 export const ContractAgreement = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountKey: z.string().min(1),
   kind: ContractKind,
   reference: z.string().min(1).max(255),
@@ -64,10 +64,10 @@ export const ContractAgreement = z.object({
   status: ContractStatus,
   notes: z.string().max(4000).nullable(),
   // Hosted source document (uploaded MSA/rate-card) + its name for a view link.
-  sourceFileId: z.string().uuid().nullable(),
+  sourceFileId: z.string().guid().nullable(),
   sourceFileName: z.string().nullable(),
-  sourceExtractionId: z.string().uuid().nullable(),
-  fieldSources: z.record(ContractFieldProvenance).default({}),
+  sourceExtractionId: z.string().guid().nullable(),
+  fieldSources: z.record(z.string(), ContractFieldProvenance).default({}),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -87,8 +87,8 @@ export const ContractAgreementCreate = z.object({
   nextRateReviewAt: z.string().datetime().nullable().optional(),
   status: ContractStatus.default('active'),
   notes: z.string().max(4000).nullable().optional(),
-  sourceFileId: z.string().uuid().nullable().optional(),
-  sourceExtractionId: z.string().uuid().nullable().optional(),
+  sourceFileId: z.string().guid().nullable().optional(),
+  sourceExtractionId: z.string().guid().nullable().optional(),
 });
 export type ContractAgreementCreate = z.infer<typeof ContractAgreementCreate>;
 
@@ -106,7 +106,7 @@ export const ContractAgreementPatch = z
     nextRateReviewAt: z.string().datetime().nullable().optional(),
     status: ContractStatus.optional(),
     notes: z.string().max(4000).nullable().optional(),
-    sourceFileId: z.string().uuid().nullable().optional(),
+    sourceFileId: z.string().guid().nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'PATCH body must contain at least one field',
@@ -151,14 +151,14 @@ export const ContractExtractionReviewStatus = z.enum(['needs_review', 'approved'
 export type ContractExtractionReviewStatus = z.infer<typeof ContractExtractionReviewStatus>;
 
 export const ContractExtractionResult = z.object({
-  id: z.string().uuid(),
-  fileId: z.string().uuid(),
-  sourceFileId: z.string().uuid(),
+  id: z.string().guid(),
+  fileId: z.string().guid(),
+  sourceFileId: z.string().guid(),
   sourceFileName: z.string().nullable(),
   accountKey: z.string().min(1).nullable(),
   status: ContractExtractionStatus,
   reviewStatus: ContractExtractionReviewStatus,
-  approvedAgreementId: z.string().uuid().nullable(),
+  approvedAgreementId: z.string().guid().nullable(),
   draft: ContractExtractionDraft.nullable(),
   confidenceBps: z.number().int().min(0).max(10_000).nullable(),
   warnings: z.array(z.string()).max(50),

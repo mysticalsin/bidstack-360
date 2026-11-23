@@ -95,7 +95,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/workflows/:id',
     {
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: Workflow } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: Workflow } },
     },
     async (req) => {
       const row = await prisma.workflow.findFirst({
@@ -112,7 +112,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     '/workflows/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: WorkflowCreate.partial(),
         response: { 200: Workflow },
       },
@@ -192,7 +192,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/workflows/:id',
     {
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const existing = await prisma.workflow.findFirst({
@@ -216,8 +216,8 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
-        body: z.object({ input: z.record(z.unknown()).default({}) }),
+        params: z.object({ id: z.string().guid() }),
+        body: z.object({ input: z.record(z.string(), z.unknown()).default({}) }),
         response: { 200: WorkflowRun },
       },
     },
@@ -294,7 +294,7 @@ export const workflowRoutes: FastifyPluginAsyncZod = async (server) => {
     '/workflows/:id/runs',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         querystring: z.object({ limit: z.coerce.number().int().min(1).max(100).default(20) }),
         response: { 200: z.object({ items: z.array(WorkflowRun) }) },
       },

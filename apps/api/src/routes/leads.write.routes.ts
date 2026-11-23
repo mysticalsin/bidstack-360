@@ -133,7 +133,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: LeadPatch,
         response: { 200: LeadDetail },
       },
@@ -258,7 +258,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: LeadConvertBody,
         response: { 200: LeadConvertResult },
       },
@@ -350,7 +350,7 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
     {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

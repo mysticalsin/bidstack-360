@@ -115,7 +115,7 @@ export const bidWorkspaceRoutes: FastifyPluginAsyncZod = async (server) => {
           200: z.object({
             items: z.array(
               z.object({
-                id: z.string().uuid(),
+                id: z.string().guid(),
                 requirement: z.string(),
                 response: z.string().nullable(),
                 status: z.enum(['pending', 'compliant', 'partial', 'non_compliant']),

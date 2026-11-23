@@ -14,16 +14,16 @@ const ROLE_WITH_PERMISSIONS = {
 } satisfies Prisma.RoleInclude;
 
 const RoleSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   description: z.string().nullable(),
   isSystem: z.boolean(),
   createdAt: z.string().datetime(),
-  permissions: z.array(z.object({ id: z.string().uuid(), key: z.string(), name: z.string() })),
+  permissions: z.array(z.object({ id: z.string().guid(), key: z.string(), name: z.string() })),
 });
 
 const PermissionSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   key: z.string(),
   name: z.string(),
   description: z.string().nullable(),
@@ -85,7 +85,7 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
         body: z.object({
           name: z.string().min(1).max(100),
           description: z.string().max(500).optional(),
-          permissionIds: z.array(z.string().uuid()).default([]),
+          permissionIds: z.array(z.string().guid()).default([]),
         }),
         response: { 201: RoleSchema },
       },
@@ -144,11 +144,11 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: z.object({
           name: z.string().min(1).max(100).optional(),
           description: z.string().max(500).optional(),
-          permissionIds: z.array(z.string().uuid()).optional(),
+          permissionIds: z.array(z.string().guid()).optional(),
         }),
         response: { 200: RoleSchema },
       },
@@ -249,7 +249,7 @@ export const roleRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('settings:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.void() },
       },
     },

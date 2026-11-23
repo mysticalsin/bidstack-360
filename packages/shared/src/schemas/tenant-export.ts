@@ -19,10 +19,10 @@ export type TenantExportStatus = z.infer<typeof TenantExportStatus>;
  * Number cannot safely hold archive sizes above 2^53.
  */
 export const TenantExportView = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   status: TenantExportStatus,
-  requestedById: z.string().uuid(),
+  requestedById: z.string().guid(),
   sizeBytes: z.string().nullable(),
   downloadUrl: z.string().url().nullable(),
   expiresAt: z.string().datetime().nullable(),
@@ -41,25 +41,25 @@ export type TenantExportListPage = z.infer<typeof TenantExportListPage>;
 
 /** Cursor + limit for the list endpoint (keyset on createdAt-desc id). */
 export const TenantExportListQuery = z.object({
-  cursor: z.string().uuid().optional(),
+  cursor: z.string().guid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type TenantExportListQuery = z.infer<typeof TenantExportListQuery>;
 
 /** Path params for every /orgs/:orgId/export* route. */
 export const TenantExportOrgParams = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
 });
 export type TenantExportOrgParams = z.infer<typeof TenantExportOrgParams>;
 
 export const TenantExportIdParams = TenantExportOrgParams.extend({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 export type TenantExportIdParams = z.infer<typeof TenantExportIdParams>;
 
 /** Job payload carried on the `tenant-export` queue. */
 export const TenantExportJob = z.object({
-  exportId: z.string().uuid(),
-  orgId: z.string().uuid(),
+  exportId: z.string().guid(),
+  orgId: z.string().guid(),
 });
 export type TenantExportJob = z.infer<typeof TenantExportJob>;

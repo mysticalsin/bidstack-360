@@ -22,7 +22,7 @@ const TypeEnum = z.enum(KAM_TASK_TYPES);
 
 export const KamTaskCreate = z.object({
   title: z.string().min(1).max(300),
-  assigneeId: z.string().uuid().optional(),
+  assigneeId: z.string().guid().optional(),
   dueDate: z.string().datetime().optional(),
   type: TypeEnum.optional(),
 });
@@ -31,20 +31,20 @@ export type KamTaskCreate = z.infer<typeof KamTaskCreate>;
 export const KamTaskPatch = z.object({
   title: z.string().min(1).max(300).optional(),
   status: StatusEnum.optional(),
-  assigneeId: z.string().uuid().nullable().optional(),
+  assigneeId: z.string().guid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   type: TypeEnum.nullable().optional(),
 });
 export type KamTaskPatch = z.infer<typeof KamTaskPatch>;
 
 export const KamTaskDetail = z.object({
-  id: z.string().uuid(),
-  initiativeId: z.string().uuid().nullable(),
-  accountId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  initiativeId: z.string().guid().nullable(),
+  accountId: z.string().guid().nullable(),
   title: z.string(),
   status: StatusEnum,
   type: z.string().nullable(),
-  assigneeId: z.string().uuid().nullable(),
+  assigneeId: z.string().guid().nullable(),
   dueDate: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -64,11 +64,11 @@ export const KamAccountTodoItem = KamTaskDetail.extend({
  * overloaded) without hard-blocking task creation.
  */
 export const KamAccountTodos = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   openCount: z.number().int(),
   doneCount: z.number().int(),
   items: z.array(KamAccountTodoItem),
-  staleInitiativeIds: z.array(z.string().uuid()),
-  overloadedInitiativeIds: z.array(z.string().uuid()),
+  staleInitiativeIds: z.array(z.string().guid()),
+  overloadedInitiativeIds: z.array(z.string().guid()),
 });
 export type KamAccountTodos = z.infer<typeof KamAccountTodos>;

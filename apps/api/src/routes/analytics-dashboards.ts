@@ -27,8 +27,8 @@ import {
   type DbDashboard,
 } from './analytics-dashboards.helpers.js';
 
-const IdParam = z.object({ id: z.string().uuid() });
-const WidgetParams = z.object({ id: z.string().uuid(), widgetId: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
+const WidgetParams = z.object({ id: z.string().guid(), widgetId: z.string().guid() });
 
 export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) => {
   async function isOrgAdmin(req: FastifyRequest): Promise<boolean> {

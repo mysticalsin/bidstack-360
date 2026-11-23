@@ -40,7 +40,7 @@ function sanitizeCrewLayout(input: Record<string, string>): Record<string, strin
 }
 
 const StoryMatch = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   title: z.string(),
   client: z.string(),
   industry: z.string(),
@@ -52,7 +52,7 @@ const StoryMatch = z.object({
 });
 
 const DraftSection = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   order: z.number().int(),
   title: z.string(),
   content: z.string(),
@@ -187,7 +187,7 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
           200: z.object({
             items: z.array(
               z.object({
-                id: z.string().uuid(),
+                id: z.string().guid(),
                 text: z.string(),
                 category: z.string(),
                 priority: z.string(),
@@ -242,7 +242,7 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         params: WorkspaceParams,
         response: {
-          200: z.object({ proposalId: z.string().uuid(), sections: z.array(DraftSection) }),
+          200: z.object({ proposalId: z.string().guid(), sections: z.array(DraftSection) }),
         },
       },
     },
@@ -271,7 +271,7 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: server.requirePermission('documents:write'),
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
-        params: WorkspaceParams.extend({ sectionId: z.string().uuid() }),
+        params: WorkspaceParams.extend({ sectionId: z.string().guid() }),
         body: z.object({ content: z.string().max(100_000), humanReviewed: z.boolean() }),
         response: { 200: DraftSection },
       },
@@ -309,7 +309,7 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: server.requirePermission('documents:read'),
       schema: {
         params: WorkspaceParams,
-        response: { 200: z.object({ layout: z.record(z.string()) }) },
+        response: { 200: z.object({ layout: z.record(z.string(), z.string()) }) },
       },
     },
     async (req, reply) => {
@@ -332,8 +332,8 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
       schema: {
         params: WorkspaceParams,
-        body: z.object({ layout: z.record(z.string()) }),
-        response: { 200: z.object({ layout: z.record(z.string()) }) },
+        body: z.object({ layout: z.record(z.string(), z.string()) }),
+        response: { 200: z.object({ layout: z.record(z.string(), z.string()) }) },
       },
     },
     async (req, reply) => {
@@ -369,7 +369,7 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
           200: z.object({
             orchestration: z
               .object({
-                id: z.string().uuid(),
+                id: z.string().guid(),
                 state: z.string(),
                 currentPhase: z.string().nullable(),
               })

@@ -13,7 +13,7 @@ import { Prisma, prisma } from '@bidstack/db';
 
 const WorkloadOwner = z.object({
   /** null = the unassigned bucket (open bids/tasks nobody owns). */
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   /** null name+email with a non-null ownerId = a departed owner still holding bids. */
   name: z.string().nullable(),
   email: z.string().nullable(),

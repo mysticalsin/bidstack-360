@@ -34,7 +34,7 @@ export const kamReportRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:read'),
       schema: {
-        params: z.object({ companyId: z.string().uuid() }),
+        params: z.object({ companyId: z.string().guid() }),
         querystring: z.object({ staleDays: z.coerce.number().int().min(1).max(365).default(14) }),
         response: { 200: KamAccountKpi },
       },

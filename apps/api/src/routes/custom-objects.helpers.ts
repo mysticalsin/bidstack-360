@@ -8,8 +8,8 @@ import { z } from 'zod';
 
 import type * as svc from '../services/custom-object.service.js';
 
-export const IdParam = z.object({ id: z.string().uuid() });
-export const IdAndRecordParam = z.object({ id: z.string().uuid(), rid: z.string().uuid() });
+export const IdParam = z.object({ id: z.string().guid() });
+export const IdAndRecordParam = z.object({ id: z.string().guid(), rid: z.string().guid() });
 
 /** Serialises a DB def row to the API response shape. */
 export function serializeDef(

@@ -28,7 +28,7 @@ export const DashboardWidget = z.object({
   y: z.number().int().nonnegative(),
   w: z.number().int().min(1),
   h: z.number().int().min(1),
-  config: z.record(z.unknown()).default({}),
+  config: z.record(z.string(), z.unknown()).default({}),
 });
 export type DashboardWidget = z.infer<typeof DashboardWidget>;
 
@@ -50,7 +50,7 @@ export type SignalFactor = z.infer<typeof SignalFactor>;
 export const CompanyHealth = z.object({
   score: z.number().int().min(0).max(100),
   band: HealthBand,
-  counts: z.record(z.number().int().nonnegative()),
+  counts: z.record(z.string(), z.number().int().nonnegative()),
   // Optional for wire-compat with snapshots persisted before factors shipped.
   factors: z.array(SignalFactor).optional(),
 });
@@ -147,7 +147,7 @@ export const OpenDataSignal = z.object({
   observedAt: z.string().datetime(),
   confidence: z.number().min(0).max(1),
   sourceAttribution: z.array(SourceAttribution).default([]),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type OpenDataSignal = z.infer<typeof OpenDataSignal>;
 
@@ -300,7 +300,7 @@ export type DataQualityIssue = z.infer<typeof DataQualityIssue>;
 
 export const DataQualityReport = z.object({
   generatedAt: z.string().datetime(),
-  counts: z.record(z.number().int().nonnegative()),
+  counts: z.record(z.string(), z.number().int().nonnegative()),
   issues: z.array(DataQualityIssue),
 });
 export type DataQualityReport = z.infer<typeof DataQualityReport>;

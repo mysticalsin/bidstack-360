@@ -5,7 +5,7 @@ export const BidScoreCriterion = z.object({
   value: z.number().int().min(0).max(5),
 });
 
-export const BidScoreCriteria = z.record(z.number().int().min(0).max(5));
+export const BidScoreCriteria = z.record(z.string(), z.number().int().min(0).max(5));
 
 export const BidScoreCategory = z.enum(['strategic', 'technical', 'commercial', 'risk']);
 
@@ -21,7 +21,7 @@ export const BidScoreOverride = z.object({
 });
 
 export const BidScoreCreate = z.object({
-  opportunityId: z.string().uuid(),
+  opportunityId: z.string().guid(),
   criteria: BidScoreCriteria,
   notes: z.string().max(5000).optional(),
   decision: BidScoreDecision.optional().default('follow'),
@@ -34,22 +34,22 @@ export const BidScoreUpdate = z.object({
 });
 
 export const BidScoreItem = z.object({
-  id: z.string().uuid(),
-  opportunityId: z.string().uuid(),
-  scoredBy: z.string().uuid(),
+  id: z.string().guid(),
+  opportunityId: z.string().guid(),
+  scoredBy: z.string().guid(),
   version: z.number().int(),
   criteria: BidScoreCriteria,
   totalScore: z.number().int(),
-  categoryScores: z.record(z.number()),
+  categoryScores: z.record(z.string(), z.number()),
   weightedSum: z.number(),
   totalWeight: z.number(),
   aiSuggested: z.boolean(),
-  memosPolicies: z.array(z.string().uuid()),
+  memosPolicies: z.array(z.string().guid()),
   recommendation: BidScoreRecommendation,
   notes: z.string().nullable(),
   // Below-threshold override audit trail (director/VP visibility surface).
   overrideJustification: z.string().nullable(),
-  overriddenBy: z.string().uuid().nullable(),
+  overriddenBy: z.string().guid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -59,23 +59,23 @@ export const BidScoreList = z.object({
 });
 
 export const BidScoreFilter = z.object({
-  opportunityId: z.string().uuid().optional(),
+  opportunityId: z.string().guid().optional(),
   recommendation: BidScoreRecommendation.optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
 
 export const BidScoreAICalibrate = z.object({
-  opportunityId: z.string().uuid(),
+  opportunityId: z.string().guid(),
 });
 
 export const BidScoreAICalibrateResponse = z.object({
   criteria: BidScoreCriteria,
   totalScore: z.number().int(),
-  categoryScores: z.record(z.number()),
+  categoryScores: z.record(z.string(), z.number()),
   recommendation: BidScoreRecommendation,
   reasoning: z.string(),
-  memosPolicies: z.array(z.string().uuid()),
+  memosPolicies: z.array(z.string().guid()),
 });
 
 export const BidScoreDefendResponse = z.object({

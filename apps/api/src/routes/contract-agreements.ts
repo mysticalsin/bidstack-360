@@ -193,7 +193,7 @@ function serialize(
   };
 }
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 const toDate = (v: string | null | undefined): Date | null | undefined =>
   v === undefined ? undefined : v === null ? null : new Date(v);
 
@@ -652,7 +652,7 @@ export const contractAgreementRoutes: FastifyPluginAsyncZod = async (server) => 
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('accounts:write')],
       schema: {
-        body: z.object({ fileId: z.string().uuid() }),
+        body: z.object({ fileId: z.string().guid() }),
         response: { 200: ContractExtractionResult },
       },
     },

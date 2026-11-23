@@ -28,7 +28,7 @@ import {
   serializeRun,
 } from './analytics-reports.helpers.js';
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 
 export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
   /** Dry-compile so invalid queries are rejected at save time, not run time. */
@@ -352,7 +352,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/reports/:id/runs/:runId',
     { preHandler: [server.requirePermission('reports:read')], 
       schema: {
-        params: z.object({ id: z.string().uuid(), runId: z.string().uuid() }),
+        params: z.object({ id: z.string().guid(), runId: z.string().guid() }),
         response: { 200: AnalyticsReportRun },
       },
     },

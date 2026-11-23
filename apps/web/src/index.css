@@ -1751,6 +1751,16 @@ select:focus-visible {
   margin-top: 4px;
   max-width: 68ch;
 }
+/* Larger than the command-center hero line (one line, ~43px tall on a phone)
+   so this paragraph stays the largest text on /dashboard. It ships in the
+   shell bundle; see DashboardFirstPaint. */
+.dashboard-lead {
+  color: var(--fg-primary);
+  font-size: 18px;
+  line-height: 1.45;
+  margin: 8px 0 0;
+  max-width: 34ch;
+}
 .page-actions {
   display: flex;
   gap: 8px;

@@ -88,7 +88,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     '/contacts/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: Contact },
       },
     },
@@ -156,7 +156,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('contacts:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: ContactPatch,
         response: { 200: Contact },
       },
@@ -234,7 +234,7 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('contacts:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

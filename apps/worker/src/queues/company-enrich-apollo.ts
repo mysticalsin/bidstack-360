@@ -45,7 +45,7 @@ const DEFAULT_EXECUTIVE_TITLES = [
 const DEFAULT_EXECUTIVE_SENIORITIES = ['owner', 'founder', 'c_suite', 'vp', 'head'];
 
 export const ApolloEnrichJobData = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   companyName: z.string().min(1),
   domain: z.string().min(1).optional(),
   signature: z.string().min(1).optional(),

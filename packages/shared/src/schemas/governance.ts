@@ -14,10 +14,10 @@ export const GovernanceMeetingType = z.enum([
 export type GovernanceMeetingType = z.infer<typeof GovernanceMeetingType>;
 
 export const GovernanceAction = z.object({
-  id: z.string().uuid(),
-  meetingId: z.string().uuid(),
+  id: z.string().guid(),
+  meetingId: z.string().guid(),
   description: z.string().min(1).max(2000),
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   ownerName: z.string().nullable(),
   dueDate: z.string().datetime().nullable(),
   status: GovernanceStatus,
@@ -26,7 +26,7 @@ export const GovernanceAction = z.object({
 export type GovernanceAction = z.infer<typeof GovernanceAction>;
 
 export const GovernanceMeeting = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountKey: z.string().min(1),
   meetingType: GovernanceMeetingType,
   date: z.string().datetime(),
@@ -40,7 +40,7 @@ export type GovernanceMeeting = z.infer<typeof GovernanceMeeting>;
 
 export const GovernanceActionInput = z.object({
   description: z.string().min(1).max(2000),
-  ownerId: z.string().uuid().nullable().optional(),
+  ownerId: z.string().guid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   status: GovernanceStatus.default('open'),
 });
@@ -71,7 +71,7 @@ export type GovernanceMeetingPatch = z.infer<typeof GovernanceMeetingPatch>;
 export const GovernanceActionPatch = z
   .object({
     description: z.string().min(1).max(2000).optional(),
-    ownerId: z.string().uuid().nullable().optional(),
+    ownerId: z.string().guid().nullable().optional(),
     dueDate: z.string().datetime().nullable().optional(),
     status: GovernanceStatus.optional(),
   })

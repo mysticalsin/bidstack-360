@@ -51,7 +51,7 @@ const AgentFields = z.object({
 const AgentCreate = AgentFields.extend({ agentKey: AgentKey });
 
 const AgentResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   agentKey: z.string(),
   role: z.string(),
   goal: z.string(),
@@ -121,7 +121,7 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
     {
       preHandler: server.requireRole('admin'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: AgentFields,
         response: { 200: AgentResponse },
       },
@@ -148,7 +148,7 @@ export const crewAgentRoutes: FastifyPluginAsync = async (server) => {
     {
       preHandler: server.requireRole('admin'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

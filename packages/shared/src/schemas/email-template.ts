@@ -43,8 +43,8 @@ export const PLACEHOLDER_TOKEN_SET: ReadonlySet<string> = new Set(
 export const EmailTemplateCategory = z.string().max(40).nullable().optional();
 
 export const EmailTemplate = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string().min(1).max(80),
   subject: z.string().min(1).max(200),
   bodyHtml: z.string().min(1).max(50_000),
@@ -53,7 +53,7 @@ export const EmailTemplate = z.object({
   archived: z.boolean(),
   useCount: z.number().int().nonnegative(),
   lastUsedAt: z.string().datetime().nullable(),
-  createdById: z.string().uuid().nullable(),
+  createdById: z.string().guid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -85,12 +85,12 @@ export type EmailTemplateList = z.infer<typeof EmailTemplateList>;
  * before the rep clicks Send).
  */
 export const EmailTemplateRenderRequest = z.object({
-  templateId: z.string().uuid(),
+  templateId: z.string().guid(),
   context: z.object({
-    leadId: z.string().uuid().optional(),
-    accountId: z.string().uuid().optional(),
-    opportunityId: z.string().uuid().optional(),
-    contactId: z.string().uuid().optional(),
+    leadId: z.string().guid().optional(),
+    accountId: z.string().guid().optional(),
+    opportunityId: z.string().guid().optional(),
+    contactId: z.string().guid().optional(),
   }),
 });
 export type EmailTemplateRenderRequest = z.infer<typeof EmailTemplateRenderRequest>;

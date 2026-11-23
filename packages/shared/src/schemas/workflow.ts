@@ -23,23 +23,23 @@ export const WorkflowActionKind = z.enum([
 export type WorkflowActionKind = z.infer<typeof WorkflowActionKind>;
 
 export const WorkflowAction = z.object({
-  id: z.string().uuid(),
-  workflowId: z.string().uuid(),
+  id: z.string().guid(),
+  workflowId: z.string().guid(),
   kind: WorkflowActionKind,
-  config: z.record(z.unknown()).default({}),
+  config: z.record(z.string(), z.unknown()).default({}),
   sortOrder: z.number().int().default(0),
   createdAt: z.string().datetime(),
 });
 export type WorkflowAction = z.infer<typeof WorkflowAction>;
 
 export const Workflow = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string().min(1).max(255),
   description: z.string().max(2000).nullable(),
   active: z.boolean().default(true),
   triggerKind: WorkflowTriggerKind,
-  triggerConfig: z.record(z.unknown()).default({}),
+  triggerConfig: z.record(z.string(), z.unknown()).default({}),
   actions: z.array(WorkflowAction).default([]),
   runCount: z.number().int().default(0),
   lastRunAt: z.string().datetime().nullable(),
@@ -52,14 +52,14 @@ export const WorkflowRunStatus = z.enum(['running', 'succeeded', 'failed', 'canc
 export type WorkflowRunStatus = z.infer<typeof WorkflowRunStatus>;
 
 export const WorkflowRun = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  workflowId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  workflowId: z.string().guid(),
   status: WorkflowRunStatus,
   triggerRecordType: z.string().nullable(),
-  triggerRecordId: z.string().uuid().nullable(),
-  input: z.record(z.unknown()).default({}),
-  output: z.record(z.unknown()).default({}),
+  triggerRecordId: z.string().guid().nullable(),
+  input: z.record(z.string(), z.unknown()).default({}),
+  output: z.record(z.string(), z.unknown()).default({}),
   error: z.string().nullable(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime().nullable(),
@@ -79,7 +79,7 @@ export const WorkflowCreate = Workflow.omit({
     .array(
       z.object({
         kind: WorkflowActionKind,
-        config: z.record(z.unknown()).default({}),
+        config: z.record(z.string(), z.unknown()).default({}),
         sortOrder: z.number().int().default(0),
       }),
     )

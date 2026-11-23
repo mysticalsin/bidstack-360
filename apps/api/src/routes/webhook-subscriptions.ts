@@ -19,7 +19,7 @@ import {
 } from '../lib/serum-connector-policy.js';
 
 const WebhookSub = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   url: z.string(),
   events: z.array(z.string()),
   active: z.boolean(),
@@ -34,7 +34,7 @@ const WebhookSubCreated = WebhookSub.extend({
 });
 
 const WebhookDeliveryRecord = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   event: z.string(),
   statusCode: z.number().int().nullable(),
   success: z.boolean(),
@@ -189,7 +189,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     {
       preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: WebhookSubUpdate,
         response: { 200: WebhookSub },
       },
@@ -250,7 +250,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     {
       preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.void() },
       },
     },
@@ -284,7 +284,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
     {
       preHandler: server.requirePermission('webhooks:read'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         querystring: z.object({
           limit: z.coerce.number().int().min(1).max(100).default(50),
           before: z.string().datetime().optional(),
@@ -349,7 +349,7 @@ export const webhookSubscriptionsRoutes: FastifyPluginAsyncZod = async (server) 
       config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('webhooks:write'), requireHumanWebhookWrite],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: {
           200: z.object({
             success: z.boolean(),

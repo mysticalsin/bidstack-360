@@ -5,7 +5,7 @@ export const Sentiment = z.enum(['hot', 'warm', 'neutral', 'cold']);
 export type Sentiment = z.infer<typeof Sentiment>;
 
 export const Contact = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   customer: z.string().min(1).max(255),
   name: z.string().min(1).max(255),
   role: z.string().max(255).nullable(),
@@ -27,7 +27,7 @@ export type ContactCreate = z.infer<typeof ContactCreate>;
 export const ContactDetail = Contact.extend({
   relatedOpportunities: z.array(
     z.object({
-      id: z.string().uuid(),
+      id: z.string().guid(),
       code: z.string(),
       name: z.string(),
       stage: z.string(),
@@ -38,7 +38,7 @@ export const ContactDetail = Contact.extend({
   ),
   relatedTasks: z.array(
     z.object({
-      id: z.string().uuid(),
+      id: z.string().guid(),
       title: z.string(),
       status: z.string(),
       dueDate: z.string().datetime().nullable(),
@@ -47,7 +47,7 @@ export const ContactDetail = Contact.extend({
   ),
   relatedNotes: z.array(
     z.object({
-      id: z.string().uuid(),
+      id: z.string().guid(),
       title: z.string(),
       authorName: z.string().nullable(),
       createdAt: z.string().datetime(),
@@ -80,7 +80,7 @@ export const ContactPatch = z
 export const ContactFilter = z.object({
   customer: z.string().max(255).optional(),
   search: z.string().max(255).optional(),
-  cursor: z.string().uuid().optional(),
+  cursor: z.string().guid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type ContactFilter = z.infer<typeof ContactFilter>;

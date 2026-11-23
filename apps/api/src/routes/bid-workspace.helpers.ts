@@ -9,10 +9,10 @@ import type { ApprovalGate, ReviewIssue, SubmissionPackage } from '@bidstack/sha
 
 // ─── Shared param schemas ────────────────────────────────────────────────────
 
-export const WorkspaceParams = z.object({ opportunityId: z.string().uuid() });
+export const WorkspaceParams = z.object({ opportunityId: z.string().guid() });
 export const MatrixParams = z.object({
-  opportunityId: z.string().uuid(),
-  rowId: z.string().uuid(),
+  opportunityId: z.string().guid(),
+  rowId: z.string().guid(),
 });
 export const RequirementCreateResult = z.object({
   requirement: Requirement,

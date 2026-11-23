@@ -28,7 +28,7 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { formatMoney } from '@/lib/format';
-import { springSnap, springSoft } from '@/lib/motion';
+import { springSnap } from '@/lib/motion';
 import { useCurrencyStore } from '@/stores/currency';
 
 import type { Opportunity } from '@bidstack/shared';
@@ -84,13 +84,10 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   });
 
   return (
-    <motion.section
+    <section
       className="command-center"
       role="region"
       aria-label={t('orgHero.region.ariaLabel', 'Workspace command center')}
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={springSoft}
     >
       <HeroPanel
         summary={summary}
@@ -109,7 +106,7 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
         ))}
       </StaggerList>
       <HeroFooter summary={summary} report={report.data} t={t} />
-    </motion.section>
+    </section>
   );
 }
 

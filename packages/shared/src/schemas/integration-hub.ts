@@ -29,7 +29,7 @@ export const SendEmailRequest = z.object({
   html: z.string().optional(),
   /** Polymorphic CRM entity this email is linked to */
   entityType: z.enum(['deal', 'contact', 'lead']).optional(),
-  entityId: z.string().uuid().optional(),
+  entityId: z.string().guid().optional(),
 }).refine(
   (v) => v.text != null || v.html != null,
   { message: 'At least one of text or html is required' },
@@ -37,9 +37,9 @@ export const SendEmailRequest = z.object({
 export type SendEmailRequest = z.infer<typeof SendEmailRequest>;
 
 export const EmailMessageDto = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
   provider: z.enum(['GMAIL', 'OUTLOOK']),
   externalMessageId: z.string(),
   threadId: z.string().nullable(),
@@ -54,7 +54,7 @@ export const EmailMessageDto = z.object({
   openedAt: z.string().datetime().nullable(),
   clickedAt: z.string().datetime().nullable(),
   entityType: z.string().nullable(),
-  entityId: z.string().uuid().nullable(),
+  entityId: z.string().guid().nullable(),
   createdAt: z.string().datetime(),
 });
 export type EmailMessageDto = z.infer<typeof EmailMessageDto>;
@@ -89,7 +89,7 @@ export type IntegrationListResponse = z.infer<typeof IntegrationListResponse>;
 // ─── Slack ────────────────────────────────────────────────────────────────
 
 export const SlackChannelDto = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   channelId: z.string(),
   channelName: z.string(),
   isShared: z.boolean(),
@@ -99,7 +99,7 @@ export type SlackChannelDto = z.infer<typeof SlackChannelDto>;
 export const SlackPostMessageRequest = z.object({
   channelId: z.string().min(1),
   /** Slack Block Kit blocks (JSON). Falls back to text if blocks omitted. */
-  blocks: z.array(z.record(z.unknown())).optional(),
+  blocks: z.array(z.record(z.string(), z.unknown())).optional(),
   text: z.string().min(1).max(3000).optional(),
 }).refine(
   (v) => v.blocks != null || v.text != null,
@@ -123,7 +123,7 @@ export const ZapierSubscribeRequest = z.object({
 export type ZapierSubscribeRequest = z.infer<typeof ZapierSubscribeRequest>;
 
 export const ZapierSubscribeResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   eventType: z.string(),
   webhookUrl: z.string(),
   createdAt: z.string().datetime(),
@@ -136,7 +136,7 @@ export const ZapierAuthRequest = z.object({
 export type ZapierAuthRequest = z.infer<typeof ZapierAuthRequest>;
 
 export const ZapierAuthResponse = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   orgName: z.string(),
 });
 export type ZapierAuthResponse = z.infer<typeof ZapierAuthResponse>;
@@ -160,14 +160,14 @@ export type ZapierCreateContactAction = z.infer<typeof ZapierCreateContactAction
 
 export const ZapierLogActivityAction = z.object({
   entityType: z.enum(['deal', 'contact', 'lead']),
-  entityId: z.string().uuid(),
+  entityId: z.string().guid(),
   activityType: z.string().min(1).max(64),
   note: z.string().max(5000).optional(),
 });
 export type ZapierLogActivityAction = z.infer<typeof ZapierLogActivityAction>;
 
 export const ZapierActionResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   createdAt: z.string().datetime(),
 });
 export type ZapierActionResponse = z.infer<typeof ZapierActionResponse>;
