@@ -19,6 +19,15 @@ describe('formatExtractedMicros', () => {
     expect(formatExtractedMicros(Number.MAX_SAFE_INTEGER + 2)).toBe('amount not readable');
   });
 
+  it('prints a liability cap above about 9.007 billion units', () => {
+    // WHY: 9,007,199,255 units is 9_007_199_255_000_000 micros. That float is an exact
+    // integer, but it sits past Number.MAX_SAFE_INTEGER, so the review said
+    // "amount not readable" for a cap a reader can still name.
+    expect(formatExtractedMicros(9_007_199_255_000_000, 'EUR')).toBe('9,007,199,255 EUR');
+    expect(formatExtractedMicros(10_000_000_000_000_000, 'EUR')).toBe('10,000,000,000 EUR');
+    expect(formatExtractedMicros(10_000_000_000_500_000, 'USD')).toBe('10,000,000,000.50 USD');
+  });
+
   it('rounds an exact half cent away from zero on both signs', () => {
     // WHY: half-up and half-down disagree only when the remainder is exactly 5_000 micros.
     expect(formatExtractedMicros(1_005_000, 'USD')).toBe('1.01 USD');
