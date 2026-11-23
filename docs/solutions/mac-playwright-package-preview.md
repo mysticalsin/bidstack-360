@@ -94,7 +94,8 @@ e2e-mac-preview:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
     - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       with:
-        version: '10'
+        # Omit version. package.json packageManager is pnpm@10.27.0, and this
+        # action fails when both are set ("Multiple versions of pnpm specified").
         run_install: false
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
