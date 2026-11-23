@@ -161,12 +161,18 @@ export const envSchema = z.object({
   OAUTH_REFRESH_LOCK_WAIT_MS: z.coerce.number().int().positive().default(10_000),
   OAUTH_REFRESH_LOCK_POLL_MS: z.coerce.number().int().positive().default(250),
 
-  // OCR
+  // OCR. Local ocrmypdf/tesseract stay the default. When the Unlimited OCR URL
+  // is set, the worker sends scanned PDFs and images there instead.
   BIDSTACK_OCR_ENABLED: z.enum(['true', 'false']).default('false'),
   BIDSTACK_OCRMYPDF_BIN: z.string().default('ocrmypdf'),
   BIDSTACK_TESSERACT_BIN: z.string().default('tesseract'),
   BIDSTACK_OCR_TIMEOUT_MS: z.coerce.number().default(120_000),
   BIDSTACK_OCR_LANGUAGES: z.string().default('eng'),
+  BIDSTACK_UNLIMITED_OCR_URL: z.string().url().optional().or(z.literal('')),
+  BIDSTACK_UNLIMITED_OCR_MODEL: z.string().default('Unlimited-OCR-2'),
+  BIDSTACK_UNLIMITED_OCR_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  BIDSTACK_PDFTOPPM_BIN: z.string().default('pdftoppm'),
+  BIDSTACK_GHOSTSCRIPT_BIN: z.string().default('gs'),
 
   // OpenAPI / Swagger UI — enable with OPENAPI_DOCS_ENABLED=true (admin only)
   OPENAPI_DOCS_ENABLED: z.enum(['true', 'false']).default('false'),
