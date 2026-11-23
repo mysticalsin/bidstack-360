@@ -1382,7 +1382,11 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
+  /* Don't let the page name collapse when the search field and account
+     cluster fill the bar. min-width: 0 made "Companies" a 26px sliver at
+     1020px, just above the breakpoint that hides search. Narrow layouts
+     below still opt into shrinking. */
+  flex-shrink: 0;
   font-size: 13px;
   color: var(--fg-tertiary);
 }
@@ -1406,7 +1410,7 @@ select:focus-visible {
   padding: 6px 10px;
   border-radius: 8px;
   width: 280px;
-  min-width: 0;
+  min-width: 120px;
   flex: 0 1 280px;
   cursor: text;
   font-size: 13px;
@@ -2574,6 +2578,13 @@ select:focus-visible {
 .app-shell .page:has(> .page-bleed) {
   max-width: none;
 }
+/* The account name + email is the widest topbar cluster. Hide it before
+   the search field is squeezed under the page name. Avatar and sign-out stay. */
+@media (max-width: 1100px) {
+  .tb-user .who {
+    display: none;
+  }
+}
 @media (min-width: 768px) and (max-width: 900px) {
   .topbar {
     gap: 8px;
@@ -2586,6 +2597,7 @@ select:focus-visible {
   }
   .crumbs {
     flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     white-space: nowrap;
   }
@@ -2617,6 +2629,7 @@ select:focus-visible {
   }
   .crumbs {
     flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     white-space: nowrap;
   }
