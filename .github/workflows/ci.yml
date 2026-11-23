@@ -85,8 +85,16 @@ jobs:
       # apps/api/src` — most matches are *.integration.test.ts (covered by the
       # first glob), plus these plain-named suites that also hit a real DB.
       - name: Test (no DB — api, DB-dependent suites excluded)
+        # exec, not `pnpm test --`. pnpm inserts a `--` that vitest treats as
+        # the end of its options, so the excludes were ignored and every
+        # Postgres suite ran in this job.
+        # DATABASE_URL is a placeholder. Env parsing requires the string, and
+        # nothing is listening: suites that open a connection are excluded and
+        # run in the integration job.
+        env:
+          DATABASE_URL: postgres://bidstack:bidstack_test@127.0.0.1:1/bidstack_test
         run: >-
-          pnpm --filter @bidstack/api test --
+          pnpm --filter @bidstack/api exec cross-env NODE_ENV=test vitest run
           --exclude "**/*.integration.test.ts"
           --exclude "src/routes/audit-logs.test.ts"
           --exclude "src/routes/companies.test.ts"
@@ -98,6 +106,13 @@ jobs:
           --exclude "src/routes/crm/widgets.test.ts"
           --exclude "src/routes/notes.test.ts"
           --exclude "src/routes/opportunity-timeline.test.ts"
+          --exclude "src/routes/dust-integration.test.ts"
+          --exclude "src/routes/erp-integration.test.ts"
+          --exclude "src/plugins/request-id.test.ts"
+          --exclude "src/plugins/security-headers.test.ts"
+          --exclude "src/security/penetration.access-control.test.ts"
+          --exclude "src/security/penetration.injection-upload.test.ts"
+          --exclude "src/security/penetration.webhook.test.ts"
 
       - name: Build
         run: pnpm -r build
