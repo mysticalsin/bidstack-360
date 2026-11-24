@@ -2400,8 +2400,10 @@ model Activity {
   body           Json?             @default("{}")
   // When the underlying event happened (may differ from DB insert time)
   occurredAt     DateTime          @default(now()) @map("occurred_at") @db.Timestamptz(6)
-  // Idempotency key — callers that replay events set this to avoid duplicates
-  idempotencyKey String?           @unique @map("idempotency_key") @db.VarChar(128)
+  // Idempotency key — callers that replay events set this to avoid duplicates.
+  // Unique with orgId (activities_org_idempotency_key). A global unique let one
+  // org's key hide another org's insert.
+  idempotencyKey String?           @map("idempotency_key") @db.VarChar(128)
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -2411,6 +2413,7 @@ model Activity {
   owner     User?              @relation(fields: [ownerId], references: [id])
   attendees ActivityAttendee[]
 
+  @@unique([orgId, idempotencyKey], map: "activities_org_idempotency_key")
   // Primary timeline scan: entity feed ordered by occurrence time
   @@index([orgId, entityType, entityId, occurredAt(sort: Desc)], map: "activities_org_entity_occurred_idx")
   // Actor feed (e.g. all things user X did)
