@@ -348,8 +348,17 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
           : Promise.resolve(null),
       ]);
 
-      // Resolve territory
+      // Resolve territory. An explicit id is a global FK: it must be this
+      // org's live territory, or the patch stores the other org's id and the
+      // response returns that territory's name.
       let territoryId: string | null | undefined = req.body.territoryId;
+      if (typeof req.body.territoryId === 'string') {
+        const ownedTerritory = await prisma.territory.findFirst({
+          where: { id: req.body.territoryId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!ownedTerritory) throw server.httpErrors.badRequest('Invalid territory');
+      }
       if (needsTerritoryLookup) {
         territoryId = patchTerritory?.id ?? null;
       }
