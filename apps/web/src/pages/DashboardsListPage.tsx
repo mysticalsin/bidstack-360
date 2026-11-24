@@ -228,8 +228,9 @@ export function DashboardsListPage() {
                     : `${t('dashboardsList.deleteAria', 'Delete dashboard {{name}}', { name: d.name })} — ${readOnlyHint}`
                 }
                 className={cn(
-                  'absolute top-2 right-2 hidden group-hover:flex items-center justify-center',
+                  'absolute top-2 right-2 flex items-center justify-center',
                   'w-7 h-7 rounded-lg text-[var(--fg-tertiary)]',
+                  'opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 focus-visible:opacity-100',
                   'hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors',
                   'min-w-[44px] min-h-[44px]',
                   'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-[var(--fg-tertiary)]',
