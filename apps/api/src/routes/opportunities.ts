@@ -28,6 +28,7 @@ import {
   getAccessScope,
   scopeCacheTag,
 } from '../lib/access-scope.js';
+import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
@@ -307,6 +308,18 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
         where: await visibleOpportunityWhere(req.auth, req.params.id),
       });
       if (!before) throw server.httpErrors.notFound('Opportunity not found');
+
+      // Same gate as contacts, companies, and leads. The value's unique key is
+      // this org's, but the definition FK is global, so a foreign id would
+      // store and would cascade-delete with the other org's field.
+      if (req.body.customFieldValues?.length) {
+        const foreign = await foreignCustomFieldDefinitions(
+          req.auth.orgId,
+          'opportunity',
+          req.body.customFieldValues.map((v) => v.definitionId),
+        );
+        if (foreign.length > 0) throw server.httpErrors.badRequest('Unknown custom field definition');
+      }
 
       // Optimistic-concurrency fail-fast: cheap check before the lookups below
       // run. The transaction's CAS updateMany re-checks atomically, so this
