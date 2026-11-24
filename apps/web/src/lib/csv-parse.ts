@@ -11,7 +11,7 @@ export interface ParsedCsv {
 
 /** Split raw CSV text into a header row + record objects keyed by header. */
 export function parseCsv(text: string): ParsedCsv {
-  const matrix = toMatrix(text);
+  const matrix = toMatrix(text, sniffDelimiter(text));
   const headerRow = matrix[0];
   if (!headerRow) return { headers: [], rows: [] };
 
@@ -34,8 +34,34 @@ export function parseCsv(text: string): ParsedCsv {
   return { headers, rows };
 }
 
+/**
+ * The separator is whatever the header uses most often outside quotes.
+ * A tie stays a comma, which is what every file this app exports uses.
+ * Excel in a comma-decimal locale writes ';' and never a comma between cells.
+ */
+function sniffDelimiter(text: string): ',' | ';' | '\t' {
+  const header = text.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/, 1)[0] ?? '';
+  const counts = { ',': 0, ';': 0, '\t': 0 };
+  let inQuotes = false;
+  for (let i = 0; i < header.length; i++) {
+    const ch = header[i];
+    if (ch === '"') {
+      if (inQuotes && header[i + 1] === '"') {
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (!inQuotes && (ch === ',' || ch === ';' || ch === '\t')) counts[ch] += 1;
+  }
+  if (counts[';'] > counts[','] && counts[';'] > counts['\t']) return ';';
+  if (counts['\t'] > counts[','] && counts['\t'] > counts[';']) return '\t';
+  return ',';
+}
+
 /** Tokenize CSV text into a 2D array of raw cell strings. */
-function toMatrix(text: string): string[][] {
+function toMatrix(text: string, delimiter: ',' | ';' | '\t'): string[][] {
   const matrix: string[][] = [];
   let field = '';
   let row: string[] = [];
@@ -62,7 +88,7 @@ function toMatrix(text: string): string[][] {
 
     if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ',') {
+    } else if (ch === delimiter) {
       row.push(field);
       field = '';
     } else if (ch === '\n') {
