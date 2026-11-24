@@ -189,6 +189,40 @@ describe('AuthProvider — stub mode (no publishableKey)', () => {
     expect(screen.getByTestId('email').textContent).toBe('none');
   });
 
+  it('replaces the Jane Smith fixture with the member /me returns', async () => {
+    // The chrome used to keep jane@mantu.com even after the API had resolved
+    // the real stub session (the first user in the org). A new workspace then
+    // looked like a different person than Identity & roles.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/v1/me')) {
+          return jsonResponse({
+            id: 'user-avery',
+            email: 'avery.founder@harbor-synthetic.example',
+            name: 'Avery Founder',
+            role: 'admin',
+            roles: ['Admin'],
+          });
+        }
+        return jsonResponse({ message: 'not found' }, 404);
+      }),
+    );
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('email').textContent).toBe(
+        'avery.founder@harbor-synthetic.example',
+      );
+    });
+  });
+
   it('treats empty string as missing key (defensive against misconfigured CI)', () => {
     localStorage.setItem('bidstack:session', 'stub');
     // Vite exposes unset env vars as undefined, but a misconfigured CI could
