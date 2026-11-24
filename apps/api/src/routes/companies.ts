@@ -24,6 +24,35 @@ import { syncAccountFinancialsSchedule } from '../services/account-financials/sc
 /** Shown instead of the name of a company outside the caller's access scope. */
 const RESTRICTED_COMPANY_NAME = 'Restricted company';
 
+/**
+ * True when setting `companyId.parentId = parentId` would close a cycle.
+ *
+ * The walk outside the transaction is not enough: two parents can each look
+ * acyclic and then point at each other. `pg_advisory_xact_lock` serializes
+ * parent edits for this org, and the walk below re-reads the chain after that
+ * lock, so the second writer sees the first writer's parent.
+ */
+async function companyParentWouldCycle(
+  tx: Prisma.TransactionClient,
+  orgId: string,
+  companyId: string,
+  parentId: string,
+): Promise<boolean> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`company-parent:${orgId}`}))`;
+  let currentId: string | null = parentId;
+  const visited = new Set<string>();
+  while (currentId) {
+    if (currentId === companyId || visited.has(currentId)) return true;
+    visited.add(currentId);
+    const row: { parentId: string | null } | null = await tx.company.findFirst({
+      where: { id: currentId, orgId, deletedAt: null },
+      select: { parentId: true },
+    });
+    currentId = row?.parentId ?? null;
+  }
+  return false;
+}
+
 /** A list row: the company plus its stored intel summary (null until the first refresh). */
 const CompanyListItem = Company.extend({ intel: CompanyIntelSummary.nullable() });
 
@@ -311,52 +340,95 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
         if (foreign.length > 0)
           throw server.httpErrors.badRequest('Unknown custom field definition');
       }
-      // CF upserts included in the same transaction so a CF failure rolls back
-      // the company update — prevents partial-update / data corruption (P0 #5).
-      const cfOps = (patch.customFieldValues ?? []).map(({ definitionId, value }) =>
-        prisma.customFieldValue.upsert({
-          where: {
-            orgId_entityType_entityId_definitionId: {
-              orgId: req.auth.orgId,
-              entityType: 'company',
-              entityId: req.params.id,
-              definitionId,
-            },
-          },
-          update: { value: value as Prisma.InputJsonValue },
-          create: {
-            orgId: req.auth.orgId,
-            definitionId,
-            entityType: 'company',
-            entityId: req.params.id,
-            value: value as Prisma.InputJsonValue,
-          },
+      const companyData = {
+        ...(patch.name !== undefined && { name: patch.name }),
+        ...(patch.legalName !== undefined && { legalName: patch.legalName }),
+        ...(patch.domain !== undefined && { domain: patch.domain }),
+        ...(patch.industry !== undefined && { industry: patch.industry }),
+        ...(patch.employeeCount !== undefined && { employeeCount: patch.employeeCount }),
+        ...(patch.countryCode !== undefined && { countryCode: patch.countryCode }),
+        ...(patch.address !== undefined && {
+          address: (patch.address ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
         }),
-      );
-
-      const [updateResult] = await prisma.$transaction([
-        prisma.company.updateMany({
-          where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-          data: {
-            ...(patch.name !== undefined && { name: patch.name }),
-            ...(patch.legalName !== undefined && { legalName: patch.legalName }),
-            ...(patch.domain !== undefined && { domain: patch.domain }),
-            ...(patch.industry !== undefined && { industry: patch.industry }),
-            ...(patch.employeeCount !== undefined && { employeeCount: patch.employeeCount }),
-            ...(patch.countryCode !== undefined && { countryCode: patch.countryCode }),
-            ...(patch.address !== undefined && {
-              address: (patch.address ?? undefined) as unknown as Prisma.InputJsonValue | undefined,
-            }),
-            ...(patch.billingEmail !== undefined && { billingEmail: patch.billingEmail }),
-            ...(patch.taxId !== undefined && { taxId: patch.taxId }),
-            ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
-            ...(patch.website !== undefined && { website: patch.website }),
-            ...(patch.tier !== undefined && patch.tier !== null && { tier: patch.tier }),
-            ...(patch.parentId !== undefined && { parentId: patch.parentId }),
-          },
-        }),
-        ...cfOps,
-      ]);
+        ...(patch.billingEmail !== undefined && { billingEmail: patch.billingEmail }),
+        ...(patch.taxId !== undefined && { taxId: patch.taxId }),
+        ...(patch.logoUrl !== undefined && { logoUrl: patch.logoUrl }),
+        ...(patch.website !== undefined && { website: patch.website }),
+        ...(patch.tier !== undefined && patch.tier !== null && { tier: patch.tier }),
+        ...(patch.parentId !== undefined && { parentId: patch.parentId }),
+      };
+      // A parent change has to re-check the chain under the org lock. Other
+      // patches keep the array transaction: nothing there depends on a row
+      // another request is moving.
+      const updateResult =
+        patch.parentId !== undefined && patch.parentId !== null
+          ? await prisma.$transaction(async (tx) => {
+              if (
+                await companyParentWouldCycle(
+                  tx,
+                  req.auth.orgId,
+                  req.params.id,
+                  patch.parentId as string,
+                )
+              ) {
+                throw server.httpErrors.badRequest('Circular reference detected');
+              }
+              const updated = await tx.company.updateMany({
+                where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+                data: companyData,
+              });
+              for (const { definitionId, value } of patch.customFieldValues ?? []) {
+                await tx.customFieldValue.upsert({
+                  where: {
+                    orgId_entityType_entityId_definitionId: {
+                      orgId: req.auth.orgId,
+                      entityType: 'company',
+                      entityId: req.params.id,
+                      definitionId,
+                    },
+                  },
+                  update: { value: value as Prisma.InputJsonValue },
+                  create: {
+                    orgId: req.auth.orgId,
+                    definitionId,
+                    entityType: 'company',
+                    entityId: req.params.id,
+                    value: value as Prisma.InputJsonValue,
+                  },
+                });
+              }
+              return updated;
+            })
+          : (
+              await prisma.$transaction([
+                prisma.company.updateMany({
+                  where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
+                  data: companyData,
+                }),
+                // CF upserts share the transaction so a CF failure rolls back
+                // the company update (P0 #5).
+                ...(patch.customFieldValues ?? []).map(({ definitionId, value }) =>
+                  prisma.customFieldValue.upsert({
+                    where: {
+                      orgId_entityType_entityId_definitionId: {
+                        orgId: req.auth.orgId,
+                        entityType: 'company',
+                        entityId: req.params.id,
+                        definitionId,
+                      },
+                    },
+                    update: { value: value as Prisma.InputJsonValue },
+                    create: {
+                      orgId: req.auth.orgId,
+                      definitionId,
+                      entityType: 'company',
+                      entityId: req.params.id,
+                      value: value as Prisma.InputJsonValue,
+                    },
+                  }),
+                ),
+              ])
+            )[0];
       if (updateResult.count === 0) throw server.httpErrors.notFound('Company not found');
       // v23: a tier change starts or stops the financials schedule right away.
       if (patch.tier !== undefined && patch.tier !== null)
