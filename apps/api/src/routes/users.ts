@@ -17,6 +17,18 @@ const OrgUser = z.object({
   deletedAt: z.string().datetime().nullable().optional(),
 });
 
+// Assignee pickers need a person to choose. They do not need the directory.
+// avatarUrl is always null until User stores an image; the key is the slot.
+const UserListItem = z.object({
+  id: z.string().uuid(),
+  name: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
+  email: z.string().optional(),
+  role: z.string().optional(),
+  createdAt: z.string().datetime().optional(),
+  deletedAt: z.string().datetime().nullable().optional(),
+});
+
 const IdParam = z.object({ id: z.string().uuid() });
 
 function hasDbAdminRole(roleNames: string[]): boolean {
@@ -60,14 +72,13 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     },
   );
 
-  // GET /users — the org roster (id/name/email/legacy role). Intentionally NOT
-  // gated on users:read: every owner/assignee picker in the product (useUsers →
-  // QuickStart, Forecasts owner filter, cross-sell, territory dialogs) reads
-  // it, and seeded personas like Sales, Account Executive, SDR and Customer
-  // Success hold no users:read grant — copying the sibling routes' users:read
-  // + admin preHandler here would 403 screens those roles are meant to see
-  // (same trap documented on GET /org-settings/locale). Role management below
-  // stays users:* + admin gated.
+  // GET /users — picker roster. Intentionally NOT gated on users:read: every
+  // owner/assignee picker (useUsers → QuickStart, Forecasts owner filter,
+  // cross-sell, territory dialogs) reads it, and seeded personas like Sales,
+  // Account Executive, SDR and Customer Success hold no users:read grant.
+  // Those callers get id, display name, and avatarUrl. Email, legacy role,
+  // and createdAt stay on the same route for users:read. Role management
+  // below stays users:* + admin gated.
   server.get(
     '/users',
     {
@@ -89,7 +100,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
         }),
         response: {
           200: z.object({
-            items: z.array(OrgUser),
+            items: z.array(UserListItem),
             nextCursor: z.string().uuid().nullable(),
           }),
         },
@@ -97,6 +108,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { limit, cursor, includeDeleted } = req.query;
+      const canReadUsers = await server.hasPermission(req, 'users:read');
       const rows = await prisma.user.findMany({
         // Explicit on both branches: the soft-delete middleware only steps
         // aside when where.deletedAt is set, and an empty filter matches all.
@@ -104,6 +116,12 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         take: limit + 1,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        select: {
+          id: true,
+          name: true,
+          deletedAt: true,
+          ...(canReadUsers ? { email: true, role: true, createdAt: true } : {}),
+        },
       });
 
       const hasMore = rows.length > limit;
@@ -111,14 +129,27 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       const nextCursor = hasMore ? (page[page.length - 1]?.id ?? null) : null;
 
       return {
-        items: page.map((u) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role,
-          createdAt: u.createdAt.toISOString(),
-          ...(includeDeleted ? { deletedAt: u.deletedAt?.toISOString() ?? null } : {}),
-        })),
+        items: page.map((u) => {
+          const directory =
+            canReadUsers &&
+            'email' in u &&
+            typeof u.email === 'string' &&
+            typeof u.role === 'string' &&
+            u.createdAt instanceof Date
+              ? {
+                  email: u.email,
+                  role: u.role,
+                  createdAt: u.createdAt.toISOString(),
+                }
+              : {};
+          return {
+            id: u.id,
+            name: u.name,
+            avatarUrl: null,
+            ...directory,
+            ...(includeDeleted ? { deletedAt: u.deletedAt?.toISOString() ?? null } : {}),
+          };
+        }),
         nextCursor,
       };
     },

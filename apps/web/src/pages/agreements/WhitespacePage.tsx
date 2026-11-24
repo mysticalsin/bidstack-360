@@ -243,7 +243,7 @@ export default function WhitespacePage() {
     [facets],
   );
   const pickers = useMemo(
-    () => (users.data ?? []).filter((u) => !u.deletedAt).map((u) => ({ id: u.id, name: u.name ?? u.email })),
+    () => (users.data ?? []).filter((u) => !u.deletedAt).map((u) => ({ id: u.id, name: u.name ?? u.email ?? '' })),
     [users.data],
   );
   const chart = (list.data?.byLine ?? []).map((b) => ({ line: labelBusinessLine(b.line), Flags: b.count }));

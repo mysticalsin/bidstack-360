@@ -56,7 +56,8 @@ export const UNGATED_ALLOWLIST: Record<string, string> = {
   'GET /api/v1/org-settings/locale': 'Org locale/currency used by every page.',
   'GET /api/v1/pipeline-stages': 'Stage catalogue (names/order); no deal data.',
   'GET /api/v1/territories': 'Territory catalogue used by pickers; analytics are gated.',
-  'GET /api/v1/users': 'Owner pickers for AE/SDR (see users.ts); users:read gates management.',
+  'GET /api/v1/users':
+    'Owner pickers get id, name, and avatarUrl (see users.ts). users:read adds email and role.',
   'GET /api/v1/onboarding/sample-data/status': 'Boolean onboarding state.',
   'GET /api/v1/onboarding/templates': 'Static template catalogue.',
   'GET /api/v1/integrations/dust/status': 'Configured/healthy flag shown in the sidebar.',
