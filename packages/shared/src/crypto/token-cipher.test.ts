@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
+import { IntegrationTokenKeyMissingError } from '../utils/crypto.js';
 import { decryptToken, encryptToken } from './token-cipher.js';
 
 const originalIntegrationTokenKey = process.env.INTEGRATION_TOKEN_KEY;
@@ -31,8 +32,9 @@ describe('token-cipher', () => {
   it('fails closed when the integration token key is missing', () => {
     setIntegrationTokenKey(undefined);
 
+    expect(() => encryptToken('oauth-refresh-token')).toThrow(IntegrationTokenKeyMissingError);
     expect(() => encryptToken('oauth-refresh-token')).toThrow(
-      'INTEGRATION_TOKEN_KEY must be a 64-character hex string',
+      'Integration token encryption is not configured',
     );
   });
 

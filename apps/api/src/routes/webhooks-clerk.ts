@@ -21,6 +21,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { prisma, seedRolesAndPermissions } from '@bidstack/db';
 
+import { throwIntegrationNotConfigured } from '../lib/integration-not-configured.js';
+
 const TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
 
 export interface ClerkWebhookHeaders {
@@ -106,10 +108,7 @@ export const webhooksClerkRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const secret = process.env.CLERK_WEBHOOK_SECRET;
       if (!secret) {
-        // Surfaces as a generic 500 to the caller: the error handler masks
-        // app-thrown 5xx bodies by design. The log line is the ops signal.
-        req.log.warn('clerk webhook dropped — CLERK_WEBHOOK_SECRET unset');
-        throw server.httpErrors.serviceUnavailable('CLERK_WEBHOOK_SECRET not configured');
+        throwIntegrationNotConfigured(req, 'CLERK_WEBHOOK_SECRET');
       }
 
       const headers: ClerkWebhookHeaders = {

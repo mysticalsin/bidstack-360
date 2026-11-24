@@ -19,6 +19,7 @@
 import { decryptToken } from '@bidstack/shared/token-crypto';
 import { prisma } from '@bidstack/db';
 import { fetchWithTimeout, providerTimeoutMs } from '../../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../../lib/upstream-body.js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -117,8 +118,8 @@ export async function createTeamsMeeting(params: CreateTeamsMeetingParams): Prom
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Teams createMeeting failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Teams createMeeting failed (${resp.status})`);
   }
 
   return (await resp.json()) as TeamsMeeting;
@@ -149,8 +150,8 @@ export async function getTeamsCallTranscript(
   );
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Teams getTranscript failed (${resp.status}): ${text}`);
+    await discardUpstreamBody(resp);
+    throw new Error(`Teams getTranscript failed (${resp.status})`);
   }
 
   const data = (await resp.json()) as {

@@ -164,9 +164,9 @@ describe('POST /webhooks/clerk', () => {
         headers: signedHeaders(rawBody),
         payload: rawBody,
       });
-      // The route throws 503, but the error handler masks app-thrown 5xx to a
-      // generic 500 by design (no internals in 5xx bodies). What matters here:
-      // the event is NOT acknowledged (non-2xx → Clerk retries) and nothing ran.
+      // The body is the generic "integration not configured" sentence. The
+      // env var name stays in the log. What matters here: the event is NOT
+      // acknowledged (non-2xx → Clerk retries) and nothing ran.
       expect(res.statusCode).toBeGreaterThanOrEqual(500);
     } finally {
       process.env.CLERK_WEBHOOK_SECRET = saved;

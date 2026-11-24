@@ -1,0 +1,121 @@
+# Plan debate: polo-fix-hermeticity-5xx-residuals
+
+Pinned head: `e7defdb07c1c752ea9091a265a9f748734e145ac`
+Pinned tree: `01f3d6b7fdd428f82b7cd260544be86f2da4ade2`
+Base main named by the validator: `1eada22cad1a82030941dc72506e07fbc6897859`
+Clean merge tree named by the validator: `50abebc6`
+Validator report sha: `f8b57629`
+
+CONSENSUS: OPEN
+
+## Proposal (writer)
+
+The plan is `specs/polo-fix-hermeticity-5xx-residuals/plan.md`.
+
+Ship the code already on the pinned head. Do not change product behavior in the docs commit that adds this file.
+
+- Stop the two API tests from using `org_seed_mantu`. Use `createIsolatedOrg()` and `useIsolatedOrgAuth()`.
+- Pass a deliberate 503 through once: Fastify `ServiceUnavailableError`, and `IntegrationTokenKeyMissingError`. Everything else at 500 stays `Something went wrong`.
+- Throw that typed error from both integration-token key readers when the key is unset. A malformed key stays a plain Error.
+- Drain upstream provider error bodies and do not log or throw them. Keep the HTTP status. The HubSpot token-exchange HTTP message is the fixed sentence `HubSpot token exchange failed`, which the handler then masks to a generic 500 because it is a bad gateway, not a deliberate 503.
+- On the way out of `GET /migrations/:id`, map unknown `errorSummary` text to `import_failed`. Keep known codes and known row sentences. Keep the `chunk failed permanently:` prefix with the sentinel `import_failed`. HubSpot sync-now shows `The import could not be completed.`
+- Do not add a migration. Do not edit the void cleanup. Do not change the migration race timeout.
+
+## Challenger: Devin
+
+Round 1, pinned to e7defdb07c1c752ea9091a265a9f748734e145ac (tree 01f3d6b7), read at docs head ce55a63a. CONSENSUS (Devin): OBJECTIONS.
+
+1. The 503 bodies give API callers env var names (HUBSPOT_CLIENT_ID, HUBSPOT_REDIRECT_URI). State in decision.md who can reach each route: admin only, any signed-in user, or unauthenticated. If anyone other than an admin can reach it, return a generic "integration not configured" sentence and keep the env var names in the server log.
+2. The handler keeps a 503 based on the error *name* string. Any error that sets name = 'ServiceUnavailableError' or 'IntegrationTokenKeyMissingError', such as a library or provider error, would pass its message straight through. Change: match on instanceof or a private brand. Test: a plain Error with a forged name, carrying secret-looking text, returns 500 'Something went wrong'.
+3. The known-sentence allowlist for errorSummary must be an exact match. Tests: 'company.name is required' followed by driver text, and a known code with a suffix, both map to import_failed. 'chunk failed permanently:' plus raw text maps to 'chunk failed permanently: import_failed' (already claimed, so name the test).
+4. Raw errorSummary text already stored stays at rest. List every reader of errorSummary (API, exports, admin views, logs) in decision.md, show that each one goes through migrationPublicMessage or migrationFailureText, and open a ticket for scrubbing data at rest as a residual.
+5. discardUpstreamBody should cancel the stream, or cap the read, rather than draining an unbounded provider body. Note that in decision.md, or change it.
+6. Merge needs Inspector's hands-on run of qa-inspector.md on the final head, and my exact-head re-gate. Any code change from items 1-3 moves the head and voids PASS evidence on e7defdb0.
+
+## Writer response, round 1
+
+1. Accepted, with the audience split in `decision.md`. `GET /api/v1/migrations/hubspot/auth` is `settings:write`, seeded only on Admin, so it still names `HUBSPOT_CLIENT_ID` and `HUBSPOT_REDIRECT_URI`. The unauthenticated callback already says `HubSpot OAuth not configured` and does not name them. Slack is `integrations:write` (Admin, Sales, Sales Manager, Account Executive, SDR, Customer Success) and already says `Integration token encryption is not configured`. Public Dust and Clerk webhooks, public Sentry smoke, Clerk auth (`CLERK_SECRET_KEY`, `PUBLIC_BASE_URL`), and a bad Cloudflare Access allowlist now return `integration not configured`. The env var name is logged as `missingEnv`. Red: `ddc4cee2356c684b638fcc63676eac24b956ad0d`, failing assertion `message` was `CLERK_WEBHOOK_SECRET not configured` (and the same shape for `DUST_WEBHOOK_SECRET`, `SENTRY_DSN`, `SENTRY_RELEASE`, `SENTRY_SMOKE_TOKEN`, `POLO_ALLOWED_USERS`, `CLERK_SECRET_KEY`, `PUBLIC_BASE_URL`). Fix: `9a369689ffb0246084c13abd5abb47981c9aea0f`.
+
+2. Accepted. The handler no longer compares `err.name`. A service-unavailable 503 must share the prototype of `server.httpErrors.serviceUnavailable`. The token-key error must be `instanceof IntegrationTokenKeyMissingError`. Red: `002dcf3ac65f2bfde3071dd98755ef4db382ca2a`, failing assertion `expected 503 to be 500` for a plain Error named `ServiceUnavailableError` whose message contains `secret-token`. The follow-up red `ee27153e2fb2714ae7ddfcbeef928c319c05511a` adds the same assertion for a plain Error named `IntegrationTokenKeyMissingError`. Fix: `72240feb994d248be35bb7de5cd7939ee07303a2`. Both now return 500 `Something went wrong`, and the body does not contain `secret-token`.
+
+3. The allowlist was already exact (`===` on the code map and the row-sentence set, plus two anchored expressions). No product change. New tests, green on that code, commit `14aad56bc3565dedff3c01237b83e77fb3c17a8a`: `maps company.name is required followed by driver text to import_failed`, `maps a known code with a suffix to import_failed`, and the named test `maps chunk failed permanently plus raw text to chunk failed permanently: import_failed`.
+
+4. Readers are listed in `decision.md`. Job JSON goes through `migrationPublicMessage`. The CSV download and HubSpot sync-now reasons go through `migrationFailureText`. The wizard reads that API payload and calls `migrationFailureText` again. No log line prints the column. `POST /migrations/:id/retry` reads the stored strings only to decide `migrationRetryOffered` and returns `serializeJob`, so the HTTP body is mapped. The stored JSON is not rewritten. Residual ticket: `specs/polo-fix-hermeticity-5xx-residuals/residual-scrub-error-summary-at-rest.md`.
+
+5. Changed, not only noted. `discardUpstreamBody` cancels the stream and does not call `text()`. Red: `421e96a6dfb2c086066a1e538c92ea57900ca6b1`, failing assertion `expected false to be true` on `cancelled`. Fix: `24d1c359b0427701e5ed87ed3a9d2a8b5e66b937`.
+
+6. Agreed. Items 1 and 2 changed product code, so PASS evidence on `e7defdb0` is void. Item 3 did not change product code. Item 5 also changed product code. Merge waits on Inspector running `qa-inspector.md` on the final head, and on Devin's exact-head re-gate. This response does not merge. The polo-preview Worker and the deploy config were not touched. Deploy stays held for Tony's Q1.
+
+## Challenger: Sentinel
+
+Plan challenge only, not merge approval. Security Q&A NOT RUN. Static read via the read-only GitHub connector, nothing executed. Pinned to e7defdb07c1c752ea9091a265a9f748734e145ac, tree 01f3d6b7fdd428f82b7cd260544be86f2da4ade2 (matches), docs read at ce55a63a. Devin round 1 read at sha 196fd1bf. Confidence 0.8: high on the quoted lines, moderate on repo-wide claims, because I could not search the whole repo. CONSENSUS (Sentinel): OBJECTIONS.
+
+1. Endorse Devin 1 to 5, with these refinements.
+   - Devin 2 (forged name). Code: `err.statusCode === 503 && (err.name === 'ServiceUnavailableError' || err.name === IntegrationTokenKeyMissingError.name)` (error-handler.ts, isDeliberateUnavailable). Any http-errors based plugin or library also emits name ServiceUnavailableError with its own message. Also a bundler that mangles class names would turn `IntegrationTokenKeyMissingError.name` into a short string and make the 503 silently fall to 500. Change: a private brand. Routes use one helper `deliberateUnavailable(message)` that sets a `Symbol.for('bidstack.deliberate503')` property. The key error class sets the same brand. The handler checks the brand plus statusCode 503, never `name`. Tests: (a) plain Error with name 'ServiceUnavailableError', statusCode 503 and secret text returns 500 'Something went wrong'; (b) a real `httpErrors.serviceUnavailable` from a route still returns 503; (c) the key error is still 503 after the shared package is rebuilt (the validator already saw a stale dist give a false pass).
+   - Devin 1 (env var names). Code: `HubSpot OAuth not configured, set HUBSPOT_CLIENT_ID and HUBSPOT_REDIRECT_URI (separator shown as a comma)` (decision.md table, qa-inspector.md section 1). Change: decision.md names the minimum permission to reach each 503 route. If it is not admin only, the body is `HubSpot is not configured` and the names go to the server log only. Update the qa-inspector expected body to match.
+   - Devin 5 (drain). Code: `await res.text().catch(() => '')` (upstream-body.ts). Refinement: add a time bound as well as a size bound, because several callers use plain `fetch` or fetchWithTimeout where the timer may stop after headers. Change: `res.body?.cancel()` first, fall back to a read capped at 64 KiB and a 2 s abort, never throw. Test: a body stream that never ends resolves within the bound, and a thrown `text()` still yields the status-only error.
+   - Devin 4 (rows at rest) is item 5 below.
+
+2. Prototype key bug in the sentence lookup. Code: `const known = MIGRATION_FAILURE_TEXT[message]; if (known) return known;` and `if (MIGRATION_FAILURE_TEXT[message] !== undefined) return message;` (shared/state-machines/migration.ts, migrationFailureText and migrationPublicMessage). `MIGRATION_FAILURE_TEXT` is a plain object. A stored message equal to `constructor`, `toString`, `valueOf` or `__proto__` hits Object.prototype: migrationFailureText returns a function, not a string, and `.slice(0, 200)` in sync-now/runs.ts throws; migrationPublicMessage echoes the word. Only a hardening gap, since I found no route that stores such a message today. Change: `Object.hasOwn(MIGRATION_FAILURE_TEXT, message)` or a Map. Test and mutant: both functions with 'constructor' and '__proto__' return 'import_failed' and 'The import could not be completed.'; reverting to the bare lookup must go red.
+
+3. Echo regexes are wider than the sentences they protect. Code: `/^No account named ".+" (dash) import accounts first$/` and `/^Entity type ".+" is not supported by the import worker yet$/` (migration.ts). `.+` lets any text inside the quotes pass the allowlist verbatim, including a long or secret-looking name. Today the text comes from the uploaded file, so this is Low and not a leak by itself. Change: cap the inner text, for example `.{1,80}` with no control characters (`[^\x00-\x1f"]{1,80}`), or return the fixed sentence and drop the name. Tests: a 5 KB name and a name with a newline both map to `import_failed`. Also say in decision.md that `field` is returned unmasked (migrations.helpers.ts publicErrorSummary: `field: typeof error.field === 'string' ? error.field : null`) and why that is safe (it is a mapped column name from the same org's upload), or cap it to 100 characters.
+
+4. Scrubbing is per call site, so unconverted sites will return. Code: 24 files each replace `await res.text()` with `await discardUpstreamBody(res)`, and only Gmail send plus HubSpot exchange have a sentinel test (provider-upstream-body.test.ts). No test or mutant covers Zoom, Teams, Twilio, Deepgram, Cohere, Anthropic, DocuSign, Graph, or HubSpot refresh and `hubspotFetch`. The validator mutants 4 and 6 prove only two sites. Change: add one table-driven test that stubs `fetch` with a 4xx and the sentinel body for each converted function and asserts the thrown message and the captured log lines never contain the sentinel. Add a repo scan, in the hermeticity test or an ESLint `no-restricted-syntax` rule, that fails on `.text()` or `.json()` of a `!res.ok` branch inside `throw new Error(...)` or `log.*(...)` under apps/api/src. Mutant: re-add `${text}` to Zoom getRecordings and require a red test. Please also list in decision.md any remaining unconverted site by file.
+
+5. Rows at rest and write time. Code: decision.md "Stored migration rows are not rewritten" and `serializeJob`/`hubspotRunFromJobs`/`migrationErrorsCsv` mask only on read. The raw driver or provider text stays in `migration_jobs.errorSummary` and in any other reader (admin or support views, exports, analytics, DB tooling, worker logs). Change: (a) list every reader of errorSummary in decision.md and show each goes through migrationPublicMessage or migrationFailureText; (b) add write-time mapping in the worker so new failures store a code, keeping the raw text only in the server log; or record at-rest scrubbing as a named residual with a ticket id. Test: the worker failure path stores `import_failed` for a sentinel driver error.
+
+6. Thrown versus returned and log-side paths. Code: the handler logs `req.log.error({ err }, 'unhandled error')` and calls `captureSentryServerError(err)`; `err` carries its message, stack and any `cause`. The body drain protects `err.message`, but a caller that wraps the fetch error with `{ cause }` or attaches `res` or the parsed JSON to the error object would put provider text into logs and Sentry. Code also: Gmail and Microsoft routes send the 503 or redirect inside the route, bypassing the handler, and the 504 path returns `err.message` (provider and operation names) while the 503 refresh-lock path returns `err.message` too. Change: state in decision.md that no scrubbed site attaches `cause` or the response to the error (the diff shows none; say so), and add one handler test that a 500 whose `cause` holds the sentinel gives a body without it. Confirm Sentry `beforeSend` or the logger serializer drops `err.cause` text for fetch errors, or list it as a residual.
+
+7. DocuSign change of error kind needs a caller check. Code: `throw credentialError(...)` replaced with `throw new Error(...)` at signature.service.ts (token exchange, document fetch, envelope creation, void). The decision table treats this as the intended 503 to 500 change. I could not see whether any caller, retry or queue classifier, or the public signing route relies on the credential error type or its status to decide retry, fallback or the user message. Change: add to decision.md the callers of getDocuSignAccessToken, sendDocuSignEnvelope and voidSignatureRequest and what each does on failure, plus a test that a DocuSign 401 on the signing path still gives the same user-visible outcome as before, or states the new one.
+
+8. Error code enumeration. Code: 503 means the token key is unset; a malformed key stays a plain Error and gives 500 (`if (!hex) throw new IntegrationTokenKeyMissingError(); if (!/^[0-9a-fA-F]{64}$/.test(hex)) {...}` in token-cipher.ts). A caller with integrations:write can tell unset from malformed. Also `import_failed` versus `chunk failed permanently: import_failed` reveal only the failure class. Both are Info. Change: decision.md records the 503 versus 500 distinction as accepted, with the reason (an operator needs it), and notes the reader scope.
+
+9. No change needed (verified in the diff, so no new risk here). `hubspotFetch` puts the secret in the Authorization header, not the URL, and the thrown path `/crm/v3/objects/${objectType}` has no query string (params are applied to the URL object separately; `objectType` is a fixed union), so `HubSpot API ${res.status} for ${path}` is safe. The 4xx branch still echoes `err.message` for any error with statusCode below 500, so an upstream library error carrying a 4xx statusCode would pass through; this is old behaviour, so say it is out of scope.
+
+What gets AGREE: items 1 to 8 each either change, or a named residual with an owner in decision.md. Items 2, 4 and the item 1 forged-name test need code or test changes, so the head moves and the PASS evidence on e7defdb0 is void; re-gate on the new head. Not merge approval.
+
+## Writer response, Sentinel item 1
+
+Devin 2: the handler no longer matches `err.name`. A 503 must carry `Symbol.for('bidstack.deliberate503')`. This server stamps that brand on its own `serviceUnavailable`. `IntegrationTokenKeyMissingError` sets the same brand, so a rebuilt package and a replaced prototype still return 503. A plain Error named `ServiceUnavailableError`, and a `ServiceUnavailable` built on another server, return 500 `Something went wrong`. Red `674e29eb` (`expected 503 to be 500`, and `expected 500 to be 503` after the prototype is replaced). Fix `7bbbae8a`.
+
+Devin 1: no 503 body in this set names an env var. HubSpot auth, which is `settings:write` and seeded only on Admin, now says `HubSpot is not configured` and logs the two names. The qa-inspector expected body matches. Red `f6f576e1` (body was `HubSpot OAuth not configured — set HUBSPOT_CLIENT_ID and HUBSPOT_REDIRECT_URI`). Fix `e24c7f29`. The non-admin routes already return `integration not configured` from Devin round 1.
+
+Devin 5: `cancel()` runs first, bounded by 2 seconds. Without `cancel`, the read stops at 64 KiB or 2 seconds, and a thrown `text()` is ignored. Red `fbde4b3c` (`too slow`). Fix `2ac952af`.
+
+## Writer response, Sentinel item 2
+
+`migrationFailureText` and `migrationPublicMessage` use `Object.hasOwn`. `constructor` and `__proto__` become `import_failed` and `The import could not be completed.` Red `d09acb2a` (`expected 'constructor' to be 'import_failed'`). Fix `e94b3c72`.
+
+## Writer response, Sentinel item 3
+
+The two echo expressions allow 1 to 80 characters and no controls or quotes. A 5 KB name and a newline become `import_failed`. Same red and fix as item 2. `field` is the upload's column name. It stays unmasked and is capped at 100 characters. Red `9510745b` (length 207). Fix `72b6645e`.
+
+## Writer response, Sentinel item 4
+
+`apps/api/src/lib/provider-body-sites.test.ts` stubs fetch for HubSpot exchange, HubSpot refresh, `hubspotFetch` via `probeHubSpotConnection`, Gmail send, Graph send, Cohere embed, Deepgram, and Zoom `getZoomRecordings`. The thrown error and the captured logs do not contain `provider-body-SENTINEL-upstream-text`. Re-adding the body to Zoom `getZoomRecordings` fails that test (`expected ... not to contain 'provider-body-SENTINEL-upstream-text'`). The mutant was not committed.
+
+`scripts/scan-upstream-error-body.mjs` fails when a `!res.ok` branch throws or logs `text()` or `json()`. `pnpm test:hermeticity` runs it. A sample leak is red in `upstream-error-body-scan.test.ts`. The current tree has no such leak. Sites that still do not cancel, and do not throw the body, are listed in `decision.md`: the NVIDIA NIM eval judge, company news (returns an empty list), and the MCP clients (they read the body only after `ok`). DocuSign document fetch now cancels. Commit `6f6e4dc5`.
+
+## Writer response, Sentinel item 5
+
+Readers are listed in `decision.md`. Job JSON uses `migrationPublicMessage`. The CSV and HubSpot sync-now use `migrationFailureText`. The wizard reads that API payload and calls `migrationFailureText` again. No log line prints the column. Retry reads the stored strings only to decide the offer and returns `serializeJob`. New rows are not rewritten in this PR. Residual ticket `polo-residual-scrub-error-summary-at-rest`, owner Tony, file `residual-scrub-error-summary-at-rest.md`.
+
+## Writer response, Sentinel item 6
+
+No converted fetch site sets `cause` or attaches the response. The only `cause` under `apps/api/src` is demo auth. Red `674e29eb`: the log line contained `provider-body-SENTINEL-upstream-text` from `cause`. Fix `7bbbae8a` logs and sends Sentry a copy with no `cause`. `beforeSend` still scrubs `exception.values[].value` and does not walk `Error.cause`. The copy has no `cause`. The HTTP body stays `Something went wrong`.
+
+## Writer response, Sentinel item 7
+
+Callers and failure behaviour are in `decision.md`. `getDocuSignAccessToken`, `sendDocuSignEnvelope`, and `voidSignatureRequest` throw a plain status error after cancelling the body. Missing credentials stay a 503-shaped `credentialError` without the brand, so the handler returns 500 `Something went wrong`. The void route test already expects that 500 and leaves the row `SENT`. The send path test `c8300144` expected `cancel()` on a 401 document body and it was not called. Fix `ffa6bb16`. The public sign route does not call these functions.
+
+## Writer response, Sentinel item 8
+
+Accepted in `decision.md`. Unset token key is 503 `Integration token encryption is not configured`. A malformed key is 500 `Something went wrong`. The two `import_failed` shapes tell the wizard whether retry is offered. They do not include driver text.
+
+## Writer response, Sentinel item 9
+
+No change. `hubspotFetch` keeps the token in the header, and the thrown path has no query string. The 4xx `err.message` passthrough is older than this PR and stays out of scope.
+
+PASS evidence on `e7defdb0` is void. Merge waits on Inspector running `qa-inspector.md` on this head, and on Devin and Sentinel both agreeing. This response does not merge. The polo-preview Worker and the deploy config were not touched. Deploy stays held for Tony's Q1.
+
+CONSENSUS: OPEN

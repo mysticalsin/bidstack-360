@@ -9,6 +9,7 @@ import {
   encryptSecret,
   getIntegrationTokenKey,
   hashWebhookSigningSecret,
+  IntegrationTokenKeyMissingError,
 } from './crypto.js';
 
 const originalIntegrationTokenKey = process.env.INTEGRATION_TOKEN_KEY;
@@ -67,7 +68,13 @@ describe('server secret crypto', () => {
   it('fails closed when the integration token key is missing', () => {
     setIntegrationTokenKey(undefined);
 
-    expect(() => getIntegrationTokenKey()).toThrow('INTEGRATION_TOKEN_KEY env var is required');
+    expect(() => getIntegrationTokenKey()).toThrow(IntegrationTokenKeyMissingError);
+    expect(() => getIntegrationTokenKey()).toThrow('Integration token encryption is not configured');
+    try {
+      getIntegrationTokenKey();
+    } catch (err) {
+      expect(err).toMatchObject({ statusCode: 503 });
+    }
   });
 
   describe('decryptSecretOrPlaintext (in-place at-rest migration)', () => {
@@ -145,7 +152,7 @@ describe('server secret crypto', () => {
       setIntegrationTokenKey(undefined);
 
       expect(() => hashWebhookSigningSecret('whsec_lookup_fixture')).toThrow(
-        'INTEGRATION_TOKEN_KEY env var is required',
+        IntegrationTokenKeyMissingError,
       );
     });
   });

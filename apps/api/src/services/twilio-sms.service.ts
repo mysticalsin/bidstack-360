@@ -29,6 +29,7 @@ import {
   reserveOutboundCommunication,
 } from '../lib/outbound-communication-guard.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../lib/upstream-body.js';
 type SmsEntityType = 'CONTACT' | 'LEAD';
 type ServiceLogger = Pick<pino.Logger, 'debug' | 'error' | 'info' | 'warn'>;
 
@@ -205,9 +206,9 @@ export async function sendSms(
     );
 
     if (!response.ok) {
-      const err = await response.text();
-      log.warn({ toNumber, status: response.status, err }, 'Twilio send failed');
-      throw new Error(`Twilio API error ${response.status}: ${err}`);
+      await discardUpstreamBody(response);
+      log.warn({ status: response.status }, 'Twilio send failed');
+      throw new Error(`Twilio API error ${response.status}`);
     }
 
     twilioMsg = (await response.json()) as { sid: string; num_segments: string };
@@ -280,9 +281,9 @@ export async function testTwilioConnection(
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    log.warn({ status: response.status, err }, 'Twilio connection test failed');
-    throw new Error(`Twilio connection test failed ${response.status}: ${err}`);
+    await discardUpstreamBody(response);
+    log.warn({ status: response.status }, 'Twilio connection test failed');
+    throw new Error(`Twilio connection test failed ${response.status}`);
   }
 
   const account = (await response.json()) as { status?: string; friendly_name?: string };

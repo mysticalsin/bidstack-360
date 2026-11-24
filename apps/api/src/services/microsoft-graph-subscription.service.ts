@@ -17,6 +17,7 @@ import {
   type ServiceLogger,
 } from './microsoft-graph-auth.service.js';
 import { fetchWithTimeout, providerTimeoutMs } from '../lib/fetch-timeout.js';
+import { discardUpstreamBody } from '../lib/upstream-body.js';
 
 // ─── Subscriptions ────────────────────────────────────────────────────────────
 
@@ -71,8 +72,8 @@ export async function createSubscription(
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    log.error({ status: res.status, body }, 'Graph subscription creation failed');
+    await discardUpstreamBody(res);
+    log.error({ status: res.status }, 'Graph subscription creation failed');
     // Not fatal — incremental pull fallback will still work
     return null;
   }
