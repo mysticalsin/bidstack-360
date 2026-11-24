@@ -78,10 +78,13 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
-        <Dialog.Content
-          asChild
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        >
+        <Dialog.Content className="fixed inset-0 z-50 overflow-y-auto p-4">
+          {/* asChild used to merge `fixed inset-0` onto this card. The card
+              also set `relative`, and that won, so the panel started below the
+              viewport while the overlay and the scroll lock stayed. The card
+              is a child of a fixed scroller now, capped to the viewport so a
+              short landscape phone can scroll the form instead of covering it. */}
+          <div className="flex min-h-full items-center justify-center">
           <motion.div
             variants={fadeScale}
             initial="initial"
@@ -90,7 +93,8 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
             className={cn(
               'relative w-full max-w-lg rounded-2xl border border-[var(--border-default)]',
               'bg-[var(--surface-card)]',
-              'shadow-[var(--shadow-lg)] p-6 max-h-[90vh] overflow-y-auto',
+              'shadow-[var(--shadow-lg)] p-6',
+              'max-h-[calc(100vh-2rem)] overflow-y-auto',
             )}
           >
             <div className="flex items-center justify-between mb-5">
@@ -231,6 +235,7 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
               </div>
             </div>
           </motion.div>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
