@@ -158,7 +158,6 @@ export function PublicBookingPage() {
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
             <section
               className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4"
-              role="grid"
               data-testid="booking-calendar"
               aria-label={t('publicBooking.calendarAriaLabel', 'Choose a booking date')}
             >

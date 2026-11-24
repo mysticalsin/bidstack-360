@@ -117,6 +117,11 @@ export function CollaborativeRichTextEditor({
   const editor = useEditor({
     extensions,
     editable: !readOnly,
+    editorProps: {
+      attributes: {
+        'aria-label': t('collaborativeRichTextEditor.fieldLabel', 'Notes'),
+      },
+    },
     onUpdate: ({ editor: e }) => {
       onChange?.(e.getHTML());
     },

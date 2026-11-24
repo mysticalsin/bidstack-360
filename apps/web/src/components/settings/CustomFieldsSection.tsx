@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -37,6 +37,7 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
 
 export function CustomFieldsSection() {
   const { t } = useTranslation('settings');
+  const entitySelectId = useId();
   const [entityType, setEntityType] = useState<EntityType>('company');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -63,7 +64,11 @@ export function CustomFieldsSection() {
       />
       <div className="p-5 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor={entitySelectId} className="sr-only">
+            {t('customFields.entityTypeLabel', 'Entity type')}
+          </label>
           <select
+            id={entitySelectId}
             className="input text-sm"
             value={entityType}
             onChange={(e) => setEntityType(e.target.value as EntityType)}

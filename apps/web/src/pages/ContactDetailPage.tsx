@@ -93,7 +93,7 @@ export function ContactDetailPage() {
                   {' · '}
                   <Link
                     to={`/companies?search=${encodeURIComponent(c.customer)}`}
-                    className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+                    className="text-[var(--brand-primary)] underline dark:text-[var(--brand-deep)]"
                   >
                     {c.customer}
                   </Link>
