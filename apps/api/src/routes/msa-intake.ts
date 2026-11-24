@@ -201,9 +201,16 @@ export const msaIntakeRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!draft) throw server.httpErrors.notFound('Intake draft not found');
       if (draft.status === 'confirmed' && draft.confirmedContractId) {
+        const agreement = await prisma.contractAgreement.findFirst({
+          where: { id: draft.confirmedContractId, orgId: req.auth.orgId, deletedAt: null },
+          select: { id: true, companyId: true },
+        });
+        // The stored id is not a grant to another org's agreement. An empty
+        // companyId would also fail the response schema, which wants a uuid.
+        if (!agreement?.companyId) throw server.httpErrors.notFound('Agreement not found');
         return reply.code(201).send({
-          contractId: draft.confirmedContractId,
-          companyId: (await prisma.contractAgreement.findFirst({ where: { id: draft.confirmedContractId } }))?.companyId ?? '',
+          contractId: agreement.id,
+          companyId: agreement.companyId,
           createdCompany: false,
         });
       }
