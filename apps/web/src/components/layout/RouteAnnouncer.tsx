@@ -138,13 +138,21 @@ export function RouteAnnouncer() {
     };
   }, []);
 
+  const routeKey = `${pathname}${search}`;
+  const routeKeyRef = useRef(routeKey);
+
   useEffect(() => {
+    const routeChanged = routeKeyRef.current !== routeKey;
+    routeKeyRef.current = routeKey;
     // Skip the initial mount so we don't announce on first paint — only
-    // navigations should speak.
+    // navigations should speak. A new `t` after translations settle is not
+    // a navigation, and it used to move focus onto <main> 60ms after Tab,
+    // so the skip link never stayed focused long enough to activate.
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
     }
+    if (!routeChanged) return;
 
     const next = t('routeAnnouncer.nowOn', 'Now on {{title}}', {
       title: titleFor(pathname, search, params, t),
@@ -156,6 +164,8 @@ export function RouteAnnouncer() {
     // Move focus to the main content area so keyboard users start at the
     // top of the new page instead of staying on the sidebar link.
     const focusHandle = window.setTimeout(() => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.classList.contains('skip-link')) return;
       const main = document.getElementById('main');
       if (main && lastInputWasKeyboard) {
         main.focus({ preventScroll: true });
@@ -166,7 +176,7 @@ export function RouteAnnouncer() {
       window.clearTimeout(handle);
       window.clearTimeout(focusHandle);
     };
-  }, [pathname, search, params, t]);
+  }, [routeKey, pathname, search, params, t]);
 
   return (
     <div
