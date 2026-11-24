@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyMappings,
+  asDate,
   asInt,
   asMicros,
   mapStage,
@@ -54,6 +55,19 @@ describe('migration value coercion', () => {
     expect(asInt('1,234')).toBe(1234);
     expect(asInt('42')).toBe(42);
     expect(asInt('')).toBeNull();
+  });
+});
+
+describe('asDate', () => {
+  it('keeps the calendar day written in the cell, including an offset that crosses UTC midnight', () => {
+    // WHY: new Date('2026-03-15T00:00:00+05:00') is 14 March in UTC, and a
+    // @db.Date column then stores the 14th. Close dates and period ends are
+    // the day in the file.
+    expect(asDate('2026-03-15')?.toISOString()).toBe('2026-03-15T00:00:00.000Z');
+    expect(asDate('2026-03-15T00:00:00+05:00')?.toISOString()).toBe('2026-03-15T00:00:00.000Z');
+    expect(asDate('03/15/2026')?.toISOString()).toBe('2026-03-15T00:00:00.000Z');
+    expect(asDate('2026-02-31')).toBeNull();
+    expect(asDate('')).toBeNull();
   });
 });
 

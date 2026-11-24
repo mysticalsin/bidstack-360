@@ -120,11 +120,31 @@ export function readOpportunityValue(raw: unknown): bigint | undefined {
   return parsed;
 }
 
-function asDate(v: unknown): Date | null {
+export function asDate(v: unknown): Date | null {
   const s = asTrimmed(v);
   if (!s) return null;
+  // Close dates and period ends are the calendar day in the cell. An ISO
+  // instant such as 2026-03-15T00:00:00+05:00 is still 15 March there, and
+  // new Date() would store the 14th once it is converted to UTC.
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(s);
+  if (iso) return utcCivilDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (us) return utcCivilDate(Number(us[3]), Number(us[1]), Number(us[2]));
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function utcCivilDate(year: number, month: number, day: number): Date | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
 }
 
 const LEAD_STATUSES = new Set([
