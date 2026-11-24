@@ -242,7 +242,9 @@ jobs:
     # ubuntu-latest is 26.04. Playwright 1.59.1 has no Chromium build for
     # ubuntu26.04-x64, so `playwright install` exits before any test.
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # Run 45296736262 cancelled at this limit: installing Chromium, Firefox,
+    # and WebKit took 24 minutes, and the web build was cut off before tests.
+    timeout-minutes: 60
     if: github.event_name == 'pull_request'
     needs: integration
 

@@ -29,7 +29,9 @@ export function EmptyState({ title, message, action, icon, secondary }: EmptySta
   const bespoke = icon != null;
   return (
     <motion.div
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      // Paint the settled text. Starting at opacity 0 fails the audit-log
+      // contrast check while the entrance is still in flight.
+      initial={false}
       animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={springSoft}
       data-empty-icon={icon ?? 'sparkle'}
@@ -81,7 +83,7 @@ export function ErrorState({ title, message, action }: BaseProps) {
   return (
     <motion.div
       role="alert"
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      initial={false}
       animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={springSoft}
       className="flex flex-col items-center justify-center py-16 text-center"
