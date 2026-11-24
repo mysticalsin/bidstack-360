@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
-import { useServiceCases } from '@/hooks/useServiceCases';
+import { useCreateServiceCase, useServiceCases } from '@/hooks/useServiceCases';
+import { useHasPermission } from '@/hooks/useCapabilities';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import type { CasePriority, CaseStatus } from '@bidstack/shared';
 
@@ -39,6 +40,10 @@ const PRIORITY_OPTIONS: { value: CasePriority | ''; labelKey: string; labelEn: s
 
 export function ServiceDeskPage() {
   const { t } = useTranslation('crm');
+  const canWrite = useHasPermission('service-desk:write');
+  const createCase = useCreateServiceCase();
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [subject, setSubject] = useState('');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [status, setStatus] = useState<CaseStatus | ''>('');
@@ -137,6 +142,58 @@ export function ServiceDeskPage() {
       ) : items.length === 0 ? (
         <EmptyState
           title={t('serviceDesk.empty.title', 'No cases yet')}
+          message={t(
+            'serviceDesk.empty.message',
+            'Open a case to track a customer request.',
+          )}
+          action={
+            canWrite ? (
+              draftOpen ? (
+                <form
+                  className="flex flex-col items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const next = subject.trim();
+                    if (!next) return;
+                    createCase.mutate(
+                      {
+                        subject: next,
+                        description: null,
+                        priority: 'medium',
+                        status: 'new',
+                        accountId: null,
+                        contactId: null,
+                        ownerId: null,
+                        source: 'web',
+                        satisfaction: null,
+                        slaDeadline: null,
+                      },
+                      {
+                        onSuccess: () => {
+                          setSubject('');
+                          setDraftOpen(false);
+                        },
+                      },
+                    );
+                  }}
+                >
+                  <input
+                    aria-label={t('serviceDesk.empty.subject', 'Case subject')}
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="min-h-[44px] w-64 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 text-sm text-[var(--fg-primary)]"
+                  />
+                  <Button type="submit" disabled={createCase.isPending || subject.trim().length === 0}>
+                    {t('serviceDesk.empty.save', 'Save case')}
+                  </Button>
+                </form>
+              ) : (
+                <Button type="button" onClick={() => setDraftOpen(true)}>
+                  {t('serviceDesk.empty.new', 'New case')}
+                </Button>
+              )
+            ) : undefined
+          }
         />
       ) : (
         <Card>

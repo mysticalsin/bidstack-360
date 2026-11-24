@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatStage, formatMoney, daysUntil } from './format.js';
+import { formatStage, formatMoney, daysUntil, taskDueChip } from './format.js';
 
 describe('formatStage', () => {
   it('humanizes snake_case enum values for display', () => {
@@ -31,5 +31,17 @@ describe('daysUntil', () => {
   it('returns negative integer for past dates (overdue UX)', () => {
     const past = new Date(Date.now() - 3 * 86400 * 1000).toISOString();
     expect(daysUntil(past)).toBeLessThan(0);
+  });
+});
+
+describe('taskDueChip', () => {
+  it('keeps a normal overdue count', () => {
+    expect(taskDueChip(-4, '2026-11-17')).toEqual({ kind: 'count', days: 4 });
+  });
+
+  it('names the date when a year-0001 task would read as hundreds of thousands of days late', () => {
+    // WHY: sweep 09's synthetic due date 0001-01-01 rendered "739940d late".
+    // The date is real. The day count is not a useful sentence.
+    expect(taskDueChip(-739_940, '0001-01-01')).toEqual({ kind: 'since', when: '0001-01-01' });
   });
 });
