@@ -1,7 +1,7 @@
 // Topbar notification center — unified feed of mentions, assignments, bid
 // overrides and system events. Click a row to open the linked entity (and mark
 // it read); "Mark all read" clears the unread badge in one shot.
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from '@/components/motion/static';
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';

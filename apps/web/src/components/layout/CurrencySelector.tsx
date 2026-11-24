@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 

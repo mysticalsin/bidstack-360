@@ -6,7 +6,7 @@
  * ~72 source lines of self-contained animation logic that will be replaced
  * by real cohort data when the Reports module ships.
  */
-import { motion } from 'framer-motion';
+import { motion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';

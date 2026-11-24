@@ -15,7 +15,7 @@
  * Styling reuses the token-based .command-center classes from index.css, so
  * light/dark parity and the ≤1180px / ≤720px breakpoints come for free.
  */
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 

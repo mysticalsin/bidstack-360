@@ -8,7 +8,7 @@
  * leaderboard fallback) and labels which source it is showing.
  */
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';

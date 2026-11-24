@@ -3,7 +3,7 @@
 // macOS "no network" banner — non-intrusive, but always visible while
 // disconnected so users don't blame the app for failed saves.
 
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';

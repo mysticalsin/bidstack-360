@@ -3,7 +3,7 @@
 // a slight scale-up, disappear cleanly. 250ms default delay matches Apple.
 
 import * as RadixTooltip from '@radix-ui/react-tooltip';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from '@/components/motion/static';
 import { forwardRef, type ReactNode } from 'react';
 
 import { springSnap } from '@/lib/motion';

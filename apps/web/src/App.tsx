@@ -12,7 +12,7 @@ import { LoadingSkeleton } from '@/components/ui/PlainSkeleton';
 import { useCmdDotClose } from '@/hooks/useCmdDotClose';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
-import { useOverlayMount, useProdFrame } from '@/lib/prodMount';
+import { useOverlayMount } from '@/lib/prodMount';
 import { usePreferences } from '@/stores/preferences';
 import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { useOnboardingStore } from '@/stores/onboarding';
@@ -40,7 +40,7 @@ const QuickAddMenu = lazy(() =>
 );
 // Hosts are global but not the first paint. Their modules pull motion into
 // the entry evaluation when imported statically.
-const Toaster = lazy(() => import('@/components/ui/Toast').then((m) => ({ default: m.Toaster })));
+const Toaster = lazy(() => import('@/components/ui/Toaster').then((m) => ({ default: m.Toaster })));
 const ConfirmHost = lazy(() =>
   import('@/components/ui/ConfirmDialog').then((m) => ({ default: m.ConfirmHost })),
 );
@@ -65,7 +65,9 @@ const GlobalInteractionSound = lazy(() =>
 export function App() {
   const palette = useCommandPalette();
   const overlays = useOverlayMount();
-  const hostsReady = useProdFrame() >= 1;
+  // Hosts pull framer-motion. Mount them on the first gesture so the
+  // dashboard audit does not evaluate that chunk while it is scoring.
+  const hostsReady = overlays;
   useHelpDrawerHotkey();
   useCmdDotClose();
   useGlobalShortcuts();

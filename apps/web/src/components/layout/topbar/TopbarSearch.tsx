@@ -1,5 +1,5 @@
 // Topbar search bar with recent-search dropdown.
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from '@/components/motion/static';
 import { useState, useRef, useEffect, useLayoutEffect, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
