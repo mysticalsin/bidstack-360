@@ -83,7 +83,7 @@ for (const route of KEY_ROUTES) {
     await stabilizeResponsiveScreenshot(page);
     if (route.name === 'dashboard') {
       await expect(page.getByRole('button', { name: 'Select currency, current: USD' })).toBeVisible();
-      await expect(page.getByText('4 companies · 2 open deals · 4.2m pipeline')).toBeVisible();
+      await expect(page.getByText(/4 companies · 2 open deals · 4\.2m pipeline/i)).toBeVisible();
       await expect(page.getByText('Overdue bids hang below the line. Select a month or a number to see the bids.')).toBeVisible();
       await expect(page.getByText('Contoso Synthetic')).toBeVisible();
     }

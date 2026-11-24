@@ -131,18 +131,17 @@ const LOCALE = { currency: 'USD', dateFormat: 'YYYY-MM-DD', timezone: 'UTC' };
 
 /** Paths the iPad dashboard screenshot reads. Anything else stays on the API. */
 function syntheticBody(url: string): unknown | undefined {
-  const path = new URL(url).pathname;
+  // api() rewrites /api/crm/summary to /api/v1/crm/summary before fetch.
+  const path = new URL(url).pathname.replace(/\/api\/v1\//, '/api/');
   if (path.endsWith('/api/crm/summary')) return SUMMARY;
   if (path.endsWith('/api/opportunities')) return OPPORTUNITIES;
   if (path.endsWith('/api/reports/pipeline')) return PIPELINE;
   if (path.includes('/api/watchdog/feed')) return WATCHDOG;
   if (path.endsWith('/api/forecasts/projection')) return PROJECTION;
   if (path.includes('/api/portfolio/momentum')) return MOMENTUM;
-  if (path.includes('/api/v1/activities')) return ACTIVITIES;
-  if (path.endsWith('/api/org-settings/locale') || path.endsWith('/api/v1/org-settings/locale')) {
-    return LOCALE;
-  }
-  if (path.endsWith('/api/v1/exchange-rates')) return FROZEN_RATES;
+  if (path.includes('/api/activities')) return ACTIVITIES;
+  if (path.endsWith('/api/org-settings/locale')) return LOCALE;
+  if (path.endsWith('/api/exchange-rates')) return FROZEN_RATES;
   return undefined;
 }
 
@@ -187,7 +186,7 @@ export async function pinSyntheticDashboard(page: Page): Promise<void> {
   await page.clock.install({ time: new Date('2026-11-15T12:00:00.000Z') });
   await page.addInitScript(pinDisplayCurrency);
   await page.route(
-    /\/api\/(?:crm\/summary|opportunities|reports\/pipeline|watchdog\/feed|forecasts\/projection|portfolio\/momentum|v1\/activities|org-settings\/locale|v1\/org-settings\/locale|v1\/exchange-rates)(?:\?|$)/,
+    /\/api\/(?:v1\/)?(?:crm\/summary|opportunities|reports\/pipeline|watchdog\/feed|forecasts\/projection|portfolio\/momentum|activities|org-settings\/locale|exchange-rates)(?:\?|$)/,
     fulfillSynthetic,
   );
 }
