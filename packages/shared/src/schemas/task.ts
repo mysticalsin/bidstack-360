@@ -5,8 +5,8 @@ export const TaskStatus = z.enum(['open', 'in_progress', 'done', 'blocked']);
 export type TaskStatus = z.infer<typeof TaskStatus>;
 
 export const Task = z.object({
-  id: z.string().uuid(),
-  oppId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  oppId: z.string().guid().nullable(),
   title: z.string().min(1).max(255),
   dueDate: z.string().date().nullable(),
   status: TaskStatus,
@@ -37,9 +37,9 @@ export const TaskPatch = z
 export type TaskPatch = z.infer<typeof TaskPatch>;
 
 export const TaskFilter = z.object({
-  oppId: z.string().uuid().optional(),
+  oppId: z.string().guid().optional(),
   status: TaskStatus.optional(),
-  cursor: z.string().uuid().optional(),
+  cursor: z.string().guid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type TaskFilter = z.infer<typeof TaskFilter>;

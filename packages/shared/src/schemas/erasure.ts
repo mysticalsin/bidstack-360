@@ -14,14 +14,14 @@ export type ErasureSubjectType = z.infer<typeof ErasureSubjectType>;
 
 /** Path params for the erasure route. */
 export const ErasureOrgParams = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
 });
 export type ErasureOrgParams = z.infer<typeof ErasureOrgParams>;
 
 /** Request body: which data subject to erase. */
 export const ErasureRequest = z.object({
   subjectType: ErasureSubjectType,
-  subjectId: z.string().uuid(),
+  subjectId: z.string().guid(),
 });
 export type ErasureRequest = z.infer<typeof ErasureRequest>;
 
@@ -33,9 +33,9 @@ export type ErasureRequest = z.infer<typeof ErasureRequest>;
  */
 export const ErasureSummary = z.object({
   subjectType: ErasureSubjectType,
-  subjectId: z.string().uuid(),
+  subjectId: z.string().guid(),
   scrubbedFields: z.array(z.string()),
-  relatedScrubbed: z.record(z.number().int().nonnegative()),
+  relatedScrubbed: z.record(z.string(), z.number().int().nonnegative()),
   erasedAt: z.string().datetime(),
 });
 export type ErasureSummary = z.infer<typeof ErasureSummary>;

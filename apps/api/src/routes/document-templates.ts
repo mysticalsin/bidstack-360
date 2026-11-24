@@ -14,24 +14,24 @@ import { renderTemplate } from '../services/documents/document.service.js';
 // ─── Response shapes ─────────────────────────────────────────────────────────
 
 const TemplateResponse = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string(),
   kind: TemplateKind,
   description: z.string().nullable(),
   bodyHtml: z.string(),
-  defaultVariables: z.record(z.string()),
+  defaultVariables: z.record(z.string(), z.string()),
   currentVersion: z.number().int(),
   createdAt: z.string(),
 });
 
 const TemplateVersionResponse = z.object({
-  id: z.string().uuid(),
-  templateId: z.string().uuid(),
+  id: z.string().guid(),
+  templateId: z.string().guid(),
   version: z.number().int(),
   bodyHtml: z.string(),
   createdAt: z.string(),
-  createdBy: z.string().uuid(),
+  createdBy: z.string().guid(),
 });
 
 function serializeTemplate(row: {
@@ -153,7 +153,7 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
     '/document-templates/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: TemplateResponse },
       },
     },
@@ -176,7 +176,7 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
     '/document-templates/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: DocumentTemplatePatch,
         response: { 200: TemplateResponse },
       },
@@ -230,7 +230,7 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
     '/document-templates/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.void() },
       },
     },
@@ -258,7 +258,7 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
     '/document-templates/:id/versions',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: z.array(TemplateVersionResponse) },
       },
     },
@@ -295,8 +295,8 @@ export const documentTemplatesRoutes: FastifyPluginAsyncZod = async (server) => 
     '/document-templates/:id/render',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
-        body: z.object({ variables: z.record(z.string()).default({}) }),
+        params: z.object({ id: z.string().guid() }),
+        body: z.object({ variables: z.record(z.string(), z.string()).default({}) }),
         response: { 200: z.object({ html: z.string() }) },
       },
     },

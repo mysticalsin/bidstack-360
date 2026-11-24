@@ -26,9 +26,9 @@ import { listExpansionOpportunities } from '../services/cs/expansion.service.js'
 
 // ─── Param / body schemas ─────────────────────────────────────────────────
 
-const AccountParams = z.object({ id: z.string().uuid() });
-const SignalParams = z.object({ id: z.string().uuid(), signalId: z.string().uuid() });
-const SurveyParams = z.object({ id: z.string().uuid() });
+const AccountParams = z.object({ id: z.string().guid() });
+const SignalParams = z.object({ id: z.string().guid(), signalId: z.string().guid() });
+const SurveyParams = z.object({ id: z.string().guid() });
 
 const ChurnSignalsQuery = z.object({
   status: z.enum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'ALL']).default('OPEN'),
@@ -47,9 +47,9 @@ const NpsRespondBody = z.object({
 // ─── Response schemas ─────────────────────────────────────────────────────
 
 const HealthScoreResponse = z.object({
-  accountId: z.string().uuid(),
+  accountId: z.string().guid(),
   score: z.number(),
-  factors: z.record(z.unknown()),
+  factors: z.record(z.string(), z.unknown()),
   trend: z.enum(['IMPROVING', 'STABLE', 'DECLINING']),
 });
 
@@ -86,7 +86,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       schema: {
         params: AccountParams,
-        response: { 200: z.array(z.record(z.unknown())) },
+        response: { 200: z.array(z.record(z.string(), z.unknown())) },
       },
     },
     async (req, _reply) => {
@@ -103,7 +103,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         params: AccountParams,
         querystring: ChurnSignalsQuery,
-        response: { 200: z.array(z.record(z.unknown())) },
+        response: { 200: z.array(z.record(z.string(), z.unknown())) },
       },
     },
     async (req, _reply) => {
@@ -199,7 +199,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
     {
       schema: {
         params: AccountParams,
-        response: { 200: z.array(z.record(z.unknown())) },
+        response: { 200: z.array(z.record(z.string(), z.unknown())) },
       },
     },
     async (req, _reply) => {
@@ -250,7 +250,7 @@ export const csRoutes: FastifyPluginAsyncZod = async (app) => {
     '/cs/dashboard',
     {
       schema: {
-        response: { 200: z.record(z.unknown()) },
+        response: { 200: z.record(z.string(), z.unknown()) },
       },
     },
     async (req, _reply) => {

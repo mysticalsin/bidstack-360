@@ -188,12 +188,12 @@ describe('rfp-orchestrator: SERUM loop runtime guard', () => {
 import { z } from 'zod';
 
 const OrchestratorSchema = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   rfpRequestId: z.string().min(1),
-  documentVersionId: z.string().uuid(),
-  opportunityId: z.string().uuid().optional(),
-  proposalId: z.string().uuid().optional(),
-  startedByUserId: z.string().uuid().optional(),
+  documentVersionId: z.string().guid(),
+  opportunityId: z.string().guid().optional(),
+  proposalId: z.string().guid().optional(),
+  startedByUserId: z.string().guid().optional(),
 });
 
 describe('rfp-orchestrator: JobData schema edge cases', () => {

@@ -38,7 +38,9 @@ test('agents page is reachable from product routes', async ({ page, gotoAndWait 
   await expect(page.getByRole('heading', { level: 1, name: 'Agent Studio' })).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByRole('heading', { level: 2, name: 'Agents' })).toBeVisible();
+  // WHY exact: the empty state heading "No agents yet" also contains "agents",
+  // so a substring match resolves two h2s and the test fails on a reachable page.
+  await expect(page.getByRole('heading', { level: 2, name: 'Agents', exact: true })).toBeVisible();
 });
 
 test('dark mode toggle persists across reload', async ({ page, gotoAndWait }) => {

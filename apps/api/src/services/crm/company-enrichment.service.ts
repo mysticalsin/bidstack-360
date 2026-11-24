@@ -8,6 +8,7 @@
 import { type z } from 'zod';
 
 import {
+  annualRevenueOnWire,
   CompanyStrategicIntel,
   type CrmCompany,
   type CrmLogoSource,
@@ -80,6 +81,26 @@ export function logoFor(name: string, url: string | null, source?: string | null
 
 // ─── Serializers ──────────────────────────────────────────────────────────────
 
+const AMOUNT_NOT_READABLE = 'amount not readable';
+
+function revenueWireFields(micros: bigint | null): {
+  annualRevenueMicros: number | null;
+  annualRevenueReadable?: false;
+} {
+  const revenue = annualRevenueOnWire(micros);
+  if (!revenue.annualRevenueReadable) {
+    return { annualRevenueMicros: null, annualRevenueReadable: false };
+  }
+  return { annualRevenueMicros: revenue.annualRevenueMicros };
+}
+
+function revenueLimitations(limitations: string[], readable: boolean | undefined): string[] {
+  if (readable !== false) return limitations;
+  return limitations.includes(AMOUNT_NOT_READABLE)
+    ? limitations
+    : [...limitations, AMOUNT_NOT_READABLE];
+}
+
 export function serializeCompany(enrichment: {
   id: string;
   tradeName: string | null;
@@ -114,8 +135,7 @@ export function serializeCompany(enrichment: {
     industry: industryCodes[0] ?? null,
     imageUrl: stringUrl(metadata.companyImageUrl),
     employeeCount: enrichment.employeeCount,
-    annualRevenueMicros:
-      enrichment.annualRevenueMicros === null ? null : Number(enrichment.annualRevenueMicros),
+    ...revenueWireFields(enrichment.annualRevenueMicros),
     status: enrichment.status,
     registryIds: stringRecord(enrichment.registryIds),
     formerNames: stringArray(enrichment.formerNames),
@@ -150,9 +170,22 @@ function parseStrategicIntel({
   const apollo = record(metadata.apollo);
   if (!Object.keys(apollo).length) return undefined;
 
+  const revenue = revenueWireFields(annualRevenueMicros);
   const parsed = CompanyStrategicIntel.safeParse(apollo.strategicIntel);
   if (parsed.success) {
-    return { ...parsed.data, freshness: freshnessFor(parsed.data.lastSyncedAt) };
+    const next = {
+      ...parsed.data,
+      ...(annualRevenueMicros === null ? {} : revenue),
+      limitations:
+        annualRevenueMicros === null
+          ? parsed.data.limitations
+          : revenueLimitations(parsed.data.limitations, revenue.annualRevenueReadable),
+      freshness: freshnessFor(parsed.data.lastSyncedAt),
+    };
+    if (annualRevenueMicros !== null && revenue.annualRevenueReadable !== false) {
+      delete next.annualRevenueReadable;
+    }
+    return next;
   }
 
   const lastSyncedAt = stringDate(apollo.lastSyncedAt) ?? latestSourceDate(sourceAttribution);
@@ -182,7 +215,7 @@ function parseStrategicIntel({
     freshness,
     employeeTrend: 'unknown',
     employeeCount,
-    annualRevenueMicros: annualRevenueMicros === null ? null : Number(annualRevenueMicros),
+    ...revenue,
     intentTopics: [],
     hiringSignals: [],
     leadershipSignals: [],
@@ -192,7 +225,7 @@ function parseStrategicIntel({
       lastSyncedAt === null
         ? 'Apollo has not synced this account yet.'
         : `Apollo sync refreshed ${lastSyncedAt.slice(0, 10)}.`,
-    limitations: stringArray(apollo.limitations),
+    limitations: revenueLimitations(stringArray(apollo.limitations), revenue.annualRevenueReadable),
     signals: [],
   };
 }

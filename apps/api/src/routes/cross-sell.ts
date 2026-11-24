@@ -18,7 +18,7 @@ import { getAccessScope, type AccessScope } from '../lib/access-scope.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { createNotification } from '../services/notification.service.js';
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 
 // GET /cross-sell-actions response page size (also the fast-path `take` for a
 // single-account or unrestricted-scope query).

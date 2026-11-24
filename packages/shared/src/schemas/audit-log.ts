@@ -9,7 +9,7 @@ export const AuditLogEntry = z.object({
   action: z.string(),
   targetType: z.string().nullable(),
   targetId: z.string().nullable(),
-  userId: z.string().uuid().nullable(),
+  userId: z.string().guid().nullable(),
   userName: z.string().nullable(),
   userEmail: z.string().nullable(),
   diff: z.unknown().nullable(),

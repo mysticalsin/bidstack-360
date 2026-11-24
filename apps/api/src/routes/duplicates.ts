@@ -26,7 +26,7 @@ import { clusterCompanies, clusterContacts } from './duplicates.helpers.js';
 const SCAN_CAP = 1_000;
 
 const CompanyDupRecord = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   legalName: z.string().nullable(),
   domain: z.string().nullable(),
@@ -39,7 +39,7 @@ const CompanyDupRecord = z.object({
 });
 
 const ContactDupRecord = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   email: z.string().nullable(),
   role: z.string().nullable(),
@@ -75,8 +75,8 @@ const ContactDupResponse = z.object({
 const MergeBody = z
   .object({
     entity: z.enum(['company', 'contact']),
-    survivorId: z.string().uuid(),
-    duplicateId: z.string().uuid(),
+    survivorId: z.string().guid(),
+    duplicateId: z.string().guid(),
   })
   .refine((b) => b.survivorId !== b.duplicateId, {
     message: 'survivorId and duplicateId must differ',
@@ -84,10 +84,10 @@ const MergeBody = z
 
 const MergeResult = z.object({
   entity: z.enum(['company', 'contact']),
-  survivorId: z.string().uuid(),
-  duplicateId: z.string().uuid(),
+  survivorId: z.string().guid(),
+  duplicateId: z.string().guid(),
   alreadyMerged: z.boolean(),
-  repointed: z.record(z.number().int()),
+  repointed: z.record(z.string(), z.number().int()),
 });
 
 type Tx = Prisma.TransactionClient;

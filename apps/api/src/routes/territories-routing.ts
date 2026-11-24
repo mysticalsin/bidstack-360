@@ -129,7 +129,7 @@ export const territoriesRoutingRoutes: FastifyPluginAsyncZod = async (server) =>
     {
       preHandler: server.requirePermission('territories:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: LeadRoutingRulePatch,
         response: { 200: LeadRoutingRule },
       },
@@ -184,7 +184,7 @@ export const territoriesRoutingRoutes: FastifyPluginAsyncZod = async (server) =>
     {
       preHandler: server.requirePermission('territories:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
       },
     },
     async (req) => {

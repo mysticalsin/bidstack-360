@@ -155,10 +155,10 @@ export const customObjectDefRoutes: FastifyPluginAsyncZod = async (server) => {
         body: CustomObjectFieldCreate,
         response: {
           201: z.object({
-            id: z.string().uuid(),
-            orgId: z.string().uuid(),
+            id: z.string().guid(),
+            orgId: z.string().guid(),
             entityType: z.string(),
-            customObjectDefId: z.string().uuid().nullable(),
+            customObjectDefId: z.string().guid().nullable(),
             fieldKey: z.string(),
             label: z.string(),
             fieldType: z.string(),

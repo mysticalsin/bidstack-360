@@ -28,7 +28,7 @@ let cache: { data: CachedRates; ts: number } | null = null;
 
 const ExchangeRatesResponse = z.object({
   base: z.string(),
-  rates: z.record(z.number()),
+  rates: z.record(z.string(), z.number()),
   date: z.string(),
 });
 

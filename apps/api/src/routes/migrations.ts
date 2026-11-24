@@ -85,7 +85,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
     '/migrations/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: MigrationJobResponse },
       },
     },
@@ -114,8 +114,8 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
           // WHY client-side: avoids streaming large CSV bodies through the API.
           // Production path: upload raw CSV to presigned URL, then call this
           // endpoint with a redisKey pointing to the stored data.
-          rows: z.array(z.record(z.string())).min(1).max(10_000),
-          mappings: z.record(z.string().nullable()),
+          rows: z.array(z.record(z.string(), z.string())).min(1).max(10_000),
+          mappings: z.record(z.string(), z.string().nullable()),
           dedupStrategy: DedupStrategyEnum.default('update'),
           externalIdColumn: z.string().optional(),
         }),
@@ -247,7 +247,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
     '/migrations/:id/cancel',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: MigrationJobResponse },
       },
     },
@@ -283,7 +283,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
     '/migrations/:id/undo',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: z.object({ message: z.string(), deletedCount: z.number() }) },
       },
     },
@@ -387,7 +387,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
 
   server.get(
     '/migrations/:id/errors.csv',
-    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    { schema: { params: z.object({ id: z.string().guid() }) } },
     async (req, reply) => {
       const { orgId } = req.auth;
       const job = await prisma.migrationJob.findFirst({

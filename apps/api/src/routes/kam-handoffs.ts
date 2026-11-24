@@ -104,7 +104,7 @@ export const kamHandoffRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: server.requirePermission('kam:read'),
       schema: {
         querystring: z.object({
-          companyId: z.string().uuid(),
+          companyId: z.string().guid(),
           status: z.enum(['draft', 'exported', 'confirmed']).optional(),
         }),
         response: { 200: KamHandoffList },
@@ -130,7 +130,7 @@ export const kamHandoffRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/handoffs/:id',
     {
       preHandler: server.requirePermission('kam:read'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamHandoffDetail } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: KamHandoffDetail } },
     },
     async (req) => toHandoffDetail(await loadHandoffOr404(req, req.params.id)),
   );
@@ -140,7 +140,7 @@ export const kamHandoffRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/handoffs/:id/export',
     {
       preHandler: server.requirePermission('kam:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamHandoffExportResult } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: KamHandoffExportResult } },
     },
     async (req) => {
       const handoff = await loadHandoffOr404(req, req.params.id);
@@ -178,7 +178,7 @@ export const kamHandoffRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: KamHandoffConfirmBody,
         response: { 200: KamHandoffDetail },
       },

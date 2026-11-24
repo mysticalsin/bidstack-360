@@ -33,7 +33,7 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
     {
       preHandler: [server.requirePermission('opportunities:read')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         querystring: z.object({ limit: z.coerce.number().int().min(1).max(100).default(50) }),
         response: {
           200: z.object({
@@ -44,7 +44,7 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
                 text: z.string(),
                 actorName: z.string().nullable(),
                 createdAt: z.string().datetime(),
-                metadata: z.record(z.unknown()).optional(),
+                metadata: z.record(z.string(), z.unknown()).optional(),
               }),
             ),
           }),

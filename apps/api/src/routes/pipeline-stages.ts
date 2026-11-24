@@ -53,7 +53,7 @@ const DEFAULT_STAGES: DefaultStage[] = [
 ];
 
 const PipelineStageSettings = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   key: z.string(),
   name: z.string(),
   orderIndex: z.number().int(),
@@ -124,7 +124,7 @@ export const pipelineStageRoutes: FastifyPluginAsyncZod = async (server) => {
     '/pipeline-stages/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: PipelineStageSettingsPatch,
         response: { 200: PipelineStageSettings },
       },

@@ -1,4 +1,4 @@
-/* global self, caches, URL, fetch */
+/* global self, caches, URL, fetch, Request */
 
 const CACHE_NAME = 'bidstack-v4-network-owned-routes';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
@@ -25,10 +25,20 @@ function isSameOriginUrl(url) {
   return url.origin === self.location.origin;
 }
 
+function cacheKeyFor(request) {
+  const mode = request && request.cache;
+  // Cache.put rejects a request whose cache mode is reload, no-store, or
+  // no-cache. The page warmer uses reload for the unhashed shell documents.
+  if (mode === 'reload' || mode === 'no-store' || mode === 'no-cache') {
+    return new Request(request.url, { method: 'GET' });
+  }
+  return request;
+}
+
 function fetchAndCache(request, cache) {
   return fetch(request).then((networkResponse) => {
     if (networkResponse && networkResponse.status === 200) {
-      cache.put(request, networkResponse.clone());
+      cache.put(cacheKeyFor(request), networkResponse.clone()).catch(function () {});
     }
     return networkResponse;
   });

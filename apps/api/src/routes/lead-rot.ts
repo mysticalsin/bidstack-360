@@ -15,7 +15,7 @@ import {
   type RecoveryPlay,
 } from '@bidstack/shared';
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 const STATUS_VALUES = LeadStatus.options;
 const FALLBACK_CONFIG_IDS: Record<z.infer<typeof LeadStatus>, string> = {
   new: '00000000-0000-4000-8000-000000000001',

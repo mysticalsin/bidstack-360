@@ -7,15 +7,21 @@
 // app is alive when a network round-trip is in progress.
 
 import { useIsFetching, useIsMutating } from '@tanstack/react-query';
-import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+
+import { usePreferences } from '@/stores/preferences';
 
 export function RouteProgress() {
   const fetching = useIsFetching();
   const mutating = useIsMutating();
   const inFlight = fetching + mutating > 0;
-  const reduced = useReducedMotion();
+  const motionPref = usePreferences((s) => s.motion);
+  const reduced =
+    motionPref === 'reduced' ||
+    (motionPref !== 'full' &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // Bump on every route change so a fast nav-without-fetch still shows a
   // brief progress hint (otherwise lazy-route loads finish before React
@@ -53,20 +59,16 @@ export function RouteProgress() {
       aria-hidden
       className="pointer-events-none fixed inset-x-0 top-0 z-[150] h-0.5 overflow-hidden"
     >
-      <motion.div
-        // Hand-rolled "trickle" — the bar drifts forward continuously while
-        // there's work, snaps to 100% and fades out when work settles.
-        // Easier and lighter than nprogress for a 2-state indicator.
-        initial={false}
-        animate={visible ? { width: '85%', opacity: 1 } : { width: '100%', opacity: 0 }}
-        transition={
-          reduced
-            ? { duration: 0.001 }
-            : visible
-              ? { width: { duration: 6, ease: [0.05, 0.7, 0.1, 1] }, opacity: { duration: 0.15 } }
-              : { width: { duration: 0.2 }, opacity: { duration: 0.25, delay: 0.1 } }
-        }
+      {/* CSS instead of framer-motion so the entry can paint before that chunk evaluates. */}
+      <div
         className="h-full bg-[var(--brand-primary)] shadow-[0_0_8px_var(--brand-primary)]"
+        style={{
+          width: visible ? '85%' : '100%',
+          opacity: visible ? 1 : 0,
+          transitionProperty: 'width, opacity',
+          transitionDuration: reduced ? '1ms' : visible ? '6s' : '200ms',
+          transitionTimingFunction: visible ? 'cubic-bezier(0.05, 0.7, 0.1, 1)' : 'ease',
+        }}
       />
     </div>
   );

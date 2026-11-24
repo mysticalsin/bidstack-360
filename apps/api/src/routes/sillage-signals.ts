@@ -13,7 +13,7 @@ const AccountSignalsBody = z
   .object({
     companyName: z.string().trim().min(1).max(200).optional(),
     domain: z.string().trim().min(1).max(253).optional(),
-    accountId: z.string().uuid().optional(),
+    accountId: z.string().guid().optional(),
   })
   .refine((body) => Boolean(body.companyName || body.domain), {
     message: 'companyName or domain is required',

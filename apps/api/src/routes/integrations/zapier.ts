@@ -149,7 +149,7 @@ export const zapierRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         summary: 'Unsubscribe from a Polo PreSales event (REST-hook)',
         tags: ['zapier'],
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: {
           204: z.null(),
           401: z.object({ error: z.string() }),

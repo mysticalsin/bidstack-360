@@ -7,17 +7,17 @@ import { z } from 'zod';
 // ─── Job data schemas ──────────────────────────────────────────────────────
 
 export const PushJobData = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
-  calendarEventId: z.string().uuid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
+  calendarEventId: z.string().guid(),
   /** push | update | delete */
   operation: z.enum(['push', 'update', 'delete']),
 });
 
 export const PullJobData = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
-  integrationTokenId: z.string().uuid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
+  integrationTokenId: z.string().guid(),
 });
 
 // ─── Shared push parameters ────────────────────────────────────────────────

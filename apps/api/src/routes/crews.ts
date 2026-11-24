@@ -109,6 +109,7 @@ const ACTIVE_RUN_STATUSES = ['queued', 'running'] as const;
 const RETRYABLE_RUN_STATUSES = ['failed', 'cancelled', 'partial'] as const;
 const RunInputs = z
   .record(
+    z.string(),
     z.string().max(MAX_INPUT_VALUE_CHARS, `Each value must be ≤ ${MAX_INPUT_VALUE_CHARS} chars`),
   )
   .default({})
@@ -194,7 +195,7 @@ const CrewBody = z
   });
 
 const CrewResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   description: z.string().nullable(),
   process: z.string(),
@@ -213,7 +214,7 @@ const CrewResponse = z.object({
 });
 
 const CrewListResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   description: z.string().nullable(),
   process: z.string(),
@@ -224,11 +225,11 @@ const CrewListResponse = z.object({
 });
 
 const RunResponse = z.object({
-  id: z.string().uuid(),
-  crewId: z.string().uuid(),
-  startedByUserId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  crewId: z.string().guid(),
+  startedByUserId: z.string().guid().nullable(),
   status: z.string(),
-  inputs: z.record(z.string()),
+  inputs: z.record(z.string(), z.string()),
   finalOutput: z.string().nullable(),
   results: z.unknown().nullable(),
   error: z.string().nullable(),
@@ -420,7 +421,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     '/crews/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: CrewResponse },
       },
     },
@@ -469,7 +470,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     {
       preHandler: admin,
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: CrewBody,
         response: { 200: CrewResponse },
       },
@@ -508,7 +509,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     '/crews/:id',
     {
       preHandler: admin,
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const affected = await prisma.$executeRaw`
@@ -544,9 +545,9 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
         app.requirePermission('agents:write'),
       ],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: CrewRunStartBody,
-        response: { 202: z.object({ runId: z.string().uuid(), status: z.string() }) },
+        response: { 202: z.object({ runId: z.string().guid(), status: z.string() }) },
       },
     },
     async (req, reply) => {
@@ -599,7 +600,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
       config: { permission: 'agents:write' },
       preHandler: app.requirePermission('agents:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: RunResponse },
       },
     },
@@ -647,8 +648,8 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
         app.requirePermission('agents:write'),
       ],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
-        response: { 202: z.object({ runId: z.string().uuid(), status: z.string() }) },
+        params: z.object({ id: z.string().guid() }),
+        response: { 202: z.object({ runId: z.string().guid(), status: z.string() }) },
       },
     },
     async (req, reply) => {
@@ -714,7 +715,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     '/crew-runs/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: RunResponse },
       },
     },
@@ -739,7 +740,7 @@ export const crewRoutes: FastifyPluginAsync = async (server) => {
     '/crew-runs',
     {
       schema: {
-        querystring: z.object({ crewId: z.string().uuid().optional() }),
+        querystring: z.object({ crewId: z.string().guid().optional() }),
         response: { 200: z.object({ items: z.array(RunResponse) }) },
       },
     },

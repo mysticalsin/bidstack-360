@@ -6,10 +6,10 @@
  * Bid/RFP routes    → ./BidRoutes
  * Admin routes      → ./AdminRoutes
  */
-import { AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
+import { DashboardFirstPaint } from '@/components/dashboard/DashboardFirstPaint';
 import { PageTransition } from '@/components/motion/PageTransition';
 
 import { adminRouteElements } from './AdminRoutes';
@@ -76,8 +76,7 @@ export function AppRoutes() {
   // animate.
   const segmentKey = '/' + (location.pathname.split('/')[1] ?? '');
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <PageTransition pageKey={segmentKey || '/'}>
+    <PageTransition pageKey={segmentKey || '/'} visibleOnMount={segmentKey === '/dashboard'}>
         <Routes location={location}>
           {/* ── Public ──────────────────────────────────────────────────── */}
           <Route path="/login" element={<LoginPage />} />
@@ -91,7 +90,7 @@ export function AppRoutes() {
             path="/dashboard"
             element={
               <RequireAuth>
-                <DashboardPage />
+                <DashboardFirstPaint />
               </RequireAuth>
             }
           />
@@ -492,6 +491,5 @@ export function AppRoutes() {
           />
         </Routes>
       </PageTransition>
-    </AnimatePresence>
   );
 }

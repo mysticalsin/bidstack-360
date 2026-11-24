@@ -88,6 +88,39 @@ describe('serializeCompany', () => {
     expect(company.strategicIntel?.freshness).toBe('stale');
   });
 
+  it('does not emit a rounded annualRevenueMicros past the safe integer line', () => {
+    // WHY: seeded enterprises (€13B–€189B) are exact bigints past the safe
+    // integer line. A neighbor of €78B micros collapses onto the same JS
+    // number, so the response nulls the field and flags it instead of
+    // sending that number.
+    const siemensMicros = 78n * 1_000_000_000_000_000n;
+    const company = serializeCompany({
+      id: 'siemens',
+      tradeName: 'Siemens',
+      legalName: 'Siemens',
+      domain: 'siemens.com',
+      website: 'https://siemens.com/',
+      industryCodes: ['Manufacturing'],
+      providerMetadata: {},
+      employeeCount: 311_000,
+      annualRevenueMicros: siemensMicros,
+      status: 'active',
+      registryIds: {},
+      formerNames: [],
+      incorporationDate: null,
+      logoUrl: null,
+      logoSource: null,
+      confidenceBps: 8000,
+      sourceAttribution: [],
+      updatedAt: new Date('2026-06-07T12:00:00.000Z'),
+    });
+
+    expect(company.annualRevenueMicros).toBeNull();
+    expect(company.annualRevenueReadable).toBe(false);
+    expect(JSON.stringify(company)).not.toContain('78000000000000000');
+    expect(BigInt(Number(siemensMicros + 1n))).toBe(siemensMicros);
+  });
+
   it('maps Seamless technologies into the company technical stack', () => {
     const company = serializeCompany({
       id: 'sanofi',

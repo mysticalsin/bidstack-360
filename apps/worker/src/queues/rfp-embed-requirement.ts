@@ -30,9 +30,9 @@ const EMBED_DIM = 1024;
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  requirementId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  requirementId: z.string().guid(),
   contentText: z.string().min(1),
 });
 type JobData = z.infer<typeof JobData>;

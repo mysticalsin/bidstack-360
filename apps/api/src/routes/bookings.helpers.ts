@@ -50,13 +50,34 @@ export const BookingPageCreate = z.object({
 
 export const BookingPagePatch = BookingPageCreate.partial();
 
+/**
+ * Noon UTC is only a calendar-day anchor. `computeSlots` walks the whole
+ * local day of that instant, including morning hours before the anchor.
+ * A lookup that starts at the anchor misses those bookings, so the public
+ * page still offers a slot the create path then rejects.
+ *
+ * Pad far enough to cover UTC−12 through UTC+14, then add the page buffer.
+ */
+const LOCAL_DAY_PAD_MS = 14 * 60 * 60 * 1000;
+
+export function blockingLookupBounds(
+  rangeStart: Date,
+  rangeEnd: Date,
+  bufferMs: number,
+): { fetchStart: Date; fetchEnd: Date } {
+  return {
+    fetchStart: new Date(rangeStart.getTime() - LOCAL_DAY_PAD_MS - bufferMs),
+    fetchEnd: new Date(rangeEnd.getTime() + LOCAL_DAY_PAD_MS + bufferMs),
+  };
+}
+
 export const PublicBookingCreate = z.object({
   attendeeName: z.string().min(1).max(120),
   attendeeEmail: z.string().email().max(254),
   attendeePhone: z.string().max(30).optional(),
   startAt: z.string().datetime(),
   /** Answers keyed by customQuestion.id */
-  answers: z.record(z.unknown()).default({}),
+  answers: z.record(z.string(), z.unknown()).default({}),
   /** IANA timezone used to validate the selected slot against page availability. */
   tz: z.string().max(50).default('UTC'),
 });

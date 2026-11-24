@@ -19,8 +19,8 @@ export const WinLossReasonCode = z.enum([
 export type WinLossReasonCode = z.infer<typeof WinLossReasonCode>;
 
 export const WinLossRecord = z.object({
-  id: z.string().uuid(),
-  opportunityId: z.string().uuid(),
+  id: z.string().guid(),
+  opportunityId: z.string().guid(),
   outcome: WinLossOutcome,
   reason: WinLossReasonCode,
   competitor: z.string().max(255).nullable(),

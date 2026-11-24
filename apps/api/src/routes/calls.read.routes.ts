@@ -31,15 +31,15 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['calls'],
         querystring: z.object({
           entityType: EntityTypeEnum.optional(),
-          entityId: z.string().uuid().optional(),
+          entityId: z.string().guid().optional(),
           provider: ProviderEnum.optional(),
           limit: z.coerce.number().int().min(1).max(100).default(25),
-          cursor: z.string().uuid().optional(),
+          cursor: z.string().guid().optional(),
         }),
         response: {
           200: z.object({
             calls: z.array(CallSessionSchema),
-            nextCursor: z.string().uuid().nullable(),
+            nextCursor: z.string().guid().nullable(),
           }),
         },
       },
@@ -119,7 +119,7 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         description: 'Get full call session detail including transcript and AI insights',
         tags: ['calls'],
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: {
           200: z.object({
             call: CallSessionSchema.extend({
@@ -128,7 +128,7 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
               signedRecordingUrl: z.string().nullable(),
               summaries: z.array(
                 z.object({
-                  id: z.string().uuid(),
+                  id: z.string().guid(),
                   key: z.string(),
                   value: z.string(),
                   confidence: z.number(),
@@ -205,7 +205,7 @@ export const callsReadRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         description: 'Re-trigger AI analysis on an existing call transcript',
         tags: ['calls'],
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: {
           202: z.object({ jobId: z.string(), message: z.string() }),
           404: z.object({ error: z.string() }),

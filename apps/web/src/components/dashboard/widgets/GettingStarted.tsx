@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 
 import { Icon, type IconName } from '@/components/ui/Icon';

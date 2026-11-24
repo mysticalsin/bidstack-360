@@ -8,7 +8,7 @@
 import { Navigate } from 'react-router-dom';
 
 import { useAuth, useIsAdmin } from '@/lib/auth';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { LoadingSkeleton } from '@/components/ui/PlainSkeleton';
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth();

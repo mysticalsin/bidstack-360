@@ -53,11 +53,21 @@ test.describe('Calendar booking (public)', () => {
     const formVisible = await booking.nameInput.isVisible({ timeout: 5_000 }).catch(() => false);
     expect(formVisible, 'Contact form must appear after slot selection').toBe(true);
 
+    const slot = page.getByRole('button', { name: /available slot/i }).first();
+    const slotName = await slot.getAttribute('aria-label');
+    expect(slotName, 'The selected slot needs an accessible name').toBeTruthy();
+
     await booking.fillContactDetails({
       name: 'E2E Test User',
       email: 'e2e@bidstack-test.example',
     });
     await booking.submit();
     await booking.assertBookingConfirmed();
+
+    // WHY: availability used to query blockers from noon UTC while slot
+    // generation included the morning, so a booked 9:00 slot stayed listed
+    // and the next submit showed "That time is no longer available."
+    await page.reload();
+    await expect(page.getByRole('button', { name: slotName! })).toHaveCount(0);
   });
 });

@@ -86,7 +86,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         params: z.object({
           entityType: z.string().min(1).max(50),
-          entityId: z.string().uuid(),
+          entityId: z.string().guid(),
         }),
         querystring: z.object({
           cursor: ActivityCursor.optional(),
@@ -207,7 +207,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
     '/activities/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: Activity },
       },
     },
@@ -285,7 +285,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
     '/activities/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: ActivityPatch,
         response: { 200: Activity },
       },
@@ -324,7 +324,7 @@ export const activityRoutes: FastifyPluginAsyncZod = async (server) => {
     '/activities/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

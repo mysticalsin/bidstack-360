@@ -17,13 +17,13 @@ const TITLE_MAX = 200;
 const BODY_MAX = 32_000;
 
 export const Note = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountId: z.string().min(1).max(255),
-  companyId: z.string().uuid().optional(),
+  companyId: z.string().guid().optional(),
   title: z.string().min(1).max(TITLE_MAX),
   bodyMd: z.string().max(BODY_MAX),
   pinned: z.boolean(),
-  authorUserId: z.string().uuid(),
+  authorUserId: z.string().guid(),
   // Author email is convenient for display so the UI doesn't need a second
   // round-trip to /users. Nullable because a deleted user could leave an
   // orphan reference, even though the FK is RESTRICT today.
@@ -35,7 +35,7 @@ export type Note = z.infer<typeof Note>;
 
 export const NoteCreate = z.object({
   accountId: z.string().min(1).max(255),
-  companyId: z.string().uuid().optional(),
+  companyId: z.string().guid().optional(),
   title: z.string().min(1).max(TITLE_MAX),
   bodyMd: z.string().max(BODY_MAX),
   pinned: z.boolean().optional().default(false),
@@ -62,7 +62,7 @@ export type NoteList = z.infer<typeof NoteList>;
 
 export const MeetingNotesImportRequest = z.object({
   accountId: z.string().min(1).max(255),
-  companyId: z.string().uuid().optional(),
+  companyId: z.string().guid().optional(),
   companyName: z.string().min(1).max(255),
   domain: z.string().trim().min(3).max(255).optional(),
   title: z.string().min(1).max(TITLE_MAX).optional(),

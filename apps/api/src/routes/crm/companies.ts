@@ -78,7 +78,7 @@ const AutopopulateSalesCompaniesBody = z
     limit: z.coerce.number().int().min(1).max(12).default(8),
     source: z.enum(['all', 'sales_orders', 'opportunities']).default('all'),
   })
-  .default({});
+  .default({ limit: 8, source: 'all' });
 
 export const crmCompanyRoutes: FastifyPluginAsyncZod = async (server) => {
   const TechnicalStackBody = z.object({

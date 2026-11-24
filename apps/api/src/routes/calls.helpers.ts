@@ -10,11 +10,11 @@ export const EntityTypeEnum = z.enum(['DEAL', 'CONTACT', 'OPPORTUNITY', 'LEAD'])
 export const ProviderEnum = z.enum(['ZOOM', 'TEAMS', 'GOOGLE_MEET', 'TWILIO_VOICE']);
 
 export const CallSessionSchema = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
   entityType: z.string(),
-  entityId: z.string().uuid(),
+  entityId: z.string().guid(),
   provider: z.string(),
   externalMeetingId: z.string().nullable(),
   joinUrl: z.string().nullable(),

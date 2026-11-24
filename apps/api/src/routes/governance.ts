@@ -16,8 +16,8 @@ import {
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { createNotification } from '../services/notification.service.js';
 
-const IdParam = z.object({ id: z.string().uuid() });
-const ActionParams = z.object({ id: z.string().uuid(), actionId: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
+const ActionParams = z.object({ id: z.string().guid(), actionId: z.string().guid() });
 
 interface DbAction {
   id: string;

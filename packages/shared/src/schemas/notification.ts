@@ -12,7 +12,7 @@ export const NotificationType = z.enum([
 export type NotificationType = z.infer<typeof NotificationType>;
 
 export const Notification = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   type: NotificationType,
   title: z.string(),
   body: z.string().nullable(),

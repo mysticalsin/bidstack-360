@@ -1,8 +1,8 @@
 # Semgrep SAST — runs on every push to main and every PR.
 # Rulesets are the OWASP curated bundles + language-specific high-signal sets.
-# Why fail on ERROR only: WARNING-tier results live in the SARIF artefact for
-# review on the Security tab, but only ERROR-tier findings should ever block
-# a merge. ERROR maps to the "code-as-vulnerability" tier in Semgrep's taxonomy.
+# `semgrep ci` rejects --severity and --error, so the scan never starts.
+# `semgrep scan` accepts both: ERROR is the code-as-vulnerability tier, and
+# --error exits non-zero when any of those findings remain.
 
 name: Semgrep SAST
 
@@ -36,22 +36,19 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Run Semgrep
-        env:
-          # Fail the build on ERROR-severity findings only. WARNING + INFO
-          # are visible in the SARIF report but don't block the PR.
-          SEMGREP_RULES: >-
-            p/typescript
-            p/owasp-top-ten
-            p/secrets
-            p/javascript
-            p/dockerfile
         run: |
-          semgrep ci \
+          semgrep scan \
+            --metrics=off \
+            --error \
+            --severity ERROR \
             --sarif \
             --output=semgrep.sarif \
-            --severity=ERROR \
-            --error \
-            --metrics=off
+            --config p/typescript \
+            --config p/owasp-top-ten \
+            --config p/secrets \
+            --config p/javascript \
+            --config p/dockerfile \
+            .
 
       - name: Upload SARIF to GitHub Security
         if: always()

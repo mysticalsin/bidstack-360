@@ -115,7 +115,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
     '/tasks/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: Task },
       },
     },
@@ -207,7 +207,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('tasks:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: TaskPatch,
         response: { 200: Task },
       },
@@ -334,7 +334,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('tasks:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

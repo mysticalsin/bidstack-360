@@ -133,6 +133,13 @@ test.describe('E-signature flow', () => {
       sendBtn,
       'Opportunity detail must expose a Send for Signature CTA in Documents',
     ).toBeVisible({ timeout: 5_000 });
-    await expect(sendBtn).toBeEnabled();
+    // WHY disabled: a signature request needs a real Document id. Seeded
+    // opportunities have no file, so the CTA stays visible but cannot open a
+    // modal that would send a broken id. The title tells the user what to do.
+    await expect(sendBtn).toBeDisabled();
+    await expect(sendBtn).toHaveAttribute(
+      'title',
+      'Upload a document before sending it for signature',
+    );
   });
 });

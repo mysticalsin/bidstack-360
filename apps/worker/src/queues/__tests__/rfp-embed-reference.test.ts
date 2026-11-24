@@ -77,8 +77,8 @@ async function runProcessJobBranches(
   try {
     const { z } = await import('zod');
     const JobData = z.object({
-      orgId: z.string().uuid(),
-      referenceId: z.string().uuid(),
+      orgId: z.string().guid(),
+      referenceId: z.string().guid(),
       contentText: z.string().min(1),
     });
 

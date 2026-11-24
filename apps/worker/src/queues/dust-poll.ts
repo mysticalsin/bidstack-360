@@ -23,7 +23,7 @@ const REPEAT_EVERY_MS = 5 * 60 * 1000;
 
 const JobData = z.object({
   source: z.string(),
-  orgId: z.string().uuid().optional(),
+  orgId: z.string().guid().optional(),
 });
 
 // Circuit breaker state — keyed per org. Module-level scalars here previously

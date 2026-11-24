@@ -232,7 +232,10 @@ describe('service-desk routes', () => {
       payload: { satisfaction: 6 },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toMatch(/satisfaction.*Number must be less than or equal to 5/);
+    // Zod 4 (fastify-type-provider-zod 6) reports the ceiling as
+    // "Too big: expected number to be <=5". The message must name
+    // satisfaction, so a 400 for a different field does not pass.
+    expect(res.json().message).toMatch(/satisfaction Too big: expected number to be <=5/);
   });
 
   skipIfNoDb('GET /api/service-cases filters by status', async () => {

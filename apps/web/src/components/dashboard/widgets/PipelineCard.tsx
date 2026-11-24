@@ -7,7 +7,7 @@
  * `smoothLinePath` lives here since it's consumed only by PipelineLiveChart.
  */
 import { type CSSProperties } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';

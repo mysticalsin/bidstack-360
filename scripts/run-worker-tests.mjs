@@ -34,6 +34,9 @@ const pnpmExecPath =
     : undefined;
 const pnpmCjsPath = findPnpmCjsFromPath() ?? pnpmExecPath;
 const command = pnpmCjsPath ? process.execPath : 'pnpm';
+const extraArgs = process.argv.slice(2);
+if (extraArgs[0] === '--') extraArgs.shift();
+
 const args = [
   ...(pnpmCjsPath ? [pnpmCjsPath] : []),
   'exec',
@@ -43,7 +46,7 @@ const args = [
   '--pool=forks',
   '--no-file-parallelism',
   '--isolate=true',
-  ...process.argv.slice(2),
+  ...extraArgs,
 ];
 
 const child = spawn(command, args, {

@@ -27,10 +27,10 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
     '/opportunities/:id/stage',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: z
           .object({
-            pipelineStageId: z.string().uuid().optional(),
+            pipelineStageId: z.string().guid().optional(),
             stage: z
               .enum([
                 's1_lead',
@@ -48,12 +48,12 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           }),
         response: {
           200: z.object({
-            id: z.string().uuid(),
-            pipelineStageId: z.string().uuid().nullable(),
+            id: z.string().guid(),
+            pipelineStageId: z.string().guid().nullable(),
             stage: z.string(),
             pipelineStage: z
               .object({
-                id: z.string().uuid(),
+                id: z.string().guid(),
                 name: z.string(),
                 probability: z.number(),
                 color: z.string().nullable(),
@@ -206,7 +206,7 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
     '/opportunities/:id/brief',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: {
           200: z.object({
             brief: z.string(),

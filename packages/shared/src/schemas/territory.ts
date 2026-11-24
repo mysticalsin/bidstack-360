@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 export const Territory = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string().min(1),
   countryCodes: z.array(z.string()),
   region: z.string().nullable(),
   postalCodes: z.array(z.string()),
-  ownerId: z.string().uuid(),
+  ownerId: z.string().guid(),
   ownerName: z.string().nullable(),
   active: z.boolean().default(true),
   createdAt: z.string().datetime(),
@@ -16,15 +16,15 @@ export const Territory = z.object({
 export type Territory = z.infer<typeof Territory>;
 
 export const LeadRoutingRule = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string().min(1),
   active: z.boolean().default(true),
   priority: z.number().int().default(0),
-  criteria: z.record(z.unknown()).default({}),
-  assignToUserId: z.string().uuid().nullable(),
-  assignToTerritoryId: z.string().uuid().nullable(),
-  roundRobinTeam: z.array(z.string().uuid()).default([]),
+  criteria: z.record(z.string(), z.unknown()).default({}),
+  assignToUserId: z.string().guid().nullable(),
+  assignToTerritoryId: z.string().guid().nullable(),
+  roundRobinTeam: z.array(z.string().guid()).default([]),
   roundRobinIndex: z.number().int().default(0),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -55,9 +55,9 @@ export const LeadRoutingRulePatch = LeadRoutingRuleCreate.partial();
 export type LeadRoutingRulePatch = z.infer<typeof LeadRoutingRulePatch>;
 
 export const Forecast = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  ownerId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  ownerId: z.string().guid(),
   ownerName: z.string().nullable(),
   period: z.string().min(1),
   category: z.enum(['pipeline', 'best_case', 'commit', 'closed']),
@@ -76,7 +76,7 @@ export type Forecast = z.infer<typeof Forecast>;
 
 export const ForecastProjectionOwner = z.object({
   // Null when the opportunity has no owner (rolled up as "Unassigned").
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   ownerName: z.string(),
   openMicros: z.number().nonnegative(),
   weightedMicros: z.number().nonnegative(),

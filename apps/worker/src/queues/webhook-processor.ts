@@ -22,7 +22,7 @@ import {
 const QUEUE_NAME = DUST_WEBHOOK_PROCESSOR.name;
 const TICK_MS = 10_000;
 
-const WebhookPayload = z.record(z.unknown());
+const WebhookPayload = z.record(z.string(), z.unknown());
 
 /**
  * Thrown inside the agent.run.completed transaction when a concurrent/retried

@@ -1,15 +1,21 @@
-import { type ReactNode } from 'react';
-import { motion, type HTMLMotionProps } from 'framer-motion';
+import { type HTMLAttributes, type ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
 
-interface GlassCardProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
+interface GlassCardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   className?: string;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   hoverable?: boolean;
   glow?: 'none' | 'blue' | 'jade' | 'purple' | 'amber' | 'teal' | 'rose';
+  /** Accepted so existing call sites can keep their entrance props. Not animated. */
+  variants?: unknown;
+  initial?: unknown;
+  animate?: unknown;
+  exit?: unknown;
+  transition?: unknown;
+  whileHover?: unknown;
+  whileTap?: unknown;
 }
 
 const paddingMap = {
@@ -31,7 +37,8 @@ const glowMap = {
 
 /**
  * GlassCard — Frosted glass card with optional colored glow.
- * Built on backdrop-filter for the frosted look.
+ * Built on backdrop-filter for the frosted look. The hover lift is CSS so the
+ * dashboard does not evaluate framer-motion to paint these cards.
  */
 export function GlassCard({
   children,
@@ -39,21 +46,27 @@ export function GlassCard({
   padding = 'md',
   hoverable = true,
   glow = 'none',
-  ...motionProps
+  variants: _variants,
+  initial: _initial,
+  animate: _animate,
+  exit: _exit,
+  transition: _transition,
+  whileHover: _whileHover,
+  whileTap: _whileTap,
+  ...rest
 }: GlassCardProps) {
-  const reduced = useReducedMotion();
-
   return (
-    <motion.div
-      className={cn('glass-card', paddingMap[padding], glowMap[glow], className)}
-      whileHover={
-        hoverable && !reduced
-          ? { y: -3, transition: { type: 'spring', stiffness: 400, damping: 25 } }
-          : undefined
-      }
-      {...motionProps}
+    <div
+      className={cn(
+        'glass-card',
+        paddingMap[padding],
+        glowMap[glow],
+        hoverable && 'transition-transform hover:-translate-y-0.5',
+        className,
+      )}
+      {...rest}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }

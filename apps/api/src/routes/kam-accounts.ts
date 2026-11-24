@@ -113,7 +113,7 @@ export const kamAccountRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ companyId: z.string().uuid() }),
+        params: z.object({ companyId: z.string().guid() }),
         body: KamAccountDesignatePatch,
         response: { 200: KamAccount },
       },

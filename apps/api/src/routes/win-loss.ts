@@ -51,7 +51,7 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const AnalysisQuery = z.object({
   from: z.string().regex(DATE_ONLY).optional(),
   to: z.string().regex(DATE_ONLY).optional(),
-  ownerId: z.string().uuid().optional(),
+  ownerId: z.string().guid().optional(),
 });
 
 const OutcomeCounts = z.object({
@@ -75,7 +75,7 @@ const WinLossAnalysis = z.object({
   competitors: z.array(OutcomeCounts.extend({ competitor: z.string() })),
   recent: z.array(
     z.object({
-      opportunityId: z.string().uuid(),
+      opportunityId: z.string().guid(),
       name: z.string(),
       customer: z.string(),
       outcome: WinLossOutcome,
@@ -83,7 +83,7 @@ const WinLossAnalysis = z.object({
       competitor: z.string().nullable(),
       /** BigInt-safe micros on the wire; format at the edge. */
       valueMicros: z.string(),
-      ownerId: z.string().uuid().nullable(),
+      ownerId: z.string().guid().nullable(),
       ownerName: z.string().nullable(),
       decidedAt: z.string().datetime(),
     }),
@@ -169,7 +169,7 @@ function aggregateAnalysis(rows: AnalysisScanRow[], truncated: boolean): WinLoss
   };
 }
 
-const OppParam = z.object({ opportunityId: z.string().uuid() });
+const OppParam = z.object({ opportunityId: z.string().guid() });
 const SELECT = {
   id: true,
   opportunityId: true,

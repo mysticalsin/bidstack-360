@@ -90,7 +90,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
     '/bid-scores/:opportunityId/latest',
     {
       schema: {
-        params: z.object({ opportunityId: z.string().uuid() }),
+        params: z.object({ opportunityId: z.string().guid() }),
         response: { 200: BidScoreItem },
       },
     },
@@ -288,7 +288,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       preHandler: server.requirePermission('bid-scores:read'),
       schema: {
-        params: z.object({ opportunityId: z.string().uuid() }),
+        params: z.object({ opportunityId: z.string().guid() }),
         response: { 200: BidScoreAICalibrateResponse },
       },
     },
@@ -401,7 +401,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       preHandler: server.requirePermission('bid-scores:read'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: BidScoreDefendResponse },
       },
     },

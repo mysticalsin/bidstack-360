@@ -7,12 +7,12 @@ export const GovernanceStatus = z.enum(['open', 'in_progress', 'done']);
 export type GovernanceStatus = z.infer<typeof GovernanceStatus>;
 
 export const CrossSellAction = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountKey: z.string().min(1),
   description: z.string().min(1).max(2000),
   requestingUnit: z.string().min(1).max(120),
   assignedUnit: z.string().min(1).max(120),
-  assigneeId: z.string().uuid().nullable(),
+  assigneeId: z.string().guid().nullable(),
   assigneeName: z.string().nullable(),
   dueDate: z.string().datetime().nullable(),
   status: GovernanceStatus,
@@ -27,7 +27,7 @@ export const CrossSellActionCreate = z.object({
   description: z.string().min(1).max(2000),
   requestingUnit: z.string().min(1).max(120),
   assignedUnit: z.string().min(1).max(120),
-  assigneeId: z.string().uuid().nullable().optional(),
+  assigneeId: z.string().guid().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   status: GovernanceStatus.default('open'),
   notes: z.string().max(4000).nullable().optional(),
@@ -39,7 +39,7 @@ export const CrossSellActionPatch = z
     description: z.string().min(1).max(2000).optional(),
     requestingUnit: z.string().min(1).max(120).optional(),
     assignedUnit: z.string().min(1).max(120).optional(),
-    assigneeId: z.string().uuid().nullable().optional(),
+    assigneeId: z.string().guid().nullable().optional(),
     dueDate: z.string().datetime().nullable().optional(),
     status: GovernanceStatus.optional(),
     notes: z.string().max(4000).nullable().optional(),

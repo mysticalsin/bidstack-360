@@ -29,8 +29,8 @@ export const FieldType = z.enum(FIELD_TYPES);
 export type FieldType = z.infer<typeof FieldType>;
 
 export const CustomFieldDefinition = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   entityType: EntityType,
   fieldKey: z.string().min(1).max(64),
   label: z.string().min(1).max(128),
@@ -70,11 +70,11 @@ export const CustomFieldDefinitionList = z.object({
 export type CustomFieldDefinitionList = z.infer<typeof CustomFieldDefinitionList>;
 
 export const CustomFieldValue = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  definitionId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  definitionId: z.string().guid(),
   entityType: EntityType,
-  entityId: z.string().uuid(),
+  entityId: z.string().guid(),
   value: z.unknown(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -83,8 +83,8 @@ export type CustomFieldValue = z.infer<typeof CustomFieldValue>;
 
 export const CustomFieldValueBulkUpsert = z.object({
   entityType: EntityType,
-  entityId: z.string().uuid(),
-  values: z.record(z.string().uuid(), z.unknown()),
+  entityId: z.string().guid(),
+  values: z.record(z.string().guid(), z.unknown()),
 });
 export type CustomFieldValueBulkUpsert = z.infer<typeof CustomFieldValueBulkUpsert>;
 
@@ -100,15 +100,15 @@ export type CustomFieldValueBulkList = z.infer<typeof CustomFieldValueBulkList>;
 
 // Lightweight shape used inside entity detail responses.
 export const CustomFieldValueLite = z.object({
-  id: z.string().uuid(),
-  definitionId: z.string().uuid(),
+  id: z.string().guid(),
+  definitionId: z.string().guid(),
   value: z.unknown(),
 });
 export type CustomFieldValueLite = z.infer<typeof CustomFieldValueLite>;
 
 // Input shape for PATCHing custom fields through a parent record.
 export const CustomFieldValueInput = z.object({
-  definitionId: z.string().uuid(),
+  definitionId: z.string().guid(),
   value: z.unknown(),
 });
 export type CustomFieldValueInput = z.infer<typeof CustomFieldValueInput>;

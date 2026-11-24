@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { microsToUnits, sumMicros } from './money.js';
+import { microsToUnits, safeJsonMicros, sumMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -38,6 +38,25 @@ describe('microsToUnits', () => {
     // naive `Math.floor`-based split would double-count the sign.
     expect(microsToUnits(-1_500_000n)).toBe(-1.5);
     expect(microsToUnits(-1_234_567n)).toBeCloseTo(-1.234567, 9);
+  });
+});
+
+describe('safeJsonMicros', () => {
+  it('returns a safe integer unchanged and refuses a bigint that Number() would round', () => {
+    // WHY: annual revenue is stored as exact integer micros. €78B is
+    // 78_000_000_000_000_000 micros, which Number() rounds to
+    // 78000000000000000. That rounded value must never go out as a JSON number.
+    expect(safeJsonMicros(1_000_000_000_000_000n)).toBe(1_000_000_000_000_000);
+    expect(safeJsonMicros(BigInt(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER);
+
+    // €78B in micros is an integer-valued double, but it is not a safe integer:
+    // the next micro rounds back onto the same number. Sending it as a JSON
+    // number would accept a value the schema cannot distinguish from its neighbor.
+    const siemensMicros = 78n * 1_000_000_000_000_000n;
+    expect(safeJsonMicros(siemensMicros)).toBeNull();
+    expect(Number.isSafeInteger(Number(siemensMicros))).toBe(false);
+    expect(BigInt(Number(siemensMicros + 1n))).toBe(siemensMicros);
+    expect(safeJsonMicros(siemensMicros + 1n)).toBeNull();
   });
 });
 

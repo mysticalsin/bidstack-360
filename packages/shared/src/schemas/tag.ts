@@ -50,11 +50,11 @@ export const TagName = z
   .max(32, 'Tag name must be 32 characters or fewer');
 
 export const Tag = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   name: z.string(),
   color: colorSchema,
-  createdById: z.string().uuid().nullable(),
+  createdById: z.string().guid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   /** Convenience count populated by API responses; null if not queried. */
@@ -81,14 +81,14 @@ export type TagList = z.infer<typeof TagList>;
 
 export const TagApply = z.object({
   entityType: TaggableEntityType,
-  entityId: z.string().uuid(),
-  tagIds: z.array(z.string().uuid()).min(1).max(20),
+  entityId: z.string().guid(),
+  tagIds: z.array(z.string().guid()).min(1).max(20),
 });
 export type TagApply = z.infer<typeof TagApply>;
 
 export const EntityTagsResponse = z.object({
   entityType: TaggableEntityType,
-  entityId: z.string().uuid(),
+  entityId: z.string().guid(),
   tags: z.array(Tag),
 });
 export type EntityTagsResponse = z.infer<typeof EntityTagsResponse>;
@@ -102,13 +102,13 @@ export const TagSuggestion = z.object({
   name: TagName,
   reason: z.string().max(280),
   confidence: z.number().min(0).max(1),
-  existingTagId: z.string().uuid().nullable(),
+  existingTagId: z.string().guid().nullable(),
 });
 export type TagSuggestion = z.infer<typeof TagSuggestion>;
 
 export const TagSuggestRequest = z.object({
   entityType: TaggableEntityType,
-  entityId: z.string().uuid(),
+  entityId: z.string().guid(),
   /** Hint text for the suggester (e.g., the lead's description + intel). */
   text: z.string().min(1).max(8000),
 });

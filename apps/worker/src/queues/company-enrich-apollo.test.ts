@@ -118,6 +118,22 @@ describe('mapApolloOrganization', () => {
     expect(mapped.annualRevenueMicros).toBe(7_500_000_000_000n);
   });
 
+  it('keeps €9B+ revenue as an exact bigint and does not publish a rounded number', () => {
+    // WHY: 78 billion euros is an exact integer, but its micros are past
+    // Number.MAX_SAFE_INTEGER. The next micro collapses onto the same JS
+    // number, so the published intel must not carry that number.
+    const mapped = mapApolloOrganization({
+      name: 'Siemens',
+      annual_revenue: 78_000_000_000,
+    });
+
+    expect(mapped.annualRevenueMicros).toBe(78n * 1_000_000_000_000_000n);
+    expect(mapped.strategicIntel.annualRevenueMicros).toBeNull();
+    expect(mapped.strategicIntel.annualRevenueReadable).toBe(false);
+    expect(mapped.strategicIntel.limitations).toContain('amount not readable');
+    expect(JSON.stringify(mapped.strategicIntel)).not.toContain('78000000000000000');
+  });
+
   it('maps Apollo strategic account intelligence without contact channels', () => {
     const mapped = mapApolloOrganization(
       {

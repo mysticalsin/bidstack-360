@@ -119,7 +119,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('customFields:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: CustomFieldDefinitionPatch,
         response: { 200: CustomFieldDefinition },
       },
@@ -174,7 +174,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('customFields:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: CustomFieldDefinition },
       },
     },
@@ -216,7 +216,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           entityType: EntityType,
-          entityId: z.string().uuid(),
+          entityId: z.string().guid(),
         }),
         response: { 200: CustomFieldValueList },
       },

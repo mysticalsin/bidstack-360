@@ -19,57 +19,57 @@ import { z } from 'zod';
 // pulling BullMQ/Prisma transitive imports into a pure schema test.
 
 const OrchestratorJobData = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   rfpRequestId: z.string().min(1),
-  documentVersionId: z.string().uuid(),
-  opportunityId: z.string().uuid().optional(),
-  proposalId: z.string().uuid().optional(),
-  startedByUserId: z.string().uuid().optional(),
+  documentVersionId: z.string().guid(),
+  opportunityId: z.string().guid().optional(),
+  proposalId: z.string().guid().optional(),
+  startedByUserId: z.string().guid().optional(),
 });
 
 const RequirementExtractJobData = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   rfpRequestId: z.string().min(1),
-  documentVersionId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
+  documentVersionId: z.string().guid(),
+  orchestrationId: z.string().guid(),
   chunkIndex: z.number().int().min(0).default(0),
   totalChunks: z.number().int().min(1).default(1),
 });
 
 const StoryMatchJobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  requirementId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  requirementId: z.string().guid(),
   topK: z.number().int().min(1).max(20).default(5),
 });
 
 const SectionDraftJobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  proposalId: z.string().uuid(),
-  sectionId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  proposalId: z.string().guid(),
+  sectionId: z.string().guid(),
   sectionTitle: z.string().min(1),
-  requirementIds: z.array(z.string().uuid()).min(0),
+  requirementIds: z.array(z.string().guid()).min(0),
 });
 
 const ComplianceFillJobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  matrixItemId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  matrixItemId: z.string().guid(),
   requirementText: z.string().min(1),
   category: z.string().optional(),
 });
 
 const EmbedReferenceJobData = z.object({
-  orgId: z.string().uuid(),
-  referenceId: z.string().uuid(),
+  orgId: z.string().guid(),
+  referenceId: z.string().guid(),
   contentText: z.string().min(1),
 });
 
 const EmbedRequirementJobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  requirementId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  requirementId: z.string().guid(),
   contentText: z.string().min(1),
 });
 

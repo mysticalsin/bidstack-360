@@ -91,7 +91,7 @@ export const kamSessionRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:read'),
       schema: {
-        querystring: z.object({ companyId: z.string().uuid() }),
+        querystring: z.object({ companyId: z.string().guid() }),
         response: { 200: KamSessionList },
       },
     },
@@ -110,7 +110,7 @@ export const kamSessionRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/sessions/:id',
     {
       preHandler: server.requirePermission('kam:read'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: KamSessionDetail } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: KamSessionDetail } },
     },
     async (req) => toSessionDetail(await loadSessionOr404(req, req.params.id)),
   );
@@ -121,7 +121,7 @@ export const kamSessionRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: z.object({
           title: z.string().max(300).nullable().optional(),
           transcriptText: z.string().max(500_000).nullable().optional(),
@@ -151,7 +151,7 @@ export const kamSessionRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('kam:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: z.object({ pulled: z.boolean(), reason: z.string() }) },
       },
     },
@@ -176,7 +176,7 @@ export const kamSessionRoutes: FastifyPluginAsyncZod = async (server) => {
     '/kam/sessions/:id',
     {
       preHandler: server.requirePermission('kam:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const existing = await loadSessionOr404(req, req.params.id);

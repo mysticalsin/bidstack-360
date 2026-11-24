@@ -43,7 +43,7 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['calls'],
         body: z.object({
           entityType: EntityTypeEnum,
-          entityId: z.string().uuid(),
+          entityId: z.string().guid(),
           provider: ProviderEnum,
           /** Optional topic/subject override. Defaults to entity name. */
           topic: z.string().max(200).optional(),
@@ -52,7 +52,7 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
         }),
         response: {
           200: z.object({
-            callSessionId: z.string().uuid(),
+            callSessionId: z.string().guid(),
             joinUrl: z.string().url().nullable(),
             hostJoinUrl: z.string().url().nullable(),
             provider: ProviderEnum,
@@ -157,7 +157,7 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ['calls'],
         body: z.object({
           entityType: EntityTypeEnum,
-          entityId: z.string().uuid(),
+          entityId: z.string().guid(),
           provider: ProviderEnum.exclude(['TWILIO_VOICE']),
           startsAt: z.string().datetime(),
           durationMinutes: z.number().int().min(15).max(480).default(60),
@@ -166,7 +166,7 @@ export const callsWriteRoutes: FastifyPluginAsync = async (fastify) => {
         }),
         response: {
           200: z.object({
-            callSessionId: z.string().uuid(),
+            callSessionId: z.string().guid(),
             joinUrl: z.string().url().nullable(),
             provider: z.string(),
           }),

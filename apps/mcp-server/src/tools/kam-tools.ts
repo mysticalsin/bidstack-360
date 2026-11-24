@@ -44,7 +44,7 @@ export const kamListAccounts: Tool<typeof ListAccountsInput> = {
 };
 
 const ListInitiativesInput = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   stage: z.enum(['initiative', 'lead', 'opportunity', 'dropped']).optional(),
   limit: z.number().int().min(1).max(100).default(50),
 });
@@ -81,7 +81,7 @@ export const kamListInitiatives: Tool<typeof ListInitiativesInput> = {
 // ─── Staging writes (scope: kam) ──────────────────────────────────────────────
 
 const IngestTranscriptInput = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   title: z.string().max(300).optional(),
   heldAt: z.string().datetime().optional(),
   sourceType: z.enum(['manual_paste', 'sharepoint_pull', 'dust_push']).default('dust_push'),
@@ -129,7 +129,7 @@ export const kamIngestTranscript: Tool<typeof IngestTranscriptInput> = {
 };
 
 const ProposeDraftInput = z.object({
-  sessionId: z.string().uuid(),
+  sessionId: z.string().guid(),
   noteDraft: z.object({
     summary: z.string().max(10_000),
     keyPoints: z.array(z.string().max(2000)).max(100).default([]),
@@ -203,7 +203,7 @@ export const kamProposeSessionDraft: Tool<typeof ProposeDraftInput> = {
 };
 
 const UpdateTaskStatusInput = z.object({
-  taskId: z.string().uuid(),
+  taskId: z.string().guid(),
   status: z.enum(['open', 'in_progress', 'done', 'blocked']),
 });
 
@@ -252,7 +252,7 @@ export const kamUpdateTaskStatus: Tool<typeof UpdateTaskStatusInput> = {
 
 // ─── KPIs + prospection (S6) ──────────────────────────────────────────────
 
-const GetKpisInput = z.object({ companyId: z.string().uuid() });
+const GetKpisInput = z.object({ companyId: z.string().guid() });
 
 export const kamGetKpis: Tool<typeof GetKpisInput> = {
   description: "Per-account KAM KPIs: initiatives by stage, open/done tasks, prospection count, stale-initiative count.",
@@ -284,7 +284,7 @@ export const kamGetKpis: Tool<typeof GetKpisInput> = {
 };
 
 const ReadProspectionsInput = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   limit: z.number().int().min(1).max(200).default(100),
 });
 
@@ -309,8 +309,8 @@ export const kamReadProspections: Tool<typeof ReadProspectionsInput> = {
 };
 
 const LogProspectionInput = z.object({
-  companyId: z.string().uuid(),
-  ownerId: z.string().uuid().optional(),
+  companyId: z.string().guid(),
+  ownerId: z.string().guid().optional(),
   actionType: z.string().min(1).max(100),
   occurredAt: z.string().datetime().optional(),
 });

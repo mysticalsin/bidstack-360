@@ -47,9 +47,9 @@ const MAX_PROPOSAL_CHARS = 12_000;
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  proposalId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  proposalId: z.string().guid(),
 });
 type JobData = z.infer<typeof JobData>;
 

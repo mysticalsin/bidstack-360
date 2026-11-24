@@ -23,8 +23,8 @@ interface DemoSessionResponse {
 }
 
 // Mirrors the production Hero background.
-const VIDEO_URL =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260428_193507_4286c423-2fd9-4efd-92bd-91a939453fc1.mp4';
+// Same local loop as Hero. The remote 4K file is 11MB and dominates LCP.
+const VIDEO_URL = '/login-bg.mp4';
 const LINKEDIN_URL = 'https://www.linkedin.com/in/tonywalteur/';
 
 export function DemoSignIn() {
@@ -76,7 +76,8 @@ export function DemoSignIn() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
+          poster="/login-bg.jpg"
           className="absolute inset-0 z-0 h-full w-full object-cover object-[65%] lg:object-center"
         >
           <source src={VIDEO_URL} type="video/mp4" />

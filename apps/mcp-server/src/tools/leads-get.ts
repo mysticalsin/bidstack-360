@@ -5,7 +5,7 @@ import { prisma } from '@bidstack/db';
 import type { Tool } from './index.js';
 
 const Input = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 
 export const leadsGet: Tool<typeof Input> = {

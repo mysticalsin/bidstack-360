@@ -25,7 +25,7 @@ export type SavedViewEntity = z.infer<typeof SavedViewEntity>;
 // caps close an authenticated storage-amplification vector.
 const FilterPrimitive = z.union([z.string().max(2000), z.number(), z.boolean(), z.null()]);
 export const SavedViewFilters = z
-  .record(z.union([FilterPrimitive, z.array(FilterPrimitive).max(200)]))
+  .record(z.string(), z.union([FilterPrimitive, z.array(FilterPrimitive).max(200)]))
   .refine((value) => Object.keys(value).length <= 50, {
     message: 'Too many filter keys (max 50)',
   });
@@ -43,9 +43,9 @@ export const SavedViewColumns = z.array(z.string().min(1).max(80)).max(60).nulla
 export type SavedViewColumns = z.infer<typeof SavedViewColumns>;
 
 export const SavedView = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
   entity: SavedViewEntity,
   name: z.string().min(1).max(120),
   filters: SavedViewFilters,

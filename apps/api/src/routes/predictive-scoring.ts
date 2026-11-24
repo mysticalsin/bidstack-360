@@ -63,7 +63,7 @@ const ModelMetrics = z.object({
 });
 
 const PredictiveModelRow = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   entityType: z.string(),
   version: z.number(),
   isActive: z.boolean(),
@@ -99,7 +99,7 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
     {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: LeadScoreResponse },
       },
     },
@@ -124,7 +124,7 @@ export const predictiveScoringRoutes: FastifyPluginAsyncZod = async (server) => 
     {
       config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: OppScoreResponse },
       },
     },

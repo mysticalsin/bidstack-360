@@ -11,10 +11,10 @@
 import { z } from 'zod';
 
 export const KamHandoffDetail = z.object({
-  id: z.string().uuid(),
-  companyId: z.string().uuid(),
-  initiativeId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  companyId: z.string().guid(),
+  initiativeId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
   status: z.enum(['draft', 'exported', 'confirmed']),
   targetSystem: z.string(),
   externalRef: z.string().nullable(),
@@ -33,22 +33,22 @@ export const KamHandoffList = z.object({ items: z.array(KamHandoffDetail) });
 export const KamHandoffPayload = z.object({
   schemaVersion: z.literal(1),
   source: z.literal('bidstack_kam'),
-  handoffId: z.string().uuid(),
+  handoffId: z.string().guid(),
   exportedAt: z.string(),
   account: z.object({
-    companyId: z.string().uuid(),
+    companyId: z.string().guid(),
     name: z.string(),
     country: z.string().nullable(),
   }),
   initiative: z.object({
-    id: z.string().uuid(),
+    id: z.string().guid(),
     title: z.string(),
     description: z.string().nullable(),
-    ownerId: z.string().uuid().nullable(),
+    ownerId: z.string().guid().nullable(),
   }),
   opportunity: z
     .object({
-      id: z.string().uuid(),
+      id: z.string().guid(),
       code: z.string(),
       valueMicros: z.number(),
       currency: z.string(),

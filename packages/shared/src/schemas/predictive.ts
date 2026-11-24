@@ -11,13 +11,13 @@ export const PredictiveScoreKind = z.enum([
 export type PredictiveScoreKind = z.infer<typeof PredictiveScoreKind>;
 
 export const PredictiveScore = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   targetType: z.string().max(50),
-  targetId: z.string().uuid(),
+  targetId: z.string().guid(),
   kind: PredictiveScoreKind,
   score: z.number().int().min(0).max(10000),
   confidence: z.number().int().min(0).max(10000),
-  features: z.record(z.unknown()).default({}),
+  features: z.record(z.string(), z.unknown()).default({}),
   modelVersion: z.string(),
   recommendedAction: z.string().nullable(),
   expiresAt: z.string().datetime(),
@@ -27,7 +27,7 @@ export type PredictiveScore = z.infer<typeof PredictiveScore>;
 
 export const PredictiveScoreFilter = z.object({
   targetType: z.string().optional(),
-  targetId: z.string().uuid().optional(),
+  targetId: z.string().guid().optional(),
   kind: PredictiveScoreKind.optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });

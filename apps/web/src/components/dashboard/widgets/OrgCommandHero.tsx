@@ -15,7 +15,7 @@
  * Styling reuses the token-based .command-center classes from index.css, so
  * light/dark parity and the ≤1180px / ≤720px breakpoints come for free.
  */
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from '@/components/motion/static';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
@@ -28,7 +28,7 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import type { OrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { formatMoney } from '@/lib/format';
-import { springSnap, springSoft } from '@/lib/motion';
+import { springSnap } from '@/lib/motion';
 import { useCurrencyStore } from '@/stores/currency';
 
 import type { Opportunity } from '@bidstack/shared';
@@ -84,13 +84,10 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   });
 
   return (
-    <motion.section
+    <section
       className="command-center"
       role="region"
       aria-label={t('orgHero.region.ariaLabel', 'Workspace command center')}
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={springSoft}
     >
       <HeroPanel
         summary={summary}
@@ -109,7 +106,7 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
         ))}
       </StaggerList>
       <HeroFooter summary={summary} report={report.data} t={t} />
-    </motion.section>
+    </section>
   );
 }
 
@@ -300,13 +297,19 @@ function weightedSignal({ report, reportPending, money, t }: SignalInputs): Hero
 
 function SignalCell({ signal, reduced }: { signal: HeroSignal; reduced: boolean }) {
   if (signal.pending) {
-    // Layout-matched skeleton (label, value, progress bar) — not a spinner —
-    // so the cell loads "in place" per the PageSkeletons doctrine.
+    // Same head / value / progress boxes as the loaded cell. A short bar in
+    // this slot was reused into `.command-signal-head` when the report
+    // arrived, and the wrapped label grew the hero (CLS ~0.20).
     return (
       <StaggerItem className="command-signal" aria-hidden>
-        <div data-testid="signal-skeleton" className="h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
-        <div className="mt-4 h-8 w-20 animate-pulse rounded bg-[var(--surface-sunken)]" />
-        <div className="mt-4 h-[7px] animate-pulse rounded-full bg-[var(--surface-sunken)]" />
+        <div className="command-signal-head" data-testid="signal-skeleton">
+          <span className="inline-block h-3 w-24 animate-pulse rounded bg-[var(--surface-sunken)]" />
+          <span className="inline-block h-5 w-16 animate-pulse rounded-full bg-[var(--surface-sunken)]" />
+        </div>
+        <strong>
+          <span className="inline-block h-7 w-16 animate-pulse rounded bg-[var(--surface-sunken)]" />
+        </strong>
+        <span className="command-progress" />
       </StaggerItem>
     );
   }

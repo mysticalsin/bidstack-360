@@ -33,7 +33,7 @@ const FACT_STATUSES = ['PROPOSED', 'APPLIED', 'DISMISSED', 'SUPERSEDED'] as cons
 
 const BidFactListQuery = z.object({
   subjectType: z.enum(SUBJECT_TYPES),
-  subjectId: z.string().uuid(),
+  subjectId: z.string().guid(),
   // The strip only ever renders PROPOSED; the other states are here so the
   // provenance/rationale panels can read the same endpoint.
   status: z.enum(FACT_STATUSES).default('PROPOSED'),
@@ -41,8 +41,8 @@ const BidFactListQuery = z.object({
 });
 
 const BidFactCitationItem = z.object({
-  id: z.string().uuid(),
-  sourceChunkId: z.string().uuid(),
+  id: z.string().guid(),
+  sourceChunkId: z.string().guid(),
   quote: z.string(),
   pageStart: z.number().int().nullable(),
   pageEnd: z.number().int().nullable(),
@@ -51,10 +51,10 @@ const BidFactCitationItem = z.object({
 });
 
 const BidFactItem = z.object({
-  id: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
   subjectType: z.string(),
-  subjectId: z.string().uuid(),
+  subjectId: z.string().guid(),
   claim: z.string(),
   verdict: z.string(),
   confidenceBps: z.number().int().nullable(),
@@ -63,7 +63,7 @@ const BidFactItem = z.object({
   rationale: z.string().nullable(),
   status: z.enum(FACT_STATUSES),
   producedByAgentKey: z.string(),
-  decidedByUserId: z.string().uuid().nullable(),
+  decidedByUserId: z.string().guid().nullable(),
   decidedAt: z.string().nullable(),
   createdAt: z.string(),
   citations: z.array(BidFactCitationItem),
@@ -74,19 +74,19 @@ const BidFactList = z.object({
   total: z.number().int(),
 });
 
-const DecideParams = z.object({ id: z.string().uuid() });
+const DecideParams = z.object({ id: z.string().guid() });
 const DecideBody = z.object({ decision: z.enum(['accept', 'dismiss']) });
 
 const DecideResponse = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   status: z.enum(FACT_STATUSES),
   decidedAt: z.string(),
-  decidedByUserId: z.string().uuid(),
-  decisionId: z.string().uuid(),
+  decidedByUserId: z.string().guid(),
+  decisionId: z.string().guid(),
   /** True when the accept wrote through to a ComplianceMatrixRow. */
   matrixRowUpdated: z.boolean(),
   /** Prior APPLIED facts for the same subject that this accept superseded. */
-  supersededFactIds: z.array(z.string().uuid()),
+  supersededFactIds: z.array(z.string().guid()),
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

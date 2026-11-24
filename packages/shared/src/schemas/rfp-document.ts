@@ -90,27 +90,27 @@ export const SubmissionPackageStatus = z.enum([
 export type SubmissionPackageStatus = z.infer<typeof SubmissionPackageStatus>;
 
 export const BidDocument = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
-  companyId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
+  companyId: z.string().guid().nullable(),
   accountId: z.string().min(1).max(255).nullable(),
   title: z.string().min(1).max(255),
   documentType: RfpDocumentType,
   status: RfpDocumentStatus,
   source: z.string().min(1).max(100),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type BidDocument = z.infer<typeof BidDocument>;
 
 export const DocumentVersion = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  bidDocumentId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  bidDocumentId: z.string().guid(),
   versionNo: z.number().int().positive(),
-  fileAttachmentId: z.string().uuid().nullable(),
+  fileAttachmentId: z.string().guid().nullable(),
   storageKey: z.string().min(1).max(500),
   contentType: z.string().min(1).max(100),
   bytes: z.number().int().nonnegative(),
@@ -121,22 +121,22 @@ export const DocumentVersion = z.object({
   extractionStatus: RfpJobStatus,
   ocrEngine: z.string().max(100).nullable(),
   extractedText: z.string().nullable(),
-  layoutJson: z.record(z.unknown()),
-  metadata: z.record(z.unknown()),
+  layoutJson: z.record(z.string(), z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   createdAt: z.string().datetime(),
 });
 export type DocumentVersion = z.infer<typeof DocumentVersion>;
 
 export const SourceChunk = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  bidDocumentId: z.string().uuid(),
-  documentVersionId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  bidDocumentId: z.string().guid(),
+  documentVersionId: z.string().guid(),
   chunkIndex: z.number().int().nonnegative(),
   pageStart: z.number().int().positive().nullable(),
   pageEnd: z.number().int().positive().nullable(),
   sectionPath: z.string().max(500).nullable(),
-  locator: z.record(z.unknown()),
+  locator: z.record(z.string(), z.unknown()),
   text: z.string(),
   hash: z.string().max(128).nullable(),
   createdAt: z.string().datetime(),
@@ -144,12 +144,12 @@ export const SourceChunk = z.object({
 export type SourceChunk = z.infer<typeof SourceChunk>;
 
 export const Requirement = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
-  bidDocumentId: z.string().uuid().nullable(),
-  documentVersionId: z.string().uuid().nullable(),
-  sourceChunkId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
+  bidDocumentId: z.string().guid().nullable(),
+  documentVersionId: z.string().guid().nullable(),
+  sourceChunkId: z.string().guid().nullable(),
   externalRef: z.string().max(100).nullable(),
   text: z.string().min(1),
   requirementType: z.string().min(1).max(100),
@@ -159,20 +159,20 @@ export const Requirement = z.object({
   // Nullable: null = no AI confidence exists (manual entry / unavailable).
   confidenceBps: z.number().int().min(0).max(10000).nullable(),
   assessmentStatus: AssessmentStatus,
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   dueDate: z.string().date().nullable(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type Requirement = z.infer<typeof Requirement>;
 
 export const ComplianceMatrixRow = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
-  requirementId: z.string().uuid(),
-  ownerId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
+  requirementId: z.string().guid(),
+  ownerId: z.string().guid().nullable(),
   status: ComplianceRowStatus,
   risk: RfpRiskLevel,
   responseStatus: z.string().min(1).max(100),
@@ -180,29 +180,29 @@ export const ComplianceMatrixRow = z.object({
   // Confidence of the compliance-fill assessment; null until one produced it.
   confidenceBps: z.number().int().min(0).max(10000).nullable(),
   assessmentStatus: AssessmentStatus,
-  evidence: z.array(z.record(z.unknown())),
-  citations: z.array(z.record(z.unknown())),
+  evidence: z.array(z.record(z.string(), z.unknown())),
+  citations: z.array(z.record(z.string(), z.unknown())),
   dueDate: z.string().date().nullable(),
   approvedAt: z.string().datetime().nullable(),
-  approverUserId: z.string().uuid().nullable(),
+  approverUserId: z.string().guid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type ComplianceMatrixRow = z.infer<typeof ComplianceMatrixRow>;
 
 export const ReviewIssue = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
-  requirementId: z.string().uuid().nullable(),
-  sourceChunkId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
+  requirementId: z.string().guid().nullable(),
+  sourceChunkId: z.string().guid().nullable(),
   category: z.string().min(1).max(100),
   severity: RfpRiskLevel,
   status: ReviewIssueStatus,
   title: z.string().min(1).max(255),
   description: z.string(),
   recommendation: z.string().nullable(),
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   resolvedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -210,31 +210,31 @@ export const ReviewIssue = z.object({
 export type ReviewIssue = z.infer<typeof ReviewIssue>;
 
 export const ApprovalGate = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
-  bidDocumentId: z.string().uuid().nullable(),
-  lockedVersionId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
+  bidDocumentId: z.string().guid().nullable(),
+  lockedVersionId: z.string().guid().nullable(),
   gateKey: z.string().min(1).max(100),
   status: ApprovalGateStatus,
-  approverUserId: z.string().uuid().nullable(),
+  approverUserId: z.string().guid().nullable(),
   decisionNotes: z.string().nullable(),
   decidedAt: z.string().datetime().nullable(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type ApprovalGate = z.infer<typeof ApprovalGate>;
 
 export const SubmissionPackage = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  opportunityId: z.string().uuid().nullable(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  opportunityId: z.string().guid().nullable(),
   name: z.string().min(1).max(255),
   status: SubmissionPackageStatus,
-  contents: z.array(z.record(z.unknown())),
-  receipt: z.record(z.unknown()).nullable(),
-  metadata: z.record(z.unknown()),
+  contents: z.array(z.record(z.string(), z.unknown())),
+  receipt: z.record(z.string(), z.unknown()).nullable(),
+  metadata: z.record(z.string(), z.unknown()),
   lockedAt: z.string().datetime().nullable(),
   submittedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
@@ -243,18 +243,18 @@ export const SubmissionPackage = z.object({
 export type SubmissionPackage = z.infer<typeof SubmissionPackage>;
 
 export const BidDocumentRegisterRequest = z.object({
-  fileAttachmentId: z.string().uuid(),
+  fileAttachmentId: z.string().guid(),
   title: z.string().min(1).max(255),
   documentType: RfpDocumentType.default('other'),
   source: z.string().min(1).max(100).default('upload'),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type BidDocumentRegisterRequest = z.infer<typeof BidDocumentRegisterRequest>;
 
 export const RequirementCreateRequest = z.object({
-  bidDocumentId: z.string().uuid(),
-  documentVersionId: z.string().uuid().optional(),
-  sourceChunkId: z.string().uuid().optional(),
+  bidDocumentId: z.string().guid(),
+  documentVersionId: z.string().guid().optional(),
+  sourceChunkId: z.string().guid().optional(),
   externalRef: z.string().min(1).max(100).optional(),
   text: z.string().min(1),
   requirementType: z.string().min(1).max(100).default('general'),
@@ -263,21 +263,21 @@ export const RequirementCreateRequest = z.object({
   // Null by default: a hand-entered requirement has no AI confidence; the old
   // default(0) rendered "0% confidence" on human-written rows.
   confidenceBps: z.number().int().min(0).max(10000).nullable().default(null),
-  ownerId: z.string().uuid().optional(),
+  ownerId: z.string().guid().optional(),
   dueDate: z.string().date().optional(),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 export type RequirementCreateRequest = z.infer<typeof RequirementCreateRequest>;
 
 export const ComplianceMatrixRowPatch = z
   .object({
-    ownerId: z.string().uuid().nullable().optional(),
+    ownerId: z.string().guid().nullable().optional(),
     status: ComplianceRowStatus.optional(),
     risk: RfpRiskLevel.optional(),
     responseStatus: z.string().min(1).max(100).optional(),
     answerDraft: z.string().nullable().optional(),
-    evidence: z.array(z.record(z.unknown())).optional(),
-    citations: z.array(z.record(z.unknown())).optional(),
+    evidence: z.array(z.record(z.string(), z.unknown())).optional(),
+    citations: z.array(z.record(z.string(), z.unknown())).optional(),
     dueDate: z.string().date().nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
@@ -286,7 +286,7 @@ export const ComplianceMatrixRowPatch = z
 export type ComplianceMatrixRowPatch = z.infer<typeof ComplianceMatrixRowPatch>;
 
 export const BidWorkspaceSnapshot = z.object({
-  opportunityId: z.string().uuid(),
+  opportunityId: z.string().guid(),
   documents: z.array(BidDocument),
   requirements: z.array(Requirement),
   matrixRows: z.array(ComplianceMatrixRow),

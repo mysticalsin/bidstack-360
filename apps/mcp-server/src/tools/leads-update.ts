@@ -9,7 +9,7 @@ import {
 import type { Tool } from './index.js';
 
 const Input = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   patch: z.object({
     firstName: z.string().min(1).max(100).optional(),
     lastName: z.string().min(1).max(100).optional(),

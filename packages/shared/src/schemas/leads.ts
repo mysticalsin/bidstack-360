@@ -32,15 +32,15 @@ export const LeadFilter = z.object({
   status: LeadStatus.optional(),
   priority: LeadPriority.optional(),
   source: LeadSource.optional(),
-  ownerId: z.string().uuid().optional(),
+  ownerId: z.string().guid().optional(),
   search: z.string().trim().max(120).optional(),
-  cursor: z.string().uuid().optional(),
+  cursor: z.string().guid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 });
 export type LeadFilter = z.infer<typeof LeadFilter>;
 
 export const LeadSummary = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   firstName: z.string(),
   lastName: z.string(),
   email: z.string().email().nullable(),
@@ -51,9 +51,9 @@ export const LeadSummary = z.object({
   status: LeadStatus,
   score: z.number().int().min(0).max(100),
   priority: LeadPriority,
-  ownerId: z.string().uuid().nullable(),
+  ownerId: z.string().guid().nullable(),
   ownerName: z.string().nullable(),
-  convertedToOpportunityId: z.string().uuid().nullable(),
+  convertedToOpportunityId: z.string().guid().nullable(),
   statusChangedAt: z.string().datetime(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -62,7 +62,7 @@ export type LeadSummary = z.infer<typeof LeadSummary>;
 
 export const LeadPage = z.object({
   items: z.array(LeadSummary),
-  nextCursor: z.string().uuid().nullable(),
+  nextCursor: z.string().guid().nullable(),
 });
 export type LeadPage = z.infer<typeof LeadPage>;
 
@@ -72,7 +72,7 @@ export const LeadDetail = LeadSummary.extend({
   authority: z.string().nullable(),
   need: z.string().nullable(),
   timeline: z.string().nullable(),
-  intel: z.record(z.unknown()).nullable(),
+  intel: z.record(z.string(), z.unknown()).nullable(),
   customFieldValues: z.array(CustomFieldValueLite).optional(),
 });
 export type LeadDetail = z.infer<typeof LeadDetail>;
@@ -87,7 +87,7 @@ export const LeadCreate = z.object({
   source: LeadSource.default('website'),
   priority: LeadPriority.default('medium'),
   score: z.number().int().min(0).max(100).default(0),
-  ownerId: z.string().uuid().optional(),
+  ownerId: z.string().guid().optional(),
   notes: z.string().max(5000).optional(),
   // BANT fields are free-text in the UI ("What problem are they trying to
   // solve?") — max(20) rejected any real sentence with a 400.
@@ -110,7 +110,7 @@ export const LeadPatch = z
     status: LeadStatus.optional(),
     priority: LeadPriority.optional(),
     score: z.number().int().min(0).max(100).optional(),
-    ownerId: z.string().uuid().optional().nullable(),
+    ownerId: z.string().guid().optional().nullable(),
     notes: z.string().max(5000).optional().nullable(),
     // Same free-text rationale as LeadCreate — 20 chars 400'd real sentences.
     budget: z.string().max(500).optional().nullable(),
@@ -130,7 +130,7 @@ export const LeadConvertBody = z.object({
   // units-based schema and rejected any real enterprise deal. 9e15 stays
   // within Number.MAX_SAFE_INTEGER (≈9.007e15) and allows up to €9B.
   opportunityValueMicros: z.number().min(0).max(9_000_000_000_000_000).optional(),
-  pipelineStageId: z.string().uuid().optional(),
+  pipelineStageId: z.string().guid().optional(),
   // Legacy stage key fallback for callers without pipeline-stage UUIDs
   // (ConvertLeadDialog) — the route resolves it to the org's matching stage.
   stage: OpportunityStage.optional(),
@@ -138,8 +138,8 @@ export const LeadConvertBody = z.object({
 export type LeadConvertBody = z.infer<typeof LeadConvertBody>;
 
 export const LeadConvertResult = z.object({
-  leadId: z.string().uuid(),
-  opportunityId: z.string().uuid(),
-  contactId: z.string().uuid(),
+  leadId: z.string().guid(),
+  opportunityId: z.string().guid(),
+  contactId: z.string().guid(),
 });
 export type LeadConvertResult = z.infer<typeof LeadConvertResult>;

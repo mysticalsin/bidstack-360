@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import { Toaster, toast } from './Toast';
+import { Toaster } from './Toaster';
+import { toast } from './Toast';
 
 describe('Toaster', () => {
   it('renders without crashing', () => {

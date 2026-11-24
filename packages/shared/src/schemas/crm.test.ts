@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CompanyLookupResponse,
+  annualRevenueOnWire,
   CrmCompany,
   CrmConnector,
   CrmDashboardSnapshot,
@@ -48,6 +49,50 @@ describe('CRM schemas', () => {
 
     expect(company.logo?.source).toBe('official_website');
     expect(company.domain).toBe('mantu.com');
+  });
+
+  it('rejects revenue micros past the safe-integer line instead of accepting a rounded number', () => {
+    // WHY: €78B micros sit past Number.MAX_SAFE_INTEGER. The double happens to
+    // be that integer, but the next micro collapses onto it. #547 still rejects
+    // a write above this line; the wire field does too, and the exact bigint is
+    // flagged not readable instead of being sent as a rounded number.
+    const siemensMicros = 78n * 1_000_000_000_000_000n;
+    const wire = annualRevenueOnWire(siemensMicros);
+    expect(wire).toEqual({ annualRevenueMicros: null, annualRevenueReadable: false });
+    expect(BigInt(Number(siemensMicros + 1n))).toBe(siemensMicros);
+
+    const company = {
+      id: 'large',
+      name: 'Large',
+      legalName: null,
+      domain: null,
+      website: null,
+      industry: null,
+      employeeCount: null,
+      status: null,
+      registryIds: {},
+      formerNames: [],
+      incorporationDate: null,
+      logo: null,
+      confidence: 0.5,
+      sourceAttribution: [],
+      updatedAt: fetchedAt,
+    };
+    expect(
+      CrmCompany.safeParse({ ...company, annualRevenueMicros: Number(siemensMicros) }).success,
+    ).toBe(false);
+    expect(CrmCompany.safeParse({ ...company, annualRevenueMicros: 1.5 }).success).toBe(false);
+    expect(
+      CrmCompany.safeParse({
+        ...company,
+        annualRevenueMicros: null,
+        annualRevenueReadable: false,
+      }).success,
+    ).toBe(true);
+    expect(annualRevenueOnWire(1_000_000_000_000_000n)).toEqual({
+      annualRevenueMicros: 1_000_000_000_000_000,
+      annualRevenueReadable: true,
+    });
   });
 
   it('keeps the requested Dust MCP crm_* tool names stable', () => {

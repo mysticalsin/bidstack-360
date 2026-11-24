@@ -39,12 +39,21 @@ import { registerRoutes } from './server.routes.js';
  * "2") or "true" is the correct setting; a CIDR/IP allowlist is also supported.
  * Empty disables proxy trust (direct-exposure default).
  */
-function parseTrustProxy(value: string | undefined): boolean | number | string[] {
+function parseTrustProxy(
+  value: string | undefined,
+): boolean | string | string[] | ((address: string, hop: number) => boolean) {
   if (!value) return false;
   const v = value.trim();
   if (v === 'true') return true;
   if (v === 'false' || v === '') return false;
-  if (/^\d+$/.test(v)) return Number(v);
+  // A bare hop count used to be a number. Fastify 5.12's trustProxy type no
+  // longer includes number, and proxy-addr still treats a numeric string as an
+  // address. The function form is the same rule proxy-addr applies to a hop
+  // count: trust the first N forwarding hops.
+  if (/^\d+$/.test(v)) {
+    const hops = Number(v);
+    return (_address, hop) => hop < hops;
+  }
   return v
     .split(',')
     .map((s) => s.trim())

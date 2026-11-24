@@ -40,26 +40,26 @@ const SMS_CLAIM_TTL_SEC = 86_400; // 24h — well beyond the BullMQ retry/backof
 // ─── Job data schemas ──────────────────────────────────────────────────────
 
 const SmsSendJobData = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
   toNumber: z.string(),
   body: z.string(),
   entityType: z.enum(['CONTACT', 'LEAD']).optional(),
-  entityId: z.string().uuid().optional(),
+  entityId: z.string().guid().optional(),
   /** Twilio account SID — resolved at enqueue time so workers don't need DB access for routing */
-  integrationTokenId: z.string().uuid(),
+  integrationTokenId: z.string().guid(),
 });
 
 const SmsBulkSendJobData = z.object({
-  orgId: z.string().uuid(),
-  userId: z.string().uuid(),
-  integrationTokenId: z.string().uuid(),
+  orgId: z.string().guid(),
+  userId: z.string().guid(),
+  integrationTokenId: z.string().guid(),
   recipients: z.array(
     z.object({
       toNumber: z.string(),
       body: z.string(),
       entityType: z.enum(['CONTACT', 'LEAD']).optional(),
-      entityId: z.string().uuid().optional(),
+      entityId: z.string().guid().optional(),
     }),
   ),
 });

@@ -25,10 +25,10 @@ import type { CrewAgentDef, CrewDef, CrewTaskDef } from '../crew/types.js';
 const QUEUE_NAME = CREW_RUN.name;
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  crewId: z.string().uuid(),
-  runId: z.string().uuid(),
-  inputs: z.record(z.string()).default({}),
+  orgId: z.string().guid(),
+  crewId: z.string().guid(),
+  runId: z.string().guid(),
+  inputs: z.record(z.string(), z.string()).default({}),
   approvalConfirmed: z.boolean().default(false),
 });
 type JobData = z.infer<typeof JobData>;

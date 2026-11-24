@@ -156,9 +156,11 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
         <div>
           <span>{t('commandCenter.footer.weightedValue.label', 'Weighted account value')}</span>
           <strong>
-            {cockpit.company.annualRevenueMicros
-              ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
-              : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
+            {cockpit.company.annualRevenueReadable === false
+              ? t('commandCenter.footer.weightedValue.notReadable', 'amount not readable')
+              : cockpit.company.annualRevenueMicros
+                ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
+                : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
           </strong>
         </div>
         <div>

@@ -21,10 +21,10 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           search: z.string().max(255).optional(),
           industry: z.string().max(100).optional(),
           limit: z.coerce.number().int().min(1).max(200).default(50),
-          cursor: z.string().uuid().optional(),
+          cursor: z.string().guid().optional(),
         }),
         response: {
-          200: z.object({ items: z.array(Company), nextCursor: z.string().uuid().optional() }),
+          200: z.object({ items: z.array(Company), nextCursor: z.string().guid().optional() }),
         },
       },
     },
@@ -84,7 +84,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     '/companies/:id',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: CompanyDetail },
       },
     },
@@ -185,7 +185,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: CompanyPatch,
         response: { 200: Company },
       },
@@ -297,7 +297,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     '/companies/:id/hierarchy',
     {
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: CompanyHierarchy },
       },
     },
@@ -385,7 +385,7 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('companies:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

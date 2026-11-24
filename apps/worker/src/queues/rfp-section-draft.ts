@@ -33,12 +33,12 @@ const MAX_STORY_CONTEXT_CHARS = 4000;
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  proposalId: z.string().uuid(),
-  sectionId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  proposalId: z.string().guid(),
+  sectionId: z.string().guid(),
   sectionTitle: z.string().min(1),
-  requirementIds: z.array(z.string().uuid()).min(0),
+  requirementIds: z.array(z.string().guid()).min(0),
 });
 type JobData = z.infer<typeof JobData>;
 

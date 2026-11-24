@@ -128,14 +128,14 @@ export function inferAllowedFileContentType(
 }
 
 export const FileAttachment = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountId: z.string().min(1).max(255),
-  companyId: z.string().uuid().optional(),
+  companyId: z.string().guid().optional(),
   name: z.string().min(1).max(255),
   contentType: z.string().min(1).max(100),
   bytes: z.number().int().nonnegative(),
   storageKey: z.string().min(1).max(500),
-  uploadedByUserId: z.string().uuid().nullable(),
+  uploadedByUserId: z.string().guid().nullable(),
   uploadedByEmail: z.string().email().nullable(),
   createdAt: z.string().datetime(),
   verifiedBytes: z.number().int().nonnegative().optional(),
@@ -147,7 +147,7 @@ export type FileAttachment = z.infer<typeof FileAttachment>;
 
 export const FileUploadUrlRequest = z.object({
   accountId: z.string().min(1).max(255),
-  companyId: z.string().uuid().optional(),
+  companyId: z.string().guid().optional(),
   name: z.string().min(1).max(255),
   contentType: z.enum(ALLOWED_FILE_CONTENT_TYPES),
   bytes: z.number().int().positive().max(FILE_MAX_BYTES),
@@ -160,13 +160,13 @@ export const FileUploadUrlResponse = z.object({
   // HTTP headers the client MUST send when PUT-ing to uploadUrl. Adapter
   // dependent: S3 demands Content-Type match the signed value; local mode
   // doesn't care but we still echo Content-Type for parity.
-  headers: z.record(z.string()),
+  headers: z.record(z.string(), z.string()),
 });
 export type FileUploadUrlResponse = z.infer<typeof FileUploadUrlResponse>;
 
 export const FileFinalizeRequest = z.object({
   accountId: z.string().min(1).max(255),
-  companyId: z.string().uuid().optional(),
+  companyId: z.string().guid().optional(),
   storageKey: z.string().min(1).max(500),
   name: z.string().min(1).max(255),
   contentType: z.enum(ALLOWED_FILE_CONTENT_TYPES),

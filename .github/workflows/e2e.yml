@@ -23,7 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: '10'
+  # Must equal package.json packageManager. A major-only pin ("10") makes
+  # pnpm/action-setup abort before install when that field is pnpm@10.27.0.
+  PNPM_VERSION: '10.27.0'
   NODE_VERSION_FILE: .nvmrc
 
 # Least-privilege default token — these jobs only read + upload artifacts.
@@ -39,7 +41,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # rfp_vector_indexes creates extension "vector". Alpine Postgres has no pgvector.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: bidstack
           POSTGRES_PASSWORD: bidstack_test
@@ -107,8 +110,13 @@ jobs:
   # ─── E2E shards ─────────────────────────────────────────────────────────────
   e2e:
     name: E2E shard ${{ matrix.shard }}/${{ matrix.total }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # ubuntu-latest is 26.04. Playwright 1.59.1 has no Chromium build for
+    # ubuntu26.04-x64, so `playwright install` exits before any test.
+    runs-on: ubuntu-24.04
+    # Run 45304506768 hit 30 minutes. Shard 3 was still installing Chromium,
+    # Firefox, and WebKit when the job was cancelled. Shard 1's install took
+    # 27 minutes and the test step was cancelled two minutes later.
+    timeout-minutes: 60
     needs: prepare
 
     strategy:
@@ -119,7 +127,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # rfp_vector_indexes creates extension "vector". Alpine Postgres has no pgvector.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: bidstack
           POSTGRES_PASSWORD: bidstack_test
@@ -167,6 +176,11 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
+      - name: Build packages the API loads
+        # tsx resolves @bidstack/db and the other workspace libs to dist/.
+        # The API exits with ERR_MODULE_NOT_FOUND before any spec if this is skipped.
+        run: pnpm --filter "@bidstack/api^..." build
+
       - name: Restore dist artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -181,8 +195,10 @@ jobs:
           restore-keys: playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers + system deps
-        # Install all browsers used by specs (chromium + mobile emulation uses chromium)
-        run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium
+        # Firefox and WebKit projects launch their own browsers. iPhone SE and
+        # iPad device descriptors set defaultBrowserType to webkit, so those
+        # specs do too. Chromium alone exits those tests before any assertion.
+        run: pnpm --filter @bidstack/web exec playwright install --with-deps chromium firefox webkit
 
       - name: Migrate + seed database
         run: |
@@ -193,41 +209,44 @@ jobs:
             pnpm db:seed
           fi
 
-      - name: Start API server
-        run: |
-          pnpm --filter @bidstack/api dev &
-          echo "Waiting for API..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:4000/health > /dev/null; then
-              echo "API ready after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-        env:
-          DATABASE_URL: postgres://bidstack:bidstack_test@localhost:5432/bidstack_test
-          REDIS_URL: redis://localhost:6379
-
       - name: Run E2E shard ${{ matrix.shard }}/${{ matrix.total }}
-        run: >
-          pnpm --filter @bidstack/web exec playwright test
-          --shard=${{ matrix.shard }}/${{ matrix.total }}
-          ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
+        # Blob reports are what merge-reports reads. Playwright 1.59 has no
+        # --output flag on that command, and an HTML report cannot be merged.
+        # Shard and the snapshot input are env vars so they are not interpolated
+        # into this script (yaml.github-actions.security.run-shell-injection).
         env:
           CI: 'true'
-          E2E_API_URL: http://localhost:4000
+          # Playwright starts the API itself. CI refuses reuseExistingServer, so a
+          # server already bound to this URL makes the run abort before any spec.
+          # E2E_API_PORT must match the URL or the process listens on 4010 while
+          # Playwright waits on 4000.
+          E2E_API_PORT: '4000'
+          E2E_API_URL: http://127.0.0.1:4000
           # These env vars allow individual flow specs to conditionally activate
           # tests that require real seed data tokens (booking slug, sign token).
           # Left empty in CI — those tests self-skip via test.skip() when blank.
           E2E_BOOKING_SLUG: ''
           E2E_SIGN_TOKEN: ''
+          SHARD: ${{ matrix.shard }}
+          SHARD_TOTAL: ${{ matrix.total }}
+          UPDATE_SNAPSHOTS: ${{ github.event.inputs.update_snapshots }}
+        run: |
+          args=(
+            --reporter=list
+            --reporter=blob
+            --shard="${SHARD}/${SHARD_TOTAL}"
+          )
+          if [ "$UPDATE_SNAPSHOTS" = "true" ]; then
+            args+=(--update-snapshots)
+          fi
+          pnpm --filter @bidstack/web exec playwright test "${args[@]}"
 
       - name: Upload Playwright report (always — for review even on pass)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report-shard-${{ matrix.shard }}
-          path: apps/web/playwright-report/
+          path: apps/web/blob-report/*.zip
           retention-days: 14
 
       - name: Upload failure screenshots
@@ -270,13 +289,17 @@ jobs:
         with:
           pattern: playwright-report-shard-*
           path: all-reports/
+          merge-multiple: true
 
       - name: Merge reports
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+          # pnpm exec runs in apps/web, so this is apps/web/merged-playwright-report.
+          PLAYWRIGHT_HTML_OUTPUT_DIR: merged-playwright-report
         run: |
           pnpm --filter @bidstack/web exec playwright merge-reports \
             --reporter html \
-            --output apps/web/merged-playwright-report/ \
-            all-reports/
+            ../../all-reports
 
       - name: Upload merged report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

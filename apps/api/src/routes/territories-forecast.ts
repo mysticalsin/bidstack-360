@@ -22,7 +22,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
       schema: {
         querystring: z.object({
           period: z.string().max(10).optional(),
-          ownerId: z.string().uuid().optional(),
+          ownerId: z.string().guid().optional(),
         }),
         response: { 200: z.object({ items: z.array(Forecast) }) },
       },
@@ -71,7 +71,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
           // The Forecasts grid lists every owner's rows and edits them inline,
           // so a write must target the row's owner — not whoever is signed in.
           // Optional: absent ownerId = self-service edit (writes the caller's row).
-          ownerId: z.string().uuid().optional(),
+          ownerId: z.string().guid().optional(),
         }),
         response: { 201: Forecast },
       },
@@ -145,7 +145,7 @@ export const territoriesForecastRoutes: FastifyPluginAsyncZod = async (server) =
     {
       preHandler: server.requirePermission('territories:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 200: z.object({ deleted: z.boolean() }) },
       },
     },

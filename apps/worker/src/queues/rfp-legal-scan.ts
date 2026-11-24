@@ -120,10 +120,10 @@ export const RFP_REVIEW_AGENTS: readonly ReviewAgentConfig[] = [
 // â”€â”€â”€ Job schema â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  documentVersionId: z.string().uuid(),
-  proposalId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  documentVersionId: z.string().guid(),
+  proposalId: z.string().guid(),
 });
 type JobData = z.infer<typeof JobData>;
 

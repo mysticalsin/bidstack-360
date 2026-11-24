@@ -103,29 +103,29 @@ export const SerumConfigApprovalStatus = z.enum([
 ]);
 export type SerumConfigApprovalStatus = z.infer<typeof SerumConfigApprovalStatus>;
 
-export const SerumConfigJson = z.record(z.unknown());
+export const SerumConfigJson = z.record(z.string(), z.unknown());
 export type SerumConfigJson = z.infer<typeof SerumConfigJson>;
 
 export const SerumConfigVersion = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   configType: SerumConfigType,
   configKey: z.string(),
   version: z.number().int().positive(),
   status: SerumConfigStatus,
   environment: SerumConfigEnvironment,
   configJson: SerumConfigJson,
-  createdByUserId: z.string().uuid().nullable(),
-  approvedByUserId: z.string().uuid().nullable(),
+  createdByUserId: z.string().guid().nullable(),
+  approvedByUserId: z.string().guid().nullable(),
   approvalStatus: SerumConfigApprovalStatus,
   approvalRequestedAt: z.string().datetime().nullable(),
-  approvalRequestedByUserId: z.string().uuid().nullable(),
+  approvalRequestedByUserId: z.string().guid().nullable(),
   approvalRequestedByCurrentUser: z.boolean(),
   approvalApprovedAt: z.string().datetime().nullable(),
   approvalReference: z.string().nullable(),
   createdAt: z.string().datetime(),
   activatedAt: z.string().datetime().nullable(),
-  rollbackOfConfigVersionId: z.string().uuid().nullable(),
+  rollbackOfConfigVersionId: z.string().guid().nullable(),
   changeReason: z.string(),
 });
 export type SerumConfigVersion = z.infer<typeof SerumConfigVersion>;
@@ -133,8 +133,8 @@ export type SerumConfigVersion = z.infer<typeof SerumConfigVersion>;
 export const SerumConfigAuditEntry = z.object({
   id: z.string(),
   action: z.string(),
-  targetId: z.string().uuid().nullable(),
-  userId: z.string().uuid().nullable(),
+  targetId: z.string().guid().nullable(),
+  userId: z.string().guid().nullable(),
   diff: z.unknown().nullable(),
   createdAt: z.string().datetime(),
 });
@@ -219,12 +219,12 @@ export const SerumRuntimeDecision = z.object({
   allowed: z.boolean(),
   status: SerumRuntimeDecisionStatus,
   reason: z.string(),
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
 });
 export type SerumRuntimeDecision = z.infer<typeof SerumRuntimeDecision>;
 
 export const SerumRuntimeAgentPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   enabled: z.boolean(),
   autonomy: z.string(),
@@ -236,7 +236,7 @@ export const SerumRuntimeAgentPolicy = z.object({
 export type SerumRuntimeAgentPolicy = z.infer<typeof SerumRuntimeAgentPolicy>;
 
 export const SerumRuntimeLoopPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   enabled: z.boolean(),
   durableEventsRequired: z.boolean(),
@@ -247,7 +247,7 @@ export const SerumRuntimeLoopPolicy = z.object({
 export type SerumRuntimeLoopPolicy = z.infer<typeof SerumRuntimeLoopPolicy>;
 
 export const SerumRuntimeToolPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   enabled: z.boolean(),
   registryMode: z.string(),
@@ -258,7 +258,7 @@ export const SerumRuntimeToolPolicy = z.object({
 export type SerumRuntimeToolPolicy = z.infer<typeof SerumRuntimeToolPolicy>;
 
 export const SerumRuntimeConnectorPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   enabled: z.boolean(),
   connectorMode: z.string(),
@@ -268,7 +268,7 @@ export const SerumRuntimeConnectorPolicy = z.object({
 export type SerumRuntimeConnectorPolicy = z.infer<typeof SerumRuntimeConnectorPolicy>;
 
 export const SerumRuntimeModelRouterPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   defaultProvider: z.string().nullable(),
   fallbackProvider: z.string().nullable(),
@@ -281,7 +281,7 @@ export const SerumRuntimeModelRouterPolicy = z.object({
 export type SerumRuntimeModelRouterPolicy = z.infer<typeof SerumRuntimeModelRouterPolicy>;
 
 export const SerumRuntimeDustMcpGatewayPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   dustEnabled: z.boolean(),
   mcpEnabled: z.boolean(),
@@ -294,7 +294,7 @@ export type SerumRuntimeDustMcpGatewayPolicy = z.infer<
 >;
 
 export const SerumRuntimeRetrievalPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   enabled: z.boolean(),
   requireGroundedSources: z.boolean(),
@@ -305,7 +305,7 @@ export const SerumRuntimeRetrievalPolicy = z.object({
 export type SerumRuntimeRetrievalPolicy = z.infer<typeof SerumRuntimeRetrievalPolicy>;
 
 export const SerumRuntimePromptLibraryPolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   versionedPromptsRequired: z.boolean(),
   promptInjectionTestsRequired: z.boolean(),
@@ -317,7 +317,7 @@ export type SerumRuntimePromptLibraryPolicy = z.infer<
 >;
 
 export const SerumRuntimeEvalsQualityGatePolicy = z.object({
-  activeConfigVersionId: z.string().uuid().nullable(),
+  activeConfigVersionId: z.string().guid().nullable(),
   activeConfigVersion: z.number().int().positive().nullable(),
   requiredBeforePublish: z.boolean(),
   minimumPassRate: z.number().min(0).max(1),

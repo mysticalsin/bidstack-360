@@ -24,7 +24,7 @@ import {
   SavedViewPatch,
 } from '@bidstack/shared';
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 
 // F6 hardening: bound how many views a user can hoard and how large a single
 // `filters` blob may be. The schema already caps per-field (string/array/key

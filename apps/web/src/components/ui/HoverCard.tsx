@@ -4,7 +4,7 @@
 // designed to be read, not glanced at.
 
 import * as RadixHoverCard from '@radix-ui/react-hover-card';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from '@/components/motion/static';
 import { forwardRef, type ReactNode } from 'react';
 
 import { springModal } from '@/lib/motion';

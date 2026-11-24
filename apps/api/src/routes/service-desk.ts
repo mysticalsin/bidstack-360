@@ -129,7 +129,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
     '/service-cases/:id',
     {
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 200: ServiceCase } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 200: ServiceCase } },
     },
     async (req) => {
       const row = await prisma.serviceCase.findFirst({
@@ -147,7 +147,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: server.requirePermission('service-desk:write'),
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: ServiceCaseCreate.partial(),
         response: { 200: ServiceCase },
       },
@@ -200,7 +200,7 @@ export const serviceDeskRoutes: FastifyPluginAsyncZod = async (server) => {
     '/service-cases/:id',
     {
       preHandler: server.requirePermission('service-desk:write'),
-      schema: { params: z.object({ id: z.string().uuid() }), response: { 204: z.null() } },
+      schema: { params: z.object({ id: z.string().guid() }), response: { 204: z.null() } },
     },
     async (req, reply) => {
       const existing = await prisma.serviceCase.findFirst({

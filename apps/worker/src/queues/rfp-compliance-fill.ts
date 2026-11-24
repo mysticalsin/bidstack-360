@@ -67,9 +67,9 @@ function defaultSerumConfigEnvironment(): 'dev' | 'staging' | 'production' {
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  matrixItemId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  matrixItemId: z.string().guid(),
   requirementText: z.string().min(1),
   category: z.string().optional(),
   // ADR-0003 Decision 2: `approvalConfirmed` is a human action, not a config
@@ -154,7 +154,7 @@ const ProposedAnswer = z.object({
       z.object({
         kind: z.enum(EVIDENCE_KINDS),
         detail: z.string().min(1).max(300),
-        sourceChunkId: z.string().uuid().optional(),
+        sourceChunkId: z.string().guid().optional(),
       }),
     )
     .max(20)
@@ -162,7 +162,7 @@ const ProposedAnswer = z.object({
   citations: z
     .array(
       z.object({
-        sourceChunkId: z.string().uuid(),
+        sourceChunkId: z.string().guid(),
         quote: z.string().min(1).max(600),
       }),
     )

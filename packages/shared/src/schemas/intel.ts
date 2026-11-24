@@ -35,7 +35,7 @@ export const Financial = z.object({
 export type Financial = z.infer<typeof Financial>;
 
 export const DecisionMember = z.object({
-  contactId: z.string().uuid(),
+  contactId: z.string().guid(),
   name: z.string(),
   role: z.string(),
   influence: z.number().min(0).max(1),

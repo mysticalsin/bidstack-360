@@ -15,26 +15,26 @@ import {
 } from '../services/ai-assistant.service.js';
 
 const EmailDraftBody = z.object({
-  contactId: z.string().uuid().optional(),
-  dealId: z.string().uuid().optional(),
+  contactId: z.string().guid().optional(),
+  dealId: z.string().guid().optional(),
   tone: z.enum(['formal', 'friendly', 'direct']).default('friendly'),
   intent: z.string().trim().min(1).max(2_000),
 });
 
 const DealSentimentBody = z.object({
-  dealId: z.string().uuid(),
+  dealId: z.string().guid(),
 });
 
 const MeetingPrepBody = z.object({
-  calendarEventId: z.string().uuid(),
+  calendarEventId: z.string().guid(),
 });
 
 const ContactEnrichBody = z.object({
-  contactId: z.string().uuid(),
+  contactId: z.string().guid(),
 });
 
 const AccountIntelBody = z.object({
-  accountId: z.string().uuid(),
+  accountId: z.string().guid(),
 });
 
 const FeedbackBody = z.object({
@@ -162,7 +162,7 @@ export const aiAssistantRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [requireHumanAiActor],
       schema: {
-        params: z.object({ sessionId: z.string().uuid() }),
+        params: z.object({ sessionId: z.string().guid() }),
         body: FeedbackBody,
       },
     },

@@ -26,7 +26,7 @@ const DeadlineQuery = z.object({
 
 const DeadlineItem = z.object({
   kind: z.enum(['opportunity', 'proposal']),
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string(),
   /** Opportunity customer — null for proposals. */
   customer: z.string().nullable(),

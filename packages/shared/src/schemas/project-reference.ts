@@ -13,14 +13,14 @@ export const ProjectReferenceStatus = z.enum([
 export type ProjectReferenceStatus = z.infer<typeof ProjectReferenceStatus>;
 
 export const ProjectReference = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountKey: z.string().min(1),
   title: z.string().min(1).max(255),
   technicalSummary: z.string().max(8000).nullable(),
   businessSummary: z.string().max(8000).nullable(),
   status: ProjectReferenceStatus,
   sourceSystem: z.string().min(1),
-  validatedById: z.string().uuid().nullable(),
+  validatedById: z.string().guid().nullable(),
   dispatchedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

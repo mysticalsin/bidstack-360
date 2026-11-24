@@ -5,7 +5,7 @@ import { prisma, type TaskStatus as PrismaTaskStatus } from '@bidstack/db';
 import type { Tool } from './index.js';
 
 const Input = z.object({
-  oppId: z.string().uuid().optional(),
+  oppId: z.string().guid().optional(),
   status: z.enum(['open', 'in_progress', 'done', 'blocked']).optional(),
   assignee: z.string().email().optional(),
   limit: z.number().int().min(1).max(200).default(50),

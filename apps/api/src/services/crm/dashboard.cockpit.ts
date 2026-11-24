@@ -247,9 +247,11 @@ export function applyFieldOverrides(
     } else if (
       o.fieldKey === 'annualRevenueMicros' &&
       typeof o.value === 'number' &&
+      Number.isSafeInteger(o.value) &&
       o.value > 0
     ) {
       next.annualRevenueMicros = o.value;
+      delete next.annualRevenueReadable;
       overriddenKeys.add('annualRevenueMicros');
     }
   }
@@ -557,9 +559,12 @@ export function buildCockpit({
       opp.stage !== 'closed_won' &&
       opp.stage !== 'closed_lost',
   );
-  const annualRevenue = company.annualRevenueMicros
-    ? formatMicrosCompact(company.annualRevenueMicros)
-    : 'Not verified';
+  const revenueNotReadable = company.annualRevenueReadable === false;
+  const annualRevenue = revenueNotReadable
+    ? 'amount not readable'
+    : company.annualRevenueMicros
+      ? formatMicrosCompact(company.annualRevenueMicros)
+      : 'Not verified';
   const companyRisks = risks.filter(
     (risk) => risk.companyName && normalizeName(risk.companyName) === normalizeName(company.name),
   );
@@ -661,9 +666,16 @@ export function buildCockpit({
       {
         label: 'Annual revenue',
         value: annualRevenue,
-        detail: company.annualRevenueMicros ? 'company revenue' : 'connect Apollo to verify',
-        tone: company.annualRevenueMicros ? 'purple' : 'amber',
-        ...externalField('annualRevenueMicros', Boolean(company.annualRevenueMicros)),
+        detail: revenueNotReadable
+          ? 'stored micros are past the exact integer range'
+          : company.annualRevenueMicros
+            ? 'company revenue'
+            : 'connect Apollo to verify',
+        tone: company.annualRevenueMicros || revenueNotReadable ? 'purple' : 'amber',
+        ...externalField(
+          'annualRevenueMicros',
+          Boolean(company.annualRevenueMicros) || revenueNotReadable,
+        ),
       },
       {
         label: 'External sync',

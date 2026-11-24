@@ -43,9 +43,9 @@ const RECENCY_HALF_LIFE_DAYS = 365;
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
-  requirementId: z.string().uuid(),
+  orgId: z.string().guid(),
+  orchestrationId: z.string().guid(),
+  requirementId: z.string().guid(),
   topK: z.number().int().min(1).max(20).default(DEFAULT_TOP_K),
 });
 type JobData = z.infer<typeof JobData>;

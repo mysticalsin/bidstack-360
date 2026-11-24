@@ -27,12 +27,12 @@ const QUEUE_NAME = RFP_ORCHESTRATE.name;
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 const JobData = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   rfpRequestId: z.string().min(1),
-  documentVersionId: z.string().uuid(),
-  opportunityId: z.string().uuid().optional(),
-  proposalId: z.string().uuid().optional(),
-  startedByUserId: z.string().uuid().optional(),
+  documentVersionId: z.string().guid(),
+  opportunityId: z.string().guid().optional(),
+  proposalId: z.string().guid().optional(),
+  startedByUserId: z.string().guid().optional(),
 });
 type JobData = z.infer<typeof JobData>;
 

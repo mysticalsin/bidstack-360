@@ -137,7 +137,7 @@ const ConfigQuery = z.object({
   environment: SerumConfigEnvironment.optional(),
 });
 const ConfigIdParams = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 const SECRET_KEY_RE = /(api[_-]?key|password|private[_-]?key|credential|secret)$/i;
 const ALLOWED_SECRET_REFERENCE_KEYS = new Set([

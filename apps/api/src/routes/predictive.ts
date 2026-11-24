@@ -53,7 +53,7 @@ export const predictiveRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         body: z.object({
           targetType: z.string().max(50),
-          targetId: z.string().uuid(),
+          targetId: z.string().guid(),
           kind: PredictiveScoreKind,
         }),
         response: { 200: PredictiveScore },

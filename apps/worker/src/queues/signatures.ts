@@ -27,11 +27,11 @@ type SignatureStatus = 'DRAFT' | 'SENT' | 'VIEWED' | 'SIGNED' | 'DECLINED' | 'VO
 
 const PollJobData = z.object({
   /** When absent: sweeper job that scans all stale SENT requests */
-  signatureRequestId: z.string().uuid().optional(),
+  signatureRequestId: z.string().guid().optional(),
 });
 
 const ReminderJobData = z.object({
-  signatureRequestId: z.string().uuid(),
+  signatureRequestId: z.string().guid(),
   recipientEmail: z.string().email(),
   recipientName: z.string(),
   documentName: z.string(),
@@ -199,7 +199,7 @@ export async function startSignatureWorkers(
     async (job) => {
       const data = PollJobData.safeParse(job.data);
       if (!data.success) {
-        log.warn({ errors: data.error.errors }, 'invalid poll job data');
+        log.warn({ errors: data.error.issues }, 'invalid poll job data');
         return;
       }
 
@@ -259,7 +259,7 @@ export async function startSignatureWorkers(
     async (job) => {
       const data = ReminderJobData.safeParse(job.data);
       if (!data.success) {
-        log.warn({ errors: data.error.errors }, 'invalid reminder job data');
+        log.warn({ errors: data.error.issues }, 'invalid reminder job data');
         return;
       }
 

@@ -184,7 +184,11 @@ const warmViteManifestCache = async (cache: Cache) => {
 };
 
 const cacheAppShellPath = async (cache: Cache, path: string) => {
-  const response = await fetch(path, { cache: 'reload' });
+  // Hashed build assets are already fresh. Reloading them races the
+  // modulepreload Vite inserts for a lazy chunk and drops that URL from the
+  // cache the offline shell checks.
+  const hashedAsset = path.startsWith('/assets/');
+  const response = await fetch(path, hashedAsset ? undefined : { cache: 'reload' });
   if (response.ok) {
     await cache.put(path, response.clone());
   }
@@ -202,10 +206,21 @@ const warmAppShellCache = async () => {
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   const registerServiceWorker = () => {
-    void warmAppShellCache().catch((error) => Sentry.captureException(error));
+    let warmTimer = 0;
+    const scheduleAppShellWarm = () => {
+      window.clearTimeout(warmTimer);
+      warmTimer = window.setTimeout(() => {
+        void warmAppShellCache().catch((error) => Sentry.captureException(error));
+      }, 200);
+    };
+    // Lazy routes insert modulepreload links after the first warm. Cache
+    // those too, or the offline shell check never sees them.
+    const headObserver = new MutationObserver(scheduleAppShellWarm);
+    headObserver.observe(document.head, { childList: true });
+    scheduleAppShellWarm();
     navigator.serviceWorker
       .register('/sw.js')
-      .then(() => warmAppShellCache())
+      .then(() => scheduleAppShellWarm())
       .catch((error) => Sentry.captureException(error));
   };
 

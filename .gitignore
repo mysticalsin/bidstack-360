@@ -115,6 +115,14 @@ apps/web/scripts/_i18n_*
 # Web app screenshot blobs (committed by QA runs, not source)
 apps/web/*.png
 apps/web/e2e/responsive/*-snapshots/
+# Device baselines for the chromium-desktop project on linux. iPhone SE and
+# iPad Mini still launch WebKit, but the snapshot name uses the project.
+!apps/web/e2e/responsive/mobile-pixel-7.spec.ts-snapshots/
+!apps/web/e2e/responsive/mobile-pixel-7.spec.ts-snapshots/*-chromium-desktop-linux.png
+!apps/web/e2e/responsive/mobile-iphone-se.spec.ts-snapshots/
+!apps/web/e2e/responsive/mobile-iphone-se.spec.ts-snapshots/*-chromium-desktop-linux.png
+!apps/web/e2e/responsive/tablet-ipad.spec.ts-snapshots/
+!apps/web/e2e/responsive/tablet-ipad.spec.ts-snapshots/*-chromium-desktop-linux.png
 
 # Scratch / exploratory scripts at repo root
 screenshot-*.cjs

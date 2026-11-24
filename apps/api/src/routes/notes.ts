@@ -86,7 +86,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: {
         querystring: z.object({
           accountId: z.string().min(1).max(255),
-          companyId: z.string().uuid().optional(),
+          companyId: z.string().guid().optional(),
           limit: z.coerce.number().int().min(1).max(200).default(100),
         }),
         response: { 200: NoteList },
@@ -280,7 +280,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('activities:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: NotePatch,
         response: { 200: Note },
       },
@@ -357,7 +357,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
     {
       preHandler: [server.requirePermission('activities:write')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         response: { 204: z.null() },
       },
     },

@@ -16,7 +16,7 @@ import {
 
 import { renderEmailTemplate } from '../lib/email-template-render.js';
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 
 export const emailTemplateRoutes: FastifyPluginAsyncZod = async (server) => {
   // RBAC: email templates were previously ungated — any authenticated user

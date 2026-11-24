@@ -15,23 +15,23 @@ export const AccountIntelFieldProvenance = z.object({
   label: z.string().min(1),
   hint: z.string().min(1),
   confidence: z.number().min(0).max(1).nullable(),
-  sourceFileId: z.string().uuid().nullable(),
+  sourceFileId: z.string().guid().nullable(),
   sourceFileName: z.string().nullable(),
-  sourceExtractionId: z.string().uuid().nullable(),
+  sourceExtractionId: z.string().guid().nullable(),
   updatedAt: z.string().datetime(),
 });
 export type AccountIntelFieldProvenance = z.infer<typeof AccountIntelFieldProvenance>;
 
 export const AccountSolution = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountId: z.string().min(1).max(255),
   name: z.string(),
   description: z.string().nullable(),
   category: z.string(),
   status: z.string(),
-  extractedFromDocumentId: z.string().uuid().nullable(),
-  metadata: z.record(z.unknown()),
-  fieldSources: z.record(AccountIntelFieldProvenance).default({}),
+  extractedFromDocumentId: z.string().guid().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+  fieldSources: z.record(z.string(), AccountIntelFieldProvenance).default({}),
   confidenceBps: z.number().int(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -39,7 +39,7 @@ export const AccountSolution = z.object({
 export type AccountSolution = z.infer<typeof AccountSolution>;
 
 export const AccountProduct = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   accountId: z.string().min(1).max(255),
   name: z.string(),
   description: z.string().nullable(),
@@ -47,9 +47,9 @@ export const AccountProduct = z.object({
   priceRangeMicros: z.number().int().nullable(),
   currency: z.string(),
   status: z.string(),
-  extractedFromDocumentId: z.string().uuid().nullable(),
-  metadata: z.record(z.unknown()),
-  fieldSources: z.record(AccountIntelFieldProvenance).default({}),
+  extractedFromDocumentId: z.string().guid().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+  fieldSources: z.record(z.string(), AccountIntelFieldProvenance).default({}),
   confidenceBps: z.number().int(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -57,11 +57,11 @@ export const AccountProduct = z.object({
 export type AccountProduct = z.infer<typeof AccountProduct>;
 
 export const DocumentExtraction = z.object({
-  id: z.string().uuid(),
-  documentId: z.string().uuid(),
+  id: z.string().guid(),
+  documentId: z.string().guid(),
   accountId: z.string().min(1).max(255),
   status: z.enum(['pending', 'running', 'done', 'error']),
-  extractedData: z.record(z.unknown()),
+  extractedData: z.record(z.string(), z.unknown()),
   error: z.string().nullable(),
   dustRunId: z.string().nullable(),
   createdAt: z.string().datetime(),

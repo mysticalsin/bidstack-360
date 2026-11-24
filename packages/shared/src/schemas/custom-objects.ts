@@ -16,8 +16,8 @@ export type Cardinality = z.infer<typeof Cardinality>;
 // ─── CustomObjectDef ───────────────────────────────────────────────────────
 
 export const CustomObjectDef = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   key: z
     .string()
     .min(1)
@@ -67,9 +67,9 @@ export type CustomObjectDefList = z.infer<typeof CustomObjectDefList>;
 // ─── CustomObjectRelation ──────────────────────────────────────────────────
 
 export const CustomObjectRelation = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  customObjectDefId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  customObjectDefId: z.string().guid(),
   relationKey: z
     .string()
     .min(1)
@@ -79,7 +79,7 @@ export const CustomObjectRelation = z.object({
   relatedEntityType: z.string().min(1).max(64),
   cardinality: Cardinality.default('ONE_TO_MANY'),
   required: z.boolean().default(false),
-  junctionTableSchema: z.record(z.unknown()).nullable().optional(),
+  junctionTableSchema: z.record(z.string(), z.unknown()).nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -129,10 +129,10 @@ export type CustomObjectFieldCreate = z.infer<typeof CustomObjectFieldCreate>;
 
 // Read shape for a persisted custom-object field (mirrors the POST response).
 export const CustomObjectField = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
   entityType: z.string(),
-  customObjectDefId: z.string().uuid().nullable(),
+  customObjectDefId: z.string().guid().nullable(),
   fieldKey: z.string(),
   label: z.string(),
   fieldType: z.string(),
@@ -154,12 +154,12 @@ export type CustomObjectFieldList = z.infer<typeof CustomObjectFieldList>;
 // ─── CustomObjectRecord ────────────────────────────────────────────────────
 
 export const CustomObjectRecord = z.object({
-  id: z.string().uuid(),
-  orgId: z.string().uuid(),
-  customObjectDefId: z.string().uuid(),
+  id: z.string().guid(),
+  orgId: z.string().guid(),
+  customObjectDefId: z.string().guid(),
   recordKey: z.string().min(1).max(32),
-  valuesJson: z.record(z.unknown()),
-  createdById: z.string().uuid().nullable(),
+  valuesJson: z.record(z.string(), z.unknown()),
+  createdById: z.string().guid().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   deletedAt: z.string().datetime().nullable(),
@@ -169,12 +169,12 @@ export const CustomObjectRecord = z.object({
 export type CustomObjectRecord = z.infer<typeof CustomObjectRecord>;
 
 export const CustomObjectRecordCreate = z.object({
-  values: z.record(z.unknown()),
+  values: z.record(z.string(), z.unknown()),
 });
 export type CustomObjectRecordCreate = z.infer<typeof CustomObjectRecordCreate>;
 
 export const CustomObjectRecordPatch = z.object({
-  values: z.record(z.unknown()),
+  values: z.record(z.string(), z.unknown()),
 });
 export type CustomObjectRecordPatch = z.infer<typeof CustomObjectRecordPatch>;
 

@@ -22,10 +22,10 @@ export const STORY_MATCH_QUEUE_NAME = RFP_STORY_MATCH.name;
 // ─── Job schema ────────────────────────────────────────────────────────────
 
 export const JobData = z.object({
-  orgId: z.string().uuid(),
+  orgId: z.string().guid(),
   rfpRequestId: z.string().min(1),
-  documentVersionId: z.string().uuid(),
-  orchestrationId: z.string().uuid(),
+  documentVersionId: z.string().guid(),
+  orchestrationId: z.string().guid(),
   chunkIndex: z.number().int().min(0).default(0),
   totalChunks: z.number().int().min(1).default(1),
 });

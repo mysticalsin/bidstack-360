@@ -8,14 +8,14 @@ import { invalidateRbacDecisionCache } from '../lib/rbac-decision-cache.js';
 import { getUserPermissions } from '../services/rbac.service.js';
 
 const OrgUser = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   name: z.string().nullable(),
   email: z.string(),
   role: z.string(),
   createdAt: z.string().datetime(),
 });
 
-const IdParam = z.object({ id: z.string().uuid() });
+const IdParam = z.object({ id: z.string().guid() });
 
 function hasDbAdminRole(roleNames: string[]): boolean {
   return roleNames.some((n) => n.toLowerCase() === 'admin');
@@ -76,12 +76,12 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
           // large orgs and loads the full set on every request even when the
           // caller needs a short dropdown. Cursor + limit fixes both.
           limit: z.coerce.number().int().min(1).max(200).default(100),
-          cursor: z.string().uuid().optional(),
+          cursor: z.string().guid().optional(),
         }),
         response: {
           200: z.object({
             items: z.array(OrgUser),
-            nextCursor: z.string().uuid().nullable(),
+            nextCursor: z.string().guid().nullable(),
           }),
         },
       },
@@ -118,7 +118,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('users:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().guid() }),
         body: z.object({ role: z.enum(['member', 'admin']) }),
         response: { 200: OrgUser },
       },
@@ -296,7 +296,7 @@ export const usersRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       preHandler: [server.requirePermission('users:write'), server.requireRole('admin')],
       schema: {
-        params: z.object({ id: z.string().uuid(), roleId: z.string().uuid() }),
+        params: z.object({ id: z.string().guid(), roleId: z.string().guid() }),
         response: { 204: z.null() },
       },
     },
