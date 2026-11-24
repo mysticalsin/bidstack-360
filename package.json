@@ -29,6 +29,7 @@
     "e2e": "pnpm --filter @bidstack/web e2e",
     "routes:inventory": "tsx scripts/route-inventory.mts",
     "load-test": "node scripts/run-k6-load-test.mjs",
+    "stress": "node stress/run.mjs",
     "load-test:certify": "cross-env K6_DURATION_PROFILE=certification node scripts/run-k6-load-test.mjs",
     "load-test:selftest": "node scripts/run-k6-load-test.mjs --selftest",
     "load-test:rfp": "tsx scripts/load-test-rfp.ts",
