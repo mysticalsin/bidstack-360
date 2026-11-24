@@ -28,7 +28,7 @@ const { getPipelineKpis } = await import('./funnel.service.js');
 beforeEach(() => {
   opportunityGroupBy.mockReset();
   opportunityCount.mockReset().mockResolvedValue(0);
-  queryRaw.mockReset().mockResolvedValue([{ weighted: 0, avgDaysOpen: 0, openCount: 0 }]);
+  queryRaw.mockReset().mockResolvedValue([{ weightedMicros: '0', avgDaysOpen: 0, openCount: 0 }]);
 });
 
 describe('getPipelineKpis money precision', () => {
