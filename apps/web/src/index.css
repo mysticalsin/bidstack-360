@@ -835,7 +835,9 @@ select:focus-visible {
   color: var(--fg-tertiary);
 }
 .proto-num {
-  text-align: right;
+  text-align: end;
+  direction: ltr;
+  unicode-bidi: isolate;
   font-feature-settings: 'tnum';
   font-variant-numeric: tabular-nums;
 }
@@ -848,7 +850,7 @@ select:focus-visible {
 /* ---------- Sidebar ---------- */
 .sidebar {
   background: var(--surface-sidebar);
-  border-right: 0.5px solid var(--border-default);
+  border-inline-end: 0.5px solid var(--border-default);
   padding: 14px 10px 24px;
   position: sticky;
   top: 0;
@@ -949,7 +951,7 @@ select:focus-visible {
   background: transparent;
   cursor: pointer;
   font-family: inherit;
-  text-align: left;
+  text-align: start;
   transition: color 120ms ease;
 }
 .sb-group-toggle:hover {
@@ -997,7 +999,7 @@ select:focus-visible {
 }
 
 .sb-badge {
-  margin-left: auto;
+  margin-inline-start: auto;
   font-size: 11px;
   font-weight: 600;
   background: var(--sidebar-badge-bg);
@@ -1016,9 +1018,8 @@ select:focus-visible {
 .sidebar.is-collapsed .sb-badge {
   opacity: 0;
   max-width: 0;
-  padding-left: 0;
-  padding-right: 0;
-  margin-left: 0;
+  padding-inline: 0;
+  margin-inline-start: 0;
   visibility: hidden;
 }
 
@@ -1045,7 +1046,7 @@ select:focus-visible {
 .sb-toggle {
   position: absolute;
   top: 10px;
-  right: 8px;
+  inset-inline-end: 8px;
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -1104,7 +1105,7 @@ select:focus-visible {
    that strip so the brand text can never run underneath it, and ellipsize
    the tagline instead of letting it clip under the button. */
 .sidebar:not(.is-collapsed) .sb-brand {
-  padding-right: 48px;
+  padding-inline-end: 48px;
 }
 .sidebar:not(.is-collapsed) .sb-brand > div:last-child {
   min-width: 0;
@@ -1194,7 +1195,7 @@ select:focus-visible {
 .sb-item::before {
   content: '';
   position: absolute;
-  left: 4px;
+  inset-inline-start: 4px;
   top: 8px;
   bottom: 8px;
   width: 2.5px;
@@ -1245,12 +1246,12 @@ select:focus-visible {
   width: 100%;
   border: none;
   background: transparent;
-  text-align: left;
+  text-align: start;
 }
 .sb-badge-dot {
   position: absolute;
   top: 10px;
-  right: 10px;
+  inset-inline-end: 10px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -1258,9 +1259,9 @@ select:focus-visible {
 }
 .sb-flyout {
   position: absolute;
-  left: 100%;
+  inset-inline-start: 100%;
   top: 0;
-  margin-left: 8px;
+  margin-inline-start: 8px;
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: 8px;
@@ -1279,7 +1280,7 @@ select:focus-visible {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -8px;
+  inset-inline-start: -8px;
   width: 8px;
 }
 .sb-parent-container:hover .sb-flyout,
@@ -1346,9 +1347,9 @@ select:focus-visible {
   flex-direction: column;
   gap: 2px;
   margin-top: 4px;
-  padding-left: 8px;
-  border-left: 1px dashed var(--border-subtle);
-  margin-left: 19px;
+  padding-inline-start: 8px;
+  border-inline-start: 1px dashed var(--border-subtle);
+  margin-inline-start: 19px;
 }
 .sb-foot {
   padding: 6px 10px 0;
@@ -1480,7 +1481,9 @@ select:focus-visible {
   color: var(--fg-tertiary);
 }
 .tb-search kbd {
-  margin-left: auto;
+  margin-inline-start: auto;
+  direction: ltr;
+  unicode-bidi: isolate;
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 1px 5px;
@@ -1517,7 +1520,7 @@ select:focus-visible {
 .iconbtn .ic-badge {
   position: absolute;
   top: 10px;
-  right: 11px;
+  inset-inline-end: 11px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -1570,7 +1573,7 @@ select:focus-visible {
   white-space: nowrap;
 }
 .tb-signout {
-  margin-left: 6px;
+  margin-inline-start: 6px;
   border: 0;
   background: transparent;
   width: 44px;
@@ -1646,7 +1649,7 @@ select:focus-visible {
   background: transparent;
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: start;
   cursor: text;
   transition:
     background-color 120ms,
@@ -2679,8 +2682,8 @@ select:focus-visible {
   scroll-margin-bottom: calc(var(--fab-clearance) + var(--fab-size));
 }
 [data-slot='pagination'] {
-  padding-right: calc(
-    var(--fab-size) + var(--fab-inset) + env(safe-area-inset-right, 0px)
+  padding-inline-end: calc(
+    var(--fab-size) + var(--fab-inset) + env(safe-area-inset-inline-end, 0px)
   );
 }
 @media (min-width: 768px) and (max-width: 900px) {
@@ -2800,13 +2803,13 @@ select:focus-visible {
 }
 .mobile-nav-drawer {
   position: absolute;
-  left: 0;
+  inset-inline-start: 0;
   top: 0;
   bottom: 0;
   width: 280px;
   max-width: 85vw;
   background: var(--surface-card);
-  border-right: 1px solid var(--border-default);
+  border-inline-end: 1px solid var(--border-default);
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
@@ -5758,14 +5761,14 @@ select:focus-visible {
 /* ---------- Salesforce Timeline Component ---------- */
 .sf-timeline {
   position: relative;
-  padding-left: 28px;
+  padding-inline-start: 28px;
 }
 .sf-timeline::before {
   content: '';
   position: absolute;
   top: 8px;
   bottom: 8px;
-  left: 11px;
+  inset-inline-start: 11px;
   width: 2px;
   background: var(--border-default);
 }
@@ -5778,7 +5781,7 @@ select:focus-visible {
 }
 .sf-timeline-marker {
   position: absolute;
-  left: -28px;
+  inset-inline-start: -28px;
   top: 4px;
   display: flex;
   align-items: center;
@@ -6270,4 +6273,28 @@ input:checked + .sf-toggle-track .sf-toggle-thumb {
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+}
+
+/* Arabic shell. Logical properties above mirror with dir=rtl. These two
+   motions are physical: the drawer slides off the start edge, and the
+   collapse chevron points toward that edge. */
+[dir='rtl'] .mobile-nav-drawer {
+  transform: translateX(105%);
+}
+[dir='rtl'] .mobile-nav-root[data-state='open'] .mobile-nav-drawer {
+  transform: none;
+}
+[dir='rtl'] .sidebar:not(.is-collapsed) .sb-toggle svg {
+  transform: none;
+}
+[dir='rtl'] .sb-group-caret.is-collapsed {
+  transform: rotate(90deg);
+}
+[dir='rtl'] .kpi-value,
+.tb-currency-code {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+[dir='rtl'] .kpi-value {
+  text-align: right;
 }

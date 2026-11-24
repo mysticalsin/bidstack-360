@@ -20,6 +20,12 @@ describe('formatMoney', () => {
     const out = formatMoney(320_000, 'EUR');
     expect(out).toMatch(/320,000/);
   });
+
+  it('keeps Western digits when the UI locale is Arabic so chart ticks stay readable', () => {
+    const out = formatMoney(320_000, 'EUR', 'ar');
+    expect(out).toMatch(/320/);
+    expect(out).not.toMatch(/[٠-٩]/);
+  });
 });
 
 describe('daysUntil', () => {

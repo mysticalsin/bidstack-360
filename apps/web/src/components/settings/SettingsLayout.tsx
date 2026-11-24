@@ -133,6 +133,10 @@ export function SettingsLayout({ active, children }: Props) {
         return t('settingsLayout.itemWorkspace', 'Workspace');
       case 'identity':
         return t('settingsLayout.itemIdentity', 'Identity & roles');
+      case 'modules':
+        return t('settingsLayout.itemModules', 'Modules');
+      case 'signing-entities':
+        return t('settingsLayout.itemSigningEntities', 'Signing entities');
       case 'crm':
         return t('settingsLayout.itemCrm', 'Data configuration');
       case 'data-import':

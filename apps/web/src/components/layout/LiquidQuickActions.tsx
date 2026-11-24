@@ -39,7 +39,7 @@ export function LiquidQuickActions() {
            home-indicator / notch safe area so the disc never sits on the
            pagination bar on a notched phone. */
         bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
-        right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
+        insetInlineEnd: 'calc(1.5rem + env(safe-area-inset-inline-end, 0px))',
       }}
       aria-hidden={undefined}
     >

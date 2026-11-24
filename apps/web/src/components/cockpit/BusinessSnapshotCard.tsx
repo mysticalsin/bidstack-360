@@ -185,11 +185,7 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     {
       label: t('businessSnapshot.row.sourceReceipts', 'Source receipts'),
       value:
-        sourceCount === 1
-          ? t('businessSnapshot.value.sourceCount_one', '{{count}} source', { count: sourceCount })
-          : t('businessSnapshot.value.sourceCount_other', '{{count}} sources', {
-              count: sourceCount,
-            }),
+        t('businessSnapshot.value.sourceCount', '{{count}} sources', { count: sourceCount }),
       source:
         sourceCount > 0
           ? {

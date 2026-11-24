@@ -1,1 +1,262 @@
-{}
+{
+  "title": "التقارير",
+  "list": {
+    "title": "مكتبة التقارير",
+    "create": "تقرير جديد",
+    "noReports": "لم يُنشأ أي تقرير",
+    "recent": "التقارير الأخيرة",
+    "starred": "التقارير المميّزة بنجمة"
+  },
+  "builder": {
+    "title": "منشئ التقارير",
+    "metric": "مقياس",
+    "dimension": "بُعد",
+    "filter": "تصفية",
+    "groupBy": "تجميع حسب",
+    "orderBy": "فرز حسب",
+    "limit": "الحد",
+    "addFilter": "إضافة عامل تصفية",
+    "addMetric": "إضافة مقياس",
+    "run": "تشغيل التقرير",
+    "running": "جارٍ التشغيل…",
+    "save": "حفظ التقرير",
+    "export": "تصدير",
+    "exportCsv": "تصدير بصيغة CSV",
+    "exportXlsx": "تصدير بصيغة Excel",
+    "schedule": "جدولة",
+    "noData": "لا توجد بيانات لهذا التحديد",
+    "error": "خطأ في تشغيل التقرير"
+  },
+  "charts": {
+    "bar": "أعمدة",
+    "line": "خطي",
+    "pie": "دائري",
+    "donut": "دائري مجوف",
+    "area": "مساحي",
+    "scatter": "مبعثر",
+    "funnel": "قمع",
+    "heatmap": "خريطة حرارية",
+    "table": "جدول"
+  },
+  "periods": {
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "last7Days": "آخر 7 أيام",
+    "last30Days": "آخر 30 يومًا",
+    "thisMonth": "هذا الشهر",
+    "lastMonth": "الشهر الماضي",
+    "thisQuarter": "هذا الربع",
+    "lastQuarter": "الربع الماضي",
+    "thisYear": "هذا العام",
+    "lastYear": "العام الماضي",
+    "custom": "مخصص"
+  },
+  "metrics": {
+    "revenue": "الإيراد",
+    "deals": "صفقات",
+    "winRate": "معدل الفوز",
+    "avgDealSize": "متوسط حجم الصفقة",
+    "salesCycle": "مدة دورة البيع",
+    "leads": "العملاء المحتملون",
+    "conversionRate": "معدل التحويل",
+    "activities": "الأنشطة",
+    "calls": "المكالمات",
+    "emails": "رسائل البريد الإلكتروني",
+    "meetings": "الاجتماعات"
+  },
+  "reportBuilder": {
+    "toast": {
+      "previewFailed": "تعذّرت المعاينة",
+      "nameRequired": "يجب تسمية التقرير قبل الحفظ.",
+      "updated": "تم تحديث التقرير",
+      "created": "تم إنشاء التقرير",
+      "saveFailed": "تعذّر الحفظ"
+    },
+    "backToReports": "رجوع إلى التقارير",
+    "title": {
+      "edit": "تعديل التقرير",
+      "new": "تقرير جديد"
+    },
+    "subtitle": "أنشئ استعلامًا، وعاينه مباشرة، ثم احفظه.",
+    "saveButton": {
+      "saving": "جارٍ الحفظ…",
+      "saveChanges": "حفظ التغييرات",
+      "create": "إنشاء تقرير"
+    },
+    "details": {
+      "title": "تفاصيل التقرير",
+      "nameLabel": "الاسم",
+      "namePlaceholder": "مثال: الصفقات الفائزة حسب الشهر",
+      "nameAria": "اسم التقرير",
+      "descriptionLabel": "الوصف",
+      "descriptionPlaceholder": "اختياري",
+      "descriptionAria": "وصف التقرير",
+      "dataSourceLabel": "مصدر البيانات",
+      "dataSourceAria": "كيان التقرير"
+    },
+    "filters": {
+      "title": "عوامل التصفية",
+      "caption": "تحديد السجلات التي تُضمَّن."
+    },
+    "measures": {
+      "title": "المقاييس",
+      "caption": "قيم تجميعية (تُترك فارغة لعرض الصفوف)."
+    },
+    "groupBy": {
+      "title": "تجميع حسب",
+      "caption": "تفصيل المقاييس حسب البُعد."
+    },
+    "sortLimit": {
+      "title": "الفرز والحد",
+      "rowLimitLabel": "حد الصفوف",
+      "rowLimitAria": "حد الصفوف"
+    },
+    "visualization": {
+      "title": "المرئيات",
+      "chartTypeAria": "نوع المخطط"
+    },
+    "preview": {
+      "running": "جارٍ التشغيل…",
+      "run": "تشغيل المعاينة"
+    },
+    "sort": {
+      "label": "فرز",
+      "fieldAria": "حقل الفرز",
+      "pickColumn": "اختر عمودًا…",
+      "directionAria": "اتجاه الفرز",
+      "ascending": "تصاعدي",
+      "descending": "تنازلي",
+      "removeAria": "إزالة الفرز",
+      "add": "+ إضافة فرز"
+    },
+    "error": {
+      "notFoundTitle": "التقرير غير موجود",
+      "notFoundMessage": "ربما تم حذفه."
+    }
+  },
+  "filterBuilder": {
+    "valueAriaLabel": "قيمة التصفية",
+    "pickOption": "— اختر —",
+    "dateValueAriaLabel": "قيمة تاريخ التصفية",
+    "numericValueAriaLabel": "القيمة الرقمية للتصفية",
+    "valuePlaceholder": "القيمة",
+    "fieldPlaceholder": "حقل…",
+    "operatorAriaLabel": "المُعامل",
+    "removeConditionAriaLabel": "إزالة الشرط",
+    "toggleLogicAriaLabel": "تبديل المنطق — حاليًا {{logic}}",
+    "noConditions": "لا توجد شروط بعد",
+    "conditionCount": "{{count}} شرط",
+    "removeGroupAriaLabel": "إزالة المجموعة",
+    "addCondition": "شرط",
+    "addGroup": "مجموعة"
+  },
+  "reports": {
+    "heading": "التقارير",
+    "subtitle": "تحليلات عبر مسار الفرص والعملاء المحتملين ومكتب الخدمة والمهام.",
+    "tab": {
+      "pipeline": "مسار الفرص",
+      "leads": "العملاء المحتملون",
+      "service-desk": "مكتب الخدمة",
+      "tasks": "المهام"
+    },
+    "tabAriaLabel": "علامة تبويب تقرير {{label}}",
+    "error": {
+      "title": "تعذّر تحميل التقرير"
+    },
+    "byStatus": "حسب الحالة",
+    "pipeline": {
+      "byStage": "مسار الفرص حسب المرحلة",
+      "weighted": "مسار الفرص المرجّح",
+      "totalOpen": "إجمالي المفتوح",
+      "closedThisQuarter": "المغلقة هذا الربع"
+    },
+    "leads": {
+      "total": "إجمالي العملاء المحتملين",
+      "converted": "المحوّلون",
+      "conversionRate": "معدل التحويل",
+      "avgScore": "متوسط الدرجة",
+      "bySource": "حسب المصدر"
+    },
+    "serviceDesk": {
+      "totalCases": "إجمالي الحالات",
+      "open": "مفتوحة",
+      "resolvedThisMonth": "تم حلها هذا الشهر",
+      "avgSatisfaction": "متوسط الرضا",
+      "byPriority": "حسب الأولوية"
+    },
+    "tasks": {
+      "total": "إجمالي المهام",
+      "completed": "مكتملة",
+      "overdue": "متأخر",
+      "completionRate": "معدل الإنجاز"
+    }
+  },
+  "reportsList": {
+    "errorTitle": "تعذّر تحميل التقارير",
+    "heading": "التقارير",
+    "savedCount": "{{count}} تقارير محفوظة",
+    "newReport": "تقرير جديد",
+    "searchPlaceholder": "بحث في التقارير…",
+    "searchAriaLabel": "بحث في التقارير",
+    "resultsCountMatching": "{{count}} تقارير تطابق \"{{search}}\"",
+    "resultsCount": "{{count}} تقارير",
+    "emptyTitle": "لم يُعثر على تقارير",
+    "emptySearchMessage": "جرّب بحثًا مختلفًا.",
+    "emptyMessage": "أنشئ أول تقرير تحليلي.",
+    "tableAriaLabel": "التقارير",
+    "columnName": "الاسم",
+    "columnEntity": "الكيان",
+    "columnLastRun": "آخر تشغيل",
+    "columnSchedule": "الجدولة",
+    "columnActions": "الإجراءات",
+    "runAriaLabel": "تشغيل التقرير {{name}}",
+    "editAriaLabel": "تعديل التقرير {{name}}",
+    "duplicateAriaLabel": "تكرار التقرير {{name}}",
+    "deleteConfirm": "حذف \"{{name}}\"؟",
+    "deleteAriaLabel": "حذف التقرير {{name}}",
+    "readOnlyHint": "يلزم إذن الكتابة للتقارير لإدارة هذا التقرير."
+  },
+  "fieldPicker": {
+    "placeholder": "اختر حقلًا…",
+    "listboxLabel": "خيارات الحقول",
+    "searchPlaceholder": "بحث في الحقول…",
+    "empty": "لم يُعثر على حقول."
+  },
+  "reportPreview": {
+    "title": "معاينة مباشرة",
+    "rowCountOne": "{{count}} صف",
+    "rowCountOther": "{{count}} صفوف",
+    "emptyMessage": "لا توجد صفوف تطابق هذا الاستعلام بعد.",
+    "chartAriaLabel": "معاينة التقرير",
+    "rowsAriaLabel": "صفوف معاينة التقرير",
+    "runPrompt": "أنشئ الاستعلام، ثم شغّل المعاينة لرؤية النتائج هنا.",
+    "chartShapeMismatch": "نوع المخطط هذا لا يناسب شكل الاستعلام الحالي. يعرض الجدول أدناه الصفوف الخام.",
+    "queryFailed": "فشل الاستعلام"
+  },
+  "aggregatePicker": {
+    "functionCount": "العدد",
+    "functionCountDistinct": "عدد القيم الفريدة",
+    "functionSum": "المجموع",
+    "functionAverage": "المتوسط",
+    "functionMin": "الحد الأدنى",
+    "functionMax": "الحد الأقصى",
+    "functionAriaLabel": "دالة التجميع",
+    "fieldPlaceholder": "اختر حقلًا…",
+    "aliasPlaceholder": "اسم مستعار (اختياري)",
+    "aliasAriaLabel": "الاسم المستعار للتجميع",
+    "removeAriaLabel": "إزالة التجميع",
+    "addButton": "+ إضافة تجميع"
+  },
+  "groupByPicker": {
+    "fieldPlaceholder": "اختر حقلًا…",
+    "timeBucketLabel": "التجميع الزمني",
+    "noTimeBucket": "بدون تجميع زمني",
+    "timeBucketDay": "يوم",
+    "timeBucketWeek": "أسبوع",
+    "timeBucketMonth": "شهر",
+    "timeBucketQuarter": "ربع",
+    "timeBucketYear": "سنة",
+    "removeField": "إزالة حقل التجميع",
+    "addGroupBy": "+ إضافة تجميع حسب"
+  }
+}

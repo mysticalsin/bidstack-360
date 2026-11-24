@@ -63,9 +63,7 @@ export function PipelineCard({
       </div>
       <p className="mt-1 text-xs text-[var(--fg-tertiary)]">{UNSPECIFIED_CURRENCY_BASIS}</p>
       <div className="mt-1 text-xs text-[var(--fg-secondary)]">
-        {count === 1
-          ? t('pipeline.openCount_one', '{{count}} open opportunity', { count })
-          : t('pipeline.openCount_other', '{{count}} open opportunities', { count })}
+        {t('pipeline.openCount', '{{count}} open opportunities', { count })}
       </div>
       <PipelineLiveChart points={chartPoints} reduced={reduced} />
     </GlassCard>

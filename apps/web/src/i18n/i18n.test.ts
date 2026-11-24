@@ -12,6 +12,7 @@ import {
   NAMESPACES,
   RTL_LOCALES,
   SUPPORTED_LOCALES,
+  applyDocumentLocale,
   i18n,
   isRtl,
   isSupportedLocale,
@@ -98,8 +99,13 @@ describe('isSupportedLocale', () => {
 });
 
 describe('isRtl', () => {
-  it('flags Arabic as RTL', () => {
+  it('flags Arabic as RTL and sets dir on the document', () => {
     expect(isRtl('ar')).toBe(true);
+    applyDocumentLocale('ar');
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(document.documentElement.lang).toBe('ar');
+    applyDocumentLocale('en');
+    expect(document.documentElement.dir).toBe('ltr');
   });
 
   it('does not flag French / Spanish / English as RTL', () => {

@@ -641,7 +641,12 @@
     "itemIntegrations": "Intégrations",
     "itemWebhooks": "Webhooks",
     "itemDeveloper": "Accès développeur",
-    "itemAuditLog": "Journal d'audit"
+    "itemAuditLog": "Journal d'audit",
+    "itemSerum": "SERUM Control Plane",
+    "itemIdentity": "Identité et rôles",
+    "itemAccessPolicies": "Politiques d'accès",
+    "itemModules": "Modules",
+    "itemSigningEntities": "Entités signataires"
   },
   "team": {
     "title": "Équipe",
