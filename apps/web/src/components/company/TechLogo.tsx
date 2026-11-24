@@ -99,7 +99,10 @@ function monogramStyle(size: number, tone: string, style?: CSSProperties): CSSPr
     height: size,
     borderRadius: Math.max(6, Math.round(size * 0.22)),
     background: `color-mix(in srgb, ${tone} 16%, var(--surface-card))`,
-    color: tone,
+    // The letter is primary text, not the tint. Jade on its own 16% mix is
+    // 4.28:1 and fails the accounts color-contrast check (Google Analytics,
+    // WordPress). Primary text stays above 4.5:1 on that tint in both themes.
+    color: 'var(--fg-primary)',
     border: `1px solid color-mix(in srgb, ${tone} 38%, var(--border-default))`,
     fontSize: Math.max(10, Math.round(size * 0.38)),
     fontWeight: 700,

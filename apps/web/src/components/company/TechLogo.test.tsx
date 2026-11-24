@@ -45,6 +45,15 @@ describe('TechLogo', () => {
     expect(screen.getByText('?')).toBeDefined();
   });
 
+  // WHY: a tinted tile whose letters use the same hue can drop under 4.5:1
+  // (jade on its 16% mix). The letter has to be primary text.
+  it('paints monogram letters in primary text so the tint still clears contrast', () => {
+    render(<TechLogo name="Google Analytics" size={20} />);
+    const mark = document.querySelector('[data-fallback="monogram"]');
+    expect(mark?.textContent).toBe('GA');
+    expect(mark?.getAttribute('style') ?? '').toMatch(/color:\s*var\(--fg-primary\)/);
+  });
+
   it('builds distinct monograms for brands that share a first letter', () => {
     expect(techMonogram('Azure')).toBe('AZ');
     expect(techMonogram('AWS')).toBe('AW');
