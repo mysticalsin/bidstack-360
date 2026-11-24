@@ -52,6 +52,8 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
     {
       config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
       schema: {
+        // Empty POST. The inventory treats a mutation without a body schema as ungated.
+        body: z.object({}).strict().nullish(),
         response: {
           200: z.object({
             ticket: z.string().min(1),
