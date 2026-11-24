@@ -2690,7 +2690,7 @@ select:focus-visible {
   }
   .tb-search,
   .tb-user .who,
-  .tb-signout {
+  .tb-signout:not(.tb-signout-keep) {
     display: none;
   }
   .crumbs {
@@ -2736,7 +2736,7 @@ select:focus-visible {
   .tb-spacer,
   .tb-search,
   .tb-user .who,
-  .tb-signout {
+  .tb-signout:not(.tb-signout-keep) {
     display: none;
   }
   .crumbs {
