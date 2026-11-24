@@ -33,6 +33,18 @@ describe('csvCell — formula-injection neutralization', () => {
   it('returns empty string unchanged', () => {
     expect(csvCell('')).toBe('');
   });
+
+  it('leaves a signed number as a number so a loss stays summable', () => {
+    // WHY: -1.50 and +3312 are numbers. Prefixing them makes Excel store text,
+    // so a re-import and a SUM both lose the amount. -1+1 is still a formula.
+    expect(csvCell('-1.50')).toBe('-1.50');
+    expect(csvCell('-1500')).toBe('-1500');
+    expect(csvCell('+33123456789')).toBe('+33123456789');
+    expect(csvCell('-1+1')).toBe("'-1+1");
+    expect(rowsToCsv([{ amount: '-1.50' }], [{ key: 'amount', label: 'Amount' }])).toBe(
+      'Amount\r\n-1.50',
+    );
+  });
 });
 
 describe('rowsToCsv uses csvCell under the hood', () => {
