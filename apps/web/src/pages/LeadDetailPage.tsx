@@ -242,9 +242,9 @@ export function LeadDetailPage() {
         {/* Status & scoring */}
         <Card>
           <div className="p-5">
-            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
               {t('leadDetail.statusScoringHeading', 'Status & scoring')}
-            </h3>
+            </h2>
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
@@ -354,9 +354,9 @@ export function LeadDetailPage() {
         {/* BANT */}
         <Card>
           <div className="p-5">
-            <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
               {t('leadDetail.bantHeading', 'BANT qualification')}
-            </h3>
+            </h2>
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-1 block text-xs text-[var(--fg-tertiary)]">
