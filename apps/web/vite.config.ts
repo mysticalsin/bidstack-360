@@ -293,6 +293,10 @@ export default defineConfig(({ command, mode }) => {
               normalized.includes('/d3-path/') ||
               normalized.includes('/d3-scale/') ||
               normalized.includes('/d3-shape/') ||
+              // d3-sankey calls d3-shape (link generators). Left in vendor,
+              // that import is the vendor -> charts edge of the circular
+              // chunk, which forces every route to download recharts.
+              normalized.includes('/d3-sankey/') ||
               normalized.includes('/d3-time-format/') ||
               normalized.includes('/d3-time/') ||
               normalized.includes('/d3-timer@3.') ||
