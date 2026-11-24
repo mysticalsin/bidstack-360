@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 
 export interface CapabilityManifest {
   userId: string;
@@ -14,6 +14,22 @@ export interface CapabilityManifest {
 const CAPABILITIES_KEY = ['me', 'capabilities'] as const;
 
 /**
+ * Global query defaults skip every 4xx. A parallel stub-user insert loses with
+ * 409, which is not a denial: the winning insert has committed. If this query
+ * stops on that conflict, RequireAuditLogRead sees an empty manifest and
+ * redirects to the dashboard, so the Audit Log h1 never mounts.
+ * TanStack asks before incrementing, so the first failure is count 0.
+ * Stop at 2, the same budget the app uses for a 5xx.
+ */
+export function shouldRetryCapabilityQuery(failureCount: number, error: unknown): boolean {
+  if (failureCount >= 2) return false;
+  if (error instanceof ApiError) {
+    return error.status === 409 || error.status >= 500 || error.status === 0;
+  }
+  return true;
+}
+
+/**
  * The signed-in user's effective authorization, resolved server-side from their
  * role grants. Prefer gating UI on a specific permission via useHasPermission
  * over the binary useIsAdmin() so the product reflects the real RBAC model.
@@ -23,6 +39,7 @@ export function useCapabilities(opts: { enabled?: boolean } = {}) {
     enabled: opts.enabled ?? true,
     queryKey: CAPABILITIES_KEY,
     queryFn: ({ signal }) => api<CapabilityManifest>('/api/me/capabilities', { signal }),
+    retry: shouldRetryCapabilityQuery,
     // Authorization rarely changes within a session; cache generously but allow
     // a manual refetch after a role assignment.
     staleTime: 5 * 60_000,
