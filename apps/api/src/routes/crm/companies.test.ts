@@ -35,6 +35,30 @@ beforeAll(async () => {
   await prisma.companyEnrichment.deleteMany({
     where: { orgId, normalizedName: TEST_NORMALIZED },
   });
+  // WHY: search, lookup, cockpit, and overrides only resolve a company that was
+  // stored. This row is that account. Mantu is not inserted.
+  await prisma.companyEnrichment.create({
+    data: {
+      orgId,
+      normalizedName: TEST_NORMALIZED,
+      legalName: TEST_COMPANY,
+      tradeName: TEST_COMPANY,
+      domain: TEST_DOMAIN,
+      website: `https://${TEST_DOMAIN}/`,
+      logoUrl: null,
+      logoSource: 'manual',
+      registryIds: {},
+      formerNames: [],
+      industryCodes: ['Software'],
+      status: 'active',
+      employeeCount: null,
+      annualRevenueMicros: null,
+      confidenceBps: 7200,
+      sourceAttribution: [],
+      providerMetadata: {},
+      cacheExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
+  });
 
   server = await buildServer();
   await server.ready();
@@ -79,15 +103,26 @@ describe('crm companies routes', () => {
     expect(body.items.length).toBeGreaterThan(0);
   });
 
-  skipIfNoDb('GET /api/crm/companies/search?q= filters by query', async () => {
-    const res = await server.inject({
+  skipIfNoDb('GET /api/crm/companies/search?q= filters a stored company and does not invent Mantu', async () => {
+    // WHY: an empty name used to be filled with a Mantu row, so a search for
+    // that name returned an account the org never stored.
+    const absent = await server.inject({
       method: 'GET',
       url: '/api/crm/companies/search?q=Mantu',
+    });
+    expect(absent.statusCode).toBe(200);
+    const absentBody = absent.json();
+    expect(absentBody.items.some((c: { name: string }) => c.name === 'Mantu')).toBe(false);
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/crm/companies/search?q=${encodeURIComponent(TEST_COMPANY)}`,
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.items.length).toBeGreaterThan(0);
-    expect(body.items.some((c: { name: string }) => c.name === 'Mantu')).toBe(true);
+    expect(body.items.some((c: { name: string }) => c.name === TEST_COMPANY)).toBe(true);
+    expect(body.items.some((c: { name: string }) => c.name === 'Mantu')).toBe(false);
   });
 
   skipIfNoDb('GET /api/crm/companies/search?limit= respects the limit', async () => {
@@ -100,30 +135,45 @@ describe('crm companies routes', () => {
   });
 
   skipIfNoDb(
-    'GET /api/crm/companies/lookup matches by domain and preserves Mantu attribution',
+    'GET /api/crm/companies/lookup matches a stored domain and does not invent Mantu',
     async () => {
-      const res = await server.inject({
+      // WHY: mantu.com used to exact-match a fabricated row with the official
+      // Mantu logo. A domain the org never stored is no match.
+      const invented = await server.inject({
         method: 'GET',
         url: '/api/crm/companies/lookup?domain=mantu.com',
+      });
+      expect(invented.statusCode).toBe(200);
+      expect(invented.json()).toMatchObject({ match: 'none', company: null, alternatives: [] });
+
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/crm/companies/lookup?domain=${TEST_DOMAIN}`,
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.match).toBe('exact_domain');
-      expect(body.company.name).toBe('Mantu');
-      expect(body.company.logo.url).toBe('https://mantu.com/favicon.ico');
-      expect(body.company.logo.attribution.source).toBe('official_website');
+      expect(body.company.name).toBe(TEST_COMPANY);
+      expect(body.company.domain).toBe(TEST_DOMAIN);
     },
   );
 
-  skipIfNoDb('GET /api/crm/companies/lookup matches by exact name', async () => {
-    const res = await server.inject({
+  skipIfNoDb('GET /api/crm/companies/lookup matches a stored name and does not invent Mantu', async () => {
+    const invented = await server.inject({
       method: 'GET',
       url: '/api/crm/companies/lookup?name=Mantu',
+    });
+    expect(invented.statusCode).toBe(200);
+    expect(invented.json()).toMatchObject({ match: 'none', company: null, alternatives: [] });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/crm/companies/lookup?name=${encodeURIComponent(TEST_COMPANY)}`,
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.match).toBe('exact_name');
-    expect(body.company.name).toBe('Mantu');
+    expect(body.company.name).toBe(TEST_COMPANY);
   });
 
   skipIfNoDb('GET /api/crm/companies/lookup with no params returns none', async () => {
@@ -135,15 +185,24 @@ describe('crm companies routes', () => {
     expect(body.alternatives).toEqual([]);
   });
 
-  skipIfNoDb('GET /api/crm/companies/lookup returns fuzzy match when no exact match', async () => {
-    const res = await server.inject({
+  skipIfNoDb('GET /api/crm/companies/lookup returns fuzzy match for a stored name and none for Mantu', async () => {
+    // WHY: "Mant" used to fuzzy-match the fabricated Mantu row. A prefix of a
+    // name the org never stored is no match; a prefix of a stored name is.
+    const invented = await server.inject({
       method: 'GET',
       url: '/api/crm/companies/lookup?name=Mant',
+    });
+    expect(invented.statusCode).toBe(200);
+    expect(invented.json()).toMatchObject({ match: 'none', company: null, alternatives: [] });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: '/api/crm/companies/lookup?name=Codex%20Verif',
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.match).toBe('fuzzy_name');
-    expect(body.company).not.toBeNull();
+    expect(body.company.name).toBe(TEST_COMPANY);
   });
 
   skipIfNoDb('GET /api/crm/companies/:id returns 404 for unknown company', async () => {
@@ -152,6 +211,23 @@ describe('crm companies routes', () => {
       url: '/api/crm/companies/unknown-company-12345',
     });
     expect(res.statusCode).toBe(404);
+  });
+
+  skipIfNoDb('GET /api/crm/companies/Mantu is 404 when the org has no such account', async () => {
+    // WHY: the cockpit and the technical stack used to resolve an invented
+    // Mantu row, so these calls returned 200 for every org.
+    const cockpit = await server.inject({ method: 'GET', url: '/api/crm/companies/Mantu' });
+    expect(cockpit.statusCode).toBe(404);
+    const stack = await server.inject({
+      method: 'GET',
+      url: '/api/crm/companies/Mantu/technical-stack',
+    });
+    expect(stack.statusCode).toBe(404);
+    const refresh = await server.inject({
+      method: 'POST',
+      url: '/api/crm/companies/Mantu/technical-stack/refresh',
+    });
+    expect(refresh.statusCode).toBe(404);
   });
 
   skipIfNoDb('POST /api/crm/companies/:id/enrich persists a verified data cache row', async () => {
@@ -240,12 +316,12 @@ describe('crm companies routes', () => {
     // data flagged as manually overridden — never silently mixed back in.
     const put = await server.inject({
       method: 'PUT',
-      url: '/api/crm/companies/Mantu/field-overrides',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`,
       payload: { fieldKey: 'industry', value: 'Aerospace & Defense' },
     });
     expect(put.statusCode).toBe(200);
 
-    const cockpit = await server.inject({ method: 'GET', url: '/api/crm/companies/mantu' });
+    const cockpit = await server.inject({ method: 'GET', url: `/api/crm/companies/${TEST_NORMALIZED}` });
     expect(cockpit.statusCode).toBe(200);
     const kpis = (cockpit.json() as { kpis: Array<Record<string, unknown>> }).kpis;
     const industry = kpis.find((k) => k.label === 'Industry');
@@ -254,16 +330,16 @@ describe('crm companies routes', () => {
     expect(industry?.overridden).toBe(true);
 
     const audit = await prisma.auditLog.findFirst({
-      where: { orgId: orgId!, action: 'company.field_override', targetId: 'mantu' },
+      where: { orgId: orgId!, action: 'company.field_override', targetId: TEST_NORMALIZED },
     });
     expect(audit).not.toBeNull();
 
     const del = await server.inject({
       method: 'DELETE',
-      url: '/api/crm/companies/Mantu/field-overrides/industry',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides/industry`,
     });
     expect(del.statusCode).toBe(204);
-    const after = await server.inject({ method: 'GET', url: '/api/crm/companies/mantu' });
+    const after = await server.inject({ method: 'GET', url: `/api/crm/companies/${TEST_NORMALIZED}` });
     const industryAfter = (after.json() as { kpis: Array<Record<string, unknown>> }).kpis.find(
       (k) => k.label === 'Industry',
     );
@@ -276,54 +352,54 @@ describe('crm companies routes', () => {
     // revenue without the place it was read from is not provable.
     const put = await server.inject({
       method: 'PUT',
-      url: '/api/crm/companies/Mantu/field-overrides',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`,
       payload: {
         fieldKey: 'annualRevenueMicros',
         value: 1_200_000_000_000_000,
-        sourceUrl: 'https://www.mantu.com/annual-report-2025.pdf',
+        sourceUrl: 'https://codex-verification.example/annual-report-2025.pdf',
         sourceLabel: 'Annual report 2025',
       },
     });
     expect(put.statusCode).toBe(200);
     expect(put.json()).toMatchObject({
       fieldKey: 'annualRevenueMicros',
-      sourceUrl: 'https://www.mantu.com/annual-report-2025.pdf',
+      sourceUrl: 'https://codex-verification.example/annual-report-2025.pdf',
       sourceLabel: 'Annual report 2025',
     });
     const row = await prisma.companyFieldOverride.findFirst({
-      where: { orgId: orgId!, companyKey: 'mantu', fieldKey: 'annualRevenueMicros' },
+      where: { orgId: orgId!, companyKey: TEST_NORMALIZED, fieldKey: 'annualRevenueMicros' },
     });
-    expect(row?.sourceUrl).toBe('https://www.mantu.com/annual-report-2025.pdf');
+    expect(row?.sourceUrl).toBe('https://codex-verification.example/annual-report-2025.pdf');
     expect(row?.sourceLabel).toBe('Annual report 2025');
     const audit = await prisma.auditLog.findFirst({
-      where: { orgId: orgId!, action: 'company.field_override', targetId: 'mantu' },
+      where: { orgId: orgId!, action: 'company.field_override', targetId: TEST_NORMALIZED },
       orderBy: { id: 'desc' },
     });
-    expect(audit?.diff).toMatchObject({ fieldKey: 'annualRevenueMicros', sourceUrl: 'https://www.mantu.com/annual-report-2025.pdf' });
+    expect(audit?.diff).toMatchObject({ fieldKey: 'annualRevenueMicros', sourceUrl: 'https://codex-verification.example/annual-report-2025.pdf' });
 
     // Saving again without a source clears the old link: the value changed,
     // so the old source no longer proves it.
     await server.inject({
       method: 'PUT',
-      url: '/api/crm/companies/Mantu/field-overrides',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`,
       payload: { fieldKey: 'annualRevenueMicros', value: 1_300_000_000_000_000 },
     });
     const cleared = await prisma.companyFieldOverride.findFirst({
-      where: { orgId: orgId!, companyKey: 'mantu', fieldKey: 'annualRevenueMicros' },
+      where: { orgId: orgId!, companyKey: TEST_NORMALIZED, fieldKey: 'annualRevenueMicros' },
     });
     expect(cleared?.sourceUrl).toBeNull();
-    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/annualRevenueMicros' });
+    await server.inject({ method: 'DELETE', url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides/annualRevenueMicros` });
   });
 
   skipIfNoDb('field override stores the currency of a manual revenue, EUR when none is given', async () => {
-    const put = (payload: object) => server.inject({ method: 'PUT', url: '/api/crm/companies/Mantu/field-overrides', payload });
-    const row = () => prisma.companyFieldOverride.findFirst({ where: { orgId: orgId!, companyKey: 'mantu', fieldKey: 'annualRevenueMicros' } });
+    const put = (payload: object) => server.inject({ method: 'PUT', url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`, payload });
+    const row = () => prisma.companyFieldOverride.findFirst({ where: { orgId: orgId!, companyKey: TEST_NORMALIZED, fieldKey: 'annualRevenueMicros' } });
 
     const usd = await put({ fieldKey: 'annualRevenueMicros', value: 2_000_000_000_000_000, currency: 'USD' });
     expect(usd.statusCode).toBe(200);
     expect(usd.json()).toMatchObject({ currency: 'USD' });
     expect((await row())?.currency).toBe('USD');
-    const audit = await prisma.auditLog.findFirst({ where: { orgId: orgId!, action: 'company.field_override', targetId: 'mantu' }, orderBy: { id: 'desc' } });
+    const audit = await prisma.auditLog.findFirst({ where: { orgId: orgId!, action: 'company.field_override', targetId: TEST_NORMALIZED }, orderBy: { id: 'desc' } });
     expect(audit?.diff).toMatchObject({ currency: 'USD' });
 
     expect((await put({ fieldKey: 'annualRevenueMicros', value: 2_100_000_000_000_000 })).json()).toMatchObject({ currency: 'EUR' });
@@ -339,15 +415,15 @@ describe('crm companies routes', () => {
     // Only revenue carries a currency.
     const emp = await put({ fieldKey: 'employeeCount', value: 500, currency: 'USD' });
     expect(emp.json()).toMatchObject({ currency: null });
-    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/annualRevenueMicros' });
-    await server.inject({ method: 'DELETE', url: '/api/crm/companies/Mantu/field-overrides/employeeCount' });
+    await server.inject({ method: 'DELETE', url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides/annualRevenueMicros` });
+    await server.inject({ method: 'DELETE', url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides/employeeCount` });
   });
 
   skipIfNoDb('field override refuses a source link that is not http or https', async () => {
     for (const sourceUrl of ['javascript:alert(1)', 'ftp://files.example.com/a', 'not a url']) {
       const res = await server.inject({
         method: 'PUT',
-        url: '/api/crm/companies/Mantu/field-overrides',
+        url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`,
         payload: { fieldKey: 'employeeCount', value: 100, sourceUrl },
       });
       expect(res.statusCode).toBe(400);
@@ -357,7 +433,7 @@ describe('crm companies routes', () => {
   skipIfNoDb('registry number and jurisdiction can be set with a source and reverted', async () => {
     const put = await server.inject({
       method: 'PUT',
-      url: '/api/crm/companies/Mantu/field-overrides',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`,
       payload: {
         fieldKey: 'registryId',
         value: '  B 123 456 789 ',
@@ -369,19 +445,19 @@ describe('crm companies routes', () => {
     expect(put.json().value).toBe('B 123 456 789');
     const jur = await server.inject({
       method: 'PUT',
-      url: '/api/crm/companies/Mantu/field-overrides',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`,
       payload: { fieldKey: 'registryJurisdiction', value: 'fr' },
     });
     expect(jur.statusCode).toBe(200);
     expect(jur.json().value).toBe('FR');
     const bad = await server.inject({
       method: 'PUT',
-      url: '/api/crm/companies/Mantu/field-overrides',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides`,
       payload: { fieldKey: 'registryJurisdiction', value: 'France!' },
     });
     expect(bad.statusCode).toBe(400);
     for (const key of ['registryId', 'registryJurisdiction']) {
-      const del = await server.inject({ method: 'DELETE', url: `/api/crm/companies/Mantu/field-overrides/${key}` });
+      const del = await server.inject({ method: 'DELETE', url: `/api/crm/companies/${TEST_NORMALIZED}/field-overrides/${key}` });
       expect(del.statusCode).toBe(204);
     }
   });
@@ -412,7 +488,7 @@ describe('crm companies routes', () => {
   skipIfNoDb('manual technical stack persists into the account cockpit', async () => {
     const put = await server.inject({
       method: 'PUT',
-      url: '/api/crm/companies/Mantu/technical-stack',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/technical-stack`,
       payload: {
         stack: [
           {
@@ -432,12 +508,12 @@ describe('crm companies routes', () => {
 
     const state = await server.inject({
       method: 'GET',
-      url: '/api/crm/companies/Mantu/technical-stack',
+      url: `/api/crm/companies/${TEST_NORMALIZED}/technical-stack`,
     });
     expect(state.statusCode).toBe(200);
     expect(state.json().manualStack[0].items[0].name).toBe('Snowflake');
 
-    const cockpit = await server.inject({ method: 'GET', url: '/api/crm/companies/mantu' });
+    const cockpit = await server.inject({ method: 'GET', url: `/api/crm/companies/${TEST_NORMALIZED}` });
     expect(cockpit.statusCode).toBe(200);
     expect(cockpit.json().technicalStack).toEqual([
       {
@@ -452,12 +528,12 @@ describe('crm companies routes', () => {
     async () => {
       const res = await server.inject({
         method: 'POST',
-        url: '/api/crm/companies/Mantu/technical-stack/refresh',
+        url: `/api/crm/companies/${TEST_NORMALIZED}/technical-stack/refresh`,
       });
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.state.companyKey).toBe('mantu');
+      expect(body.state.companyKey).toBe(TEST_NORMALIZED);
       expect(body.providers.map((provider: { id: string }) => provider.id)).toEqual([
         'apollo',
         'seamless',
@@ -491,7 +567,7 @@ describe('crm companies routes', () => {
     try {
       const res = await server.inject({
         method: 'POST',
-        url: '/api/crm/companies/Mantu/technical-stack/refresh',
+        url: `/api/crm/companies/${TEST_NORMALIZED}/technical-stack/refresh`,
       });
 
       expect(res.statusCode).toBe(200);
@@ -528,7 +604,7 @@ describe('crm companies routes', () => {
     try {
       const res = await server.inject({
         method: 'POST',
-        url: '/api/crm/companies/Mantu/technical-stack/refresh',
+        url: `/api/crm/companies/${TEST_NORMALIZED}/technical-stack/refresh`,
       });
 
       expect(res.statusCode).toBe(200);
