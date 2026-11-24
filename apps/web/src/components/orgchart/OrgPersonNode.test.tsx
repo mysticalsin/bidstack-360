@@ -30,6 +30,19 @@ function renderNode(node: OrgNode, c: NodeCov | undefined, extra: Partial<Compon
 }
 afterEach(cleanup);
 
+describe('PersonNode card', () => {
+  // WHY: a floating name pill hides the role. The chart has to read as a person
+  // with a job, in one card the reporting line can attach to.
+  it('shows the name and role together on the card', () => {
+    renderNode(person(), cov(null));
+    const node = screen.getByTestId('orgchart-node');
+    expect(node.querySelector('.oc-name')?.textContent).toBe('Ana Silva');
+    expect(node.querySelector('.oc-title')?.textContent).toBe('Chief Executive Officer');
+    expect(node.querySelector('.oc-pill')).toBeNull();
+    expect(node.getAttribute('data-level')).toBe('c_level');
+  });
+});
+
 describe('PersonNode recency badge', () => {
   it('green "Met recently" within 30 days, with the date in the tooltip', () => {
     renderNode(person(), cov(ago(5)));

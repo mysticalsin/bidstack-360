@@ -284,15 +284,16 @@
 .tech-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .tech-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   max-width: 100%;
-  padding: 4px 10px 4px 6px;
-  border-radius: 999px;
+  min-height: 36px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 10px;
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
   font-size: 12px;

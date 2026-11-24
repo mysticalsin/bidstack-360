@@ -180,6 +180,9 @@ describe('CompanyTechStackSection', () => {
 
     render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
 
+    const azure = document.querySelector('[data-tech-item="Microsoft 365"]');
+    expect(azure?.getAttribute('data-logo-tile')).toBe('true');
+    expect(azure?.querySelector('[data-tech-logo]')?.getAttribute('title')).toBe('Microsoft 365');
     expect(screen.getByRole('heading', { name: 'Collaboration' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Data' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Microsoft 365 evidence, DNS, 95% confidence/ })).toBeTruthy();
