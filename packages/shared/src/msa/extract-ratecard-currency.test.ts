@@ -14,6 +14,7 @@ describe('extract rate-card currency', () => {
         'Senior Consultant: 850 EUR per day',
         'Principal Consultant: £1,100 per day',
         'Analyst: $400 per hour',
+        'Researcher: 700 usd per day',
         'Associate: 900 per day',
       ].join('\n'),
     );
@@ -28,6 +29,7 @@ describe('extract rate-card currency', () => {
       ['Senior Consultant', 850_000_000, 'day', 'EUR'],
       ['Principal Consultant', 1_100_000_000, 'day', 'GBP'],
       ['Analyst', 400_000_000, 'hour', 'USD'],
+      ['Researcher', 700_000_000, 'day', 'USD'],
       ['Associate', 900_000_000, 'day', null],
     ]);
   });

@@ -165,8 +165,18 @@ function detectLiability(pages: TextPage[]): { amountMicros: number; currency: s
   };
 }
 
-function detectRateCard(pages: TextPage[]): { role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year' }[] {
-  const lines: { role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year' }[] = [];
+function rateLineCurrency(symbol: string | undefined, written: string | undefined): string | null {
+  if (written) return written.toUpperCase();
+  if (symbol === '€') return 'EUR';
+  if (symbol === '£') return 'GBP';
+  if (symbol === '$') return 'USD';
+  return null;
+}
+
+function detectRateCard(
+  pages: TextPage[],
+): { role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year'; currency: string | null }[] {
+  const lines: { role: string; rateMicros: number; unit: 'day' | 'hour' | 'month' | 'year'; currency: string | null }[] = [];
   const unitMap: Record<string, 'day' | 'hour' | 'month' | 'year'> = {
     day: 'day',
     daily: 'day',
@@ -177,14 +187,19 @@ function detectRateCard(pages: TextPage[]): { role: string; rateMicros: number; 
   for (const page of pages) {
     for (const raw of page.text.split(/\r?\n/)) {
       const m = raw.match(
-        /^\s*([A-Za-z][A-Za-z /&'-]{2,60}?)\s*[:.\t|]*\s*[€£$]?\s*([\d.,]{2,12})\s*(?:EUR|USD|GBP)?\s*(?:\/|per|par)?\s*(day|daily|hour|month|year)\b/i,
+        /^\s*([A-Za-z][A-Za-z /&'-]{2,60}?)\s*[:.\t|]*\s*([€£$])?\s*([\d.,]{2,12})\s*(EUR|USD|GBP)?\s*(?:\/|per|par)?\s*(day|daily|hour|month|year)\b/i,
       );
       if (!m) continue;
       const role = m[1]!.trim().replace(/[:.-]+$/, '');
-      const amount = Number(m[2]!.replace(/[,\s]/g, ''));
-      const unit = unitMap[m[3]!.toLowerCase()] ?? 'day';
+      const amount = Number(m[3]!.replace(/[,\s]/g, ''));
+      const unit = unitMap[m[5]!.toLowerCase()] ?? 'day';
       if (!role || !Number.isFinite(amount) || amount <= 0) continue;
-      lines.push({ role, rateMicros: Math.round(amount * 1_000_000), unit });
+      lines.push({
+        role,
+        rateMicros: Math.round(amount * 1_000_000),
+        unit,
+        currency: rateLineCurrency(m[2], m[4]),
+      });
     }
   }
   return lines.slice(0, 50);
