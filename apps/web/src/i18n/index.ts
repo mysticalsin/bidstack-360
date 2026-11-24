@@ -23,7 +23,7 @@
 import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpBackend from 'i18next-http-backend';
-import { initReactI18next } from 'react-i18next';
+import * as reactI18next from 'react-i18next';
 
 export const SUPPORTED_LOCALES = ['en', 'fr', 'es', 'pt', 'it', 'zh', 'ar'] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
@@ -69,10 +69,14 @@ function createTestResources(): Record<string, Record<string, object>> {
 
 const i18nPipeline = isTest ? i18n : i18n.use(HttpBackend);
 
-void i18nPipeline
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
+// A named import of initReactI18next throws in component tests whose
+// react-i18next mock only returns useTranslation. The published package
+// always has the plugin, so production still installs it.
+const withI18n = reactI18next.initReactI18next
+  ? i18nPipeline.use(LanguageDetector).use(reactI18next.initReactI18next)
+  : i18nPipeline.use(LanguageDetector);
+
+void withI18n.init({
     fallbackLng: DEFAULT_LOCALE,
     supportedLngs: SUPPORTED_LOCALES as unknown as string[],
     // Strip region from "en-US" → "en" so we only fetch the locales we ship.
