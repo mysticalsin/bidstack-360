@@ -276,6 +276,27 @@ describe('boot environment validation', () => {
     expect(env.POLO_ALLOWED_USERS).toBe('ada@example.test:Admin');
   });
 
+  it('rejects TRUSTED_PROXIES=true in production and still accepts a hop count or CIDR list', async () => {
+    // true trusts every X-Forwarded-For hop, including the client-chosen
+    // leftmost address, so the per-IP rate limit splits one socket into
+    // many buckets. Production must refuse to boot.
+    await expect(
+      loadEnvWith({ ...COMPLETE_PRODUCTION_ENV, TRUSTED_PROXIES: 'true' }),
+    ).rejects.toThrow(/TRUSTED_PROXIES=true is not allowed in production/);
+
+    const hops = await loadEnvWith({ ...COMPLETE_PRODUCTION_ENV, TRUSTED_PROXIES: '2' });
+    expect(hops.TRUSTED_PROXIES).toBe('2');
+
+    const cidrs = await loadEnvWith({
+      ...COMPLETE_PRODUCTION_ENV,
+      TRUSTED_PROXIES: '10.0.0.0/8, 192.168.0.0/16',
+    });
+    expect(cidrs.TRUSTED_PROXIES).toBe('10.0.0.0/8, 192.168.0.0/16');
+
+    const dev = await loadEnvWith({ NODE_ENV: 'development', TRUSTED_PROXIES: 'true' });
+    expect(dev.TRUSTED_PROXIES).toBe('true');
+  });
+
   it('refuses the Access loopback email trust in production and defaults it off', async () => {
     // WHY: a missing flag must not mean "trust the email header". Production
     // must refuse to boot if an operator turns the dev bypass on.

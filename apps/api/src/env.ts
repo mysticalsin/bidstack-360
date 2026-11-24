@@ -1,7 +1,11 @@
 import { z } from 'zod';
 
 import { databaseLogin } from '@bidstack/db';
-import { oauthRefreshLockStartupError, oauthRefreshLockTimingError } from '@bidstack/shared/server';
+import {
+  oauthRefreshLockStartupError,
+  oauthRefreshLockTimingError,
+  productionTrustProxyError,
+} from '@bidstack/shared/server';
 
 import { parseAllowedUsers } from './lib/allowed-users.js';
 
@@ -557,6 +561,10 @@ export function getEnv(): Env {
   }
   if (env.NODE_ENV === 'production' && env.CF_ACCESS_TRUST_LOOPBACK_EMAIL === 'true') {
     semanticErrors.push('CF_ACCESS_TRUST_LOOPBACK_EMAIL=true is not allowed in production');
+  }
+  if (env.NODE_ENV === 'production') {
+    const trustProxyError = productionTrustProxyError(env.TRUSTED_PROXIES);
+    if (trustProxyError) semanticErrors.push(trustProxyError);
   }
   if (semanticErrors.length > 0) {
     throw new Error(`Environment validation failed:\n  Invalid: ${semanticErrors.join(', ')}`);
