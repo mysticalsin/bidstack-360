@@ -113,7 +113,10 @@ jobs:
     # ubuntu-latest is 26.04. Playwright 1.59.1 has no Chromium build for
     # ubuntu26.04-x64, so `playwright install` exits before any test.
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Run 45304506768 hit 30 minutes. Shard 3 was still installing Chromium,
+    # Firefox, and WebKit when the job was cancelled. Shard 1's install took
+    # 27 minutes and the test step was cancelled two minutes later.
+    timeout-minutes: 60
     needs: prepare
 
     strategy:

@@ -1,4 +1,4 @@
-/* global self, caches, URL, fetch */
+/* global self, caches, URL, fetch, Request */
 
 const CACHE_NAME = 'bidstack-v4-network-owned-routes';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];

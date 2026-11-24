@@ -13,11 +13,10 @@ const OfflineIndicator = lazy(() =>
 );
 
 function SidebarFallback() {
-  return (
-    <div className="sidebar">
-      <nav aria-label="Primary navigation" />
-    </div>
-  );
+  // The landmark has to be the sidebar itself. An empty nav inside the rail
+  // has no box, so the iPad check (no menu button at 768px) treats it as
+  // missing until the real sidebar chunk arrives.
+  return <nav className="sidebar" aria-label="Primary navigation" />;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
