@@ -14,6 +14,7 @@ import {
   mapStage,
   normalizeEntity,
   readOpportunityValue,
+  formatNextOpportunityCode,
   splitLeadName,
 } from './migration.js';
 
@@ -84,6 +85,17 @@ describe('asDate', () => {
     expect(asDate('03/15/2026')?.toISOString()).toBe('2026-03-15T00:00:00.000Z');
     expect(asDate('2026-02-31')).toBeNull();
     expect(asDate('')).toBeNull();
+  });
+});
+
+describe('formatNextOpportunityCode', () => {
+  it('ignores a non-numeric OP- code such as OP-H10', () => {
+    // WHY: lexicographic DESC ranks OP-H10 above OP-2048. Number("H10") is
+    // NaN, and the importer stored OP-0NaN, then failed every later row on
+    // the unique (org, code) key. The error file hid the Prisma text.
+    expect(formatNextOpportunityCode(2048)).toBe('OP-2049');
+    expect(formatNextOpportunityCode(10000)).toBe('OP-10001');
+    expect(formatNextOpportunityCode(null)).toBe('OP-2001');
   });
 });
 
