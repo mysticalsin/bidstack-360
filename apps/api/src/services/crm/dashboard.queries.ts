@@ -83,6 +83,7 @@ export function serializeWidget(widget: {
   w: number;
   h: number;
   config: unknown;
+  updatedAt?: Date;
 }): z.infer<typeof DashboardWidget> {
   return {
     id: widget.id,
@@ -93,6 +94,7 @@ export function serializeWidget(widget: {
     w: widget.w,
     h: widget.h,
     config: record(widget.config),
+    ...(widget.updatedAt ? { updatedAt: widget.updatedAt.toISOString() } : {}),
   };
 }
 

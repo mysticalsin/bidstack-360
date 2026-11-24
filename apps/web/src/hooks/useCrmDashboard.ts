@@ -30,7 +30,12 @@ export function useSaveDashboardWidgets() {
     mutationFn: (widgets: DashboardWidget[]) =>
       api<{ widgets: DashboardWidget[] }>('/api/crm/widgets', {
         method: 'PATCH',
-        body: { widgets },
+        body: {
+          widgets: widgets.map((widget) => ({
+            ...widget,
+            ...(widget.updatedAt ? { expectedUpdatedAt: widget.updatedAt } : {}),
+          })),
+        },
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['crm-dashboard'] });

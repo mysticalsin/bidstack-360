@@ -222,6 +222,7 @@ export async function buildDashboardSnapshot(
         w: true,
         h: true,
         config: true,
+        updatedAt: true,
       },
       orderBy: [{ y: 'asc' }, { x: 'asc' }],
       take: 20,
