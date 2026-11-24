@@ -34,6 +34,7 @@ Thumbs.db
 coverage/
 .nyc_output/
 playwright-report/
+e2e/journeys/results.json
 test-results/
 load-test-report/
 deploy-evidence/
@@ -110,6 +111,7 @@ apps/web/scripts/_i18n_*
 
 # Root-level screenshot dumps (from Playwright QA passes)
 *.png
+!docs/sweeps/**/*.png
 *.mjs
 !scripts/*.mjs
 !apps/polo-preview/**/*.mjs
