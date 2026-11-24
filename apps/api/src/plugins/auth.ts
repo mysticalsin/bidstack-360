@@ -325,6 +325,8 @@ function forwardedClientIsRemote(req: FastifyRequest): boolean {
   const raw = req.headers['x-forwarded-for'];
   if (!raw) return false;
   const header = Array.isArray(raw) ? raw[0] : raw;
+  // noUncheckedIndexedAccess: an empty array has no first entry.
+  if (!header) return false;
   const first = header.split(',')[0]?.trim() ?? '';
   if (!first) return false;
   return !isLoopbackAddress(first);
