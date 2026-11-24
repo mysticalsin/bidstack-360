@@ -3,9 +3,10 @@ import fp from 'fastify-plugin';
 import {
   cacheGet,
   cacheSet,
+  cacheSetIfEpoch,
   cacheKey,
   bodyHash,
-  registerOrgCacheKey,
+  currentCacheEpoch,
   invalidateOrgCache,
 } from '../lib/redis-cache.js';
 import { invalidateDashboardSnapshotCache } from '../routes/crm/dashboard.js';
@@ -70,13 +71,18 @@ const redisCachePluginImpl: FastifyPluginAsync<RedisCachePluginOptions> = async 
     if (inFlight) return inFlight;
 
     const promise = (async () => {
+      // Capture before the handler. A mutation during the read bumps the epoch
+      // and deletes keys; storing afterwards would put the pre-mutation value
+      // back for the rest of the TTL.
+      const epoch = orgId === 'anon' ? null : await currentCacheEpoch(orgId);
       const data = await handler();
-      await cacheSet(key, { data }, options.ttlSeconds);
-      // Register the key under this org's index so a later mutation can drop it
-      // without scanning the keyspace. 'anon' has no mutations to invalidate it,
-      // so skip indexing unauthenticated reads.
-      if (orgId !== 'anon') {
-        await registerOrgCacheKey(orgId, key, options.ttlSeconds);
+      if (epoch === null) {
+        await cacheSet(key, { data }, options.ttlSeconds);
+      } else {
+        // Writes the value and the org index together. A false result means
+        // the epoch moved during the read; leave the cache empty so the next
+        // request loads again.
+        await cacheSetIfEpoch(key, { data }, options.ttlSeconds, orgId, epoch);
       }
       return data;
     })();
