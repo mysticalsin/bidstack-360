@@ -25,6 +25,25 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpBackend from 'i18next-http-backend';
 import * as reactI18next from 'react-i18next';
 
+type ReactI18nextPlugin = typeof import('react-i18next').initReactI18next;
+
+// A named read of initReactI18next throws when a component test's
+// react-i18next mock only returns useTranslation. The published package
+// still has the plugin; tests load that copy so useTranslation gets an instance.
+function pluginFromBinding(): ReactI18nextPlugin | undefined {
+  try {
+    return reactI18next.initReactI18next;
+  } catch {
+    return undefined;
+  }
+}
+
+async function publishedReactPlugin(): Promise<ReactI18nextPlugin> {
+  const { vi } = await import('vitest');
+  const actual = await vi.importActual<typeof import('react-i18next')>('react-i18next');
+  return actual.initReactI18next;
+}
+
 export const SUPPORTED_LOCALES = ['en', 'fr', 'es', 'pt', 'it', 'zh', 'ar'] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -69,14 +88,15 @@ function createTestResources(): Record<string, Record<string, object>> {
 
 const i18nPipeline = isTest ? i18n : i18n.use(HttpBackend);
 
-// A named import of initReactI18next throws in component tests whose
-// react-i18next mock only returns useTranslation. The published package
-// always has the plugin, so production still installs it.
-const withI18n = reactI18next.initReactI18next
-  ? i18nPipeline.use(LanguageDetector).use(reactI18next.initReactI18next)
-  : i18nPipeline.use(LanguageDetector);
-
-void withI18n.init({
+if (!i18n.isInitialized) {
+  const reactPlugin =
+    pluginFromBinding() ??
+    (import.meta.env.MODE === 'test' ? await publishedReactPlugin() : undefined);
+  if (!reactPlugin) {
+    throw new Error('react-i18next is missing initReactI18next');
+  }
+  const withI18n = i18nPipeline.use(LanguageDetector).use(reactPlugin);
+  void withI18n.init({
     fallbackLng: DEFAULT_LOCALE,
     supportedLngs: SUPPORTED_LOCALES as unknown as string[],
     // Strip region from "en-US" → "en" so we only fetch the locales we ship.
@@ -110,5 +130,6 @@ void withI18n.init({
       useSuspense: false,
     },
   });
+}
 
 export { i18n };

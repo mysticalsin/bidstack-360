@@ -1,3 +1,7 @@
+// Bind the shared i18n instance before components call useTranslation.
+// Tests that mock `@/lib/api` never import this module on their own.
+import '@/i18n';
+
 // happy-dom 21 implements WAAPI `cancel()` by rejecting `animation.finished`
 // with AbortError. Framer Motion does not attach a handler, so Vitest treats
 // the rejection as unhandled after an otherwise-passing unmount. Attach a
