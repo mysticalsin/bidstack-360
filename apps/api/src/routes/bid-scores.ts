@@ -100,13 +100,20 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
-      const scoped = await visibleOpportunityRelation(req.auth);
+      // Same gate as the other by-id deal routes: an out-of-scope (or missing)
+      // opportunity is 404. Only a visible deal with no score is the empty 204.
+      const opportunity = await prisma.opportunity.findFirst({
+        where: await visibleOpportunityWhere(req.auth, req.params.opportunityId),
+        select: { id: true },
+      });
+      if (!opportunity) {
+        return reply.notFound('Opportunity not found');
+      }
       const row = await prisma.bidScore.findFirst({
         where: {
           orgId: req.auth.orgId,
           opportunityId: req.params.opportunityId,
           deletedAt: null,
-          ...(scoped ? { opportunity: scoped } : {}),
         },
         orderBy: { version: 'desc' },
       });
