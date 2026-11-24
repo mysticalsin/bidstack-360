@@ -96,7 +96,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'opportunities:read' },
       schema: {
         params: z.object({ opportunityId: z.string().uuid() }),
-        response: { 200: BidScoreItem },
+        response: { 200: BidScoreItem, 204: z.null() },
       },
     },
     async (req, reply) => {
@@ -113,7 +113,7 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!row) {
         // No score is the empty state. A 404 shows up as a failed resource
         // in the browser even when the card treats it as "not scored yet".
-        return reply.code(204).send();
+        return reply.code(204).send(null);
       }
       return serializeBidScore(row);
     },
