@@ -467,7 +467,13 @@ export function DataTable<TRow, TSub = unknown>({
       <Table
         aria-busy={loading || undefined}
         className={cn(
-          'table-fixed [&_td:first-child]:pl-4 [&_th:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:last-child]:pr-4',
+          // table-fixed gives every width class (w-36, …) its pixels. On a
+          // phone those pixels use up the row and the unsized name column
+          // collapses to 0, so the next cell is painted on the name and a
+          // click hits the stage instead of the link. w-max lets the table
+          // grow to its columns and the container scrolls; min-w-full keeps
+          // a short table full-bleed. w-max wins over Table's w-full.
+          'table-fixed w-max min-w-full [&_td:first-child]:pl-4 [&_th:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:last-child]:pr-4',
           tableClassName,
         )}
         containerClassName="min-h-0 flex-1 overflow-auto rounded-lg border border-border-default bg-surface-card"
