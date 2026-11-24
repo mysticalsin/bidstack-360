@@ -10,6 +10,11 @@
 //   DELETE /api/v1/migrations/:id/undo             — undo a completed import (within 24h)
 //   GET    /api/v1/migrations/:id/errors.csv       — download failed rows as CSV
 //
+// Reads use migrations:read. Every non-GET (start, retry, preview, parse,
+// save mappings, cancel, undo) requires settings:write — the same admin gate
+// the settings UI uses. migrations:read's description says running or undoing
+// an import needs settings:write; the route config is that gate.
+//
 // HubSpot OAuth + import → migrations-hubspot.routes.ts
 
 import { randomUUID } from 'node:crypto';
@@ -362,7 +367,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/start-csv',
     {
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: { permission: 'settings:write', rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         body: z.object({
           source: z.enum(['SALESFORCE_CSV', 'CSV']),
@@ -558,6 +563,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/:id/retry',
     {
+      config: { permission: 'settings:write' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: RetryBody,
@@ -744,7 +750,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/preview-csv',
     {
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      config: { permission: 'settings:write', rateLimit: { max: 20, timeWindow: '1 minute' } },
       schema: {
         body: z.object({
           entityType: z.string().min(1),
@@ -762,7 +768,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/parse-spreadsheet',
     {
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: { permission: 'settings:write', rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         body: z.object({
           filename: z.string().min(1).max(255),
@@ -789,6 +795,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.post(
     '/migrations/mappings',
     {
+      config: { permission: 'settings:write' },
       schema: {
         body: SaveMappingRequest,
         response: { 200: MigrationMappingResponse },
@@ -836,6 +843,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/migrations/:id/cancel',
     {
+      config: { permission: 'settings:write' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: MigrationJobResponse },
@@ -886,6 +894,7 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
   server.delete(
     '/migrations/:id/undo',
     {
+      config: { permission: 'settings:write' },
       schema: {
         params: z.object({ id: z.string().uuid() }),
         response: { 200: z.object({ message: z.string(), deletedCount: z.number() }) },
