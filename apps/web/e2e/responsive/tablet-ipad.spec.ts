@@ -85,7 +85,9 @@ for (const route of KEY_ROUTES) {
       await expect(page.getByRole('button', { name: 'Select currency, current: USD' })).toBeVisible();
       await expect(page.getByText(/4 companies · 2 open deals · 4\.2m pipeline/i)).toBeVisible();
       await expect(page.getByText('Overdue bids hang below the line. Select a month or a number to see the bids.')).toBeVisible();
-      await expect(page.getByText('Contoso Synthetic')).toBeVisible();
+      // The synthetic account name is repeated in the hero, the chart, and the
+      // momentum tile. Any one of them is enough to prove the pin landed.
+      await expect(page.getByText('Contoso Synthetic').first()).toBeVisible();
     }
     await page.waitForTimeout(500);
 
