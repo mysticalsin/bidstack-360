@@ -94,16 +94,21 @@ TableCaption.displayName = 'TableCaption';
 export function TableScrollArea({
   className,
   'aria-label': ariaLabel,
+  tabIndex = 0,
   ...rest
 }: HTMLAttributes<HTMLDivElement>) {
   // WHY conditional role: a landmark region MUST have an accessible name or
   // screen readers will either skip it or announce it as "region" with no
   // context. We only add the role when the caller supplies aria-label.
+  // WHY tabIndex 0: a sideways-scrolling table is a keyboard trap of the
+  // other kind — the overflow is not a tab stop, so columns past the edge
+  // (the forecast owner table at 390px) cannot be scrolled into view.
   return (
     <div
       className={cn('overflow-x-auto', className)}
       role={ariaLabel ? 'region' : undefined}
       aria-label={ariaLabel}
+      tabIndex={tabIndex}
       {...rest}
     />
   );
