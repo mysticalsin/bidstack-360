@@ -41,6 +41,9 @@ export const AccountCard = memo(function AccountCard({
   const topTech = rankedTech.slice(0, 3);
   const imageUrl = displayableLogoUrl(company.imageUrl);
   const meta = `${titleCase(company.industry ?? t('account.unknownIndustry', 'Unknown industry'))}${company.domain ? ` · ${company.domain}` : ''}`;
+  const coverageHint = `${row.coverage.reason} ${t('account.coverageNextAction', 'Next: {{nextAction}}', {
+    nextAction: row.coverage.nextAction,
+  })}`;
   return (
     <motion.div
       layout
@@ -158,7 +161,7 @@ export const AccountCard = memo(function AccountCard({
                 <AnimatedMetric value={`${Math.round(company.confidence * 100)}%`} />
               </strong>
             </div>
-            <div className="account-card-coverage">
+            <div className="account-card-coverage" title={coverageHint}>
               <div>
                 <span>{t('account.coverage', 'Coverage')}</span>
                 <strong>
@@ -168,32 +171,6 @@ export const AccountCard = memo(function AccountCard({
               <span aria-hidden>
                 <i style={{ width: `${row.coverage.score}%` }} />
               </span>
-            </div>
-            <div
-              className={`account-card-insight${row.coverage.missing.length === 0 ? ' is-complete' : ''}`}
-              aria-label={t(
-                'account.coverageInsightAria',
-                '{{name}} coverage insight: {{reason}} {{nextAction}}',
-                {
-                  name: company.name,
-                  reason: row.coverage.reason,
-                  nextAction: t('account.coverageNextAction', 'Next: {{nextAction}}', {
-                    nextAction: row.coverage.nextAction,
-                  }),
-                },
-              )}
-            >
-              <Icon
-                name={row.coverage.missing.length === 0 ? 'checkCircle' : 'info'}
-                size={14}
-                ariaHidden
-              />
-              <span>{`${row.coverage.reason} `}</span>
-              <strong>
-                {t('account.coverageNextAction', 'Next: {{nextAction}}', {
-                  nextAction: row.coverage.nextAction,
-                })}
-              </strong>
             </div>
           </div>
 

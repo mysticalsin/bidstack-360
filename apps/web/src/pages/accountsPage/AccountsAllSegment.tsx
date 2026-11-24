@@ -15,7 +15,7 @@ import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
-import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
+import { FilterRow, FilterSelect, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
 import {
   deriveAccount,
@@ -195,16 +195,6 @@ export function AccountsAllSegment() {
     [rows, t],
   );
 
-  const topMissingFields = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-      for (const missing of row.coverage.missing) {
-        counts.set(missing, (counts.get(missing) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-  }, [rows]);
-
   if (dashboard.isLoading) {
     return (
       <>
@@ -273,19 +263,6 @@ export function AccountsAllSegment() {
       >
         <SegmentHeader
           title={t('accounts.title', 'Accounts')}
-          subtitle={
-            <>
-              {rows.length === 1
-                ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
-                : t('accounts.summary.companyCount_other', '{{count}} companies', {
-                    count: rows.length,
-                  })}{' '}
-              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
-              {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: formatMoneyMicros(totalPipeline, 'EUR'),
-              })}
-            </>
-          }
           actions={
             <>
               {autopopulate.data ? (
@@ -366,44 +343,35 @@ export function AccountsAllSegment() {
         <StatTile
           label={t('accounts.stats.accounts.label', 'Accounts')}
           value={rows.length.toLocaleString()}
-          sublabel={t('accounts.stats.accounts.detail', 'portfolio')}
         />
         <StatTile
           label={t('accounts.stats.openDeals.label', 'Open deals')}
           value={totalOpen.toLocaleString()}
-          sublabel={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
           value={formatMoneyMicros(totalPipeline, 'EUR')}
-          sublabel={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
         />
-        <StatTile
-          label={t('accounts.stats.coverage.label', 'Avg coverage')}
-          value={`${avgCoverage}%`}
-          sublabel={t('accounts.stats.coverage.detail', '{{logos}} logos / {{tech}} tech', {
+        <div
+          title={t('accounts.stats.coverage.detail', '{{logos}} logos / {{tech}} tech', {
             logos: logoCoverage,
             tech: techAccounts,
           })}
-        />
+        >
+          <StatTile
+            label={t('accounts.stats.coverage.label', 'Avg coverage')}
+            value={`${avgCoverage}%`}
+          />
+        </div>
         <StatTile
           label={t('accounts.stats.enrichedProfiles.label', 'Enriched profiles')}
           value={enrichedAccounts.toLocaleString()}
-          sublabel={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
         />
       </section>
 
-      <InsightPanel
-        ariaLabel={t('accounts.experience.regionLabel', 'Portfolio cockpit')}
-        eyebrow={t('accounts.experience.eyebrow', 'Portfolio cockpit')}
-        heading={t('accounts.experience.title', '{{count}} accounts in view', { count: rows.length })}
-        sub={
-          topMissingFields.length > 0
-            ? t('accounts.experience.gaps', 'Top gaps: {{gaps}}', {
-                gaps: topMissingFields.map(([name, count]) => `${name} (${count})`).join(', '),
-              })
-            : t('accounts.experience.complete', 'No coverage gaps in the current view.')
-        }
+      <section
+        aria-label={t('accounts.health.region', 'Account health')}
+        className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),var(--shadow-xs)]"
       >
         <div className="account-health-bars">
           {healthDistribution.map((item) => {
@@ -421,7 +389,7 @@ export function AccountsAllSegment() {
             );
           })}
         </div>
-      </InsightPanel>
+      </section>
 
       <motion.div
         className="space-y-3"
