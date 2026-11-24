@@ -388,7 +388,9 @@
       "companyCount_one": "{{count}} company",
       "companyCount_other": "{{count}} companies",
       "openDeals": "{{count}} open deals",
-      "weightedPipeline": "{{amount}} weighted pipeline"
+      "openDealsCapped": "{{count}} open deals in the {{sample}} deals counted",
+      "weightedPipeline": "{{amount}} weighted pipeline",
+      "weightedPipelineCapped": "{{amount}} from the {{sample}} deals counted"
     },
     "sync": {
       "result": "{{enriched}} enriched / {{cached}} cached",
@@ -412,11 +414,13 @@
       },
       "openDeals": {
         "label": "Open deals",
-        "detail": "External CRM pipeline"
+        "detail": "External CRM pipeline",
+        "capped": "{{sample}} deals counted in this snapshot"
       },
       "weightedPipeline": {
         "label": "Weighted pipeline",
-        "detail": "bid and presales"
+        "detail": "bid and presales",
+        "capped": "{{sample}} deals counted in this snapshot"
       },
       "logoCoverage": {
         "label": "Logo coverage",

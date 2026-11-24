@@ -139,6 +139,10 @@ export function AccountsAllSegment() {
     () => ({
       totalPipeline: rows.reduce((acc, r) => acc + r.pipelineMicros, 0),
       totalOpen: rows.reduce((acc, r) => acc + r.openDeals, 0),
+      // Deals that actually entered these totals. A capped snapshot can return
+      // more than the org's latest 100 once an account sample is merged in,
+      // and a filter drops rows, so the label must name this set.
+      countedDeals: rows.reduce((acc, r) => acc + r.totalDeals, 0),
       logoCoverage: rows.filter((r) => Boolean(r.company.logo?.url)).length,
       enrichedAccounts: rows.filter((r) => r.company.source === 'verified_data').length,
       techAccounts: rows.filter((r) => (r.company.technicalStack?.length ?? 0) > 0).length,
@@ -236,7 +240,9 @@ export function AccountsAllSegment() {
     );
   }
 
-  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
+  const { totalPipeline, totalOpen, countedDeals, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } =
+    summaryStats;
+  const dealsSampleCapped = dashboard.data.dealsSampleCapped === true;
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
@@ -280,10 +286,24 @@ export function AccountsAllSegment() {
                 : t('accounts.summary.companyCount_other', '{{count}} companies', {
                     count: rows.length,
                   })}{' '}
-              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
-              {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: formatMoneyMicros(totalPipeline, 'EUR'),
-              })}
+              ·{' '}
+              {dealsSampleCapped
+                ? t(
+                    'accounts.summary.openDealsCapped',
+                    '{{count}} open deals in the {{sample}} deals counted',
+                    { count: totalOpen, sample: countedDeals },
+                  )
+                : t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })}{' '}
+              ·{' '}
+              {dealsSampleCapped
+                ? t(
+                    'accounts.summary.weightedPipelineCapped',
+                    '{{amount}} from the {{sample}} deals counted',
+                    { amount: formatMoneyMicros(totalPipeline, 'EUR'), sample: countedDeals },
+                  )
+                : t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
+                    amount: formatMoneyMicros(totalPipeline, 'EUR'),
+                  })}
             </>
           }
           actions={
@@ -371,12 +391,26 @@ export function AccountsAllSegment() {
         <StatTile
           label={t('accounts.stats.openDeals.label', 'Open deals')}
           value={totalOpen.toLocaleString()}
-          sublabel={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
+          sublabel={
+            dealsSampleCapped
+              ? t('accounts.stats.openDeals.capped', '{{sample}} deals counted in this snapshot', {
+                  sample: countedDeals,
+                })
+              : t('accounts.stats.openDeals.detail', 'External CRM pipeline')
+          }
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
           value={formatMoneyMicros(totalPipeline, 'EUR')}
-          sublabel={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
+          sublabel={
+            dealsSampleCapped
+              ? t(
+                  'accounts.stats.weightedPipeline.capped',
+                  '{{sample}} deals counted in this snapshot',
+                  { sample: countedDeals },
+                )
+              : t('accounts.stats.weightedPipeline.detail', 'bid and presales')
+          }
         />
         <StatTile
           label={t('accounts.stats.coverage.label', 'Avg coverage')}
