@@ -23,6 +23,10 @@ import {
   type FieldType as FieldTypeEnum,
 } from '@bidstack/shared';
 
+function tombstoneFieldKey(id: string): string {
+  return `deleted:${id}`;
+}
+
 export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
   // ── Definitions ────────────────────────────────────────────────────────
 
@@ -87,18 +91,38 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const body = req.body;
-      const created = await prisma.customFieldDefinition.create({
-        data: {
-          orgId: req.auth.orgId,
-          entityType: body.entityType,
-          fieldKey: body.fieldKey,
-          label: body.label,
-          fieldType: body.fieldType,
-          options: body.options ?? [],
-          defaultValue: (body.defaultValue ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-          required: body.required ?? false,
-          orderIndex: body.orderIndex ?? 0,
-        },
+      // The unique key includes soft-deleted rows. Free a tombstone that still
+      // holds this key, then insert a new definition. Renaming (not reviving)
+      // keeps the old values on the old id.
+      const created = await prisma.$transaction(async (tx) => {
+        const tombstone = await tx.customFieldDefinition.findFirst({
+          where: {
+            orgId: req.auth.orgId,
+            entityType: body.entityType,
+            fieldKey: body.fieldKey,
+            deletedAt: { not: null },
+          },
+          select: { id: true },
+        });
+        if (tombstone) {
+          await tx.customFieldDefinition.update({
+            where: { id: tombstone.id, deletedAt: { not: null } },
+            data: { fieldKey: tombstoneFieldKey(tombstone.id) },
+          });
+        }
+        return tx.customFieldDefinition.create({
+          data: {
+            orgId: req.auth.orgId,
+            entityType: body.entityType,
+            fieldKey: body.fieldKey,
+            label: body.label,
+            fieldType: body.fieldType,
+            options: body.options ?? [],
+            defaultValue: (body.defaultValue ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+            required: body.required ?? false,
+            orderIndex: body.orderIndex ?? 0,
+          },
+        });
       });
       return reply.code(201).send({
         id: created.id,
@@ -191,7 +215,13 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const updated = await prisma.customFieldDefinition.update({
         where: { id: existing.id },
-        data: { active: false, deletedAt: new Date() },
+        data: {
+          active: false,
+          deletedAt: new Date(),
+          // The unique key does not ignore tombstones. Rename so the key can
+          // be created again. Values stay on this id and are hidden on read.
+          fieldKey: tombstoneFieldKey(existing.id),
+        },
       });
       return {
         id: updated.id,
@@ -233,6 +263,8 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: req.query.entityType,
           entityId: req.query.entityId,
           deletedAt: null,
+          // The definition include does not inherit the soft-delete filter.
+          definition: { is: { deletedAt: null } },
         },
         include: { definition: true },
         take: 500,
@@ -278,6 +310,7 @@ export const customFieldsRoutes: FastifyPluginAsyncZod = async (server) => {
           entityType: req.query.entityType,
           entityId: { in: ids },
           deletedAt: null,
+          definition: { is: { deletedAt: null } },
         },
         take: 500,
       });
