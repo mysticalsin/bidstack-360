@@ -67,10 +67,47 @@ export function formatDate(iso: string | null | undefined, locale?: string): str
   });
 }
 
-export function daysUntil(iso: string | null | undefined): number | null {
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DAY_MS = 86_400_000;
+
+function calendarSerial(year: number, month: number, day: number): number {
+  return Math.floor(Date.UTC(year, month - 1, day) / DAY_MS);
+}
+
+function viewerCalendarSerial(now: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  return calendarSerial(value('year'), value('month'), value('day'));
+}
+
+export function daysUntil(
+  iso: string | null | undefined,
+  now: Date = new Date(Date.now()),
+  timeZone: string = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+): number | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
-  return Math.round(ms / (1000 * 60 * 60 * 24));
+  // A date-only due date is that calendar day for the viewer, not UTC midnight.
+  // Rounding the elapsed milliseconds marks it late after about 12:00 UTC.
+  const dateOnly = DATE_ONLY.exec(iso);
+  if (dateOnly) {
+    const due = calendarSerial(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]));
+    return due - viewerCalendarSerial(now, timeZone);
+  }
+  const ms = new Date(iso).getTime() - now.getTime();
+  if (Number.isNaN(ms)) return null;
+  return Math.round(ms / DAY_MS);
+}
+
+/** Yesterday is -1 and is late. Today is 0 and is not. `< -1` would hide the
+ *  first late calendar day. */
+export function isLateDueDay(days: number): boolean {
+  return days < 0;
 }
 
 export function formatStage(stage: string): string {
