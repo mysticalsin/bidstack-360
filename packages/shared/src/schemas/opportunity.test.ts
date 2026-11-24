@@ -59,6 +59,15 @@ describe('Opportunity', () => {
   it('accepts legacy persisted codes on read so historical records do not crash list views', () => {
     expect(() => Opportunity.parse({ ...valid, code: 'RFP-ABCD-1234' })).not.toThrow();
   });
+
+  it('reads a credit and a deal past the write cap so one stored row cannot 500 the list', () => {
+    // WHY: the list response validates every row. A negative amount (a credit)
+    // or a value above the create cap used to fail the whole page with 500.
+    expect(Opportunity.parse({ ...valid, value: -1.5 }).value).toBe(-1.5);
+    expect(Opportunity.parse({ ...valid, value: 50_000_000_000_000 }).value).toBe(50_000_000_000_000);
+    expect(() => Opportunity.parse({ ...valid, value: Number.NaN })).toThrow();
+    expect(() => Opportunity.parse({ ...valid, value: Number.POSITIVE_INFINITY })).toThrow();
+  });
 });
 
 describe('OpportunityCreate', () => {
@@ -99,6 +108,24 @@ describe('OpportunityCreate', () => {
         territoryName: null,
       }),
     ).toThrow();
+  });
+
+  it('still refuses a credit or an unbounded amount on create', () => {
+    const base = {
+      customer: 'X',
+      name: 'X bid',
+      pipelineStageId: '00000000-0000-0000-0000-000000000001',
+      probability: 30,
+      dueDate: null,
+      owner: null,
+      industry: null,
+      logo: null,
+      country: null,
+      territoryId: null,
+      territoryName: null,
+    };
+    expect(() => OpportunityCreate.parse({ ...base, value: -1 })).toThrow();
+    expect(() => OpportunityCreate.parse({ ...base, value: 1_000_000_000_001 })).toThrow();
   });
 });
 

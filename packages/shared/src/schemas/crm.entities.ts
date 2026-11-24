@@ -116,7 +116,10 @@ export const CrmDeal = z.object({
   companyName: z.string().nullable(),
   name: z.string().min(1),
   stage: CrmDealStage,
-  amountMicros: z.number().int().nonnegative(),
+  // A stored credit is negative. Rejecting it here 500s the whole dashboard
+  // snapshot, because one deal fails the response schema. Writes that create
+  // a deal still go through OpportunityWriteValue.
+  amountMicros: z.number().int(),
   currencyCode: z.string().length(3).nullable(),
   probability: z.number().int().min(0).max(100).nullable(),
   closeDate: z.string().date().nullable(),

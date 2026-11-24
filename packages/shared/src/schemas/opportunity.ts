@@ -63,7 +63,10 @@ export const Opportunity = z.object({
   stage: z.string().nullable(),
   pipelineStageId: z.string().uuid().nullable(),
   pipelineStage: PipelineStage.nullable(),
-  value: z.number().nonnegative().max(1_000_000_000_000),
+  // Reads accept a credit (negative) and a deal past the write cap. The list
+  // response is validated as a whole, so one stored outlier used to 500 every
+  // page that included it. Writes still use OpportunityWriteValue.
+  value: z.number().finite(),
   probability: z.number().int().min(0).max(100),
   dueDate: z.string().date().nullable(),
   owner: z.string().email().nullable(),
@@ -89,6 +92,9 @@ export const Opportunity = z.object({
 });
 export type Opportunity = z.infer<typeof Opportunity>;
 
+/** What a user may type. The read schema is wider on purpose — see Opportunity.value. */
+const OpportunityWriteValue = z.number().nonnegative().max(1_000_000_000_000);
+
 export const OpportunityCreate = Opportunity.omit({
   id: true,
   updatedAt: true,
@@ -104,6 +110,7 @@ export const OpportunityCreate = Opportunity.omit({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
   pipelineStageId: z.string().uuid().optional().nullable(),
+  value: OpportunityWriteValue,
 });
 export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 
@@ -120,6 +127,7 @@ export const OpportunityPatch = Opportunity.partial().omit({
   fteEstimate: true,
   commitmentLevel: true,
 }).extend({
+  value: OpportunityWriteValue.optional(),
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and
   // the API 409s when the row changed since — without it, concurrent
