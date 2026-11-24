@@ -33,6 +33,8 @@ RUN pnpm --filter @bidstack/marketing build
 FROM nginxinc/nginx-unprivileged:alpine AS marketing
 COPY --from=builder /app/apps/marketing/dist /usr/share/nginx/html
 COPY --from=builder /app/apps/marketing/nginx.conf /etc/nginx/conf.d/default.conf
+# nginx-unprivileged already defaults to uid 101. Scanners only see a USER instruction.
+USER nginx
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1

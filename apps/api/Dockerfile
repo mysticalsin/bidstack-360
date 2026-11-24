@@ -56,6 +56,9 @@ COPY --chown=bidstack:bidstack --from=builder /app ./
 WORKDIR /app/apps/api
 USER bidstack
 EXPOSE 4000
+# start-period covers migrate deploy, which this image runs before the server listens.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:4000/readyz', (r) => r.statusCode===200?process.exit(0):process.exit(1))"
 # Apply pending Prisma migrations against Railway's private Postgres (reachable
 # only from inside the container) then boot. `migrate deploy` is idempotent —
 # it applies only unapplied migrations, so it's safe on every restart. The

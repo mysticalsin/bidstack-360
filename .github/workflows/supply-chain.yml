@@ -6,10 +6,10 @@ name: Supply Chain — IaC + dependency scan
 #   2. Trivy fs — second-opinion dependency CVE + secret + misconfig scan from a
 #      different vuln DB.
 #
-# Both are SOFT (advisory): findings go to the Security tab + PR annotations but
-# do NOT block merges, because the baselines (e.g. infra/azure/main.bicep is a
-# draft, base-image CVEs) have not been triaged. Flip Checkov `soft_fail: false`
-# / Trivy `exit-code: '1'` to make them hard gates once baselined.
+# CKV_DOCKER_2 (HEALTHCHECK) and CKV_DOCKER_3 (non-root USER) fail this job
+# via `hard_fail_on`. Other Checkov findings stay advisory (`soft_fail: true`)
+# because the rest of the baseline (for example infra/azure/main.bicep) is not
+# triaged. Trivy stays advisory (`exit-code: '0'`) for the same reason.
 #
 # NOTE: the built-container OS-CVE scan (scanning the actual deploy image) runs
 # via `pnpm deploy:evidence:container` (scripts/run-container-vulnerability-scan
@@ -48,7 +48,9 @@ jobs:
           framework: dockerfile,bicep
           skip_path: node_modules
           quiet: true
-          soft_fail: true # advisory until the baseline is triaged — see header
+          # Missing USER or HEALTHCHECK fails the job. Every other check stays advisory.
+          soft_fail: true
+          hard_fail_on: CKV_DOCKER_2,CKV_DOCKER_3
           output_format: cli,sarif
           output_file_path: console,checkov.sarif
 
