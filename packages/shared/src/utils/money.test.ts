@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatMicrosDecimal, microsToUnits, sumMicros, unitsToMicros } from './money.js';
+import { formatMicrosDecimal, microsToUnits, sumMicros, unitsToMicros, weightedMicros } from './money.js';
 
 describe('microsToUnits', () => {
   it('converts everyday amounts exactly (bigint input)', () => {
@@ -128,5 +128,28 @@ describe('formatMicrosDecimal', () => {
     expect(formatMicrosDecimal(2_000_000n)).toBe('2');
     expect(formatMicrosDecimal(-1_500_000n)).toBe('-1.5');
     expect(formatMicrosDecimal(0n)).toBe('0');
+  });
+});
+
+describe('weightedMicros', () => {
+  it('keeps 1% of 1.50 as 0.015 instead of a cent round to 0.02', () => {
+    const micros = weightedMicros(1_500_000n, 1);
+    expect(micros).toBe(15_000n);
+    expect(microsToUnits(micros)).toBe(0.015);
+    expect(Math.round(0.015 * 100) / 100).toBe(0.02);
+  });
+
+  it('adds nothing at probability 0 and keeps the full value at 100, past 2^53', () => {
+    const big = 600_000_000_001_000_000n;
+    expect(weightedMicros(big, 0)).toBe(0n);
+    expect(weightedMicros(big, 100)).toBe(big);
+    expect(microsToUnits(big)).toBe(600_000_000_001);
+    expect(Number(big) / 1_000_000).not.toBe(600_000_000_001);
+  });
+
+  it('sums two deals in integer micros', () => {
+    const total = weightedMicros(1_000_000n, 50) + weightedMicros(2_000_000n, 25);
+    expect(total).toBe(1_000_000n);
+    expect(microsToUnits(total)).toBe(1);
   });
 });
