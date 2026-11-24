@@ -297,7 +297,9 @@ export async function verifyArticleBody(url: string, ids: AccountIdentifiers, de
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), ARTICLE_TIMEOUT_MS);
     try {
-      const res = await deps.fetchImpl(target, { headers, signal: ac.signal, redirect: 'follow' });
+      // 'manual': the production body fetch revalidates each hop itself.
+      // Passing 'follow' would let a public article 302 to a metadata address.
+      const res = await deps.fetchImpl(target, { headers, signal: ac.signal, redirect: 'manual' });
       return { res, text: res.ok ? await readCapped(res, ARTICLE_MAX_BYTES) : '' };
     } finally {
       clearTimeout(timer);

@@ -20,6 +20,7 @@ import {
   type NewsSubject,
 } from './news.js';
 import { hasNewsIdentifiers, usableIdentifiers, type BodyFetch } from './news-verify.js';
+import { createPinnedBodyFetch, createPinnedNewsFetch } from './pinned-news-fetch.js';
 
 type Db = Pick<typeof prisma, 'accountWatchEvent' | 'notification' | 'company' | 'companyFirmographics' | 'opportunity' | 'accountWatchSubject'>;
 
@@ -179,8 +180,10 @@ export async function runNewsScan(deps: NewsScanDeps = {}): Promise<NewsScanSumm
   });
   const store = prismaNewsStore(db);
   const cache = deps.cache ?? memoryNewsCache();
-  const fetchImpl = deps.fetchImpl ?? (fetch as unknown as NewsFetch);
-  const bodyFetch = deps.bodyFetch ?? (deps.fetchImpl ? undefined : (fetch as unknown as BodyFetch));
+  // Default fetches pin DNS and re-check redirects. Injected fakes skip that
+  // so unit tests can answer without a network. F-01.
+  const fetchImpl = deps.fetchImpl ?? createPinnedNewsFetch();
+  const bodyFetch = deps.bodyFetch ?? (deps.fetchImpl ? undefined : createPinnedBodyFetch());
   let paced = false;
   let cfg = config;
   const backoff = config.sources.includes('gdelt') ? await readBackoff(cache) : { level: 0, until: 0 };
