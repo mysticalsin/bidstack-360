@@ -124,13 +124,18 @@ function writeSessionMarker(value: string | null): void {
   notifyAuthFingerprintChanged();
 }
 
+function stubSessionIsSignedIn(): boolean {
+  // A session marker means this browser signed in. The signed-out marker is
+  // what a reload reads after Sign out. Either key changing in another tab
+  // has to recompute this; the mounted tab does not reload on its own.
+  return (
+    localStorage.getItem(STUB_SESSION_KEY) !== null ||
+    localStorage.getItem(STUB_SIGNED_OUT_KEY) === null
+  );
+}
+
 function StubAuthProvider({ children }: { children: ReactNode }) {
-  const [signedIn, setSignedIn] = useState(() => {
-    return (
-      localStorage.getItem(STUB_SESSION_KEY) !== null ||
-      localStorage.getItem(STUB_SIGNED_OUT_KEY) === null
-    );
-  });
+  const [signedIn, setSignedIn] = useState(() => stubSessionIsSignedIn());
   const [stubRole, setStubRole] = useState(() => normalizeStubRole(localStorage.getItem(STUB_ROLE_KEY)));
 
   useEffect(() => {
@@ -145,6 +150,12 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
     const onStorage = (event: StorageEvent) => {
       if (event.key === STUB_ROLE_KEY) {
         setStubRole(normalizeStubRole(event.newValue));
+      }
+      // storage fires in the other tabs. Sign out there removes the session
+      // marker and sets the signed-out key; this tab has to drop the workspace
+      // without waiting for a reload.
+      if (event.key === STUB_SESSION_KEY || event.key === STUB_SIGNED_OUT_KEY) {
+        setSignedIn(stubSessionIsSignedIn());
       }
     };
     window.addEventListener('storage', onStorage);
@@ -242,6 +253,21 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
       writeSessionMarker('demo');
     }
   }, [signedIn]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (
+        event.key !== DEMO_TOKEN_KEY &&
+        event.key !== DEMO_SIGNED_OUT_KEY &&
+        event.key !== STUB_SESSION_KEY
+      ) {
+        return;
+      }
+      setSignedIn(localStorage.getItem(DEMO_TOKEN_KEY) !== null);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const signIn = useCallback((cb?: () => void) => {
     const hasToken = localStorage.getItem(DEMO_TOKEN_KEY) !== null;
