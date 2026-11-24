@@ -1,24 +1,18 @@
-import { MotionConfig } from 'framer-motion';
 import { lazy, Suspense, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import { useUser } from '@/lib/auth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LiveAnnouncer } from '@/components/a11y/LiveAnnouncer';
-import { ConfettiHost } from '@/components/delight/Confetti';
-import { WebVitalsHud } from '@/components/dev/WebVitalsHud';
 import { useHelpDrawerHotkey } from '@/components/help/useHelpDrawer';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { RouteProgress } from '@/components/layout/RouteProgress';
-import { SampleDataBanner } from '@/components/onboarding/SampleDataBanner';
-import { GlobalInteractionSound } from '@/components/sound/GlobalInteractionSound';
-import { ConfirmHost, PromptHost } from '@/components/ui/ConfirmDialog';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
-import { Toaster } from '@/components/ui/Toast';
+import { LoadingSkeleton } from '@/components/ui/PlainSkeleton';
 import { useCmdDotClose } from '@/hooks/useCmdDotClose';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
+import { useOverlayMount, useProdFrame } from '@/lib/prodMount';
 import { usePreferences } from '@/stores/preferences';
 import { useCockpitLayout } from '@/stores/cockpitLayout';
 import { useOnboardingStore } from '@/stores/onboarding';
@@ -44,9 +38,34 @@ const TemplatePicker = lazy(() =>
 const QuickAddMenu = lazy(() =>
   import('@/components/quickadd/QuickAddMenu').then((m) => ({ default: m.QuickAddMenu })),
 );
+// Hosts are global but not the first paint. Their modules pull motion into
+// the entry evaluation when imported statically.
+const Toaster = lazy(() => import('@/components/ui/Toast').then((m) => ({ default: m.Toaster })));
+const ConfirmHost = lazy(() =>
+  import('@/components/ui/ConfirmDialog').then((m) => ({ default: m.ConfirmHost })),
+);
+const PromptHost = lazy(() =>
+  import('@/components/ui/ConfirmDialog').then((m) => ({ default: m.PromptHost })),
+);
+const ConfettiHost = lazy(() =>
+  import('@/components/delight/Confetti').then((m) => ({ default: m.ConfettiHost })),
+);
+const WebVitalsHud = lazy(() =>
+  import('@/components/dev/WebVitalsHud').then((m) => ({ default: m.WebVitalsHud })),
+);
+const SampleDataBanner = lazy(() =>
+  import('@/components/onboarding/SampleDataBanner').then((m) => ({ default: m.SampleDataBanner })),
+);
+const GlobalInteractionSound = lazy(() =>
+  import('@/components/sound/GlobalInteractionSound').then((m) => ({
+    default: m.GlobalInteractionSound,
+  })),
+);
 
 export function App() {
   const palette = useCommandPalette();
+  const overlays = useOverlayMount();
+  const hostsReady = useProdFrame() >= 1;
   useHelpDrawerHotkey();
   useCmdDotClose();
   useGlobalShortcuts();
@@ -69,14 +88,8 @@ export function App() {
     if (userId) hydrateOnboarding(userId);
   }, [user?.id, scopePreferences, scopeCockpitLayout, hydrateOnboarding]);
 
-  // Map our 3-way motion pref onto framer-motion's MotionConfig contract.
-  // `system` → framer's `user` (read prefers-reduced-motion).
-  // `reduced` → force `always`. `full` → force `never`.
-  const motion = usePreferences((s) => s.motion);
-  const reducedMotion = motion === 'reduced' ? 'always' : motion === 'full' ? 'never' : 'user';
-
   return (
-    <MotionConfig reducedMotion={reducedMotion}>
+    <>
       <RouteProgress />
       {isShellLess ? (
         <ErrorBoundary>
@@ -86,7 +99,6 @@ export function App() {
         </ErrorBoundary>
       ) : (
         <AppShell>
-          <GlobalInteractionSound />
           {/* ErrorBoundary scoped inside AppShell so a render error in any page
               falls back gracefully while the sidebar/topbar survive. */}
           {/* Enter-only page transition keyed on the path: each navigation
@@ -102,23 +114,30 @@ export function App() {
               </Suspense>
             </ErrorBoundary>
           </PageTransition>
-          <Suspense fallback={null}>
-            <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
-            <QuickAddMenu />
-            <HelpDrawer />
-            <ProductTour />
-            <TemplatePicker />
-          </Suspense>
+          {overlays && (
+            <Suspense fallback={null}>
+              <CommandPalette open={palette.open} onOpenChange={palette.setOpen} />
+              <QuickAddMenu />
+              <HelpDrawer />
+              <ProductTour />
+              <TemplatePicker />
+            </Suspense>
+          )}
           {/* Global hosts — mount once so any component can dispatch without prop-drilling */}
-          <Toaster />
-          <ConfirmHost />
-          <PromptHost />
-          <ConfettiHost />
+          {hostsReady && (
+            <Suspense fallback={null}>
+              <Toaster />
+              <ConfirmHost />
+              <PromptHost />
+              <ConfettiHost />
+              <WebVitalsHud />
+              <SampleDataBanner />
+              <GlobalInteractionSound />
+            </Suspense>
+          )}
           <LiveAnnouncer />
-          <WebVitalsHud />
-          <SampleDataBanner />
         </AppShell>
       )}
-    </MotionConfig>
+    </>
   );
 }

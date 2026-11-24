@@ -214,13 +214,25 @@ function dashboardSnapshot(freshness: 'fresh' | 'stale' | 'never' = 'fresh') {
 }
 
 function renderAccountRoute() {
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={['/accounts/acme']}>
       <Routes>
         <Route path="/accounts/:accountId" element={<DashboardPage />} />
       </Routes>
     </MemoryRouter>,
   );
+  return view;
+}
+
+async function settleCockpit() {
+  renderAccountRoute();
+  await waitFor(() => {
+    const ready =
+      screen.queryByTestId('page-head') ||
+      screen.queryByRole('alert') ||
+      screen.queryByRole('status');
+    expect(ready).toBeTruthy();
+  });
 }
 
 describe('DashboardPage account cockpit', () => {
@@ -254,7 +266,7 @@ describe('DashboardPage account cockpit', () => {
     cleanup();
   });
 
-  it('keeps the last verified cockpit visible when a background dashboard refresh fails', () => {
+  it('keeps the last verified cockpit visible when a background dashboard refresh fails', async () => {
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: dashboardSnapshot('fresh'),
       isLoading: false,
@@ -263,7 +275,7 @@ describe('DashboardPage account cockpit', () => {
       refetch,
     } as never);
 
-    renderAccountRoute();
+    await settleCockpit();
 
     expect(screen.getByTestId('page-head').textContent).toBe('Acme');
     expect(screen.getByTestId('kpi-row')).toBeDefined();
@@ -273,7 +285,7 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
   });
 
-  it('themes the live-refresh banner with paired amber tokens, never light-only yellows', () => {
+  it('themes the live-refresh banner with paired amber tokens, never light-only yellows', async () => {
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: dashboardSnapshot('fresh'),
       isLoading: false,
@@ -282,7 +294,7 @@ describe('DashboardPage account cockpit', () => {
       refetch,
     } as never);
 
-    renderAccountRoute();
+    await settleCockpit();
 
     const banner = screen.getByRole('status');
     // Raw yellow-* utilities have no dark-mode pairing — in dark mode they
@@ -293,7 +305,7 @@ describe('DashboardPage account cockpit', () => {
     expect(banner.className).toContain('var(--tag-amber-fg)');
   });
 
-  it('shows the fatal cockpit error only when no snapshot exists', () => {
+  it('shows the fatal cockpit error only when no snapshot exists', async () => {
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -302,14 +314,14 @@ describe('DashboardPage account cockpit', () => {
       refetch,
     } as never);
 
-    renderAccountRoute();
+    await settleCockpit();
 
     expect(screen.getByRole('alert')).toBeDefined();
     expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
     expect(screen.queryByTestId('page-head')).toBeNull();
   });
 
-  it('uses the tab-local verified cockpit snapshot when a resumed page gets a transient 500', () => {
+  it('uses the tab-local verified cockpit snapshot when a resumed page gets a transient 500', async () => {
     sessionStorage.setItem('bidstack:account-cockpit:acme', JSON.stringify(dashboardSnapshot()));
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: undefined,
@@ -319,7 +331,7 @@ describe('DashboardPage account cockpit', () => {
       refetch,
     } as never);
 
-    renderAccountRoute();
+    await settleCockpit();
 
     expect(screen.getByTestId('page-head').textContent).toBe('Acme');
     expect(screen.getByTestId('kpi-row')).toBeDefined();
@@ -329,7 +341,7 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
   });
 
-  it('does not use the tab-local cockpit snapshot for a real missing account', () => {
+  it('does not use the tab-local cockpit snapshot for a real missing account', async () => {
     sessionStorage.setItem('bidstack:account-cockpit:acme', JSON.stringify(dashboardSnapshot()));
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: undefined,
@@ -339,14 +351,14 @@ describe('DashboardPage account cockpit', () => {
       refetch,
     } as never);
 
-    renderAccountRoute();
+    await settleCockpit();
 
     expect(screen.getByRole('alert')).toBeDefined();
     expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
     expect(screen.queryByTestId('page-head')).toBeNull();
   });
 
-  it('passes the route account key to account-scoped intelligence cards', () => {
+  it('passes the route account key to account-scoped intelligence cards', async () => {
     const snapshot = dashboardSnapshot('fresh');
     snapshot.cockpit.company.id = '00000000-0000-4000-8000-000000000999';
 
@@ -358,7 +370,7 @@ describe('DashboardPage account cockpit', () => {
       refetch,
     } as never);
 
-    renderAccountRoute();
+    await settleCockpit();
 
     expect(cardProps.crossSellKeys).toContain('acme');
     expect(cardProps.governanceKeys).toContain('acme');
@@ -376,7 +388,7 @@ describe('DashboardPage account cockpit', () => {
       refetch,
     } as never);
 
-    renderAccountRoute();
+    await settleCockpit();
 
     await waitFor(() => {
       expect(mutate).toHaveBeenCalledWith({

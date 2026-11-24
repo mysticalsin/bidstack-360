@@ -85,7 +85,7 @@ describe('OrgDashboard first-run state', () => {
 
   afterEach(() => cleanup());
 
-  it('shows the getting-started branch when the org has zero records', () => {
+  it('shows the getting-started branch when the org has zero records', async () => {
     vi.mocked(useOrgSummary).mockReturnValue({
       data: emptySummary,
       isLoading: false,
@@ -94,13 +94,13 @@ describe('OrgDashboard first-run state', () => {
 
     renderDashboard();
 
-    expect(screen.getByTestId('getting-started')).toBeDefined();
+    expect(await screen.findByTestId('getting-started')).toBeDefined();
     // The full command center must not also render for an empty org.
     expect(screen.queryByTestId('kpi-row')).toBeNull();
     expect(screen.queryByTestId('org-command-hero')).toBeNull();
   });
 
-  it('renders the command center once any record exists', () => {
+  it('renders the command center once any record exists', async () => {
     vi.mocked(useOrgSummary).mockReturnValue({
       data: { ...emptySummary, leads: 1 },
       isLoading: false,
@@ -109,9 +109,9 @@ describe('OrgDashboard first-run state', () => {
 
     renderDashboard();
 
-    expect(screen.getByTestId('kpi-row')).toBeDefined();
+    expect(await screen.findByTestId('kpi-row')).toBeDefined();
     // The cinematic hero band is the landing moment for any org with data.
-    expect(screen.getByTestId('org-command-hero')).toBeDefined();
+    expect(await screen.findByTestId('org-command-hero')).toBeDefined();
     expect(screen.queryByTestId('getting-started')).toBeNull();
   });
 });

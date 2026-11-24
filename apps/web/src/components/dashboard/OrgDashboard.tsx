@@ -1,32 +1,73 @@
 import '../../styles/org-dashboard.css';
 
-import { memo, useEffect, useMemo, useState } from 'react';
-import { useReducedMotion } from 'framer-motion';
+import { lazy, memo, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
-import { ErrorState } from '@/components/ui/StateMessages';
-import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
-import { Reveal } from '@/components/motion/Reveal';
+import { LoadingSkeleton } from '@/components/ui/PlainSkeleton';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { formatMoney } from '@/lib/format';
 import { useCurrencyStore } from '@/stores/currency';
+import { usePreferences } from '@/stores/preferences';
 import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
-import { KpiRow } from './widgets/KpiRow';
-import { OrgCommandHero } from './widgets/OrgCommandHero';
-import { InsightsBar } from './widgets/InsightsBar';
-import { ClosingThisWeekCard } from './widgets/ClosingThisWeekCard';
-import { PipelineCard } from './widgets/PipelineCard';
-import { PipelineByStageMini } from './widgets/PipelineByStageMini';
-import { AlertCard } from './widgets/AlertCard';
-import { QuickActionsCard, QuickLinksCard } from './widgets/SidebarCards';
-import { RecentActivityCard } from './widgets/RecentActivityCard';
-import { TopAccountsCard } from './widgets/TopAccountsCard';
-import { SalesFunnelCard } from './widgets/SalesFunnelCard';
-import { WinRateCard } from './widgets/WinRateCard';
-import { GettingStarted } from './widgets/GettingStarted';
+
+// Widget modules pull framer-motion. Loading each phase as its own chunk keeps
+// that evaluation off the entry task and under the dashboard long-task line.
+const GettingStarted = lazy(() =>
+  import('./widgets/GettingStarted').then((m) => ({ default: m.GettingStarted })),
+);
+const KpiRow = lazy(() => import('./widgets/KpiRow').then((m) => ({ default: m.KpiRow })));
+const OrgCommandHero = lazy(() =>
+  import('./widgets/OrgCommandHero').then((m) => ({ default: m.OrgCommandHero })),
+);
+const InsightsBar = lazy(() =>
+  import('./widgets/InsightsBar').then((m) => ({ default: m.InsightsBar })),
+);
+const ClosingThisWeekCard = lazy(() =>
+  import('./widgets/ClosingThisWeekCard').then((m) => ({ default: m.ClosingThisWeekCard })),
+);
+const PipelineCard = lazy(() =>
+  import('./widgets/PipelineCard').then((m) => ({ default: m.PipelineCard })),
+);
+const PipelineByStageMini = lazy(() =>
+  import('./widgets/PipelineByStageMini').then((m) => ({ default: m.PipelineByStageMini })),
+);
+const AlertCard = lazy(() => import('./widgets/AlertCard').then((m) => ({ default: m.AlertCard })));
+const QuickActionsCard = lazy(() =>
+  import('./widgets/SidebarCards').then((m) => ({ default: m.QuickActionsCard })),
+);
+const QuickLinksCard = lazy(() =>
+  import('./widgets/SidebarCards').then((m) => ({ default: m.QuickLinksCard })),
+);
+const RecentActivityCard = lazy(() =>
+  import('./widgets/RecentActivityCard').then((m) => ({ default: m.RecentActivityCard })),
+);
+const TopAccountsCard = lazy(() =>
+  import('./widgets/TopAccountsCard').then((m) => ({ default: m.TopAccountsCard })),
+);
+const SalesFunnelCard = lazy(() =>
+  import('./widgets/SalesFunnelCard').then((m) => ({ default: m.SalesFunnelCard })),
+);
+const WinRateCard = lazy(() =>
+  import('./widgets/WinRateCard').then((m) => ({ default: m.WinRateCard })),
+);
+
+function useReducedMotion(): boolean {
+  const motionPref = usePreferences((s) => s.motion);
+  if (motionPref === 'reduced') return true;
+  if (motionPref === 'full') return false;
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+/** Entrance wrapper without framer-motion, so this module stays out of that chunk. */
+function Reveal({ children }: { children: ReactNode; delay?: number }) {
+  return <>{children}</>;
+}
 
 // ─── OrgDashboard ─────────────────────────────────────────────────────────────
 // Layout-only orchestrator. Every widget component lives in ./widgets/.
@@ -171,31 +212,42 @@ export const OrgDashboard = memo(function OrgDashboard() {
     return () => window.cancelAnimationFrame(id);
   }, [immediate, ready, phase]);
 
-  if (summary.isLoading) return <DashboardSkeleton />;
+  if (summary.isLoading) return <LoadingSkeleton rows={6} />;
   if (summary.isError) {
     return (
-      <ErrorState
-        title={t('orgDashboard.errorTitle', 'Could not load dashboard')}
-        message={
-          summary.error?.message ??
-          t('orgDashboard.errorMessage', 'The workspace summary endpoint did not respond.')
-        }
-        action={
-          <button type="button" className="btn btn-secondary" onClick={() => void summary.refetch()}>
-            <Icon name="refresh" size={14} />
-            {t('orgDashboard.retry', 'Retry')}
-          </button>
-        }
-      />
+      <div className="flex flex-col items-center justify-center py-16 text-center" role="alert">
+        <h2 className="text-sm font-semibold text-[var(--danger)]">
+          {t('orgDashboard.errorTitle', 'Could not load dashboard')}
+        </h2>
+        <p className="mt-1 max-w-sm text-xs text-[var(--fg-secondary)]">
+          {summary.error?.message ??
+            t('orgDashboard.errorMessage', 'The workspace summary endpoint did not respond.')}
+        </p>
+        <button
+          type="button"
+          className="btn btn-secondary mt-4"
+          onClick={() => void summary.refetch()}
+        >
+          <Icon name="refresh" size={14} />
+          {t('orgDashboard.retry', 'Retry')}
+        </button>
+      </div>
     );
   }
-  if (isEmptyOrg) return <GettingStarted />;
+  if (isEmptyOrg) {
+    return (
+      <Suspense fallback={<LoadingSkeleton rows={4} />}>
+        <GettingStarted />
+      </Suspense>
+    );
+  }
 
   const showPrimary = phase >= 1;
   const showMain = phase >= 2;
   const showSide = phase >= 3;
 
   return (
+    <Suspense fallback={<LoadingSkeleton rows={4} />}>
     <div className="space-y-5">
       <div className="page-sub">
         {t(
@@ -316,5 +368,6 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </aside>
       </section>
     </div>
+    </Suspense>
   );
 });

@@ -6,7 +6,7 @@
  */
 import { lazy } from 'react';
 
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { LoadingSkeleton } from '@/components/ui/PlainSkeleton';
 
 // ─── Core ─────────────────────────────────────────────────────────────────────
 
