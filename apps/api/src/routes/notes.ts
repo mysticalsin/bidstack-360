@@ -19,6 +19,7 @@ import {
   NotePatch,
 } from '@bidstack/shared';
 import { canReadAccount } from '../lib/account-access.js';
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
 import {
   attribution,
   extractMeetingNotes,
@@ -75,6 +76,16 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       prismaClient: prisma,
     });
     if (!access.allowed) throw server.httpErrors.notFound('Account not found');
+  }
+
+  // companyId is a global FK. An unrestricted admin skips the account check,
+  // so a company id still has to be proven to belong to this org before it
+  // is stored. A foreign id is 404, the same as a missing company.
+  async function assertCompanyInOrg(orgId: string, companyId: string | null | undefined) {
+    if (!companyId) return;
+    if (!(await tenantEntityBelongsToOrg('company', companyId, orgId))) {
+      throw server.httpErrors.notFound('Company not found');
+    }
   }
 
   // GET /api/notes?accountId=<id>
@@ -135,6 +146,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req, reply) => {
+      await assertCompanyInOrg(req.auth.orgId, req.body.companyId);
       await ensureAccountVisible({
         orgId: req.auth.orgId,
         userId: req.auth.userId,
@@ -184,6 +196,7 @@ export const notesRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req, reply) => {
       const accountId = normalizeAccountId(req.body.accountId);
+      await assertCompanyInOrg(req.auth.orgId, req.body.companyId);
       await ensureAccountVisible({
         orgId: req.auth.orgId,
         userId: req.auth.userId,
