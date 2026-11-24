@@ -6,7 +6,7 @@
 // error linkage, loading indicators, dark mode, and 44px touch targets —
 // zero extra lines vs the fieldClass approach but with all accessibility
 // states included.
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
@@ -33,14 +33,21 @@ export function NewCompanyDialog({ onClose, onCreate, isPending }: NewCompanyDia
   const [industry, setIndustry] = useState('');
   const [countryCode, setCountryCode] = useState('');
   const [nameError, setNameError] = useState<string | undefined>();
+  const submitting = useRef(false);
+
+  useEffect(() => {
+    if (!isPending) submitting.current = false;
+  }, [isPending]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (submitting.current || isPending) return;
     if (!name.trim()) {
       setNameError(t('newCompany.nameRequiredError', 'Company name is required.'));
       return;
     }
     setNameError(undefined);
+    submitting.current = true;
     onCreate({
       name: name.trim(),
       domain: domain.trim() || null,
