@@ -19,3 +19,32 @@ export function appDatabaseUrl(password) {
   url.password = password;
   return url.toString();
 }
+
+// A database dump does not contain roles. After restore, the migrations that
+// created app_role are already recorded, so they do not run again. The login
+// has to exist before pg_restore applies GRANTs and before ALTER ROLE sets
+// the password.
+export function ensureAppRoleSql() {
+  return `DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${APP_LOGIN}') THEN
+    CREATE ROLE ${APP_LOGIN} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+  ELSE
+    ALTER ROLE ${APP_LOGIN} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+  END IF;
+END $$;`;
+}
+
+// Same grants as 20261112180000. Reapplied after restore because a dump
+// taken without the role skips those GRANTs.
+export function appRoleGrantsSql() {
+  return `DO $$ BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO ${APP_LOGIN}', current_database());
+END $$;
+GRANT USAGE ON SCHEMA public TO ${APP_LOGIN};
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${APP_LOGIN};
+REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public.audit_log FROM ${APP_LOGIN};
+GRANT SELECT, INSERT ON TABLE public.audit_log TO ${APP_LOGIN};
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${APP_LOGIN};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${APP_LOGIN};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO ${APP_LOGIN};`;
+}
