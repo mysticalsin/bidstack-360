@@ -108,9 +108,9 @@ export function QuickStartPage() {
       label: t('quickStart.items.inviteTeam.label', 'Invite your team'),
       description: t(
         'quickStart.items.inviteTeam.description',
-        'Collaboration works best with the whole team in one place.',
+        'Teammates show up under Identity & roles after they sign in. Assign a role there. Access groups share records; they do not send invitations.',
       ),
-      action: () => navigate('/settings?tab=groups'),
+      action: () => navigate('/settings?tab=identity'),
     },
   ];
 
