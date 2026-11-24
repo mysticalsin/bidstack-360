@@ -73,6 +73,16 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+/** Exact aliases for headers that do not equal a label or a key tail. */
+function headerMatchesField(headerNorm: string, field: TargetField): boolean {
+  const tail = field.key.split('.')[1] ?? field.key;
+  if (headerNorm === normalize(field.label) || headerNorm === normalize(tail)) return true;
+  if (field.key === 'company.name' && headerNorm === 'accountname') return true;
+  if (field.key === 'company.employeeCount' && headerNorm === 'employees') return true;
+  if (field.key === 'company.countryCode' && headerNorm === 'country') return true;
+  return false;
+}
+
 /**
  * Best-effort auto-mapping of CSV headers to target fields by normalized name.
  * A header maps to the first field whose label or key tail it matches; each
@@ -90,8 +100,7 @@ export function autoMap(
     let match: string | null = null;
     for (const field of fields) {
       if (used.has(field.key)) continue;
-      const tail = field.key.split('.')[1] ?? field.key;
-      if (nh === normalize(field.label) || nh === normalize(tail)) {
+      if (headerMatchesField(nh, field)) {
         match = field.key;
         break;
       }

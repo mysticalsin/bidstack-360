@@ -9,6 +9,8 @@
       "statusStalled": "توقف الاستيراد",
       "reasonStalled": "توقف الاستيراد قبل حفظ أي صف.",
       "reasonEnqueue": "لم يبدأ الاستيراد. حاول مرة أخرى.",
+      "reasonCouldNotQueue": "تعذر وضع الاستيراد في قائمة الانتظار. حاول مرة أخرى.",
+      "reasonAlreadyRunning": "هذا الاستيراد قيد التشغيل بالفعل.",
       "reasonRowsExpired": "انتهت صلاحية هذه الصفوف. أعد رفع الملف.",
       "reasonConflict": "تعارض الاستيراد مع كتابة أخرى.",
       "reasonEnqueueStopped": "توقف الاستيراد قبل حفظ الصفوف المتبقية.",

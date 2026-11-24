@@ -55,4 +55,14 @@ describe('autoMap', () => {
     expect(result['Email']).toBe('contact.email');
     expect(result['E-mail']).toBeNull();
   });
+
+  it('maps Account Name, Employees, and Country onto the company fields', () => {
+    // WHY: a Salesforce-style account export uses these headers. Leaving them
+    // unmapped blocks the required Name field, and on a phone the clipped
+    // select cannot be used to fix it.
+    const result = autoMap(['Account Name', 'Employees', 'Country'], TARGET_FIELDS.company);
+    expect(result['Account Name']).toBe('company.name');
+    expect(result['Employees']).toBe('company.employeeCount');
+    expect(result['Country']).toBe('company.countryCode');
+  });
 });

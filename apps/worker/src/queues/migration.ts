@@ -31,6 +31,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import {
   ACCOUNT_INTEL,
   MIGRATION,
+  MIGRATION_CANCEL_REQUESTED,
   MigrationJobPayload,
   type MigrationJobError,
   MIGRATION_STALE_MS,
@@ -205,6 +206,147 @@ export function isMigrationDeadlock(err: unknown, seen?: Set<unknown>): boolean 
   if (migrationConflictCode(row.code) || migrationConflictCode(row.meta?.code)) return true;
   if (typeof row.message === 'string' && DRIVER_CONFLICT_CODE.test(row.message)) return true;
   return row.cause !== undefined && isMigrationDeadlock(row.cause, visited);
+}
+
+/** Cancel asked while this chunk held the row. Roll the inserts back and stop. */
+class MigrationCancelRequested extends Error {
+  constructor() {
+    super('migration cancel requested');
+    this.name = 'MigrationCancelRequested';
+  }
+}
+
+/**
+ * A mark for this attempt stays in force until the attempt leaves PENDING or
+ * RUNNING. The comparison is the job row's started_at, not a process clock
+ * and not a 150s cutoff.
+ */
+async function cancelWasRequested(
+  db: { $queryRaw: Prisma.TransactionClient['$queryRaw'] },
+  orgId: string,
+  jobId: string,
+  attemptId: string | null,
+  preStart = true,
+): Promise<boolean> {
+  const rows = await db.$queryRaw<Array<{ ok: number }>>`
+    SELECT 1 AS ok
+    FROM audit_log AS mark
+    INNER JOIN migration_jobs AS job
+      ON job.id = ${jobId}::uuid
+     AND job.org_id = mark.org_id
+    WHERE mark.org_id = ${orgId}::uuid
+      AND mark.target_id = ${jobId}
+      AND mark.target_type = 'MigrationJob'
+      AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+      AND mark.deleted_at IS NULL
+      AND job.status::text IN ('PENDING', 'RUNNING')
+      AND (
+        (
+          (
+            (${attemptId}::text IS NULL AND (mark.diff->>'attemptId') IS NULL)
+            OR mark.diff->>'attemptId' = ${attemptId}
+          )
+          AND mark.at >= COALESCE(job.started_at, '-infinity'::timestamptz)
+        )
+        OR (
+          ${preStart}::boolean
+          AND (mark.diff->>'attemptId') IS NULL
+          AND ${attemptId}::text IS NOT NULL
+          AND COALESCE(job.started_at, '-infinity'::timestamptz) >= mark.at
+        )
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log AS resolved
+        WHERE resolved.org_id = mark.org_id
+          AND resolved.target_id = mark.target_id
+          AND resolved.target_type = 'MigrationJob'
+          AND resolved.action = 'migration.cancel.resolved'
+          AND resolved.deleted_at IS NULL
+          AND resolved.at >= mark.at
+      )
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+/** Same rule as the chunk: a live attempt keeps its mark. */
+async function pendingCancelForAttempt(
+  orgId: string,
+  jobId: string,
+  attemptId: string | null,
+  preStart = true,
+): Promise<boolean> {
+  return cancelWasRequested(prisma, orgId, jobId, attemptId, preStart);
+}
+
+export async function applyMarkedCancel(
+  orgId: string,
+  jobId: string,
+  log: { info: (obj: object, msg?: string) => void },
+): Promise<void> {
+  const mark = await prisma.auditLog.findFirst({
+    where: {
+      orgId,
+      targetId: jobId,
+      targetType: 'MigrationJob',
+      action: MIGRATION_CANCEL_REQUESTED,
+    },
+    orderBy: { at: 'desc' },
+    select: { userId: true, diff: true },
+  });
+  if (!mark?.userId) return;
+  const moved = await prisma.migrationJob.updateMany({
+    where: { id: jobId, orgId, status: { in: [...migrationFrom('cancel')] } },
+    data: { status: 'CANCELLED', completedAt: new Date() },
+  });
+  if (moved.count !== 1) {
+    const current = await prisma.migrationJob.findFirst({
+      where: { id: jobId, orgId },
+      select: { status: true, meta: true },
+    });
+    const rawAttempt = (mark.diff as { attemptId?: unknown } | null)?.attemptId;
+    const markAttempt = typeof rawAttempt === 'string' ? rawAttempt : null;
+    // The other chunk already cancelled this attempt. That is not a lost cancel.
+    if (
+      current?.status === 'CANCELLED' &&
+      migrationChunkMatchesAttempt(migrationAttemptId(current.meta), markAttempt)
+    ) {
+      return;
+    }
+    log.info({ migrationJobId: jobId, status: current?.status ?? null }, 'migration cancel lost');
+    await prisma.auditLog.create({
+      data: {
+        orgId,
+        userId: mark.userId,
+        action: 'migration.cancel.lost',
+        targetType: 'MigrationJob',
+        targetId: jobId,
+        diff: { status: current?.status ?? null },
+      },
+    });
+    return;
+  }
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      userId: mark.userId,
+      action: 'migration.cancel',
+      targetType: 'MigrationJob',
+      targetId: jobId,
+      diff: { via: MIGRATION_CANCEL_REQUESTED },
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      orgId,
+      userId: mark.userId,
+      action: 'migration.cancel.resolved',
+      targetType: 'MigrationJob',
+      targetId: jobId,
+      diff: { reason: 'cancelled' },
+    },
+  });
 }
 
 /** A deadlock aborts the transaction. The chunk fails so BullMQ retries the whole chunk. */
@@ -749,9 +891,18 @@ export async function maybeComplete(
   if (!migrationChunkMatchesAttempt(migrationAttemptId(job.meta), attemptId)) return;
   const done = job.processedRows + job.errorRows;
   const total = forceTotal ?? job.totalRows;
-  if (done < total) return;
-  // A cancel or a newer attempt can land after the read above. Only the
-  // attempt that is still current, and still RUNNING, becomes COMPLETE.
+  // A mark inserted by the counter UPDATE is not visible to a read that ran
+  // before that statement. The stale sweep only claims processedRows = 0, so
+  // a partial chunk would stay RUNNING. Cancel it here, after the commit.
+  if (done < total) {
+    if (await cancelWasRequested(prisma, job.orgId, migrationJobId, attemptId)) {
+      await applyMarkedCancel(job.orgId, migrationJobId, cancelChunkLog(log));
+    }
+    return;
+  }
+  // The predicate is in the statement that sets COMPLETE. A read before this
+  // UPDATE can miss a mark the bookkeeping UPDATE just committed. The mark
+  // stays until this attempt is no longer the live one.
   const completedAt = new Date();
   const undoableUntil = new Date(Date.now() + 24 * 3600 * 1000);
   const moved = await prisma.$executeRaw`
@@ -767,17 +918,63 @@ export async function maybeComplete(
         (${attemptId}::text IS NULL AND (meta->>'attemptId') IS NULL)
         OR meta->>'attemptId' = ${attemptId}
       )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM audit_log AS mark
+        WHERE mark.org_id = migration_jobs.org_id
+          AND mark.target_id = migration_jobs.id::text
+          AND mark.target_type = 'MigrationJob'
+          AND mark.action = ${MIGRATION_CANCEL_REQUESTED}
+          AND mark.deleted_at IS NULL
+          AND (
+            (
+              (
+                (${attemptId}::text IS NULL AND (mark.diff->>'attemptId') IS NULL)
+                OR mark.diff->>'attemptId' = ${attemptId}
+              )
+              AND mark.at >= COALESCE(migration_jobs.started_at, '-infinity'::timestamptz)
+            )
+            OR (
+              (mark.diff->>'attemptId') IS NULL
+              AND ${attemptId}::text IS NOT NULL
+              AND COALESCE(migration_jobs.started_at, '-infinity'::timestamptz) >= mark.at
+            )
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM audit_log AS resolved
+            WHERE resolved.org_id = mark.org_id
+              AND resolved.target_id = mark.target_id
+              AND resolved.target_type = 'MigrationJob'
+              AND resolved.action = 'migration.cancel.resolved'
+              AND resolved.deleted_at IS NULL
+              AND resolved.at >= mark.at
+          )
+      )
   `;
-  if (Number(moved) !== 1) {
-    const current = await prisma.migrationJob.findUnique({
-      where: { id: migrationJobId },
-      select: { status: true },
-    });
-    log?.warn(
-      { migrationJobId, from: current?.status ?? null, to: 'COMPLETE' },
-      'illegal migration transition',
-    );
+  if (Number(moved) === 1) return;
+  if (await cancelWasRequested(prisma, job.orgId, migrationJobId, attemptId)) {
+    await applyMarkedCancel(job.orgId, migrationJobId, cancelChunkLog(log));
+    return;
   }
+  const current = await prisma.migrationJob.findUnique({
+    where: { id: migrationJobId },
+    select: { status: true },
+  });
+  log?.warn(
+    { migrationJobId, from: current?.status ?? null, to: 'COMPLETE' },
+    'illegal migration transition',
+  );
+}
+
+function cancelChunkLog(log: ChunkLog | undefined): {
+  info: (obj: object, msg?: string) => void;
+} {
+  return {
+    info: (obj, msg) => {
+      log?.info(obj, msg ?? '');
+    },
+  };
 }
 
 // ─── Chunk processing ──────────────────────────────────────────────────────
@@ -788,6 +985,10 @@ export interface MigrationChunkDeps {
   enqueueChunk(name: string, data: MigrationJobPayload, opts: { jobId: string }): Promise<unknown>;
   enqueueIntel(jobs: IntelEnqueueJob[]): Promise<void>;
   env: Record<string, string | undefined>;
+  /** Test seam. Runs after row writes and before the pre-commit cancel check. */
+  afterRows?: () => Promise<void>;
+  /** Test seam. Runs once this chunk has decided to apply the cancel mark. */
+  onMarkedCancel?: () => Promise<void>;
 }
 
 type ChunkLog = Pick<pino.Logger, 'info' | 'warn'>;
@@ -968,12 +1169,14 @@ export async function processMigrationChunk(
   // The inserts, the counters, and the undo trail commit together. A retry
   // that already replaced the attempt writes nothing.
   let written: { createdIds: string[]; processed: number; errors: MigrationJobError[] } | null;
-  let skipReason: 'org' | 'attempt' | 'status' | null = null;
+  let skipReason: 'org' | 'attempt' | 'status' | 'cancel' | null = null;
   try {
     written = await prisma.$transaction(
     async (tx) => {
-      const locked = await tx.$queryRaw<Array<{ status: string; org_id: string; meta: unknown }>>`
-        SELECT status::text AS status, org_id::text AS org_id, meta
+      const locked = await tx.$queryRaw<
+        Array<{ status: string; org_id: string; meta: unknown; started_at: Date | null }>
+      >`
+        SELECT status::text AS status, org_id::text AS org_id, meta, started_at
         FROM migration_jobs
         WHERE id = ${payload.migrationJobId}::uuid
         FOR UPDATE
@@ -989,6 +1192,17 @@ export async function processMigrationChunk(
       }
       if (!migrationChunkMatchesAttempt(migrationAttemptId(holder.meta), payload.attemptId ?? null)) {
         skipReason = 'attempt';
+        return null;
+      }
+      if (
+        await cancelWasRequested(
+          tx,
+          holder.org_id,
+          payload.migrationJobId,
+          migrationAttemptId(holder.meta),
+        )
+      ) {
+        skipReason = 'cancel';
         return null;
       }
       const ctx: WriteCtx = {
@@ -1016,6 +1230,17 @@ export async function processMigrationChunk(
           });
         }
       }
+      if (deps.afterRows) await deps.afterRows();
+      if (
+        await cancelWasRequested(
+          tx,
+          holder.org_id,
+          payload.migrationJobId,
+          migrationAttemptId(holder.meta),
+        )
+      ) {
+        throw new MigrationCancelRequested();
+      }
       const booked = await persistChunkBookkeeping(tx, {
         orgId: holder.org_id,
         userId: payload.userId,
@@ -1035,11 +1260,23 @@ export async function processMigrationChunk(
     { maxWait: 10_000, timeout: 120_000 },
     );
   } catch (err) {
+    if (err instanceof MigrationCancelRequested) {
+      if (deps.onMarkedCancel) await deps.onMarkedCancel();
+      await applyMarkedCancel(payload.orgId, payload.migrationJobId, log);
+      log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk rolled back — cancel requested');
+      return;
+    }
     if (err instanceof MigrationChunkConflict) throw err;
     if (isMigrationDeadlock(err)) throw new MigrationChunkConflict();
     throw err;
   }
   if (!written) {
+    if (skipReason === 'cancel') {
+      if (deps.onMarkedCancel) await deps.onMarkedCancel();
+      await applyMarkedCancel(payload.orgId, payload.migrationJobId, log);
+      log.info({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — cancel requested');
+      return;
+    }
     if (skipReason === 'org') {
       log.warn({ migrationJobId: payload.migrationJobId }, 'migration chunk skipped — org mismatch');
     } else if (skipReason === 'attempt') {
@@ -1150,7 +1387,16 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
       errorRows: 0,
       updatedAt: { lte: cutoff },
     },
-    select: { id: true, status: true, meta: true, updatedAt: true, processedRows: true, errorRows: true },
+    select: {
+      id: true,
+      orgId: true,
+      status: true,
+      meta: true,
+      startedAt: true,
+      updatedAt: true,
+      processedRows: true,
+      errorRows: true,
+    },
   });
   let claimed = 0;
   for (const job of candidates) {
@@ -1163,6 +1409,22 @@ export async function sweepStaleMigrations(now = new Date()): Promise<number> {
         now,
       })
     ) {
+      continue;
+    }
+    // The worker died after Cancel had already been accepted. Failing the job
+    // offers Retry, and the pending mark would then cancel that attempt.
+    if (
+      // A pre-start mark is not this attempt. Failing the job leaves it
+      // retryable. The retry claim clears that mark. Binding it here would
+      // cancel the retry the sweep just made possible.
+      await pendingCancelForAttempt(job.orgId, job.id, migrationAttemptId(job.meta), false)
+    ) {
+      await applyMarkedCancel(job.orgId, job.id, { info() {} });
+      const stored = await prisma.migrationJob.findUnique({
+        where: { id: job.id },
+        select: { status: true },
+      });
+      if (stored?.status === 'CANCELLED') claimed += 1;
       continue;
     }
     if (await claimStaleMigration(job.id, job.updatedAt)) claimed += 1;

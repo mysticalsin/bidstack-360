@@ -1208,6 +1208,8 @@ model AuditLog {
   @@unique([orgId, chainSeq], map: "audit_log_org_chain_seq_key")
   @@index([orgId, at(sort: Desc)])
   @@index([orgId, targetType, targetId, at(sort: Desc)])
+  // Cancel-mark lookup is target id plus action, twice per chunk.
+  @@index([targetId, action], map: "audit_log_target_action_idx")
   // Scale: backs the id-keyset cursor list (routes/audit-logs.ts) — org +
   // soft-delete filter sorted by id DESC. See migration scale_hot_path_indexes.
   @@index([orgId, deletedAt, id(sort: Desc)], map: "audit_log_org_deleted_id_idx")
