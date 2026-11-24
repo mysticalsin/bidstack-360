@@ -41,6 +41,7 @@ describe('audit log app role', () => {
     const wrangler = readFileSync(resolve(root, 'apps/polo-preview/wrangler.toml'), 'utf8');
     const passed = readFileSync(resolve(root, 'apps/polo-preview/src/container-env.js'), 'utf8');
     const entry = readFileSync(resolve(root, 'apps/polo-preview/container/entrypoint.mjs'), 'utf8');
+    const roleBoot = readFileSync(resolve(root, 'apps/polo-preview/src/database-boot.js'), 'utf8');
     const bicep = readFileSync(resolve(root, 'infra/azure/main.bicep'), 'utf8');
     const migration = readFileSync(
       resolve(
@@ -58,7 +59,8 @@ describe('audit log app role', () => {
     expect(entry).toContain('env: migrateEnv()');
     expect(entry).toContain('delete env.DATABASE_URL_OWNER');
     expect(entry).toContain('DATABASE_URL_OWNER: OWNER_URL');
-    expect(entry).toContain('could not set the app role password');
+    expect(entry).toContain('appRolePasswordError(');
+    expect(roleBoot).toContain('could not set the app role password');
     expect(bicep).not.toContain('database-url-app-api');
     expect(bicep).not.toContain('pgAppPassword');
     expect(migration).toContain('REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public.audit_log FROM app_role');
