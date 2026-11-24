@@ -3,6 +3,8 @@ import type { z } from 'zod';
 
 import type { ActivityType } from '@bidstack/shared';
 
+import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+
 export type ActivityEventType = z.infer<typeof ActivityType>;
 
 type ActivityActorType = 'user' | 'system' | 'agent';
@@ -41,6 +43,13 @@ export async function logActivity(input: LogActivityInput) {
     ? { idempotencyKey: input.idempotencyKey }
     : undefined;
 
+  const actorType = input.actorType ?? 'user';
+  let actorId = input.actorId ?? null;
+  if (actorId && actorType === 'user') {
+    const inOrg = await tenantEntityBelongsToOrg('user', actorId, input.orgId);
+    if (!inOrg) actorId = null;
+  }
+
   const data = {
     orgId: input.orgId,
     type: input.type,
@@ -51,9 +60,9 @@ export async function logActivity(input: LogActivityInput) {
     status: input.status ?? 'completed',
     entityType: input.entityType,
     entityId: input.entityId,
-    ownerId: input.actorType === 'user' ? input.actorId ?? null : null,
-    actorId: input.actorId ?? null,
-    actorType: input.actorType ?? 'user',
+    ownerId: actorType === 'user' ? actorId : null,
+    actorId,
+    actorType,
     body: (input.body ?? {}) as Prisma.InputJsonObject,
     metadata: (input.metadata ?? metadata) as Prisma.InputJsonObject | undefined,
     occurredAt: input.occurredAt ?? new Date(),
