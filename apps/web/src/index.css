@@ -2759,6 +2759,35 @@ select:focus-visible {
     display: none;
   }
 }
+/* The icon buttons take the 390px bar and leave the current page name about
+   45px, so "Opportunities" is clipped mid-word. The name gets its own row. */
+@media (max-width: 520px) {
+  .topbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    row-gap: 0;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .crumbs {
+    flex: 1 0 100%;
+    order: 2;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .crumbs-seg {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .crumbs .here {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 @media (max-width: 360px) {
   .tb-currency {
     display: none;
