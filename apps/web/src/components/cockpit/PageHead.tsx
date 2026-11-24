@@ -13,6 +13,7 @@ import { useEnrichCompany } from '@/hooks/useEnrichCompany';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
+import { stageOutcome } from '@bidstack/shared';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { MetricSpark } from '@/components/viz/lazy-bklit';
 import CommandButton from '@/components/kokonutui/command-button';
@@ -77,7 +78,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
-  const openOpps = accountOpps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost');
+  const openOpps = accountOpps.filter((o) => stageOutcome(o) === 'open');
   const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
   const highRisks = openRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
@@ -88,7 +89,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const closedCount = winLoss ? winLoss.wonCount + winLoss.lostCount : 0;
   // Sparklines (real rows only): open value accumulated by due date, running
   // win rate across closed bids in close order, open risks by severity.
-  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: o.value, dueDate: o.dueDate ?? null, closedAt: o.closedAt ?? null, customer: o.customer }));
+  const sparkRows = accountOpps.map((o) => ({ id: o.id, stage: o.stage, value: o.value, dueDate: o.dueDate ?? null, closedAt: o.closedAt ?? null, customer: o.customer, pipelineStage: o.pipelineStage }));
   const openSpark = cumulativeOpen(sparkRows);
   const winSpark = runningWinRate(sparkRows);
   const riskSpark = (['low', 'medium', 'high', 'critical'] as const).map((sev) => openRisks.filter((r) => r.severity === sev).length);
