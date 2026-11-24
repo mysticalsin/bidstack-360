@@ -46,6 +46,7 @@ vi.mock('@bidstack/shared', () => ({
     name: 'rfp.requirement-extract',
     defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
   },
+  rfpSqlIn: (event: string) => (event === 'fail' ? `'queued', 'running'` : `'queued', 'running', 'failed'`),
 }));
 
 import { serumLoopDenialForRfpOrchestrator } from '../rfp-orchestrator.js';

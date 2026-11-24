@@ -14,13 +14,13 @@ import type pino from 'pino';
 
 import { Worker as BullWorker, Queue as BullQueue } from 'bullmq';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { Prisma, prisma } from '@bidstack/db';
 import {
   SERUM_RUNTIME_CONFIG_KEYS,
   checkSerumLoopRuntimePolicy,
 } from '@bidstack/db/serum-runtime-policy';
 
-import { RFP_ORCHESTRATE, RFP_REQUIREMENT_EXTRACT } from '@bidstack/shared';
+import { RFP_ORCHESTRATE, RFP_REQUIREMENT_EXTRACT, rfpSqlIn } from '@bidstack/shared';
 
 const QUEUE_NAME = RFP_ORCHESTRATE.name;
 
@@ -86,9 +86,14 @@ async function upsertOrchestration(
       root_job_id   = ${rootJobId},
       started_at    = now(),
       updated_at    = now()
+    WHERE rfp_orchestrations.state IN (${Prisma.raw(rfpSqlIn('restart'))})
     RETURNING id, org_id
   `;
-  if (!rows.length) throw new Error('upsertOrchestration: no row returned');
+  if (!rows.length) {
+    const err = new Error('rfp-orchestrator: orchestration is not in a restartable state');
+    (err as Error & { doNotRetry?: boolean }).doNotRetry = true;
+    throw err;
+  }
   // rows[0] is defined — the length check above guarantees it
   return rows[0]!;
 }
@@ -107,7 +112,9 @@ async function markOrchestrationFailed(
   await prisma.$executeRaw`
     UPDATE rfp_orchestrations
     SET state = 'failed', failed_phase = NULL, failure_reason = ${detail}, updated_at = now()
-    WHERE org_id = ${orgId}::uuid AND rfp_request_id = ${rfpRequestId}
+    WHERE org_id = ${orgId}::uuid
+      AND rfp_request_id = ${rfpRequestId}
+      AND state IN (${Prisma.raw(rfpSqlIn('fail'))})
   `;
 }
 
