@@ -27,12 +27,14 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 't1' }),
+  useNavigate: () => vi.fn(),
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 
 vi.mock('@/hooks/useTasks', () => ({
   useTasks: vi.fn(),
   useUpdateTask: vi.fn(),
+  useDeleteTask: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 const capabilitiesMocks = vi.hoisted(() => ({ useHasPermission: vi.fn(() => true) }));

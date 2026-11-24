@@ -41,6 +41,9 @@ describe('TaskSummary schema', () => {
       open: 8,
       overdue: 2,
       dueSoon: 4,
+      openForUser: 8,
+      civilToday: '2026-11-21',
+      timeZone: 'America/Sao_Paulo',
     });
 
     expect(result.success).toBe(true);

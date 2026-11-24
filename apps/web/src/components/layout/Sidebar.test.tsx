@@ -13,13 +13,17 @@ import { MemoryRouter } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useUiStore } from '@/stores/ui';
 
+const taskSummary = vi.hoisted(() => ({
+  current: { data: undefined as { openForUser?: number; overdue?: number } | undefined },
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: undefined, isLoading: false }) }));
 vi.mock('@/hooks/useOpportunities', () => ({ useOpportunityCount: () => ({ data: undefined }) }));
-vi.mock('@/hooks/useTasks', () => ({ useTaskSummary: () => ({ data: undefined }) }));
+vi.mock('@/hooks/useTasks', () => ({ useTaskSummary: () => taskSummary.current }));
 vi.mock('@/hooks/useAppModules', () => ({ useAppModules: () => ({ data: {} }) }));
 vi.mock('@/lib/auth', () => ({ useIsAdmin: () => false }));
 
@@ -34,6 +38,7 @@ function renderSidebar(initialPath: string) {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  taskSummary.current = { data: undefined };
   useUiStore.setState({ sidebarCollapsed: false, collapsedSections: {}, mobileNavOpen: false });
 });
 
@@ -48,6 +53,14 @@ describe('Sidebar route sync', () => {
     expect(container.querySelector('#sb-section-pipeline')).not.toBeNull();
     // The accordion invariant still holds: revealing pipeline collapsed accounts.
     expect(useUiStore.getState().collapsedSections.accounts).toBe(true);
+  });
+
+  it('badges open tasks for the user, not the org-wide overdue count', () => {
+    // The reported split was badge 7 (overdue) and page 8 (the due-today row).
+    // The badge has to follow openForUser so that row is counted.
+    taskSummary.current = { data: { openForUser: 8, overdue: 7 } };
+    const { container } = renderSidebar('/tasks');
+    expect(container.querySelector('.sb-badge')?.textContent).toBe('8');
   });
 
   it('does not touch collapsedSections when the active section is already expanded', () => {

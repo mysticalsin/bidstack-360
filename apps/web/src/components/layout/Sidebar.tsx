@@ -92,10 +92,10 @@ export function Sidebar() {
   const recents = useAccountHistory((s) => s.recents);
   const favorites = useAccountHistory((s) => s.favorites);
 
-  // Badge counts only truly overdue tasks so its meaning matches the Dashboard KPI.
+  // Same open-for-user count the Tasks page lists (GET /api/tasks?scope=mine).
   const badges: Badges = {
     openBids: oppsCount.data?.count ?? 0,
-    overdueTasks: taskSummary.data?.overdue ?? 0,
+    overdueTasks: taskSummary.data?.openForUser ?? 0,
   };
 
   const settings = isAdmin ? ADMIN_SETTINGS : MEMBER_SETTINGS;
