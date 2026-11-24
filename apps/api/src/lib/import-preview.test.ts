@@ -8,6 +8,15 @@ describe('import preview validation', () => {
     expect(parseMoneyUnits('1,200,000.50')).toEqual({ ok: true, units: 1_200_000.5 });
   });
 
+  it('reads a European amount and allows a filed loss on a financial line', () => {
+    // WHY: 1.234,56 is €1,234.56, not €1.23. A negative operating income is a
+    // loss, which the financial import stores. A deal amount still cannot be
+    // negative, matching the opportunity create schema.
+    expect(parseMoneyUnits('1.234,56')).toEqual({ ok: true, units: 1234.56 });
+    expect(parseMoneyUnits('(1,234.50)')).toEqual({ ok: false, reason: 'money cannot be negative' });
+    expect(parseMoneyUnits('(1,234.50)', { signed: true })).toEqual({ ok: true, units: -1234.5 });
+  });
+
   it('requires ISO dates so locale-formatted close dates cannot silently shift', () => {
     expect(parseIsoDate('31/12/2026').ok).toBe(false);
     expect(parseIsoDate('2026-12-31')).toEqual({ ok: true, iso: '2026-12-31' });

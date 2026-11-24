@@ -5,7 +5,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { applyMappings, asInt, asMicros, mapStage, normalizeEntity } from './migration.js';
+import {
+  applyMappings,
+  asInt,
+  asMicros,
+  mapStage,
+  normalizeEntity,
+  readOpportunityValue,
+} from './migration.js';
 
 describe('migration value coercion', () => {
   it('parses currency units into micros (money is stored ×1e6)', () => {
@@ -20,6 +27,27 @@ describe('migration value coercion', () => {
     expect(asMicros('   ')).toBeNull();
     expect(asMicros(null)).toBeNull();
     expect(asMicros('n/a')).toBeNull();
+  });
+
+  it('keeps European decimals, accounting losses, and cents past the float boundary', () => {
+    // WHY: stripping every comma turns "1.234,56" into 1.23456 and "(1,234.50)"
+    // into a profit. Number()*1e6 also rounds a trillion-and-a-cent. The
+    // stored micros have to be the amount the cell wrote.
+    expect(asMicros('1.234,56')).toBe(1_234_560_000n);
+    expect(asMicros('1,50')).toBe(1_500_000n);
+    expect(asMicros('(1,234.50)')).toBe(-1_234_500_000n);
+    expect(asMicros('1000000000000.01')).toBe(1_000_000_000_000_010_000n);
+    expect(asMicros("'-1.50")).toBe(-1_500_000n);
+  });
+
+  it('rejects a deal amount the create route would refuse, and leaves a blank cell unset', () => {
+    // WHY: "n/a" used to become €0, which looks like a real zero-value deal.
+    // A credit and a figure past the write cap are row errors, not stored amounts.
+    expect(readOpportunityValue('')).toBeUndefined();
+    expect(readOpportunityValue('1.234,56')).toBe(1_234_560_000n);
+    expect(() => readOpportunityValue('n/a')).toThrow('opportunity value is not a number');
+    expect(() => readOpportunityValue('-1.50')).toThrow('opportunity value cannot be negative');
+    expect(() => readOpportunityValue('1000000000000.01')).toThrow('opportunity value exceeds 1e12');
   });
 
   it('strips separators from integers', () => {

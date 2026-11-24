@@ -79,6 +79,102 @@ export function unitsToMicros(units: string | number): bigint {
   return negative ? -micros : micros;
 }
 
+const IMPORT_BLANK = /^(?:n\/?a|tbd|—|-)$/i;
+const IMPORT_CODE = /^(?:EUR|USD|GBP|CHF|JPY|CAD)\s*/i;
+
+/**
+ * CSV money cell → integer micros.
+ *
+ * Accepts the shapes a spreadsheet actually writes: `1,200,000.50`,
+ * `1.234,56`, `1,50`, `€2 500`, `(1,234.50)`, and a leading `'` that an
+ * export added so Excel would not treat the cell as a formula. Returns null
+ * for a blank or a non-number so the caller can skip the field instead of
+ * storing zero. The split into whole and fraction is BigInt, same as
+ * `unitsToMicros`, because `Number(text) * 1e6` is already wrong at a
+ * trillion and a cent.
+ */
+export function parseImportMoney(raw: string): bigint | null {
+  let s = raw.trim().replace(/^\uFEFF/, '');
+  if (s.startsWith("'") && /^'[=+\-@\t\r(]/.test(s)) s = s.slice(1).trim();
+  if (!s || IMPORT_BLANK.test(s) || !/\d/.test(s)) return null;
+  s = s.replace(IMPORT_CODE, '').replace(/[€$£¥₹]/g, '').replace(/[\s\u00A0\u202F]/g, '');
+  let negative = false;
+  if (s.startsWith('(') && s.endsWith(')')) {
+    negative = true;
+    s = s.slice(1, -1);
+  }
+  if (s.startsWith('+')) s = s.slice(1);
+  else if (s.startsWith('-')) {
+    negative = true;
+    s = s.slice(1);
+  }
+  const canonical = canonicalMoneyDecimal(s);
+  if (!canonical) return null;
+  try {
+    return unitsToMicros(negative ? `-${canonical}` : canonical);
+  } catch {
+    return null;
+  }
+}
+
+function canonicalMoneyDecimal(s: string): string | null {
+  if (!/^[\d.,]+$/.test(s)) return null;
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  let whole: string;
+  let frac: string;
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) {
+      whole = s.slice(0, lastComma).replaceAll('.', '');
+      frac = s.slice(lastComma + 1);
+    } else {
+      whole = s.slice(0, lastDot).replaceAll(',', '');
+      frac = s.slice(lastDot + 1);
+    }
+  } else if (lastComma >= 0) {
+    const parts = s.split(',');
+    const grouped = parts.slice(1).every((part) => part.length === 3);
+    if (grouped) {
+      whole = parts.join('');
+      frac = '';
+    } else if (parts.length === 2 && parts[1]!.length >= 1 && parts[1]!.length <= 2) {
+      whole = parts[0]!;
+      frac = parts[1]!;
+    } else {
+      return null;
+    }
+  } else if (lastDot >= 0) {
+    const parts = s.split('.');
+    const grouped = parts.length > 2 && parts.slice(1).every((part) => part.length === 3);
+    if (grouped) {
+      whole = parts.join('');
+      frac = '';
+    } else if (parts.length === 2) {
+      whole = parts[0]!;
+      frac = parts[1]!;
+    } else {
+      return null;
+    }
+  } else {
+    whole = s;
+    frac = '';
+  }
+  if (!/^\d+$/.test(whole) || (frac.length > 0 && !/^\d+$/.test(frac))) return null;
+  const rounded = roundMoneyFrac(whole, frac);
+  const trimmedWhole = rounded.whole.replace(/^0+(?=\d)/, '');
+  const trimmedFrac = rounded.frac.replace(/0+$/, '');
+  return trimmedFrac.length === 0 ? trimmedWhole : `${trimmedWhole}.${trimmedFrac}`;
+}
+
+function roundMoneyFrac(whole: string, frac: string): { whole: string; frac: string } {
+  if (frac.length <= 6) return { whole, frac };
+  const head = frac.slice(0, 6);
+  if (frac[6]! < '5') return { whole, frac: head };
+  const combined = BigInt(whole + head) + 1n;
+  const text = combined.toString().padStart(whole.length + 6, '0');
+  return { whole: text.slice(0, -6), frac: text.slice(-6) };
+}
+
 function unitsToFixedMicrosString(units: number): string {
   if (!Number.isFinite(units)) {
     throw new Error('Invalid money units');

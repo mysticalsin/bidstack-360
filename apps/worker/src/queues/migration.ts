@@ -43,6 +43,8 @@ import {
   migrationFrom,
   migrationProgressAt,
   migrationStaleDue,
+  microsToUnits,
+  parseImportMoney,
 } from '@bidstack/shared';
 import { decryptSecret } from '@bidstack/shared/server-crypto';
 
@@ -93,15 +95,29 @@ export function asInt(v: unknown): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-/** Currency units (e.g. "1,200,000.50") → micros BigInt. */
+/** Currency units (e.g. "1,200,000.50" or "1.234,56") → micros BigInt. */
 export function asMicros(v: unknown): bigint | null {
   const s = asTrimmed(v);
   // Require a digit so a non-numeric cell ("n/a", "TBD") is SKIPPED, not
   // silently coerced to €0 (Number('') === 0 would otherwise do that).
   if (!s || !/\d/.test(s)) return null;
-  const n = Number(s.replace(/[^0-9.-]/g, ''));
-  if (!Number.isFinite(n)) return null;
-  return BigInt(Math.round(n * 1_000_000));
+  return parseImportMoney(s);
+}
+
+const MAX_OPPORTUNITY_MICROS = 1_000_000_000_000n * 1_000_000n;
+
+/**
+ * A present opportunity amount must be a number the create route would store.
+ * A blank cell stays unset (the column default is 0). "n/a", a credit, or a
+ * figure past the write cap is a row error — not €0 and not a rounded bigint.
+ */
+export function readOpportunityValue(raw: unknown): bigint | undefined {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return undefined;
+  const parsed = asMicros(raw);
+  if (parsed === null) throw new Error('opportunity value is not a number');
+  if (parsed < 0n) throw new Error('opportunity value cannot be negative');
+  if (parsed > MAX_OPPORTUNITY_MICROS) throw new Error('opportunity value exceeds 1e12');
+  return parsed;
 }
 
 function asDate(v: unknown): Date | null {
@@ -379,7 +395,7 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
       await ctx.tx.opportunity.update({
         where: { id: existing.id },
         data: {
-          valueMicros: asMicros(t['opportunity.valueMicros']) ?? undefined,
+          valueMicros: readOpportunityValue(t['opportunity.valueMicros']),
           probability: asInt(t['opportunity.probability']) ?? undefined,
           dueDate: asDate(t['opportunity.closeDate']) ?? undefined,
         },
@@ -401,7 +417,7 @@ async function writeOpportunity(ctx: WriteCtx, t: Record<string, unknown>): Prom
             name,
             customer,
             stage: mapStage(t['opportunity.stage']) as never,
-            valueMicros: asMicros(t['opportunity.valueMicros']) ?? 0n,
+            valueMicros: readOpportunityValue(t['opportunity.valueMicros']) ?? 0n,
             probability: asInt(t['opportunity.probability']) ?? 0,
             dueDate: asDate(t['opportunity.closeDate']),
           },
@@ -439,9 +455,11 @@ async function writeFinancial(ctx: WriteCtx, t: Record<string, unknown>): Promis
   if (!company) throw new Error(`No account named "${companyName}" — import accounts first`);
 
   const metric = (key: string, concept: string) => {
-    const units = asMicros(t[key]);
-    if (units === null) return undefined;
-    return { value: Number(units) / 1_000_000, concept };
+    const raw = t[key];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return undefined;
+    const units = asMicros(raw);
+    if (units === null) throw new Error(`${key} is not a number`);
+    return { value: microsToUnits(units), concept };
   };
   const metrics: Record<string, { value: number; concept: string }> = {};
   const revenue = metric('financial.revenue', 'manual.revenue');
