@@ -128,22 +128,18 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       const opportunity = await ensureOpportunity(req.auth.orgId, req.params.opportunityId);
       if (!opportunity) return reply.notFound('Opportunity not found');
 
-      // take: bound the scan — the dev query-guard rejects unbounded findMany,
-      // and an RFP realistically has far fewer than 500 requirements to match.
-      const requirements = await prisma.requirement.findMany({
-        where: { orgId: req.auth.orgId, opportunityId: opportunity.id, deletedAt: null },
-        select: { id: true },
-        take: 500,
-      });
-      if (requirements.length === 0) return { items: [], total: 0 };
-      const requirementIds = requirements.map((r) => r.id);
-
-      // Wave-9 table — raw SQL. Org-scoped + bounded to this RFP's requirements.
+      // One join, not a 500-row sample. A match on requirement 501 was
+      // dropped, and total was the length of that sample.
       const matches = await prisma.$queryRaw<MatchRow[]>`
-        SELECT reference_id, requirement_id, score_bps
-        FROM requirement_reference_matches
-        WHERE org_id = ${req.auth.orgId}::uuid AND deleted_at IS NULL
-          AND requirement_id = ANY(${requirementIds}::uuid[])
+        SELECT m.reference_id, m.requirement_id, m.score_bps
+        FROM requirement_reference_matches m
+        INNER JOIN requirements r
+          ON r.id = m.requirement_id
+         AND r.org_id = m.org_id
+         AND r.deleted_at IS NULL
+        WHERE m.org_id = ${req.auth.orgId}::uuid
+          AND m.deleted_at IS NULL
+          AND r.opportunity_id = ${opportunity.id}::uuid
       `;
       if (matches.length === 0) return { items: [], total: 0 };
 
@@ -157,8 +153,10 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
       }
 
       // Reference + company are core models (in the client) — typed lookup.
+      const refIds = [...byRef.keys()];
       const refs = await prisma.reference.findMany({
-        where: { orgId: req.auth.orgId, id: { in: [...byRef.keys()] }, deletedAt: null },
+        where: { orgId: req.auth.orgId, id: { in: refIds }, deletedAt: null },
+        take: refIds.length,
         select: {
           id: true,
           title: true,
@@ -185,7 +183,7 @@ export const bidWorkspaceRfpRoutes: FastifyPluginAsyncZod = async (server) => {
             url: r.documentUrl,
           };
         })
-        .sort((a, b) => b.hybridScoreBps - a.hybridScoreBps);
+        .sort((a, b) => b.hybridScoreBps - a.hybridScoreBps || a.id.localeCompare(b.id));
 
       return { items, total: items.length };
     },
