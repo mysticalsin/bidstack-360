@@ -123,6 +123,7 @@ export function OppPageHeader({
   stageFilter,
   stageOptions,
   itemCount,
+  countReady = true,
   hasData,
   isExporting = false,
   onClearSearch,
@@ -133,6 +134,8 @@ export function OppPageHeader({
   stageFilter: string | null;
   stageOptions: PipelineStage[];
   itemCount: number;
+  /** False while the list is loading or failed. A zero then is not an empty book. */
+  countReady?: boolean;
   hasData: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
@@ -175,12 +178,12 @@ export function OppPageHeader({
                 {t('oppToolbar.clearFilter', 'clear filter')}
               </button>
             </>
+          ) : !countReady ? (
+            t('oppToolbar.loading', 'Loading opportunities…')
           ) : (
-            <>
-              {t('oppToolbar.bidsInFlight', '{{count}} bids in flight', {
-                count: itemCount,
-              })}
-            </>
+            t('oppToolbar.bidsInFlight', '{{count}} bids in flight', {
+              count: itemCount,
+            })
           )}
         </p>
       </div>
