@@ -4,7 +4,7 @@
 // rendered enabled unconditionally — a role without the permission saw
 // controls that always 403'd on submit.
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from 'react-router-dom';
 
@@ -197,6 +197,25 @@ describe('CustomObjectDetailPage — defined fields on an empty record', () => {
     expect(screen.getByRole('alert').textContent).toContain('Could not load fields.');
   });
 
+  it('keeps a stored value the catalog does not list', () => {
+    vi.mocked(useCustomObjectFields).mockReturnValue({
+      data: {
+        items: [{ fieldKey: 'name', label: 'Name', fieldType: 'text', options: null }],
+      },
+      isLoading: false,
+      isError: false,
+    } as ReturnType<typeof useCustomObjectFields>);
+    vi.mocked(useCustomObjectRecord).mockReturnValue({
+      data: { ...record, valuesJson: { name: 'Acme Supplies', legacy_note: 'Keep me' } },
+      isLoading: false,
+    } as ReturnType<typeof useCustomObjectRecord>);
+
+    renderPage();
+
+    expect(screen.getByText('Name')).toBeTruthy();
+    expect(screen.getByText('Keep me')).toBeTruthy();
+  });
+
   it('still says no fields are defined when the catalog and the record are both empty', () => {
     vi.mocked(useCustomObjectFields).mockReturnValue({
       data: { items: [] },
@@ -255,7 +274,9 @@ describe('CustomObjectDetailPage — edit draft follows the record in the URL', 
       recordKey: 'VEN-0002',
       valuesJson: { name: 'Northwind' },
     };
-    await router.navigate('/o/vendors/rec-2');
+    await act(async () => {
+      await router.navigate('/o/vendors/rec-2');
+    });
 
     expect(screen.queryByDisplayValue('Not Acme')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Northwind' })).toBeTruthy();
