@@ -24,6 +24,7 @@ import {
 import type { Forecast } from '@bidstack/shared';
 
 import { FORECAST_LIST_PAGE, forecastGroupCaption } from './forecast-list-caption';
+import { forecastListAmount } from './forecast-list-amount';
 import { CATEGORIES, CATEGORY_LABELS, type ForecastRow } from './forecastsConfig';
 
 interface EditingCell {
@@ -47,6 +48,8 @@ interface ForecastListProps {
     micros: number,
   ) => void;
   onDeleteRow: (row: ForecastRow) => void;
+  // The page still passes its formatter. The row does not carry a currency,
+  // so the list does not use that formatter.
   formatMoneyMicros: (micros: number, currency: string) => string;
   /** territories:write — gates cell edits, per-row delete, and the empty-state CTA. */
   canWrite: boolean;
@@ -65,7 +68,6 @@ export function ForecastList({
   onNewForecast,
   onSaveCell,
   onDeleteRow,
-  formatMoneyMicros,
   canWrite,
   readOnlyHint,
   pageContinues = false,
@@ -227,7 +229,7 @@ export function ForecastList({
                                       )} — ${readOnlyHint}`
                                 }
                               >
-                                {formatMoneyMicros(val, 'EUR')}
+                                {forecastListAmount(val)}
                               </button>
                             )}
                           </TableCell>
@@ -235,9 +237,8 @@ export function ForecastList({
                       })}
                       <TableCell className="text-right">
                         <span className="text-sm font-semibold tabular-nums text-[var(--fg-primary)]">
-                          {formatMoneyMicros(
+                          {forecastListAmount(
                             row.pipeline + row.bestCase + row.commit + row.closed,
-                            'EUR',
                           )}
                         </span>
                       </TableCell>
@@ -328,7 +329,7 @@ export function ForecastList({
                                   )} — ${readOnlyHint}`
                             }
                           >
-                            {formatMoneyMicros(val, 'EUR')}
+                            {forecastListAmount(val)}
                           </button>
                         )}
                       </div>
@@ -338,10 +339,7 @@ export function ForecastList({
                 <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                   <span className="text-xs font-semibold text-[var(--fg-primary)]">
                     {t('forecastList.totalLabel', 'Total:')}{' '}
-                    {formatMoneyMicros(
-                      row.pipeline + row.bestCase + row.commit + row.closed,
-                      'EUR',
-                    )}
+                    {forecastListAmount(row.pipeline + row.bestCase + row.commit + row.closed)}
                   </span>
                   <button
                     type="button"
