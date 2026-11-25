@@ -7,6 +7,7 @@
 .en-src { font-size: 12px; color: var(--fg-tertiary); margin: 0; overflow-wrap: anywhere; }
 .en-sample { font-size: 12px; padding: 0 8px; min-height: 24px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--tag-amber-bg); color: var(--tag-amber-fg); }
 .en-link { font-size: 13px; font-weight: 500; color: var(--brand-primary); min-height: 32px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; background: none; border: 0; cursor: pointer; }
+.en-link.en-retry { min-height: 44px; min-width: 44px; padding: 0 12px; color: var(--brand-deep); }
 .en-link:hover { text-decoration: underline; }
 .en-link:focus-visible, .en-tab:focus-visible, .en-row-btn:focus-visible { outline: 2px solid var(--focus-ring-color, var(--brand-primary)); outline-offset: 2px; }
 .en-row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }

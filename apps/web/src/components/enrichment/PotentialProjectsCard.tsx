@@ -10,6 +10,8 @@ import { CONFIDENCE_LABEL, projectAnchor } from '@/lib/enrichment/aggregate';
 import { fmtAsOf } from '@/lib/enrichment/client';
 import type { Confidence } from '@/lib/enrichment/types';
 
+import { EnrichmentHold } from './EnrichmentHold';
+import { enrichmentGate } from './enrichment-read';
 import { SampleBadge, SourceNote } from './SourceNote';
 
 const LEVEL: Record<Confidence, number> = { low: 1, medium: 2, high: 3 };
@@ -43,6 +45,20 @@ export function PotentialProjectsCard({ companyId }: { companyId: string }) {
     return () => cancelAnimationFrame(raf);
   }, [hashId]);
 
+  const gate = enrichmentGate(q);
+  if (gate === 'loading' || gate === 'error') {
+    return (
+      <EnrichmentHold
+        testId="account-potential-projects"
+        titleId={`${id}-h`}
+        title="Potential projects"
+        gate={gate}
+        loading="Loading potential projects"
+        error="Couldn't load potential projects"
+        onRetry={() => void q.refetch()}
+      />
+    );
+  }
   if (!q.data) return null;
   return (
     <section className="en-section" aria-labelledby={`${id}-h`} data-testid="account-potential-projects">
