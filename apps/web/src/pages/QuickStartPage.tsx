@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { useChecklistBidScoreCount } from '@/hooks/useBidScore';
 import { useOnboardingStore, type ChecklistItem } from '@/stores/onboarding';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useUsers } from '@/hooks/useUsers';
@@ -31,10 +32,17 @@ export function QuickStartPage() {
   // they kick off an action with no cheap "is it done" signal.
   const summary = useOrgSummary();
   const users = useUsers();
+  const bidScores = useChecklistBidScoreCount();
+  // Only a settled read may decide the bid/no-bid row. While it is loading, or
+  // when the visitor cannot read scores, the row stays click-acknowledged.
+  // A lead or a deal on the org summary is not a scored matrix.
+  const bidScoreKnown = bidScores.isSuccess;
+  const hasBidScore = bidScoreKnown && (bidScores.data ?? 0) > 0;
   const derived: Partial<Record<ChecklistItem, boolean>> = {
     first_lead: (summary.data?.leads ?? 0) > 0,
     first_deal: (summary.data?.opportunities ?? 0) > 0,
     invite_team: (users.data?.length ?? 0) > 1,
+    ...(bidScoreKnown ? { first_email: hasBidScore } : {}),
   };
   const isDone = (key: ChecklistItem) => derived[key] ?? completedChecklist.includes(key);
 
@@ -174,7 +182,7 @@ export function QuickStartPage() {
                 onClick={() => {
                   item.action();
                   // Only click-acknowledge non-derived steps; derived ones
-                  // (lead/deal/team) follow the real workspace, not the click.
+                  // (lead, deal, team, and a settled bid score) follow the workspace.
                   if (!(item.key in derived) && !done) markChecklistItem(item.key);
                 }}
                 className={cn(

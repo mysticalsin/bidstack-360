@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { api } from '@/lib/api';
-import { useChecklistBidScoreCount } from './useBidScore';
+import { useChecklistBidScoreCount, useCreateBidScore } from './useBidScore';
 
 vi.mock('@/lib/api', () => ({ api: vi.fn(async () => ({ items: [] })) }));
 
@@ -31,5 +31,24 @@ describe('useChecklistBidScoreCount', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(result.current.data).toBe(1);
+  });
+
+  it('refreshes the checklist count after a score is saved', async () => {
+    // WHY: once the list has settled at zero, a click no longer closes the row.
+    // Saving a score has to refresh that count, or the step stays open after
+    // the visitor did the work.
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    vi.mocked(api).mockResolvedValue({ id: 'score-1' });
+    const { result } = renderHook(() => useCreateBidScore(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      ),
+    });
+    result.current.mutate({ opportunityId: 'opp-2048', criteria: { strategic_fit: 4 } });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['bid-score', 'checklist-count'] });
   });
 });
