@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { leadSourceLabel } from '@/components/lead/lead-source-label';
 import { LeadPriorityBadge, LeadStatusBadge } from '@/components/lead/LeadStatusBadge';
 import { SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { InlineEditSelect } from '@/components/opportunity/InlineEdit';
@@ -61,7 +62,7 @@ export function LeadRow({
   return (
     <SpotlightTableRow
       query={query}
-      searchableText={`${lead.firstName} ${lead.lastName} ${lead.email ?? ''} ${lead.companyName ?? ''} ${lead.status} ${lead.priority} ${lead.source ?? ''} ${lead.ownerName ?? ''}`}
+      searchableText={`${lead.firstName} ${lead.lastName} ${lead.email ?? ''} ${lead.companyName ?? ''} ${lead.status} ${lead.priority} ${lead.source ?? ''} ${leadSourceLabel(lead.source, t)} ${lead.ownerName ?? ''}`}
       data-selected={selected}
       className="group"
     >
@@ -130,7 +131,7 @@ export function LeadRow({
       <td className="px-4 py-3">
         <span className="font-mono text-xs">{lead.score}</span>
       </td>
-      <td className="px-4 py-3 text-[var(--fg-secondary)] capitalize">{lead.source}</td>
+      <td className="px-4 py-3 text-[var(--fg-secondary)]">{leadSourceLabel(lead.source, t)}</td>
       <td className="px-4 py-3 text-[var(--fg-secondary)]">{lead.ownerName ?? '—'}</td>
       <td className="px-4 py-3 text-right">
         <button

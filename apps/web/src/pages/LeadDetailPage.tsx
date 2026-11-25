@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import { leadSourceLabel } from '@/components/lead/lead-source-label';
 import { LeadPriorityBadge, LeadStatusBadge } from '@/components/lead/LeadStatusBadge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -166,9 +167,9 @@ export function LeadDetailPage() {
                 </span>
               )}
               {l.source && (
-                <span className="flex items-center gap-1.5 capitalize">
+                <span className="flex items-center gap-1.5">
                   <Icon name="link" size={12} />
-                  {l.source}
+                  {leadSourceLabel(l.source, t)}
                 </span>
               )}
             </div>
@@ -342,7 +343,7 @@ export function LeadDetailPage() {
                 >
                   {LeadSource.options.map((s) => (
                     <option key={s} value={s}>
-                      {s.replace('_', ' ').replace(/^\w/, (c) => c.toUpperCase())}
+                      {leadSourceLabel(s, t)}
                     </option>
                   ))}
                 </select>
