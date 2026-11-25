@@ -82,4 +82,57 @@ describe('SettingsOverviewSection', () => {
     expect(hookMocks.useApiKeys).toHaveBeenCalledWith({ enabled: false });
     expect(hookMocks.useWebhookSubscriptions).toHaveBeenCalledWith({ enabled: false });
   });
+
+  it('does not call an unloaded webhook list an empty healthy book', () => {
+    // WHY: the overview is the settings panel a demo admin lands on. While the
+    // webhook read is still out, or it failed, items are missing. Painting
+    // "0 active / 0 failing" and a Live tile says the book is empty and fine.
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('Webhook delivery')).toBeTruthy();
+    expect(screen.getByText('Webhook counts are not loaded')).toBeTruthy();
+    expect(screen.queryByText('0 active / 0 failing')).toBeNull();
+  });
+
+  it('keeps a settled empty webhook list as zero active and zero failing', () => {
+    // WHY: a finished read with no subscriptions is a real empty book. That
+    // zero is the count. Only a missing payload must refuse the zero.
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useWebhookSubscriptions.mockReturnValue({
+      data: { items: [], pageContinues: false },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('0 active / 0 failing')).toBeTruthy();
+    expect(screen.queryByText('Webhook counts are not loaded')).toBeNull();
+  });
+
+  it('counts a loaded webhook that is failing', () => {
+    // WHY: once the list has arrived, a failing subscription has to stay
+    // visible. Hiding it behind an unloaded caption would hide the break.
+    authMocks.isAdmin = true;
+    Object.values(hookMocks).forEach((mock) => mock.mockReturnValue(emptyQuery()));
+    hookMocks.useWebhookSubscriptions.mockReturnValue({
+      data: {
+        items: [
+          { active: true, failureCount: 2 },
+          { active: false, failureCount: 0 },
+        ],
+        pageContinues: false,
+      },
+      isError: false,
+      isLoading: false,
+    });
+
+    render(<SettingsOverviewSection onNavigate={vi.fn()} />);
+
+    expect(screen.getByText('1 active / 1 failing')).toBeTruthy();
+  });
 });
