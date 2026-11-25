@@ -53,6 +53,12 @@ const SENTIMENT_OPTS = [
   { value: 'cold' as Sentiment, label: 'Cold' },
 ];
 
+// Dark mode --brand-primary is a fill (3.95:1 on the page). Text uses
+// --brand-deep (8.38:1). The name and the email are the row's person links,
+// so the hit area is 44px rather than the line box.
+const PERSON_LINK =
+  'inline-flex min-h-[44px] items-center rounded text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)] dark:focus-visible:ring-[var(--brand-deep)]';
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface ContactTableProps {
@@ -305,10 +311,7 @@ export function ContactTable({
                     </label>
                   </td>
                   <td className="px-5 py-3">
-                    <Link
-                      to={`/contacts/${c.id}`}
-                      className="rounded font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-                    >
+                    <Link to={`/contacts/${c.id}`} className={`font-medium ${PERSON_LINK}`}>
                       {c.name}
                     </Link>
                   </td>
@@ -330,10 +333,7 @@ export function ContactTable({
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">
                     <div className="flex flex-col">
                       {c.email ? (
-                        <a
-                          href={`mailto:${c.email}`}
-                          className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-                        >
+                        <a href={`mailto:${c.email}`} className={PERSON_LINK}>
                           {c.email}
                         </a>
                       ) : null}
