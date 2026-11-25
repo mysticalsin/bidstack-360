@@ -149,6 +149,11 @@
 .rel-map .rel-node { fill: var(--surface-card, #fff); stroke: var(--viz-line); }
 .rel-map .rel-root { fill: var(--surface-sunken, #f6f6f6); }
 .rel-map .rel-name { fill: var(--viz-ink); font-size: 13px; font-weight: 500; }
+/* The node box is 176×52. Color comes from the link so dark text uses --brand-deep. */
+.rel-map a.rel-person { cursor: pointer; }
+.rel-map a.rel-person .rel-name { fill: currentColor; }
+.rel-map a.rel-person:hover .rel-name,
+.rel-map a.rel-person:focus-visible .rel-name { text-decoration: underline; }
 .rel-map .rel-edge { fill: none; stroke: color-mix(in srgb, var(--viz-muted) 45%, transparent); stroke-width: 1; }
 .rel-map .rel-edge[data-dashed='true'] { stroke-dasharray: 3 4; animation: none; stroke-dashoffset: 0; }
 .acct-visuals { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); align-items: start; }

@@ -56,11 +56,13 @@ describe('account relationship map contact', () => {
   it('opens the contact from the map node when the person id is a uuid', () => {
     // WHY: the cockpit already has the contact id. Leaving the map to search
     // by name can open a different person. The node goes to that id.
-    people.list = [person(ADA, 'Ada North', 'Buyer')];
+    people.list = [person(ADA, 'Ada North', 'Buyer'), person('Globex Labs', 'Globex Labs')];
     renderMap();
 
     const map = mapRegion();
     const link = within(map).getByRole('link', { name: 'Ada North' });
+    expect(within(map).queryByRole('link', { name: 'Globex Labs' })).toBeNull();
+    expect(within(map).getAllByText('Globex Labs').length).toBeGreaterThan(0);
     expect(link.getAttribute('href')).toBe(`/contacts/${ADA}`);
     expect(link.getAttribute('href')).not.toContain('Ada');
     expect(link.getAttribute('href')).not.toContain('search=');
@@ -102,12 +104,23 @@ describe('account relationship map contact', () => {
     ];
     renderMap();
 
-    expect(screen.queryByRole('link', { name: 'Script Person' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Globex Labs' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Blank Person' })).toBeNull();
+    const map = mapRegion();
+    // A chart with nothing to open stays one image. It is not a stack of dead links.
+    expect(map.querySelector('.viz-figure')?.getAttribute('role')).toBe('img');
+    expect(within(map).queryByRole('link', { name: 'Script Person' })).toBeNull();
+    expect(within(map).queryByRole('link', { name: 'Globex Labs' })).toBeNull();
+    expect(within(map).queryByRole('link', { name: 'Blank Person' })).toBeNull();
     expect(screen.getAllByText('Script Person').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Globex Labs').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Blank Person').length).toBeGreaterThan(0);
+
+    fireEvent.click(within(map).getByRole('button', { name: 'Table' }));
+    expect(within(map).queryByRole('link', { name: 'Script Person' })).toBeNull();
+    expect(within(map).queryByRole('link', { name: 'Globex Labs' })).toBeNull();
+    expect(within(map).queryByRole('link', { name: 'Blank Person' })).toBeNull();
+    expect(within(map).getByRole('rowheader', { name: 'Script Person' })).toBeTruthy();
+    expect(within(map).getByRole('rowheader', { name: 'Globex Labs' })).toBeTruthy();
+    expect(within(map).getByRole('rowheader', { name: 'Blank Person' })).toBeTruthy();
     expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
     expect(document.querySelector('a[href*="Globex"]')).toBeNull();
     expect(document.querySelector('a[href*="search="]')).toBeNull();
