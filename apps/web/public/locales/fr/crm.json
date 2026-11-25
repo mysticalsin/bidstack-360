@@ -291,7 +291,10 @@
     "empty": {
       "title": "Aucune tâche pour le moment",
       "filteredTitle": "Aucune tâche ne correspond à ce filtre",
-      "message": "Créez une relance pour commencer."
+      "message": "Créez une relance pour commencer.",
+      "todayTitle": "Rien n'est dû aujourd'hui",
+      "todayButLate": "Déjà en retard dans cette liste : {{count}}.",
+      "showOverdue": "Afficher les retards"
     },
     "reorder": {
       "announce": "{{title}} déplacée à la position {{position}} sur {{total}}."

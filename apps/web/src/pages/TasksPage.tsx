@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
+import { lateCountWhenTodayIsEmpty, showQuickAdd } from '@/components/task/task-list-empty';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
@@ -140,6 +141,10 @@ export function TasksPage() {
     // STATUS_ORDER is a literal-shaped constant, no need to depend on it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredItems, sort, ordinalOf]);
+
+  // Today is filtered on the loaded page, so an empty Today view can still
+  // be holding the late follow-ups. The count is those rows, not the book.
+  const lateInList = lateCountWhenTodayIsEmpty(filter, items.length, data?.items ?? []);
 
   const moveTask = useCallback(
     (fromIndex: number, toIndex: number) => {
@@ -337,11 +342,28 @@ export function TasksPage() {
               <EmptyState
                 icon={filter === 'all' ? 'tasks' : 'search'}
                 title={
-                  filter === 'all'
-                    ? t('tasks.empty.headline', 'Nothing on the bid clock')
-                    : t('tasks.empty.filteredTitle', 'No tasks match this filter')
+                  lateInList > 0
+                    ? t('tasks.empty.todayTitle', 'Nothing is due today')
+                    : filter === 'all'
+                      ? t('tasks.empty.headline', 'Nothing on the bid clock')
+                      : t('tasks.empty.filteredTitle', 'No tasks match this filter')
                 }
-                action={filter === 'all' && canWrite ? <CreateTaskDialog /> : null}
+                message={
+                  lateInList > 0
+                    ? t('tasks.empty.todayButLate', 'Already late in this list: {{count}}.', {
+                        count: lateInList,
+                      })
+                    : undefined
+                }
+                action={
+                  lateInList > 0 ? (
+                    <Button variant="secondary" size="sm" onClick={() => switchFilter('overdue')}>
+                      {t('tasks.empty.showOverdue', 'Show overdue')}
+                    </Button>
+                  ) : filter === 'all' && canWrite ? (
+                    <CreateTaskDialog />
+                  ) : null
+                }
               />
             ) : sort === 'natural' ? (
               // Manual ordering — use framer-motion's Reorder primitive so
@@ -384,8 +406,10 @@ export function TasksPage() {
             {/* Inline quick-add — sits at the bottom of the list so power users
               don't need to open the dialog for a one-shot follow-up. Hidden
               (not just disabled) for read-only users, matching the primary-CTA
-              convention for POST /api/tasks (tasks:write). */}
-            {canWrite && <InlineTaskAdd />}
+              convention for POST /api/tasks (tasks:write). Also hidden on an
+              empty Today / Overdue / status view: a new open follow-up would
+              not appear there, so the form would read as a failed save. */}
+            {canWrite && showQuickAdd(filter, items.length) ? <InlineTaskAdd /> : null}
             {/* Cursor pager — only meaningful on the list view. For the
               client-side 'overdue'/'today' filters it pages the underlying
               status-unfiltered set, so a page may render fewer rows than the

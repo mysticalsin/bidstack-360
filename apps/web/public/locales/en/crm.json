@@ -282,7 +282,10 @@
     "empty": {
       "title": "No tasks yet",
       "filteredTitle": "No tasks match this filter",
-      "message": "Create a follow-up to get started."
+      "message": "Create a follow-up to get started.",
+      "todayTitle": "Nothing is due today",
+      "todayButLate": "Already late in this list: {{count}}.",
+      "showOverdue": "Show overdue"
     },
     "reorder": {
       "announce": "Moved {{title}} to position {{position}} of {{total}}."

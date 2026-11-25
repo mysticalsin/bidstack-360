@@ -282,7 +282,10 @@
     "empty": {
       "title": "Ancora nessuna attività",
       "filteredTitle": "Nessuna attività corrisponde a questo filtro",
-      "message": "Crea un follow-up per iniziare."
+      "message": "Crea un follow-up per iniziare.",
+      "todayTitle": "Niente scade oggi",
+      "todayButLate": "Già in ritardo in questo elenco: {{count}}.",
+      "showOverdue": "Mostra in ritardo"
     },
     "reorder": {
       "announce": "{{title}} spostata alla posizione {{position}} di {{total}}."

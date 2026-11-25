@@ -282,7 +282,10 @@
     "empty": {
       "title": "暂无任务",
       "filteredTitle": "没有任务匹配此筛选条件",
-      "message": "创建一个跟进以开始。"
+      "message": "创建一个跟进以开始。",
+      "todayTitle": "今天没有到期",
+      "todayButLate": "此列表中已逾期：{{count}}。",
+      "showOverdue": "显示逾期"
     },
     "reorder": {
       "announce": "已将 {{title}} 移动到第 {{position}} 个，共 {{total}} 个。"

@@ -282,7 +282,10 @@
     "empty": {
       "title": "Ainda não há tarefas",
       "filteredTitle": "Nenhuma tarefa corresponde a este filtro",
-      "message": "Crie um acompanhamento para começar."
+      "message": "Crie um acompanhamento para começar.",
+      "todayTitle": "Nada vence hoje",
+      "todayButLate": "Já atrasados nesta lista: {{count}}.",
+      "showOverdue": "Mostrar atrasadas"
     },
     "reorder": {
       "announce": "{{title}} movida para a posição {{position}} de {{total}}."
