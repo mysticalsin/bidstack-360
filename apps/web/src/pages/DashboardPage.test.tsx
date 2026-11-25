@@ -21,6 +21,18 @@ const cardProps = vi.hoisted(() => ({
   contractKeys: [] as string[],
 }));
 
+const bidRead = vi.hoisted(() => ({
+  calls: [] as Array<string | null | undefined>,
+  items: [] as Array<{
+    id: string;
+    customer: string | null;
+    stage: string | null;
+    value: number | null;
+    dueDate: string | null;
+  }>,
+  drillCustomers: [] as Array<string | null>,
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (_key: string, fallback: string) => fallback,
@@ -106,8 +118,18 @@ vi.mock('@/components/agreements/WhoWorksWithThem', () => ({
 vi.mock('@/components/agreements/AgreementsSummaryCard', () => ({
   AgreementsSummaryCard: () => <section data-testid="account-agreements-card" />,
 }));
-vi.mock('@/components/drill/OppDrill', () => ({ OppDrill: () => null }));
-vi.mock('@/hooks/useOpportunityRows', () => ({ useOpportunityRows: () => ({ data: { items: [] } }) }));
+vi.mock('@/components/drill/OppDrill', () => ({
+  OppDrill: ({ rows }: { rows: Array<{ customer: string | null }> }) => {
+    bidRead.drillCustomers = rows.map((row) => row.customer);
+    return null;
+  },
+}));
+vi.mock('@/hooks/useOpportunityRows', () => ({
+  useOpportunityRows: (companyId?: string | null) => {
+    bidRead.calls.push(companyId);
+    return { data: { items: bidRead.items }, isSuccess: true, isError: false, isPending: false };
+  },
+}));
 vi.mock('@/components/watchdog/AccountWatchdogSection', () => ({
   AccountWatchdogSection: () => <section data-testid="account-watchdog" />,
 }));
@@ -255,6 +277,9 @@ describe('DashboardPage account cockpit', () => {
     cardProps.governanceKeys = [];
     cardProps.spotlightKeys = [];
     cardProps.contractKeys = [];
+    bidRead.calls = [];
+    bidRead.items = [];
+    bidRead.drillCustomers = [];
     sessionStorage.clear();
     vi.mocked(usePipelineReport).mockReturnValue({} as never);
       vi.mocked(useOpportunities).mockReturnValue({
@@ -390,6 +415,37 @@ describe('DashboardPage account cockpit', () => {
     expect(cardProps.spotlightKeys).toContain('acme');
     expect(cardProps.contractKeys).toContain('acme');
     expect(cardProps.crossSellKeys).not.toContain('00000000-0000-4000-8000-000000000999');
+  });
+
+  it('opens the bid drill on this company, including a bid whose customer text differs', () => {
+    // WHY: the stage chart and the sheet behind "show the bids" used the latest
+    // portfolio page and a customer-name match. Globex Labs was either a
+    // different account or this account's own bid with a longer label.
+    const accountId = '11111111-1111-4111-8111-111111111111';
+    const snapshot = dashboardSnapshot('fresh');
+    snapshot.cockpit.company.id = accountId;
+    snapshot.cockpit.company.name = 'Globex';
+    bidRead.items = [
+      {
+        id: 'bid-labs',
+        customer: 'Globex Labs',
+        stage: 's1_ongoing',
+        value: 2_500_000,
+        dueDate: '2026-09-01',
+      },
+    ];
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: snapshot,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    expect(bidRead.calls).toContain(accountId);
+    expect(bidRead.drillCustomers).toContain('Globex Labs');
   });
 
   it('queues Apollo refresh once when account strategic intelligence is stale', async () => {
