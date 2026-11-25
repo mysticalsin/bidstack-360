@@ -3386,6 +3386,7 @@
     "regionLabel": "Problemas abertos por gravidade",
     "title": "Problemas abertos",
     "captionAllClear": "Tudo certo",
+    "captionUnrecorded": "Nada registado",
     "captionItemsToAction": "{{count}} item{{plural}} para tratar",
     "bucketsLabel": "Grupos de gravidade",
     "severityCritical": "Crítico",
@@ -3393,7 +3394,8 @@
     "severityMedium": "Médio",
     "severityLow": "Baixo",
     "emptyTitle": "Nenhum problema aberto",
-    "emptyMessage": "Aqui está tudo em ordem.",
+    "emptyMessage": "Ainda não há riscos nem verificações de conformidade registados para esta conta.",
+    "emptyClosedMessage": "Os riscos e verificações registados estão fechados.",
     "unassigned": "Não atribuído",
     "dueSuffix": " - vence {{dueDate}}",
     "noOwner": "Sem responsável"

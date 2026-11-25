@@ -3386,6 +3386,7 @@
     "regionLabel": "按严重程度划分的未解决问题",
     "title": "未解决的问题",
     "captionAllClear": "一切正常",
+    "captionUnrecorded": "尚未记录",
     "captionItemsToAction": "{{count}} 个待处理项{{plural}}",
     "bucketsLabel": "严重程度分组",
     "severityCritical": "严重",
@@ -3393,7 +3394,8 @@
     "severityMedium": "中",
     "severityLow": "低",
     "emptyTitle": "没有未解决的问题",
-    "emptyMessage": "这里一切正常。",
+    "emptyMessage": "此账户尚未记录风险或合规检查。",
+    "emptyClosedMessage": "已记录的风险和检查均已关闭。",
     "unassigned": "未分配",
     "dueSuffix": " - 截止 {{dueDate}}",
     "noOwner": "无负责人"

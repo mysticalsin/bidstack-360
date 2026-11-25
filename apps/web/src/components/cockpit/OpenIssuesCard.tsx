@@ -11,6 +11,7 @@ import { springSoft } from '@/lib/motion';
 import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
 
 import { severityBg, severityTone } from './_tokens';
+import { openIssuesPosture } from './open-issues-posture';
 
 interface Props {
   risks: RiskItem[];
@@ -27,6 +28,10 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
     (c) => c.status === 'blocked' || c.status === 'in_progress' || c.status === 'not_started',
   );
   const total = openRisks.length + openCompliance.length;
+  // An empty file is not "all clear". That sentence waits until rows exist
+  // and none of them are still open. A closed row must not be described as
+  // a file that was never recorded.
+  const posture = openIssuesPosture(risks.length + compliance.length, total);
   // Severity buckets are computed against the full risk list (not just open)
   // so the bar reflects the registry total rather than "what's left today".
   const buckets = [
@@ -67,12 +72,14 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
       <SectionHeader
         title={t('openIssues.title', 'Open issues')}
         caption={
-          total === 0
-            ? t('openIssues.captionAllClear', 'All clear')
-            : t('openIssues.captionItemsToAction', '{{count}} item{{plural}} to action', {
-                count: total,
-                plural: total === 1 ? '' : 's',
-              })
+          posture === 'unrecorded'
+            ? t('openIssues.captionUnrecorded', 'Nothing recorded')
+            : posture === 'clear'
+              ? t('openIssues.captionAllClear', 'All clear')
+              : t('openIssues.captionItemsToAction', '{{count}} item{{plural}} to action', {
+                  count: total,
+                  plural: total === 1 ? '' : 's',
+                })
         }
       />
       <div style={{ padding: '8px 18px 14px' }}>
@@ -92,12 +99,23 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
             </motion.div>
           ))}
         </div>
-        {total === 0 ? (
+        {posture === 'open' ? null : (
           <EmptyState
             title={t('openIssues.emptyTitle', 'No open issues')}
-            message={t('openIssues.emptyMessage', 'No risks or compliance checks are recorded for this account yet.')}
+            message={
+              posture === 'unrecorded'
+                ? t(
+                    'openIssues.emptyMessage',
+                    'No risks or compliance checks are recorded for this account yet.',
+                  )
+                : t(
+                    'openIssues.emptyClosedMessage',
+                    'Recorded risks and checks are closed.',
+                  )
+            }
           />
-        ) : (
+        )}
+        {posture === 'open' ? (
           <ul className="open-issues">
             {openRisks.slice(0, 4).map((r, index) => (
               <motion.li
@@ -146,7 +164,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
               </motion.li>
             ))}
           </ul>
-        )}
+        ) : null}
       </div>
     </Card>
   );
