@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -7,6 +8,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { formatDate, relativeTime } from '@/lib/format';
 
+import { timelineTaskHref, timelineTaskLateClause } from './deal-timeline-task';
 import { opportunityTimelineCaption, shownOpportunityTimeline } from './opportunity-timeline-caption';
 
 // Timeline kind → icon. Covers the three legacy sources (audit/task/comment)
@@ -34,6 +36,38 @@ const KIND_ICON: Record<string, IconName> = {
 
 function iconFor(kind: string): IconName {
   return KIND_ICON[kind] ?? 'info';
+}
+
+function TimelineEntryText({
+  id,
+  kind,
+  text,
+  metadata,
+  now,
+}: {
+  id: string;
+  kind: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+  now: Date;
+}) {
+  const late = timelineTaskLateClause(kind, metadata, now);
+  const href = timelineTaskHref(id, kind);
+  const body = (
+    <>
+      {text}
+      {late ? <span className="text-[var(--fg-error)]"> {late}</span> : null}
+    </>
+  );
+  if (!href) return <div className="text-sm text-[var(--fg-primary)]">{body}</div>;
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-[44px] items-center rounded-sm text-sm text-[var(--fg-primary)] hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] dark:hover:text-[var(--brand-deep)]"
+    >
+      {body}
+    </Link>
+  );
 }
 
 /**
@@ -73,6 +107,8 @@ export function TimelinePanel({ oppId }: { oppId: string }) {
       />
     );
 
+  const now = new Date();
+
   return (
     <Card>
       <SectionHeader
@@ -92,7 +128,13 @@ export function TimelinePanel({ oppId }: { oppId: string }) {
               <Icon name={iconFor(e.kind)} size={13} />
             </span>
             <div className="min-w-0">
-              <div className="text-sm text-[var(--fg-primary)]">{e.text}</div>
+              <TimelineEntryText
+                id={e.id}
+                kind={e.kind}
+                text={e.text}
+                metadata={e.metadata}
+                now={now}
+              />
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-[var(--fg-tertiary)]">
                 {e.actorName ? (
                   <>
