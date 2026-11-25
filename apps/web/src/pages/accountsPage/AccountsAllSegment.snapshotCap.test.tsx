@@ -286,15 +286,21 @@ describe('AccountsAllSegment health bands', () => {
     fireEvent.click(healthGroup().getByRole('button', { name: /^Strong\b/ }));
 
     expect(screen.getAllByTestId('account-card')).toHaveLength(1);
-    expect(healthGroup().getByRole('button', { name: /^Strong\b/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(healthGroup().getByRole('button', { name: /^Strong\b/ }).getAttribute('aria-pressed')).toBe('true');
     expect(healthGroup().getByRole('button', { name: /^Good\b/ }).textContent).toMatch(/1/);
     expect(healthGroup().getByRole('button', { name: /^Watch\b/ }).textContent).toMatch(/1/);
     expect(healthGroup().getByRole('button', { name: /^At risk\b/ }).textContent).toMatch(/1/);
 
-    fireEvent.click(healthGroup().getByRole('button', { name: /^Strong\b/ }));
+    fireEvent.click(healthGroup().getByRole('button', { name: /^Good\b/ }));
+
+    expect(screen.getAllByTestId('account-card')).toHaveLength(1);
+    expect(healthGroup().getByRole('button', { name: /^Good\b/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(healthGroup().getByRole('button', { name: /^Strong\b/ }).getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(healthGroup().getByRole('button', { name: /^Good\b/ }));
 
     expect(screen.getAllByTestId('account-card')).toHaveLength(4);
-    expect(healthGroup().getByRole('button', { name: /^Strong\b/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(healthGroup().getByRole('button', { name: /^Good\b/ }).getAttribute('aria-pressed')).toBe('false');
   });
 
   it('clears the health band from Reset with the other filters', () => {
@@ -307,6 +313,6 @@ describe('AccountsAllSegment health bands', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
 
     expect(screen.getAllByTestId('account-card')).toHaveLength(4);
-    expect(healthGroup().getByRole('button', { name: /^At risk\b/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(healthGroup().getByRole('button', { name: /^At risk\b/ }).getAttribute('aria-pressed')).toBe('false');
   });
 });

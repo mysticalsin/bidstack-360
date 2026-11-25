@@ -22,6 +22,7 @@ import {
   segmentMatches,
   sortRows,
   titleCase,
+  type AccountRow,
   type AccountSegmentKey,
   type SortKey,
 } from './accountUtils';
@@ -59,6 +60,7 @@ export function AccountsAllSegment() {
   const [sort, setSort] = useState<SortKey>('pipeline');
   const [params] = useSearchParams();
   const [leverageOnly, setLeverageOnly] = useState(() => params.get('leverage') === 'hema');
+  const [health, setHealth] = useState<AccountRow['health'] | null>(null);
   const leverage = useMsaLeverage(undefined, true);
   const [page, setPage] = useState(0);
   const syncError = autopopulate.error instanceof Error ? autopopulate.error.message : null;
@@ -82,44 +84,49 @@ export function AccountsAllSegment() {
     return (leverage.data?.items ?? []).filter((item) => !known.has(item.companyId));
   }, [allRows, leverage.data]);
 
-  const rows = useMemo(() => {
-    return allRows
-      .filter((row) => {
-        if (leverageOnly && !leverageIds.has(row.company.id)) return false;
-        if (industry && row.company.industry !== industry) return false;
-        if (!segmentMatches(row, segment)) return false;
-        if (
-          technology &&
-          !(row.company.technicalStack ?? []).some(
+  const matchedRows = useMemo(() => {
+    return allRows.filter((row) => {
+      if (leverageOnly && !leverageIds.has(row.company.id)) return false;
+      if (industry && row.company.industry !== industry) return false;
+      if (!segmentMatches(row, segment)) return false;
+      if (
+        technology &&
+        !(row.company.technicalStack ?? []).some(
+          (category) =>
+            category.label === technology ||
+            category.items.some((item) => item.name === technology),
+        )
+      ) {
+        return false;
+      }
+      if (search) {
+        const needle = search.toLowerCase();
+        return (
+          row.company.name.toLowerCase().includes(needle) ||
+          (row.company.domain ?? '').toLowerCase().includes(needle) ||
+          (row.company.industry ?? '').toLowerCase().includes(needle) ||
+          (row.company.technicalStack ?? []).some(
             (category) =>
-              category.label === technology ||
-              category.items.some((item) => item.name === technology),
+              category.label.toLowerCase().includes(needle) ||
+              category.items.some((item) => item.name.toLowerCase().includes(needle)),
           )
-        ) {
-          return false;
-        }
-        if (search) {
-          const needle = search.toLowerCase();
-          return (
-            row.company.name.toLowerCase().includes(needle) ||
-            (row.company.domain ?? '').toLowerCase().includes(needle) ||
-            (row.company.industry ?? '').toLowerCase().includes(needle) ||
-            (row.company.technicalStack ?? []).some(
-              (category) =>
-                category.label.toLowerCase().includes(needle) ||
-                category.items.some((item) => item.name.toLowerCase().includes(needle)),
-            )
-          );
-        }
-        return true;
-      })
-      .sort((a, b) => sortRows(a, b, sort));
-  }, [allRows, search, industry, segment, technology, sort, leverageOnly, leverageIds]);
+        );
+      }
+      return true;
+    });
+  }, [allRows, search, industry, segment, technology, leverageOnly, leverageIds]);
+
+  // Health is applied after the other filters so each band keeps the count
+  // of the current view. Pressing Strong must not zero Good.
+  const rows = useMemo(() => {
+    const base = health ? matchedRows.filter((row) => row.health === health) : matchedRows;
+    return [...base].sort((a, b) => sortRows(a, b, sort));
+  }, [matchedRows, health, sort]);
 
   // Reset to the first page whenever the filtered/sorted view changes, without an
   // effect — the react-hooks linter rejects effect-driven resets, so the active
   // page is clamped in render (mirrors useCursorPagination's token-reset pattern).
-  const pageToken = `${search} ${industry} ${segment} ${technology} ${sort} ${leverageOnly}`;
+  const pageToken = `${search} ${industry} ${segment} ${technology} ${sort} ${leverageOnly} ${health ?? ''}`;
   const [pageTokenState, setPageTokenState] = useState(pageToken);
   const activePage = pageTokenState === pageToken ? page : 0;
   const pageCount = Math.max(1, Math.ceil(rows.length / ACCOUNTS_PAGE_SIZE));
@@ -183,16 +190,16 @@ export function AccountsAllSegment() {
 
   const healthDistribution = useMemo(
     () => [
-      { key: 'strong', label: t('accounts.health.strong', 'Strong'), count: rows.filter((row) => row.health === 'strong').length },
-      { key: 'good', label: t('accounts.health.good', 'Good'), count: rows.filter((row) => row.health === 'good').length },
+      { key: 'strong' as const, label: t('accounts.health.strong', 'Strong'), count: matchedRows.filter((row) => row.health === 'strong').length },
+      { key: 'good' as const, label: t('accounts.health.good', 'Good'), count: matchedRows.filter((row) => row.health === 'good').length },
       {
-        key: 'needs_attention',
+        key: 'needs_attention' as const,
         label: t('accounts.health.watch', 'Watch'),
-        count: rows.filter((row) => row.health === 'needs_attention').length,
+        count: matchedRows.filter((row) => row.health === 'needs_attention').length,
       },
-      { key: 'critical', label: t('accounts.health.risk', 'At risk'), count: rows.filter((row) => row.health === 'critical').length },
+      { key: 'critical' as const, label: t('accounts.health.risk', 'At risk'), count: matchedRows.filter((row) => row.health === 'critical').length },
     ],
-    [rows, t],
+    [matchedRows, t],
   );
 
   const topMissingFields = useMemo(() => {
@@ -241,7 +248,7 @@ export function AccountsAllSegment() {
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
   const snapshotCapped = loadedAccountCount >= SNAPSHOT_ACCOUNT_CAP;
-  const filtersActive = Boolean(search || industry || technology || segment !== 'all' || leverageOnly);
+  const filtersActive = Boolean(search || industry || technology || segment !== 'all' || leverageOnly || health);
   // True first-run org state: no search/filter narrowing the view AND the
   // underlying snapshot itself has zero rows. Distinct from "filters matched
   // nothing" — that case keeps the existing filter-miss copy below.
@@ -405,11 +412,18 @@ export function AccountsAllSegment() {
             : t('accounts.experience.complete', 'No coverage gaps in the current view.')
         }
       >
-        <div className="account-health-bars">
+        <div className="account-health-bars" role="group" aria-label={t('accounts.health.label', 'Account health')}>
           {healthDistribution.map((item) => {
-            const width = rows.length > 0 ? `${Math.round((item.count / rows.length) * 100)}%` : '0%';
+            const width = matchedRows.length > 0 ? `${Math.round((item.count / matchedRows.length) * 100)}%` : '0%';
+            const pressed = health === item.key;
             return (
-              <div key={item.key} className={`account-health-bar account-health-${item.key}`}>
+              <button
+                key={item.key}
+                type="button"
+                aria-pressed={pressed}
+                className={`account-health-bar account-health-${item.key}${pressed ? ' is-active' : ''}`}
+                onClick={() => setHealth((current) => (current === item.key ? null : item.key))}
+              >
                 <div>
                   <span>{item.label}</span>
                   <strong>{item.count}</strong>
@@ -417,7 +431,7 @@ export function AccountsAllSegment() {
                 <span aria-hidden>
                   <i style={{ width }} />
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -462,9 +476,10 @@ export function AccountsAllSegment() {
             setTechnology(null);
             setSegment('all');
             setLeverageOnly(false);
+            setHealth(null);
           }}
           resetLabel={t('accounts.filters.reset', 'Reset')}
-          showReset={Boolean(search || industry || technology || segment !== 'all' || leverageOnly)}
+          showReset={Boolean(search || industry || technology || segment !== 'all' || leverageOnly || health)}
         >
           <FilterSelect
             ariaLabel={t('accounts.filters.industry.label', 'Industry')}

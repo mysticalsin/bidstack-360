@@ -3879,11 +3879,30 @@ select:focus-visible {
   gap: 10px;
 }
 .account-health-bar {
+  display: block;
+  width: 100%;
+  margin: 0;
   min-width: 0;
+  min-height: 44px;
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   background: var(--surface-sunken);
   padding: 12px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.account-health-bar:hover {
+  border-color: var(--border-strong);
+}
+.account-health-bar.is-active {
+  border-color: color-mix(in srgb, var(--brand-primary) 56%, var(--border-default));
+  background: color-mix(in srgb, var(--brand-primary) 10%, var(--surface-sunken));
+  color: var(--fg-primary);
+}
+.account-health-bar.is-active > div {
+  color: var(--fg-primary);
 }
 .account-health-bar > div {
   display: flex;
