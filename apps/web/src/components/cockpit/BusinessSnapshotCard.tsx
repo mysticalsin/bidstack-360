@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { beatsProvider, figureText, isCompanyId, useSourcedFigures } from '@/hooks/useSourcedFigures';
 import { relativeTime } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
@@ -13,6 +12,7 @@ import { springSoft } from '@/lib/motion';
 import type { AccountCockpitSnapshot, CockpitKpi, SourceAttribution } from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
+import { snapshotRevenueAmount } from './snapshot-revenue';
 import { headquartersFor, labelForBand } from './_tokens';
 
 interface Props {
@@ -38,7 +38,6 @@ interface SnapshotRow {
 // avoids re-render churn when sibling cards refetch).
 export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const c = cockpit.company;
   const headquarters = headquartersFor(c.name);
@@ -119,8 +118,10 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),
       figure: 'revenue',
       hasValue: Boolean(c.annualRevenueMicros),
+      // annualRevenueMicros has no currency column. The line is the
+      // grouped units. A display currency must not turn that integer into a euro forecast.
       value: c.annualRevenueMicros
-        ? formatMoney(c.annualRevenueMicros / 1_000_000, 'EUR')
+        ? snapshotRevenueAmount(c.annualRevenueMicros)
         : notVerified,
       source: cockpitKpiSource(
         cockpit.kpis,
