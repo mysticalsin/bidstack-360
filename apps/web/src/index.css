@@ -2822,6 +2822,15 @@ select:focus-visible {
   transform: none;
   transition-duration: 320ms;
 }
+/* Rail rows are 44px with no pointer query. Below 56rem this drawer is the
+   only primary nav, including a demo window resized to a phone. That window
+   keeps pointer:fine, so the coarse-pointer floor never applies, and a
+   utility such as min-h-9 (36px) beats the element rule anyway. */
+.mobile-nav-drawer button,
+.mobile-nav-drawer a {
+  min-height: 44px;
+  min-width: 44px;
+}
 .mobile-nav-root[data-motion='instant'],
 .mobile-nav-root[data-motion='instant'] * {
   transition-duration: 0s !important;
