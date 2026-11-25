@@ -640,13 +640,14 @@
   },
   "team": {
     "title": "Team",
-    "caption": "Members of your workspace. Admins can manage roles.",
+    "caption": "Members of your workspace. The role column is a stored label. Org admin is assigned with Manage roles.",
     "empty": "No team members found.",
     "col": {
       "status": "Online status",
       "name": "Name",
       "email": "Email",
-      "role": "Role",
+      "role": "Stored role",
+      "roleHint": "Stored label. Org admin is assigned with Manage roles.",
       "joined": "Joined",
       "actions": "Actions"
     },
@@ -657,9 +658,7 @@
     },
     "action": {
       "hideRoles": "Hide roles",
-      "manageRoles": "Manage roles",
-      "demote": "Demote to member",
-      "promote": "Promote to admin"
+      "manageRoles": "Manage roles"
     }
   },
   "opportunityFilters": {
