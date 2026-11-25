@@ -19,25 +19,42 @@ export type ProposalAnalyticsRollup = {
 /**
  * Counts and linked-bid value for the proposal book.
  *
- * Adds each slice's value. Two proposals on one bid are two slices, so
- * that bid is booked twice. Counts still include every proposal.
+ * A bid with two proposals is one amount. The value is added once for the
+ * book and once for each owner who has a proposal on it. Proposal counts
+ * still include every proposal. A slice with no linked bid adds a count
+ * and no value.
  */
 export function rollupProposalAnalytics(
   slices: readonly ProposalAnalyticsSlice[],
 ): ProposalAnalyticsRollup {
   const statusCounts = new Map<string, number>();
   const ownerAgg = new Map<string, { ownerId: string | null; count: number; value: bigint }>();
+  const seenTotal = new Set<string>();
+  const seenOwner = new Map<string, Set<string>>();
   let totalCount = 0;
   let totalValue = 0n;
 
   for (const slice of slices) {
     totalCount += slice.count;
-    totalValue += slice.valueMicros;
     statusCounts.set(slice.status, (statusCounts.get(slice.status) ?? 0) + slice.count);
     const key = slice.ownerId ?? '';
     const cur = ownerAgg.get(key) ?? { ownerId: slice.ownerId, count: 0, value: 0n };
     cur.count += slice.count;
-    cur.value += slice.valueMicros;
+    if (slice.opportunityId) {
+      if (!seenTotal.has(slice.opportunityId)) {
+        seenTotal.add(slice.opportunityId);
+        totalValue += slice.valueMicros;
+      }
+      let seen = seenOwner.get(key);
+      if (!seen) {
+        seen = new Set();
+        seenOwner.set(key, seen);
+      }
+      if (!seen.has(slice.opportunityId)) {
+        seen.add(slice.opportunityId);
+        cur.value += slice.valueMicros;
+      }
+    }
     ownerAgg.set(key, cur);
   }
 
