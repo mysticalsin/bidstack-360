@@ -13,6 +13,7 @@ import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { cn } from '@/lib/cn';
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
+import { countryDetailAmount } from './country-detail-amount';
 import { ROUTING_RULE_LIST_PAGE, routingRuleListCaption } from './routing-rule-list-caption';
 import { TERRITORY_LIST_PAGE, territoryListCaption } from './territory-list-caption';
 
@@ -85,11 +86,12 @@ export function KpiTile({
 
 export function CountryDetailPanel({
   selected,
-  formatMoneyMicros,
   globalTotals,
   onClear,
 }: {
   selected: TerritoryAnalyticsItem | null;
+  // Callers still pass a formatter. A country pipeline has no currency, so
+  // the label does not use it and does not invent EUR.
   formatMoneyMicros: (micros: number, currency: string) => string;
   globalTotals?: { totalValueMicros: number } | null;
   onClear?: () => void;
@@ -142,7 +144,7 @@ export function CountryDetailPanel({
                 {t('territoryPanels.pipeline', 'Pipeline')}
               </div>
               <div className="mt-1 text-2xl font-extrabold text-[var(--fg-primary)] tabular-nums">
-                {formatMoneyMicros(selected.totalValueMicros, 'EUR')}
+                {countryDetailAmount(selected.totalValueMicros)}
               </div>
             </div>
           </div>

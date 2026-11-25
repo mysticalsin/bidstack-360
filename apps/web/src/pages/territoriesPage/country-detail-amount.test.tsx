@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
+import { countryDetailAmount } from './country-detail-amount';
 import { CountryDetailPanel } from './TerritoryPanels';
 
 vi.mock('react-i18next', () => ({
@@ -55,5 +56,13 @@ describe('territory country detail amount under demo data', () => {
     expect(digits(text)).toBe('61520');
     expect(formatMoneyMicros).not.toHaveBeenCalled();
     expect(screen.getByText('50.0%')).toBeTruthy();
+  });
+
+  it('does not invent a euro zero when the micros are not a safe integer', () => {
+    // WHY: a country total that is not an integer micros value is not an
+    // amount. It must not fall through to an EUR zero.
+    expect(countryDetailAmount(Number.NaN)).toBe('Not a number');
+    expect(countryDetailAmount(1.5)).toBe('Not a number');
+    expect(countryDetailAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });
