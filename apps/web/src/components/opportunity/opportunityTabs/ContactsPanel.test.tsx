@@ -84,6 +84,10 @@ describe('ContactsPanel contact record', () => {
     expect(link.className).toContain('focus-visible:ring-2');
     expect(link.className).toContain('text-[var(--brand-primary)]');
     expect(link.className).toContain('dark:text-[var(--brand-deep)]');
+    // The role control sits on the same row. It needs a name or the link is
+    // the only thing a screen reader can identify.
+    expect(screen.getByRole('combobox', { name: 'Role for Ada North' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Unset primary' })).toBeTruthy();
   });
 
   it('leaves a script id and a name-shaped id as text', () => {

@@ -359,6 +359,8 @@
       "deleted": "Deleted {{name}}"
     },
     "linkedTitle": "Linked contacts",
+    "openContact": ", open contact",
+    "roleLabel": "Role for {{name}}",
     "countCaption": "{{count}} contacts",
     "linkAction": "+ Link contact",
     "selectPlaceholder": "Select a contact…",
