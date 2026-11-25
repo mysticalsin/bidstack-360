@@ -3,8 +3,11 @@
 // direction. Each item opens the matching slice 12 intel tab.
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { compactAmount, type CompanyIntelSummary } from '@bidstack/shared';
+
+import { Button } from '@/components/ui/Button';
 
 import {
   EmptyIntel,
@@ -14,6 +17,7 @@ import {
   revenueText,
   signedPct,
 } from '../companiesPage/IntelCells';
+import type { IntelStripRead } from './intel-strip-read';
 
 export type IntelTab = 'direction' | 'hiring' | 'financials' | 'news';
 
@@ -64,11 +68,47 @@ export function IntelStrip({
   summary,
   onOpen,
   crmEmployees = null,
+  read = 'ready',
+  onRetry,
 }: {
   summary: CompanyIntelSummary | null;
   onOpen: (tab: IntelTab) => void;
   crmEmployees?: number | null;
+  /** `ready` is a settled read. Loading and error must not look like an empty enrichment. */
+  read?: IntelStripRead;
+  onRetry?: () => void;
 }) {
+  const { t } = useTranslation('crm');
+  if (read === 'loading') {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        className="flex min-h-11 items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 text-sm font-medium text-[var(--fg-primary)]"
+      >
+        {t('companyDetail.intelStrip.loading', 'Loading company intel')}
+      </div>
+    );
+  }
+  if (read === 'error') {
+    return (
+      <div
+        role="alert"
+        className="flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2"
+      >
+        <p className="text-sm font-medium text-[var(--fg-primary)]">
+          {t(
+            'companyDetail.intelStrip.error',
+            "Couldn't load company intel. Please try again.",
+          )}
+        </p>
+        <Button size="lg" variant="secondary" onClick={() => onRetry?.()}>
+          {t('companyDetail.intelStrip.retry', 'Retry')}
+        </Button>
+      </div>
+    );
+  }
   const s = summary;
   const r = s?.revenue;
   const h = s?.headcount;

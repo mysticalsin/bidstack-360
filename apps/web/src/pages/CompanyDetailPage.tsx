@@ -35,6 +35,7 @@ import {
   HierarchyTab,
 } from './companyDetail/CompanyTabs';
 import { IntelStrip, type IntelTab } from './companyDetail/IntelStrip';
+import { intelStripRead } from './companyDetail/intel-strip-read';
 import { relatedCount } from './companyDetail/relatedCount';
 
 type TabKey = 'contacts' | 'people' | 'opportunities' | 'cases' | 'notes' | 'hierarchy' | 'intel';
@@ -216,6 +217,8 @@ export function CompanyDetailPage() {
               <div className="min-w-0 flex-1">
                 <IntelStrip
                   summary={intelSummary.data?.summary ?? null}
+                  read={intelStripRead(intelSummary)}
+                  onRetry={() => void intelSummary.refetch()}
                   onOpen={openIntel}
                   crmEmployees={c.employeeCount ?? null}
                 />
