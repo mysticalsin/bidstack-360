@@ -6,6 +6,7 @@ import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/s
 
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
+import { searchTaskStatusLabel } from '../lib/search-task-status.js';
 
 const VALID_TYPES = [
   'opportunity',
@@ -338,7 +339,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   type: 'task' as const,
                   id: t.id,
                   title: t.title,
-                  subtitle: t.status,
+                  subtitle: searchTaskStatusLabel(t.status),
                   url: `/tasks?search=${encodeURIComponent(t.title)}`,
                   score: scoreMatch(q, [{ text: t.title, weight: 3 }]),
                 },
