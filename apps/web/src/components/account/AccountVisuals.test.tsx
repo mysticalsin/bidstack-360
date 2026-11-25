@@ -146,6 +146,8 @@ describe('AccountVisuals deals section', () => {
     expect(screen.getByText(/No contacts yet/)).toBeTruthy();
     const add = screen.getByRole('link', { name: 'Add a contact' });
     expect(add.getAttribute('href')).toBe('/contacts');
+    // The link has to stay out of a role="img" figure or the keyboard cannot reach it.
+    expect(add.closest('[role="img"]')).toBeNull();
   });
 
   it('counts only this account once the bid list has settled', () => {

@@ -66,32 +66,66 @@ function RelationshipMap({ company, people }: { company: string; people: MapPers
   );
 }
 
+/** A read with no success and no error is still in flight. An error is not an empty book. */
+function readGate(query: { isSuccess: boolean; isError: boolean }): 'loading' | 'error' | 'ready' {
+  if (query.isError) return 'error';
+  if (query.isSuccess) return 'ready';
+  return 'loading';
+}
+
 export function AccountVisuals({ companyId, companyName, onDrill }: { companyId: string; companyName: string; onDrill?: (f: OppDrillFilter) => void }) {
   const opps = useOpportunityRows();
   const people = usePeopleMap({ companyId });
-  const rows: OppRow[] = (opps.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === companyName.toLowerCase());
+  const bidGate = readGate(opps);
+  const peopleGate = readGate(people);
+  // Hold the rows until the read settles so a missing payload cannot become "0 open bids".
+  const rows: OppRow[] = bidGate === 'ready'
+    ? (opps.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === companyName.toLowerCase())
+    : [];
   const stages = stageFunnel(rows);
   const stageIds = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
   const mix = statusMix(rows);
-  const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
+  const openCount = stages.reduce((n, s) => n + s.count, 0);
+  const ppl: MapPerson[] = peopleGate === 'ready'
+    ? (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }))
+    : [];
   const { edges } = layoutOrg(ppl);
   const counts = ppl.reduce<Record<string, number>>((m, p) => { const l = (STANDING[p.standing] ?? STANDING.unknown!).label; m[l] = (m[l] ?? 0) + 1; return m; }, {});
+  const pipelineSummary = bidGate === 'loading'
+    ? 'Loading the pipeline for this account.'
+    : bidGate === 'error'
+      ? 'Could not load the pipeline for this account.'
+      : stages.map((s) => `${s.label}: ${fmtCompact(s.value)}`).join('; ') || 'No open bids for this account';
+  const peopleSummary = peopleGate === 'loading'
+    ? 'Loading contacts for this account.'
+    : peopleGate === 'error'
+      ? 'Could not load contacts for this account.'
+      : ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet';
 
   return (
     <div className="acct-visuals" data-testid="account-visuals">
       <ChartCard
         title="Pipeline by stage"
-        interactive={Boolean(onDrill)}
+        interactive={Boolean(onDrill) || bidGate !== 'ready'}
         testId="account-pipeline"
-        meta={(() => { const n = stages.reduce((m, s) => m + s.count, 0); return `${n} open bid${n === 1 ? '' : 's'}`; })()}
-        summary={stages.map((s) => `${s.label}: ${fmtCompact(s.value)}`).join('; ') || 'No open bids for this account'}
-        table={{ columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, fmtCompact(s.value)]) }}
+        meta={bidGate === 'ready' ? `${openCount} open bid${openCount === 1 ? '' : 's'}` : undefined}
+        summary={pipelineSummary}
+        table={bidGate === 'ready' && stages.length ? { columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, fmtCompact(s.value)]) } : undefined}
       >
-        {stages.length ? (
+        {bidGate === 'loading' ? (
+          <p className="viz-empty" role="status">Loading the pipeline for this account.</p>
+        ) : bidGate === 'error' ? (
+          <>
+            <p className="viz-empty">Could not load the pipeline for this account.</p>
+            <button type="button" className="btn btn-secondary" onClick={() => void opps.refetch()}>
+              Retry loading the pipeline
+            </button>
+          </>
+        ) : stages.length ? (
           <StageBars data={stages} format={fmtCompact}
             onSelect={onDrill ? (label) => { const i = stages.findIndex((x) => x.label === label); onDrill({ status: 'open', stage: stageIds[i] ?? null }); } : undefined} />
         ) : <p className="viz-empty">No open bids for this account.</p>}
-        {onDrill && rows.length ? (
+        {bidGate === 'ready' && onDrill && rows.length ? (
           <>
             <div className="viz-caption">Select a stage bar or a status to see the bids behind it.</div>
             <div className="dash-chips" role="group" aria-label="Bids by status">
@@ -104,11 +138,22 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
       </ChartCard>
       <ChartCard
         title="Relationship map"
-        meta={ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
-        summary={ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet'}
-        table={{ columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
+        // The empty state contains a link. A role="img" figure would hide it from the keyboard.
+        interactive={peopleGate !== 'ready' || ppl.length === 0}
+        meta={peopleGate === 'ready' && ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
+        summary={peopleSummary}
+        table={peopleGate === 'ready' && ppl.length ? { columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) } : undefined}
       >
-        {ppl.length ? (
+        {peopleGate === 'loading' ? (
+          <p className="viz-empty" role="status">Loading contacts for this account.</p>
+        ) : peopleGate === 'error' ? (
+          <>
+            <p className="viz-empty">Could not load contacts for this account.</p>
+            <button type="button" className="btn btn-secondary" onClick={() => void people.refetch()}>
+              Retry loading contacts
+            </button>
+          </>
+        ) : ppl.length ? (
           <>
             <RelationshipMap company={companyName} people={ppl} />
             <ul className="viz-legend" aria-hidden>
