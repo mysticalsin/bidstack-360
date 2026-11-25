@@ -3744,7 +3744,11 @@
     "viewAll": "Tout voir",
     "emptyAccountTitle": "Aucune opportunité pour ce compte pour l'instant",
     "emptyTitle": "Aucune opportunité pour l'instant",
-    "emptyAccountMessage": "Créez une opportunité depuis l'en-tête du compte pour démarrer un espace de travail d'offre."
+    "emptyAccountMessage": "Créez une opportunité depuis l'en-tête du compte pour démarrer un espace de travail d'offre.",
+    "errorAccountTitle": "Impossible de charger les opportunités de ce compte",
+    "errorTitle": "Impossible de charger les opportunités",
+    "errorMessage": "La liste des offres n'a pas répondu.",
+    "retry": "Réessayer"
   },
   "spotlightRefs": {
     "regionLabel": "Références Spotlight",

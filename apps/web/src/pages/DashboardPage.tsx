@@ -56,6 +56,7 @@ import {
   WinLossReasonsCard,
   type ClosedOpp,
 } from '@/components/account-intel/WinLossReasonsCard';
+import { accountBidsQuery, decidedBidsForAccount, openBidsForAccount } from '@/components/cockpit/account-bids';
 import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu';
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
@@ -101,7 +102,26 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
   const report = usePipelineReport();
-  const opps = useOpportunities({ limit: 5 });
+  const cachedSnapshot = useMemo(() => {
+    if (!accountId) return null;
+    try {
+      const stored = sessionStorage.getItem(`bidstack:account-cockpit:${accountId}`);
+      if (stored) return JSON.parse(stored) as CrmDashboardSnapshot;
+    } catch {
+      // ignore parse errors
+    }
+    return null;
+  }, [accountId]);
+  const isTransientError =
+    dashboard.isError && !(dashboard.error instanceof ApiError && dashboard.error.status === 404);
+  // This account's bids, not the five newest in the book. A resumed page that
+  // is showing the last snapshot still has a company to ask for. Until that
+  // company is known the read stays off so another account's rows cannot
+  // flash in as "no opportunities".
+  const cockpitCompany =
+    dashboard.data?.cockpit.company ?? (isTransientError ? cachedSnapshot?.cockpit.company : undefined);
+  const bidsQuery = accountBidsQuery(cockpitCompany);
+  const opps = useOpportunities(bidsQuery ?? { limit: 1 }, { enabled: bidsQuery !== null });
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
   // any early returns below. The visit-tracker reads the resolved company
@@ -160,25 +180,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     [tasks.data?.items],
   );
 
-  const cachedSnapshot = useMemo(() => {
-    if (!accountId) return null;
-    try {
-      const stored = sessionStorage.getItem(`bidstack:account-cockpit:${accountId}`);
-      if (stored) return JSON.parse(stored) as CrmDashboardSnapshot;
-    } catch {
-      // ignore parse errors
-    }
-    return null;
-  }, [accountId]);
-
   useEffect(() => {
     if (dashboard.data && accountId) {
       sessionStorage.setItem(`bidstack:account-cockpit:${accountId}`, JSON.stringify(dashboard.data));
     }
   }, [dashboard.data, accountId]);
 
-  const isTransientError =
-    dashboard.isError && !(dashboard.error instanceof ApiError && dashboard.error.status === 404);
   const snapshot = dashboard.data ?? (isTransientError ? cachedSnapshot : null);
 
   if (dashboard.isLoading && !snapshot) {
@@ -211,15 +218,16 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  const accountOpps = opps.data?.items.filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
+  const scopedBids = opps.data?.items ?? [];
+  const accountOpps = openBidsForAccount(scopedBids, cockpit.company.name);
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.
-  const closedOpps: ClosedOpp[] = (accountOpps ?? [])
-    .filter((o) => o.stage === 'closed_won' || o.stage === 'closed_lost')
-    .map((o) => ({ id: o.id, name: o.name, outcome: o.stage === 'closed_won' ? 'won' : 'lost' }));
+  const closedOpps: ClosedOpp[] = decidedBidsForAccount(scopedBids, cockpit.company.name).map((o) => ({
+    id: o.id,
+    name: o.name,
+    outcome: o.pipelineStage?.isWon || o.stage === 'closed_won' ? 'won' : 'lost',
+  }));
 
   // Everything below the watchdog: customise menu, KPI strip and the long
   // cockpit grid. On the account page it folds behind "Account details".

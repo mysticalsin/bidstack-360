@@ -3722,7 +3722,11 @@
     "viewAll": "Ver todo",
     "emptyAccountTitle": "Aún no hay oportunidades para esta cuenta",
     "emptyTitle": "Aún no hay oportunidades",
-    "emptyAccountMessage": "Crea una oportunidad desde el encabezado de la cuenta para iniciar un espacio de trabajo de oferta."
+    "emptyAccountMessage": "Crea una oportunidad desde el encabezado de la cuenta para iniciar un espacio de trabajo de oferta.",
+    "errorAccountTitle": "No se pudieron cargar las oportunidades de esta cuenta",
+    "errorTitle": "No se pudieron cargar las oportunidades",
+    "errorMessage": "La lista de ofertas no respondió.",
+    "retry": "Reintentar"
   },
   "spotlightRefs": {
     "regionLabel": "Referencias de Spotlight",

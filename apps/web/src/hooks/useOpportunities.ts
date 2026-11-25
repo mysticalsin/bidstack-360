@@ -12,10 +12,16 @@ import type {
   OpportunityPatch,
 } from '@bidstack/shared';
 
-export function useOpportunities(filter: Partial<OpportunityFilter> = {}) {
+export function useOpportunities(
+  filter: Partial<OpportunityFilter> = {},
+  options?: { enabled?: boolean },
+) {
   const mountedRefresh = useRef(false);
   const query = useQuery({
     queryKey: ['opportunities', filter],
+    // The account cockpit waits until it knows which company to ask for.
+    // A disabled read must not fall through to the unscoped list.
+    enabled: options?.enabled ?? true,
     queryFn: ({ signal }) => {
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(filter)) {
