@@ -6,6 +6,8 @@ import { Link } from 'react-router-dom';
 
 import { useId, useState } from 'react';
 
+import { useTaskSummary } from '@/hooks/useTasks';
+
 import { ChartCard, SignalLegend, SignalShape } from '@/components/viz/ChartCard';
 import { KIND_LABEL } from '@/components/viz/viz-kinds';
 import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
@@ -117,18 +119,24 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
   pending?: boolean;
 }) {
   const [now] = useState(() => Date.now());
+  const taskSummary = useTaskSummary();
+  // Demo sign-in leaves overdueTasks at 0: the late handover is done, and the
+  // open follow-ups sit inside the next 7 days. That count is dueSoon.
+  const dueSoon = taskSummary.data?.dueSoon ?? 0;
+  const hold = pending || taskSummary.isLoading;
   const pastDue = pastDueOpen(rows, now);
   const soon = (feed?.earnings ?? []).filter((e) => new Date(e.expectedAt).getTime() - now < 14 * 86_400_000);
   const items = [
     pastDue.length > 0 && { key: 'due', to: '/opportunities', title: `${pastDue.length} open bid${pastDue.length === 1 ? '' : 's'} past due date`, meta: pastDue.slice(0, 2).map((o) => o.customer).filter(Boolean).join(', '), kind: 'RISK' },
     overdueTasks > 0 && { key: 'tasks', to: '/tasks?filter=overdue', title: `${overdueTasks} overdue task${overdueTasks === 1 ? '' : 's'}`, meta: 'Follow-ups waiting on you', kind: 'RISK' },
+    dueSoon > 0 && { key: 'soon', to: '/tasks', title: `${dueSoon} follow-up${dueSoon === 1 ? '' : 's'} due this week`, meta: 'Open follow-ups due in the next 7 days', kind: 'NEUTRAL' },
     (feed?.newAlertCount ?? 0) > 0 && { key: 'alerts', to: `/accounts/${feed!.alerts[0]!.companyId}`, title: `${feed!.newAlertCount} new account signal${feed!.newAlertCount === 1 ? '' : 's'}`, meta: feed!.alerts[0]!.title, kind: feed!.alerts[0]!.implication },
     ...soon.slice(0, 2).map((e) => ({ key: e.id, to: `/accounts/${e.companyId}`, title: `${e.companyName} results ${dayFmt.format(new Date(e.expectedAt))}`, meta: `${e.fiscalPeriod}${e.confirmed ? ' · confirmed' : ''}`, kind: 'NEUTRAL' })),
   ].filter(Boolean) as Array<{ key: string; to: string; title: string; meta: string; kind: string }>;
   return (
     <section className="viz dash-needs" aria-labelledby="dash-needs-t" data-testid="needs-you">
-      <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{pending ? '\u00a0' : items.length}</span></header>
-      {pending ? (
+      <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{hold ? '\u00a0' : items.length}</span></header>
+      {hold ? (
         <div className="dash-needs-skel" aria-busy="true" data-testid="needs-you-placeholder">
           <span /><span /><span />
         </div>
