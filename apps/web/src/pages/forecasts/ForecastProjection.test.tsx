@@ -26,7 +26,7 @@ const period = (label: string, open: number, weighted: number, won: number) => (
 });
 
 describe('ForecastProjection', () => {
-  it('draws every quarter as stacked won, weighted and unweighted bars', () => {
+  it('draws every quarter that holds pipeline or closed won', () => {
     projection.result = {
       data: { periods: [period('Q4 2026', 73_000_000, 39_100_000, 0), period('Q1 2027', 10_000_000, 4_000_000, 0)] },
       isLoading: false,
@@ -34,7 +34,8 @@ describe('ForecastProjection', () => {
     };
     render(<ForecastProjection />);
     expect(screen.getByRole('group', { name: /projection by quarter/i })).toBeTruthy();
-    const table = screen.getAllByRole('table').find((t) => within(t).queryByText('Unweighted'))!;
+    const table = screen.getByRole('table', { name: /projection by quarter/i });
+    expect(within(table).getByText('Q4 2026')).toBeTruthy();
     expect(within(table).getByText('Q1 2027')).toBeTruthy();
     expect(screen.queryByText(/stage win-probability, by close-date quarter/)).toBeNull();
   });

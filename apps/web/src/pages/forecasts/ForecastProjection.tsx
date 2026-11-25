@@ -21,12 +21,12 @@ import {
   TableCell,
   TableScrollArea,
 } from '@/components/ui/Table';
-import { forecastPeriodBars } from '@/components/charts/bid-chart-data';
 import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
-import { fmtCompact } from '@/components/viz/viz-data';
 import { useForecastProjection } from '@/hooks/useForecasts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
+
+import { forecastChartColumns, formatForecastChartAmount } from './forecast-chart-total';
 
 type FormatMoney = (micros: number, currency?: string) => string;
 
@@ -39,7 +39,7 @@ export function ForecastProjection() {
   const periods = projection.data?.periods ?? [];
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
   const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
-  const bars = forecastPeriodBars(periods);
+  const bars = forecastChartColumns(periods);
 
   return (
     <Card>
@@ -71,13 +71,28 @@ export function ForecastProjection() {
             title={t('forecastProjection.chartLabel', 'Projection by quarter')}
             labels={bars.labels}
             series={[
-              { id: 'won', label: t('forecastProjection.won', 'Closed won'), values: bars.won, color: 'var(--success)' },
-              { id: 'weighted', label: t('forecastProjection.weighted', 'Weighted'), values: bars.weighted, color: 'var(--brand-deep)' },
-              { id: 'unweighted', label: t('forecastProjection.unweighted', 'Unweighted'), values: bars.unweighted, color: 'var(--chart-3)' },
+              {
+                id: 'weighted',
+                label: t('forecastProjection.weighted', 'Weighted'),
+                values: bars.weighted,
+                color: 'var(--brand-deep)',
+              },
             ]}
-            format={fmtCompact}
+            below={{
+              id: 'won',
+              label: t('forecastProjection.won', 'Closed won'),
+              values: bars.won,
+              color: 'var(--success)',
+            }}
+            format={formatForecastChartAmount}
             onActivate={(i) => setSelected(bars.periods[i]?.period ?? null)}
           />
+          <p className="text-xs text-[var(--fg-tertiary)]">
+            {t(
+              'forecastProjection.chartTotal',
+              'Column total is the weighted forecast. Closed won is drawn apart from that total.',
+            )}
+          </p>
           <Tabs value={activePeriod.period} onValueChange={setSelected}>
             <TabsList aria-label={t('forecastProjection.periodLabel', 'Forecast period')}>
               {periods.map((p) => (
