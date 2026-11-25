@@ -25,12 +25,15 @@ export function AuditHero({
   page,
   isLoading,
   lastRefreshedAt,
+  pageArrived,
 }: {
   stats: AuditStats;
   totalVisible: number;
   page: number;
   isLoading: boolean;
   lastRefreshedAt?: string;
+  /** False until the server page arrives. A missing page is not an empty trail. */
+  pageArrived: boolean;
 }) {
   const { t } = useTranslation('crm');
   return (
@@ -62,50 +65,60 @@ export function AuditHero({
           aria-atomic="true"
           className="flex min-w-fit items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]"
         >
-          <span className="size-2 rounded-full bg-[var(--tag-jade-fg)] shadow-[0_0_0_4px_var(--tag-jade-bg)]" />
+          <span
+            className={
+              pageArrived
+                ? 'size-2 rounded-full bg-[var(--tag-jade-fg)] shadow-[0_0_0_4px_var(--tag-jade-bg)]'
+                : 'size-2 rounded-full bg-[var(--text-muted)]'
+            }
+          />
           {isLoading
             ? t('auditLogHero.refreshing', 'Refreshing evidence...')
-            : `${t('auditLogHero.visibleOnPage', '{{count}} visible on page {{page}}', { count: totalVisible, page })}${lastRefreshedAt ? ` · ${t('auditLogHero.refreshedSuffix', 'refreshed {{time}}', { time: relativeTime(lastRefreshedAt) })}` : ''}`}
+            : pageArrived
+              ? `${t('auditLogHero.visibleOnPage', '{{count}} visible on page {{page}}', { count: totalVisible, page })}${lastRefreshedAt ? ` · ${t('auditLogHero.refreshedSuffix', 'refreshed {{time}}', { time: relativeTime(lastRefreshedAt) })}` : ''}`
+              : t('auditLogHero.notLoaded', 'Audit entries are not loaded')}
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <AuditMetricCard
-          icon="reports"
-          label={t('auditLogHero.metric.eventsLoaded.label', 'Events loaded')}
-          value={<AnimatedMetric value={String(stats.total)} />}
-          tone="blue"
-          helper={t('auditLogHero.metric.eventsLoaded.helper', 'Current server page')}
-        />
-        <AuditMetricCard
-          icon="shield"
-          label={t('auditLogHero.metric.security.label', 'Security/API')}
-          value={<AnimatedMetric value={String(stats.security)} />}
-          tone="purple"
-          helper={t('auditLogHero.metric.security.helper', 'Keys, MCP, auth, webhooks')}
-        />
-        <AuditMetricCard
-          icon="warning"
-          label={t('auditLogHero.metric.destructive.label', 'Destructive')}
-          value={<AnimatedMetric value={String(stats.destructive)} />}
-          tone="tomato"
-          helper={t('auditLogHero.metric.destructive.helper', 'Deletes, revokes, cancels')}
-        />
-        <AuditMetricCard
-          icon="building"
-          label={t('auditLogHero.metric.dataChanges.label', 'Data changes')}
-          value={<AnimatedMetric value={String(stats.crm)} />}
-          tone="teal"
-          helper={t('auditLogHero.metric.dataChanges.helper', 'Revenue record edits')}
-        />
-        <AuditMetricCard
-          icon="clock"
-          label={t('auditLogHero.metric.latestEvent.label', 'Latest event')}
-          value={stats.latest ? relativeTime(stats.latest) : t('auditLogHero.metric.latestEvent.none', 'None')}
-          tone="jade"
-          helper={stats.latest ? formatAbsolute(stats.latest) : t('auditLogHero.metric.latestEvent.noEvents', 'No events in range')}
-        />
-      </div>
+      {pageArrived ? (
+        <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <AuditMetricCard
+            icon="reports"
+            label={t('auditLogHero.metric.eventsLoaded.label', 'Events loaded')}
+            value={<AnimatedMetric value={String(stats.total)} />}
+            tone="blue"
+            helper={t('auditLogHero.metric.eventsLoaded.helper', 'Current server page')}
+          />
+          <AuditMetricCard
+            icon="shield"
+            label={t('auditLogHero.metric.security.label', 'Security/API')}
+            value={<AnimatedMetric value={String(stats.security)} />}
+            tone="purple"
+            helper={t('auditLogHero.metric.security.helper', 'Keys, MCP, auth, webhooks')}
+          />
+          <AuditMetricCard
+            icon="warning"
+            label={t('auditLogHero.metric.destructive.label', 'Destructive')}
+            value={<AnimatedMetric value={String(stats.destructive)} />}
+            tone="tomato"
+            helper={t('auditLogHero.metric.destructive.helper', 'Deletes, revokes, cancels')}
+          />
+          <AuditMetricCard
+            icon="building"
+            label={t('auditLogHero.metric.dataChanges.label', 'Data changes')}
+            value={<AnimatedMetric value={String(stats.crm)} />}
+            tone="teal"
+            helper={t('auditLogHero.metric.dataChanges.helper', 'Revenue record edits')}
+          />
+          <AuditMetricCard
+            icon="clock"
+            label={t('auditLogHero.metric.latestEvent.label', 'Latest event')}
+            value={stats.latest ? relativeTime(stats.latest) : t('auditLogHero.metric.latestEvent.none', 'None')}
+            tone="jade"
+            helper={stats.latest ? formatAbsolute(stats.latest) : t('auditLogHero.metric.latestEvent.noEvents', 'No events in range')}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
