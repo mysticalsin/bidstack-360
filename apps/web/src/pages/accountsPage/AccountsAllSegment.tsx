@@ -16,6 +16,7 @@ import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
+import { LEVERAGE_SCOPE_COPY, leverageCardModel } from './leverageCardCopy';
 import { isSyntheticAccountName } from './testDataFilter';
 import {
   deriveAccount,
@@ -77,6 +78,15 @@ export function AccountsAllSegment() {
     () => new Set((leverage.data?.items ?? []).map((item) => item.companyId)),
     [leverage.data],
   );
+  const leverageByCompany = useMemo(() => {
+    const grouped = new Map<string, NonNullable<typeof leverage.data>['items']>();
+    for (const item of leverage.data?.items ?? []) {
+      const current = grouped.get(item.companyId);
+      if (current) current.push(item);
+      else grouped.set(item.companyId, [item]);
+    }
+    return grouped;
+  }, [leverage.data]);
   const leverageMissing = useMemo(() => {
     const known = new Set(allRows.map((row) => row.company.id));
     return (leverage.data?.items ?? []).filter((item) => !known.has(item.companyId));
@@ -541,11 +551,17 @@ export function AccountsAllSegment() {
             { count: leverageMissing.length },
           )}
           {' '}
-          {leverageMissing.slice(0, 8).map((item) => (
-            <Link key={item.companyId} to={`/accounts/${item.companyId}`} className="mr-2 underline">
-              {item.companyName}
-            </Link>
-          ))}
+          {leverageMissing.slice(0, 8).map((item) => {
+            const model = leverageCardModel([item]);
+            const scope = model
+              ? t(`account.leverageScope.${model.scope}`, LEVERAGE_SCOPE_COPY[model.scope])
+              : '';
+            return (
+              <Link key={item.msaId} to={`/accounts/${item.companyId}`} className="mr-2 underline">
+                {model ? `${item.companyName}: ${model.headline} ${scope}` : item.companyName}
+              </Link>
+            );
+          })}
         </p>
       ) : null}
 
@@ -612,7 +628,12 @@ export function AccountsAllSegment() {
             layout
           >
             {pagedRows.map((row, i) => (
-              <AccountCard key={row.company.id} row={row} index={i} />
+              <AccountCard
+                key={row.company.id}
+                row={row}
+                index={i}
+                leverageFlags={leverageByCompany.get(row.company.id)}
+              />
             ))}
           </motion.section>
           {pageCount > 1 ? (
