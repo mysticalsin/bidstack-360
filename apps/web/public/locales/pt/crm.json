@@ -1804,12 +1804,13 @@
   "companyDetail": {
     "error": {
       "title": "Não foi possível carregar a empresa",
-      "message": "A empresa pode ter sido excluída."
+      "message": "O registro da empresa não carregou. Tente novamente.",
+      "retry": "Tentar novamente"
     },
     "notFound": {
       "title": "Empresa não encontrada",
       "message": "A empresa pode ter sido excluída ou você pode não ter acesso a ela.",
-      "goBack": "Voltar"
+      "backToCompanies": "Voltar às empresas"
     },
     "field": {
       "companyName": "Nome da empresa",
