@@ -9,15 +9,10 @@ import { NotificationDeliverySection } from './NotificationDeliverySection';
 
 type TFunc = (key: string, defaultValue: string) => string;
 
+// emailDigest stays on the stored row and on every PUT (the schema requires
+// it) but nothing sends that morning pipeline summary. The account digest
+// in the delivery section is the mail a user can actually turn on.
 const buildItems = (t: TFunc): { key: keyof NotificationPrefs; label: string; desc: string }[] => [
-  {
-    key: 'emailDigest',
-    label: t('notificationPrefs.emailDigestLabel', 'Daily digest email'),
-    desc: t(
-      'notificationPrefs.emailDigestDesc',
-      'A summary of your pipeline, tasks, and mentions every morning.',
-    ),
-  },
   {
     key: 'mentionPush',
     label: t('notificationPrefs.mentionPushLabel', 'Mention notifications'),
