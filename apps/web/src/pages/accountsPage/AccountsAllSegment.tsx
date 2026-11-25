@@ -139,6 +139,7 @@ export function AccountsAllSegment() {
     () => ({
       totalPipeline: rows.reduce((acc, r) => acc + r.pipelineMicros, 0),
       totalOpen: rows.reduce((acc, r) => acc + r.openDeals, 0),
+      totalOverdue: rows.reduce((acc, r) => acc + r.overdueDeals, 0),
       logoCoverage: rows.filter((r) => Boolean(r.company.logo?.url)).length,
       enrichedAccounts: rows.filter((r) => r.company.source === 'verified_data').length,
       techAccounts: rows.filter((r) => (r.company.technicalStack?.length ?? 0) > 0).length,
@@ -236,7 +237,7 @@ export function AccountsAllSegment() {
     );
   }
 
-  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
+  const { totalPipeline, totalOpen, totalOverdue, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
@@ -280,7 +281,15 @@ export function AccountsAllSegment() {
                 : t('accounts.summary.companyCount_other', '{{count}} companies', {
                     count: rows.length,
                   })}{' '}
-              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
+              ·{' '}
+              {totalOverdue > 0
+                ? t(
+                    'accounts.summary.openDealsOverdue',
+                    '{{count}} open deals · {{overdue}} overdue',
+                    { count: totalOpen, overdue: totalOverdue },
+                  )
+                : t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })}{' '}
+              ·{' '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
                 amount: formatMoneyMicros(totalPipeline, 'EUR'),
               })}
@@ -371,7 +380,11 @@ export function AccountsAllSegment() {
         <StatTile
           label={t('accounts.stats.openDeals.label', 'Open deals')}
           value={totalOpen.toLocaleString()}
-          sublabel={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
+          sublabel={
+            totalOverdue > 0
+              ? t('accounts.stats.openDeals.overdue', '{{count}} overdue', { count: totalOverdue })
+              : t('accounts.stats.openDeals.detail', 'External CRM pipeline')
+          }
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}

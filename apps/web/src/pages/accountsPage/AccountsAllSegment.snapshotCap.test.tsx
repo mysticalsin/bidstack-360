@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CrmCompany } from '@bidstack/shared';
+import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
 import { AccountsAllSegment } from './AccountsAllSegment';
 
@@ -222,5 +222,43 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     expect(
       screen.getByRole('link', { name: /import accounts from csv/i }),
     ).toBeTruthy();
+  });
+
+  // Demo bids close April–September 2026. A later day makes that open book
+  // overdue, but the summary still reads like a current pipeline. The count
+  // has to be on the page or the portfolio looks healthy.
+  it('names overdue open deals in the portfolio summary', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-25T12:00:00.000Z'));
+    const pastDue: CrmDeal = {
+      id: 'deal-1',
+      source: 'external_crm',
+      companyId: 'c-1',
+      companyName: 'Acme 1',
+      name: 'Modernization',
+      stage: 'proposal',
+      amountMicros: 1_000_000,
+      currencyCode: 'EUR',
+      probability: 50,
+      closeDate: '2026-07-22',
+      ownerId: null,
+      ownerName: null,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    dashboardState.current = {
+      data: { companies: [company(1)], deals: [pastDue], providerHealth: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+    };
+    try {
+      renderSegment();
+
+      const heading = screen.getByRole('heading', { name: 'Accounts' });
+      expect(heading.parentElement?.parentElement?.textContent).toMatch(/1 open deals · 1 overdue/);
+      expect(screen.getByText('1 overdue')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

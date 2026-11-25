@@ -3,6 +3,8 @@
 // filter labels) and AccountCard (healthTone, healthLabel, sourcePillsFor).
 import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
+import { daysUntilDueUtc } from '@/components/ui/DueDateChip';
+
 export type SortKey = 'name' | 'pipeline' | 'health' | 'industry' | 'coverage';
 export type AccountSegmentKey = 'all' | 'enriched' | 'with_tech' | 'needs_data' | 'watch';
 
@@ -14,7 +16,9 @@ export interface AccountRow {
   // Coarse health proxy until real data enhancement lands: weighted-pipeline / open-deals
   // banded into 4 buckets. Real CompanyHealth lives in cockpit; per-account here
   // is derived because we only have aggregate signal at the list level.
+  // Overdue is a separate count. A large past-due book can still read Strong.
   health: 'strong' | 'good' | 'needs_attention' | 'critical';
+  overdueDeals: number;
   coverage: {
     score: number;
     present: string[];
@@ -33,12 +37,17 @@ const COVERAGE_NEXT_ACTIONS: Record<string, string> = {
   Pipeline: 'Link open opportunities to make this actionable.',
 };
 
-export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow {
+export function deriveAccount(company: CrmCompany, deals: CrmDeal[], now: Date = new Date()): AccountRow {
   const matched = deals.filter(
     (d) =>
       d.companyId === company.id || d.companyName?.toLowerCase() === company.name.toLowerCase(),
   );
   const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
+  // closeDate is the bid due date. A day before today (UTC) is overdue; today
+  // and a missing date are not. Closed deals are already out of `open`.
+  const overdueDeals = open.filter(
+    (d) => d.closeDate != null && daysUntilDueUtc(d.closeDate, now) < 0,
+  ).length;
   const pipelineMicros = open.reduce(
     (acc, d) => acc + Math.round(d.amountMicros * ((d.probability ?? 50) / 100)),
     0,
@@ -80,6 +89,7 @@ export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow
     openDeals: open.length,
     pipelineMicros,
     totalDeals: matched.length,
+    overdueDeals,
     health,
     coverage,
   };

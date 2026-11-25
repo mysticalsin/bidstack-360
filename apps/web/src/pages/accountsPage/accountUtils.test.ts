@@ -98,6 +98,30 @@ describe('accountUtils', () => {
     expect(segmentMatches(row, 'needs_data')).toBe(true);
     expect(segmentMatches(row, 'watch')).toBe(true);
   });
+
+  // The demo book closes April–September 2026. On a later day those open deals
+  // are past due, but health is only a pipeline-size band, so a large overdue
+  // book still reads Strong. The list has to count the clock separately or a
+  // sales lead treats a missed deadline as a healthy pipeline.
+  it('counts an open deal past its close date and leaves a current or closed one', () => {
+    const now = new Date('2026-11-25T12:00:00.000Z');
+    const row = deriveAccount(
+      company(),
+      [
+        deal({ id: 'past', closeDate: '2026-07-22' }),
+        deal({ id: 'future', closeDate: '2026-12-01' }),
+        deal({ id: 'today', closeDate: '2026-11-25' }),
+        deal({ id: 'won', stage: 'closed_won', closeDate: '2026-04-12' }),
+        deal({ id: 'blank', closeDate: null }),
+        deal({ id: 'other', companyId: 'other', companyName: 'Other', closeDate: '2026-04-12' }),
+      ],
+      now,
+    );
+
+    expect(row.openDeals).toBe(4);
+    expect(row.overdueDeals).toBe(1);
+    expect(row.health).toBe('strong');
+  });
 });
 
 describe('topTechFor', () => {
