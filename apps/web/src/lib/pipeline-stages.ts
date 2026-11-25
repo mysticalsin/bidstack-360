@@ -30,10 +30,18 @@ export function isLegacyOpportunityStage(value: string): value is OpportunitySta
   return LEGACY_BY_ID.has(value);
 }
 
+function legacyStageFromStageText(value: string | null | undefined): PipelineStage | undefined {
+  if (!value) return undefined;
+  const byId = LEGACY_BY_ID.get(value);
+  if (byId) return byId;
+  const needle = value.trim().toLowerCase();
+  return LEGACY_PIPELINE_STAGES.find((stage) => stage.name.toLowerCase() === needle);
+}
+
 export function resolvePipelineStage(opp: Opportunity): PipelineStage {
   if (opp.pipelineStage) return opp.pipelineStage;
 
-  const legacy = opp.stage ? LEGACY_BY_ID.get(opp.stage) : undefined;
+  const legacy = legacyStageFromStageText(opp.stage);
   if (legacy) return legacy;
 
   const id = opp.pipelineStageId ?? opp.stage ?? 'unknown';
@@ -57,6 +65,8 @@ export function getPipelineStageBusinessKey(stage: PipelineStage): string {
 
 export function getOpportunityStageBusinessKey(opp: Opportunity): string {
   if (opp.pipelineStage) return getPipelineStageBusinessKey(opp.pipelineStage);
+  const legacy = legacyStageFromStageText(opp.stage);
+  if (legacy) return legacy.id;
   return opp.stage ?? 'unknown';
 }
 

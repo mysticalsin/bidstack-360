@@ -162,6 +162,71 @@ describe('useStageMutation', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 
+  it('keeps a legacy closed-column move on the closed_won key', async () => {
+    // WHY: dropping onto a column whose id is the enum stores the column
+    // title in stage and clears the stage link. The demo Closed Won column
+    // answers to closed_won, not the title, so the card leaves that column.
+    const { queryClient, wrapper } = createHarness();
+    const listKey = ['opportunities', { limit: 50 }] as const;
+    const closedWon: PipelineStage = {
+      id: 'closed_won',
+      name: 'Closed Won',
+      probability: 100,
+      color: '#22c55e',
+      isWon: true,
+      isLost: false,
+    };
+    queryClient.setQueryData<OpportunityPage>(listKey, {
+      items: [opportunity],
+      nextCursor: null,
+    });
+    let confirmMove: ((value: unknown) => void) | undefined;
+    vi.mocked(api).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          confirmMove = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() => useStageMutation(), { wrapper });
+
+    act(() => {
+      result.current.mutate({
+        id: opportunity.id,
+        pipelineStageId: closedWon.id,
+        pipelineStage: closedWon,
+      });
+    });
+
+    await waitFor(() => {
+      const optimistic = queryClient.getQueryData<OpportunityPage>(listKey);
+      expect(optimistic?.items[0]).toMatchObject({
+        id: opportunity.id,
+        stage: 'closed_won',
+        pipelineStageId: null,
+        pipelineStage: null,
+      });
+    });
+
+    act(() => {
+      confirmMove?.({
+        id: opportunity.id,
+        pipelineStageId: '66666666-6666-4666-8666-666666666666',
+        stage: 'closed_won',
+        pipelineStage: {
+          id: '66666666-6666-4666-8666-666666666666',
+          name: 'Closed Won',
+          probability: 100,
+          color: '#22c55e',
+          isWon: true,
+          isLost: false,
+        },
+      });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+
   it('rolls back list and detail caches when the server rejects a stage move', async () => {
     const { queryClient, wrapper } = createHarness();
     const listKey = ['opportunities', { limit: 50 }] as const;
