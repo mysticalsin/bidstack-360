@@ -48,12 +48,13 @@ function frame(data: Record<string, unknown>) {
   };
 }
 
-const seen = { path: '' };
+const seen = { path: '', hash: '' };
 function Where() {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   useEffect(() => {
     seen.path = pathname;
-  }, [pathname]);
+    seen.hash = hash;
+  }, [pathname, hash]);
   return null;
 }
 function Harness() {
@@ -138,5 +139,36 @@ describe('notification stream', () => {
     );
     expect(toast.dismiss).toHaveBeenCalledWith(firstId);
     expect(vi.mocked(toast.info).mock.calls[1]![0]).toBe('3 new updates on Pfizer');
+  });
+
+  it('opens a fixture account news alert on that account watchdog', async () => {
+    const account = 'c0000000-0000-4000-8000-000000000001';
+    const qc = new QueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <Routes>
+            <Route path="*" element={<Harness />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await vi.waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    act(() =>
+      FakeSocket.last!.emit(
+        frame({
+          id: 'n-news',
+          type: 'system',
+          title: 'Update at fixture account: sample funding',
+          url: `/dashboard?account=${account}#watchdog`,
+        }),
+      ),
+    );
+    const opts = vi.mocked(toast.info).mock.calls.at(-1)![1] as {
+      action?: { onClick: () => void };
+    };
+    act(() => opts.action!.onClick());
+    expect(seen.path).toBe(`/accounts/${account}`);
+    expect(seen.hash).toBe('#watchdog');
   });
 });

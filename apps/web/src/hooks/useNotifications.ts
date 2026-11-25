@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { NotificationSocket, type LiveNotification } from '@/lib/notification-socket';
 import { toast } from '@/components/ui/Toast';
+import { accountNewsAlertPath } from '@/components/layout/topbar/account-news-alert-path';
 
 export type NotificationType =
   | 'mention'
@@ -71,7 +72,7 @@ export function useNotificationStream(
       void qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
       const previous = shown.get(n.id);
       if (previous) toast.dismiss(previous);
-      const url = n.url;
+      const url = accountNewsAlertPath(n.url);
       const toastId = toast.info(n.title, {
         description: n.body ?? undefined,
         duration: 8000,
