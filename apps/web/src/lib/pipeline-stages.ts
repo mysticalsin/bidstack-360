@@ -47,9 +47,18 @@ export function resolvePipelineStage(opp: Opportunity): PipelineStage {
   };
 }
 
-export function getPipelineStageBusinessKey(stage: PipelineStage): string {
+export type BoardPipelineStage = PipelineStage & { key?: string | null };
+
+// Demo columns keep a short name ("Technical Iteration") and the legacy key
+// (s3_technical_iteration). Seeded bids store that key and often have no
+// pipeline stage row. The display name is not the key, so a name-only match
+// opens a second S3 column and leaves the demo column empty.
+export function getPipelineStageBusinessKey(stage: BoardPipelineStage): string {
+  if (stage.key && isLegacyOpportunityStage(stage.key)) return stage.key;
   if (isPipelineStageIdUuid(stage.id)) {
-    const legacy = LEGACY_PIPELINE_STAGES.find((s) => s.name.toLowerCase() === stage.name.toLowerCase());
+    const legacy = LEGACY_PIPELINE_STAGES.find(
+      (s) => s.name.toLowerCase() === stage.name.toLowerCase(),
+    );
     return legacy ? legacy.id : stage.id;
   }
   return stage.id;
@@ -62,11 +71,12 @@ export function getOpportunityStageBusinessKey(opp: Opportunity): string {
 
 export function getPipelineStages(
   items: Opportunity[],
-  configuredStages: PipelineStage[] = [],
+  configuredStages: BoardPipelineStage[] = [],
 ): PipelineStage[] {
   const hasCanonicalStages = items.some((opp) => opp.pipelineStage);
   const hasConfiguredStages = configuredStages.length > 0;
   const map = new Map<string, PipelineStage>();
+  const configuredIds = new Set(configuredStages.map((stage) => stage.id));
 
   for (const stage of configuredStages) {
     map.set(getPipelineStageBusinessKey(stage), stage);
@@ -78,7 +88,9 @@ export function getPipelineStages(
 
   for (const opp of items) {
     const stage = resolvePipelineStage(opp);
-    if (stage.id !== 'unknown') {
+    // A bid already on a configured column id must not open a second column
+    // when its nested stage has no legacy key of its own.
+    if (stage.id !== 'unknown' && !configuredIds.has(stage.id)) {
       const bkey = getPipelineStageBusinessKey(stage);
       if (!map.has(bkey) || (!hasConfiguredStages && isPipelineStageIdUuid(stage.id))) {
         map.set(bkey, stage);
