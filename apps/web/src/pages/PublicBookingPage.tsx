@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { buildApiUrl } from '@/lib/api';
 import { cn } from '@/lib/cn';
 
+import { calendarDayKey, speakCalendarDay } from './booking-calendar-day';
+
 interface AvailabilityResponse {
   slots: string[];
   durationMinutes: number;
@@ -13,10 +15,8 @@ interface AvailabilityResponse {
   customQuestions: unknown[];
 }
 
-function isoDate(offsetDays: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+function viewerTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }
 
 function formatSlot(iso: string) {
@@ -32,7 +32,8 @@ function formatSlot(iso: string) {
 export function PublicBookingPage() {
   const { t } = useTranslation('crm');
   const { slug = '' } = useParams<{ slug: string }>();
-  const [date, setDate] = useState(() => isoDate(1));
+  const timezone = useMemo(() => viewerTimeZone(), []);
+  const [date, setDate] = useState(() => calendarDayKey(new Date(), timezone, 1));
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +43,10 @@ export function PublicBookingPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => isoDate(i + 1)), []);
-  const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', []);
+  const days = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => calendarDayKey(new Date(), timezone, i + 1)),
+    [timezone],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -179,11 +182,7 @@ export function PublicBookingPage() {
                         : 'border-[var(--border-subtle)] text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)]',
                     )}
                   >
-                    {new Intl.DateTimeFormat(undefined, {
-                      weekday: 'long',
-                      month: 'short',
-                      day: 'numeric',
-                    }).format(new Date(`${day}T12:00:00Z`))}
+                    {speakCalendarDay(day)}
                   </button>
                 ))}
               </div>
