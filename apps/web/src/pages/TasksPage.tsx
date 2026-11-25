@@ -18,6 +18,7 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
 import { daysUntil, formatDate } from '@/lib/format';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
+import { orderTaskList } from '@/components/task/task-list-order';
 import { useTaskOrder } from '@/stores/taskOrder';
 import { Select } from '@/components/ui/Select';
 
@@ -96,50 +97,17 @@ export function TasksPage() {
     });
   }, [data?.items, filter]);
 
-  // Sort. Default 'natural' = server order (createdAt desc on the backend).
-  // 'due' sorts asc with nulls last so overdue surfaces at the top of the
-  // filter result; 'status' clusters open → in_progress → blocked → done.
+  // Recent (`natural`) is createdAt on this page. The route itself returns
+  // due-date order, so the control must reorder the loaded rows. Due date
+  // is earliest day first. A personal drag applies only to Recent.
   type Sort = 'natural' | 'due' | 'status';
-  const STATUS_ORDER: Record<TaskStatus, number> = {
-    open: 0,
-    in_progress: 1,
-    blocked: 2,
-    done: 3,
-  };
   const sort = (searchParams.get('sort') as Sort | null) ?? 'natural';
-  // Personal client-side order. Only applies when sort is 'natural' (the
-  // user's manual ordering); explicit sort modes ignore it.
   const ordinalOf = useTaskOrder((s) => s.ordinalOf);
   const setOrder = useTaskOrder((s) => s.setOrder);
-  const items = useMemo(() => {
-    if (sort === 'natural') {
-      // Stable sort by (clientOrdinal, naturalIndex). Tasks the user has
-      // never reordered keep their original server order — ordinalOf
-      // returns Infinity for them so they fall after explicit picks.
-      const indexed = filteredItems.map((t, i) => ({ t, i }));
-      indexed.sort((a, b) => {
-        const oa = ordinalOf(a.t.id);
-        const ob = ordinalOf(b.t.id);
-        if (oa !== ob) return oa - ob;
-        return a.i - b.i;
-      });
-      return indexed.map((x) => x.t);
-    }
-    const next = [...filteredItems];
-    if (sort === 'due') {
-      next.sort((a, b) => {
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return a.dueDate.localeCompare(b.dueDate);
-      });
-    } else {
-      next.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
-    }
-    return next;
-    // STATUS_ORDER is a literal-shaped constant, no need to depend on it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredItems, sort, ordinalOf]);
+  const items = useMemo(
+    () => orderTaskList(filteredItems, sort, ordinalOf),
+    [filteredItems, sort, ordinalOf],
+  );
 
   const moveTask = useCallback(
     (fromIndex: number, toIndex: number) => {
