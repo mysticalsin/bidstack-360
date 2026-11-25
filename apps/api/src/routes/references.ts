@@ -9,6 +9,7 @@ import { prisma } from '@bidstack/db';
 
 import { enqueueRfpEmbedReference } from '../queues/rfp-embed-reference.js';
 import { tenantEntityBelongsToOrg } from '../lib/tenant-ownership.js';
+import { referenceLibrarySearchWhere } from './reference-library-search.js';
 
 // z.string().url() alone accepts any scheme the URL constructor parses,
 // including javascript: and data: — a stored reference link with one of
@@ -94,14 +95,9 @@ export const referencesRoutes: FastifyPluginAsync = async (server) => {
           ...(industry ? { industry: { equals: industry, mode: 'insensitive' } } : {}),
           ...(companyId ? { companyId } : {}),
           ...(tag ? { tags: { has: tag } } : {}),
-          ...(search
-            ? {
-                OR: [
-                  { title: { contains: search, mode: 'insensitive' } },
-                  { description: { contains: search, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
+          // Title, description, industry, company name, and whole tags.
+          // A blank search is omitted so it does not filter the library.
+          ...(referenceLibrarySearchWhere(search) ?? {}),
         },
         include: { company: { select: { id: true, name: true, logoUrl: true } } },
         orderBy: { createdAt: 'desc' },
