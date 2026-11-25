@@ -43,9 +43,20 @@ interface TimeGridProps {
   showDeadlines: boolean;
   onSlot: (key: string, hour: number) => void;
   onSelect: (ev: CalendarEvent) => void;
+  /** Opens the calendar on a deadline day outside the visible range. */
+  onJumpToDay?: (day: string) => void;
 }
 
-export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, onSelect }: TimeGridProps) {
+export function TimeGrid({
+  keys,
+  tz,
+  events,
+  todayKey,
+  showDeadlines,
+  onSlot,
+  onSelect,
+  onJumpToDay,
+}: TimeGridProps) {
   const { t } = useTranslation('crm');
   const scroller = useRef<HTMLDivElement>(null);
   const lane = useMemo(() => layoutLane(events, keys, tz), [events, keys, tz]);
@@ -136,7 +147,7 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
         </div>
       )}
 
-      {showDeadlines && <DeadlinesRow days={keys.map(keyToLocalDate)} />}
+      {showDeadlines && <DeadlinesRow days={keys.map(keyToLocalDate)} onJumpToDay={onJumpToDay} />}
 
       <div className="grid" style={columns(keys.length)}>
         <div aria-hidden="true">

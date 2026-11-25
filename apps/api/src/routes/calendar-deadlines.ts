@@ -13,9 +13,10 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { prisma, type Prisma } from '@bidstack/db';
 
 import { canViewAllRfps } from '../lib/rfp-visibility.js';
+import { nearestDueDay } from './calendar-deadlines.nearest.js';
 
 const DeadlineQuery = z.object({
   /** Inclusive start of the window (date-only — dueDate columns are @db.Date). */
@@ -45,7 +46,15 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
       preHandler: [server.requirePermission('opportunities:read')],
       schema: {
         querystring: DeadlineQuery,
-        response: { 200: z.object({ items: z.array(DeadlineItem) }) },
+        response: {
+          200: z.object({
+            items: z.array(DeadlineItem),
+            /** Latest open deadline strictly before `from`, or null. */
+            nearestBefore: z.string().date().nullable(),
+            /** Earliest open deadline on or after `to`, or null. */
+            nearestAfter: z.string().date().nullable(),
+          }),
+        },
       },
     },
     async (req) => {
@@ -56,34 +65,69 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.badRequest('`from` must be before `to`');
       }
 
-      const [opportunities, proposals] = await Promise.all([
+      // Same owner gate as the window: a caller who cannot see every RFP
+      // must not be pointed at a proposal day they cannot open.
+      const proposalOwnerId = (await canViewAllRfps(req)) ? undefined : req.auth.userId;
+      const openOpportunity = (
+        dueDate: Prisma.DateTimeNullableFilter,
+      ): Prisma.OpportunityWhereInput => ({
+        orgId,
+        deletedAt: null,
+        dueDate,
+        // Closed bids have no live deadline — filter on BOTH the legacy
+        // stage enum and the Phase-5 pipelineStage flags, since either may
+        // be the source of truth depending on the org's data vintage.
+        stage: { notIn: ['closed_won', 'closed_lost'] },
+        OR: [{ pipelineStageId: null }, { pipelineStage: { isWon: false, isLost: false } }],
+      });
+      const openProposal = (dueDate: Prisma.DateTimeNullableFilter): Prisma.ProposalWhereInput => ({
+        orgId,
+        deletedAt: null,
+        dueDate,
+        status: { notIn: ['won', 'lost'] },
+        ...(proposalOwnerId ? { ownerId: proposalOwnerId } : {}),
+      });
+
+      // The week on screen is often empty. The next (or previous) open day
+      // is what lets the calendar jump to the book instead of saying there
+      // is nothing due. findFirst, not the 200-row window: the cap would
+      // return the oldest overdue day and hide the one just behind `from`.
+      const edgeDay = async (edge: 'before' | 'after', bound: Date): Promise<string | null> => {
+        const dueDate = edge === 'after' ? { gte: bound } : { lt: bound };
+        const orderBy = { dueDate: edge === 'after' ? ('asc' as const) : ('desc' as const) };
+        const [opportunity, proposal] = await Promise.all([
+          prisma.opportunity.findFirst({
+            where: openOpportunity(dueDate),
+            orderBy,
+            select: { dueDate: true },
+          }),
+          prisma.proposal.findFirst({
+            where: openProposal(dueDate),
+            orderBy,
+            select: { dueDate: true },
+          }),
+        ]);
+        return nearestDueDay(
+          [opportunity?.dueDate, proposal?.dueDate].map((day) => (day ? toDateOnly(day) : null)),
+          edge,
+        );
+      };
+
+      const [opportunities, proposals, nearestBefore, nearestAfter] = await Promise.all([
         prisma.opportunity.findMany({
-          where: {
-            orgId,
-            deletedAt: null,
-            dueDate: { gte: from, lt: to },
-            // Closed bids have no live deadline — filter on BOTH the legacy
-            // stage enum and the Phase-5 pipelineStage flags, since either may
-            // be the source of truth depending on the org's data vintage.
-            stage: { notIn: ['closed_won', 'closed_lost'] },
-            OR: [{ pipelineStageId: null }, { pipelineStage: { isWon: false, isLost: false } }],
-          },
+          where: openOpportunity({ gte: from, lt: to }),
           orderBy: { dueDate: 'asc' },
           take: 200,
           select: { id: true, code: true, customer: true, name: true, dueDate: true },
         }),
         prisma.proposal.findMany({
-          where: {
-            orgId,
-            deletedAt: null,
-            dueDate: { gte: from, lt: to },
-            status: { notIn: ['won', 'lost'] },
-            ...((await canViewAllRfps(req)) ? {} : { ownerId: req.auth.userId }),
-          },
+          where: openProposal({ gte: from, lt: to }),
           orderBy: { dueDate: 'asc' },
           take: 200,
           select: { id: true, name: true, dueDate: true },
         }),
+        edgeDay('before', from),
+        edgeDay('after', to),
       ]);
 
       const items = [
@@ -106,7 +150,7 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
         })),
       ].sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name));
 
-      return { items };
+      return { items, nearestBefore, nearestAfter };
     },
   );
 };

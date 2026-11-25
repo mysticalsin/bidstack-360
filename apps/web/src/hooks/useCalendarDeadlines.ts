@@ -26,8 +26,16 @@ export interface CalendarDeadline {
   dueDate: string;
 }
 
+export interface CalendarDeadlinePage {
+  items: CalendarDeadline[];
+  /** Latest open deadline strictly before `from`. Absent on older responses. */
+  nearestBefore?: string | null;
+  /** Earliest open deadline on or after `to`. Absent on older responses. */
+  nearestAfter?: string | null;
+}
+
 export function useCalendarDeadlines(from: string, to: string) {
-  return useQuery<{ items: CalendarDeadline[] }>({
+  return useQuery<CalendarDeadlinePage>({
     queryKey: ['calendar-deadlines', from, to],
     queryFn: ({ signal }) =>
       api(
