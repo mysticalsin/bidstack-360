@@ -22,7 +22,9 @@ import { useAccountHistory } from '@/stores/accountHistory';
 
 import type { AccountCockpitMaybeScored, CompanyHealth } from '@bidstack/shared';
 
+import { isDecidedDeal, openBookDue } from './account-open-due';
 import { deriveNextMove } from './CommandCenter';
+import { OpenPipelineDueLine } from './OpenPipelineDueLine';
 import { labelForBand } from './_tokens';
 
 interface Props {
@@ -77,7 +79,10 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
-  const openOpps = accountOpps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost');
+  // Frozen for this visit so the day count does not tick while the header is open.
+  const [asOf] = useState(() => new Date());
+  const bookDue = openBookDue(accountOpps, asOf);
+  const openOpps = accountOpps.filter((o) => !isDecidedDeal(o));
   const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
   const highRisks = openRisks.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
@@ -228,11 +233,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
             <span className="acct-key-label">{t('pageHead.keyOpenPipeline', 'Open pipeline')}</span>
             <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
             <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
-            <span>
-              {openOpps.length === 1
-                ? t('pageHead.keyOpenDeal', '1 open deal')
-                : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
-            </span>
+            <OpenPipelineDueLine
+              open={bookDue.open}
+              overdue={bookDue.overdue}
+              oldestOverdueDays={bookDue.oldestOverdueDays}
+            />
             {onDrill ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('open')}>{t('pageHead.showOpenBids', 'Show open bids')}</button> : null}
           </div>
           <div>
