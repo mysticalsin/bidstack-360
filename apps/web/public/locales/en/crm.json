@@ -3330,6 +3330,7 @@
     "heading": "Recent activity",
     "latestUpdates": "Latest updates",
     "empty": "No recent activity",
+    "overdueDays": "{{count}}d overdue",
     "viewAll": "View all {{count}} activities →"
   },
   "extractStep": {

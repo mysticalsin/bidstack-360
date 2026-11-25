@@ -3314,6 +3314,7 @@
     "heading": "Atividade recente",
     "latestUpdates": "Últimas atualizações",
     "empty": "Nenhuma atividade recente",
+    "overdueDays": "{{count}}d em atraso",
     "viewAll": "Ver todas as {{count}} atividades →"
   },
   "extractStep": {
