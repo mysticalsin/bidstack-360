@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,7 @@ import {
   ADMIN_SETTINGS,
   MEMBER_SETTINGS,
   NAV_SECTIONS,
+  isNavItemActive,
   isNavItemVisible,
   type NavItem,
   type NavSection,
@@ -269,8 +270,15 @@ function SidebarSection({
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+              const active = isNavItemActive(item, location);
               return (
-                <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  aria-current={active ? 'page' : undefined}
+                  className="sb-flyout-item"
+                >
                   <span>{t(item.labelKey, item.label)}</span>
                   {badge > 0 && <span className="sb-badge">{badge}</span>}
                 </NavLink>
@@ -346,33 +354,14 @@ function SidebarItem({
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const prefetch = () => prefetchRoute(item.to);
-
-  const isActive = useMemo(() => {
-    try {
-      const toUrl = new URL(item.to, window.location.origin);
-      const toPath = toUrl.pathname;
-      const toTab = toUrl.searchParams.get('tab');
-
-      const currentTab = new URLSearchParams(location.search).get('tab');
-
-      if (location.pathname !== toPath) return false;
-
-      if (toTab) {
-        return currentTab === toTab;
-      } else {
-        return !currentTab || currentTab === 'overview';
-      }
-    } catch {
-      return false;
-    }
-  }, [location, item.to]);
+  const active = isNavItemActive(item, location);
 
   const link = (
     <NavLink
       to={item.to}
       end={item.end}
-      aria-current={isActive ? 'page' : undefined}
-      className={cn('sb-item', isActive && 'is-active')}
+      aria-current={active ? 'page' : undefined}
+      className={cn('sb-item', active && 'is-active')}
       aria-label={label}
       title={collapsed ? undefined : label}
       onMouseEnter={prefetch}

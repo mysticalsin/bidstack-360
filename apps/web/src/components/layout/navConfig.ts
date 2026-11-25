@@ -28,9 +28,10 @@ export interface NavItem {
   badgeKey?: NavBadgeKey;
   /** When set, the item is hidden unless its module is enabled (OrgSettings). */
   featureKey?: NavFeatureKey;
-  /** Exact-match active state. Use for section overviews whose sub-routes are
-   *  themselves separate nav items (e.g. `/sales` vs `/sales/orders`), so the
-   *  overview doesn't stay highlighted while a sibling route is active. */
+  /** Exact-match active state. Set this when another rail item lives under
+   *  this path, so the parent does not stay current on the child
+   *  (Settings vs `/settings/custom-objects`, Collaborate vs
+   *  `/workspace/insights`). */
   end?: boolean;
 }
 
@@ -161,7 +162,15 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       // Collaborative workspace (AppFlowy embed) — hidden until an admin enables
       // it + sets the URL in Settings → Modules.
-      { to: '/workspace', label: 'Collaborate', labelKey: 'nav.collaborate', icon: 'note', featureKey: 'appflowy' },
+      // CRM Insights is /workspace/insights, its own rail item.
+      {
+        to: '/workspace',
+        label: 'Collaborate',
+        labelKey: 'nav.collaborate',
+        icon: 'note',
+        featureKey: 'appflowy',
+        end: true,
+      },
     ],
   },
 ];
@@ -188,10 +197,39 @@ export function isNavItemVisible(item: NavItem, flags: NavModuleFlags | undefine
 // Settings page (see SettingsLayout GROUPS — RFP Analytics/Webhooks/Audit log are
 // admin-gated there), so the sidebar shows a single "Settings" entry for everyone
 // instead of duplicating those destinations as standalone nav links.
+// Custom Objects lives at /settings/custom-objects. Settings has to match
+// /settings exactly, or that page lights both rail items.
 export const ADMIN_SETTINGS: NavItem[] = [
-  { to: '/settings', label: 'Settings', labelKey: 'nav.settings', icon: 'settings' },
+  { to: '/settings', label: 'Settings', labelKey: 'nav.settings', icon: 'settings', end: true },
 ];
 
 export const MEMBER_SETTINGS: NavItem[] = [
-  { to: '/settings', label: 'Settings', labelKey: 'nav.settings', icon: 'settings' },
+  { to: '/settings', label: 'Settings', labelKey: 'nav.settings', icon: 'settings', end: true },
 ];
+
+/** True when this rail item owns the current URL.
+ *  A record under the item's path counts (`/accounts/sample-account` is
+ *  Accounts) unless `end` is set. A `?tab=` on the item must match. A tab
+ *  on the URL does not clear an item that names no tab, so
+ *  `/settings?tab=integrations` stays on Settings. */
+export function isNavItemActive(
+  item: Pick<NavItem, 'to' | 'end'>,
+  location: { pathname: string; search: string },
+): boolean {
+  let toPath: string;
+  let toTab: string | null;
+  try {
+    const toUrl = new URL(item.to, 'http://localhost');
+    toPath = toUrl.pathname;
+    toTab = toUrl.searchParams.get('tab');
+  } catch {
+    return false;
+  }
+
+  const pathMatches = item.end
+    ? location.pathname === toPath
+    : location.pathname === toPath || location.pathname.startsWith(`${toPath}/`);
+  if (!pathMatches) return false;
+  if (toTab == null) return true;
+  return new URLSearchParams(location.search).get('tab') === toTab;
+}
