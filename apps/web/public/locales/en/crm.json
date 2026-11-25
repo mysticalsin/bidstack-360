@@ -3908,7 +3908,10 @@
   },
   "oppIndustryBreakdown": {
     "title": "Pipeline by industry",
-    "sectorCount": "{{count}} sector"
+    "sectorCount": "{{count}} sector",
+    "thisFilter": "This filter",
+    "pagePartial": "This page, not every match",
+    "filterEmpty": "Nothing in this filter."
   },
   "revenueEvolution": {
     "regionLabel": "Revenue evolution",

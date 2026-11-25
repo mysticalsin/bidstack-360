@@ -429,8 +429,13 @@ export function OpportunitiesPage() {
         </div>
       </div>
 
-      {/* Industry visibility — the bids we're working on, split by sector. */}
-      <OppIndustryBreakdown />
+      {/* Industry visibility — the open book, or this filtered page. */}
+      <OppIndustryBreakdown
+        filtered={Boolean(search || stageFilter || dueFilter)}
+        rows={items}
+        pageContinues={Boolean(data?.nextCursor)}
+        listLoading={isLoading}
+      />
 
       {selectedOpps.length > 0 && (
         <OppBulkBar
