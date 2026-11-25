@@ -98,7 +98,7 @@ function named(id: string, name: string, domain: string, countryCode: string, em
   };
 }
 
-describe('CompanyDetailsForm — account switch', () => {
+describe('CompanyDetailsForm account switch', () => {
   afterEach(() => {
     cleanup();
     hookMocks.canWrite = true;
