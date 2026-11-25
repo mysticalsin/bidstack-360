@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
+import { paletteGroupLabel, paletteGroupTag } from '@/lib/search-result-types';
 
 import {
   fuzzyMatch,
@@ -307,7 +308,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
           <div
             key={`group-${run.group}-${run.entries[0]?.index}`}
             role="group"
-            aria-label={groupAriaLabel(run.group)}
+            aria-label={paletteGroupLabel(run.group) ?? groupAriaLabel(run.group)}
           >
             {run.entries.map(({ item, index }) => {
               const active = index === safeIdx;
@@ -346,7 +347,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
                             : 'border-[var(--border-default)] bg-[var(--surface-sunken)] text-[var(--fg-tertiary)]',
                         )}
                       >
-                        {groupTag(item.group)}
+                        {paletteGroupTag(item.group) ?? groupTag(item.group)}
                       </span>
                     )}
                     <span

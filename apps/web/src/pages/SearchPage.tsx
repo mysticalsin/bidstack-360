@@ -3,62 +3,62 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
-import { Icon } from '@/components/ui/Icon';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { cn } from '@/lib/cn';
+import {
+  SEARCH_GUIDANCE,
+  SEARCH_PLACEHOLDER,
+  SEARCH_RESULT_TABS,
+  SEARCH_TAB_EMPTY_MESSAGE,
+  SEARCH_TAB_EMPTY_TITLE,
+  isSearchTab,
+  searchTabLabel,
+  searchTypeLabel,
+  type SearchTabKey,
+} from '@/lib/search-result-types';
 
 import { searchResultsCaption, searchTabBadge } from './search-results-caption';
 
-const TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'opportunity', label: 'Opportunities' },
-  { key: 'lead', label: 'Leads' },
-  { key: 'contact', label: 'Contacts' },
-  { key: 'company', label: 'Companies' },
-  { key: 'task', label: 'Tasks' },
-  { key: 'note', label: 'Notes' },
-] as const;
-
-type TabKey = (typeof TABS)[number]['key'];
-
-const TYPE_ICONS: Record<string, string> = {
+const TYPE_ICONS: Record<string, IconName> = {
   opportunity: 'briefcase',
   lead: 'zap',
   contact: 'contacts',
   company: 'building',
   task: 'tasks',
   note: 'note',
+  proposal: 'receipt',
+  rfp_requirement: 'note',
+  reference: 'book',
 };
 
 export function SearchPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
-  const activeTab = (searchParams.get('type') as TabKey) ?? 'all';
+  // A token that is not a real result type (sales_order is tolerated on the
+  // wire and nothing emits it) stays on All. Treating it as a filter made a
+  // Siemens search look empty while the proposal was in the payload.
+  const requestedType = searchParams.get('type');
+  const activeTab: SearchTabKey = isSearchTab(requestedType) ? requestedType : 'all';
   const [draft, setDraft] = useState({ query, value: query });
   const inputValue = draft.query === query ? draft.value : query;
 
   const { data, isLoading, isError, error } = useGlobalSearch(query);
 
-  const tabLabels: Record<TabKey, string> = {
-    all: t('search.tab.all', 'All'),
-    opportunity: t('search.tab.opportunity', 'Opportunities'),
-    lead: t('search.tab.lead', 'Leads'),
-    contact: t('search.tab.contact', 'Contacts'),
-    company: t('search.tab.company', 'Companies'),
-    task: t('search.tab.task', 'Tasks'),
-    note: t('search.tab.note', 'Notes'),
-  };
-
-  const typeLabels: Record<string, string> = {
-    opportunity: t('search.type.opportunity', 'Opportunity'),
-    lead: t('search.type.lead', 'Lead'),
-    contact: t('search.type.contact', 'Contact'),
-    company: t('search.type.company', 'Company'),
-    task: t('search.type.task', 'Task'),
-    note: t('search.type.note', 'Note'),
+  const tabLabels: Record<SearchTabKey, string> = {
+    all: t('search.tab.all', searchTabLabel('all')),
+    opportunity: t('search.tab.opportunity', searchTabLabel('opportunity')),
+    lead: t('search.tab.lead', searchTabLabel('lead')),
+    contact: t('search.tab.contact', searchTabLabel('contact')),
+    company: t('search.tab.company', searchTabLabel('company')),
+    task: t('search.tab.task', searchTabLabel('task')),
+    note: t('search.tab.note', searchTabLabel('note')),
+    proposal: t('search.tab.proposal', searchTabLabel('proposal')),
+    rfp_requirement: t('search.tab.rfp_requirement', searchTabLabel('rfp_requirement')),
+    reference: t('search.tab.reference', searchTabLabel('reference')),
   };
 
   const filtered = useMemo(() => {
@@ -89,7 +89,7 @@ export function SearchPage() {
     setSearchParams({ q: trimmed, type: activeTab });
   };
 
-  const setTab = (tab: TabKey) => {
+  const setTab = (tab: SearchTabKey) => {
     setSearchParams({ q: query, type: tab });
   };
 
@@ -108,10 +108,7 @@ export function SearchPage() {
             <input
               type="search"
               className="flex-1 bg-transparent text-lg text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] outline-none"
-              placeholder={t(
-                'search.input.placeholder',
-                'Search across opportunities, contacts, companies, tasks, notes, and orders…',
-              )}
+              placeholder={t('search.input.placeholder', SEARCH_PLACEHOLDER)}
               value={inputValue}
               onChange={(e) => setDraft({ query, value: e.target.value })}
               aria-label={t('search.input.ariaLabel', 'Search workspace')}
@@ -126,35 +123,38 @@ export function SearchPage() {
         {query && (
           <>
             <div className="mb-4 flex items-center gap-1 overflow-x-auto pb-1">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setTab(tab.key)}
-                  className={cn(
-                    'shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                    activeTab === tab.key
-                      ? 'bg-[var(--brand-primary)] text-white'
-                      : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]',
-                  )}
-                  aria-pressed={activeTab === tab.key}
-                >
-                  {tabLabels[tab.key]}
-                  {counts[tab.key] ? (
-                    <span
-                      className={cn(
-                        'ml-1.5 text-xs',
-                        activeTab === tab.key ? 'text-white/80' : 'text-[var(--fg-tertiary)]',
-                      )}
-                    >
-                      {searchTabBadge(
-                        counts[tab.key] ?? 0,
-                        tab.key === 'all' ? pageContinues : continuedTypes.has(tab.key),
-                      )}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
+              {SEARCH_RESULT_TABS.map((key) => {
+                const tab = { key, label: tabLabels[key] };
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setTab(tab.key)}
+                    className={cn(
+                      'shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                      activeTab === tab.key
+                        ? 'bg-[var(--brand-primary)] text-white'
+                        : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]',
+                    )}
+                    aria-pressed={activeTab === tab.key}
+                  >
+                    {tab.label}
+                    {counts[tab.key] ? (
+                      <span
+                        className={cn(
+                          'ml-1.5 text-xs',
+                          activeTab === tab.key ? 'text-white/80' : 'text-[var(--fg-tertiary)]',
+                        )}
+                      >
+                        {searchTabBadge(
+                          counts[tab.key] ?? 0,
+                          tab.key === 'all' ? pageContinues : continuedTypes.has(tab.key),
+                        )}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
 
             <section
@@ -171,12 +171,25 @@ export function SearchPage() {
                 <SearchSkeleton />
               ) : filtered.length === 0 ? (
                 <EmptyState
-                  title={t('search.empty.title', 'No results found')}
-                  message={t(
-                    'search.empty.message',
-                    'We couldn\'t find anything matching "{{query}}". Try different keywords or check your spelling.',
-                    { query },
-                  )}
+                  title={
+                    activeTab !== 'all' && (data?.items.length ?? 0) > 0
+                      ? t('search.empty.tabTitle', SEARCH_TAB_EMPTY_TITLE, {
+                          type: tabLabels[activeTab].toLowerCase(),
+                        })
+                      : t('search.empty.title', 'No results found')
+                  }
+                  message={
+                    activeTab !== 'all' && (data?.items.length ?? 0) > 0
+                      ? t('search.empty.tabMessage', SEARCH_TAB_EMPTY_MESSAGE, {
+                          type: tabLabels[activeTab],
+                          query,
+                        })
+                      : t(
+                          'search.empty.message',
+                          'We couldn\'t find anything matching "{{query}}". Try different keywords or check your spelling.',
+                          { query },
+                        )
+                  }
                 />
               ) : (
                 <motion.div
@@ -202,7 +215,9 @@ export function SearchPage() {
                           <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
                             {item.title}
                           </span>
-                          <Badge tone="gray">{typeLabels[item.type] ?? item.type}</Badge>
+                          <Badge tone="gray">
+                            {t(`search.type.${item.type}`, searchTypeLabel(item.type))}
+                          </Badge>
                         </div>
                         <p className="truncate text-xs text-[var(--fg-secondary)]">
                           {item.subtitle}
@@ -226,10 +241,7 @@ export function SearchPage() {
           <section role="region" aria-label={t('search.guidance.ariaLabel', 'Search guidance')}>
             <EmptyState
               title={t('search.guidance.title', 'Search across your workspace')}
-              message={t(
-                'search.guidance.message',
-                'Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders.',
-              )}
+              message={t('search.guidance.message', SEARCH_GUIDANCE)}
             />
           </section>
         )}

@@ -2594,7 +2594,7 @@
       "ariaLabel": "Workspace search"
     },
     "input": {
-      "placeholder": "Search across opportunities, contacts, companies, tasks, notes, and orders…",
+      "placeholder": "Search across opportunities, contacts, companies, tasks, notes, proposals, and references…",
       "ariaLabel": "Search workspace"
     },
     "tab": {
@@ -2604,7 +2604,10 @@
       "contact": "Contacts",
       "company": "Companies",
       "task": "Tasks",
-      "note": "Notes"
+      "note": "Notes",
+      "proposal": "Proposals",
+      "rfp_requirement": "Requirements",
+      "reference": "References"
     },
     "type": {
       "opportunity": "Opportunity",
@@ -2612,7 +2615,10 @@
       "contact": "Contact",
       "company": "Company",
       "task": "Task",
-      "note": "Note"
+      "note": "Note",
+      "proposal": "Proposal",
+      "rfp_requirement": "Requirement",
+      "reference": "Reference"
     },
     "results": {
       "ariaLabel": "Search results",
@@ -2625,12 +2631,14 @@
     },
     "empty": {
       "title": "No results found",
-      "message": "We couldn't find anything matching \"{{query}}\". Try different keywords or check your spelling."
+      "message": "We couldn't find anything matching \"{{query}}\". Try different keywords or check your spelling.",
+      "tabTitle": "No {{type}}",
+      "tabMessage": "Other matches are on All. Nothing in {{type}} for \"{{query}}\"."
     },
     "guidance": {
       "ariaLabel": "Search guidance",
       "title": "Search across your workspace",
-      "message": "Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders."
+      "message": "Type a keyword above to find opportunities, contacts, companies, tasks, notes, proposals, and references."
     }
   },
   "createWebhook": {
