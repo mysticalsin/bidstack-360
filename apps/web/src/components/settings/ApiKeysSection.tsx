@@ -51,6 +51,7 @@ export function ApiKeysSection() {
   const [revealed, setRevealed] = useState<ApiKeyCreated | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -84,13 +85,17 @@ export function ApiKeysSection() {
         msaIds,
       });
       setRevealed(created);
+      setCopied(false);
+      setCopyFailed(false);
       setOpen(false);
-      toast.success(t('apiKeys.toast.createdTitle', 'API key created'), {
-        description: t(
-          'apiKeys.toast.createdDescription',
-          'Copy the secret now — it will not be shown again.',
-        ),
-      });
+      if (copyableSecret(created.secret)) {
+        toast.success(t('apiKeys.toast.createdTitle', 'API key created'), {
+          description: t(
+            'apiKeys.toast.createdDescription',
+            'Copy the secret now — it will not be shown again.',
+          ),
+        });
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -125,17 +130,20 @@ export function ApiKeysSection() {
   };
 
   const copySecret = async () => {
-    if (!revealed) return;
+    const secret = copyableSecret(revealed?.secret);
+    if (!secret) return;
+    setCopyFailed(false);
     try {
-      await navigator.clipboard.writeText(revealed.secret);
+      await navigator.clipboard.writeText(secret);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard unavailable — the secret is still visible in the textbox */
+      setCopied(false);
+      setCopyFailed(true);
     }
   };
 
-  const items = list.data?.items ?? [];
+  const items = list.data && Array.isArray(list.data.items) ? list.data.items : null;
 
   const scopeHelp: Record<(typeof MCP_SCOPES)[number], string> = {
     read: t('apiKeys.scopeHelp.read', 'MCP read-only tool access.'),
@@ -151,7 +159,7 @@ export function ApiKeysSection() {
       <SectionHeader
         title={t('apiKeys.title', 'API keys')}
         caption={
-          list.data?.pageContinues
+          list.data?.pageContinues && Array.isArray(list.data.items)
             ? `${t(
                 'apiKeys.caption',
                 'Used by MCP clients, REST callers, and CI jobs. SHA-256 hashed at rest.',
@@ -318,22 +326,35 @@ export function ApiKeysSection() {
       />
 
       {revealed ? (
-        <div className="mx-5 mt-4 rounded-md border border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] p-3">
-          <div className="text-xs font-semibold text-[var(--fg-primary)]">
-            {t('apiKeys.reveal.warning', "Copy your new key now — it won't be shown again.")}
+        copyableSecret(revealed.secret) ? (
+          <div className="mx-5 mt-4 rounded-md border border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] p-3">
+            <div className="text-xs font-semibold text-[var(--fg-primary)]">
+              {t('apiKeys.reveal.warning', "Copy your new key now — it won't be shown again.")}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="block flex-1 select-all overflow-x-auto rounded bg-[var(--surface-card)] px-2 py-1 font-mono text-xs text-[var(--fg-primary)]">
+                {revealed.secret}
+              </code>
+              <Button size="sm" variant="secondary" onClick={copySecret}>
+                {copied ? t('apiKeys.reveal.copied', 'Copied!') : t('apiKeys.reveal.copy', 'Copy')}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setRevealed(null)}>
+                {t('apiKeys.reveal.dismiss', 'Dismiss')}
+              </Button>
+            </div>
+            {copyFailed ? (
+              <p role="alert" className="mt-2 text-xs text-[var(--danger)]">
+                {t('apiKeys.reveal.copyFailed', 'Copy failed. The secret is still on screen.')}
+              </p>
+            ) : null}
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <code className="block flex-1 select-all overflow-x-auto rounded bg-[var(--surface-card)] px-2 py-1 font-mono text-xs text-[var(--fg-primary)]">
-              {revealed.secret}
-            </code>
-            <Button size="sm" variant="secondary" onClick={copySecret}>
-              {copied ? t('apiKeys.reveal.copied', 'Copied!') : t('apiKeys.reveal.copy', 'Copy')}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setRevealed(null)}>
-              {t('apiKeys.reveal.dismiss', 'Dismiss')}
-            </Button>
+        ) : (
+          <div className="mx-5 mt-4 rounded-md border border-[var(--border-default)] bg-[var(--surface-sunken)] p-3">
+            <p role="status" className="text-xs font-semibold text-[var(--fg-primary)]">
+              {t('apiKeys.reveal.noSecret', 'This key has no secret to copy.')}
+            </p>
           </div>
-        </div>
+        )
       ) : null}
 
       {list.isLoading ? (
@@ -365,6 +386,23 @@ export function ApiKeysSection() {
                 onClick={() => void list.refetch()}
               >
                 {t('apiKeys.loadError.retry', 'Retry')}
+              </Button>
+            }
+          />
+        </div>
+      ) : items === null ? (
+        <div className="p-5">
+          <EmptyState
+            title={t('apiKeys.notLoaded.title', 'API keys are not loaded')}
+            message={t('apiKeys.notLoaded.message', 'The key list has no payload to show.')}
+            action={
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void list.refetch()}
+              >
+                {t('apiKeys.notLoaded.retry', 'Retry')}
               </Button>
             }
           />
@@ -436,6 +474,12 @@ export function ApiKeysSection() {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function copyableSecret(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  if (value.trim() === '') return null;
+  return value;
+}
 
 function parseUuidList(raw: string): string[] | null {
   const parts = raw
