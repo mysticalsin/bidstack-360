@@ -247,6 +247,8 @@
   "tasks": {
     "title": "Tasks",
     "subtitle": "{{count}} active follow-ups.",
+    "subtitlePending": "Counting follow-ups.",
+    "subtitleError": "Couldn't count follow-ups.",
     "actions": {
       "exportCsv": "Export CSV"
     },

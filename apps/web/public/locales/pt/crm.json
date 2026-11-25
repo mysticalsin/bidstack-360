@@ -247,6 +247,8 @@
   "tasks": {
     "title": "Tarefas",
     "subtitle": "{{count}} acompanhamentos ativos.",
+    "subtitlePending": "A contar acompanhamentos.",
+    "subtitleError": "Não foi possível contar os acompanhamentos.",
     "actions": {
       "exportCsv": "Exportar CSV"
     },

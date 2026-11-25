@@ -247,6 +247,8 @@
   },
   "tasks": {
     "title": "Tareas",
+    "subtitlePending": "Contando seguimientos.",
+    "subtitleError": "No se pudieron contar los seguimientos.",
     "new": "Nueva tarea",
     "dueToday": "Para hoy",
     "overdue": "Vencida",

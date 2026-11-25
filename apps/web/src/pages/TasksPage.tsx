@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
+import { activeFollowUpCount } from '@/components/task/task-active-count';
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useTasks } from '@/hooks/useTasks';
+import { useTaskSummary, useTasks } from '@/hooks/useTasks';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { cn } from '@/lib/cn';
@@ -67,6 +68,12 @@ export function TasksPage() {
   const serverStatus =
     filter === 'all' || filter === 'overdue' || filter === 'today' ? undefined : filter;
   const pager = useCursorPagination(filter);
+  const summary = useTaskSummary();
+  const followUps = activeFollowUpCount({
+    isLoading: summary.isLoading,
+    isError: summary.isError,
+    data: summary.data,
+  });
   const { data, isLoading, isError, error } = useTasks({
     ...(serverStatus ? { status: serverStatus } : {}),
     limit: 50,
@@ -193,10 +200,15 @@ export function TasksPage() {
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
             {t('tasks.title', 'Tasks')}
           </h1>
-          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('tasks.subtitle', '{{count}} active follow-ups.', {
-              count: data?.items.length ?? 0,
-            })}
+          <p
+            className="mt-1 text-sm text-[var(--fg-secondary)]"
+            aria-busy={followUps.phase === 'pending'}
+          >
+            {followUps.phase === 'ready'
+              ? t('tasks.subtitle', '{{count}} active follow-ups.', { count: followUps.active })
+              : followUps.phase === 'error'
+                ? t('tasks.subtitleError', "Couldn't count follow-ups.")
+                : t('tasks.subtitlePending', 'Counting follow-ups.')}
           </p>
         </div>
         <div className="flex items-center gap-2">
