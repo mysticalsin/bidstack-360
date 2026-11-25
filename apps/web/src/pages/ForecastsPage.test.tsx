@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-i18next', () => ({
@@ -116,5 +116,97 @@ describe('ForecastsPage — territories:write gating', () => {
       expect((btn as HTMLButtonElement).disabled).toBe(true);
       expect(btn.getAttribute('aria-label')).toMatch(new RegExp(`— ${hint}$`));
     });
+  });
+});
+
+describe('ForecastsPage — period label the projection prints', () => {
+  const mutateAsync = vi.fn(async () => ({ id: 'created' }));
+
+  beforeEach(() => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    forecastsMocks.useCreateForecast.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync,
+      isPending: false,
+    });
+    usersMocks.useUsers.mockReturnValue({
+      data: [{ id: 'owner-1', name: 'Alex Example', email: 'alex.example@example.test' }],
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('keeps a quarter copied from the projection on the Quarterly tab', () => {
+    // WHY: the chart says "Q1 2027". That string matches no period filter, so
+    // the row is saved and then missing from Monthly, Quarterly, and Yearly.
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: {
+        items: [{ ...forecast, period: 'Q1 2027' }],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.queryByText('Alice Dev')).toBeNull();
+    // Radix tabs select on mouse down.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Quarterly' }));
+    expect(screen.getAllByText('Alice Dev').length).toBeGreaterThan(0);
+  });
+
+  it('stores the projection label as the quarterly key and opens that tab', async () => {
+    // WHY: New Forecast accepts the label on the chart. Leaving the page on
+    // Monthly after a quarterly save hides the row the rep just entered.
+    renderPage();
+
+    fireEvent.click(screen.getAllByRole('button', { name: /New Forecast/i })[0]!);
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'Q1 2027' } });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Owner' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Alex Example' }));
+    fireEvent.change(screen.getByLabelText('Commit'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Forecast' }));
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ period: '2027-Q1', ownerId: 'owner-1', category: 'commit' }),
+      );
+    });
+    expect(screen.getByRole('tab', { name: 'Quarterly' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(screen.getByRole('tab', { name: 'Monthly' }).getAttribute('aria-selected')).toBe(
+      'false',
+    );
+  });
+
+  it('does not save a period that no filter can show', () => {
+    // WHY: an owner and an amount are enough to save today. A period the
+    // three filters all drop must stay on the form, not become a hidden row.
+    renderPage();
+
+    fireEvent.click(screen.getAllByRole('button', { name: /New Forecast/i })[0]!);
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'next quarter' } });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Owner' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Alex Example' }));
+    fireEvent.change(screen.getByLabelText('Commit'), { target: { value: '5' } });
+
+    expect(screen.getByRole('alert').textContent).toMatch(/Q1 2027/);
+    expect((screen.getByRole('button', { name: 'Save Forecast' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 });

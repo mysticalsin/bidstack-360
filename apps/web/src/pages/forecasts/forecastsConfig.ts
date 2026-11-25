@@ -33,6 +33,37 @@ export interface ForecastRow {
 
 export type PeriodFilter = 'monthly' | 'quarterly' | 'yearly';
 
+const MONTH_PERIOD = /^(\d{4})-(0[1-9]|1[0-2])$/;
+const YEAR_PERIOD = /^(\d{4})$/;
+const QUARTER_KEY = /^(\d{4})-q([1-4])$/i;
+const QUARTER_LABEL = /^q([1-4])\s+(\d{4})$/i;
+
+/**
+ * The projection prints "Q1 2027". The book stores "2027-Q1". Both are the
+ * same quarter. A month is `2026-05`. A year is `2026`. Anything else is not
+ * a period the filter can show.
+ */
+export function canonicalForecastPeriod(input: string): string | null {
+  const raw = input.trim().replace(/\s+/g, ' ');
+  if (MONTH_PERIOD.test(raw)) return raw;
+  const quarterKey = QUARTER_KEY.exec(raw);
+  if (quarterKey) return `${quarterKey[1]}-Q${quarterKey[2]}`;
+  const quarterLabel = QUARTER_LABEL.exec(raw);
+  if (quarterLabel) return `${quarterLabel[2]}-Q${quarterLabel[1]}`;
+  if (YEAR_PERIOD.test(raw)) return raw;
+  return null;
+}
+
+/** Which period tab can show this period, including the projection's label. */
+export function periodFilterFor(period: string): PeriodFilter | null {
+  const canonical = canonicalForecastPeriod(period);
+  if (!canonical) return null;
+  if (MONTH_PERIOD.test(canonical)) return 'monthly';
+  if (QUARTER_KEY.test(canonical)) return 'quarterly';
+  if (YEAR_PERIOD.test(canonical)) return 'yearly';
+  return null;
+}
+
 export function groupForecasts(items: Forecast[]): ForecastRow[] {
   const map = new Map<string, ForecastRow>();
   for (const item of items) {
@@ -67,10 +98,7 @@ export function groupForecasts(items: Forecast[]): ForecastRow[] {
 }
 
 export function matchesPeriodFilter(period: string, filter: PeriodFilter): boolean {
-  if (filter === 'monthly') return /^\d{4}-\d{2}$/.test(period);
-  if (filter === 'quarterly') return /^\d{4}-Q\d$/.test(period);
-  if (filter === 'yearly') return /^\d{4}$/.test(period);
-  return true;
+  return periodFilterFor(period) === filter;
 }
 
 export type ChartDatum = {

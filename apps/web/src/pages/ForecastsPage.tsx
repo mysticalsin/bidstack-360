@@ -29,6 +29,7 @@ import {
   buildChartData,
   groupForecasts,
   matchesPeriodFilter,
+  periodFilterFor,
   type ForecastRow,
   type PeriodFilter,
 } from './forecasts/forecastsConfig';
@@ -183,6 +184,8 @@ export function ForecastsPage() {
                         }),
                       ),
                   );
+                  const shape = periodFilterFor(body.period);
+                  if (shape) setPeriodFilter(shape);
                   toast.success(t('forecasts.toastCreated', 'Forecast created'));
                   setDialogOpen(false);
                 } catch (err) {
