@@ -27,8 +27,18 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 't1' }),
-  Link: ({ children, to }: { children: React.ReactNode; to?: string }) => (
-    <a href={typeof to === 'string' ? to : undefined}>{children}</a>
+  Link: ({
+    children,
+    to,
+    className,
+  }: {
+    children: React.ReactNode;
+    to?: string;
+    className?: string;
+  }) => (
+    <a href={typeof to === 'string' ? to : undefined} className={className}>
+      {children}
+    </a>
   ),
 }));
 
@@ -195,6 +205,7 @@ describe('TaskDetailPage — the record names its bid', () => {
     const bid = screen.getByRole('link', { name: 'CI Financial — IT Modernization & MSP' });
     expect(bid.getAttribute('href')).toBe(`/opportunities/${PRICING_OPP}`);
     expect(screen.queryByRole('link', { name: 'Opportunity' })).toBeNull();
+    expect(bid.className).toContain('min-h-6');
   });
 });
 

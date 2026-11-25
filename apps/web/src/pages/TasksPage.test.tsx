@@ -113,6 +113,12 @@ describe('TasksPage — a follow-up names its bid', () => {
     const bid = screen.getByRole('link', { name: 'CI Financial — IT Modernization & MSP' });
     expect(bid.getAttribute('href')).toBe(`/opportunities/${PRICING_OPP}`);
     expect(screen.queryByRole('link', { name: 'Opportunity' })).toBeNull();
+    // axe target-size on /tasks: the title link and this bid link stack. Each
+    // needs a 24px box or the undersized pair fails the tasks route scan.
+    expect(bid.className).toContain('min-h-6');
+    expect(
+      screen.getByRole('link', { name: 'Submit revised pricing & SoW v2' }).className,
+    ).toContain('min-h-6');
   });
 });
 

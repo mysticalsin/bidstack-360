@@ -245,11 +245,17 @@ export const TaskRow = memo(function TaskRow({
             task.status === 'done' && 'line-through text-[var(--fg-tertiary)]',
           )}
         >
-          <Link to={`/tasks/${task.id}`} className="hover:text-[var(--brand-primary)]">
+          <Link
+            to={`/tasks/${task.id}`}
+            className="inline-flex min-h-6 min-w-6 items-center hover:text-[var(--brand-primary)]"
+          >
             {task.title}
           </Link>
         </div>
-        <TaskBidLink task={task} className="block max-w-full truncate text-xs" />
+        <TaskBidLink
+          task={task}
+          className="max-w-full min-w-0 truncate text-xs"
+        />
         <div className="text-xs text-[var(--fg-tertiary)]">
           {t('taskRow.due', 'Due {{date}}', { date: formatDate(task.dueDate) })}
           {d !== null && task.status !== 'done' ? (
