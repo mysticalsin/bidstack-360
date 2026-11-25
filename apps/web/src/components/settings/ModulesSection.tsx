@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useAppModules, useUpdateAppModules } from '@/hooks/useAppModules';
 import type { AppModules, AppModulesUpdate } from '@bidstack/shared';
 
@@ -40,18 +41,35 @@ function Toggle({
 }
 
 export function ModulesSection() {
-  const { data, isLoading } = useAppModules();
+  const { data, isLoading, refetch } = useAppModules();
   const update = useUpdateAppModules();
   // Draft overlays the server value (no setState-in-effect); a key is "edited"
   // once it's present in draft.
   const [draft, setDraft] = useState<AppModulesUpdate>({});
 
+  // A missing record is not an all-off org. Save merges the body over the
+  // stored record, so switches filled from false would turn SERUM off too.
+  if (!data) {
+    if (isLoading) return <LoadingSkeleton rows={4} />;
+    return (
+      <ErrorState
+        title="Could not load modules"
+        message="Module switches stay hidden until the org record loads. Saving from a blank load would turn Agent Studio, Collaborate, and SERUM off."
+        action={
+          <Button type="button" variant="secondary" size="sm" onClick={() => void refetch()}>
+            Retry
+          </Button>
+        }
+      />
+    );
+  }
+
   const view: AppModules = {
-    agentStudioEnabled: draft.agentStudioEnabled ?? data?.agentStudioEnabled ?? false,
-    appflowyEnabled: draft.appflowyEnabled ?? data?.appflowyEnabled ?? false,
-    appflowyUrl: draft.appflowyUrl !== undefined ? draft.appflowyUrl : (data?.appflowyUrl ?? null),
+    agentStudioEnabled: draft.agentStudioEnabled ?? data.agentStudioEnabled,
+    appflowyEnabled: draft.appflowyEnabled ?? data.appflowyEnabled,
+    appflowyUrl: draft.appflowyUrl !== undefined ? draft.appflowyUrl : data.appflowyUrl,
     // SERUM is toggled in its own section; preserve the current value here.
-    serumEnabled: draft.serumEnabled ?? data?.serumEnabled ?? false,
+    serumEnabled: draft.serumEnabled ?? data.serumEnabled,
   };
   const set = <K extends keyof AppModulesUpdate>(k: K, v: AppModulesUpdate[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -104,7 +122,7 @@ export function ModulesSection() {
       </Card>
 
       <div className="flex justify-end">
-        <Button variant="primary" disabled={isLoading || update.isPending} onClick={() => update.mutate(view)}>
+        <Button variant="primary" disabled={update.isPending} onClick={() => update.mutate(view)}>
           {update.isPending ? 'Saving…' : 'Save modules'}
         </Button>
       </div>
