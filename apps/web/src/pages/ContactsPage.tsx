@@ -30,6 +30,7 @@ import type { Contact } from '@bidstack/shared';
 import { ContactContextMenu } from './contacts/ContactContextMenu';
 import { ContactTable } from './contacts/ContactTable';
 import type { ContactSortKey, ContactSortState } from './contacts/ContactTable';
+import { contactPeekAfterListChange } from './contacts/contact-peek-list';
 import { useContactsKeyboard } from './contacts/useContactsKeyboard';
 
 export function ContactsPage() {
@@ -170,14 +171,25 @@ export function ContactsPage() {
   // macOS-style Quick Look — Space on a focused row peeks the record.
   const [quickLook, setQuickLook] = useState<Contact | null>(null);
 
-  // Vim-style keyboard cursor. Reset when the visible list changes (search/sort)
-  // using the "compare-prev-during-render" pattern — React's canonical way to
-  // derive resettable state without cascading renders.
+  // Vim-style keyboard cursor. When the visible list changes (search, sort,
+  // or a refresh), keep the highlight and an open peek on the same person.
+  // Clearing the index here left the previous title and phone on the card,
+  // and the next j landed on whoever was now first.
   const [cursorIdx, setCursorIdx] = useState(-1);
   const [prevItems, setPrevItems] = useState(items);
-  if (items !== prevItems) {
+  // A new search key has no rows yet. Wait for that read to settle so the
+  // card is not closed on the gap and then left closed when the person
+  // is still in the result.
+  if (!isLoading && items !== prevItems) {
+    const next = contactPeekAfterListChange({
+      previousItems: prevItems,
+      nextItems: items,
+      cursorIdx,
+      quickLook,
+    });
     setPrevItems(items);
-    setCursorIdx(-1);
+    setCursorIdx(next.cursorIdx);
+    if (next.quickLook !== quickLook) setQuickLook(next.quickLook);
   }
 
   // j/k navigation, gg/G chords, Enter/x/Space shortcuts — see useContactsKeyboard.
