@@ -50,6 +50,102 @@ vi.mock('@bidstack/db', () => ({
 
 const checkConnector = vi.mocked(checkSerumConnectorRuntimePolicy);
 const userRoleCount = vi.mocked(prisma.userRole.count);
+const companyFindMany = vi.mocked(prisma.companyEnrichment.findMany);
+const opportunityFindMany = vi.mocked(prisma.opportunity.findMany);
+
+type DomainBookCompany = {
+  id: string;
+  legalName: string;
+  tradeName: string;
+  domain: string;
+  website: string;
+  registryIds: Record<string, string>;
+  confidenceBps: number;
+};
+
+type DomainBookOpportunity = {
+  customer: string;
+  name: string;
+  logoUrl: string | null;
+};
+
+// A domain lookup must not browse this book. The company row is a domain hit.
+// The opportunity customer has no domain, so it is not a hit.
+const DOMAIN_BOOK_COMPANIES: DomainBookCompany[] = [
+  {
+    id: '11111111-1111-4111-8111-111111111111',
+    legalName: 'Northwind Demo SAS',
+    tradeName: 'Northwind',
+    domain: 'northwind.example',
+    website: 'https://northwind.example',
+    registryIds: {},
+    confidenceBps: 8000,
+  },
+  {
+    id: '22222222-2222-4222-8222-222222222222',
+    legalName: 'Contoso Demo GmbH',
+    tradeName: 'Contoso',
+    domain: 'contoso.example',
+    website: 'https://contoso.example',
+    registryIds: {},
+    confidenceBps: 7000,
+  },
+];
+
+const DOMAIN_BOOK_OPPORTUNITIES: DomainBookOpportunity[] = [
+  {
+    customer: 'Fabrikam Demo',
+    name: 'Fabrikam staffing bid',
+    logoUrl: null,
+  },
+];
+
+function textIncludes(value: string | null | undefined, needle: string | undefined): boolean {
+  if (!needle) return false;
+  return (value ?? '').toLowerCase().includes(needle.toLowerCase());
+}
+
+function companyMatchesClause(row: DomainBookCompany, clause: Record<string, unknown>): boolean {
+  const legalName = clause.legalName as { contains?: string } | undefined;
+  if (legalName?.contains) return textIncludes(row.legalName, legalName.contains);
+  const tradeName = clause.tradeName as { contains?: string } | undefined;
+  if (tradeName?.contains) return textIncludes(row.tradeName, tradeName.contains);
+  const domain = clause.domain as { contains?: string; equals?: string } | undefined;
+  if (domain?.contains) return textIncludes(row.domain, domain.contains);
+  if (domain?.equals) return row.domain.toLowerCase() === domain.equals.toLowerCase();
+  return false;
+}
+
+function seedDomainPartnerBook() {
+  companyFindMany.mockImplementation(((args?: { where?: { OR?: Array<Record<string, unknown>> } }) => {
+    const clauses = args?.where?.OR;
+    const rows = clauses?.length
+      ? DOMAIN_BOOK_COMPANIES.filter((row) => clauses.some((clause) => companyMatchesClause(row, clause)))
+      : DOMAIN_BOOK_COMPANIES;
+    return Promise.resolve(rows);
+  }) as never);
+  opportunityFindMany.mockImplementation(((args?: { where?: { OR?: Array<Record<string, unknown>> } }) => {
+    const clauses = args?.where?.OR;
+    const rows = clauses?.length
+      ? DOMAIN_BOOK_OPPORTUNITIES.filter((row) =>
+          clauses.some((clause) => {
+            const customer = clause.customer as { contains?: string } | undefined;
+            const name = clause.name as { contains?: string } | undefined;
+            return textIncludes(row.customer, customer?.contains) || textIncludes(row.name, name?.contains);
+          }),
+        )
+      : DOMAIN_BOOK_OPPORTUNITIES;
+    return Promise.resolve(rows);
+  }) as never);
+}
+
+function clearDomainPartnerBook() {
+  companyFindMany.mockReset();
+  companyFindMany.mockResolvedValue([]);
+  opportunityFindMany.mockReset();
+  opportunityFindMany.mockResolvedValue([]);
+}
+
 const TEST_ORG_ID = '00000000-0000-4000-8000-000000000001';
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000002';
 
@@ -268,6 +364,65 @@ describe('erp-integration route', () => {
       items: [],
       warnings: ['ERP MCP is not configured; using local Polo PreSales records.'],
     });
+  });
+
+  it('does not list the demo opportunity book for a domain partner lookup', async () => {
+    // WHY: demo leaves ERP unset. A domain is a company key. Opportunity
+    // customers have no domain, so a domain hit must not append them and a
+    // domain miss must not come back as the rest of the book.
+    delete process.env.ERP_MCP_URL;
+    delete process.env.ODOO_MCP_URL;
+    __resetErpClient();
+    seedDomainPartnerBook();
+    companyFindMany.mockClear();
+    opportunityFindMany.mockClear();
+    try {
+      const app = await buildApp();
+      const hit = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?domain=northwind.example',
+      });
+      expect(hit.statusCode).toBe(200);
+      const hitBody = hit.json() as { source: string; items: Array<{ name: string; matchKeys: string[] }> };
+      expect(hitBody.source).toBe('local');
+      expect(hitBody.items.map((item) => item.name)).toEqual(['Northwind']);
+      expect(hitBody.items[0]?.matchKeys).toContain('domain');
+
+      const miss = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?domain=missing.example',
+      });
+      expect(miss.statusCode).toBe(200);
+      const missBody = miss.json() as { source: string; items: Array<{ name: string }> };
+      expect(missBody.source).toBe('none');
+      expect(missBody.items).toEqual([]);
+
+      expect(opportunityFindMany).not.toHaveBeenCalled();
+    } finally {
+      clearDomainPartnerBook();
+    }
+  });
+
+  it('still returns the matching opportunity customer when the partner lookup names one', async () => {
+    // Guard: refusing a domain browse must not blank a real name search.
+    delete process.env.ERP_MCP_URL;
+    delete process.env.ODOO_MCP_URL;
+    __resetErpClient();
+    seedDomainPartnerBook();
+    try {
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?q=Fabrikam',
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { source: string; items: Array<{ name: string }> };
+      expect(body.source).toBe('local');
+      expect(body.items.map((item) => item.name)).toEqual(['Fabrikam Demo']);
+      expect(opportunityFindMany).toHaveBeenCalled();
+    } finally {
+      clearDomainPartnerBook();
+    }
   });
 
   it('proxies search_records and returns rows', async () => {
