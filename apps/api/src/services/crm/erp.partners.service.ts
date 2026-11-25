@@ -90,12 +90,35 @@ function normalizeErpPartner(
 
 // ─── Local Company Search ────────────────────────────────────────────────────
 
+// A VAT/DUNS lookup has no name clause, so `take: limit` is just the newest
+// slice of the org. Read far enough to find a registry hit, then drop the rest.
+const REGISTRY_ONLY_SCAN = 100;
+
+function registryNeedle(value: string | undefined): string {
+  return value ? normalizeToken(value) : '';
+}
+
+// VAT follows the ERP `ilike` (punctuation-insensitive substring). DUNS follows
+// the ERP equality check. Opportunity customers never carry either id.
+function matchesRequestedRegistry(
+  query: CompanyAutocompleteInput,
+  vat: string | null,
+  duns: string | null,
+): boolean {
+  const vatNeedle = registryNeedle(query.vat);
+  const dunsNeedle = registryNeedle(query.duns);
+  if (vatNeedle && (!vat || !normalizeToken(vat).includes(vatNeedle))) return false;
+  if (dunsNeedle && (!duns || normalizeToken(duns) !== dunsNeedle)) return false;
+  return true;
+}
+
 export async function searchLocalCompanies(
   orgId: string,
   query: CompanyAutocompleteInput,
 ): Promise<CompanySuggestion[]> {
   const q = query.q?.trim();
   const domain = normalizeDomain(query.domain);
+  const wantsRegistry = Boolean(registryNeedle(query.vat) || registryNeedle(query.duns));
   const where: Prisma.CompanyEnrichmentWhereInput = { orgId };
   const clauses: Prisma.CompanyEnrichmentWhereInput[] = [];
   if (q) {
@@ -108,50 +131,56 @@ export async function searchLocalCompanies(
   if (domain) clauses.push({ domain: { equals: domain, mode: 'insensitive' } });
   if (clauses.length) where.OR = clauses;
 
+  const registryOnly = wantsRegistry && clauses.length === 0;
+
   const [dataRows, opportunities] = await Promise.all([
     prisma.companyEnrichment.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
-      take: query.limit,
+      take: registryOnly ? Math.max(query.limit, REGISTRY_ONLY_SCAN) : query.limit,
     }),
-    prisma.opportunity.findMany({
-      where: {
-        orgId,
-        ...(q
-          ? {
-              OR: [
-                { customer: { contains: q, mode: 'insensitive' } },
-                { name: { contains: q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: query.limit * 2,
-    }),
+    wantsRegistry
+      ? Promise.resolve([])
+      : prisma.opportunity.findMany({
+          where: {
+            orgId,
+            ...(q
+              ? {
+                  OR: [
+                    { customer: { contains: q, mode: 'insensitive' } },
+                    { name: { contains: q, mode: 'insensitive' } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: query.limit * 2,
+        }),
   ]);
 
-  const dataItems = dataRows.map((row) => ({
-    id: `verified:${row.id}`,
-    name: row.tradeName ?? row.legalName,
-    legalName: row.legalName,
-    domain: normalizeDomain(row.domain),
-    website: asUrl(row.website),
-    vat: stringRegistry(row.registryIds, 'vat'),
-    duns: stringRegistry(row.registryIds, 'duns'),
-    phone: null,
-    email: null,
-    source: 'verified_data' as const,
-    confidence: row.confidenceBps / 10_000,
-    matchKeys: matchKeys({
-      query,
+  const dataItems = dataRows
+    .map((row) => ({
+      id: `verified:${row.id}`,
       name: row.tradeName ?? row.legalName,
+      legalName: row.legalName,
       domain: normalizeDomain(row.domain),
+      website: asUrl(row.website),
       vat: stringRegistry(row.registryIds, 'vat'),
       duns: stringRegistry(row.registryIds, 'duns'),
-    }),
-    sourceUrl: asUrl(row.website),
-  }));
+      phone: null,
+      email: null,
+      source: 'verified_data' as const,
+      confidence: row.confidenceBps / 10_000,
+      matchKeys: matchKeys({
+        query,
+        name: row.tradeName ?? row.legalName,
+        domain: normalizeDomain(row.domain),
+        vat: stringRegistry(row.registryIds, 'vat'),
+        duns: stringRegistry(row.registryIds, 'duns'),
+      }),
+      sourceUrl: asUrl(row.website),
+    }))
+    .filter((item) => matchesRequestedRegistry(query, item.vat, item.duns));
 
   const seenCustomers = new Set(dataItems.map((item) => normalizeName(item.name)));
   const opportunityItems = opportunities

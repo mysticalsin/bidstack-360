@@ -50,6 +50,48 @@ vi.mock('@bidstack/db', () => ({
 
 const checkConnector = vi.mocked(checkSerumConnectorRuntimePolicy);
 const userRoleCount = vi.mocked(prisma.userRole.count);
+const companyFindMany = vi.mocked(prisma.companyEnrichment.findMany);
+const opportunityFindMany = vi.mocked(prisma.opportunity.findMany);
+
+// Two verified companies plus one opportunity customer. A VAT-only or
+// DUNS-only lookup must return the registry hit, not this whole book.
+function seedRegistryPartnerBook() {
+  companyFindMany.mockResolvedValue([
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      legalName: 'Northwind Demo SAS',
+      tradeName: 'Northwind',
+      domain: 'northwind.example',
+      website: 'https://northwind.example',
+      registryIds: { vat: 'FR 44 123 456 789', duns: '111222333' },
+      confidenceBps: 8000,
+    },
+    {
+      id: '22222222-2222-4222-8222-222222222222',
+      legalName: 'Contoso Demo GmbH',
+      tradeName: 'Contoso',
+      domain: 'contoso.example',
+      website: 'https://contoso.example',
+      registryIds: { VAT: 'DE999', duns: '999888777' },
+      confidenceBps: 7000,
+    },
+  ] as never);
+  opportunityFindMany.mockResolvedValue([
+    {
+      customer: 'Fabrikam Demo',
+      name: 'Fabrikam staffing bid',
+      logoUrl: null,
+    },
+  ] as never);
+}
+
+function clearRegistryPartnerBook() {
+  companyFindMany.mockReset();
+  companyFindMany.mockResolvedValue([]);
+  opportunityFindMany.mockReset();
+  opportunityFindMany.mockResolvedValue([]);
+}
+
 const TEST_ORG_ID = '00000000-0000-4000-8000-000000000001';
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000002';
 
@@ -268,6 +310,93 @@ describe('erp-integration route', () => {
       items: [],
       warnings: ['ERP MCP is not configured; using local Polo PreSales records.'],
     });
+  });
+
+  it('returns only the registry hit for a VAT-only or DUNS-only partner lookup', async () => {
+    // WHY: with ERP unset, a vat or duns query has no local where clause, so
+    // the route lists every company and every opportunity customer. A registry
+    // lookup is a match, not a browse of the demo book.
+    delete process.env.ERP_MCP_URL;
+    delete process.env.ODOO_MCP_URL;
+    __resetErpClient();
+    seedRegistryPartnerBook();
+    companyFindMany.mockClear();
+    opportunityFindMany.mockClear();
+    try {
+      const app = await buildApp();
+      const vatRes = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?vat=FR%2044%20123%20456%20789',
+      });
+      expect(vatRes.statusCode).toBe(200);
+      const vatBody = vatRes.json() as {
+        source: string;
+        items: Array<{ name: string; matchKeys: string[] }>;
+      };
+      expect(vatBody.source).toBe('local');
+      expect(vatBody.items.map((item) => item.name)).toEqual(['Northwind']);
+      expect(vatBody.items[0]?.matchKeys).toContain('vat');
+
+      const upperVatRes = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?vat=de999',
+      });
+      expect(upperVatRes.statusCode).toBe(200);
+      expect(
+        (upperVatRes.json() as { items: Array<{ name: string }> }).items.map((item) => item.name),
+      ).toEqual(['Contoso']);
+
+      const dunsRes = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?duns=999888777',
+      });
+      expect(dunsRes.statusCode).toBe(200);
+      const dunsBody = dunsRes.json() as {
+        source: string;
+        items: Array<{ name: string; matchKeys: string[] }>;
+      };
+      expect(dunsBody.source).toBe('local');
+      expect(dunsBody.items.map((item) => item.name)).toEqual(['Contoso']);
+      expect(dunsBody.items[0]?.matchKeys).toContain('duns');
+
+      const bothRes = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?vat=FR44123456789&duns=111222333',
+      });
+      expect(bothRes.statusCode).toBe(200);
+      expect(
+        (bothRes.json() as { items: Array<{ name: string }> }).items.map((item) => item.name),
+      ).toEqual(['Northwind']);
+
+      expect(opportunityFindMany).not.toHaveBeenCalled();
+    } finally {
+      clearRegistryPartnerBook();
+    }
+  });
+
+  it('returns no companies when a VAT or DUNS matches nobody in the local book', async () => {
+    // WHY: a miss, a short DUNS, or a VAT and DUNS from two different
+    // companies must not fall through to the rest of the book.
+    delete process.env.ERP_MCP_URL;
+    delete process.env.ODOO_MCP_URL;
+    __resetErpClient();
+    seedRegistryPartnerBook();
+    try {
+      const app = await buildApp();
+      for (const url of [
+        '/api/integrations/erp/company-autocomplete?vat=GB000000000',
+        '/api/integrations/erp/company-autocomplete?duns=111',
+        '/api/integrations/erp/company-autocomplete?vat=FR44123456789&duns=999888777',
+      ]) {
+        const res = await app.inject({ method: 'GET', url });
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as { source: string; items: Array<{ name: string }> };
+        expect(body.source).toBe('none');
+        expect(body.items).toEqual([]);
+      }
+    } finally {
+      clearRegistryPartnerBook();
+    }
   });
 
   it('proxies search_records and returns rows', async () => {
