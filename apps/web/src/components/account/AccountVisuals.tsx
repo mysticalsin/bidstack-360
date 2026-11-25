@@ -12,6 +12,7 @@ import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 
 import { layoutOrg, type MapPerson } from './org-layout';
+import { relationshipPersonHref } from './relationship-person-href';
 
 // Standing is evidence quality; map it to the shared colour + shape language.
 const STANDING: Record<string, { kind: string; label: string }> = {
@@ -52,14 +53,34 @@ function RelationshipMap({ company, people }: { company: string; people: MapPers
       {people.map((p, i) => {
         const at = pos.get(p.id)!;
         const st = STANDING[p.standing] ?? STANDING.unknown!;
-        return (
-          <g key={p.id} className="viz-pop" style={{ '--i': i } as React.CSSProperties}>
+        const href = relationshipPersonHref(p.id);
+        const node = (
+          <>
             <title>{`${p.name}${p.title ? `, ${p.title}` : ''} (${st.label})`}</title>
             <rect className="rel-node" x={at.x} y={at.y} width={NW} height={NH} rx={8} />
             <SignalShape kind={st.kind} x={at.x + 16} y={at.y + 18} r={4} />
-            <text className="rel-name" x={at.x + 28} y={at.y + 22}>{p.name.length > 20 ? `${p.name.slice(0, 19)}…` : p.name}</text>
+            <text className={href ? 'rel-name underline' : 'rel-name'} x={at.x + 28} y={at.y + 22}>{p.name.length > 20 ? `${p.name.slice(0, 19)}…` : p.name}</text>
             <text className="tick" x={at.x + 12} y={at.y + 40}>{(p.title ?? '').length > 26 ? `${p.title!.slice(0, 25)}…` : p.title}</text>
-          </g>
+          </>
+        );
+        const pop = { '--i': i } as React.CSSProperties;
+        if (!href) {
+          return (
+            <g key={p.id} className="viz-pop" style={pop}>
+              {node}
+            </g>
+          );
+        }
+        return (
+          <Link
+            key={p.id}
+            to={href}
+            aria-label={`Open ${p.name}`}
+            className="rel-person viz-pop focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]"
+            style={pop}
+          >
+            {node}
+          </Link>
         );
       })}
     </svg>
@@ -74,6 +95,9 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
   const stageIds = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
   const mix = statusMix(rows);
   const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
+  // A failed refresh must not replace a map that already loaded.
+  const peoplePending = people.isLoading && !people.data;
+  const peopleFailed = people.isError && !people.data;
   const { edges } = layoutOrg(ppl);
   const counts = ppl.reduce<Record<string, number>>((m, p) => { const l = (STANDING[p.standing] ?? STANDING.unknown!).label; m[l] = (m[l] ?? 0) + 1; return m; }, {});
 
@@ -104,11 +128,31 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
       </ChartCard>
       <ChartCard
         title="Relationship map"
-        meta={ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
-        summary={ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet'}
-        table={{ columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
+        interactive={peoplePending || peopleFailed || ppl.some((p) => relationshipPersonHref(p.id))}
+        meta={!peoplePending && !peopleFailed && ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
+        summary={
+          peoplePending
+            ? 'Loading contacts for this account'
+            : peopleFailed
+              ? "Couldn't load contacts for this account"
+              : ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet'
+        }
+        table={!peoplePending && !peopleFailed ? { columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) } : undefined}
       >
-        {ppl.length ? (
+        {peoplePending ? (
+          <p className="viz-empty" role="status">Loading contacts for this account.</p>
+        ) : peopleFailed ? (
+          <div className="viz-empty" role="status">
+            <p>Couldn&apos;t load contacts for this account.</p>
+            <button
+              type="button"
+              onClick={() => void people.refetch()}
+              className="inline-flex min-h-11 items-center rounded px-2 text-sm font-semibold text-[var(--fg-primary)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]"
+            >
+              Retry contacts
+            </button>
+          </div>
+        ) : ppl.length ? (
           <>
             <RelationshipMap company={companyName} people={ppl} />
             <ul className="viz-legend" aria-hidden>
@@ -127,7 +171,7 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
             ) : null}
           </>
         ) : (
-          <p className="viz-empty">No contacts yet. <Link to="/contacts">Add a contact</Link></p>
+          <p className="viz-empty">No contacts yet. <Link to="/contacts" className="rounded text-[var(--brand-primary)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] dark:text-[var(--brand-deep)]">Add a contact</Link></p>
         )}
       </ChartCard>
     </div>
