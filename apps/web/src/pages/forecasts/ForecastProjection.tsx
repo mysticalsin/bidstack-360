@@ -28,6 +28,8 @@ import { useForecastProjection } from '@/hooks/useForecasts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
+import { forecastFocusPeriod } from './forecast-focus';
+
 type FormatMoney = (micros: number, currency?: string) => string;
 
 export function ForecastProjection() {
@@ -37,7 +39,12 @@ export function ForecastProjection() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const periods = projection.data?.periods ?? [];
-  const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
+  // Current quarter is first. When it has no figures, open the later period
+  // that does so a book closing next quarter is not presented as zero.
+  const focus = forecastFocusPeriod(periods);
+  const activePeriod = (selected ? periods.find((p) => p.period === selected) : undefined) ?? focus;
+  const reporting = periods[0];
+  const shifted = Boolean(reporting && focus && reporting.period !== focus.period);
   const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
   const bars = forecastPeriodBars(periods);
 
@@ -81,12 +88,22 @@ export function ForecastProjection() {
           <Tabs value={activePeriod.period} onValueChange={setSelected}>
             <TabsList aria-label={t('forecastProjection.periodLabel', 'Forecast period')}>
               {periods.map((p) => (
-                <TabsTrigger key={p.period} value={p.period}>
+                <TabsTrigger key={p.period} value={p.period} className="min-h-11">
                   {p.label}
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
+
+          {shifted && reporting && focus ? (
+            <p className="text-sm text-[var(--fg-secondary)]">
+              {t(
+                'forecastProjection.laterBook',
+                'Nothing closes in {{quarter}}. Next figures are in {{next}}.',
+                { quarter: reporting.label, next: focus.label },
+              )}
+            </p>
+          ) : null}
 
           <ProjectionTotals period={activePeriod} formatMoneyMicros={formatMoneyMicros} t={t} />
           <ProjectionOwnerTable period={activePeriod} formatMoneyMicros={formatMoneyMicros} t={t} />
