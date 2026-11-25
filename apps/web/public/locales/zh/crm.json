@@ -118,7 +118,13 @@
       "inStageOne": "所选阶段中有 {{count}} 个商机",
       "inStageMany": "所选阶段中有 {{count}} 个商机",
       "totalOne": "{{count}} 个商机",
-      "totalMany": "{{count}} 个商机"
+      "totalMany": "{{count}} 个商机",
+      "dueWithin7One": "{{count}} 个 7 天内到期的投标",
+      "dueWithin7Many": "{{count}} 个 7 天内到期的投标",
+      "overdueOne": "{{count}} 个逾期投标",
+      "overdueMany": "{{count}} 个逾期投标",
+      "inViewOne": "此视图中有 {{count}} 个商机",
+      "inViewMany": "此视图中有 {{count}} 个商机"
     },
     "error": {
       "title": "无法加载商机",
@@ -126,7 +132,19 @@
     },
     "empty": {
       "title": "暂无商机",
-      "message": "创建您的第一个商机以开始跟踪投标。"
+      "message": "创建您的第一个商机以开始跟踪投标。",
+      "dueWithin7Title": "未来 7 天没有到期的投标",
+      "dueWithin7Message": "其余标书仍在。清除筛选即可查看。",
+      "overdueTitle": "没有逾期投标",
+      "overdueMessage": "此列表中没有已过期的投标。清除筛选即可查看其余标书。",
+      "stageTitle": "此阶段没有商机",
+      "stageMessage": "清除筛选即可查看其余标书。",
+      "searchTitle": "没有商机与搜索匹配",
+      "searchMessage": "没有与“{{search}}”匹配的结果。",
+      "viewTitle": "没有商机与此视图匹配",
+      "viewMessage": "清除筛选即可查看其余标书。",
+      "clearFilter": "清除筛选",
+      "clearFilters": "清除筛选条件"
     },
     "caption": {
       "matching": "匹配 “{{search}}” 的商机",
@@ -2135,6 +2153,13 @@
     "stageOpportunities": "{{stage}}商机",
     "clearFilter": "清除筛选",
     "bidsInFlight": "{{count}} 个进行中的投标 · 点击任意单元格即可行内编辑。",
+    "bidDueWithin7": "个 7 天内到期的投标",
+    "bidsDueWithin7": "个 7 天内到期的投标",
+    "bidOverdue": "个逾期投标",
+    "bidsOverdue": "个逾期投标",
+    "dueWordWithin7": "7 天内到期",
+    "dueWordOverdue": "逾期",
+    "dueStageOpportunities": "{{due}}的{{stage}}商机",
     "exportingLabel": "正在导出商机…",
     "exportLabel": "将可见商机导出为 CSV",
     "exporting": "正在导出…",

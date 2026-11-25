@@ -7,6 +7,30 @@ import { OpportunitiesPage } from './OpportunitiesPage';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useHasPermission } from '@/hooks/useCapabilities';
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string, opts?: Record<string, unknown>) => {
+      const template = typeof fallback === 'string' ? fallback : key;
+      if (!opts) return template;
+      return Object.entries(opts).reduce(
+        (str, [name, value]) => str.replaceAll(`{{${name}}}`, String(value)),
+        template,
+      );
+    },
+    i18n: { language: 'en' },
+  }),
+}));
+
+vi.mock('@/hooks/useOrgSummary', () => ({
+  useOrgSummary: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunities: vi.fn(),
   usePatchOpportunity: vi.fn(() => ({ mutate: vi.fn() })),
@@ -70,10 +94,15 @@ function mockOpportunities(value: Partial<ReturnType<typeof useOpportunities>>) 
   vi.mocked(useOpportunities).mockReturnValue(value as ReturnType<typeof useOpportunities>);
 }
 
-function renderWithProviders(ui: React.ReactElement) {
+function subtitleText(): string {
+  const heading = screen.getByRole('heading', { name: 'Opportunities' });
+  return heading.parentElement?.querySelector('p')?.textContent ?? '';
+}
+
+function renderWithProviders(ui: React.ReactElement, path = '/') {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -237,6 +266,73 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href')).toBe(
       '/settings?tab=data-import',
     );
+  });
+
+  // The demo book is dated mid-2026. "Due ≤ 7d" is a forward window, so on a
+  // later day that chip matches nothing. An empty filtered read is not an
+  // empty book: the first-run pitch would send someone to create a bid that
+  // already exists under Overdue.
+  it('does not call a due-window miss an empty book', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?due=within7');
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByRole('link', { name: /import your deal book/i })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Nothing due in the next 7 days' })).toBeTruthy();
+    expect(screen.getByText(/The rest of the book is still here/)).toBeTruthy();
+    expect(subtitleText()).toMatch(/0 bids due within 7 days/);
+    expect(subtitleText()).not.toMatch(/bids in flight/);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Clear filter$/ }));
+
+    expect(screen.getByText('No open bids yet')).toBeTruthy();
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('dueWithinDays');
+  });
+
+  it('names overdue bids in the subtitle when that filter has rows', () => {
+    mockOpportunities({
+      data: { items: [seededOpportunity()], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?due=overdue');
+
+    expect(screen.getByText('Acme Upgrade')).toBeTruthy();
+    expect(subtitleText()).toMatch(/1 overdue bid/);
+    expect(subtitleText()).not.toMatch(/bids in flight/);
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+  });
+
+  it('does not call a stage or search miss an empty book', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const { unmount } = renderWithProviders(
+      <OpportunitiesPage />,
+      '/opportunities?pipelineStageId=s1_lead',
+    );
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'No opportunities in this stage' })).toBeTruthy();
+    unmount();
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?search=nomatch');
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'No opportunities match your search' })).toBeTruthy();
+    expect(screen.getByText(/Nothing matched "nomatch"/)).toBeTruthy();
   });
 });
 

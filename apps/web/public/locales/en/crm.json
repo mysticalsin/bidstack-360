@@ -118,7 +118,13 @@
       "inStageOne": "{{count}} opportunity in selected stage",
       "inStageMany": "{{count}} opportunities in selected stage",
       "totalOne": "{{count}} opportunity",
-      "totalMany": "{{count}} opportunities"
+      "totalMany": "{{count}} opportunities",
+      "dueWithin7One": "{{count}} bid due within 7 days",
+      "dueWithin7Many": "{{count}} bids due within 7 days",
+      "overdueOne": "{{count}} overdue bid",
+      "overdueMany": "{{count}} overdue bids",
+      "inViewOne": "{{count}} opportunity in this view",
+      "inViewMany": "{{count}} opportunities in this view"
     },
     "error": {
       "title": "Couldn't load opportunities",
@@ -126,7 +132,19 @@
     },
     "empty": {
       "title": "No opportunities yet",
-      "message": "Create your first opportunity to start tracking bids."
+      "message": "Create your first opportunity to start tracking bids.",
+      "dueWithin7Title": "Nothing due in the next 7 days",
+      "dueWithin7Message": "The rest of the book is still here. Clear the filter to see it.",
+      "overdueTitle": "No overdue bids",
+      "overdueMessage": "Nothing in this list is past its due date. Clear the filter to see the rest of the book.",
+      "stageTitle": "No opportunities in this stage",
+      "stageMessage": "Clear the filter to see the rest of the book.",
+      "searchTitle": "No opportunities match your search",
+      "searchMessage": "Nothing matched \"{{search}}\".",
+      "viewTitle": "No opportunities match this view",
+      "viewMessage": "Clear the filters to see the rest of the book.",
+      "clearFilter": "Clear filter",
+      "clearFilters": "Clear filters"
     },
     "caption": {
       "matching": "Opportunities matching \"{{search}}\"",
@@ -2144,6 +2162,13 @@
     "stageOpportunities": "{{stage}} opportunities",
     "clearFilter": "clear filter",
     "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "bidDueWithin7": "bid due within 7 days",
+    "bidsDueWithin7": "bids due within 7 days",
+    "bidOverdue": "overdue bid",
+    "bidsOverdue": "overdue bids",
+    "dueWordWithin7": "due within 7 days",
+    "dueWordOverdue": "overdue",
+    "dueStageOpportunities": "{{due}} {{stage}} opportunities",
     "exportingLabel": "Exporting opportunities…",
     "exportLabel": "Export visible opportunities as CSV",
     "exporting": "Exporting…",

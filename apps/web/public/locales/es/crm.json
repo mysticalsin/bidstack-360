@@ -336,7 +336,13 @@
       "inStageOne": "{{count}} oportunidad en la etapa seleccionada",
       "inStageMany": "{{count}} oportunidades en la etapa seleccionada",
       "totalOne": "{{count}} oportunidad",
-      "totalMany": "{{count}} oportunidades"
+      "totalMany": "{{count}} oportunidades",
+      "dueWithin7One": "{{count}} oferta que vence en 7 días",
+      "dueWithin7Many": "{{count}} ofertas que vencen en 7 días",
+      "overdueOne": "{{count}} oferta vencida",
+      "overdueMany": "{{count}} ofertas vencidas",
+      "inViewOne": "{{count}} oportunidad en esta vista",
+      "inViewMany": "{{count}} oportunidades en esta vista"
     },
     "error": {
       "title": "No se pudieron cargar las oportunidades",
@@ -344,7 +350,19 @@
     },
     "empty": {
       "title": "Aún no hay oportunidades",
-      "message": "Crea tu primera oportunidad para empezar a seguir las licitaciones."
+      "message": "Crea tu primera oportunidad para empezar a seguir las licitaciones.",
+      "dueWithin7Title": "Nada vence en los próximos 7 días",
+      "dueWithin7Message": "El resto de la cartera sigue aquí. Quita el filtro para verlo.",
+      "overdueTitle": "Ninguna oferta vencida",
+      "overdueMessage": "Nada en esta lista ha pasado su fecha. Quita el filtro para ver el resto de la cartera.",
+      "stageTitle": "Ninguna oportunidad en esta etapa",
+      "stageMessage": "Quita el filtro para ver el resto de la cartera.",
+      "searchTitle": "Ninguna oportunidad coincide con tu búsqueda",
+      "searchMessage": "Nada coincidió con \"{{search}}\".",
+      "viewTitle": "Ninguna oportunidad coincide con esta vista",
+      "viewMessage": "Quita los filtros para ver el resto de la cartera.",
+      "clearFilter": "Quitar filtro",
+      "clearFilters": "Quitar filtros"
     },
     "caption": {
       "matching": "Oportunidades que coinciden con \"{{search}}\"",
@@ -2168,6 +2186,13 @@
     "stageOpportunities": "oportunidades {{stage}}",
     "clearFilter": "borrar filtro",
     "bidsInFlight": "{{count}} ofertas en curso · haz clic en cualquier celda para editar en línea.",
+    "bidDueWithin7": "oferta que vence en 7 días",
+    "bidsDueWithin7": "ofertas que vencen en 7 días",
+    "bidOverdue": "oferta vencida",
+    "bidsOverdue": "ofertas vencidas",
+    "dueWordWithin7": "que vencen en 7 días",
+    "dueWordOverdue": "vencidas",
+    "dueStageOpportunities": "oportunidades {{stage}} {{due}}",
     "exportingLabel": "Exportando oportunidades…",
     "exportLabel": "Exportar las oportunidades visibles como CSV",
     "exporting": "Exportando…",

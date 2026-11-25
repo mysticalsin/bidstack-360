@@ -26,6 +26,10 @@ import { useTranslation } from 'react-i18next';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
+import { opportunitySubtitle, type DueQuickFilter } from './opportunity-view-copy';
+
+export type { DueQuickFilter };
+
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
 /**
@@ -121,16 +125,20 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
 export function OppPageHeader({
   search,
   stageFilter,
+  dueFilter,
   stageOptions,
   itemCount,
   hasData,
   isExporting = false,
   onClearSearch,
   onClearStageFilter,
+  onClearDueFilter,
+  onClearStageAndDue,
   onExportCsv,
 }: {
   search: string | undefined;
   stageFilter: string | null;
+  dueFilter: DueQuickFilter;
   stageOptions: PipelineStage[];
   itemCount: number;
   hasData: boolean;
@@ -138,6 +146,8 @@ export function OppPageHeader({
   isExporting?: boolean;
   onClearSearch: () => void;
   onClearStageFilter: () => void;
+  onClearDueFilter: () => void;
+  onClearStageAndDue: () => void;
   onExportCsv: () => void;
 }) {
   const { t } = useTranslation('crm');
@@ -146,15 +156,28 @@ export function OppPageHeader({
   const stageFilterLabel = stageFilter
     ? (stageOptions.find((s) => s.id === stageFilter)?.name ?? formatStage(stageFilter))
     : '';
+  const subtitle = opportunitySubtitle({
+    search,
+    stageFilter,
+    stageLabel: stageFilterLabel,
+    dueFilter,
+    count: itemCount,
+  });
   const clearBtnClass =
-    'ml-2 rounded text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
+    'ml-2 inline-flex min-h-11 items-center rounded px-2 text-xs font-medium text-[var(--fg-secondary)] underline decoration-[var(--fg-secondary)] underline-offset-2 hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
+  const clearLabel =
+    subtitle.clear === 'filters'
+      ? t('opportunities.empty.clearFilters', 'Clear filters')
+      : t('oppToolbar.clearFilter', 'clear filter');
+  const onClearSubtitle =
+    subtitle.kind === 'due-and-stage' ? onClearStageAndDue : onClearDueFilter;
 
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <h1 className="page-title">{t('oppToolbar.title', 'Opportunities')}</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {search ? (
+          {subtitle.kind === 'search' ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
               {t('oppToolbar.resultsFor', 'results for')}{' '}
@@ -165,7 +188,7 @@ export function OppPageHeader({
                 {t('oppToolbar.clear', 'clear')}
               </button>
             </>
-          ) : stageFilter ? (
+          ) : subtitle.kind === 'stage' ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
               {t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
@@ -173,6 +196,28 @@ export function OppPageHeader({
               })}
               <button type="button" onClick={onClearStageFilter} className={clearBtnClass}>
                 {t('oppToolbar.clearFilter', 'clear filter')}
+              </button>
+            </>
+          ) : subtitle.kind === 'due' || subtitle.kind === 'due-and-stage' ? (
+            <>
+              <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
+              {subtitle.phrase
+                ? t(
+                    subtitle.phrase.key,
+                    subtitle.phrase.fallback,
+                    subtitle.phrase.vars?.due
+                      ? {
+                          ...subtitle.phrase.vars,
+                          due:
+                            dueFilter === 'overdue'
+                              ? t('oppToolbar.dueWordOverdue', 'overdue')
+                              : t('oppToolbar.dueWordWithin7', 'due within 7 days'),
+                        }
+                      : subtitle.phrase.vars,
+                  )
+                : null}
+              <button type="button" onClick={onClearSubtitle} className={clearBtnClass}>
+                {clearLabel}
               </button>
             </>
           ) : (
@@ -265,8 +310,6 @@ export function OppStageChips({
 // action — "due soon" and "already missed". Same toggle-pill pattern as
 // OppStageChips (click again to clear) so the two chip rows read as one
 // filtering language, not two different UI idioms.
-
-export type DueQuickFilter = 'within7' | 'overdue' | null;
 
 export function OppDueChips({
   dueFilter,

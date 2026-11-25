@@ -118,7 +118,13 @@
       "inStageOne": "{{count}} oportunidade na etapa selecionada",
       "inStageMany": "{{count}} oportunidades na etapa selecionada",
       "totalOne": "{{count}} oportunidade",
-      "totalMany": "{{count}} oportunidades"
+      "totalMany": "{{count}} oportunidades",
+      "dueWithin7One": "{{count}} proposta que vence em 7 dias",
+      "dueWithin7Many": "{{count}} propostas que vencem em 7 dias",
+      "overdueOne": "{{count}} proposta atrasada",
+      "overdueMany": "{{count}} propostas atrasadas",
+      "inViewOne": "{{count}} oportunidade nesta vista",
+      "inViewMany": "{{count}} oportunidades nesta vista"
     },
     "error": {
       "title": "Não foi possível carregar as oportunidades",
@@ -126,7 +132,19 @@
     },
     "empty": {
       "title": "Ainda não há oportunidades",
-      "message": "Crie sua primeira oportunidade para começar a acompanhar as propostas."
+      "message": "Crie sua primeira oportunidade para começar a acompanhar as propostas.",
+      "dueWithin7Title": "Nada vence nos próximos 7 dias",
+      "dueWithin7Message": "O resto da carteira continua aqui. Limpe o filtro para vê-lo.",
+      "overdueTitle": "Nenhuma proposta atrasada",
+      "overdueMessage": "Nada nesta lista passou da data. Limpe o filtro para ver o resto da carteira.",
+      "stageTitle": "Nenhuma oportunidade nesta etapa",
+      "stageMessage": "Limpe o filtro para ver o resto da carteira.",
+      "searchTitle": "Nenhuma oportunidade corresponde à pesquisa",
+      "searchMessage": "Nada corresponde a \"{{search}}\".",
+      "viewTitle": "Nenhuma oportunidade corresponde a esta vista",
+      "viewMessage": "Limpe os filtros para ver o resto da carteira.",
+      "clearFilter": "Limpar filtro",
+      "clearFilters": "Limpar filtros"
     },
     "caption": {
       "matching": "Oportunidades correspondentes a \"{{search}}\"",
@@ -2135,6 +2153,13 @@
     "stageOpportunities": "oportunidades {{stage}}",
     "clearFilter": "limpar filtro",
     "bidsInFlight": "{{count}} propostas em andamento · clique em qualquer célula para editar em linha.",
+    "bidDueWithin7": "proposta que vence em 7 dias",
+    "bidsDueWithin7": "propostas que vencem em 7 dias",
+    "bidOverdue": "proposta atrasada",
+    "bidsOverdue": "propostas atrasadas",
+    "dueWordWithin7": "que vencem em 7 dias",
+    "dueWordOverdue": "atrasadas",
+    "dueStageOpportunities": "oportunidades {{stage}} {{due}}",
     "exportingLabel": "Exportando oportunidades…",
     "exportLabel": "Exportar as oportunidades visíveis como CSV",
     "exporting": "Exportando…",

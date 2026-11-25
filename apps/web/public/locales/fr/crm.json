@@ -358,7 +358,13 @@
       "inStageOne": "{{count}} opportunité dans l'étape sélectionnée",
       "inStageMany": "{{count}} opportunités dans l'étape sélectionnée",
       "totalOne": "{{count}} opportunité",
-      "totalMany": "{{count}} opportunités"
+      "totalMany": "{{count}} opportunités",
+      "dueWithin7One": "{{count}} offre due dans les 7 jours",
+      "dueWithin7Many": "{{count}} offres dues dans les 7 jours",
+      "overdueOne": "{{count}} offre en retard",
+      "overdueMany": "{{count}} offres en retard",
+      "inViewOne": "{{count}} opportunité dans cette vue",
+      "inViewMany": "{{count}} opportunités dans cette vue"
     },
     "error": {
       "title": "Impossible de charger les opportunités",
@@ -366,7 +372,19 @@
     },
     "empty": {
       "title": "Aucune opportunité pour l'instant",
-      "message": "Créez votre première opportunité pour commencer à suivre les appels d'offres."
+      "message": "Créez votre première opportunité pour commencer à suivre les appels d'offres.",
+      "dueWithin7Title": "Rien n'arrive à échéance dans les 7 prochains jours",
+      "dueWithin7Message": "Le reste du portefeuille est toujours là. Effacez le filtre pour le voir.",
+      "overdueTitle": "Aucune offre en retard",
+      "overdueMessage": "Rien dans cette liste n'a dépassé sa date d'échéance. Effacez le filtre pour voir le reste du portefeuille.",
+      "stageTitle": "Aucune opportunité à cette étape",
+      "stageMessage": "Effacez le filtre pour voir le reste du portefeuille.",
+      "searchTitle": "Aucune opportunité ne correspond à votre recherche",
+      "searchMessage": "Rien ne correspond à « {{search}} ».",
+      "viewTitle": "Aucune opportunité ne correspond à cette vue",
+      "viewMessage": "Effacez les filtres pour voir le reste du portefeuille.",
+      "clearFilter": "Effacer le filtre",
+      "clearFilters": "Effacer les filtres"
     },
     "caption": {
       "matching": "Opportunités correspondant à \"{{search}}\"",
@@ -2190,6 +2208,13 @@
     "stageOpportunities": "opportunités {{stage}}",
     "clearFilter": "effacer le filtre",
     "bidsInFlight": "{{count}} offres en cours · cliquez sur une cellule pour modifier en ligne.",
+    "bidDueWithin7": "offre due dans les 7 jours",
+    "bidsDueWithin7": "offres dues dans les 7 jours",
+    "bidOverdue": "offre en retard",
+    "bidsOverdue": "offres en retard",
+    "dueWordWithin7": "dues dans les 7 jours",
+    "dueWordOverdue": "en retard",
+    "dueStageOpportunities": "opportunités {{stage}} {{due}}",
     "exportingLabel": "Exportation des opportunités…",
     "exportLabel": "Exporter les opportunités visibles au format CSV",
     "exporting": "Exportation…",
