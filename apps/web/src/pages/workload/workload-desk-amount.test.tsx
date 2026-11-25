@@ -6,6 +6,8 @@ import type { WorkloadOwner } from '@/hooks/useWorkload';
 import { WorkloadTable } from '@/pages/workload/WorkloadTable';
 import { useCurrencyStore } from '@/stores/currency';
 
+import { workloadDeskAmount } from './workload-desk-amount';
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (_key: string, fallback: string) => fallback,
@@ -56,5 +58,13 @@ describe('workload desk weighted amount under demo data', () => {
     const text = weighted?.textContent ?? '';
     expect(text).not.toMatch(/EUR|€/);
     expect(digits(text)).toBe('61520');
+  });
+
+  it('does not invent a euro zero when the micros are not a safe integer', () => {
+    // WHY: a desk figure that is not an integer micros value is not an
+    // amount. It must not fall through to an EUR zero. The team total is separate.
+    expect(workloadDeskAmount(Number.NaN)).toBe('Not a number');
+    expect(workloadDeskAmount(1.5)).toBe('Not a number');
+    expect(workloadDeskAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });
