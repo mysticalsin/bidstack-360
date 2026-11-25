@@ -69,7 +69,9 @@
     "sectionNav": "Draft section navigation",
     "selectSection": "Select a section above to review and edit it.",
     "emptyTitle": "No draft yet",
-    "emptyMessage": "Draft sections will appear here once section drafting is complete."
+    "emptyMessage": "Draft sections will appear here once section drafting is complete.",
+    "noSectionsTitle": "This proposal has no sections.",
+    "noSectionsMessage": "This draft has no section text. Section drafting is not still running."
   },
   "compliance": {
     "heading": "Compliance Matrix",

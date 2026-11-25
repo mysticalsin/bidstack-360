@@ -6,6 +6,15 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { DraftSection } from '@/hooks/rfp/useRfpDraft';
+
+const SUMMARY_ID = '22222222-2222-4222-8222-222222222222';
+
+const draft = vi.hoisted(() => ({
+  proposalId: '22222222-2222-4222-8222-222222222222',
+  sections: [] as DraftSection[],
+}));
+
 const EN: Record<string, string> = {
   'draft.heading': 'Draft Sections',
   'draft.emptyTitle': 'No draft yet',
@@ -27,10 +36,7 @@ vi.mock('@/stores/rfpPipeline', () => ({
 vi.mock('@/hooks/rfp/useRfpDraft', () => ({
   useRfpDraft: () => ({
     query: {
-      data: {
-        proposalId: '22222222-2222-4222-8222-222222222222',
-        sections: [],
-      },
+      data: draft,
       isLoading: false,
       isError: false,
       error: null,
@@ -41,9 +47,21 @@ vi.mock('@/hooks/rfp/useRfpDraft', () => ({
 
 import { DraftReviewPane } from './DraftReviewPane';
 
+const TECHNICAL_SECTION: DraftSection = {
+  id: '11111111-1111-4111-8111-111111111111',
+  order: 0,
+  title: 'Executive summary',
+  content: '<p>Win themes for the Siemens ERP bid.</p>',
+  aiGenerated: false,
+  humanReviewed: false,
+  lastEditedAt: null,
+};
+
 describe('DraftReviewPane empty demo draft', () => {
   afterEach(() => {
     cleanup();
+    draft.proposalId = SUMMARY_ID;
+    draft.sections = [];
   });
 
   it('does not tell a reviewer that section drafting will still fill an empty proposal', () => {
@@ -61,6 +79,23 @@ describe('DraftReviewPane empty demo draft', () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText('No draft yet')).toBeNull();
-    expect(screen.queryByText('Draft sections will appear here once section drafting is complete.')).toBeNull();
+    expect(
+      screen.queryByText('Draft sections will appear here once section drafting is complete.'),
+    ).toBeNull();
+  });
+
+  it('still lists sections when the opened proposal has them', () => {
+    // WHY: the Siemens technical proposal can hold the draft. An empty
+    // sibling must not make this pane say the open proposal has no sections.
+    draft.proposalId = '11111111-1111-4111-8111-111111111111';
+    draft.sections = [TECHNICAL_SECTION];
+
+    render(<DraftReviewPane />);
+
+    expect(screen.getByRole('button', { name: 'Executive summary' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'This proposal has no sections.' })).toBeNull();
+    expect(
+      screen.queryByText('Draft sections will appear here once section drafting is complete.'),
+    ).toBeNull();
   });
 });

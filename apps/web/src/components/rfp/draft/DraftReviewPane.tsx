@@ -32,7 +32,17 @@ export function DraftReviewPane() {
         </p>
       )}
 
-      {!isLoading && !isError && (!data || data.sections.length === 0) && (
+      {!isLoading && !isError && data && data.sections.length === 0 && (
+        <EmptyState
+          title={t('draft.noSectionsTitle', 'This proposal has no sections.')}
+          message={t(
+            'draft.noSectionsMessage',
+            'This draft has no section text. Section drafting is not still running.',
+          )}
+        />
+      )}
+
+      {!isLoading && !isError && !data && (
         <EmptyState title={t('draft.emptyTitle')} message={t('draft.emptyMessage')} />
       )}
 
