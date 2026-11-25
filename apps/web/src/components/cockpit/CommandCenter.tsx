@@ -7,13 +7,13 @@ import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { beatsProvider, figureText, isCompanyId, useSourcedFigures } from '@/hooks/useSourcedFigures';
 import { springSnap, springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, RiskItem } from '@bidstack/shared';
 
 import { labelForBand } from './_tokens';
+import { commandCenterAmount } from './command-center-amount';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -29,7 +29,6 @@ interface CommandSignal {
 
 export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoneyMicros } = useFormatMoney();
   const { t } = useTranslation('crm');
   const readiness = deriveReadiness(cockpit);
   const nextMove = deriveNextMove(cockpit, t);
@@ -161,12 +160,16 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
             <SourcedRevenue
               companyId={cockpit.company.id}
               companyName={cockpit.company.name}
-              crmValue={cockpit.company.annualRevenueMicros ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR') : null}
+              crmValue={
+                cockpit.company.annualRevenueMicros
+                  ? commandCenterAmount(cockpit.company.annualRevenueMicros)
+                  : null
+              }
             />
           ) : (
             <strong>
               {cockpit.company.annualRevenueMicros
-                ? formatMoneyMicros(cockpit.company.annualRevenueMicros, 'EUR')
+                ? commandCenterAmount(cockpit.company.annualRevenueMicros)
                 : t('commandCenter.footer.weightedValue.notVerified', 'Not verified')}
             </strong>
           )}

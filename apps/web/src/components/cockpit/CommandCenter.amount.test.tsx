@@ -13,15 +13,9 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useSourcedFigures', async () => {
-  const actual = await vi.importActual<typeof import('@/hooks/useSourcedFigures')>(
-    '@/hooks/useSourcedFigures',
-  );
-  return {
-    ...actual,
-    useSourcedFigures: () => ({ revenue: null, employees: null, companyName: '' }),
-  };
-});
+vi.mock('@/lib/api', () => ({
+  api: vi.fn(async () => ({ items: [] })),
+}));
 
 vi.mock('framer-motion', async () => {
   const React = await import('react');
