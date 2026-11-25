@@ -19,14 +19,12 @@ import type {
   SignalFactor,
 } from '@bidstack/shared';
 
-import { defaultTechnicalStack } from './dashboard.defaults.js';
 import {
   asComplianceStatus,
   asRiskSeverity,
   asRiskStatus,
   attribution,
   formatMicrosCompact,
-  mergeTechnicalStack,
   normalizeName,
   parseAttribution,
   record,
@@ -270,7 +268,10 @@ function resolveCockpitTechnicalStack(
     overrides.find((override) => override.fieldKey === TECHNICAL_STACK_FIELD_KEY)?.value,
   );
   if (technicalStackOverride) return technicalStackOverride.stack;
-  return mergeTechnicalStack(providerStack, defaultTechnicalStack());
+  // An empty detection stays empty. A canned catalog (Microsoft 365, Azure,
+  // AWS, Google Cloud, and the rest) used to fill every account, so funding
+  // eligibility recommended ECIF, MAP, and PSF for shops that are not those.
+  return providerStack;
 }
 
 // ─── Activity serializer ──────────────────────────────────────────────────────
