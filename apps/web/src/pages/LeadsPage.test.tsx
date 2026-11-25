@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -113,5 +113,55 @@ describe('LeadsPage — leads:write gating', () => {
     renderWithProviders(<LeadsPage />);
 
     expect(screen.queryByRole('button', { name: /New lead/i })).toBeNull();
+  });
+
+  // Demo seeds are open leads (new, contacted, qualified, nurture). The list
+  // status control must not offer Converted: that PATCH is rejected, and the
+  // optimistic update would paint a Converted badge the server then rolls back.
+  // Conversion creates the opportunity and contact from the lead detail action.
+  it('does not offer Converted in the list status editor', () => {
+    vi.mocked(useHasPermission).mockReturnValue(true);
+
+    renderWithProviders(<LeadsPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Edit status for/i }));
+    const select = screen.getByRole('combobox', { name: /^Edit status for/i });
+    const options = within(select).getAllByRole('option').map((o) => o.getAttribute('value'));
+    expect(options).not.toContain('converted');
+    expect(options).toContain('qualified');
+  });
+
+  // A lead that is already converted keeps that badge. Reopening the status
+  // editor would offer a move the API rejects, and the badge would go stale
+  // until the rollback.
+  it('keeps a converted lead on a static Converted badge', () => {
+    vi.mocked(useHasPermission).mockReturnValue(true);
+    mockLeads({
+      data: {
+        items: [
+          {
+            ...baseLead(),
+            status: 'converted',
+            convertedToOpportunityId: '22222222-2222-2222-2222-222222222222',
+          },
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<LeadsPage />);
+
+    const row = screen.getByRole('row', { name: /Jane Doe/i });
+    expect(within(row).queryByRole('button', { name: /^Edit status for/i })).toBeNull();
+    expect(within(row).getByText('Converted')).toBeTruthy();
+    expect(within(row).queryByRole('option', { name: 'Converted' })).toBeNull();
+    // Filtering by converted stays. Only the row editor was the false convert path.
+    const filter = screen.getByRole('combobox', { name: /Filter leads by status/i });
+    expect(within(filter).getByRole('option', { name: 'Converted' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Edit priority for/i })).toBeTruthy();
   });
 });
