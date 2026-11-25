@@ -67,6 +67,18 @@ export const CompanyAutocompleteQuery = z.object({
 export type CompanyAutocompleteInput = z.infer<typeof CompanyAutocompleteQuery>;
 export type CompanySuggestion = z.infer<typeof ErpCompanySuggestion>;
 
+// A partner lookup is a search, not a browse. With no name, domain, VAT, or
+// DUNS the ERP domain is only `is_company = true` and the local query is the
+// whole org, so a blank demo lookup lists unrelated companies as matches.
+export function hasCompanyLookupKey(query: {
+  q?: string | null;
+  domain?: string | null;
+  vat?: string | null;
+  duns?: string | null;
+}): boolean {
+  return [query.q, query.domain, query.vat, query.duns].some((value) => Boolean(value?.trim()));
+}
+
 // ─── Merge utility (exported for route layer) ───────────────────────────────
 
 export function mergeSuggestions(...groups: CompanySuggestion[][]): CompanySuggestion[] {

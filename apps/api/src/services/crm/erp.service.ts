@@ -21,6 +21,7 @@ export {
   type CompanySuggestion,
   asUrl,
   normalizeDomain,
+  hasCompanyLookupKey,
   mergeSuggestions,
   safeErrorMessage,
 } from './erp.helpers.js';
