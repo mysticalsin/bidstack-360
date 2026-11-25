@@ -6,12 +6,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
+import { QuickAddMenu } from '@/components/quickadd/QuickAddMenu';
 import { useQuickAddStore } from '@/stores/quickAdd';
 
 import { LiquidQuickActions } from './LiquidQuickActions';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
+}));
+
+// The phone disc only has to choose the entity. QuickAddMenu is the one
+// place those dialogs render, so the test mounts that owner and stubs the
+// forms. A real form would call the API.
+vi.mock('@/components/opportunity/CreateOpportunityDialog', () => ({
+  CreateOpportunityDialog: ({ open }: { open?: boolean }) =>
+    open ? <div role="dialog" aria-label="New opportunity" /> : null,
+}));
+vi.mock('@/components/task/CreateTaskDialog', () => ({
+  CreateTaskDialog: ({ open }: { open?: boolean }) =>
+    open ? <div role="dialog" aria-label="New task" /> : null,
+}));
+vi.mock('@/components/contact/ContactDialog', () => ({
+  ContactDialog: () => null,
 }));
 
 function PathProbe() {
@@ -23,6 +39,7 @@ function renderActions(path = '/dashboard') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <LiquidQuickActions />
+      <QuickAddMenu />
       <PathProbe />
     </MemoryRouter>,
   );
@@ -44,9 +61,10 @@ describe('bottom quick actions on a phone', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New opportunity' }));
 
-    // The list is where a closed form lives. The dialog is the quick-add pick
-    // QuickAddMenu already renders for the command palette.
+    // The list is where a closed form lives. The dialog is the one QuickAddMenu
+    // renders for this pick, the same dialog the command palette opens.
     expect(screen.getByTestId('path').textContent).toBe('/dashboard');
+    expect(screen.getByRole('dialog', { name: 'New opportunity' })).toBeTruthy();
     expect(useQuickAddStore.getState().pick).toBe('opportunity');
     expect(screen.getByRole('button', { name: 'Quick actions' }).getAttribute('aria-expanded')).toBe(
       'false',
@@ -60,6 +78,7 @@ describe('bottom quick actions on a phone', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New task' }));
 
     expect(screen.getByTestId('path').textContent).toBe('/dashboard');
+    expect(screen.getByRole('dialog', { name: 'New task' })).toBeTruthy();
     expect(useQuickAddStore.getState().pick).toBe('task');
   });
 
