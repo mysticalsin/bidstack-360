@@ -21,6 +21,7 @@ import {
   proposalApprovalRoutes,
   proposalIsImmutable,
 } from './proposals.approval.js';
+import { proposalOpportunityValueLine } from './proposal-amount.js';
 import { DEFAULT_SECTIONS, serializeProposal } from './proposals.helpers.js';
 
 // DEFAULT_SECTIONS and serializeProposal extracted to ./proposals.helpers.ts (BS-R1)
@@ -399,7 +400,7 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       const opportunityContext = [
         opp ? `Opportunity: ${opp.name}` : '',
         opp ? `Stage: ${opp.stage}, Probability: ${opp.probability}%` : '',
-        opp?.valueMicros ? `Value: €${(Number(opp.valueMicros) / 1e6).toLocaleString()}` : '',
+        proposalOpportunityValueLine(opp?.valueMicros),
         opp?.territory?.name ? `Territory: ${opp.territory.name}` : '',
         req.body.context ? `User context: ${req.body.context}` : '',
       ]
