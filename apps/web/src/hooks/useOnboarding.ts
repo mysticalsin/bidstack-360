@@ -39,6 +39,22 @@ export function useSampleDataStatus() {
   });
 }
 
+// The Quick Start RFP row used to flip on a click. A demo workspace already
+// has responses, so the row has to follow the same list the proposals page
+// reads. `limit=1` keeps the body to a single row; only `total` is used.
+// A failed read (no proposals:read) stays unresolved so the page can fall
+// back to the click instead of inventing a finished response.
+export function useChecklistProposalCount() {
+  return useQuery({
+    queryKey: ['onboarding', 'checklist-proposals'],
+    queryFn: ({ signal }) =>
+      api<{ total: number }>('/api/v1/proposals?limit=1', { signal }),
+    select: (page) => page.total,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
 // Invalidate the workspace-shaping caches a template install or sample-data
 // delete touches, so the pipeline/dashboard/lists reflect the change at once.
 function invalidateWorkspace(qc: ReturnType<typeof useQueryClient>) {

@@ -34,6 +34,7 @@
   "quickStart": {
     "title": "Quick Start",
     "subtitle": "Get from zero to piloting your first bid.",
+    "subtitleStarted": "This workspace already has bid records. Finish the steps that are still open.",
     "progress": {
       "count": "{{completed}} of {{total}} complete",
       "percent": "{{percent}}%",
