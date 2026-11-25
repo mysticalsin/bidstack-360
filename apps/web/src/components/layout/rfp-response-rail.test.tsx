@@ -84,4 +84,20 @@ describe('rail on an RFP response', () => {
     expect(screen.getByRole('button', { name: 'Bids & RFP' }).getAttribute('aria-expanded')).toBe('true');
     expect(proposalsLink().getAttribute('aria-current')).toBeNull();
   });
+
+  it('still marks Proposals current on its own door', () => {
+    renderSidebar('/proposals');
+
+    const proposals = proposalsLink();
+    expect(proposals.getAttribute('aria-current')).toBe('page');
+    expect(proposals.getAttribute('href')).toBe('/proposals');
+  });
+
+  it('does not treat a deeper rfp path as the response', () => {
+    useUiStore.setState({ collapsedSections: { bids: false } });
+
+    renderSidebar('/rfp/sample-bid/pipeline/extra');
+
+    expect(proposalsLink().getAttribute('aria-current')).toBeNull();
+  });
 });
