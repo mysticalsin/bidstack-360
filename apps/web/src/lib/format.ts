@@ -67,10 +67,32 @@ export function formatDate(iso: string | null | undefined, locale?: string): str
   });
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Whole days from now until `iso`.
+ *
+ * A date-only value (`YYYY-MM-DD`, the task and bid due-date contract) is a
+ * UTC calendar day. Counting elapsed milliseconds marks that day overdue
+ * after 12:00 UTC, while the dashboard overdue count (`due_date < today`)
+ * still treats it as today. Calendar subtraction keeps the two clocks on
+ * the same day.
+ *
+ * A full timestamp keeps elapsed-time rounding. Results dates carry a time,
+ * and that clock is not a due day.
+ */
 export function daysUntil(iso: string | null | undefined): number | null {
   if (!iso) return null;
+  const dateOnly = DATE_ONLY.exec(iso);
+  if (dateOnly) {
+    const dueDay = Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+    const now = new Date();
+    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    return Math.round((dueDay - today) / 86_400_000);
+  }
   const ms = new Date(iso).getTime() - Date.now();
-  return Math.round(ms / (1000 * 60 * 60 * 24));
+  if (Number.isNaN(ms)) return null;
+  return Math.round(ms / 86_400_000);
 }
 
 export function formatStage(stage: string): string {
@@ -167,7 +189,10 @@ export function relativeTime(iso: string, locale?: string): string {
 export function formatBytes(bytes: number, locale?: string): string {
   const resolvedLocale = locale ?? detectLocale();
   const safe = Math.max(0, bytes);
-  const units: Array<{ unit: 'byte' | 'kilobyte' | 'megabyte' | 'gigabyte' | 'terabyte'; threshold: number }> = [
+  const units: Array<{
+    unit: 'byte' | 'kilobyte' | 'megabyte' | 'gigabyte' | 'terabyte';
+    threshold: number;
+  }> = [
     { unit: 'terabyte', threshold: 1024 ** 4 },
     { unit: 'gigabyte', threshold: 1024 ** 3 },
     { unit: 'megabyte', threshold: 1024 ** 2 },
