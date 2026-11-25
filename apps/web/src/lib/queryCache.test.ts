@@ -84,6 +84,50 @@ describe('queryCache', () => {
     expect(hydratedClient.getQueryData(['tasks', 'summary'])).toBeUndefined();
   });
 
+  it('does not persist the notification bell across reload', () => {
+    // WHY: the phone bell is a live unread count. A reload that restores the
+    // last snapshot keeps it until the stale window ends. Under demo that is
+    // a badge for "Synthetic bid moved to proposal" after it was marked read,
+    // or an empty tray while that alert is already waiting.
+    const queryClient = new QueryClient();
+    persistCache(queryClient);
+    queryClient.setQueryData(['notifications'], {
+      unread: 1,
+      items: [
+        {
+          id: 'ntf_demo_stage',
+          type: 'stage_change',
+          title: 'Synthetic bid moved to proposal',
+          body: 'Demo record only',
+          entityType: 'opportunity',
+          entityId: 'opp_demo_1',
+          url: '/opportunities/opp_demo_1',
+          readAt: null,
+          createdAt: '2026-11-25T12:00:00.000Z',
+        },
+      ],
+    });
+
+    const hydratedClient = new QueryClient();
+    hydrateCache(hydratedClient);
+
+    expect(hydratedClient.getQueryData(['notifications'])).toBeUndefined();
+
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        [JSON.stringify(['notifications'])]: {
+          state: { data: { unread: 0, items: [] } },
+          timestamp: Date.now(),
+        },
+      }),
+    );
+    const fromDisk = new QueryClient();
+    hydrateCache(fromDisk);
+
+    expect(fromDisk.getQueryData(['notifications'])).toBeUndefined();
+  });
+
   it('does not hydrate live control-plane status snapshots', () => {
     const queryClient = new QueryClient();
     persistCache(queryClient);
