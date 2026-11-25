@@ -140,3 +140,101 @@ describe('notification stream', () => {
     expect(vi.mocked(toast.info).mock.calls[1]![0]).toBe('3 new updates on Pfizer');
   });
 });
+
+const DEMO_ALERT_ID = '11111111-1111-4111-8111-111111111111';
+const DEMO_ALERT_TITLE = 'Synthetic bid moved to proposal';
+const DEMO_ALERT_URL = '/opportunities/opp_demo_1';
+
+describe('live demo alert on the bell', () => {
+  it('counts the alert before the list reload returns', async () => {
+    // WHY: the demo inbox is empty, so the tray says the work is caught up and
+    // the badge is off. A live alert is already on screen as a toast. The bell
+    // waited for GET /api/notifications. Until that reload returned, the tray
+    // stayed empty and the badge stayed at 0.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(['notifications'], { items: [], unread: 0 });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Routes>
+            <Route path="*" element={<Harness />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await vi.waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    act(() =>
+      FakeSocket.last!.emit(
+        frame({
+          id: DEMO_ALERT_ID,
+          type: 'stage_change',
+          title: DEMO_ALERT_TITLE,
+          body: 'Demo record only',
+          url: DEMO_ALERT_URL,
+        }),
+      ),
+    );
+    const page = qc.getQueryData<{
+      unread: number;
+      items: Array<{ id: string; title: string; url: string | null; readAt: string | null }>;
+    }>(['notifications']);
+    expect(page?.unread).toBe(1);
+    expect(page?.items[0]).toMatchObject({
+      id: DEMO_ALERT_ID,
+      title: DEMO_ALERT_TITLE,
+      url: DEMO_ALERT_URL,
+      readAt: null,
+    });
+  });
+
+  it('does not count a coalesced update of the same alert twice', async () => {
+    // WHY: a second frame for the same demo alert replaces the title. It is
+    // still one unread row. Bumping the badge again would say 2 while the
+    // tray holds a single alert.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(['notifications'], {
+      unread: 1,
+      items: [
+        {
+          id: DEMO_ALERT_ID,
+          type: 'stage_change',
+          title: DEMO_ALERT_TITLE,
+          body: 'Demo record only',
+          entityType: 'opportunity',
+          entityId: 'opp_demo_1',
+          url: DEMO_ALERT_URL,
+          readAt: null,
+          createdAt: '2026-05-15T12:00:00.000Z',
+        },
+      ],
+    });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Routes>
+            <Route path="*" element={<Harness />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await vi.waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    act(() =>
+      FakeSocket.last!.emit(
+        frame({
+          id: DEMO_ALERT_ID,
+          type: 'stage_change',
+          title: '3 new updates on Synthetic bid',
+          url: DEMO_ALERT_URL,
+          count: 3,
+        }),
+      ),
+    );
+    const page = qc.getQueryData<{
+      unread: number;
+      items: Array<{ id: string; title: string }>;
+    }>(['notifications']);
+    expect(page?.unread).toBe(1);
+    expect(page?.items.filter((item) => item.id === DEMO_ALERT_ID)).toHaveLength(1);
+    expect(page?.items[0]?.title).toBe('3 new updates on Synthetic bid');
+  });
+});
