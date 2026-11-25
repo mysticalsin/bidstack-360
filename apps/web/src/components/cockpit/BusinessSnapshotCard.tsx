@@ -13,7 +13,7 @@ import { springSoft } from '@/lib/motion';
 import type { AccountCockpitSnapshot, CockpitKpi, SourceAttribution } from '@bidstack/shared';
 
 import { SourceBadge, type CockpitSourceState } from './SourceBadge';
-import { headquartersFor, labelForBand } from './_tokens';
+import { labelForBand } from './_tokens';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -41,7 +41,6 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
   const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const c = cockpit.company;
-  const headquarters = headquartersFor(c.name);
   const sourceCount = c.sourceAttribution.length;
   const notVerified = t('businessSnapshot.value.notVerified', 'Not verified');
   const strategic = c.strategicIntel;
@@ -101,19 +100,12 @@ export const BusinessSnapshotCard = memo(function BusinessSnapshotCard({ cockpit
     },
     {
       label: t('businessSnapshot.row.headquarters', 'Headquarters'),
-      value: headquarters ?? notVerified,
-      source: headquarters
-        ? {
-            label: t('businessSnapshot.source.derived', 'Derived'),
-            state: 'crm',
-            hint: t(
-              'businessSnapshot.source.derivedHeadquarters',
-              'Derived from Polo PreSales account geography rules.',
-            ),
-          }
-        : missingSource(
-            t('businessSnapshot.source.missingHeadquarters', 'No headquarters source is attached.'),
-          ),
+      // A trade name is not a headquarters source. The old name dictionary
+      // printed Oslo for DNB and Lisbon for any name containing "nos".
+      value: notVerified,
+      source: missingSource(
+        t('businessSnapshot.source.missingHeadquarters', 'No headquarters source is attached.'),
+      ),
     },
     {
       label: t('businessSnapshot.row.annualRevenue', 'Annual revenue'),

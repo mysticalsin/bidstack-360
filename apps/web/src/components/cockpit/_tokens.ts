@@ -60,23 +60,6 @@ export function labelForBand(b: CompanyHealth['band']): string {
         : 'At risk';
 }
 
-// Static fixtures used by the BusinessSnapshotCard when the company row's
-// fields are sparse (older seed data, accounts without verified data).
-// These dictionaries belong in the seeder long-term; for now they live with
-// the card that consumes them so the dashboard isn't reaching into an
-// unrelated module for a literal lookup.
-export function headquartersFor(companyName: string): string | null {
-  const normalized = companyName.toLowerCase();
-  if (normalized.includes('mantu')) return 'Paris, France';
-  if (normalized.includes('rush')) return 'Chicago, United States';
-  if (normalized.includes('dnb')) return 'Oslo, Norway';
-  if (normalized.includes('mapfre')) return 'Madrid, Spain';
-  if (normalized.includes('mahle')) return 'Stuttgart, Germany';
-  if (normalized.includes('aritzia')) return 'Vancouver, Canada';
-  if (normalized.includes('nos')) return 'Lisbon, Portugal';
-  return null;
-}
-
 export function tickerForCompany(companyName: string): string | null {
   const normalized = companyName.toLowerCase();
   if (normalized.includes('apple')) return 'AAPL';

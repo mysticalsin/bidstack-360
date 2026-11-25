@@ -146,6 +146,31 @@ function cockpit(overrides: Partial<CrmCompany> = {}): AccountCockpitSnapshot {
 }
 
 describe('BusinessSnapshotCard provenance', () => {
+  // WHY: the headquarters row used a name dictionary (DNB → Oslo, any name
+  // containing "nos" → Lisbon, "rush" → Chicago). Demo accounts then showed a
+  // city Polo never recorded, and a substring was enough to attach it. A bid
+  // lead must see "Not verified" until a headquarters source is on the record.
+  it('does not invent a headquarters city from the account name', () => {
+    const dnbView = render(<BusinessSnapshotCard cockpit={cockpit({ name: 'DNB Bank' })} />);
+    const dnb = screen.getByText('Headquarters').closest('.kv');
+    expect(dnb?.textContent).toContain('Not verified');
+    expect(dnb?.textContent).toContain('Missing');
+    expect(dnb?.querySelector('.kv-source')?.getAttribute('aria-label')).toBe(
+      'No headquarters source is attached.',
+    );
+    expect(dnb?.textContent).not.toContain('Oslo');
+    expect(dnb?.textContent).not.toContain('Derived');
+    dnbView.unmount();
+
+    const diagnosisView = render(
+      <BusinessSnapshotCard cockpit={cockpit({ name: 'Diagnosis Partners' })} />,
+    );
+    const diagnosis = screen.getByText('Headquarters').closest('.kv');
+    expect(diagnosis?.textContent).toContain('Not verified');
+    expect(diagnosis?.textContent).not.toContain('Lisbon');
+    diagnosisView.unmount();
+  });
+
   it('renders a source badge for every business snapshot field', () => {
     const { container } = render(<BusinessSnapshotCard cockpit={cockpit()} />);
 
