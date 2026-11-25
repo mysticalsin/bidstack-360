@@ -43,6 +43,7 @@ import { PotentialProjectsCard } from '@/components/enrichment/PotentialProjects
 import { OppDrill } from '@/components/drill/OppDrill';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { accountDealFilter, cachedCockpitCompanyId, dealsForAccount } from '@/lib/account-deal-read';
 import { AccountDetailsFold } from '@/components/account/AccountDetailsFold';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
@@ -101,7 +102,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
   const report = usePipelineReport();
-  const opps = useOpportunities({ limit: 5 });
+  const opps = useOpportunities(
+    accountDealFilter(
+      dashboard.data?.cockpit.company.id ?? cachedCockpitCompanyId(accountId),
+      5,
+    ),
+  );
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
   // any early returns below. The visit-tracker reads the resolved company
@@ -211,9 +217,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  const accountOpps = opps.data?.items.filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
+  const accountOpps = dealsForAccount(opps.data?.items, cockpit.company.id, cockpit.company.name);
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.
