@@ -112,13 +112,40 @@ describe('topTechFor', () => {
       }),
     );
     expect(top).toEqual([
-      { name: 'AWS', category: 'Data' },
-      { name: 'Azure', category: 'Cloud' },
-      { name: 'Salesforce', category: 'CRM' },
+      { name: 'AWS', category: 'Data', sample: false },
+      { name: 'Azure', category: 'Cloud', sample: false },
+      { name: 'Salesforce', category: 'CRM', sample: false },
     ]);
   });
 
   it('is empty when the account has no stack', () => {
     expect(topTechFor(company())).toEqual([]);
+  });
+
+  // A louder sample sighting must not hide a real one. The card caption is
+  // sample only when every sighting of that name is demo fixture data.
+  it('keeps sample only when every sighting of that technology is demo sample data', () => {
+    const top = topTechFor(
+      company({
+        technicalStack: [
+          {
+            label: 'Collaboration',
+            items: [{ name: 'Google Workspace', source: 'open_data:dns', confidence: 0.95, sample: true }],
+          },
+          {
+            label: 'Cloud',
+            items: [
+              { name: 'Microsoft Azure', source: 'open_data:jobs', confidence: 0.9, sample: true },
+              { name: 'Microsoft Azure', source: 'apollo_io', confidence: 0.4 },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(top).toEqual([
+      { name: 'Google Workspace', category: 'Collaboration', sample: true },
+      { name: 'Microsoft Azure', category: 'Cloud', sample: false },
+    ]);
   });
 });
