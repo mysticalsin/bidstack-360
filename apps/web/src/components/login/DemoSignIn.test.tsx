@@ -1,6 +1,49 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+
+const localesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../public/locales');
+
+function authSubtitle(locale: string): string {
+  const auth = JSON.parse(readFileSync(path.join(localesDir, locale, 'auth.json'), 'utf8')) as {
+    demoSignIn?: { subtitle?: string };
+  };
+  return auth.demoSignIn?.subtitle ?? '';
+}
+
+// Why these phrases: the public demo is a seeded sandbox that resets. A
+// subtitle that says the book is real, or the pipeline is live, is the
+// sentence a visitor reads before they type an email.
+const SAMPLE_SANDBOX: Record<string, { avoid: RegExp[]; keep: RegExp }> = {
+  en: {
+    avoid: [/real accounts/i, /live pipeline/i],
+    keep: /sample accounts, a sample pipeline[\s\S]*private sandbox/i,
+  },
+  fr: {
+    avoid: [/vrais comptes/i, /pipeline en direct/i],
+    keep: /comptes d'exemple[\s\S]*pipeline d'exemple[\s\S]*bac à sable/i,
+  },
+  es: {
+    avoid: [/cuentas reales/i, /pipeline en vivo/i],
+    keep: /cuentas de ejemplo[\s\S]*pipeline de ejemplo[\s\S]*entorno aislado/i,
+  },
+  pt: {
+    avoid: [/contas reais/i, /pipeline ao vivo/i],
+    keep: /contas de exemplo[\s\S]*pipeline de exemplo[\s\S]*ambiente isolado/i,
+  },
+  it: {
+    avoid: [/account reali/i, /tempo reale/i],
+    keep: /account di esempio[\s\S]*pipeline di esempio[\s\S]*ambiente isolato/i,
+  },
+  zh: {
+    avoid: [/真实客户/, /实时管道/],
+    keep: /示例客户[\s\S]*示例管道[\s\S]*隔离沙盒/,
+  },
+};
 
 const apiMock = vi.hoisted(() => vi.fn());
 const signInMock = vi.hoisted(() => vi.fn((done: () => void) => done()));
@@ -184,5 +227,29 @@ describe('DemoSignIn', () => {
     fireEvent.click(screen.getByRole('button', { name: /Sign in/ }));
     expect((await screen.findByRole('alert')).textContent).toBe('That code is wrong or expired.');
     expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('names the demo door a sample sandbox instead of a live book', async () => {
+    route('/__auth/me', new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } }));
+    renderPage();
+    await screen.findByLabelText('Work email');
+    const subtitle = screen.getByText(/sample accounts, a sample pipeline/i);
+    expect(subtitle.textContent).toBe(authSubtitle('en'));
+    expect(subtitle.textContent).toMatch(SAMPLE_SANDBOX.en!.keep);
+    for (const claim of SAMPLE_SANDBOX.en!.avoid) {
+      expect(subtitle.textContent).not.toMatch(claim);
+    }
+  });
+
+  it('keeps every shipped language on that same sample sandbox', () => {
+    for (const [locale, rule] of Object.entries(SAMPLE_SANDBOX)) {
+      const subtitle = authSubtitle(locale);
+      expect(subtitle.length, locale).toBeGreaterThan(0);
+      expect(subtitle, locale).toMatch(rule.keep);
+      for (const claim of rule.avoid) {
+        expect(subtitle, locale).not.toMatch(claim);
+      }
+    }
+    expect(authSubtitle('ar')).toBe('');
   });
 });
