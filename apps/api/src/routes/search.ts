@@ -5,6 +5,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/shared';
 
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
+import { textOrAddressWhere } from '../lib/search-address.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
 
 const VALID_TYPES = [
@@ -193,15 +194,9 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               where: {
                 orgId: req.auth.orgId,
                 deletedAt: null,
-                // email is PII-encrypted at rest (emailHash index supports only
-                // equality/in, never `contains`) — substring-searching it throws
-                // in the pii-encryption middleware and 500s the whole request.
-                // Search the plaintext columns; email still ranks matched rows.
-                AND: tokenAndClauses(tokens, [
-                  'firstName',
-                  'lastName',
-                  'companyName',
-                ]) as Prisma.LeadWhereInput['AND'],
+                // email is PII-encrypted. contains throws and 500s the request.
+                // A full address is equality. A fragment stays on plaintext columns.
+                ...(textOrAddressWhere(['firstName', 'lastName', 'companyName'], q) as Prisma.LeadWhereInput),
               },
               orderBy: { statusChangedAt: 'desc' },
               take: perTypeLimit + 1,
@@ -235,12 +230,9 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               where: {
                 orgId: req.auth.orgId,
                 deletedAt: null,
-                // email is PII-encrypted (see the lead query above) — substring
-                // search on it throws in the middleware. Search name/role only.
-                AND: tokenAndClauses(tokens, [
-                  'name',
-                  'role',
-                ]) as Prisma.ContactWhereInput['AND'],
+                // email is PII-encrypted. contains throws and 500s the request.
+                // A full address is equality. A fragment stays on name and role.
+                ...(textOrAddressWhere(['name', 'role'], q) as Prisma.ContactWhereInput),
               },
               take: perTypeLimit + 1,
             });
