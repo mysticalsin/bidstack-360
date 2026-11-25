@@ -113,6 +113,109 @@ describe('AccountActivityCharts', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 
+  // Demo follow-ups are due in May 2026. On 25 Nov the chart is the last 12
+  // weeks, so those late follow-ups never land on a bar. A blank chart, or a
+  // chart that only draws newer calls, reads as a quiet account.
+  it('names late follow-ups the week bars cannot draw', () => {
+    mockQuery({
+      data: summary({
+        total: 0,
+        byHour: Array.from({ length: 24 }, (_, hour) => ({
+          hour,
+          call: 0,
+          email: 0,
+          meeting: 0,
+          note: 0,
+          stage_change: 0,
+        })),
+        weekly: [
+          {
+            weekStart: '2026-11-02',
+            call: 0,
+            email: 0,
+            meeting: 0,
+            note: 0,
+            stage_change: 0,
+            overdue: 0,
+          },
+          {
+            weekStart: '2026-11-09',
+            call: 0,
+            email: 0,
+            meeting: 0,
+            note: 0,
+            stage_change: 0,
+            overdue: 0,
+          },
+        ],
+        overdue: { count: 7, oldestDueAt: '2026-05-12T00:00:00.000Z' },
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    render(<AccountActivityCharts companyId={COMPANY} />);
+    expect(
+      screen.getByText(
+        '7 open follow-ups are already late and outside this 2-week chart. Oldest due May 12, 2026.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Activity by hour' })).toBeNull();
+    expect(screen.queryByText(/No activity in the last/)).toBeNull();
+  });
+
+  it('keeps the charts when newer activity exists and still names the late follow-ups the bars leave out', () => {
+    const base = summary();
+    mockQuery({
+      data: summary({
+        overdue: { count: 7, oldestDueAt: '2026-05-12T00:00:00.000Z' },
+        weekly: base.weekly.map((week) => ({ ...week, overdue: 0 })),
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    render(<AccountActivityCharts companyId={COMPANY} />);
+    expect(screen.getByRole('heading', { name: 'Activity per week' })).toBeTruthy();
+    expect(
+      screen.getByText(
+        '7 open follow-ups are already late and outside this 2-week chart. Oldest due May 12, 2026.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('uses the singular when one late follow-up sits outside the chart', () => {
+    mockQuery({
+      data: summary({
+        total: 0,
+        weekly: [
+          {
+            weekStart: '2026-11-09',
+            call: 0,
+            email: 0,
+            meeting: 0,
+            note: 0,
+            stage_change: 0,
+            overdue: 0,
+          },
+        ],
+        overdue: { count: 1, oldestDueAt: '2026-05-23T00:00:00.000Z' },
+      }),
+      isLoading: false,
+      isError: false,
+    });
+    render(<AccountActivityCharts companyId={COMPANY} />);
+    expect(
+      screen.getByText(
+        '1 open follow-up is already late and outside this 1-week chart. Oldest due May 23, 2026.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('does not call in-window overdue follow-ups outside the chart', () => {
+    mockQuery({ data: summary(), isLoading: false, isError: false });
+    render(<AccountActivityCharts companyId={COMPANY} />);
+    expect(screen.queryByText(/outside this/)).toBeNull();
+  });
+
   it('says so when the summary fails to load', () => {
     mockQuery({ data: undefined, isLoading: false, isError: true, refetch: vi.fn() });
     render(<AccountActivityCharts companyId={COMPANY} />);
