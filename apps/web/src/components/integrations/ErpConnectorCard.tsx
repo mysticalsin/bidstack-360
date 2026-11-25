@@ -65,7 +65,7 @@ interface ErpCompanyAutocomplete {
 
 export function ErpConnectorCard() {
   const { t } = useTranslation('integrations');
-  const [query, setQuery] = useState('Mantu');
+  const [query, setQuery] = useState('');
   const status = useQuery({
     queryKey: ['erp:status'],
     queryFn: ({ signal }) => api<ErpStatus>('/api/integrations/erp/status', { signal }),
@@ -80,7 +80,7 @@ export function ErpConnectorCard() {
     enabled: configured,
   });
   const autocomplete = useQuery({
-    enabled: configured,
+    enabled: configured && query.trim().length > 0,
     queryKey: ['erp:company-autocomplete', query],
     queryFn: ({ signal }) => {
       const params = new URLSearchParams({ q: query, limit: '5' });
@@ -90,6 +90,14 @@ export function ErpConnectorCard() {
       });
     },
   });
+
+  const lookupStatus = !query.trim()
+    ? t('erpConnector.autocomplete.notSearched', 'not searched')
+    : autocomplete.isFetching
+      ? t('erpConnector.status.checking', 'checking')
+      : autocomplete.isError
+        ? t('erpConnector.status.error', 'error')
+        : (autocomplete.data?.source ?? t('erpConnector.autocomplete.notSearched', 'not searched'));
 
   const tone = status.isError
     ? 'tomato'
@@ -188,6 +196,7 @@ export function ErpConnectorCard() {
         </>
       )}
 
+      {configured ? (
       <div className="border-t border-[var(--border-subtle)] p-5">
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
           <div>
@@ -268,14 +277,16 @@ export function ErpConnectorCard() {
                 </div>
                 <Badge
                   tone={
-                    autocomplete.data?.source === 'external_erp'
-                      ? 'jade'
-                      : autocomplete.data?.source === 'mixed'
-                        ? 'purple'
-                        : 'amber'
+                    autocomplete.isError
+                      ? 'tomato'
+                      : autocomplete.data?.source === 'external_erp'
+                        ? 'jade'
+                        : autocomplete.data?.source === 'mixed'
+                          ? 'purple'
+                          : 'amber'
                   }
                 >
-                  {autocomplete.data?.source ?? t('erpConnector.status.checking', 'checking')}
+                  {lookupStatus}
                 </Badge>
               </div>
               <div className="mt-3 flex gap-2">
@@ -286,15 +297,36 @@ export function ErpConnectorCard() {
                   aria-label={t('erpConnector.autocomplete.ariaLabel', 'Company autocomplete query')}
                   placeholder={t('erpConnector.autocomplete.placeholder', 'Name, domain, VAT, or DUNS')}
                 />
-                <Button size="sm" variant="secondary" onClick={() => autocomplete.refetch()}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!query.trim() || autocomplete.isFetching}
+                  onClick={() => {
+                    if (query.trim()) void autocomplete.refetch();
+                  }}
+                >
                   {t('erpConnector.autocomplete.check', 'Check')}
                 </Button>
               </div>
             </div>
-            {autocomplete.isLoading ? (
+            {autocomplete.isError ? (
+              <p className="p-4 text-sm text-[var(--danger)]" role="alert">
+                {t(
+                  'erpConnector.autocomplete.failed',
+                  'Could not check companies. Try again.',
+                )}
+              </p>
+            ) : autocomplete.isFetching ? (
               <div className="p-3">
                 <LoadingSkeleton rows={3} />
               </div>
+            ) : !autocomplete.data ? (
+              <p className="p-4 text-sm text-[var(--fg-secondary)]">
+                {t(
+                  'erpConnector.autocomplete.prompt',
+                  'Type a company name, domain, VAT, or DUNS, then check.',
+                )}
+              </p>
             ) : (
               <ul className="divide-y divide-[var(--border-subtle)]">
                 {autocomplete.data?.items.map((item) => (
@@ -358,6 +390,7 @@ export function ErpConnectorCard() {
           </div>
         ) : null}
       </div>
+      ) : null}
     </Card>
   );
 }
