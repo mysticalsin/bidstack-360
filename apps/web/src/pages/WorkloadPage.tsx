@@ -21,6 +21,7 @@ import { useWorkload } from '@/hooks/useWorkload';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import { teamTotals } from './workload/workloadConfig';
+import { workloadPipelineAmount } from './workload/workload-pipeline-amount';
 import { WorkloadTable } from './workload/WorkloadTable';
 
 export function WorkloadPage() {
@@ -43,7 +44,9 @@ export function WorkloadPage() {
     {
       key: 'weighted',
       label: t('workload.totalWeighted', 'Weighted pipeline'),
-      value: formatMoneyMicros(totals.weightedValueMicros.toString()),
+      // The team total sums opportunity valueMicros. Those rows do not store a
+      // currency, so the label is the grouped units. Desk rows stay on the hook.
+      value: workloadPipelineAmount(totals.weightedValueMicros),
       alert: false,
     },
     {

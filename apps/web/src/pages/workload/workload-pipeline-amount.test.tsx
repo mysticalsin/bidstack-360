@@ -6,6 +6,8 @@ import type { WorkloadOwner } from '@/hooks/useWorkload';
 import WorkloadPage from '@/pages/WorkloadPage';
 import { useCurrencyStore } from '@/stores/currency';
 
+import { workloadPipelineAmount } from './workload-pipeline-amount';
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (_key: string, fallback: string) => fallback,
@@ -65,5 +67,13 @@ describe('workload weighted pipeline amount under demo data', () => {
     const tile = screen.getByTestId('workload-kpi-weighted').textContent ?? '';
     expect(tile).not.toMatch(/EUR|€/);
     expect(digits(tile)).toBe('61520');
+  });
+
+  it('does not invent a euro zero when the micros are not a safe integer', () => {
+    // WHY: a team total that is not an integer micros value is not an
+    // amount. It must not fall through to an EUR zero. Desk rows are separate.
+    expect(workloadPipelineAmount(Number.NaN)).toBe('Not a number');
+    expect(workloadPipelineAmount(1.5)).toBe('Not a number');
+    expect(workloadPipelineAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });
