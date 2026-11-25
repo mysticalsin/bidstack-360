@@ -33,9 +33,59 @@ describe('NewsPanel sources', () => {
   });
 
   it('keeps items without a source link apart and flags them', () => {
-    render(<NewsPanel n={news([base({}), base({ id: 'b', title: 'Rumour', url: null })])} />);
+    render(<NewsPanel n={news([base({}), base({ id: 'b', title: 'Rumour', url: null, sample: false })])} />);
     expect(screen.queryByTestId('news-b')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Show 1 item without a source link' }));
     expect(within(screen.getByTestId('news-b')).getByText('No source link')).toBeTruthy();
+  });
+
+  it('shows a demo sample story that has no source link, and still hides an unchecked rumour', () => {
+    // CI Financial's demo signals are sample rows with an empty source URL.
+    // Hiding them with the rumour control makes the News tab look empty.
+    render(
+      <NewsPanel
+        n={news([
+          base({
+            id: 'ci',
+            title: 'Sample: CI Financial third-quarter profit rose 12% on record assets',
+            url: '',
+            source: 'sample',
+            sourceLabel: 'Sample data',
+            sample: true,
+          }),
+          base({ id: 'rumour', title: 'Rumour', url: null, sample: false }),
+        ])}
+      />,
+    );
+
+    const story = screen.getByTestId('news-ci');
+    expect(story.textContent).toMatch(/Sample: CI Financial third-quarter profit rose 12% on record assets/);
+    expect(within(story).getByText('Sample')).toBeTruthy();
+    expect(within(story).queryByText('No source link')).toBeNull();
+    expect(story.querySelector('a')).toBeNull();
+    expect(screen.queryByText('No posts or news with a source link')).toBeNull();
+    expect(screen.queryByTestId('news-rumour')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show 1 item without a source link' })).toBeTruthy();
+  });
+
+  it('does not call a page of sample stories an empty news list', () => {
+    render(
+      <NewsPanel
+        n={news([
+          base({
+            id: 'ci',
+            title: 'Sample: CI Financial third-quarter profit rose 12% on record assets',
+            url: '',
+            source: 'sample',
+            sourceLabel: 'Sample data',
+            sample: true,
+          }),
+        ])}
+      />,
+    );
+
+    expect(screen.getByTestId('news-ci')).toBeTruthy();
+    expect(screen.queryByText('No posts or news with a source link')).toBeNull();
+    expect(screen.queryByRole('button', { name: /without a source link/ })).toBeNull();
   });
 });

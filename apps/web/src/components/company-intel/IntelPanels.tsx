@@ -536,8 +536,10 @@ export function FinancialsPanel({ f, company }: { f: AccountFinancialsIntel; com
 export function NewsPanel({ n }: { n: AccountNewsIntel }) {
   const [showUnlinked, setShowUnlinked] = useState(false);
   if (!n.items.length) return <p className="ci-none">No posts or news found</p>;
-  const linked = n.items.filter((p) => safeHref(p.url));
-  const unlinked = n.items.filter((p) => !safeHref(p.url));
+  // A sample row is demo data. An empty URL is how that seed is stored, so it
+  // stays on the list. A real row with no link still cannot be checked.
+  const listed = n.items.filter((p) => safeHref(p.url) || p.sample);
+  const unlinked = n.items.filter((p) => !safeHref(p.url) && !p.sample);
   const row = (p: AccountNewsIntel['items'][number]) => {
     const href = safeHref(p.url);
     return (
@@ -552,7 +554,11 @@ export function NewsPanel({ n }: { n: AccountNewsIntel }) {
           ) : (
             <span className="ci-line-label">{p.title}</span>
           )}
-          {href ? null : <span className="ci-basis">No source link</span>}
+          {href ? null : p.sample ? (
+            <span className="sg-sample">Sample</span>
+          ) : (
+            <span className="ci-basis">No source link</span>
+          )}
         </span>
         <span className="ci-meta">
           {[p.origin === 'own' ? 'Company' : 'Press', fmtDate(p.publishedAt)].filter(Boolean).join(', ')}
@@ -571,7 +577,7 @@ export function NewsPanel({ n }: { n: AccountNewsIntel }) {
   };
   return (
     <div className="ci-panel">
-      {linked.length ? <ul className="ci-list">{linked.map(row)}</ul> : <p className="ci-none">No posts or news with a source link</p>}
+      {listed.length ? <ul className="ci-list">{listed.map(row)}</ul> : <p className="ci-none">No posts or news with a source link</p>}
       {unlinked.length ? (
         <div className="ci-block">
           <button type="button" className="ci-link" aria-expanded={showUnlinked} onClick={() => setShowUnlinked((v) => !v)}>
