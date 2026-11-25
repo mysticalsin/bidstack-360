@@ -922,6 +922,7 @@
     "decisionUnitEmptyTitle": "暂无决策单元成员",
     "decisionUnitEmptyMessage": "从联系人页面添加联系人或从 Dust 同步。",
     "decisionUnitTitle": "决策单元",
+    "openContact": "，打开联系人",
     "stakeholdersCount": "{{count}} 位干系人",
     "dustBadge": "Dust",
     "influenceAriaLabel": "影响力 {{value}}（满分 5）",

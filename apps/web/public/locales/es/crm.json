@@ -985,6 +985,7 @@
     "decisionUnitEmptyTitle": "Aún no hay miembros de la unidad de decisión",
     "decisionUnitEmptyMessage": "Agrega un contacto desde la página de Contactos o sincroniza desde Dust.",
     "decisionUnitTitle": "Unidad de decisión",
+    "openContact": ", abrir contacto",
     "stakeholdersCount": "{{count}} interesados",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influencia {{value}} de 5",

@@ -922,6 +922,7 @@
     "decisionUnitEmptyTitle": "Ainda não há membros da unidade de decisão",
     "decisionUnitEmptyMessage": "Adicione um contato pela página de Contatos ou sincronize a partir do Dust.",
     "decisionUnitTitle": "Unidade de decisão",
+    "openContact": ", abrir contato",
     "stakeholdersCount": "{{count}} partes interessadas",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influência {{value}} de 5",
