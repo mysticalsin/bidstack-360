@@ -8,7 +8,8 @@ import { KIND_LABEL } from './viz-kinds';
 
 export interface TableData {
   columns: string[];
-  rows: Array<Array<string | number>>;
+  /** A cell may be a link when the row opens a record. Plain text stays a string. */
+  rows: Array<Array<ReactNode>>;
 }
 
 export function ChartCard({
