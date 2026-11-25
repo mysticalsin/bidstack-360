@@ -168,6 +168,7 @@
     "saving": "Saving…",
     "save": "Save",
     "emptyContent": "No content yet. Use AI Draft to generate a first version.",
+    "emptySections": "This proposal has no sections.",
     "draftSectionError": "Could not generate an AI draft. Please try again."
   },
   "proposals": {

@@ -193,3 +193,36 @@ describe('ProposalDetailPage — AI draft section', () => {
     ).toBeNull();
   });
 });
+
+describe('ProposalDetailPage — no sections', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('says the proposal has no sections, and does not point at AI Draft', async () => {
+    // WHY: the demo seed writes proposals and no sections. Opening one rendered
+    // only the title, because the page mapped an empty list. AI Draft exists
+    // on a section, so the empty line must not send the reader to a control
+    // that is not on the page.
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(CAPABILITIES);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) {
+        return Promise.resolve({
+          ...PROPOSAL,
+          name: 'Siemens ERP Technical Proposal',
+          status: 'review',
+          complianceScore: 82,
+          sections: [],
+        });
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('This proposal has no sections.')).toBeTruthy();
+    expect(screen.queryByText(/Use AI Draft/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /AI Draft/ })).toBeNull();
+  });
+});

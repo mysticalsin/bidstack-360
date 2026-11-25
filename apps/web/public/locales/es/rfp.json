@@ -21,6 +21,7 @@
     "saving": "Guardando…",
     "save": "Guardar",
     "emptyContent": "Aún no hay contenido. Usa Borrador de IA para generar una primera versión.",
+    "emptySections": "Esta propuesta no tiene secciones.",
     "draftSectionError": "No se pudo generar el borrador de IA. Vuelve a intentarlo."
   },
   "proposals": {
