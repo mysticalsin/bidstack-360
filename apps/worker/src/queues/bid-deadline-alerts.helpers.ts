@@ -116,3 +116,21 @@ export const OVERDUE_DEDUPE_THRESHOLD = 0;
 export function overdueByLabel(daysOverdue: number): string {
   return daysOverdue === 1 ? 'overdue by 1 day' : `overdue by ${daysOverdue} days`;
 }
+
+/**
+ * Rows the hourly scan may alert. A legacy closed stage is out. So is a bid
+ * the board already marked won or lost on its pipeline stage while that
+ * legacy column is still open. A bid with no pipeline stage stays in.
+ */
+export function deadlineScanWhere(windowStart: Date, windowEnd: Date) {
+  return {
+    deletedAt: null,
+    stage: { notIn: ['closed_won', 'closed_lost'] as const },
+    ownerId: { not: null },
+    dueDate: { gte: windowStart, lte: windowEnd },
+    OR: [
+      { pipelineStageId: null },
+      { pipelineStage: { isWon: false, isLost: false } },
+    ],
+  };
+}
