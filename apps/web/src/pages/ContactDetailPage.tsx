@@ -14,7 +14,18 @@ import { useNotes } from '@/hooks/useNotes';
 import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
-import { formatDate } from '@/lib/format';
+import { DueDateChip, daysUntilDueUtc } from '@/components/ui/DueDateChip';
+import { formatDate, formatStage } from '@/lib/format';
+import type { Opportunity, Task } from '@bidstack/shared';
+
+function dealIsOpen(deal: Pick<Opportunity, 'stage' | 'pipelineStage'>): boolean {
+  if (deal.pipelineStage) return !deal.pipelineStage.isWon && !deal.pipelineStage.isLost;
+  return deal.stage !== 'closed_won' && deal.stage !== 'closed_lost';
+}
+
+function followUpIsLate(task: Pick<Task, 'status'>, days: number | null): boolean {
+  return task.status !== 'done' && days !== null && days < 0;
+}
 
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
@@ -175,11 +186,19 @@ export function ContactDetailPage() {
                     {o.code}
                   </Link>
                   <div className="text-xs text-[var(--fg-secondary)]">{o.name}</div>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-[var(--fg-tertiary)]">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--fg-tertiary)]">
                     <span className="rounded bg-[var(--surface-subtle)] px-1.5 py-0.5">
-                      {o.stage}
+                      {formatStage(o.stage ?? 'unknown')}
                     </span>
                     <span>{o.probability}%</span>
+                    {/* A won or lost deal keeps its date. Only an open bid
+                        uses the bid clock, so a past close on a finished
+                        deal is not called overdue. */}
+                    {dealIsOpen(o) && o.dueDate ? (
+                      <DueDateChip dueDate={o.dueDate} size="md" />
+                    ) : o.dueDate ? (
+                      <span>{formatDate(o.dueDate)}</span>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -201,34 +220,48 @@ export function ContactDetailPage() {
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
-              {relatedTasks.map((task) => (
-                <li key={task.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div>
-                    <div className="text-sm text-[var(--fg-primary)]">{task.title}</div>
-                    <div className="text-xs text-[var(--fg-tertiary)]">
-                      {task.dueDate
-                        ? t('contactDetail.dueDate', 'Due {{date}}', {
-                            date: formatDate(task.dueDate),
-                          })
-                        : t('contactDetail.noDueDate', 'No due date')}
-                      {task.assignee ? ` · ${task.assignee}` : null}
+              {relatedTasks.map((task) => {
+                // UTC day, same clock as a bid's due chip. Elapsed-ms rounding
+                // marks the due day itself late after noon. A finished task
+                // keeps the date: the work is done, so it is not a late follow-up.
+                const days = task.dueDate ? daysUntilDueUtc(task.dueDate) : null;
+                const late = followUpIsLate(task, days);
+                return (
+                  <li key={task.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div>
+                      <div className="text-sm text-[var(--fg-primary)]">{task.title}</div>
+                      <div className="text-xs text-[var(--fg-tertiary)]">
+                        {task.dueDate
+                          ? t('contactDetail.dueDate', 'Due {{date}}', {
+                              date: formatDate(task.dueDate),
+                            })
+                          : t('contactDetail.noDueDate', 'No due date')}
+                        {late && days !== null ? (
+                          <span className="ml-2 font-semibold text-[var(--danger)]">
+                            {t('taskRow.overdue', 'Overdue: {{count}}d late', {
+                              count: Math.abs(days),
+                            })}
+                          </span>
+                        ) : null}
+                        {task.assignee ? ` · ${task.assignee}` : null}
+                      </div>
                     </div>
-                  </div>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${
-                      task.status === 'done'
-                        ? 'bg-[var(--success-tint)] text-[var(--success)]'
-                        : task.status === 'in_progress'
-                          ? 'bg-[var(--info-tint)] text-[var(--info)]'
-                          : task.status === 'blocked'
-                            ? 'bg-[var(--danger-tint)] text-[var(--danger)]'
-                            : 'bg-[var(--surface-subtle)] text-[var(--fg-secondary)]'
-                    }`}
-                  >
-                    {task.status.replace('_', ' ')}
-                  </span>
-                </li>
-              ))}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${
+                        task.status === 'done'
+                          ? 'bg-[var(--success-tint)] text-[var(--success)]'
+                          : task.status === 'in_progress'
+                            ? 'bg-[var(--info-tint)] text-[var(--info)]'
+                            : task.status === 'blocked'
+                              ? 'bg-[var(--danger-tint)] text-[var(--danger)]'
+                              : 'bg-[var(--surface-subtle)] text-[var(--fg-secondary)]'
+                      }`}
+                    >
+                      {task.status.replace('_', ' ')}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
