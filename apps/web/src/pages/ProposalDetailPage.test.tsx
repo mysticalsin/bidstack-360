@@ -193,3 +193,41 @@ describe('ProposalDetailPage — AI draft section', () => {
     ).toBeNull();
   });
 });
+
+describe('ProposalDetailPage — list stage after a status change', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('drops the proposals list cache when the stage changes, so the list does not keep the old stage', async () => {
+    // WHY this matters: the app keeps list queries fresh for 2 minutes. The
+    // proposals stage column and the stage tabs read that cache. A demo draft
+    // such as the executive summary can be moved to In review on this page,
+    // and the list still shows Draft until that window ends. Delete and revise
+    // already drop the list cache. The stage change does not.
+    apiMock.mockImplementation((path: string, opts?: { method?: string; body?: { status?: string } }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(CAPABILITIES);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) return Promise.resolve(PROPOSAL);
+      if (path === '/api/v1/proposals/p1' && opts?.method === 'PATCH') {
+        return Promise.resolve({ ...PROPOSAL, status: opts.body?.status ?? 'review' });
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ProposalDetailPage />
+      </QueryClientProvider>,
+    );
+
+    const status = await screen.findByLabelText('Proposal status');
+    fireEvent.change(status, { target: { value: 'review' } });
+
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['proposals'] });
+    });
+  });
+});
