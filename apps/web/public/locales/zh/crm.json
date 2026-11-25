@@ -1825,7 +1825,8 @@
       "cancel": "取消",
       "saving": "保存中…",
       "save": "保存",
-      "edit": "编辑"
+      "edit": "编辑",
+      "openCockpit": "打开账户驾驶舱"
     },
     "tabs": {
       "label": "公司板块"

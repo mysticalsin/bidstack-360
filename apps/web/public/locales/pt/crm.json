@@ -1825,7 +1825,8 @@
       "cancel": "Cancelar",
       "saving": "Salvando…",
       "save": "Salvar",
-      "edit": "Editar"
+      "edit": "Editar",
+      "openCockpit": "Abrir o cockpit da conta"
     },
     "tabs": {
       "label": "Seções da empresa"

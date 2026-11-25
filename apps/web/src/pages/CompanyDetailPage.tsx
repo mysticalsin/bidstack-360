@@ -25,6 +25,7 @@ import { AccountDirectionSection } from '@/components/company-intel/AccountDirec
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyIntelSummary, useRefreshCompanyIntel } from '@/hooks/useCompanyIntelSummary';
 
+import { companyCockpitHref } from './companyDetail/company-cockpit-href';
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
 import { CompanyPeopleTab } from './companyDetail/CompanyPeopleTab';
 import {
@@ -137,6 +138,10 @@ export function CompanyDetailPage() {
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <Link to={companyCockpitHref(c.id)} className="btn btn-secondary">
+            <Icon name="arrow" size={14} ariaHidden />
+            {t('companyDetail.action.openCockpit', 'Open account cockpit')}
+          </Link>
           <FollowAccountButton companyId={c.id} />
           <div
             role="radiogroup"

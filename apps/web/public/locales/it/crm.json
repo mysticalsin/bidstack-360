@@ -1825,7 +1825,8 @@
       "cancel": "Annulla",
       "saving": "Salvataggio…",
       "save": "Salva",
-      "edit": "Modifica"
+      "edit": "Modifica",
+      "openCockpit": "Apri il cockpit dell'account"
     },
     "tabs": {
       "label": "Sezioni dell'azienda"
