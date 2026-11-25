@@ -17,12 +17,14 @@ export function shownFileAttachments<T>(
 
 /**
  * Account files caption. A longer loaded list is the latest attachments,
- * not every attachment. A shorter list keeps "N attachment(s)".
+ * not every attachment. A loaded page with nothing on it is no files, not
+ * an access miss. A shorter list that has files keeps "N attachment(s)".
  * No attachment total is invented.
  */
 export function fileAttachmentCaption(count: number, pageContinues: boolean): string {
   if (pageContinues) {
     return `${count} in the latest ${count}, not every attachment`;
   }
+  if (count === 0) return 'No files on this account';
   return `${count} attachment(s) - access follows account groups`;
 }

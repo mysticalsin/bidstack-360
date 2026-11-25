@@ -86,4 +86,20 @@ describe('account file page', () => {
       '100 attachment(s) - access follows account groups',
     );
   });
+
+  it('does not call an empty account file page zero attachments or an access miss', () => {
+    // WHY: demo seed attaches no account files. The files card still printed
+    // "0 attachment(s) - access follows account groups" beside "No files yet",
+    // which reads as if files were hidden by account groups. A loaded page
+    // with nothing on it is no files. A page that has files keeps
+    // "N attachment(s)". No attachment total is invented.
+    const empty = fileAttachmentCaption(0, false);
+    expect(empty).toBe('No files on this account');
+    expect(empty).not.toBe('0 attachment(s) - access follows account groups');
+    expect(empty).not.toMatch(/0 attachment|access follows|not every/i);
+
+    expect(fileAttachmentCaption(1, false)).toBe(
+      '1 attachment(s) - access follows account groups',
+    );
+  });
 });
