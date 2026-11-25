@@ -20,6 +20,14 @@
 }
 .kn-tile:hover, .kn-tile:focus-visible { border-color: color-mix(in srgb, var(--kn-accent) 40%, var(--kn-line)); }
 .kn-tile:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--kn-accent) 35%, transparent); }
+.kn-jump {
+  display: grid; gap: 4px; min-width: 0; color: inherit; text-decoration: none; border-radius: 6px;
+}
+.kn-jump:focus-visible { outline: 2px solid var(--kn-accent); outline-offset: 2px; }
+.kn-tile:has(.kn-jump:focus-visible) {
+  border-color: color-mix(in srgb, var(--kn-accent) 40%, var(--kn-line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--kn-accent) 35%, transparent);
+}
 .kn-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--kn-muted); }
 .kn-value { font-size: 26px; line-height: 1.1; font-weight: 500; letter-spacing: -0.02em; color: var(--kn-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kn-tile[data-missing='true'] .kn-value { font-size: 16px; font-weight: 400; color: var(--kn-muted); padding: 5px 0; }

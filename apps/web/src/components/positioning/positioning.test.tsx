@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -110,6 +113,18 @@ describe('KeyNumbersStrip', () => {
     expect(within(screen.getByTestId('kn-momentum')).queryByRole('link', { name: /Momentum/ })).toBeNull();
     expect(within(screen.getByTestId('kn-open_jobs')).queryByRole('link', { name: /Open jobs/ })).toBeNull();
     expect(within(screen.getByTestId('kn-margin')).queryByRole('link', { name: /Margin/ })).toBeNull();
+  });
+
+  it('can open every section anchor the key-number API emits', () => {
+    // The loader decides which block explains a number. If it names a new
+    // section, the tile has to know that id or the jump silently disappears.
+    const load = readFileSync(join(process.cwd(), '../../apps/api/src/services/account-positioning/load.ts'), 'utf8');
+    const strip = readFileSync(join(process.cwd(), 'src/components/positioning/KeyNumbersStrip.tsx'), 'utf8');
+    const anchors = [...load.matchAll(/anchor: '([^']+)'/g)].map((match) => match[1]!);
+    expect(anchors.length).toBeGreaterThan(0);
+    for (const anchor of new Set(anchors)) {
+      expect(strip, anchor).toContain(`'${anchor}'`);
+    }
   });
 });
 
