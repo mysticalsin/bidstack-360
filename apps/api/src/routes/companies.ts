@@ -196,7 +196,13 @@ export const companiesRoutes: FastifyPluginAsyncZod = async (server) => {
           },
           notes: {
             where: { deletedAt: null },
-            select: { id: true, title: true, author: { select: { name: true } }, createdAt: true },
+            select: {
+              id: true,
+              title: true,
+              bodyMd: true,
+              author: { select: { name: true } },
+              createdAt: true,
+            },
             orderBy: { createdAt: 'desc' },
             take: 20,
           },

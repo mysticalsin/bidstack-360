@@ -2,6 +2,8 @@ import { prisma } from '@bidstack/db';
 import { type Company, type CompanyDetail } from '@bidstack/shared';
 import { type z } from 'zod';
 
+import { companyDetailNote } from './company-note.js';
+
 export function serializeCompany(c: {
   id: string;
   orgId: string;
@@ -82,7 +84,13 @@ export async function serializeCompanyDetail(
       dueDate: Date | null;
     }>;
     serviceCases: Array<{ id: string; number: string; subject: string; status: string; priority: string }>;
-    notes: Array<{ id: string; title: string; author: { name: string | null } | null; createdAt: Date }>;
+    notes: Array<{
+      id: string;
+      title: string;
+      bodyMd: string;
+      author: { name: string | null } | null;
+      createdAt: Date;
+    }>;
     parent?: { id: string; name: string } | null;
     children?: Array<{ id: string; name: string }>;
   },
@@ -102,12 +110,7 @@ export async function serializeCompanyDetail(
       dueDate: x.dueDate?.toISOString() ?? null,
     })),
     openCases: c.serviceCases.map((x) => ({ ...x })),
-    notes: c.notes.map((x) => ({
-      id: x.id,
-      title: x.title,
-      authorName: x.author?.name ?? null,
-      createdAt: x.createdAt.toISOString(),
-    })),
+    notes: c.notes.map((x) => companyDetailNote(x)),
     parent: c.parent ?? null,
     children: c.children ?? [],
     customFieldValues,

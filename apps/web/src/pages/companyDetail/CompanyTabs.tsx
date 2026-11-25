@@ -194,7 +194,13 @@ export function CasesTab({
 export function NotesTab({
   notes,
 }: {
-  notes: Array<{ id: string; title: string; authorName: string | null; createdAt: string }>;
+  notes: Array<{
+    id: string;
+    title: string;
+    bodyMd: string;
+    authorName: string | null;
+    createdAt: string;
+  }>;
 }) {
   const { t } = useTranslation('crm');
   if (notes.length === 0)
@@ -209,21 +215,29 @@ export function NotesTab({
     );
   return (
     <div className="space-y-3">
-      {notes.map((n) => (
-        <Card key={n.id} className="p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-[var(--fg-primary)]">{n.title}</h3>
-            <span className="text-xs text-[var(--fg-tertiary)]">
-              {new Date(n.createdAt).toLocaleDateString()}
-            </span>
-          </div>
-          {n.authorName && (
-            <p className="mt-1 text-xs text-[var(--fg-secondary)]">
-              {t('companyTabs.notes.byAuthor', 'by {{author}}', { author: n.authorName })}
-            </p>
-          )}
-        </Card>
-      ))}
+      {notes.map((n) => {
+        const body = n.bodyMd.trim();
+        return (
+          <Card key={n.id} className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-medium text-[var(--fg-primary)]">{n.title}</h3>
+              <span className="shrink-0 text-xs text-[var(--fg-tertiary)]">
+                {new Date(n.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+            {body ? (
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-[var(--fg-secondary)]">
+                {body}
+              </p>
+            ) : null}
+            {n.authorName && (
+              <p className="mt-1 text-xs text-[var(--fg-secondary)]">
+                {t('companyTabs.notes.byAuthor', 'by {{author}}', { author: n.authorName })}
+              </p>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 }
