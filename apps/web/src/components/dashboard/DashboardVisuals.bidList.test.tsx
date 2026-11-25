@@ -120,4 +120,29 @@ describe('cockpit bid list before it settles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
+
+  it('says no commit target is set only after the forecast settles without one', () => {
+    render(<PerformanceCard rows={closedBids} projection={{ periods: [] }} />);
+    expect(screen.getByText(/No target set yet/)).toBeTruthy();
+  });
+
+  it('names the commit target once the forecast has settled', () => {
+    render(
+      <PerformanceCard
+        rows={closedBids}
+        projection={{
+          periods: [
+            {
+              label: 'Q1 2026',
+              weightedMicros: 0,
+              wonMicros: 0,
+              openMicros: 0,
+              manualCommitMicros: 11_900_000,
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText(/Commit target 11\.9/)).toBeTruthy();
+  });
 });
