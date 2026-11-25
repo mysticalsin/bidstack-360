@@ -4048,5 +4048,15 @@
     "title": "复盘总结",
     "update": "更新复盘",
     "winFactor": "决定性赢单因素"
+  },
+  "dueDateChip": {
+    "noDate": "无日期",
+    "overdueBy_one": "逾期 {{count}} 天",
+    "overdueBy_other": "逾期 {{count}} 天",
+    "dueToday": "今天到期",
+    "daysLeft_one": "还剩 {{count}} 天",
+    "daysLeft_other": "还剩 {{count}} 天",
+    "ariaLabel": "到期日 {{date}}",
+    "ariaLabelNoDate": "未设置到期日"
   }
 }

@@ -4097,5 +4097,15 @@
     "title": "Retour d'expérience",
     "update": "Mettre à jour",
     "winFactor": "Facteur décisif du gain"
+  },
+  "dueDateChip": {
+    "noDate": "Aucune date",
+    "overdueBy_one": "{{count}} j de retard",
+    "overdueBy_other": "{{count}} j de retard",
+    "dueToday": "Aujourd'hui",
+    "daysLeft_one": "{{count}} j restant",
+    "daysLeft_other": "{{count}} j restants",
+    "ariaLabel": "Échéance le {{date}}",
+    "ariaLabelNoDate": "Aucune date d'échéance"
   }
 }

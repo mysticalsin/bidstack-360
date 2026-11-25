@@ -66,7 +66,8 @@ const COPY: Record<'en' | (typeof TRANSLATED)[number], ChipCopy> = {
   pt: {
     daysLeftOne: '1 d restante',
     daysLeftOther: '45 d restantes',
-    daysLeftZero: '0 d restantes',
+    // Portuguese groups 0 with the singular, same as French.
+    daysLeftZero: '0 d restante',
     overdueOne: '1 d em atraso',
     overdueOther: '126 d em atraso',
     dueToday: 'Vence hoje',
