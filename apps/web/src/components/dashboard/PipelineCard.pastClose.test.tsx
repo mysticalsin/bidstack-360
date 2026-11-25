@@ -52,4 +52,27 @@ describe('PipelineCard open count past close', () => {
     expect(card.textContent).not.toMatch(/past close/);
     expect(card.textContent).toMatch(/sit today/);
   });
+
+  it('names only the late bids when part of the open book is still inside its close days', () => {
+    // WHY: saying every open bid is past close would hide the one that is still current.
+    const rows: OppRow[] = [
+      { id: 'late', stage: 's2_sent', value: 80_000, dueDate: '2026-11-24', customer: 'Yesterday Co' },
+      { id: 'later', stage: 's4_negotiation', value: 100_000, dueDate: '2026-12-01', customer: 'Later' },
+    ];
+    render(<PipelineCard rows={rows} onDrill={vi.fn()} />);
+
+    const card = screen.getByTestId('dashboard-pipeline');
+    expect(card.textContent).toMatch(/2 open of 2 bids, 1 past close/);
+    expect(card.textContent).toMatch(/1 of these open bids is past close/);
+    expect(card.textContent).not.toMatch(/All 2 open bids are past close/);
+  });
+
+  it('names a single late bid without saying all 1', () => {
+    const rows: OppRow[] = [
+      { id: 'late', stage: 's1_ongoing', value: 20_000, dueDate: '2026-06-30', customer: 'Only' },
+    ];
+    render(<PipelineCard rows={rows} onDrill={vi.fn()} />);
+
+    expect(screen.getByTestId('dashboard-pipeline').textContent).toMatch(/The open bid is past close/);
+  });
 });

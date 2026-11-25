@@ -128,6 +128,30 @@ export function pastDueOpen(rows: OppRow[], now = Date.now()) {
   return rows.filter((o) => !isClosed(o) && o.dueDate && new Date(o.dueDate).getTime() < now);
 }
 
+function utcDay(ms: number): number {
+  const d = new Date(ms);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/**
+ * Open bids whose UTC due day is before today.
+ * The due day itself stays open. A blank or unreadable date is not past close.
+ * A won or lost bid is an outcome, not an open count.
+ */
+export function pastCloseOpenCount(rows: OppRow[], now = Date.now()): number {
+  const today = utcDay(now);
+  let count = 0;
+  for (const row of rows) {
+    if (isClosed(row)) continue;
+    if (!row.dueDate) continue;
+    const due = new Date(row.dueDate);
+    if (Number.isNaN(due.getTime())) continue;
+    if (utcDay(due.getTime()) >= today) continue;
+    count += 1;
+  }
+  return count;
+}
+
 /** Running win rate after each closed bid, in close order (sparkline). */
 export function runningWinRate(rows: OppRow[]) {
   const closed = rows.filter((o) => isClosed(o) && closeDate(o)).sort((a, b) => new Date(closeDate(a)!).getTime() - new Date(closeDate(b)!).getTime());

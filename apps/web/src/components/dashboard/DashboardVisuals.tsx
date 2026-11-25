@@ -16,7 +16,7 @@ import { QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bkl
 import { closeMonthLabel, pipelineByCloseMonth } from '@/components/charts/bid-chart-data';
 import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import {
-  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
+  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastCloseOpenCount, pastDueOpen, stageFunnel, stageKey, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
@@ -155,12 +155,29 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
 /** Pipeline by stage and bids by status, merged (both answered "where are my
  *  bids?"). Each funnel column and each status chip opens the bid drill. */
 export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDrill }) {
+  const [now] = useState(() => Date.now());
   const data = stageFunnel(rows);
   const ids = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
   const m = statusMix(rows);
+  const pastClose = pastCloseOpenCount(rows, now);
+  const total = m.open + m.won + m.lost;
+  const meta = pastClose > 0
+    ? `${m.open} open of ${total} bids, ${pastClose} past close · value per stage`
+    : `${m.open} open of ${total} bids · value per stage`;
+  const caption = pastClose === 0
+    ? 'Where your open bids sit today. Select a stage or a status to see the bids.'
+    : pastClose === m.open
+      ? pastClose === 1
+        ? 'The open bid is past close. Select a stage or a status to see the bids.'
+        : `All ${pastClose} open bids are past close. Select a stage or a status to see the bids.`
+      : pastClose === 1
+        ? '1 of these open bids is past close. Select a stage or a status to see the bids.'
+        : `${pastClose} of these open bids are past close. Select a stage or a status to see the bids.`;
+  const stageSummary = data.map((d) => `${d.label}: ${fmtCompact(d.value)} across ${d.count}`).join('; ') || 'No open bids';
+  const summary = pastClose > 0 ? `${meta}. ${stageSummary}` : stageSummary;
   return (
-    <ChartCard title="Pipeline" meta={`${m.open} open of ${m.open + m.won + m.lost} bids · value per stage`} interactive testId="dashboard-pipeline"
-      summary={data.map((d) => `${d.label}: ${fmtCompact(d.value)} across ${d.count}`).join('; ') || 'No open bids'}
+    <ChartCard title="Pipeline" meta={meta} interactive testId="dashboard-pipeline"
+      summary={summary}
       table={{ columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, fmtCompact(d.value)]) }}>
       {data.length ? (
         <div style={{ position: 'relative' }}>
@@ -173,7 +190,7 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
           </div>
         </div>
       ) : <p className="viz-empty">No open bids.</p>}
-      <div className="viz-caption">Where your open bids sit today. Select a stage or a status to see the bids.</div>
+      <div className="viz-caption">{caption}</div>
       <div className="dash-chips" role="group" aria-label="Bids by status">
         {([['open', 'Open', m.open], ['won', 'Won', m.won], ['lost', 'Lost', m.lost]] as const).map(([k, label, n]) => (
           <button key={k} type="button" className="dash-chip" onClick={() => onDrill({ status: k })}>
