@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 
+import { protectedStageProbabilityDecision } from './pipeline-stage-probability.js';
+
 interface DefaultStage {
   key: string;
   name: string;
@@ -145,6 +147,11 @@ export const pipelineStageRoutes: FastifyPluginAsyncZod = async (server) => {
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
       });
       if (!existing) throw server.httpErrors.notFound('Pipeline stage not found');
+
+      if (req.body.probability !== undefined) {
+        const decision = protectedStageProbabilityDecision(existing, req.body.probability);
+        if (!decision.ok) throw server.httpErrors.badRequest(decision.message);
+      }
 
       const [updated] = await prisma.$transaction([
         prisma.pipelineStage.update({
