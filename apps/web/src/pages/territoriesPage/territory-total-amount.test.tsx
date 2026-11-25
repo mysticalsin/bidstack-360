@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 
 import { TerritoriesPage } from '@/pages/TerritoriesPage';
+import { territoryTotalAmount } from './territory-total-amount';
 import {
   useLeadRoutingRules,
   useTerritories,
@@ -107,5 +108,13 @@ describe('territory total pipeline amount under demo data', () => {
     const text = tile?.textContent ?? '';
     expect(text).not.toMatch(/EUR|€/);
     expect(digits(text)).toBe('61520');
+  });
+
+  it('does not invent a euro zero when the micros are not a safe integer', () => {
+    // WHY: a territory total that is not an integer micros value is not an
+    // amount. It must not fall through to an EUR zero.
+    expect(territoryTotalAmount(Number.NaN)).toBe('Not a number');
+    expect(territoryTotalAmount(1.5)).toBe('Not a number');
+    expect(territoryTotalAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });

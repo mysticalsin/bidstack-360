@@ -177,7 +177,12 @@ describe('TerritoriesPage', () => {
 
     // Check header and KPI values
     expect(screen.getByRole('heading', { name: 'Territories', level: 1 })).toBeTruthy();
-    expect(screen.getByText('$15K')).toBeTruthy(); // 15,000,000,000 micros = 15,000 EUR, converted to USD and compacted
+    const pipeline = screen.getByText('Total Pipeline').parentElement;
+    const pipelineText = pipeline?.textContent ?? '';
+    // 15,000,000,000 micros is 15,000 units. The rows store no currency, so the
+    // tile keeps that number and does not convert it into dollars.
+    expect(pipelineText).not.toMatch(/EUR|€|\$/);
+    expect(pipelineText.replace(/\D/g, '')).toBe('15000');
     expect(screen.getByText('75%')).toBeTruthy();
 
     // Check list entries
