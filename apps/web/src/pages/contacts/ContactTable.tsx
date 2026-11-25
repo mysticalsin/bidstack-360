@@ -60,10 +60,14 @@ export interface ContactTableProps {
   items: ReadonlyArray<Contact>;
   /** Unfiltered list (used in the "N of M" aria-live announcement) */
   raw: ReadonlyArray<Contact>;
-  /** Current search string (for empty-state labels and "clear search" button) */
+  /** Keystroke buffer. The clear control writes here. */
   search: string;
   setSearch: (s: string) => void;
-  /** Deferred value forwarded to SpotlightTable for highlight rendering */
+  /**
+   * Search the rows belong to. Empty-state copy uses this, not `search`:
+   * the box updates before the list query, and a cleared miss must not
+   * read as an empty buying group.
+   */
   deferredSearch: string;
   isLoading: boolean;
   isError: boolean;
@@ -118,6 +122,9 @@ export function ContactTable({
   readOnlyHint,
 }: ContactTableProps) {
   const { t } = useTranslation('crm');
+  // Rows are the settled query. The keystroke buffer can already be empty
+  // while that query is still a miss, so the copy follows deferredSearch.
+  const settledSearch = deferredSearch.trim();
 
   return (
     <>
@@ -125,11 +132,11 @@ export function ContactTable({
           readers. Visually hidden; updates only when the count actually
           changes so SR doesn't fire on every keystroke. */}
       <p className="sr-only" role="status" aria-live="polite">
-        {search
+        {settledSearch
           ? t(
               'contactTable.announceFiltered',
               'Showing {{count}} of {{total}} contacts matching {{search}}.',
-              { count: items.length, total: raw.length, search },
+              { count: items.length, total: raw.length, search: settledSearch },
             )
           : t('contactTable.announceTotal', 'Showing {{count}} contacts.', {
               count: items.length,
@@ -151,16 +158,16 @@ export function ContactTable({
           />
         ) : items.length === 0 ? (
           <EmptyState
-            icon={search ? 'search' : 'contacts'}
+            icon={settledSearch ? 'search' : 'contacts'}
             title={
-              search
+              settledSearch
                 ? t('contactTable.emptyFilteredTitle', 'No matches')
                 : t('contactTable.emptyHeadline', 'Nobody in the buying group yet')
             }
             message={
-              search
+              settledSearch
                 ? t('contactTable.emptyFilteredMessage', 'Nothing matched "{{search}}".', {
-                    search,
+                    search: settledSearch,
                   })
                 : t(
                     'contactTable.emptyBody',
@@ -168,10 +175,12 @@ export function ContactTable({
                   )
             }
             action={
-              search ? (
-                <Button size="sm" variant="secondary" onClick={() => setSearch('')}>
-                  {t('contactTable.clearSearch', 'Clear search')}
-                </Button>
+              settledSearch ? (
+                search.trim() ? (
+                  <Button size="sm" variant="secondary" onClick={() => setSearch('')}>
+                    {t('contactTable.clearSearch', 'Clear search')}
+                  </Button>
+                ) : null
               ) : (
                 canWrite && (
                   <ContactDialog
@@ -185,7 +194,7 @@ export function ContactTable({
               )
             }
             secondary={
-              search ? null : (
+              settledSearch ? null : (
                 <EmptyStateLink to="/settings?tab=data-import">
                   {t('contactTable.importCsv', 'Or import contacts from CSV')}
                 </EmptyStateLink>
