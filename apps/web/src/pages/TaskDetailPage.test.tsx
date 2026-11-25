@@ -27,7 +27,9 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 't1' }),
-  Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+  Link: ({ children, to }: { children: React.ReactNode; to?: string }) => (
+    <a href={typeof to === 'string' ? to : undefined}>{children}</a>
+  ),
 }));
 
 vi.mock('@/hooks/useTasks', () => ({
@@ -88,10 +90,7 @@ describe('TaskDetailPage — save() error surfacing', () => {
     } as unknown as ReturnType<typeof useTasks>);
 
     const mutate = vi.fn(
-      (
-        _vars: unknown,
-        opts?: { onSuccess?: () => void; onError?: (err: unknown) => void },
-      ) => {
+      (_vars: unknown, opts?: { onSuccess?: () => void; onError?: (err: unknown) => void }) => {
         opts?.onError?.(new Error('body/status Invalid enum value'));
       },
     );
@@ -155,6 +154,50 @@ describe('TaskDetailPage — save() error surfacing', () => {
 // Regression: PATCH /api/tasks/:id is gated server-side behind tasks:write —
 // the Edit control must stay disabled (not just visually) for a user without
 // it, otherwise a role like Presales sees an editable form that 403s on save.
+const PRICING_OPP = '00000000-0000-4000-8000-000000020041';
+
+// Opening the demo pricing follow-up shows a link that only says
+// "Opportunity". The task title does not name CI Financial, so the record
+// hides which bid the late work belongs to.
+describe('TaskDetailPage — the record names its bid', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('links the demo pricing follow-up to the CI Financial bid by name', () => {
+    vi.mocked(useTasks).mockReturnValue({
+      data: {
+        items: [
+          {
+            ...TASK,
+            id: 't1',
+            oppId: PRICING_OPP,
+            title: 'Submit revised pricing & SoW v2',
+            dueDate: '2026-05-15',
+            status: 'in_progress',
+            opportunityName: 'CI Financial — IT Modernization & MSP',
+          },
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useTasks>);
+    vi.mocked(useUpdateTask).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTask>);
+
+    renderPage();
+
+    const bid = screen.getByRole('link', { name: 'CI Financial — IT Modernization & MSP' });
+    expect(bid.getAttribute('href')).toBe(`/opportunities/${PRICING_OPP}`);
+    expect(screen.queryByRole('link', { name: 'Opportunity' })).toBeNull();
+  });
+});
+
 describe('TaskDetailPage — tasks:write gating', () => {
   afterEach(() => {
     cleanup();
@@ -195,9 +238,7 @@ describe('TaskDetailPage — tasks:write gating', () => {
 
     const editButton = screen.getByRole('button', { name: /^Edit/ });
     expect((editButton as HTMLButtonElement).disabled).toBe(true);
-    expect(editButton.getAttribute('title')).toBe(
-      'You need task write access to edit this task.',
-    );
+    expect(editButton.getAttribute('title')).toBe('You need task write access to edit this task.');
     // `title` is mouse-only — the disabled button stays in the tab order, so
     // the accessible name itself must carry the reason too.
     expect(editButton.getAttribute('aria-label')).toBe(

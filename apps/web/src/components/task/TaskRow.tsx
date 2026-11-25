@@ -16,6 +16,7 @@ import { daysUntil, formatDate } from '@/lib/format';
 
 import type { Task } from '@bidstack/shared';
 
+import { TaskBidLink } from './TaskBidLink';
 import { STATUS_CYCLE } from './taskConstants';
 
 // Each row is memoized so toggling one task's status doesn't re-render the
@@ -248,6 +249,7 @@ export const TaskRow = memo(function TaskRow({
             {task.title}
           </Link>
         </div>
+        <TaskBidLink task={task} className="block max-w-full truncate text-xs" />
         <div className="text-xs text-[var(--fg-tertiary)]">
           {t('taskRow.due', 'Due {{date}}', { date: formatDate(task.dueDate) })}
           {d !== null && task.status !== 'done' ? (
