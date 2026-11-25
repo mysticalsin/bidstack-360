@@ -194,7 +194,7 @@ describe('ProposalDetailPage — AI draft section', () => {
   });
 });
 
-describe('ProposalDetailPage — list stage after a status change', () => {
+describe('ProposalDetailPage: list stage after a status change', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
