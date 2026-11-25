@@ -338,3 +338,23 @@ export function groupItemsByRun(items: Item[]): ItemGroupRun[] {
   });
   return runs;
 }
+
+/**
+ * Index of the row the palette paints as selected. An empty list has no
+ * row, so the index stays 0. This still follows the list's current formula:
+ * a negative index is kept once rows exist.
+ */
+export function clampPaletteIndex(index: number, length: number): number {
+  if (length <= 0) return 0;
+  return Math.min(index, length - 1);
+}
+
+/**
+ * Highlighted row after ArrowUp (`direction` -1) or ArrowDown (`direction` 1).
+ * This still follows the list's current formula, including ArrowDown on an
+ * empty list, which stores -1.
+ */
+export function nextPaletteIndex(index: number, length: number, direction: 1 | -1): number {
+  if (direction > 0) return Math.min(length - 1, index + 1);
+  return Math.max(0, index - 1);
+}

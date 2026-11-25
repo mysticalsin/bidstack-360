@@ -352,4 +352,60 @@ describe('CommandPalette — loading state while server searches are pending', (
     await screen.findByText('Globex Industries');
     expect(screen.queryByText('Searching…')).toBeNull();
   });
+
+  it('highlights the first row when results arrive after ArrowDown on an empty list', async () => {
+    // WHY: ArrowDown while the list was empty stored -1. The server row
+    // then rendered with no option selected, and Enter had no row to open.
+    mockAppModules({});
+    const oppRequest = deferredResponse();
+    const globalRequest = deferredResponse();
+    vi.mocked(api).mockImplementation((path: string) =>
+      path.startsWith('/api/search') ? globalRequest.promise : oppRequest.promise,
+    );
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+          <CommandPalette open={true} onOpenChange={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    vi.mocked(api).mockClear();
+    fireEvent.change(input, { target: { value: 'zzgap' } });
+
+    await waitFor(() =>
+      expect(vi.mocked(api)).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search?q=zzgap'),
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByText('Searching…')).toBeTruthy();
+    expect(screen.queryByRole('option')).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    oppRequest.resolve({ items: [] });
+    globalRequest.resolve({
+      items: [
+        {
+          id: 'lead_northwind',
+          type: 'lead',
+          title: 'Northwind retrofit',
+          subtitle: 'Synthetic lead',
+          url: '/leads/lead_northwind',
+          score: 1,
+        },
+      ],
+      total: 1,
+      query: 'zzgap',
+    });
+
+    const option = await screen.findByRole('option', { name: /Northwind retrofit/i });
+    expect(option.getAttribute('aria-selected')).toBe('true');
+    expect(input.getAttribute('aria-activedescendant')).toBe('cmdk-option-0');
+    expect(input.getAttribute('aria-activedescendant')).not.toBe('cmdk-option--1');
+  });
 });

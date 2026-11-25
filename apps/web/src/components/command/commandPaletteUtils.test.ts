@@ -1,11 +1,16 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { CrmCompany } from '@bidstack/shared';
 
 import {
+  clampPaletteIndex,
   finalizePaletteItems,
   fuzzyMatch,
   matchCompanies,
+  nextPaletteIndex,
   rankPaletteItems,
   type Item,
 } from './commandPaletteUtils';
@@ -212,5 +217,46 @@ describe('finalizePaletteItems — frecency integration', () => {
     // records them so the Enter-direct-jump path (which bypasses the items
     // list) counts exactly once.
     expect(getFrecencyScores().has('nav:/dashboard')).toBe(false);
+  });
+});
+
+describe('palette keyboard index', () => {
+  it('does not store a negative index when ArrowDown is pressed on an empty list', () => {
+    // WHY: ArrowDown used Math.min(length - 1, index + 1). Length 0 makes
+    // that -1. The rows that arrive afterwards then highlight nothing, and
+    // Enter selects nothing.
+    expect(nextPaletteIndex(0, 0, 1)).toBe(0);
+    expect(nextPaletteIndex(0, 0, 1)).not.toBe(-1);
+  });
+
+  it('moves from the first real row when a stored negative index meets a filled list', () => {
+    // WHY: leaving -1 in state swallows the next ArrowDown. The visible row
+    // is the first one, so the next Down step is the second row.
+    expect(clampPaletteIndex(-1, 4)).toBe(0);
+    expect(nextPaletteIndex(-1, 4, 1)).toBe(1);
+    expect(nextPaletteIndex(-1, 4, -1)).toBe(0);
+  });
+
+  it('stays on the ends of a filled list', () => {
+    expect(nextPaletteIndex(2, 3, 1)).toBe(2);
+    expect(nextPaletteIndex(0, 3, -1)).toBe(0);
+    expect(clampPaletteIndex(0, 3)).toBe(0);
+    expect(clampPaletteIndex(9, 3)).toBe(2);
+    expect(clampPaletteIndex(1, 0)).toBe(0);
+  });
+
+  it('is what the palette uses for arrows and the painted row', () => {
+    const src = readFileSync(
+      path.resolve(process.cwd(), 'src/components/command/CommandPalette.tsx'),
+      'utf8',
+    );
+    const keys = src.slice(src.indexOf('onKeyDown={(e) => {'));
+    expect(keys).toContain('nextPaletteIndex(i, displayItems.length, 1)');
+    expect(keys).toContain('nextPaletteIndex(i, displayItems.length, -1)');
+    expect(keys).not.toContain('Math.min(displayItems.length - 1, i + 1)');
+    expect(src).toContain('clampPaletteIndex(activeIdx, displayItems.length)');
+    expect(src).not.toContain(
+      'displayItems.length === 0 ? 0 : Math.min(activeIdx, displayItems.length - 1)',
+    );
   });
 });
