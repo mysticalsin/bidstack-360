@@ -118,3 +118,65 @@ describe('ForecastsPage — territories:write gating', () => {
     });
   });
 });
+
+describe('ForecastsPage — headline totals wait for a settled list', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('does not print a zero commit while the forecast list is still loading', () => {
+    // WHY: the four tiles are the page's answer. An unloaded list is not a
+    // zero commit, and a salesperson must not read one before the request ends.
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.queryByText('Commit')).toBeNull();
+    expect(screen.getByRole('status', { name: /still loading/i })).toBeTruthy();
+  });
+
+  it('does not print a zero commit when the forecast list failed to load', () => {
+    // WHY: a failed read sitting under four €0 tiles looks like a real forecast.
+    // The tiles stay hidden and the existing list retry remains the way out.
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('forecasts down'),
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.queryByText('Commit')).toBeNull();
+    expect(screen.getByRole('status', { name: /stay hidden/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+  });
+
+  it('still shows a commit tile when the loaded list is empty', () => {
+    // WHY: an empty override book is a real zero. Hiding it would make "no
+    // manual forecasts" look the same as a request that has not answered.
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Commit')).toBeTruthy();
+    expect(screen.queryByRole('status', { name: /still loading|stay hidden/i })).toBeNull();
+  });
+});
