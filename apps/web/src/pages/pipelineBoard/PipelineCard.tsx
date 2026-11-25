@@ -10,10 +10,12 @@ import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { formatDate } from '@/lib/format';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
 
+import { boardCardClockStopped } from './board-card-clock';
 import { getStageName } from './pipelineUtils';
 
 interface PipelineCardProps {
@@ -49,13 +51,17 @@ export const PipelineCard = memo(function PipelineCard({
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
-  // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
-  // compare, which flagged "due today" as overdue for the whole day while the
-  // DueDateChip below said "Due today". Tint/aria-label must agree with the chip.
-  const isStalled =
-    dueDateUrgency(opp.dueDate).urgency === 'danger' &&
-    stageName !== 'Closed Won' &&
-    stageName !== 'Closed Lost';
+  // A won or lost board stage has no live deadline. Demo seed still stores a
+  // due date on those bids, and counting it down (or tinting a past date red)
+  // reads as an open submission. Open bids keep the chip's UTC-day urgency so
+  // "due today" is not overdue.
+  const clockStopped = boardCardClockStopped(opp);
+  const isStalled = !clockStopped && dueDateUrgency(opp.dueDate).urgency === 'danger';
+  const closedDueLabel = opp.dueDate
+    ? t('pipeline.boardCardClosedDue', 'Closed bid. Due {{date}}', {
+        date: formatDate(opp.dueDate),
+      })
+    : t('pipeline.boardCardClosedNoDate', 'Closed bid. No due date');
 
   return (
     <motion.li
@@ -172,7 +178,18 @@ export const PipelineCard = memo(function PipelineCard({
             WCAG 1.4.1) — a separate static "Overdue" badge used to render
             alongside it, duplicating the same state as two tomato pills. */}
         <div className="mt-2 flex items-center justify-between text-xs text-[var(--fg-tertiary)]">
-          <DueDateChip dueDate={opp.dueDate} size="sm" />
+          {clockStopped ? (
+            <Badge
+              tone="gray"
+              aria-label={closedDueLabel}
+              className="gap-0.5 px-1.5 py-0 text-[9px] font-medium"
+            >
+              <Icon name="clock" size={10} strokeWidth={2} />
+              {t('pipeline.boardCardClosed', 'Closed')}
+            </Badge>
+          ) : (
+            <DueDateChip dueDate={opp.dueDate} size="sm" />
+          )}
           <span className="font-mono">{opp.code}</span>
         </div>
       </Link>
