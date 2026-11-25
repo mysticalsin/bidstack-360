@@ -58,12 +58,17 @@ const news: AccountNewsIntel = {
 };
 
 const refresh = vi.fn();
-const state = { direction: direction as AccountDirection | undefined };
+const state = {
+  direction: direction as AccountDirection | undefined,
+  hiring,
+  financials,
+  news,
+};
 vi.mock('@/hooks/useCompanyIntel', () => ({
   useCompanyDirection: () => ({ data: state.direction, isLoading: false, isError: false, refetch: vi.fn() }),
-  useCompanyHiringIntel: () => ({ data: hiring, isLoading: false, isError: false }),
-  useCompanyFinancialsIntel: () => ({ data: financials, isLoading: false, isError: false }),
-  useCompanyNewsIntel: () => ({ data: news, isLoading: false, isError: false }),
+  useCompanyHiringIntel: () => ({ data: state.hiring, isLoading: false, isError: false }),
+  useCompanyFinancialsIntel: () => ({ data: state.financials, isLoading: false, isError: false }),
+  useCompanyNewsIntel: () => ({ data: state.news, isLoading: false, isError: false }),
   useRefreshIntelSource: () => ({ mutate: refresh, isPending: false, variables: undefined }),
 }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
@@ -76,6 +81,9 @@ describe('AccountDirectionSection', () => {
     cleanup();
     refresh.mockReset();
     state.direction = direction;
+    state.hiring = hiring;
+    state.financials = financials;
+    state.news = news;
   });
 
   it('opens on the direction view with cited claims and inferred labels', () => {
@@ -114,5 +122,25 @@ describe('AccountDirectionSection', () => {
     state.direction = { ...direction, sample: true };
     render(<AccountDirectionSection companyId="c1" />);
     expect(screen.getByText('Sample')).toBeTruthy();
+  });
+
+  it('does not mark an empty filings tab as sample because the hiring fixture is', () => {
+    // CI Financial stores sample job posts and no filed years. The section
+    // heading was Sample on every tab, so "No filed figures" read as demo data.
+    state.direction = { ...direction, sample: false };
+    state.hiring = { ...hiring, sample: true };
+    state.financials = { ...financials, years: [], revenueFallback: null, registry: [], sample: false };
+    state.news = { ...news, sample: false };
+    render(<AccountDirectionSection companyId="c1" initialTab="financials" />);
+
+    expect(screen.getByText('No filed figures')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Hiring' }));
+    expect(screen.getByText('Sample')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Financials' }));
+    expect(screen.getByText('No filed figures')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
   });
 });
