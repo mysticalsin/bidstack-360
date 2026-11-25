@@ -185,11 +185,28 @@ export interface AccountPerformance {
  * Postgres aggregate instead (the array can be take-capped). Won/lost honor
  * either the pipelineStage flags or the canonical `stage` column.
  */
+function asUtcDate(value: Date | null | unknown): Date | null {
+  if (value == null) return null;
+  const d = value instanceof Date ? value : new Date(value as string);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Month the win counts as revenue: the close stamp, then the due date. */
+export function wonRevenueMonth(
+  dueDate: Date | null | unknown,
+  closedAt: Date | null | unknown,
+): string | null {
+  const when = asUtcDate(closedAt) ?? asUtcDate(dueDate);
+  if (!when) return null;
+  return `${when.getUTCFullYear()}-${String(when.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export function deriveAccountPerformance(
   opps: Array<{
     stage: string;
     valueMicros: bigint | number | unknown;
     dueDate: Date | null | unknown;
+    closedAt?: Date | null | unknown;
     pipelineStage?: { isWon: boolean; isLost: boolean } | null;
   }>,
 ): AccountPerformance {
@@ -201,11 +218,8 @@ export function deriveAccountPerformance(
 
   const revenueByMonth = new Map<string, number>();
   for (const o of wonOpps) {
-    const when = o.dueDate ?? null;
-    if (!when) continue;
-    const d = when instanceof Date ? when : new Date(when as string);
-    if (Number.isNaN(d.getTime())) continue;
-    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    const key = wonRevenueMonth(o.dueDate, o.closedAt);
+    if (!key) continue;
     revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toMicros(o.valueMicros));
   }
   return {
@@ -511,6 +525,7 @@ export function buildCockpit({
     valueMicros: bigint | number | unknown;
     probability: number;
     dueDate: Date | null;
+    closedAt?: Date | null;
     owner: { name: string | null; email: string } | null;
   }>;
   contacts: Array<{
