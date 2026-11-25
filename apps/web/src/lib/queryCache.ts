@@ -122,6 +122,9 @@ function shouldPersistQueryKey(key: unknown[]): boolean {
   // The nav badge is a live count. Restoring it after reload shows the
   // previous overdue total while the task list has already moved on.
   if (key[0] === 'tasks' && key[1] === 'summary') return false;
+  // The bell is a live unread count. Restoring it after reload shows the
+  // previous total, or an empty tray, while the inbox has already moved.
+  if (key[0] === 'notifications') return false;
   return true;
 }
 
