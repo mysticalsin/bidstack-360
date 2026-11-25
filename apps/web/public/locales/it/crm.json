@@ -2317,6 +2317,7 @@
     "relatedCount": "{{count}} correlati",
     "noOpportunities": "Nessuna opportunità per {{customer}}.",
     "tasksTitle": "Attività",
+    "openTask": ", apri il seguito",
     "noTasks": "Nessuna attività correlata.",
     "dueDate": "Scadenza {{date}}",
     "noDueDate": "Nessuna scadenza",

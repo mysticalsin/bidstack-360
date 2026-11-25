@@ -2317,6 +2317,7 @@
     "relatedCount": "{{count}} relacionados",
     "noOpportunities": "Nenhuma oportunidade para {{customer}}.",
     "tasksTitle": "Tarefas",
+    "openTask": ", abrir o acompanhamento",
     "noTasks": "Nenhuma tarefa relacionada.",
     "dueDate": "Vence {{date}}",
     "noDueDate": "Sem data de vencimento",
