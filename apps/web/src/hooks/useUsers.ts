@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toast } from '@/components/ui/Toast';
@@ -84,7 +85,33 @@ export function useUsersPage(params: UsersPageParams = {}) {
 // real-time registration). Polls every 30s — matches the Redis 30s TTL so we
 // see a departed user drop off within one cycle. Returns a Set<userId> for
 // O(1) "is this user online?" lookups in the Team table.
+// Must stay under the 30s Redis TTL. The list refreshes the signed-in row
+// on this interval while it is mounted.
+export const ORG_PRESENCE_HEARTBEAT_MS = 15_000;
+
 export function useOrgPresence() {
+  const queryClient = useQueryClient();
+  // Redis forgets a person after 30s. Refresh our own row while this list is
+  // mounted, then read it again. A failed beat stays quiet: the dots fall
+  // back to offline, which is what an empty snapshot already means.
+  useEffect(() => {
+    let stopped = false;
+    const beat = () => {
+      void api('/api/v1/presence/heartbeat', { method: 'POST', body: {} })
+        .then(() => {
+          if (stopped) return;
+          void queryClient.invalidateQueries({ queryKey: ['presence', 'org'] });
+        })
+        .catch(() => {});
+    };
+    beat();
+    const timer = setInterval(beat, ORG_PRESENCE_HEARTBEAT_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ['presence', 'org'],
     queryFn: ({ signal }) => api<{ users: PresenceEntry[] }>('/api/v1/presence/org', { signal }),
