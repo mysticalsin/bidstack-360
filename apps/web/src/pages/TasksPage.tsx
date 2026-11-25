@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
+import { compareTasksByDue } from '@/components/task/task-due-order';
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
@@ -97,8 +98,9 @@ export function TasksPage() {
   }, [data?.items, filter]);
 
   // Sort. Default 'natural' = server order (createdAt desc on the backend).
-  // 'due' sorts asc with nulls last so overdue surfaces at the top of the
-  // filter result; 'status' clusters open → in_progress → blocked → done.
+  // 'due' puts unfinished rows first, earliest due day first, missing day
+  // last in that group, then finished rows. A completed handover must not
+  // read as the next deadline. 'status' clusters open, in progress, blocked, done.
   type Sort = 'natural' | 'due' | 'status';
   const STATUS_ORDER: Record<TaskStatus, number> = {
     open: 0,
@@ -127,12 +129,7 @@ export function TasksPage() {
     }
     const next = [...filteredItems];
     if (sort === 'due') {
-      next.sort((a, b) => {
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return a.dueDate.localeCompare(b.dueDate);
-      });
+      next.sort(compareTasksByDue);
     } else {
       next.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
     }
