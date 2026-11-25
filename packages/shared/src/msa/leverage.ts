@@ -113,3 +113,14 @@ export function evaluateLeverage(
     scopeCitation: citation,
   };
 }
+
+/**
+ * The flag that belongs to this agreement. A sibling MSA on the same account
+ * is a different document.
+ */
+export function leverageFlagForAgreement<T extends { msaId: string }>(
+  agreementId: string,
+  flags: readonly T[],
+): T | null {
+  return flags.find((flag) => flag.msaId === agreementId) ?? null;
+}

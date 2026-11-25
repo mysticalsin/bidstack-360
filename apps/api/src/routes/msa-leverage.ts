@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import {
   buildValuePanel,
+  leverageFlagForAgreement,
   MsaLeverageFlag,
   MsaLeverageListResponse,
   MsaLeverageSummary,
@@ -60,7 +61,7 @@ export const msaLeverageRoutes: FastifyPluginAsyncZod = async (server) => {
       if (!row) throw server.httpErrors.notFound('MSA not found');
       if (!row.companyId) return { flag: null };
       const items = await listLeverageFlags(req.auth.orgId, scope, row.companyId);
-      return { flag: items.find((i) => i.msaId === req.params.id) ?? items[0] ?? null };
+      return { flag: leverageFlagForAgreement(req.params.id, items) };
     },
   );
 
