@@ -2323,6 +2323,7 @@
     "breadcrumbLabel": "Breadcrumb",
     "contacts": "Contacts",
     "noRole": "No role",
+    "openAccount": "Open account {{customer}}",
     "influence": "Influence: {{value}}/5",
     "added": "Added",
     "opportunitiesTitle": "Opportunities",

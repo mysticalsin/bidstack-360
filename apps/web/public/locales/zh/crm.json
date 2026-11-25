@@ -2311,6 +2311,7 @@
     "breadcrumbLabel": "面包屑导航",
     "contacts": "联系人",
     "noRole": "无职位",
+    "openAccount": "打开账户 {{customer}}",
     "influence": "影响力：{{value}}/5",
     "added": "添加于",
     "opportunitiesTitle": "商机",

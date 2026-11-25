@@ -2366,6 +2366,7 @@
     "breadcrumbLabel": "Fil d'Ariane",
     "contacts": "Contacts",
     "noRole": "Aucun rôle",
+    "openAccount": "Ouvrir le compte {{customer}}",
     "influence": "Influence : {{value}}/5",
     "added": "Ajouté",
     "opportunitiesTitle": "Opportunités",
