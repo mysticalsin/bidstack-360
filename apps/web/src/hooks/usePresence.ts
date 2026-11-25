@@ -29,11 +29,12 @@
 // Staleness: a crashed tab never sends the leave POST, so viewers whose
 //   lastSeenAt is older than 3 missed heartbeats are dropped client-side too.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import { useUser } from '@/lib/auth';
+import { readDemoSessionUserId } from '@/lib/demo-session-user';
 import type { UserPresence } from '@bidstack/shared';
 
 const HEARTBEAT_MS = 15_000;
@@ -66,6 +67,11 @@ function postPresence(body: {
 
 export function usePresence(entityType: string, entityId: string | undefined): UsePresenceResult {
   const { user } = useUser();
+  // Demo auth's user.id is the placeholder "demo-user". The presence row
+  // uses the uuid in the session token. Read it once so a person alone on
+  // a bid is not listed as a teammate. A later token write needs a remount,
+  // which sign-in already does by leaving the login screen.
+  const [demoSelfId] = useState(readDemoSessionUserId);
 
   // React 18 StrictMode (dev only) intentionally double-invokes this effect
   // on initial mount — setup, cleanup, setup again — synchronously, before
@@ -138,10 +144,10 @@ export function usePresence(entityType: string, entityId: string | undefined): U
     // anyway, so staleness detection loses nothing in practice.
     const now = query.dataUpdatedAt;
     return items
-      .filter((p) => p.userId !== user?.id)
+      .filter((p) => p.userId !== user?.id && p.userId !== demoSelfId)
       .filter((p) => now - new Date(p.lastSeenAt).getTime() < STALE_MS)
       .map((p) => ({ userId: p.userId, userName: p.userName, lastSeenAt: p.lastSeenAt }));
-  }, [query.data, query.dataUpdatedAt, user?.id]);
+  }, [query.data, query.dataUpdatedAt, user?.id, demoSelfId]);
 
   return { viewers, isLoading: query.isLoading };
 }
