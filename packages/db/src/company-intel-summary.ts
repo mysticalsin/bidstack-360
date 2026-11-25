@@ -47,6 +47,7 @@ const NEWS_LABEL: Record<string, string> = {
   companies_house: 'Companies House',
   apollo: 'Apollo',
   fixture: 'Sample data',
+  sample: 'Sample data',
 };
 const NEWS_EXCLUDED = ['financials', 'apify_linkedin'];
 
@@ -220,7 +221,9 @@ export async function loadIntelSummaryInput(
           url: e.sourceUrl || null,
           publishedAt: iso(e.occurredAt),
           sourceLabel: NEWS_LABEL[e.source] ?? e.source,
-          sample: e.source === 'fixture',
+          // Source "sample" is the demo watchdog seed (empty URL, "Sample:" title).
+          // "fixture" is the seeded company post. Both are sample data.
+          sample: e.source === 'fixture' || e.source === 'sample',
         })),
     ],
     firmographics: firmo
