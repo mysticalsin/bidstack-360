@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { prisma, syncCalendarEventActivity } from '@bidstack/db';
 import { CALENDAR_PUSH, mayWriteCalendar } from '@bidstack/shared';
 import { Queue } from 'bullmq';
+import { loggedMeetingsInRange } from './calendar-logged-meetings.js';
 import { redis } from '../redis.js';
 
 const CalendarEventBase = z.object({
@@ -254,7 +255,60 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
         select: EVENT_SELECT,
       });
 
-      return { items: items.map(toResponse) };
+      const calendarItems = items.map(toResponse);
+      if (!from || !to || !(await server.hasPermission(req, 'activities:read'))) {
+        return { items: calendarItems };
+      }
+
+      // Demo workshops are activities on a UTC day. Without them the week
+      // column for that day is empty even though the book has the meeting.
+      const fromDate = new Date(from);
+      const toDate = new Date(to);
+      try {
+        const meetings = await prisma.activity.findMany({
+          where: {
+            orgId: req.auth.orgId,
+            deletedAt: null,
+            type: 'meeting',
+            AND: [
+              { OR: [{ ownerId: req.auth.userId }, { actorId: req.auth.userId }] },
+              {
+                OR: [
+                  { occurredAt: { gte: fromDate, lt: toDate } },
+                  { startTime: { gte: fromDate, lt: toDate } },
+                  { startTime: { lt: toDate }, endTime: { gt: fromDate } },
+                ],
+              },
+            ],
+          },
+          orderBy: { occurredAt: 'asc' },
+          take: 100,
+          select: {
+            id: true,
+            type: true,
+            subject: true,
+            occurredAt: true,
+            startTime: true,
+            endTime: true,
+            entityType: true,
+            entityId: true,
+            createdAt: true,
+          },
+        });
+        const logged = loggedMeetingsInRange(
+          meetings,
+          { from: fromDate, to: toDate },
+          items.map((event) => ({ subject: event.subject, startAt: event.startAt })),
+        );
+        return {
+          items: [...calendarItems, ...logged].sort(
+            (a, b) => a.startAt.localeCompare(b.startAt) || a.subject.localeCompare(b.subject),
+          ),
+        };
+      } catch (err) {
+        server.log.warn({ err }, 'Could not add logged meetings to the calendar');
+        return { items: calendarItems };
+      }
     },
   );
 
