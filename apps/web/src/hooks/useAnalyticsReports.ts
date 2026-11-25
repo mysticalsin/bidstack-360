@@ -93,6 +93,8 @@ export interface ReportQuery {
   groupBy?: GroupBy[];
   sort?: SortField[];
   limit?: number;
+  /** IANA zone for a calendar-day filter or a time bucket. Omitted means UTC. */
+  timezone?: string;
 }
 
 export interface Report {

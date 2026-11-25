@@ -124,6 +124,37 @@ describe('buildQuery', () => {
     expect(q.sort).toBeUndefined();
   });
 
+  it('stamps the runtime zone on a calendar-day filter so the day is not UTC midnight', () => {
+    const q = buildQuery({
+      entity: 'opportunity',
+      filters: {
+        logic: 'AND',
+        conditions: [{ field: 'createdAt', operator: 'lte', value: '2026-11-25' }],
+      },
+      aggregates: [],
+      groupBy: [],
+      sort: [],
+      limit: 100,
+    });
+    // The date input is a calendar day in the author's zone. The engine uses
+    // this zone for the day window. A hardcoded UTC stamp would drop a demo
+    // row written that evening in a zone behind UTC.
+    expect(q.filters?.conditions).toHaveLength(1);
+    expect(q.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it('stamps the runtime zone on a time bucket so the month boundary follows the author', () => {
+    const q = buildQuery({
+      entity: 'opportunity',
+      filters: { logic: 'AND', conditions: [] },
+      aggregates: [{ fn: 'COUNT', field: '*' }],
+      groupBy: [{ field: 'createdAt', timeBucket: 'MONTH' }],
+      sort: [],
+      limit: 100,
+    });
+    expect(q.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
   it('clamps an out-of-range limit into 1..1000', () => {
     const base = {
       entity: 'lead' as const,
