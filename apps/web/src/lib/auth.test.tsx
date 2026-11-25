@@ -21,10 +21,12 @@ import { useEffect, type ReactNode } from 'react';
 
 import {
   AuthProvider,
+  DEMO_EMAIL_KEY,
   DEMO_SIGNED_OUT_KEY,
   DEMO_TOKEN_KEY,
   isTransientMeFailure,
   useAuth,
+  useSignInAction,
   useSignOut,
   useUser,
 } from './auth';
@@ -128,6 +130,25 @@ function Probe() {
       <span data-testid="email">{user?.primaryEmailAddress?.emailAddress ?? 'none'}</span>
       <button type="button" onClick={() => signOut()}>
         Sign out
+      </button>
+    </div>
+  );
+}
+
+/** Same two fields the topbar session banner renders from the auth user. */
+function DemoSessionBanner() {
+  const { user } = useUser();
+  const { signIn } = useSignInAction();
+  return (
+    <div className="who">
+      <div className="name" data-testid="session-name">
+        {user?.fullName ?? 'Guest'}
+      </div>
+      <div className="role" data-testid="session-detail">
+        {user?.primaryEmailAddress?.emailAddress ?? 'Not signed in'}
+      </div>
+      <button type="button" onClick={() => signIn()}>
+        Refresh session
       </button>
     </div>
   );
@@ -263,6 +284,33 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
     expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
     expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
+  });
+
+  it('replaces the session banner when a later demo email is stored without signing out', () => {
+    // WHY: the topbar session banner reads the name and the email line from
+    // this provider. Demo login stores a new email, then calls signIn(), and
+    // the provider stays mounted from /login into the app. Setting signed-in
+    // to true when it is already true does not render again, so the banner
+    // kept the previous visitor after the workspace had changed.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.clear();
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <DemoSessionBanner />
+      </AuthProvider>,
+    );
+
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-ada');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'ada.visitor@example.test');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh session' }));
+    expect(screen.getByTestId('session-name').textContent).toBe('ada.visitor@example.test');
+    expect(screen.getByTestId('session-detail').textContent).toBe('ada.visitor@example.test');
+
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-bo');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'bo.visitor@example.test');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh session' }));
+    expect(screen.getByTestId('session-name').textContent).toBe('bo.visitor@example.test');
+    expect(screen.getByTestId('session-detail').textContent).toBe('bo.visitor@example.test');
   });
 });
 
