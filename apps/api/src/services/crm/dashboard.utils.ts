@@ -137,11 +137,28 @@ export function titleCase(value: string) {
     .join(' ');
 }
 
-export function formatMicrosCompact(micros: number) {
-  const units = micros / 1_000_000;
-  if (units >= 1_000_000_000) return `$${(units / 1_000_000_000).toFixed(1)}B`;
-  if (units >= 1_000_000) return `$${(units / 1_000_000).toFixed(1)}M`;
-  return `$${units.toLocaleString()}`;
+const MICROS_PER_UNIT = 1_000_000n;
+
+/**
+ * Cockpit annual revenue has no currency column. The KPI is the grouped
+ * units. A dollar prefix would price a synthetic figure the CRM never
+ * recorded. Fractional units stay on the decimal. A non-integer is not
+ * an amount.
+ */
+export function formatMicrosCompact(micros: number): string {
+  if (!Number.isSafeInteger(micros)) return 'Not a number';
+  const value = BigInt(micros);
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const whole = abs / MICROS_PER_UNIT;
+  const remainder = abs % MICROS_PER_UNIT;
+  const frac = remainder.toString().padStart(6, '0').replace(/0+$/, '');
+  const grouped = new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0,
+    useGrouping: true,
+  }).format(Number(whole));
+  const shown = frac.length === 0 ? grouped : `${grouped}.${frac}`;
+  return negative ? `-${shown}` : shown;
 }
 
 // ─── Normalizers ─────────────────────────────────────────────────────────────
