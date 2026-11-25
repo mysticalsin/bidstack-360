@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import type { SegmentDimension, TerritorySegment } from '@/hooks/useTerritories';
+import { territorySegmentAmount } from './territory-segment-amount';
 
 export function TerritorySegmentBreakdown({
   dimension,
@@ -15,7 +16,6 @@ export function TerritorySegmentBreakdown({
   isError,
   errorMessage,
   onRetry,
-  formatMoneyMicros,
 }: {
   dimension: SegmentDimension;
   segments: TerritorySegment[];
@@ -23,6 +23,8 @@ export function TerritorySegmentBreakdown({
   isError: boolean;
   errorMessage?: string;
   onRetry: () => void;
+  // Callers still pass a formatter. Segment totals have no currency, so the
+  // label does not use it and does not invent EUR.
   formatMoneyMicros: (micros: number, currency: string) => string;
 }) {
   const { t } = useTranslation('crm');
@@ -90,7 +92,7 @@ export function TerritorySegmentBreakdown({
                   {s.label}
                 </span>
                 <span className="shrink-0 text-sm font-semibold text-[var(--fg-primary)]">
-                  {formatMoneyMicros(s.totalValueMicros, 'EUR')}
+                  {territorySegmentAmount(s.totalValueMicros)}
                 </span>
               </div>
               {/* Value bar */}

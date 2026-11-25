@@ -12,6 +12,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 import { TerritorySegmentBreakdown } from './TerritorySegmentBreakdown';
+import { territorySegmentAmount } from './territory-segment-amount';
 
 const UNITS_61520_MICROS = 61_520_000_000;
 
@@ -66,5 +67,13 @@ describe('territory segment amount under demo data', () => {
     expect(digits(text)).toContain('61520');
     expect(formatMoneyMicros).not.toHaveBeenCalled();
     expect(screen.getByText('Later segment')).toBeTruthy();
+  });
+
+  it('does not invent a euro zero when the micros are not a safe integer', () => {
+    // WHY: a segment total that is not an integer micros value is not an
+    // amount. It must not fall through to an EUR zero.
+    expect(territorySegmentAmount(Number.NaN)).toBe('Not a number');
+    expect(territorySegmentAmount(1.5)).toBe('Not a number');
+    expect(territorySegmentAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });
