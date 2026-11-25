@@ -123,6 +123,9 @@ export function OppPageHeader({
   stageFilter,
   stageOptions,
   itemCount,
+  inFlightCount,
+  closedCount,
+  pageContinues = false,
   hasData,
   isExporting = false,
   onClearSearch,
@@ -133,6 +136,12 @@ export function OppPageHeader({
   stageFilter: string | null;
   stageOptions: PipelineStage[];
   itemCount: number;
+  /** Open rows on this page. "Bids in flight" is this count, not the page length. */
+  inFlightCount: number;
+  /** Won or lost rows on this page. They stay in the table. */
+  closedCount: number;
+  /** Another page exists, so the in-flight figure is not every match. */
+  pageContinues?: boolean;
   hasData: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
@@ -175,12 +184,28 @@ export function OppPageHeader({
                 {t('oppToolbar.clearFilter', 'clear filter')}
               </button>
             </>
+          ) : closedCount > 0 ? (
+            pageContinues ? (
+              t(
+                'oppToolbar.bidsInFlightWithClosedPage',
+                '{{open}} bids in flight on this page · {{closed}} closed on this page.',
+                { open: inFlightCount, closed: closedCount },
+              )
+            ) : (
+              t(
+                'oppToolbar.bidsInFlightWithClosed',
+                '{{open}} bids in flight · {{closed}} closed on this page.',
+                { open: inFlightCount, closed: closedCount },
+              )
+            )
           ) : (
-            <>
-              {t('oppToolbar.bidsInFlight', '{{count}} bids in flight · click any cell to edit inline.', {
+            t(
+              'oppToolbar.bidsInFlight',
+              '{{count}} bids in flight · click any cell to edit inline.',
+              {
                 count: itemCount,
-              })}
-            </>
+              },
+            )
           )}
         </p>
       </div>
