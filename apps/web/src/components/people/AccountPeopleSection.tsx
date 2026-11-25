@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -11,6 +12,8 @@ import {
   usePeopleMap,
 } from '@/hooks/useAccountPeople';
 import type { ConnectionStanding, PeopleMapPerson } from '@bidstack/shared';
+
+import { taskRecordHref } from './task-record-href';
 
 type DealOption = { id: string; name: string };
 
@@ -26,6 +29,25 @@ function standingClass(standing: ConnectionStanding): string {
   if (standing === 'evidenced') return 'text-[var(--brand-primary)]';
   if (standing === 'conflicted') return 'text-[var(--danger)]';
   return 'text-[var(--fg-secondary)]';
+}
+
+function InternalTaskTitle({ id, title }: { id: string; title: string }) {
+  const { t } = useTranslation('crm');
+  // A title search can match a different follow-up. Only a task uuid opens
+  // the record.
+  const href = taskRecordHref(id);
+  if (!href) {
+    return <p className="text-sm font-medium text-[var(--fg-primary)]">{title}</p>;
+  }
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center rounded text-sm font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:text-[var(--brand-deep)]"
+    >
+      {title}
+      <span className="sr-only">{t('commitments.openTask', ', open follow-up')}</span>
+    </Link>
+  );
 }
 
 function actionClass(primary = false): string {
@@ -727,7 +749,7 @@ function CommitmentLists({
                 <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
                   {work?.internalTasks.map((task) => (
                     <li key={task.id} className="py-3">
-                      <p className="text-sm text-[var(--fg-primary)]">{task.title}</p>
+                      <InternalTaskTitle id={task.id} title={task.title} />
                       <p className="mt-1 text-sm text-[var(--fg-secondary)]">
                         {t('commitments.taskMeta', 'Internal task · {{status}} · due {{due}}', {
                           status: task.status,
