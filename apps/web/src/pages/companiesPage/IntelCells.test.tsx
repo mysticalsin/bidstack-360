@@ -79,4 +79,56 @@ describe('intel cells', () => {
     );
     expect(screen.getByText('Contracting')).toBeTruthy();
   });
+
+  it('names a demo sample headline as sample when the summary still calls it live', () => {
+    // WHY: CI Financial's demo story is titled "Sample:" and the list summary
+    // can still store sample:false with the source label "sample". The Signal
+    // cell then shows only "Results", which reads as a live filing.
+    const { unmount } = render(
+      <IntelCellFor
+        column="signal"
+        summary={intelSummary({
+          signal: {
+            kind: 'results',
+            label: 'Results',
+            title: 'Sample: CI Financial third-quarter profit rose 12% on record assets',
+            url: null,
+            publishedAt: '2026-11-19T00:00:00.000Z',
+            sourceLabel: 'sample',
+            sample: false,
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Results')).toBeTruthy();
+    expect(screen.getByText('Sample')).toBeTruthy();
+    const stale =
+      screen.getByText('Results').closest('[aria-label]')?.getAttribute('aria-label') ?? '';
+    expect(stale).toMatch(/sample data/i);
+    unmount();
+
+    render(
+      <IntelCellFor
+        column="signal"
+        summary={intelSummary({
+          signal: {
+            kind: 'results',
+            label: 'Results',
+            title: 'CI Financial third-quarter profit rose 12% on record assets',
+            url: null,
+            publishedAt: '2026-11-19T00:00:00.000Z',
+            sourceLabel: 'Sample data',
+            sample: true,
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Sample')).toBeTruthy();
+  });
+
+  it('leaves a live news signal unmarked', () => {
+    render(<IntelCellFor column="signal" summary={intelSummary()} />);
+    expect(screen.getByText('Acquisition')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+  });
 });
