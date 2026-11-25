@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OpportunitiesPage } from './OpportunitiesPage';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { useHasPermission } from '@/hooks/useCapabilities';
+import { useOrgSummary } from '@/hooks/useOrgSummary';
 
 vi.mock('@/hooks/useOpportunities', () => ({
   useOpportunities: vi.fn(),
@@ -18,6 +19,10 @@ vi.mock('@/hooks/useOpportunities', () => ({
 // suite below (which doesn't care about permission) keeps seeing every
 // affordance; the dedicated describe block overrides per-test.
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn(() => true) }));
+
+// The page asks for the tenant-wide summary so a filtered miss can tell a
+// bid lead the book still has bids. Left unmocked it fetches :3000.
+vi.mock('@/hooks/useOrgSummary', () => ({ useOrgSummary: vi.fn() }));
 
 vi.mock('@/hooks/useStageMutation', () => ({
   useStageMutation: vi.fn(() => ({ mutateAsync: vi.fn() })),
@@ -70,10 +75,10 @@ function mockOpportunities(value: Partial<ReturnType<typeof useOpportunities>>) 
   vi.mocked(useOpportunities).mockReturnValue(value as ReturnType<typeof useOpportunities>);
 }
 
-function renderWithProviders(ui: React.ReactElement) {
+function renderWithProviders(ui: React.ReactElement, initialEntry = '/') {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -103,10 +108,35 @@ function seededOpportunity() {
   };
 }
 
+function mockOrgSummary(opportunities: number | null = null) {
+  vi.mocked(useOrgSummary).mockReturnValue({
+    data:
+      opportunities === null
+        ? undefined
+        : {
+            companies: 0,
+            contacts: 0,
+            leads: 0,
+            opportunities,
+            openOpportunities: opportunities,
+            pipelineValue: 0,
+            tasks: 0,
+            overdueTasks: 0,
+            serviceCases: 0,
+            openServiceCases: 0,
+            recentActivity: [],
+          },
+    isLoading: false,
+    isError: false,
+    error: null,
+  } as unknown as ReturnType<typeof useOrgSummary>);
+}
+
 describe('OpportunitiesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useHasPermission).mockReturnValue(true);
+    mockOrgSummary(0);
   });
 
   afterEach(() => {
@@ -238,6 +268,159 @@ describe('OpportunitiesPage', () => {
       '/settings?tab=data-import',
     );
   });
+
+  // A due or stage chip that matches nothing is a filtered list, not an empty
+  // deal book. The first-run pitch ("No open bids yet" + CSV import) tells a
+  // bid lead the pipeline is empty and invites a second import of the same book.
+  it('does not pitch an empty deal book when the overdue filter matches nothing', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    mockOrgSummary(3);
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?due=overdue');
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByText(/Convert a qualified lead or log the RFP/)).toBeNull();
+    expect(screen.queryByRole('link', { name: /import your deal book/i })).toBeNull();
+    expect(screen.getByText(/The deal book still has bids/)).toBeTruthy();
+    expect(screen.queryByText(/bids in flight/i)).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: 'No opportunities match these filters' }),
+    ).toBeTruthy();
+    expect(screen.getByText(/overdue opportunities/i)).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toMatch(/overdue/i);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    expect(screen.getByText('No open bids yet')).toBeTruthy();
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('overdue');
+  });
+
+  it('does not invent a populated deal book when the summary is empty too', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    mockOrgSummary(0);
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?due=overdue');
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByText(/deal book still has bids/i)).toBeNull();
+    expect(screen.queryByRole('link', { name: /import your deal book/i })).toBeNull();
+    expect(screen.getByText(/Nothing in this view matches/)).toBeTruthy();
+  });
+
+  it('does not pitch an empty deal book when a stage chip matches nothing', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?pipelineStageId=s2_sent');
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByRole('link', { name: /import your deal book/i })).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: 'No opportunities match these filters' }),
+    ).toBeTruthy();
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({ stage: 's2_sent' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    expect(screen.getByText('No open bids yet')).toBeTruthy();
+    const lastCall = vi.mocked(useOpportunities).mock.calls.at(-1)?.[0];
+    expect(lastCall).not.toHaveProperty('stage');
+    expect(lastCall).not.toHaveProperty('pipelineStageId');
+  });
+
+  it('does not pitch an empty deal book when search matches nothing', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?search=NoSuchBid');
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByRole('link', { name: /import your deal book/i })).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: 'No opportunities match these filters' }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    expect(screen.getByText('No open bids yet')).toBeTruthy();
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('search');
+  });
+
+  it('names the 7-day due filter instead of an empty deal book', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?due=within7');
+
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByText(/bids in flight/i)).toBeNull();
+    // Visible subtitle and the live region both name the window. A count of
+    // "bids in flight" would hide that the 7-day chip is what emptied the list.
+    expect(screen.getAllByText(/opportunities due within 7 days/i)).toHaveLength(2);
+    expect(screen.getByRole('status').textContent).toMatch(/due within 7 days/i);
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({ dueWithinDays: 7 });
+  });
+
+  it('names both the stage and the due filter when they narrow the list together', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(
+      <OpportunitiesPage />,
+      '/opportunities?pipelineStageId=s2_sent&due=overdue',
+    );
+
+    // Either constraint alone would mis-state the count. The subtitle and the
+    // live region have to name the intersection, and the empty state must not
+    // invite a CSV import of a book that is only filtered out.
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByRole('link', { name: /import your deal book/i })).toBeNull();
+    expect(screen.getByText(/opportunities that are overdue/i)).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toMatch(/stage and due filters/i);
+  });
+
+  it('names an overdue filter in the subtitle when rows are still on the page', () => {
+    mockOpportunities({
+      data: { items: [seededOpportunity()], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />, '/opportunities?due=overdue');
+
+    expect(screen.queryByText(/bids in flight/i)).toBeNull();
+    expect(screen.getByText(/overdue opportunities/i)).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'No opportunities match these filters' }),
+    ).toBeNull();
+  });
 });
 
 // The backend 403s every opportunity PATCH/DELETE/stage-move for a role
@@ -246,6 +429,7 @@ describe('OpportunitiesPage', () => {
 describe('OpportunitiesPage — opportunities:write gating', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockOrgSummary(null);
     mockOpportunities({
       data: { items: [seededOpportunity()], nextCursor: null },
       isLoading: false,
