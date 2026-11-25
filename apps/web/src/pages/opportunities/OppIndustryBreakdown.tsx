@@ -8,14 +8,15 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { useTerritorySegments } from '@/hooks/useTerritories';
 import { TerritorySegmentBreakdown } from '@/components/territories/TerritorySegmentBreakdown';
+
+import { opportunityIndustryAmount } from './opportunity-industry-amount';
 
 export function OppIndustryBreakdown() {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const segments = useTerritorySegments('industry');
   const totals = segments.data?.totals;
 
@@ -35,7 +36,9 @@ export function OppIndustryBreakdown() {
               {t('oppIndustryBreakdown.sectorCount', '{{count}} sector', {
                 count: totals.totalSegments,
               })}{' '}
-              · {formatMoneyMicros(totals.totalValueMicros, 'EUR')}
+              · {opportunityIndustryAmount(totals.totalValueMicros)}
+              {' · '}
+              {UNSPECIFIED_CURRENCY_BASIS}
             </span>
           ) : null}
         </span>
@@ -55,7 +58,7 @@ export function OppIndustryBreakdown() {
             isError={segments.isError}
             errorMessage={segments.error instanceof Error ? segments.error.message : undefined}
             onRetry={() => void segments.refetch()}
-            formatMoneyMicros={formatMoneyMicros}
+            formatMoneyMicros={(micros) => opportunityIndustryAmount(micros)}
           />
         </div>
       ) : null}
