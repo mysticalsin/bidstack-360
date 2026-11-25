@@ -34,6 +34,7 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
+import { resolveBoardStageFilter } from './pipelineBoard/board-stage-filter';
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
@@ -60,7 +61,8 @@ export function PipelinePage() {
   const canWrite = useHasPermission('opportunities:write');
 
   // Stage filter via the URL. `?pipelineStageId=...` collapses the board to a
-  // single column so the user can focus that slice and share the link.
+  // single column so the user can focus that slice and share the link. The
+  // value may be a column id or the demo stage key stored on that column.
   const [searchParams, setSearchParams] = useSearchParams();
   const stageFilter = searchParams.get('pipelineStageId') ?? null;
   const setStageFilter = (next: string | null) => {
@@ -99,6 +101,29 @@ export function PipelinePage() {
     () => getPipelineStages(data?.items ?? [], configuredStageOptions),
     [configuredStageOptions, data?.items],
   );
+
+  const stageKeyById = useMemo(() => {
+    const keys = new Map<string, string>();
+    for (const stage of configuredStages.data?.items ?? []) {
+      if (stage.key) keys.set(stage.id, stage.key);
+    }
+    return keys;
+  }, [configuredStages.data?.items]);
+
+  const resolvedFilter = useMemo(
+    () =>
+      resolveBoardStageFilter(
+        stageFilter,
+        stages.map((stage) => ({ id: stage.id, key: stageKeyById.get(stage.id) ?? null })),
+      ),
+    [stageFilter, stageKeyById, stages],
+  );
+  const visibleStages =
+    resolvedFilter.kind === 'all'
+      ? stages
+      : resolvedFilter.kind === 'column'
+        ? stages.filter((stage) => stage.id === resolvedFilter.id)
+        : [];
 
   const stageIdByBusinessKey = useMemo(
     () => new Map(stages.map((stage) => [getPipelineStageBusinessKey(stage), stage.id])),
@@ -184,8 +209,6 @@ export function PipelinePage() {
     );
   };
 
-  const visibleStages = stageFilter ? stages.filter((s) => s.id === stageFilter) : stages;
-
   return (
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
@@ -206,11 +229,16 @@ export function PipelinePage() {
             <span>{t('pipeline.stageFilterLabel', 'Stage')}</span>
             <select
               aria-label={t('pipeline.stageFilterAriaLabel', 'Filter pipeline by stage')}
-              value={stageFilter ?? ''}
+              value={resolvedFilter.kind === 'column' ? resolvedFilter.id : (stageFilter ?? '')}
               onChange={(e) => setStageFilter(e.target.value || null)}
               className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
             >
               <option value="">{t('pipeline.stageFilterAllOption', 'All')}</option>
+              {resolvedFilter.kind === 'missing' && stageFilter ? (
+                <option value={stageFilter}>
+                  {t('pipeline.stageFilterMissingOption', 'Stage not on this board')}
+                </option>
+              ) : null}
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -234,19 +262,23 @@ export function PipelinePage() {
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
           ? (() => {
+              if (resolvedFilter.kind === 'missing') {
+                return t('pipeline.stageFilterMissingTitle', 'This stage is not on the board');
+              }
               const count = visibleStages.reduce(
                 (s, st) => s + (byStage.get(st.id)?.length ?? 0),
                 0,
               );
-              const filteredStageName = stageFilter
-                ? (stages.find((s) => s.id === stageFilter)?.name ?? '')
-                : '';
+              const filteredStageName =
+                resolvedFilter.kind === 'column'
+                  ? (stages.find((s) => s.id === resolvedFilter.id)?.name ?? '')
+                  : '';
               const label = pageContinues
                 ? pipelineBoardCaption(count, pageContinues, latest)
                 : count === 1
                   ? t('pipeline.liveRegionCountOne', '{{count}} opportunity', { count })
                   : t('pipeline.liveRegionCountOther', '{{count}} opportunities', { count });
-              return stageFilter ? `${label} · ${filteredStageName}` : label;
+              return resolvedFilter.kind === 'column' ? `${label} · ${filteredStageName}` : label;
             })()
           : ''}
       </p>
@@ -339,6 +371,23 @@ export function PipelinePage() {
               className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
             >
               {t('pipeline.emptyGoToOpportunitiesButton', 'Go to Opportunities')}
+            </button>
+          }
+        />
+      ) : resolvedFilter.kind === 'missing' ? (
+        <EmptyState
+          title={t('pipeline.stageFilterMissingTitle', 'This stage is not on the board')}
+          message={t(
+            'pipeline.stageFilterMissingMessage',
+            'The stage filter does not match a column. Clear it to see the bids on this board.',
+          )}
+          action={
+            <button
+              type="button"
+              onClick={() => setStageFilter(null)}
+              className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
+            >
+              {t('pipeline.stageFilterClear', 'Clear stage filter')}
             </button>
           }
         />
