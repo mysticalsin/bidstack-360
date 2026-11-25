@@ -6,15 +6,18 @@ import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 
+import { forecastChartAmount } from './forecast-chart-amount';
 import { CATEGORIES, CATEGORY_COLOR, CATEGORY_LABELS, type ChartDatum } from './forecastsConfig';
 
 interface ForecastChartProps {
   chartData: ChartDatum[];
   maxTotal: number;
+  // The page still passes its formatter. The summed bar does not carry a
+  // currency, so the chart does not use that formatter.
   formatMoneyMicros: (micros: number, currency: string) => string;
 }
 
-export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: ForecastChartProps) {
+export function ForecastChart({ chartData, maxTotal }: ForecastChartProps) {
   const { t } = useTranslation('crm');
 
   if (chartData.length === 0) return null;
@@ -38,7 +41,7 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
                       className="flex w-12 flex-col-reverse overflow-hidden rounded-md"
                       style={{ height: `${Math.max(heightPct, 0)}%` }}
                       role="img"
-                      aria-label={`${d.period}: ${formatMoneyMicros(total, 'EUR')}`}
+                      aria-label={`${d.period}: ${forecastChartAmount(total)}`}
                     >
                       {CATEGORIES.map((cat) => {
                         const val = d[cat === 'best_case' ? 'bestCase' : cat];
@@ -51,7 +54,7 @@ export function ForecastChart({ chartData, maxTotal, formatMoneyMicros }: Foreca
                               backgroundColor: CATEGORY_COLOR[cat],
                               minHeight: val > 0 ? 2 : 0,
                             }}
-                            title={`${CATEGORY_LABELS[cat]}: ${formatMoneyMicros(val, 'EUR')}`}
+                            title={`${CATEGORY_LABELS[cat]}: ${forecastChartAmount(val)}`}
                           />
                         );
                       })}
