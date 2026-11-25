@@ -74,7 +74,11 @@ export function DraftReviewPane() {
               const sec = data.sections.find((s) => s.id === activeSectionId);
               if (!sec) return null;
               return (
+                // TipTap reads content when the editor is created. Reusing that
+                // editor for the next section keeps the previous words on
+                // screen, and save writes them onto the section that is open.
                 <SectionEditor
+                  key={sec.id}
                   section={sec}
                   onSave={(content) => handleSave(sec.id, content)}
                   isSaving={saveSection.isPending}
