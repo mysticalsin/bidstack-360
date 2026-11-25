@@ -6,7 +6,7 @@ import type { WatchImplication } from '@/hooks/useAccountWatchdog';
 export interface WatchdogFeed {
   days: number;
   earnings: Array<{ id: string; companyId: string; companyName: string; fiscalPeriod: string; expectedAt: string; confirmed: boolean }>;
-  alerts: Array<{ id: string; companyId: string; companyName: string; title: string; source: string; occurredAt: string; implication: WatchImplication }>;
+  alerts: Array<{ id: string; companyId: string; companyName: string; title: string; source: string; occurredAt: string; implication: WatchImplication; sample?: boolean }>;
   newAlertCount: number;
   heat: Array<{ companyId: string; companyName: string; weeks: Array<{ count: number; worst: WatchImplication | null }> }>;
   heatWeekStarts: string[];

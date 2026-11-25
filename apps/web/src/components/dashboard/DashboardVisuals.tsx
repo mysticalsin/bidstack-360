@@ -24,23 +24,23 @@ import type { OppDrillFilter } from '@/components/drill/OppDrill';
 /** Opens the bid drill-down sheet with a starting filter. */
 export type OnDrill = (f: OppDrillFilter) => void;
 import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
+import { watchdogPulseCaption, watchdogPulseTone } from './watchdog-alert-caption';
 
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false }: {
+export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false, feedFailed = false, onFeedRetry }: {
   rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
   /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
   rowsPending?: boolean;
   /** Watchdog feed still loading: hold the pulse slot so the figures row does not grow. */
   feedPending?: boolean;
+  /** Watchdog feed failed and there is no payload to keep on screen. */
+  feedFailed?: boolean;
+  onFeedRetry?: () => void;
 }) {
-  const fresh = feed?.newAlertCount ?? 0;
-  const risks = feed?.alerts.filter((a) => a.implication === 'RISK').length ?? 0;
-  const pulse = feed ? (risks > 0 ? 'alert' : fresh > 0 ? 'watch' : 'calm') : null;
-  const pulseText = !feed ? '' : fresh > 0
-    ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
-    : 'Watchdog: all quiet';
+  const pulse = feed ? watchdogPulseTone(feed) : null;
+  const pulseText = feed ? watchdogPulseCaption(feed) : '';
   const [now] = useState(() => Date.now());
   const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
   const months = pipelineByCloseMonth(rows, now);
@@ -70,12 +70,21 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
         {pulse ? (
           <div className="dash-hero-pulse" data-testid="dashboard-pulse">
             <PulseOrb tone={pulse} size={96} bold />
-            <span className="viz-meta">{pulseText}</span>
+            <span className="viz-meta" data-testid="dashboard-pulse-caption">{pulseText}</span>
           </div>
         ) : feedPending ? (
-          <div className="dash-hero-pulse" aria-hidden="true" data-testid="dashboard-pulse-placeholder">
-            <span className="dash-hero-pulse-skel" />
-            <span className="viz-meta">{'\u00a0'}</span>
+          <div className="dash-hero-pulse" data-testid="dashboard-pulse-placeholder">
+            <span className="dash-hero-pulse-skel" aria-hidden="true" />
+            <p className="viz-meta" role="status" aria-busy="true">Loading watchdog.</p>
+          </div>
+        ) : feedFailed ? (
+          <div className="dash-hero-pulse" data-testid="dashboard-pulse-error">
+            <p className="viz-meta" role="alert">Could not load watchdog.</p>
+            {onFeedRetry ? (
+              <button type="button" className="btn btn-secondary min-h-[44px]" onClick={onFeedRetry}>
+                Retry
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
