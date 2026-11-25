@@ -78,7 +78,11 @@ describe('RFP analytics pipeline amount under demo data', () => {
     expect(text).not.toMatch(/EUR|€/);
     expect(digits(text)).toContain('61520');
     expect(screen.getByText('Ada Owner')).toBeTruthy();
-    expect(screen.getAllByText((_, node) => digits(node?.textContent) === '61520').length).toBe(2);
+    const amounts = screen.getAllByText((_, node) => {
+      if (!node || node.children.length > 0) return false;
+      return digits(node.textContent) === '61520';
+    });
+    expect(amounts).toHaveLength(2);
   });
 
   it('does not invent a euro zero while the rollup is still loading', () => {
