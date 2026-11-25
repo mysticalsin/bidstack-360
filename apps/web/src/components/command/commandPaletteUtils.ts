@@ -341,20 +341,25 @@ export function groupItemsByRun(items: Item[]): ItemGroupRun[] {
 
 /**
  * Index of the row the palette paints as selected. An empty list has no
- * row, so the index stays 0. This still follows the list's current formula:
- * a negative index is kept once rows exist.
+ * row, so the index stays 0. A stored index below 0 is the first row, so a
+ * list that fills in after an empty ArrowDown still highlights a real row.
  */
 export function clampPaletteIndex(index: number, length: number): number {
   if (length <= 0) return 0;
+  if (!Number.isFinite(index) || index < 0) return 0;
   return Math.min(index, length - 1);
 }
 
 /**
  * Highlighted row after ArrowUp (`direction` -1) or ArrowDown (`direction` 1).
- * This still follows the list's current formula, including ArrowDown on an
- * empty list, which stores -1.
+ * An empty list stays at 0. A stored index below 0 is pulled onto the first
+ * row before the step, so the next ArrowDown moves to the second row.
  */
 export function nextPaletteIndex(index: number, length: number, direction: 1 | -1): number {
-  if (direction > 0) return Math.min(length - 1, index + 1);
-  return Math.max(0, index - 1);
+  if (length <= 0) return 0;
+  const current = clampPaletteIndex(index, length);
+  const next = current + direction;
+  if (next < 0) return 0;
+  if (next >= length) return length - 1;
+  return next;
 }
