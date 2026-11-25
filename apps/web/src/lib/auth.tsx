@@ -190,16 +190,41 @@ function StubAuthProvider({ children }: { children: ReactNode }) {
 // Demo mode (VITE_AUTH_MODE=demo): public passwordless "try the demo" flow.
 // The DemoSignIn screen POSTs an email to /api/v1/demo/session, stores the
 // returned signed Bearer token in localStorage, then calls signIn() to flip
-// state. Here we simply read that token: the API client sends it as
-// `Authorization: Bearer`, and each visitor lands in their own seeded org.
-// The visitor is always an org admin in their demo workspace.
+// state. The API client sends that token as `Authorization: Bearer`, and each
+// visitor lands in their own seeded org. The session banner follows the stored
+// email, including when another tab replaces the visitor. The visitor is
+// always an org admin in their demo workspace.
 export const DEMO_TOKEN_KEY = 'bidstack:demo-token';
 export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
 /** Set by an explicit sign-out so /login does not re-enter from the edge identity. */
 export const DEMO_SIGNED_OUT_KEY = 'bidstack:demo-signed-out';
 
+interface DemoSessionView {
+  signedIn: boolean;
+  email: string | null;
+}
+
+function readDemoSession(): DemoSessionView {
+  try {
+    const token = localStorage.getItem(DEMO_TOKEN_KEY);
+    if (!token) return { signedIn: false, email: null };
+    return { signedIn: true, email: localStorage.getItem(DEMO_EMAIL_KEY) };
+  } catch {
+    return { signedIn: false, email: null };
+  }
+}
+
+function sameDemoSession(left: DemoSessionView, right: DemoSessionView): boolean {
+  return left.signedIn === right.signedIn && left.email === right.email;
+}
+
 function DemoAuthProvider({ children }: { children: ReactNode }) {
-  const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
+  const [session, setSession] = useState(readDemoSession);
+  const signedIn = session.signedIn;
+  const email = session.email;
+  const publishSession = useCallback((next: DemoSessionView) => {
+    setSession((prev) => (sameDemoSession(prev, next) ? prev : next));
+  }, []);
 
   // Register the token provider SYNCHRONOUSLY, during this component's own
   // render — not in a useEffect. React commits child effects before parent
@@ -226,16 +251,29 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   // session left in localStorage from a previous visit), clear it and drop to
   // signed-out so RequireAuth routes back to the passwordless sign-in — instead
   // of every query 401ing forever behind "Failed to load…". Registered in an
-  // effect (only needed after mount, on a 401) so it can close over setSignedIn.
+  // effect (only needed after mount, on a 401) so it can close over the session.
   useEffect(() => {
     setAuthInvalidHandler(() => {
       localStorage.removeItem(DEMO_TOKEN_KEY);
       localStorage.removeItem(DEMO_EMAIL_KEY);
       writeSessionMarker(null);
-      setSignedIn(false);
+      publishSession({ signedIn: false, email: null });
     });
     return () => setAuthInvalidHandler(null);
-  }, []);
+  }, [publishSession]);
+
+  // Another tab writes the demo token and email through localStorage. Those
+  // writes do not re-render this tab. signIn() is also a no-op while this tab
+  // is already signed in, so the session banner would keep the previous
+  // visitor while requests use the new token. Republish the stored visitor.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== DEMO_TOKEN_KEY && event.key !== DEMO_EMAIL_KEY) return;
+      publishSession(readDemoSession());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [publishSession]);
 
   useEffect(() => {
     if (signedIn && localStorage.getItem(DEMO_TOKEN_KEY)) {
@@ -244,17 +282,17 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   }, [signedIn]);
 
   const signIn = useCallback((cb?: () => void) => {
-    const hasToken = localStorage.getItem(DEMO_TOKEN_KEY) !== null;
-    setSignedIn(hasToken);
-    if (hasToken) writeSessionMarker('demo');
+    const next = readDemoSession();
+    publishSession(next);
+    if (next.signedIn) writeSessionMarker('demo');
     cb?.();
-  }, []);
+  }, [publishSession]);
 
   const signOut = useCallback((cb?: () => void) => {
     localStorage.removeItem(DEMO_TOKEN_KEY);
     localStorage.removeItem(DEMO_EMAIL_KEY);
     localStorage.setItem(DEMO_SIGNED_OUT_KEY, '1');
-    setSignedIn(false);
+    publishSession({ signedIn: false, email: null });
     writeSessionMarker(null);
     // Behind the polo-preview Worker this clears the Polo session cookie. An
     // Access session outlives it, which is what DEMO_SIGNED_OUT_KEY covers.
@@ -265,9 +303,7 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
       body: '{}',
     }).catch(() => undefined);
     cb?.();
-  }, []);
-
-  const email = typeof window !== 'undefined' ? localStorage.getItem(DEMO_EMAIL_KEY) : null;
+  }, [publishSession]);
 
   return (
     <AuthContext.Provider

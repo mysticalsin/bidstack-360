@@ -16,7 +16,7 @@
 // (grep `dist/assets/index-*.js` for "clerk").
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, type ReactNode } from 'react';
 
 import {
@@ -327,13 +327,15 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
 
     localStorage.removeItem(DEMO_TOKEN_KEY);
     localStorage.removeItem(DEMO_EMAIL_KEY);
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: DEMO_TOKEN_KEY,
-        newValue: null,
-        storageArea: localStorage,
-      }),
-    );
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: DEMO_TOKEN_KEY,
+          newValue: null,
+          storageArea: localStorage,
+        }),
+      );
+    });
 
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
     expect(screen.getByTestId('email').textContent).toBe('none');
@@ -356,13 +358,15 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
 
     localStorage.setItem(DEMO_TOKEN_KEY, 'token-bao');
     localStorage.setItem(DEMO_EMAIL_KEY, 'bao.visitor@example.test');
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: DEMO_EMAIL_KEY,
-        newValue: 'bao.visitor@example.test',
-        storageArea: localStorage,
-      }),
-    );
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: DEMO_EMAIL_KEY,
+          newValue: 'bao.visitor@example.test',
+          storageArea: localStorage,
+        }),
+      );
+    });
 
     expect(screen.getByTestId('signed-in').textContent).toBe('true');
     expect(screen.getByTestId('email').textContent).toBe('bao.visitor@example.test');
