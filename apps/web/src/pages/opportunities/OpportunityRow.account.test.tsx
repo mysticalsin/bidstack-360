@@ -64,6 +64,9 @@ describe('Opportunity row account link', () => {
 
     const account = screen.getByRole('link', { name: 'Open CI Financial account' });
     expect(account.getAttribute('href')).toBe(`/accounts/${COMPANY_ID}`);
+    // The name sits in the same line as "updated …". Color alone fails
+    // axe link-in-text-block; the underline is the non-color distinction.
+    expect(account.className).toContain('underline');
     expect(screen.getByRole('link', { name: 'OP-2041' }).getAttribute('href')).toBe(
       `/opportunities/${OPP.id}`,
     );

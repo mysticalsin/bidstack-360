@@ -167,7 +167,7 @@ export const Row = memo(function Row({
             <Link
               to={`/accounts/${encodeURIComponent(opp.companyId)}`}
               aria-label={`Open ${opp.customer} account`}
-              className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)]"
+              className="rounded text-[var(--brand-primary)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)]"
             >
               {opp.customer}
             </Link>

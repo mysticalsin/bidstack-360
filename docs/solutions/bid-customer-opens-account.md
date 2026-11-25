@@ -12,4 +12,5 @@ A name search is a second page and can miss the account.
 The opportunity read shape includes `companyId`. Create and patch still omit
 it; the server re-links from the customer name. The list and the deal header
 link to `/accounts/:id` when the id is present, and stay plain text when it
-is null.
+is null. The list link is underlined because it sits in the same line as the
+updated-ago text, and color alone fails the link-in-text-block check.

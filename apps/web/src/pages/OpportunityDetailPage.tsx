@@ -272,7 +272,7 @@ export function OpportunityDetailPage() {
                     <Link
                       to={`/accounts/${encodeURIComponent(data.companyId)}`}
                       aria-label={`Open ${data.customer} account`}
-                      className="inline-flex min-h-11 items-center rounded px-2 text-xs font-semibold text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)]"
+                      className="inline-flex min-h-11 items-center rounded px-2 text-xs font-semibold text-[var(--brand-primary)] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)]"
                     >
                       {t('opportunityDetail.openAccountShort', 'Account')}
                     </Link>
