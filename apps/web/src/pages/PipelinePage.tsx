@@ -37,6 +37,7 @@ import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch'
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
+import { pipelineKpiAmount } from './pipeline-kpi-amount';
 
 export function PipelinePage() {
   const { t } = useTranslation('crm');
@@ -270,7 +271,7 @@ export function PipelinePage() {
             return [
               {
                 label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
-                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
+                value: loading ? '…' : pipelineKpiAmount(totalValue),
                 tone: 'blue' as const,
               },
               {
