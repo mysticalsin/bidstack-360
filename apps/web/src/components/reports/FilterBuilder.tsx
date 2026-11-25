@@ -106,7 +106,12 @@ function ValueInput({
       <input
         type="number"
         value={String(value ?? '')}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => {
+          const raw = e.target.value;
+          // A cleared box is blank, not zero. Number('') is 0, and a zero
+          // filter hides every demo deal that actually has an amount.
+          onChange(raw === '' ? '' : Number(raw));
+        }}
         aria-label={t('filterBuilder.numericValueAriaLabel', 'Filter numeric value')}
         className={inputCls}
       />
