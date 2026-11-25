@@ -2038,7 +2038,7 @@
     "upload": "Carica",
     "dropzoneLabel": "Trascina qui i file da caricare",
     "dropPrompt": "Rilascia i file o fai clic per sfogliare",
-    "acceptedFormats": "PDF, DOCX, XLSX, immagini — fino a 50 MB",
+    "acceptedFormats": "PDF, Office, testo/dati, immagine, audio o video, fino a 50 MB",
     "unsupportedType": "Tipo di file non supportato: {{type}}",
     "unknownType": "sconosciuto",
     "loadErrorTitle": "Impossibile caricare i file",

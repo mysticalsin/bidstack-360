@@ -2038,7 +2038,7 @@
     "upload": "上传",
     "dropzoneLabel": "将文件拖到此处上传",
     "dropPrompt": "拖放文件或点击浏览",
-    "acceptedFormats": "PDF、DOCX、XLSX、图片 — 最大 50 MB",
+    "acceptedFormats": "PDF、Office、文本/数据、图片、音频或视频，最大 50 MB",
     "unsupportedType": "不支持的文件类型：{{type}}",
     "unknownType": "未知",
     "loadErrorTitle": "无法加载文件",

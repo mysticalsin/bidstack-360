@@ -35,6 +35,7 @@ vi.mock('@/hooks/useFiles', () => ({
   useDeleteFile: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 
+import { fileUploadAcceptCaption } from './file-upload-accept-caption';
 import { FilesPanel } from './FilesPanel';
 
 function localeCaption(lang: string): string {
@@ -76,6 +77,7 @@ describe('account file dropzone on an empty demo account', () => {
     expect(accept).not.toContain('.exe');
 
     const expected = `PDF, Office, text/data, image, audio, or video, up to ${maxMb} MB`;
+    expect(fileUploadAcceptCaption()).toBe(expected);
     expect(screen.getByText(expected)).toBeTruthy();
     expect(screen.queryByText(/DOCX, XLSX, images/)).toBeNull();
     expect(localeCaption('en')).toBe(expected);
