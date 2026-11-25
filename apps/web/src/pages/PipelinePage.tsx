@@ -32,6 +32,8 @@ import {
 } from '@/lib/pipeline-stages';
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
+type BoardStage = PipelineStage & { key?: string };
+
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
 import { getStageId } from './pipelineBoard/pipelineUtils';
@@ -79,10 +81,11 @@ export function PipelinePage() {
   // for a11y — drag-and-drop is unreachable by keyboard alone (WCAG 2.1.1).
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
-  const configuredStageOptions = useMemo<PipelineStage[]>(
+  const configuredStageOptions = useMemo<BoardStage[]>(
     () =>
       configuredStages.data?.items.map((stage) => ({
         id: stage.id,
+        key: stage.key,
         name: stage.name,
         probability: stage.probability,
         color: stage.color,
