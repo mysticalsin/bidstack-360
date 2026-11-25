@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import type { Reference } from '@/hooks/useReferences';
 
+import { describeReferenceLastUsed } from './reference-last-used';
+
 // Defense in depth: the API now rejects non-http(s) documentUrl values on
 // write, but existing rows (or a future write path) could still carry a
 // javascript:/data: URL — rendering it as a clickable <a href> would execute
@@ -36,6 +38,23 @@ function withoutRowToggle(run: () => void) {
     event.stopPropagation();
     run();
   };
+}
+
+/**
+ * A missing timestamp is "Never" — the seeded DNB row has no last use, and a
+ * null cell becomes the table's em dash. A use inside 30 days reads as a
+ * recency (CI is 12 days, Rush is 30). The absolute date stays on the title.
+ * An unreadable timestamp stays empty.
+ */
+function lastUsedCell(reference: Reference, t: TFunction) {
+  const used = describeReferenceLastUsed(reference.lastUsedAt);
+  if (used.kind === 'never') return t('references.lastUsedNever', 'Never');
+  if (used.kind === 'unknown') return null;
+  return (
+    <span className="block truncate" title={used.title}>
+      {used.text}
+    </span>
+  );
 }
 
 /** Fixed-width columns cut long values; the title keeps the full text reachable. */
@@ -170,7 +189,7 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
       numeric: true,
       width: 'w-28',
       hideBelow: 'xl',
-      cell: (row) => (row.lastUsedAt ? new Date(row.lastUsedAt).toLocaleDateString() : null),
+      cell: (row) => lastUsedCell(row, t),
     },
     {
       id: 'documentUrl',
