@@ -21,6 +21,9 @@ export interface InstallResult {
 }
 
 const STATUS_KEY = ['onboarding', 'sample-data-status'] as const;
+// Separate from STATUS_KEY so this read can fail once without changing how
+// the sample-data banner retries. Install and delete still invalidate it.
+const CHECKLIST_TEMPLATE_KEY = ['onboarding', 'checklist-template'] as const;
 
 export function useTemplates() {
   return useQuery({
@@ -39,11 +42,28 @@ export function useSampleDataStatus() {
   });
 }
 
+// Quick Start's "pick a template pipeline" row used to flip when the picker
+// opened. Installing a template writes sample leads. The row follows that
+// flag. Install and sample-data delete invalidate this read. A seeded demo
+// book is not this signal. retry is off so a denied read fails once and the
+// page can keep a stored click instead of inventing an install.
+export function useChecklistTemplateInstalled() {
+  return useQuery({
+    queryKey: CHECKLIST_TEMPLATE_KEY,
+    queryFn: ({ signal }) =>
+      api<{ hasSampleData: boolean }>('/api/onboarding/sample-data/status', { signal }),
+    select: (status) => status.hasSampleData,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 // Invalidate the workspace-shaping caches a template install or sample-data
 // delete touches, so the pipeline/dashboard/lists reflect the change at once.
 function invalidateWorkspace(qc: ReturnType<typeof useQueryClient>) {
   for (const key of [
     STATUS_KEY,
+    CHECKLIST_TEMPLATE_KEY,
     ['pipeline'],
     ['crm-dashboard'],
     ['opportunities'],
