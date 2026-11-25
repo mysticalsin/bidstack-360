@@ -123,9 +123,25 @@ export function accountBars(rows: OppRow[], n = 6) {
     .slice(0, n);
 }
 
-/** Open bids whose due date has already passed. */
+/**
+ * True when the UTC calendar day of `dueDate` is before the UTC day of `now`.
+ * A due date is a calendar day (midnight UTC). Comparing elapsed milliseconds
+ * marks that whole day late after 00:00 UTC, while the deal board still says
+ * "Due today".
+ */
+export function isPastDueDate(dueDate: string | null | undefined, now = Date.now()): boolean {
+  if (!dueDate) return false;
+  const due = new Date(dueDate);
+  if (Number.isNaN(due.getTime())) return false;
+  const nowDate = new Date(now);
+  const nowDay = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
+  const dueDay = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+  return dueDay < nowDay;
+}
+
+/** Open bids whose due day is before today (UTC). */
 export function pastDueOpen(rows: OppRow[], now = Date.now()) {
-  return rows.filter((o) => !isClosed(o) && o.dueDate && new Date(o.dueDate).getTime() < now);
+  return rows.filter((o) => !isClosed(o) && isPastDueDate(o.dueDate, now));
 }
 
 /** Running win rate after each closed bid, in close order (sparkline). */

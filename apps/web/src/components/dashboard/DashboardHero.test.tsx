@@ -1,10 +1,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 import { filterOpps } from '@/components/drill/filterOpps';
 import type { OppRow } from '@/components/viz/viz-data';
 
-import { DashboardHero } from './DashboardVisuals';
+import { DashboardHero, NeedsYou } from './DashboardVisuals';
 
 const rows: OppRow[] = [
   { id: 'w1', stage: 'closed_won', value: 7_900_000, dueDate: '2026-10-02', closedAt: '2026-10-02', customer: 'Rush' },
@@ -53,6 +54,43 @@ describe('DashboardHero', () => {
   it('shows an empty state without dated bids', () => {
     render(<DashboardHero rows={[]} openValue={0} weighted={0} openCount={0} />);
     expect(screen.getByText('No dated bids yet.')).toBeTruthy();
+  });
+});
+
+describe('NeedsYou past due', () => {
+  it('does not call a bid due today past due', () => {
+    // WHY: the clock is noon UTC on the due day. Elapsed milliseconds already
+    // say the date has passed. The row must stay quiet so it matches "Due today".
+    const today: OppRow = {
+      id: 't',
+      stage: 's2_sent',
+      value: 100,
+      dueDate: '2026-11-07',
+      customer: 'MAHLE',
+    };
+    render(
+      <MemoryRouter>
+        <NeedsYou rows={[today]} overdueTasks={0} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText(/past due/i)).toBeNull();
+    expect(screen.getByText('Nothing waiting. Nice.')).toBeTruthy();
+  });
+
+  it('still names an open bid whose due day was yesterday', () => {
+    const yesterday: OppRow = {
+      id: 'y',
+      stage: 's2_sent',
+      value: 100,
+      dueDate: '2026-11-06',
+      customer: 'DNB Bank',
+    };
+    render(
+      <MemoryRouter>
+        <NeedsYou rows={[yesterday]} overdueTasks={0} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('1 open bid past due date')).toBeTruthy();
   });
 });
 
