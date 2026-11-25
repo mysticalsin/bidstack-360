@@ -23,7 +23,11 @@ import {
 } from '@/components/ui/Table';
 import type { Forecast } from '@bidstack/shared';
 
-import { FORECAST_LIST_PAGE, forecastGroupCaption } from './forecast-list-caption';
+import {
+  FORECAST_LIST_PAGE,
+  forecastDetailsCaption,
+  forecastGroupCaption,
+} from './forecast-list-caption';
 import { CATEGORIES, CATEGORY_LABELS, type ForecastRow } from './forecastsConfig';
 
 interface EditingCell {
@@ -102,19 +106,24 @@ export function ForecastList({
     return row.closed;
   };
 
+  // A zero count is not the forecast. The projection above is the book.
+  const detailsCaption = forecastDetailsCaption(rows.length, pageContinues, FORECAST_LIST_PAGE);
+
   return (
     <Card>
       <SectionHeader
         title={t('forecastList.sectionTitle', 'Forecast Details')}
         caption={
-          pageContinues
-            ? t(
-                'forecastList.sectionCaptionPartial',
-                forecastGroupCaption(rows.length, true, FORECAST_LIST_PAGE),
-              )
-            : t('forecastList.sectionCaption', '{{count}} forecast groups', {
-                count: rows.length,
-              })
+          detailsCaption == null
+            ? undefined
+            : pageContinues
+              ? t(
+                  'forecastList.sectionCaptionPartial',
+                  forecastGroupCaption(rows.length, true, FORECAST_LIST_PAGE),
+                )
+              : t('forecastList.sectionCaption', '{{count}} forecast groups', {
+                  count: rows.length,
+                })
         }
       />
 

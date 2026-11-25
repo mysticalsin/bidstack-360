@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ForecastList } from './ForecastList';
+import { FORECAST_LIST_PAGE, forecastDetailsCaption } from './forecast-list-caption';
 import type { ForecastRow } from './forecastsConfig';
 
 vi.mock('react-i18next', () => ({
@@ -69,5 +70,17 @@ describe('forecast details caption on an empty manual book', () => {
     renderList([row('2026-Q1'), row('2027-Q1')]);
 
     expect(screen.getByText('2 forecast groups')).toBeTruthy();
+  });
+});
+
+describe('forecastDetailsCaption', () => {
+  it('omits a zero count and keeps a real count and a continued page', () => {
+    // WHY: zero groups is not a forecast total. A saved row and a page that
+    // dropped a later forecast still need their captions.
+    expect(forecastDetailsCaption(0, false, FORECAST_LIST_PAGE)).toBeNull();
+    expect(forecastDetailsCaption(2, false, FORECAST_LIST_PAGE)).toBe('2 forecast groups');
+    expect(forecastDetailsCaption(4, true, FORECAST_LIST_PAGE)).toBe(
+      `4 forecast groups in the latest ${FORECAST_LIST_PAGE}, not every forecast`,
+    );
   });
 });
