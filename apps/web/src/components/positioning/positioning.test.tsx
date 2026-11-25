@@ -87,6 +87,30 @@ describe('KeyNumbersStrip', () => {
     expect(md.getAttribute('data-tone')).toBe('neg');
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
   });
+
+  it('opens the cockpit section that explains a number, and does not follow an unsafe anchor', () => {
+    // A salesperson reads Revenue at the top of the account and needs the filings
+    // underneath, not a hunt down the page. The anchor is already on the payload.
+    // An anchor that is not one of those sections must not become a link.
+    state.kn = {
+      companyId: 'c1',
+      computedAt: '2026-11-01T00:00:00Z',
+      items: [
+        kn({ id: 'revenue', label: 'Revenue', unit: 'money', currency: 'EUR', value: 1.7e9, anchor: 'financial-health' }),
+        kn({ id: 'momentum', group: 'health', label: 'Momentum', unit: 'score', value: 62, anchor: null }),
+        kn({ id: 'open_jobs', label: 'Open jobs', value: 4, anchor: 'javascript:alert(1)' }),
+        kn({ id: 'margin', label: 'Margin', value: 18, unit: 'pct', anchor: 'https://evil.example/phish' }),
+      ],
+    };
+    render(<KeyNumbersStrip companyId="c1" />);
+
+    const jump = within(screen.getByTestId('kn-revenue')).getByRole('link', { name: /Revenue/ });
+    expect(jump.getAttribute('href')).toBe('#financial-health');
+    expect(jump.querySelector('button')).toBeNull();
+    expect(within(screen.getByTestId('kn-momentum')).queryByRole('link', { name: /Momentum/ })).toBeNull();
+    expect(within(screen.getByTestId('kn-open_jobs')).queryByRole('link', { name: /Open jobs/ })).toBeNull();
+    expect(within(screen.getByTestId('kn-margin')).queryByRole('link', { name: /Margin/ })).toBeNull();
+  });
 });
 
 const pos: AccountPositioning = {
