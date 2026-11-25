@@ -17,16 +17,25 @@ import type {
 
 const notesKey = (accountId: string) => ['notes', accountId] as const;
 
-export function useNotes(accountId: string | undefined) {
+// companyId is the account the note row is filed on. accountId alone is the
+// free-text tag (often a display name). Passing both lets a linked contact
+// read notes stored under the company id without changing the name-only call
+// the cockpit already makes.
+export function notesListPath(accountId: string, companyId?: string | null): string {
+  const params = new URLSearchParams({ accountId });
+  if (companyId) params.set('companyId', companyId);
+  return `/api/notes?${params.toString()}`;
+}
+
+export function useNotes(accountId: string | undefined, scope?: { companyId?: string | null }) {
+  const companyId = scope?.companyId || undefined;
   return useQuery({
-    queryKey: notesKey(accountId ?? ''),
+    queryKey: companyId ? [...notesKey(accountId ?? ''), companyId] : notesKey(accountId ?? ''),
     // Only fetch when an accountId is available — the cockpit may render
     // briefly before route params resolve.
     enabled: Boolean(accountId),
     queryFn: ({ signal }) =>
-      api<{ items: Note[] }>(`/api/notes?accountId=${encodeURIComponent(accountId!)}`, {
-        signal,
-      }),
+      api<{ items: Note[] }>(notesListPath(accountId!, companyId), { signal }),
   });
 }
 
