@@ -331,6 +331,8 @@ describe('DashboardPage account cockpit', () => {
 
     expect(screen.getByRole('alert')).toBeDefined();
     expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'Account not found' })).toBeNull();
     expect(screen.queryByTestId('page-head')).toBeNull();
   });
 
@@ -354,7 +356,11 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
   });
 
-  it('does not use the tab-local cockpit snapshot for a real missing account', () => {
+  it('says a missing account is not in the workspace instead of a failed load', () => {
+    // WHY: demo synthetic ids that this org does not have return 404. The
+    // cockpit printed that as "Couldn't load the account cockpit" and offered
+    // Retry, which reads as a blip. A 404 is a missing record. A load still
+    // in flight is a skeleton, not that missing record.
     sessionStorage.setItem('bidstack:account-cockpit:acme', JSON.stringify(dashboardSnapshot()));
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: undefined,
@@ -366,8 +372,37 @@ describe('DashboardPage account cockpit', () => {
 
     renderAccountRoute();
 
-    expect(screen.getByRole('alert')).toBeDefined();
-    expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Account not found' })).toBeDefined();
+    expect(
+      screen.getByText(
+        'This account is not in the workspace. It may have been removed, or you may not have access to it.',
+      ),
+    ).toBeDefined();
+    expect(screen.getAllByText('Account not found')).toHaveLength(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByTestId('page-head')).toBeNull();
+    const back = screen.getByRole('link', { name: 'Back to accounts' });
+    expect(back.getAttribute('href')).toBe('/accounts');
+    expect(back.className).toContain('min-h-[44px]');
+    expect(back.className).toContain('focus-visible:ring-2');
+  });
+
+  it('keeps a cockpit load in progress off the missing-account and load-failure copy', () => {
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    expect(screen.getByTestId('dashboard-skeleton')).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'Account not found' })).toBeNull();
+    expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
     expect(screen.queryByTestId('page-head')).toBeNull();
   });
 
