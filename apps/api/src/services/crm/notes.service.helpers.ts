@@ -131,6 +131,16 @@ function extractTechStack(bodyMd: string): TechnicalStackCategory[] {
   }));
 }
 
+// A person line opens with a role label, after an optional bullet.
+// "Attendees:" is the heading on the paste example. A risk sentence that
+// names an owner is not a person line, so it stays a risk.
+const PERSON_LINE =
+  /^(?:[-*]\s*)?(?:contacts?|attendees?|participants?|people|buyers?|champions?|blockers?|owners?|influencers?)\s*[:=-]\s*/i;
+
+function trimTrailingComma(value: string): string {
+  return value.replace(/[\s,]+$/g, '').trim();
+}
+
 function extractContacts(bodyMd: string): MeetingImportedContact[] {
   const chunks = bodyMd
     .split(/[\n;]+/)
@@ -143,21 +153,18 @@ function extractContacts(bodyMd: string): MeetingImportedContact[] {
       match[0].toLowerCase(),
     );
     const phone = chunk.match(/(?:\+?\d[\d ().-]{7,}\d)/)?.[0] ?? null;
-    if (!emails.length && !/\b(contact|attendee|buyer|champion|blocker|owner)\b/i.test(chunk)) {
+    if (!emails.length && !PERSON_LINE.test(chunk)) {
       continue;
     }
 
     const email = emails[0] ?? null;
     const beforeEmail = email ? chunk.slice(0, chunk.toLowerCase().indexOf(email)).trim() : chunk;
-    const cleaned = beforeEmail
-      .replace(/^(contact|attendee|buyer|champion|blocker|owner|influencer)\s*[:=-]\s*/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const cleaned = trimTrailingComma(beforeEmail.replace(PERSON_LINE, '').replace(/\s+/g, ' '));
     const [namePart, titlePart] = cleaned.split(/\s[-|,]\s/, 2);
     const name = titleCaseName(
       namePart || (email ? (email.split('@')[0] ?? 'Unknown contact') : 'Unknown contact'),
     );
-    const title = titlePart?.trim() || roleLabelFromText(chunk);
+    const title = trimTrailingComma(titlePart ?? '') || roleLabelFromText(chunk);
     const contact: MeetingImportedContact = {
       name,
       title: title || null,

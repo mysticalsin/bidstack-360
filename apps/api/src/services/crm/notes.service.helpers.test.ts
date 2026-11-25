@@ -36,9 +36,12 @@ describe('meeting note contacts', () => {
     expect(extracted.contacts[0]?.name.startsWith('Attendees:')).toBe(false);
     expect(extracted.contacts.some((contact) => contact.name.startsWith('Risk:'))).toBe(false);
 
-    // The risk and the follow-up stay where they were. Only the person row changes.
-    expect(extracted.risks.map((risk) => risk.owner)).toEqual(['Ada Sample']);
-    expect(extracted.tasks.map((task) => task.title)).toEqual(['Send the endpoint plan by 2026-06-15']);
+    // The endpoint risk keeps its owner. It is not copied into the people list.
+    const endpoint = extracted.risks.find((risk) => risk.owner === 'Ada Sample');
+    expect(endpoint?.title.toLowerCase()).toContain('endpoint migration');
+    expect(extracted.tasks.map((task) => task.title)).toEqual([
+      'Send the endpoint plan by 2026-06-15',
+    ]);
   });
 
   it('still reads a person line that starts with Owner', () => {
