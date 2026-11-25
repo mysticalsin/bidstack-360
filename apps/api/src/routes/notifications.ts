@@ -23,6 +23,8 @@ import {
 } from '@bidstack/shared';
 import { decryptSecret, encryptSecret } from '@bidstack/shared/server-crypto';
 
+import { NOTIFICATION_TRAY_LIMIT, buildNotificationTray } from '../lib/notification-tray.js';
+
 interface DbRow {
   id: string;
   type: string;
@@ -61,22 +63,32 @@ export const notificationsRoutes: FastifyPluginAsyncZod = async (server) => {
       },
     },
     async (req) => {
+      const scoped = { orgId: req.auth.orgId, userId: req.auth.userId };
       const where = {
-        orgId: req.auth.orgId,
-        userId: req.auth.userId,
+        ...scoped,
         ...(req.query.unreadOnly ? { readAt: null } : {}),
       };
-      const [items, unread] = await Promise.all([
+      // The badge counts every unread row. The page keeps unread rows even
+      // when newer read rows would fill the window on their own.
+      const [recent, unreadRows, unread] = await Promise.all([
         prisma.notification.findMany({
           where,
           orderBy: { createdAt: 'desc' },
-          take: 30,
+          take: NOTIFICATION_TRAY_LIMIT,
+        }),
+        prisma.notification.findMany({
+          where: { ...scoped, readAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: NOTIFICATION_TRAY_LIMIT,
         }),
         prisma.notification.count({
-          where: { orgId: req.auth.orgId, userId: req.auth.userId, readAt: null },
+          where: { ...scoped, readAt: null },
         }),
       ]);
-      return { items: items.map(serialize), unread };
+      return {
+        items: buildNotificationTray(recent.map(serialize), unreadRows.map(serialize)),
+        unread,
+      };
     },
   );
 
