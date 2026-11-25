@@ -14,6 +14,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/lib/auth', () => ({
   useAuth: () => ({ isSignedIn: true, isLoaded: true }),
+  useIsAdmin: () => false,
   useUser: () => ({
     user: {
       fullName: 'Ada Admin',
@@ -21,6 +22,11 @@ vi.mock('@/lib/auth', () => ({
       primaryEmailAddress: { emailAddress: 'ada.admin@example.test' },
     },
   }),
+}));
+
+vi.mock('@/hooks/useDataResidency', () => ({
+  useDataResidency: () => ({ isLoading: true, isError: false, data: undefined, error: null }),
+  useUpdateDataResidency: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import { SecuritySection } from './SecuritySection';
