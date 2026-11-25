@@ -470,7 +470,7 @@ describe('opportunities routes', () => {
     const in30Days = new Date(now.getTime() + 30 * 86_400_000);
     const yesterday = new Date(now.getTime() - 1 * 86_400_000);
 
-    const [dueSoon, dueFar, overdue] = await prisma.$transaction([
+    const [dueSoon, dueFar, overdue, decided] = await prisma.$transaction([
       prisma.opportunity.create({
         data: {
           orgId: orgId!,
@@ -504,6 +504,20 @@ describe('opportunities routes', () => {
           dueDate: yesterday,
         },
       }),
+      // A won bid whose close day has passed is decided. The Overdue chip is
+      // the open book, the same slice Needs you counts. Leaving it in the
+      // list makes that click longer than the number the lead was sent to clear.
+      prisma.opportunity.create({
+        data: {
+          orgId: orgId!,
+          code: `OP-WON-${suffix}`,
+          customer: 'Due Window Test',
+          name: 'Won yesterday',
+          stage: 'closed_won',
+          probability: 100,
+          dueDate: yesterday,
+        },
+      }),
     ]);
 
     try {
@@ -528,9 +542,10 @@ describe('opportunities routes', () => {
       expect(overdueIds).toContain(overdue.id);
       expect(overdueIds).not.toContain(dueSoon.id);
       expect(overdueIds).not.toContain(dueFar.id);
+      expect(overdueIds).not.toContain(decided.id);
     } finally {
       await prisma.opportunity.deleteMany({
-        where: { id: { in: [dueSoon.id, dueFar.id, overdue.id] } },
+        where: { id: { in: [dueSoon.id, dueFar.id, overdue.id, decided.id] } },
       });
     }
   });

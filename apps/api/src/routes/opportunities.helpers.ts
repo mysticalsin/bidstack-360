@@ -4,8 +4,11 @@
  * WHY separate: mintNextCode and isUniqueViolation have no Fastify dependency
  * and are used from create, import, and lead conversion handlers.
  */
-import { Prisma } from '@bidstack/db';
+import { Prisma, type OpportunityStage } from '@bidstack/db';
 import { normalizeName } from '@bidstack/shared';
+
+/** Won and lost bids are decided. They are not an open bid waiting on a close. */
+const DECIDED_OPPORTUNITY_STAGES: OpportunityStage[] = ['closed_won', 'closed_lost'];
 
 type MaxOpportunityCodeRow = {
   maxCode: number | bigint | null;
@@ -143,4 +146,31 @@ export function opportunityDueDateWhere(
   }
   if (filter.overdue) return { dueDate: { lt: startOfTodayUTC } };
   return {};
+}
+
+/**
+ * List and CSV filters for the bid clock.
+ *
+ * overdue is the open book whose close day is before today (UTC). A won or
+ * lost bid is decided, so it stays off that list even when its close date is
+ * in the past. An explicit stage still narrows the open book.
+ *
+ * dueWithinDays stays a calendar window. A stage the caller picked, including
+ * a decided stage, still applies there.
+ */
+export function opportunityListFilters(
+  filter: { stage?: OpportunityStage; dueWithinDays?: number; overdue?: boolean },
+  now: Date = new Date(),
+): Prisma.OpportunityWhereInput {
+  const due = opportunityDueDateWhere(filter, now);
+  const overdueWindow = filter.overdue === true && filter.dueWithinDays === undefined;
+  if (!overdueWindow) {
+    return {
+      ...(filter.stage ? { stage: filter.stage } : {}),
+      ...due,
+    };
+  }
+  const open = { stage: { notIn: DECIDED_OPPORTUNITY_STAGES } };
+  if (filter.stage) return { AND: [{ stage: filter.stage }, open], ...due };
+  return { ...open, ...due };
 }

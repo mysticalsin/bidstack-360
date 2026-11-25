@@ -23,7 +23,7 @@ import { OpportunityFilter, microsToUnits } from '@bidstack/shared';
 import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
 import { pumpBatches } from '../lib/batch-stream.js';
 import { createConcurrencyGate, gateSizeFromEnv } from '../lib/concurrency-gate.js';
-import { opportunityDueDateWhere } from './opportunities.helpers.js';
+import { opportunityListFilters } from './opportunities.helpers.js';
 
 const BATCH_SIZE = 250;
 
@@ -117,10 +117,13 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
           orgId,
           deletedAt: null,
           ...(pipelineStageId ? { pipelineStageId } : {}),
-          ...(stage ? { stage: stage as PrismaStage } : {}),
+          ...opportunityListFilters({
+            stage: stage as PrismaStage | undefined,
+            dueWithinDays,
+            overdue,
+          }),
           ...(industry ? { industry } : {}),
           ...(owner ? { owner: { email: owner } } : {}),
-          ...opportunityDueDateWhere({ dueWithinDays, overdue }),
           ...(search
             ? {
                 OR: [
