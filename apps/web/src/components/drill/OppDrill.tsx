@@ -12,7 +12,13 @@ import { closeDate, fmtCompact, OPEN_STAGES, stageKey, stageText, type OppRow, t
 
 export type { OppDrillFilter } from './filterOpps';
 
-const STATUS_LABEL: Record<OppStatus | 'all', string> = { all: 'All bids', open: 'Open', won: 'Won', lost: 'Lost' };
+const STATUS_LABEL: Record<OppStatus | 'all' | 'closed', string> = {
+  all: 'All bids',
+  open: 'Open',
+  won: 'Won',
+  lost: 'Lost',
+  closed: 'Won and lost',
+};
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'Dashboard' }: {

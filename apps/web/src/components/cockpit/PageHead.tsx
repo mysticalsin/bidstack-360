@@ -28,8 +28,8 @@ import { labelForBand } from './_tokens';
 interface Props {
   cockpit: AccountCockpitMaybeScored;
   accountView: boolean;
-  /** Account view: open the bid drill for this account ('open' or closed 'won'/'lost' = all closed). */
-  onDrill?: (status: 'open' | 'all') => void;
+  /** Account view: 'open' is the live book. 'closed' is won and lost, the win-rate book. */
+  onDrill?: (status: 'open' | 'closed') => void;
 }
 
 const UNREAD_HEALTH: CompanyHealth = { score: 0, band: 'critical', counts: {} };
@@ -247,7 +247,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
                   })
                 : t('pageHead.keyNoClosed', 'No closed bids yet')}
             </span>
-            {onDrill && closedCount > 0 ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('all')}>{t('pageHead.showAllBids', 'Show won and lost')}</button> : null}
+            {onDrill && closedCount > 0 ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('closed')}>{t('pageHead.showAllBids', 'Show won and lost')}</button> : null}
           </div>
           <div>
             <span className="acct-key-label">{t('pageHead.keyOpenRisks', 'Open risks')}</span>

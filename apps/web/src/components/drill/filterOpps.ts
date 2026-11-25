@@ -3,7 +3,8 @@
 import { closeDate, oppStatus, stageKey, type OppRow, type OppStatus } from '@/components/viz/viz-data';
 
 export interface OppDrillFilter {
-  status?: OppStatus | 'all';
+  /** 'closed' is won and lost together — the win-rate book, not every bid. */
+  status?: OppStatus | 'all' | 'closed';
   stage?: string | null;
   account?: string | null;
   /** Won within the current calendar year (hero "Won this year"). */
@@ -15,7 +16,9 @@ export interface OppDrillFilter {
 export function filterOpps(rows: OppRow[], f: OppDrillFilter, q = '', year = new Date().getUTCFullYear()): OppRow[] {
   const needle = q.trim().toLowerCase();
   return rows.filter((o) => {
-    if (f.status && f.status !== 'all' && oppStatus(o) !== f.status) return false;
+    if (f.status === 'closed') {
+      if (oppStatus(o) === 'open') return false;
+    } else if (f.status && f.status !== 'all' && oppStatus(o) !== f.status) return false;
     if (f.stage && stageKey(o.stage) !== f.stage) return false;
     if (f.account && (o.customer ?? '').toLowerCase() !== f.account.toLowerCase()) return false;
     if (f.thisYear) {
