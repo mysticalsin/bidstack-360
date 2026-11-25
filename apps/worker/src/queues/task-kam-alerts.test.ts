@@ -28,6 +28,12 @@ vi.mock('@bidstack/db', () => ({
 }));
 
 import { scanTaskDueAlerts, scanKamStaleness } from './task-kam-alerts.js';
+import { legacyTaskDueDedupeUrl } from './task-kam-alerts.helpers.js';
+
+// Demo follow-up "Submit revised pricing & SoW v2", due 15 May 2026. On
+// 25 Nov 2026 it is overdue. The alert Open action must land on that record.
+const PRICING_ID = '00000000-0000-4000-8000-000000010001';
+const PRICING_DAY = new Date('2026-11-25T18:00:00.000Z');
 
 const log = {
   info: vi.fn(),
@@ -109,6 +115,64 @@ describe('scanTaskDueAlerts', () => {
 
     expect(created).toBe(0);
     expect(mocks.notificationFindFirst).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it('opens the overdue demo pricing follow-up on its record', async () => {
+    mocks.taskFindMany.mockResolvedValue([
+      {
+        id: PRICING_ID,
+        orgId: ORG_ID,
+        title: 'Submit revised pricing & SoW v2',
+        dueDate: new Date('2026-05-15T00:00:00.000Z'),
+        assigneeId: 'user-1',
+      },
+    ]);
+    mocks.notificationFindFirst.mockResolvedValue(null);
+
+    const created = await scanTaskDueAlerts(PRICING_DAY, log);
+
+    expect(created).toBe(1);
+    expect(mocks.notificationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          entityId: PRICING_ID,
+          url: `/tasks/${PRICING_ID}?due=2026-11-25`,
+        }),
+      }),
+    );
+    const written = mocks.notificationCreate.mock.calls[0]?.[0]?.data?.url as string;
+    expect(written).not.toContain('taskId=');
+  });
+
+  it('does not send a second alert the same day when the old list URL is already stored', async () => {
+    // WHY: the previous marker was /tasks?taskId=&due=. A scan that only
+    // looks up the record URL would not see that row and would nudge again
+    // on the deploy day. Same-day silence is the point of the marker.
+    mocks.taskFindMany.mockResolvedValue([
+      {
+        id: PRICING_ID,
+        orgId: ORG_ID,
+        title: 'Submit revised pricing & SoW v2',
+        dueDate: new Date('2026-05-15T00:00:00.000Z'),
+        assigneeId: 'user-1',
+      },
+    ]);
+    const legacy = legacyTaskDueDedupeUrl(PRICING_ID, '2026-11-25');
+    mocks.notificationFindFirst.mockImplementation(async (args: { where?: { url?: unknown } }) => {
+      const url = args.where?.url;
+      const urls =
+        typeof url === 'string'
+          ? [url]
+          : url && typeof url === 'object' && 'in' in url
+            ? (url.in as string[])
+            : [];
+      return urls.includes(legacy) ? { id: 'existing' } : null;
+    });
+
+    const created = await scanTaskDueAlerts(PRICING_DAY, log);
+
+    expect(created).toBe(0);
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
