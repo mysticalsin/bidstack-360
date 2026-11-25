@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
 import SectorViewPage from '@/pages/SectorViewPage';
+import { sectorIndustryAmount } from './sector-industry-amount';
 import { useSectorView, type SectorViewResponse } from '@/hooks/useSectorView';
 import { useTerritoryAnalytics, useTerritorySegments } from '@/hooks/useTerritories';
 import { useCurrencyStore } from '@/stores/currency';
@@ -119,5 +120,13 @@ describe('sector industry pipeline amount under demo data', () => {
     expect(meta).not.toMatch(/EUR|€/);
     const valuePart = meta.split('·').pop() ?? '';
     expect(digits(valuePart)).toBe('61520');
+  });
+
+  it('does not invent a euro zero when the micros are not a safe integer', () => {
+    // WHY: an industry label that is not an integer micros value is not an
+    // amount. It must not fall through to an EUR zero. The bar scale is separate.
+    expect(sectorIndustryAmount(Number.NaN)).toBe('Not a number');
+    expect(sectorIndustryAmount(1.5)).toBe('Not a number');
+    expect(sectorIndustryAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });
