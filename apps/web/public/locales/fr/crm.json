@@ -256,6 +256,7 @@
     "relatedTo": "Lié à",
     "addNote": "Ajouter une note",
     "subtitle": "{{count}} relances actives.",
+    "subtitleOne": "1 relance active.",
     "actions": {
       "exportCsv": "Exporter en CSV"
     },

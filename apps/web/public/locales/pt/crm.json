@@ -247,6 +247,7 @@
   "tasks": {
     "title": "Tarefas",
     "subtitle": "{{count}} acompanhamentos ativos.",
+    "subtitleOne": "1 acompanhamento ativo.",
     "actions": {
       "exportCsv": "Exportar CSV"
     },
