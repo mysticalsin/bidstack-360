@@ -18,6 +18,7 @@ import { Icon } from '@/components/ui/Icon';
 import { ApiError } from '@/lib/api';
 import { parseCsv, type ParsedCsv } from '@/lib/csv-parse';
 import {
+  assignColumnMapping,
   autoMap,
   IMPORT_ENTITIES,
   TARGET_FIELDS,
@@ -345,7 +346,9 @@ export function CsvImportWizard() {
                         })}
                         value={mappings[header] ?? ''}
                         onChange={(e) =>
-                          setMappings((m) => ({ ...m, [header]: e.target.value || null }))
+                          setMappings((current) =>
+                            assignColumnMapping(current, header, e.target.value || null),
+                          )
                         }
                       >
                         <option value="">{t('csvImport.map.dontImport', 'Don’t import')}</option>

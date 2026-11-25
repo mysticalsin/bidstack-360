@@ -71,10 +71,15 @@ export function mappedValue(
   mappings: Record<string, string | null>,
   field: string,
 ): string {
+  // Same rule as the worker's applyMappings: skip a blank cell, and keep the
+  // last filled column mapped to this field. That is the cell the import stores.
+  let value = '';
   for (const [header, target] of Object.entries(mappings)) {
-    if (target === field) return (row[header] ?? '').trim();
+    if (target !== field) continue;
+    const cell = (row[header] ?? '').trim();
+    if (cell) value = cell;
   }
-  return '';
+  return value;
 }
 
 export function previewImportRows(input: {

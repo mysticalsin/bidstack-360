@@ -102,3 +102,20 @@ export function autoMap(
 
   return result;
 }
+
+/**
+ * Point one source column at a target field. A field stays on one column:
+ * the previous column drops it, so the map on screen is the map that is sent.
+ */
+export function assignColumnMapping(
+  mappings: Record<string, string | null>,
+  header: string,
+  field: string | null,
+): Record<string, string | null> {
+  const next: Record<string, string | null> = { ...mappings, [header]: field };
+  if (!field) return next;
+  for (const key of Object.keys(next)) {
+    if (key !== header && next[key] === field) next[key] = null;
+  }
+  return next;
+}
