@@ -48,6 +48,7 @@ import {
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 import { LessonsLearnedCard } from './opportunityDetail/LessonsLearnedCard';
+import { opportunityIntelSections } from './opportunityDetail/opportunity-intel-sections';
 import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
@@ -185,6 +186,7 @@ export function OpportunityDetailPage() {
 
   const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
   const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
+  const intelSections = opportunityIntelSections(intel);
   const isOutcomeLocked = isWon || isLost;
   const moveToOutcome = (stage: 'closed_won' | 'closed_lost') => {
     stageMove.mutate(
@@ -529,18 +531,20 @@ export function OpportunityDetailPage() {
       <DataFreshnessRibbon intel={intel} />
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        <FinancialHealthCard intel={intel} />
-        <WinPredictionCard intel={intel} />
+        {intelSections.financial ? <FinancialHealthCard intel={intel} /> : null}
+        {intelSections.winPrediction ? <WinPredictionCard intel={intel} /> : null}
         <BidScoreCard opportunityId={data.id} />
         <OpportunityAccountIntel accountId={data.customer} />
       </div>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <TriggersCard intel={intel} />
-        <CompetitorRadarCard intel={intel} />
-      </div>
+      {intelSections.triggers || intelSections.competitors ? (
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          {intelSections.triggers ? <TriggersCard intel={intel} /> : null}
+          {intelSections.competitors ? <CompetitorRadarCard intel={intel} /> : null}
+        </div>
+      ) : null}
 
-      <NewsCard intel={intel} />
+      {intelSections.news ? <NewsCard intel={intel} /> : null}
 
       {/* Amaris Bid Office governance lives ON the record: the class, the gates
           that class requires, and the formal sign-offs against them. */}
