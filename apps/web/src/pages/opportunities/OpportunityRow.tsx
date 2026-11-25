@@ -24,12 +24,13 @@ import { useLiveRelativeTime } from '@/hooks/useLiveRelativeTime';
 import type { usePatchOpportunity } from '@/hooks/useOpportunities';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
-import { isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
+import { isPipelineStageIdUuid } from '@/lib/pipeline-stages';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { DateCell, NumberCell, StageCell } from './OppInlineEditCells';
+import { opportunityRowStage } from './opportunity-stage-chips';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
 const ROW_BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
@@ -180,7 +181,7 @@ export const Row = memo(function Row({
 
       <td className="px-5 py-3">
         <StageCell
-          stage={resolvePipelineStage(opp)}
+          stage={opportunityRowStage(opp, stageOptions)}
           options={stageOptions}
           isSaving={saving.stage}
           canEdit={canWrite}
