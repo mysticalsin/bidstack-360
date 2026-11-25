@@ -269,6 +269,44 @@ describe('OpportunityDetailPage load states', () => {
   });
 });
 
+describe('OpportunityDetailPage account link', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  // WHY: the customer name on a deal is an editor, so it cannot also be the
+  // account link. The deal still needs a way onto that account, and only when
+  // the stored id is a uuid — a name must not become a search.
+  it('opens the linked account and hides the link when the deal has no company id', () => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    const companyId = 'c0000000-0000-4000-8000-0000000000bb';
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: { ...OPPORTUNITY, companyId },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'Open Acme Corp account' }).getAttribute('href')).toBe(
+      `/accounts/${companyId}`,
+    );
+    expect(screen.getByRole('button', { name: 'Edit customer name' })).toBeTruthy();
+
+    cleanup();
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: { ...OPPORTUNITY, companyId: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+    renderPage();
+    expect(screen.queryByRole('link', { name: 'Open Acme Corp account' })).toBeNull();
+  });
+});
+
 describe('OpportunityDetailPage deal value', () => {
   beforeEach(() => {
     vi.mocked(useOpportunity).mockReturnValue({
