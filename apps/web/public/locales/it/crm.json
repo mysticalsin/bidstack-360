@@ -1210,6 +1210,7 @@
   "pipeline": {
     "heading": "Pipeline aperta",
     "subtitle": "Trascina una scheda tra le colonne, oppure selezionane una e usa ← / → per cambiare fase.",
+    "subtitleReadOnly": "Apri una scheda per rivedere l'offerta. Spostare una fase richiede il permesso di modificare le opportunità.",
     "stageFilterLabel": "Fase",
     "stageFilterAriaLabel": "Filtra il pipeline per fase",
     "stageFilterAllOption": "Tutte",

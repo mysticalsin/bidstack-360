@@ -101,6 +101,7 @@
     "totalValue": "Valeur totale",
     "heading": "Pipeline ouvert",
     "subtitle": "Faites glisser une carte entre les colonnes, ou sélectionnez-en une et utilisez ← / → pour changer d'étape.",
+    "subtitleReadOnly": "Ouvrez une carte pour consulter l'offre. Changer d'étape nécessite le droit de modifier les opportunités.",
     "stageFilterLabel": "Étape",
     "stageFilterAriaLabel": "Filtrer le pipeline par étape",
     "stageFilterAllOption": "Toutes",

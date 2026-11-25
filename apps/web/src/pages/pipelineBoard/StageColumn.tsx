@@ -13,6 +13,7 @@ import { springSnap } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
 
 import { pipelineColumnCaption } from './pipeline-board-caption';
+import { pipelineColumnEmptyCopy } from './pipeline-column-empty';
 import { PipelineCard } from './PipelineCard';
 
 interface StageColumnProps {
@@ -67,6 +68,8 @@ export const StageColumn = memo(function StageColumn({
 }: StageColumnProps) {
   const { formatMoney } = useFormatMoney();
   const countLabel = pipelineColumnCaption(items.length, pageContinues, latest);
+  const emptyCopy =
+    items.length === 0 ? pipelineColumnEmptyCopy({ canWrite, pageContinues }) : null;
   const ariaLabel = pageContinues
     ? `${stageName} column, ${countLabel}`
     : items.length === 1
@@ -111,9 +114,9 @@ export const StageColumn = memo(function StageColumn({
       <GlassCard
         padding="none"
         data-testid="pipeline-column-dropzone"
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+        onDragOver={canWrite ? onDragOver : undefined}
+        onDragLeave={canWrite ? onDragLeave : undefined}
+        onDrop={canWrite ? onDrop : undefined}
         animate={{
           backgroundColor: isHoverTarget ? 'var(--brand-primary-tint)' : 'rgba(0,0,0,0)',
           borderColor: isHoverTarget ? 'var(--brand-primary)' : 'var(--border-subtle)',
@@ -142,9 +145,10 @@ export const StageColumn = memo(function StageColumn({
               />
             ))}
           </AnimatePresence>
-          {items.length === 0 ? (
-            <li className="flex h-32 items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-xs font-medium text-[var(--fg-tertiary)] uppercase tracking-widest">
-              Drop here
+          {emptyCopy ? (
+            <li className="flex h-32 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-center text-sm text-[var(--fg-secondary)]">
+              <span>{emptyCopy.state}</span>
+              {emptyCopy.action ? <span className="text-xs">{emptyCopy.action}</span> : null}
             </li>
           ) : null}
         </ul>

@@ -1211,6 +1211,7 @@
   "pipeline": {
     "heading": "Open pipeline",
     "subtitle": "Drag a card between columns, or focus a card and use ← / → to move stages.",
+    "subtitleReadOnly": "Open a card to review the bid. Moving a stage needs permission to edit opportunities.",
     "stageFilterLabel": "Stage",
     "stageFilterAriaLabel": "Filter pipeline by stage",
     "stageFilterAllOption": "All",

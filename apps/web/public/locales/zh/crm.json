@@ -1210,6 +1210,7 @@
   "pipeline": {
     "heading": "未结管道",
     "subtitle": "在列之间拖动卡片，或选中卡片并使用 ← / → 切换阶段。",
+    "subtitleReadOnly": "打开卡片以查看投标。移动阶段需要编辑机会的权限。",
     "stageFilterLabel": "阶段",
     "stageFilterAriaLabel": "按阶段筛选管道",
     "stageFilterAllOption": "全部",
