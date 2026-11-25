@@ -82,6 +82,14 @@ export function ForecastsPage() {
     for (const item of filteredItems) t[item.category] += item.amountMicros;
     return t;
   }, [filteredItems]);
+  const totalsLoadingLabel = t(
+    'forecasts.totalsLoading',
+    'Forecast totals are still loading.',
+  );
+  const totalsUnavailableLabel = t(
+    'forecasts.totalsUnavailable',
+    'Forecast totals stay hidden until the list loads.',
+  );
 
   // ownerId identifies the row being edited — the grid shows every owner's
   // forecasts, so the write MUST carry it through or it silently overwrites the
@@ -233,36 +241,64 @@ export function ForecastsPage() {
       ) : null}
 
       {/* ── Headline totals — the page's answer at a glance ── */}
-      <motion.div
-        variants={reducedMotion ? undefined : staggerChild}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
-      >
-        {(
-          [
-            { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
-            { key: 'best_case', label: t('forecasts.totalBestCase', 'Best case'), accent: false },
-            { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
-            { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
-          ] as const
-        ).map((k) => (
-          <div
-            key={k.key}
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
-          >
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-              {k.label}
-            </div>
+      {/* An unloaded or failed list is not a zero commit. The tiles render
+          only after the forecast read settles; loading keeps the same grid
+          as a skeleton so the answer does not flash €0. */}
+      {forecasts.isLoading ? (
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label={totalsLoadingLabel}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+        >
+          {(['commit', 'best_case', 'pipeline', 'closed'] as const).map((key) => (
             <div
-              className={`mt-1 text-lg font-bold tabular-nums ${
-                k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
-              }`}
+              key={key}
+              aria-hidden
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
             >
-              {formatMoneyMicros(totals[k.key], 'EUR')}
+              <div className="bs-shimmer h-3 w-16 rounded" />
+              <div className="bs-shimmer mt-2 h-6 w-24 rounded" />
             </div>
-          </div>
-        ))}
-      </motion.div>
+          ))}
+        </div>
+      ) : forecasts.isError || !forecasts.data ? (
+        <p role="status" aria-label={totalsUnavailableLabel} className="text-sm text-[var(--fg-secondary)]">
+          {totalsUnavailableLabel}
+        </p>
+      ) : (
+        <motion.div
+          variants={reducedMotion ? undefined : staggerChild}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+          role="group"
+          aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
+        >
+          {(
+            [
+              { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
+              { key: 'best_case', label: t('forecasts.totalBestCase', 'Best case'), accent: false },
+              { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
+              { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
+            ] as const
+          ).map((k) => (
+            <div
+              key={k.key}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            >
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
+                {k.label}
+              </div>
+              <div
+                className={`mt-1 text-lg font-bold tabular-nums ${
+                  k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
+                }`}
+              >
+                {formatMoneyMicros(totals[k.key], 'EUR')}
+              </div>
+            </div>
+          ))}
+        </motion.div>
+      )}
 
       {/* ── Chart (desktop only; returns null when empty) ── */}
       <motion.div variants={reducedMotion ? undefined : staggerChild}>
