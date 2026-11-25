@@ -11,7 +11,7 @@ import {
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useIsAdmin } from '@/lib/auth';
@@ -124,6 +124,19 @@ export function RolesSection() {
       <div className="p-5 space-y-4">
         {roles.isLoading || permissions.isLoading ? (
           <LoadingSkeleton rows={3} />
+        ) : roles.isError && roles.data == null ? (
+          <ErrorState
+            title={t('roles.loadErrorTitle', 'Could not load roles')}
+            message={t(
+              'roles.loadErrorMessage',
+              'This is not an empty role list. Retry the list before creating a role.',
+            )}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void roles.refetch()}>
+                {t('roles.retry', 'Retry')}
+              </Button>
+            }
+          />
         ) : (
           <>
             {isAdmin && !showNew && (
