@@ -931,6 +931,7 @@
     "tasksTitle": "Tasks",
     "tasksActiveCount": "{{count}} active",
     "taskDue": "Due {{date}}",
+    "tasksErrorTitle": "Couldn't load tasks",
     "callsErrorTitle": "Couldn't load calls",
     "callsEmptyTitle": "No calls yet",
     "callsEmptyMessage": "Scheduled and completed calls for this opportunity show up here.",

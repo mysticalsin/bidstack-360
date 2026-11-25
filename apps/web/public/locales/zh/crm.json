@@ -930,6 +930,7 @@
     "tasksTitle": "任务",
     "tasksActiveCount": "{{count}} 个进行中",
     "taskDue": "截止 {{date}}",
+    "tasksErrorTitle": "无法加载任务",
     "callsErrorTitle": "无法加载通话",
     "callsEmptyTitle": "暂无通话",
     "callsEmptyMessage": "此商机的已安排和已完成通话将显示在此处。",

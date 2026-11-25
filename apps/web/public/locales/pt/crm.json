@@ -930,6 +930,7 @@
     "tasksTitle": "Tarefas",
     "tasksActiveCount": "{{count}} ativas",
     "taskDue": "Vence em {{date}}",
+    "tasksErrorTitle": "Não foi possível carregar as tarefas",
     "callsErrorTitle": "Não foi possível carregar as chamadas",
     "callsEmptyTitle": "Ainda não há chamadas",
     "callsEmptyMessage": "As chamadas agendadas e concluídas desta oportunidade aparecem aqui.",
