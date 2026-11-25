@@ -22,6 +22,7 @@ vi.mock('react-i18next', () => ({
 const apiMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api', () => ({ api: apiMock }));
 
+import { deadlineDateLabel } from './DeadlinesRow';
 import { TimeGrid } from './TimeGrid';
 
 // 26 Nov 2026 03:00 UTC is 25 Nov 22:00 in Toronto, the calendar's today.
@@ -97,6 +98,16 @@ describe('Due lane on the calendar today', () => {
 
     const todayChip = await screen.findByRole('link', { name: /Bridge bid/ });
     const todayLabel = todayChip.getAttribute('aria-label') ?? '';
+    const spoken = deadlineDateLabel('2026-11-25');
+    const heardInToronto = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Toronto',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(new Date('2026-11-25T00:00:00.000Z'));
+    expect(heardInToronto).toBe('Nov 24, 2026');
+    expect(spoken).not.toBe(heardInToronto);
+    expect(todayLabel).toContain(spoken);
     expect(todayLabel).toContain('due today');
     expect(todayLabel).not.toContain('overdue');
     expect(container.querySelector('[data-date="2026-11-25"]')?.contains(todayChip)).toBe(true);

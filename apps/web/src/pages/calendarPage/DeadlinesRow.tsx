@@ -6,17 +6,16 @@
  * synced meetings — an RFP due Thursday was invisible while a 1:1 was not.
  * Opportunity and proposal due dates render as outline chips with a diamond
  * marker (deliberately unlike the solid meeting bars) and deep-link to their
- * record. Urgency follows DueDateChip semantics so every surface agrees on
- * the bid clock: overdue = danger, due today = amber emphasis.
+ * record. Overdue is danger and due today is amber. "Today" is the day the
+ * grid highlights, not the UTC date: after 19:00 in Toronto the UTC day has
+ * already moved on, and a bid due on the highlighted column was reading overdue.
  */
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { dueDateUrgency } from '@/components/ui/DueDateChip';
 import { useCalendarDeadlines, type CalendarDeadline } from '@/hooks/useCalendarDeadlines';
 import { cn } from '@/lib/cn';
-import { formatDate } from '@/lib/format';
 
 import { toLocalIsoDate } from './dateUtils';
 
@@ -36,9 +35,27 @@ interface ChipTone {
   dueToday: boolean;
 }
 
-function chipTone(dueDate: string): ChipTone {
-  const { urgency, days } = dueDateUrgency(dueDate);
-  if (urgency === 'danger') {
+/**
+ * Speak a date-only deadline as that calendar date. `formatDate` reads the
+ * UTC midnight instant in the viewer zone, so Toronto heard 24 Nov for a
+ * 25 Nov deadline.
+ */
+export function deadlineDateLabel(dueDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate);
+  if (!match) return dueDate;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function chipTone(dueDate: string, todayKey: string): ChipTone {
+  if (dueDate < todayKey) {
     // --danger on --danger-tint: 5.31:1 light / dark pair verified in index.css.
     return {
       className:
@@ -48,8 +65,8 @@ function chipTone(dueDate: string): ChipTone {
       dueToday: false,
     };
   }
-  if (days === 0) {
-    // Due today — amber emphasis, same tone DueDateChip uses for "Due today".
+  if (dueDate === todayKey) {
+    // Due on the highlighted column. Amber emphasis.
     // --warning on --warning-tint: 5.28:1 light / dark pair verified in index.css.
     return {
       className:
@@ -67,9 +84,9 @@ function chipTone(dueDate: string): ChipTone {
   };
 }
 
-function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
+function DeadlineChip({ deadline, todayKey }: { deadline: CalendarDeadline; todayKey: string }) {
   const { t } = useTranslation('crm');
-  const { className, filled, overdue, dueToday } = chipTone(deadline.dueDate);
+  const { className, filled, overdue, dueToday } = chipTone(deadline.dueDate, todayKey);
 
   const isOpp = deadline.kind === 'opportunity';
   const label =
@@ -89,7 +106,7 @@ function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
       title={`${kindLabel}: ${label}`}
       aria-label={
         `${kindLabel}: ${label}, ` +
-        t('calendar.deadlineDue', 'due {{date}}', { date: formatDate(deadline.dueDate) }) +
+        t('calendar.deadlineDue', 'due {{date}}', { date: deadlineDateLabel(deadline.dueDate) }) +
         stateSuffix
       }
       className={cn(
@@ -111,7 +128,7 @@ function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
   );
 }
 
-export function DeadlinesRow({ days }: { days: Date[] }) {
+export function DeadlinesRow({ days, todayKey }: { days: Date[]; todayKey: string }) {
   const { t } = useTranslation('crm');
   const first = days[0] ?? new Date();
   const last = days[days.length - 1] ?? first;
@@ -193,7 +210,7 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
             className="flex min-h-[28px] flex-col gap-1 border-l border-[var(--border-subtle)] p-1"
           >
             {dayItems.map((d) => (
-              <DeadlineChip key={`${d.kind}-${d.id}`} deadline={d} />
+              <DeadlineChip key={`${d.kind}-${d.id}`} deadline={d} todayKey={todayKey} />
             ))}
           </div>
         );

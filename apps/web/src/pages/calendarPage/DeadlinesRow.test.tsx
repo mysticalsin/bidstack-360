@@ -61,7 +61,7 @@ function renderRow() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <DeadlinesRow days={WEEK} />
+        <DeadlinesRow days={WEEK} todayKey="2026-03-10" />
       </MemoryRouter>
     </QueryClientProvider>,
   );
