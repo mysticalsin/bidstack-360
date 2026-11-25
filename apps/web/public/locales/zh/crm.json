@@ -1429,7 +1429,7 @@
     "greetingEvening": "晚上好",
     "pageTitle": "工作区指挥中心",
     "pageSubtitle": "{{companies}} 家公司 · {{openDeals}} 个进行中的交易 · {{pipeline}} 管道",
-    "pageSubtitleHeld": "{{companies}} 家公司 · {{openDeals}} 个进行中的交易",
+    "pageSubtitleHeld": "{{companies}} 家公司",
     "allAccounts": "所有客户",
     "opportunities": "商机",
     "errorTitle": "无法加载仪表板",

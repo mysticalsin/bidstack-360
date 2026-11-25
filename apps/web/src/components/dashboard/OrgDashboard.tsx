@@ -48,8 +48,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const oppRows = useMemo(() => opps.data?.items ?? [], [opps.data?.items]);
   // Empty is a result only after this read succeeds. A later failure keeps the last rows.
   const bidsFailed = opps.isError && !opps.data;
-  // The chart, the headline, and the page subtitle share this read. The
-  // pipeline report and the workspace summary are a different book.
+  // The chart, the headline, and the page subtitle share this read, including
+  // the open-deal count. Company count stays on the workspace summary. The
+  // open-deal count stays off while this read is held.
   const book = openBook(oppRows);
   const pipelineHeld = oppRows.length === 0 && (opps.isLoading || bidsFailed);
   const retryBids = () => {
@@ -226,10 +227,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
             {pipelineHeld
               ? t(
                   'orgDashboard.pageSubtitleHeld',
-                  '{{companies}} companies · {{openDeals}} open deals',
+                  '{{companies}} companies',
                   {
                     companies: s?.companies ?? 0,
-                    openDeals: s?.openOpportunities ?? 0,
                   },
                 )
               : t(
@@ -237,7 +237,7 @@ export const OrgDashboard = memo(function OrgDashboard() {
                   '{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline',
                   {
                     companies: s?.companies ?? 0,
-                    openDeals: s?.openOpportunities ?? 0,
+                    openDeals: book.count,
                     pipeline: fmtCompact(book.value),
                   },
                 )}
