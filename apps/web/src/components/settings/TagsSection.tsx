@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { TagChip } from '@/components/tags/TagChip';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { cn } from '@/lib/cn';
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '@/hooks/useTags';
@@ -20,7 +20,7 @@ import { tagLibraryCaption } from './tag-library-caption';
  */
 export function TagsSection() {
   const { t } = useTranslation('settings');
-  const { data, isLoading } = useTags();
+  const list = useTags();
   const create = useCreateTag();
   const update = useUpdateTag();
   const del = useDeleteTag();
@@ -28,7 +28,11 @@ export function TagsSection() {
   const [draftName, setDraftName] = useState('');
   const [draftColor, setDraftColor] = useState<string>(TAG_COLORS[0]);
 
-  const tags = data?.items ?? [];
+  // A missing page is not an empty library. The count stays off until rows arrive.
+  const page = list.data;
+  const tags = page?.items ?? [];
+  const failed = page == null && list.isError;
+  const waiting = page == null && !list.isError;
 
   const handleCreate = async () => {
     const name = draftName.trim();
@@ -72,46 +76,50 @@ export function TagsSection() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <div className="p-4">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--fg-primary)]">
-            {t('tags.createHeading', 'Create a tag')}
-          </h3>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              maxLength={32}
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              placeholder={t('tags.namePlaceholder', 'e.g. Hot Lead')}
-              className="flex-1 min-w-[180px] rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2.5 py-1.5 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void handleCreate();
-                }
-              }}
-            />
-            <ColorSwatch value={draftColor} onChange={setDraftColor} />
-            <Button onClick={() => void handleCreate()} disabled={!draftName.trim()}>
-              {t('tags.createButton', 'Create')}
-            </Button>
+      {page ? (
+        <Card>
+          <div className="p-4">
+            <h3 className="mb-2 text-sm font-semibold text-[var(--fg-primary)]">
+              {t('tags.createHeading', 'Create a tag')}
+            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                maxLength={32}
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                placeholder={t('tags.namePlaceholder', 'e.g. Hot Lead')}
+                className="flex-1 min-w-[180px] rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2.5 py-1.5 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void handleCreate();
+                  }
+                }}
+              />
+              <ColorSwatch value={draftColor} onChange={setDraftColor} />
+              <Button onClick={() => void handleCreate()} disabled={!draftName.trim()}>
+                {t('tags.createButton', 'Create')}
+              </Button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      ) : null}
 
       <Card>
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('tags.libraryHeading', 'Library')}{' '}
-            <span className="font-normal text-[var(--fg-tertiary)]">
-              {data?.pageContinues
-                ? `(${t('tags.libraryCountPartial', tagLibraryCaption(tags.length, true))})`
-                : `(${tags.length})`}
-            </span>
+            {page ? (
+              <span className="font-normal text-[var(--fg-tertiary)]">
+                {page.pageContinues
+                  ? `(${t('tags.libraryCountPartial', tagLibraryCaption(tags.length, true))})`
+                  : `(${tags.length})`}
+              </span>
+            ) : null}
           </h3>
         </div>
-        {isLoading ? (
+        {waiting ? (
           // Shimmer rows shaped like tag library rows (name + chip) — shared
           // bs-shimmer system, not a bare "Loading…" string.
           <div
@@ -127,6 +135,21 @@ export function TagsSection() {
                 <span className="bs-shimmer ml-auto h-4 w-10" />
               </div>
             ))}
+          </div>
+        ) : failed ? (
+          <div className="p-6">
+            <ErrorState
+              title={t('tags.loadErrorTitle', 'Could not load the tag library')}
+              message={t(
+                'tags.loadErrorMessage',
+                'This is not an empty tag library. Retry the list before creating a tag.',
+              )}
+              action={
+                <Button size="sm" variant="secondary" onClick={() => void list.refetch()}>
+                  {t('tags.retry', 'Retry')}
+                </Button>
+              }
+            />
           </div>
         ) : tags.length === 0 ? (
           <div className="p-6">
