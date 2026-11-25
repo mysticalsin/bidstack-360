@@ -3915,7 +3915,8 @@
   },
   "keyContacts": {
     "title": "Contacts clés",
-    "noTitleOrEmail": "s.o."
+    "noTitleOrEmail": "s.o.",
+    "openContact": ", ouvrir le contact"
   },
   "pipelineByStageMini": {
     "heading": "Pipeline par étape"

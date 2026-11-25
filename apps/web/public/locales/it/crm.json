@@ -3860,7 +3860,8 @@
   },
   "keyContacts": {
     "title": "Contatti chiave",
-    "noTitleOrEmail": "n/d"
+    "noTitleOrEmail": "n/d",
+    "openContact": ", apri il contatto"
   },
   "pipelineByStageMini": {
     "heading": "Pipeline per fase"
