@@ -20,6 +20,7 @@ import {
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
+import { topAccountPastClose } from './top-account-past-close';
 
 /** Opens the bid drill-down sheet with a starting filter. */
 export type OnDrill = (f: OppDrillFilter) => void;
@@ -222,18 +223,55 @@ export function WinRateTrendCard({ rows, headingLevel }: { rows: OppRow[]; headi
   );
 }
 
-export function TopAccountsBarCard({ rows, headingLevel, onDrill }: { rows: OppRow[]; headingLevel?: 2 | 3; onDrill?: OnDrill }) {
+export function TopAccountsBarCard({ rows, headingLevel, onDrill, now }: {
+  rows: OppRow[];
+  headingLevel?: 2 | 3;
+  onDrill?: OnDrill;
+  /** Pinned clock for tests. The dashboard freezes the clock at mount. */
+  now?: number;
+}) {
+  const [mountedNow] = useState(() => Date.now());
+  const clock = now ?? mountedNow;
   const data = accountBars(rows);
+  const slipped = topAccountPastClose(rows, clock);
+  const bars = data.map((d) => `${d.label}: won ${fmtCompact(d.won)}, open ${fmtCompact(d.open)}`).join('; ');
+  const summary = slipped.sentence ? `${bars}. ${slipped.sentence}` : bars;
+  const columns = slipped.total > 0 ? ['Account', 'Won', 'Open', 'Past close'] : ['Account', 'Won', 'Open'];
   return (
     <ChartCard headingLevel={headingLevel} title="Top accounts" meta="Won plus open value"
-      summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}, open ${fmtCompact(d.open)}`).join('; ')}
-      table={{ columns: ['Account', 'Won', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.open)]) }}>
+      summary={summary}
+      table={{
+        columns,
+        rows: data.map((d) => {
+          const cells = [d.label, fmtCompact(d.won), fmtCompact(d.open)];
+          if (slipped.total > 0) {
+            const past = slipped.byAccount.get(d.label) ?? 0;
+            cells.push(past > 0 ? fmtCompact(past) : '–');
+          }
+          return cells;
+        }),
+      }}>
+      {slipped.sentence ? <p className="viz-past-close">{slipped.sentence}</p> : null}
       <HBars data={data} format={fmtCompact} onSelect={onDrill ? (label) => onDrill({ status: 'all', account: label }) : undefined} />
       {onDrill ? (
         <ul className="dash-chips" aria-label="Open an account's bids">
-          {data.map((d) => (
-            <li key={d.label}><button type="button" className="dash-chip" onClick={() => onDrill({ status: 'all', account: d.label })}>{d.label} <b>{fmtCompact(d.won + d.open)}</b></button></li>
-          ))}
+          {data.map((d) => {
+            const total = fmtCompact(d.won + d.open);
+            const past = slipped.byAccount.get(d.label) ?? 0;
+            const pastClose = past > 0 ? `${fmtCompact(past)} past close` : null;
+            return (
+              <li key={d.label}>
+                <button
+                  type="button"
+                  className="dash-chip"
+                  aria-label={pastClose ? `${d.label} ${total}, ${pastClose}` : undefined}
+                  onClick={() => onDrill({ status: 'all', account: d.label })}
+                >
+                  {d.label} <b>{total}</b>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       <ul className="viz-legend" aria-hidden>
