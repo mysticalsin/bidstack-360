@@ -3881,9 +3881,17 @@
     "ofTotal": "/ {{total}}"
   },
   "pipelineByStage": {
-    "regionLabel": "按阶段划分的组合管道",
-    "title": "组合管道",
-    "caption": "所有客户按阶段划分的管道"
+    "accountRegion": "{{account}} 的分阶段管道",
+    "accountTitle": "分阶段管道",
+    "accountCaption": "{{account}} 的投标",
+    "unlinkedTitle": "没有公司记录",
+    "unlinked": "此客户未关联公司记录。",
+    "errorTitle": "无法加载此客户的管道",
+    "errorMessage": "此客户的阶段合计没有加载。",
+    "retry": "重试",
+    "emptyTitle": "此客户还没有投标",
+    "emptyMessage": "与该公司关联的投标会显示在这里。",
+    "pagePartial": "这些条形图是此客户的前 {{count}} 个投标，不是全部。"
   },
   "accountDashboardWidgets": {
     "railAriaLabel": "CRM 集成状态",

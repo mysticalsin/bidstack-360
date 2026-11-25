@@ -3875,9 +3875,17 @@
     "ofTotal": "di {{total}}"
   },
   "pipelineByStage": {
-    "regionLabel": "Pipeline del portafoglio per fase",
-    "title": "Pipeline del portafoglio",
-    "caption": "Pipeline di tutti gli account per fase"
+    "accountRegion": "Pipeline di {{account}} per fase",
+    "accountTitle": "Pipeline per fase",
+    "accountCaption": "Trattative di {{account}}",
+    "unlinkedTitle": "Nessuna scheda azienda",
+    "unlinked": "Questo account non è collegato a una scheda azienda.",
+    "errorTitle": "Impossibile caricare la pipeline di questo account",
+    "errorMessage": "I totali per fase di questo account non si sono caricati.",
+    "retry": "Riprova",
+    "emptyTitle": "Nessuna trattativa su questo account",
+    "emptyMessage": "Le trattative collegate a questa azienda compariranno qui.",
+    "pagePartial": "Queste barre sono le prime {{count}} trattative di questo account, non tutte."
   },
   "accountDashboardWidgets": {
     "railAriaLabel": "Stato di integrazione del CRM",

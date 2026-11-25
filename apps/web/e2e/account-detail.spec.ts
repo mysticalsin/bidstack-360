@@ -95,7 +95,9 @@ test('target account renders a scoped, trustworthy cockpit', async ({ page, goto
   // org-dashboard only (it repeated the account header).
   await openAccountDetails(page);
   await expect(page.getByRole('region', { name: 'Account metrics' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Portfolio pipeline by stage' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: `${company.name} pipeline by stage` }),
+  ).toBeVisible();
   await expect(page.getByRole('region', { name: 'Account opportunities' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Account signal coverage' })).toBeVisible();
   await expect(page.getByRole('tablist', { name: 'Account intelligence views' })).toBeVisible({

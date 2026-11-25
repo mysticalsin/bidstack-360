@@ -63,7 +63,6 @@ import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
 import { ErrorState } from '@/components/ui/StateMessages';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useOpportunities } from '@/hooks/useOpportunities';
-import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
@@ -100,7 +99,6 @@ const COMPANY_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
-  const report = usePipelineReport();
   const opps = useOpportunities({ limit: 5 });
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
@@ -262,7 +260,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
                 {show('openIssues') && (
                   <OpenIssuesCard risks={cockpit.risks} compliance={cockpit.compliance} />
                 )}
-                {show('pipelineStage') && <PipelineByStageCard report={report.data} />}
+                {show('pipelineStage') && (
+                  <PipelineByStageCard
+                    companyId={cockpit.company.id}
+                    accountName={cockpit.company.name}
+                  />
+                )}
               </div>
             </Reveal>
           )}
