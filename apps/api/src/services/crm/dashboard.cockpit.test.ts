@@ -101,6 +101,33 @@ describe('computeSignalCoverage', () => {
     const f = (h: typeof fresh) => h.factors!.find((x) => x.key === 'firmographics')!.score;
     expect(f(fresh)).toBeGreaterThan(f(stale));
   });
+
+  // A closed book (Aritzia won, NOS lost, Mantu history) has no open deals.
+  // That is an empty pipeline, not a set of deals missing stage, owner, or date.
+  it('does not tell an account with no open deals to complete missing deal fields', () => {
+    const health = computeSignalCoverage({
+      company: company({ industry: 'retail' }),
+      contacts: [{ influence: 4, email: 'buyer@example.test' }],
+      openDeals: [],
+      tasks: [{ status: 'open', dueDate: new Date('2026-05-12T00:00:00.000Z'), createdAt: new Date('2026-05-01T00:00:00.000Z') }],
+    });
+    const pipeline = health.factors!.find((factor) => factor.key === 'pipeline')!;
+    expect(pipeline.score).toBe(0);
+    expect(pipeline.recommendedAction).toBe('No open deals on this account.');
+    expect(pipeline.recommendedAction).not.toMatch(/missing/i);
+  });
+
+  it('still asks to complete an open deal that has no owner or close date', () => {
+    const health = computeSignalCoverage({
+      company: company(),
+      contacts: [],
+      openDeals: [{ probability: 40, dueDate: null, owner: null }],
+      tasks: [],
+    });
+    const pipeline = health.factors!.find((factor) => factor.key === 'pipeline')!;
+    expect(pipeline.score).toBe(40);
+    expect(pipeline.recommendedAction).toMatch(/missing stage/i);
+  });
 });
 
 describe('applyFieldOverrides', () => {
