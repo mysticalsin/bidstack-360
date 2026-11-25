@@ -3429,6 +3429,7 @@
     "emptyMessage": "Aquí todo está en verde.",
     "unassigned": "Sin asignar",
     "dueSuffix": " - vence {{dueDate}}",
+    "overdue": "Vencida: {{count}} d de retraso",
     "noOwner": "Sin responsable"
   },
   "deliveryHistory": {

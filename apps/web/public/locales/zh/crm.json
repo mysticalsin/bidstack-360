@@ -3396,6 +3396,7 @@
     "emptyMessage": "这里一切正常。",
     "unassigned": "未分配",
     "dueSuffix": " - 截止 {{dueDate}}",
+    "overdue": "逾期：迟了{{count}}天",
     "noOwner": "无负责人"
   },
   "deliveryHistory": {

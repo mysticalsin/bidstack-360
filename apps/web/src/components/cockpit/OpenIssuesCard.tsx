@@ -5,12 +5,48 @@ import { useTranslation } from 'react-i18next';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
+import { daysUntilDueUtc } from '@/components/ui/DueDateChip';
 import { EmptyState } from '@/components/ui/StateMessages';
 import { springSoft } from '@/lib/motion';
 
 import type { ComplianceCheck, RiskItem } from '@bidstack/shared';
 
 import { severityBg, severityTone } from './_tokens';
+
+// dueDate is a UTC calendar day, the same clock as the bid due chip. Formatting
+// in the viewer's zone would print the previous local day for a date-only
+// string, so the label and the late count would name different days.
+function formatUtcDueDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const locale =
+    typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en';
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+function OpenIssueMeta({ owner, dueDate }: { owner: string | null; dueDate: string | null }) {
+  const { t } = useTranslation('crm');
+  const days = dueDate ? daysUntilDueUtc(dueDate) : null;
+  const late = days !== null && days < 0;
+  return (
+    <div style={{ fontSize: 11.5, color: 'var(--fg-tertiary)' }}>
+      {owner ?? t('openIssues.unassigned', 'Unassigned')}
+      {dueDate
+        ? t('openIssues.dueSuffix', ' - due {{dueDate}}', { dueDate: formatUtcDueDay(dueDate) })
+        : ''}
+      {late ? (
+        <span className="ml-2 font-semibold text-[var(--danger)]">
+          {t('openIssues.overdue', 'Overdue: {{count}}d late', { count: Math.abs(days) })}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 interface Props {
   risks: RiskItem[];
@@ -113,10 +149,7 @@ export const OpenIssuesCard = memo(function OpenIssuesCard({ risks, compliance }
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--fg-primary)' }}>
                     {r.title}
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--fg-tertiary)' }}>
-                    {r.owner ?? t('openIssues.unassigned', 'Unassigned')}
-                    {r.dueDate ? t('openIssues.dueSuffix', ' - due {{dueDate}}', { dueDate: r.dueDate }) : ''}
-                  </div>
+                  <OpenIssueMeta owner={r.owner} dueDate={r.dueDate} />
                 </div>
                 <Badge tone={severityTone(r.severity)}>{r.status.replace('_', ' ')}</Badge>
               </motion.li>
