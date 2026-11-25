@@ -9,9 +9,9 @@
  *   A cursor-batched stream writes 250 rows at a time, keeping the Node.js
  *   heap flat regardless of total row count.
  *
- * Column set matches the client-side export in OpportunitiesPage.tsx so
- * users get identical headers whether they export from the table or via a
- * direct download link.
+ * The place column is Country when the filtered rows have no territory,
+ * and Territory when one of them does. The opportunities list uses the
+ * same rule. The download is this stream.
  */
 
 import { PassThrough } from 'node:stream';
@@ -24,6 +24,10 @@ import { applyOpportunityScope, getAccessScope } from '../lib/access-scope.js';
 import { pumpBatches } from '../lib/batch-stream.js';
 import { createConcurrencyGate, gateSizeFromEnv } from '../lib/concurrency-gate.js';
 import { opportunityDueDateWhere } from './opportunities.helpers.js';
+import {
+  opportunityExportHeaders,
+  opportunityExportPlaceCell,
+} from './opportunity-export-place.js';
 
 const BATCH_SIZE = 250;
 
@@ -53,19 +57,6 @@ function csvRow(cells: string[]): string {
 function formatMicros(micros: bigint | number): string {
   return microsToUnits(micros).toFixed(2);
 }
-
-const CSV_HEADERS = [
-  'Code',
-  'Name',
-  'Customer',
-  'Stage',
-  'Value (EUR)',
-  'Probability',
-  'Due date',
-  'Owner',
-  'Territory',
-  'Updated at',
-] as const;
 
 export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => {
   server.get(
@@ -134,6 +125,20 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
         accessScope,
       );
 
+      // The place heading follows the rows this export will write. Demo books
+      // have countries and no territories, so the column is Country. One
+      // territory anywhere in the filtered set keeps Territory.
+      let hasTerritory: boolean;
+      try {
+        hasTerritory =
+          (await prisma.opportunity.count({
+            where: { AND: [where, { territoryId: { not: null } }] },
+          })) > 0;
+      } catch (err) {
+        release();
+        throw err;
+      }
+
       // Stream through Fastify so global headers (CORS/security) still apply
       // while keeping memory flat for large exports.
       const stream = new PassThrough();
@@ -151,7 +156,7 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
       const writeExport = async () => {
         const { written, aborted } = await pumpBatches({
           out: stream,
-          header: csvRow([...CSV_HEADERS]),
+          header: csvRow([...opportunityExportHeaders(hasTerritory)]),
           batchSize: BATCH_SIZE,
           // WHY include not select: Prisma's TS inference for relation fields is
           // only reliable with `include`. Using `select` with nested relation
@@ -187,7 +192,10 @@ export const opportunityExportRoutes: FastifyPluginAsyncZod = async (server) => 
               `${opp.probability}%`,
               opp.dueDate?.toISOString().slice(0, 10) ?? '',
               opp.owner?.name ?? opp.owner?.email ?? '',
-              opp.territory?.name ?? '',
+              opportunityExportPlaceCell({
+                territoryName: opp.territory?.name,
+                country: opp.country,
+              }),
               opp.updatedAt.toISOString(),
             ]),
         });
