@@ -290,7 +290,7 @@ describe('OpportunityDetailPage account link', () => {
 
     renderPage();
 
-    expect(screen.getByRole('link', { name: 'Open Acme Corp account' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Open account Acme Corp' }).getAttribute('href')).toBe(
       `/accounts/${companyId}`,
     );
     expect(screen.getByRole('button', { name: 'Edit customer name' })).toBeTruthy();
@@ -303,7 +303,7 @@ describe('OpportunityDetailPage account link', () => {
       error: null,
     } as unknown as ReturnType<typeof useOpportunity>);
     renderPage();
-    expect(screen.queryByRole('link', { name: 'Open Acme Corp account' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Open account Acme Corp' })).toBeNull();
   });
 });
 

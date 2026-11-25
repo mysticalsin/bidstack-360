@@ -59,6 +59,10 @@ export const Opportunity = z.object({
   // schemas below still enforce the canonical OP-NNNN format for supplied codes.
   code: OpportunityCode,
   customer: z.string().min(1).max(255),
+  // The account this deal belongs to. Null when the customer text has no
+  // unique company. Writes do not accept it — the server resolves it from
+  // the customer name so a client cannot point a deal at another account.
+  companyId: z.string().uuid().nullable().optional(),
   name: z.string().min(1).max(255),
   stage: z.string().nullable(),
   pipelineStageId: z.string().uuid().nullable(),
@@ -89,8 +93,15 @@ export const Opportunity = z.object({
 });
 export type Opportunity = z.infer<typeof Opportunity>;
 
+/** A stored company id, or null when the value is missing or not a uuid. */
+export function readCompanyId(value: unknown): string | null {
+  const parsed = z.string().uuid().safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 export const OpportunityCreate = Opportunity.omit({
   id: true,
+  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,
@@ -110,6 +121,7 @@ export type OpportunityCreate = z.infer<typeof OpportunityCreate>;
 export const OpportunityPatch = Opportunity.partial().omit({
   id: true,
   code: true,
+  companyId: true,
   updatedAt: true,
   taskCount: true,
   commentCount: true,

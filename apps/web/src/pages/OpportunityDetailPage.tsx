@@ -32,6 +32,7 @@ import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useStageMutation } from '@/hooks/useStageMutation';
+import { accountCockpitHref } from '@/lib/account-href';
 import { formatDate, formatStage } from '@/lib/format';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 import { StatusPill } from '@/components/vendor/tuffui/status-pill';
@@ -183,6 +184,7 @@ export function OpportunityDetailPage() {
     );
   }
 
+  const accountHref = accountCockpitHref(data.companyId);
   const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
   const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
   const isOutcomeLocked = isWon || isLost;
@@ -268,6 +270,15 @@ export function OpportunityDetailPage() {
                   ) : (
                     <span title={readOnlyHint}>{data.customer}</span>
                   )}
+                  {accountHref ? (
+                    <Link
+                      to={accountHref}
+                      className="rounded text-xs font-semibold text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)]"
+                    >
+                      {t('opportunityDetail.openAccountLabel', 'Open account')}
+                      <span className="sr-only"> {data.customer}</span>
+                    </Link>
+                  ) : null}
                 </span>
                 <span className="opacity-30">|</span>
                 <span className="flex items-center gap-1.5">

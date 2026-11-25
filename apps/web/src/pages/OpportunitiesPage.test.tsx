@@ -274,7 +274,7 @@ describe('OpportunitiesPage', () => {
 
     renderWithProviders(<OpportunitiesPage />);
 
-    expect(screen.getByRole('link', { name: 'Open Acme Corp account' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Acme Corp account' }).getAttribute('href')).toBe(
       `/accounts/${companyId}`,
     );
     expect(screen.getByText('Globex').closest('a')).toBeNull();

@@ -8,6 +8,7 @@
  * schedule timer re-renders only this span, not the whole row.
  */
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
@@ -22,6 +23,7 @@ import {
 } from '@/components/dashboard/unspecified-currency';
 import { useLiveRelativeTime } from '@/hooks/useLiveRelativeTime';
 import type { usePatchOpportunity } from '@/hooks/useOpportunities';
+import { accountCockpitHref } from '@/lib/account-href';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
@@ -77,7 +79,9 @@ export const Row = memo(function Row({
    * 403s the PATCH otherwise, so every inline-edit cell renders read-only. */
   canWrite: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const fireConfetti = useConfetti((s) => s.fire);
+  const accountHref = accountCockpitHref(opp.companyId);
 
   // Per-field flash timestamp. Bumping a field's value re-triggers the
   // SavedFlash chip next to that cell, independent of the others.
@@ -163,7 +167,17 @@ export const Row = memo(function Row({
           </Badge>
         ) : null}
         <div className="text-xs text-[var(--fg-tertiary)]">
-          <span>{opp.customer}</span>
+          {accountHref ? (
+            <Link
+              to={accountHref}
+              className="rounded font-medium text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)]"
+            >
+              {opp.customer}
+              <span className="sr-only"> {t('opportunities.accountSuffix', 'account')}</span>
+            </Link>
+          ) : (
+            <span>{opp.customer}</span>
+          )}
           <UpdatedAgo iso={opp.updatedAt} />
         </div>
       </td>
