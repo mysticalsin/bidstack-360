@@ -35,6 +35,63 @@ describe('parseCsv', () => {
   it('returns empty result for empty input', () => {
     expect(parseCsv('')).toEqual({ headers: [], rows: [] });
   });
+
+  it('splits a semicolon file into columns instead of one glued company', () => {
+    // WHY: Excel in a comma-decimal locale writes ";" between cells. Reading
+    // that as one column lets the wizard treat "Lumen Freight;lumen.example"
+    // as a valid company name.
+    const { headers, rows } = parseCsv('name;domain\nLumen Freight;lumen.example\n');
+    expect(headers).toEqual(['name', 'domain']);
+    expect(rows).toEqual([{ name: 'Lumen Freight', domain: 'lumen.example' }]);
+  });
+
+  it('drops an Excel sep hint so the hint is not imported as a company', () => {
+    // WHY: Excel writes "sep=;" on the first line. If that line is the header,
+    // the real header becomes a row and preview can save a company named "name".
+    const hinted = parseCsv('sep=;\nname;domain\nLumen Freight;lumen.example\n');
+    expect(hinted.headers).toEqual(['name', 'domain']);
+    expect(hinted.rows).toEqual([{ name: 'Lumen Freight', domain: 'lumen.example' }]);
+    expect(hinted.rows.some((row) => Object.values(row).includes('name'))).toBe(false);
+
+    const commaHint = parseCsv('sep=,\nname,domain\nLumen Freight,lumen.example\n');
+    expect(commaHint).toEqual({
+      headers: ['name', 'domain'],
+      rows: [{ name: 'Lumen Freight', domain: 'lumen.example' }],
+    });
+
+    const withBom = parseCsv('\uFEFFsep=;\r\nname;domain\r\nLumen Freight;lumen.example\r\n');
+    expect(withBom.rows).toEqual([{ name: 'Lumen Freight', domain: 'lumen.example' }]);
+  });
+
+  it('keeps a comma file when a semicolon sits inside a cell', () => {
+    // WHY: a tie, or a semicolon that is text, must stay a comma. This app
+    // exports commas. Flipping the separator would shift every column.
+    expect(parseCsv('name;legal,domain\nA;B,north.example\n')).toEqual({
+      headers: ['name;legal', 'domain'],
+      rows: [{ 'name;legal': 'A;B', domain: 'north.example' }],
+    });
+    expect(parseCsv('name,note\nLumen Freight,see; later\n').rows[0]).toEqual({
+      name: 'Lumen Freight',
+      note: 'see; later',
+    });
+  });
+
+  it('keeps a quoted comma inside a semicolon file and reads tabs', () => {
+    // WHY: the separator is only the character between cells. A comma inside
+    // quotes is part of the name, and a tab-separated paste is the same split.
+    expect(parseCsv('"Lumen, Freight";domain\n"Lumen, Freight";lumen.example\n')).toEqual({
+      headers: ['Lumen, Freight', 'domain'],
+      rows: [{ 'Lumen, Freight': 'Lumen, Freight', domain: 'lumen.example' }],
+    });
+    expect(parseCsv('name\tdomain\nLumen Freight\tlumen.example\n')).toEqual({
+      headers: ['name', 'domain'],
+      rows: [{ name: 'Lumen Freight', domain: 'lumen.example' }],
+    });
+    expect(parseCsv('\uFEFFname;domain\nLumen Freight;lumen.example').headers).toEqual([
+      'name',
+      'domain',
+    ]);
+  });
 });
 
 describe('autoMap', () => {
