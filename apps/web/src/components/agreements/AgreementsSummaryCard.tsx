@@ -6,6 +6,8 @@ import '@/components/drill/drill.css';
 
 import { Link } from 'react-router-dom';
 
+import type { MsaLeverageFlag } from '@bidstack/shared';
+
 import { accountAgreementCaption } from '@/components/agreements/account-agreement-caption';
 import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
@@ -13,12 +15,72 @@ import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { useMsaAccountSummary } from '@/hooks/useMsa';
 import { fmtDate, fmtDays, urgency } from '@/lib/msa/labels';
 
+function LeverageRetry({ onRetry }: { onRetry: () => void }) {
+  return (
+    <button
+      type="button"
+      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-medium text-[var(--brand-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+      onClick={onRetry}
+    >
+      Retry
+    </button>
+  );
+}
+
+function AgreementLeverageSlot({
+  active,
+  loading,
+  failed,
+  hasPayload,
+  flag,
+  onRetry,
+}: {
+  active: boolean;
+  loading: boolean;
+  failed: boolean;
+  hasPayload: boolean;
+  flag: MsaLeverageFlag | undefined;
+  onRetry: () => void;
+}) {
+  // The Sample preview never starts this read. A Retry there would call a
+  // route the card already knows is missing.
+  if (!active) return null;
+  if (failed && hasPayload) {
+    return (
+      <>
+        {flag ? <LeverageFlag flag={flag} compact /> : null}
+        <div className="agr-caption" role="alert" data-testid="account-agreements-leverage">
+          <span>Could not refresh this MSA leverage read.</span>
+          <LeverageRetry onRetry={onRetry} />
+        </div>
+      </>
+    );
+  }
+  if (failed) {
+    return (
+      <div className="agr-caption" role="alert" data-testid="account-agreements-leverage">
+        <span>Could not load the MSA leverage read.</span>
+        <LeverageRetry onRetry={onRetry} />
+      </div>
+    );
+  }
+  if (loading) {
+    return (
+      <p className="agr-caption" role="status" data-testid="account-agreements-leverage">
+        Loading the MSA leverage read.
+      </p>
+    );
+  }
+  if (flag) return <LeverageFlag flag={flag} compact />;
+  return null;
+}
+
 export function AgreementsSummaryCard({ companyId, companyName }: { companyId: string; companyName?: string }) {
   const q = useMsaAccountSummary(companyId, companyName);
-  const leverage = useMsaLeverage(companyId, Boolean(q.data) && !q.data?.sample);
+  const leverageOn = Boolean(q.data) && !q.data?.sample;
+  const leverage = useMsaLeverage(companyId, leverageOn);
   const base = `/agreements?companyId=${encodeURIComponent(companyId)}`;
   const s = q.data?.data;
-  const flag = leverage.data?.items[0];
   return (
     <section className="agr-section" aria-labelledby="agr-acct" data-testid="account-agreements-card">
       <div className="agr-head" style={{ alignItems: 'center' }}>
@@ -27,7 +89,14 @@ export function AgreementsSummaryCard({ companyId, companyName }: { companyId: s
         </h2>
         <Link className="drill-more" to={base}>View all</Link>
       </div>
-      {flag ? <LeverageFlag flag={flag} compact /> : null}
+      <AgreementLeverageSlot
+        active={leverageOn}
+        loading={leverage.isLoading}
+        failed={leverage.isError}
+        hasPayload={leverage.data != null}
+        flag={leverage.data?.items[0]}
+        onRetry={() => void leverage.refetch()}
+      />
       {q.isLoading ? <p className="drill-empty">Loading…</p> : q.isError || !s ? (
         <p className="drill-empty">Agreements are unavailable right now.</p>
       ) : s.total === 0 ? (
