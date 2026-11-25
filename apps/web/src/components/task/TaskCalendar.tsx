@@ -8,6 +8,8 @@ import { daysUntil } from '@/lib/format';
 
 import type { Task } from '@bidstack/shared';
 
+import { taskRecordPath } from './task-record-path';
+
 interface TaskCalendarProps {
   tasks: Task[];
 }
@@ -122,8 +124,11 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
                   {cell.tasks.map((t) => (
                     <Link
                       key={t.id}
-                      to={`/tasks?search=${encodeURIComponent(t.title)}`}
-                      className="block truncate rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-[var(--surface-hover)]"
+                      to={taskRecordPath(t.id)}
+                      className={cn(
+                        'block truncate rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-[var(--surface-hover)]',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]',
+                      )}
                       style={{
                         backgroundColor:
                           t.status === 'done'
