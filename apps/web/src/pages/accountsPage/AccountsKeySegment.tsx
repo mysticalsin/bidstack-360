@@ -79,10 +79,20 @@ export function AccountsKeySegment() {
     [items],
   );
   const industryBreakdown = useMemo(() => {
-    const byIndustry = new Map<string, { count: number; pipeline: number }>();
+    // `filterValue` is the industry the API can exact-match. Accounts with no
+    // industry share the "Unclassified" label, which is not an industry — sending
+    // it as `industry=` matches nothing and the page looks empty.
+    const byIndustry = new Map<
+      string,
+      { count: number; pipeline: number; filterValue: string | null }
+    >();
     for (const account of signalItems) {
       const key = account.industry || unclassifiedIndustry;
-      const current = byIndustry.get(key) ?? { count: 0, pipeline: 0 };
+      const current = byIndustry.get(key) ?? {
+        count: 0,
+        pipeline: 0,
+        filterValue: account.industry,
+      };
       current.count += 1;
       current.pipeline += account.totalValue;
       byIndustry.set(key, current);
@@ -195,11 +205,19 @@ export function AccountsKeySegment() {
                 <button
                   key={item.name}
                   type="button"
-                  aria-label={t('keyAccounts.filterByIndustry', 'Filter key accounts by {{industry}}', {
-                    industry: item.name,
-                  })}
-                  aria-pressed={industry === item.name}
-                  onClick={() => setIndustry(industry === item.name ? '' : item.name)}
+                  aria-label={
+                    item.filterValue
+                      ? t('keyAccounts.filterByIndustry', 'Filter key accounts by {{industry}}', {
+                          industry: item.name,
+                        })
+                      : t('keyAccounts.clearIndustryFilter', 'Clear key account industry filter')
+                  }
+                  aria-pressed={item.filterValue !== null && industry === item.filterValue}
+                  onClick={() =>
+                    item.filterValue
+                      ? setIndustry(industry === item.filterValue ? '' : item.filterValue)
+                      : setIndustry('')
+                  }
                   className="group rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3 text-left transition hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
@@ -237,8 +255,10 @@ export function AccountsKeySegment() {
           (≤50/page) and returns no org-wide aggregate, so summing `items`
           (this page) and labelling it a portfolio total would silently
           under-report and shift as the user pages. The 'On this page' eyebrow
-          makes the page-scope explicit rather than overclaiming. */}
-      {!accounts.isError ? (
+          makes the page-scope explicit rather than overclaiming. Hidden until
+          a page has actually loaded: `items` is empty while the first request
+          is in flight, and painting those zeros reads as an empty portfolio. */}
+      {accounts.data && !accounts.isError ? (
         <motion.section
           variants={reducedMotion ? undefined : staggerChild}
           aria-label={t('keyAccounts.statsStripAria', 'Key account totals on this page')}
@@ -293,19 +313,47 @@ export function AccountsKeySegment() {
           }
         />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('keyAccounts.emptyTitle', 'No key accounts yet')}
-          message={t(
-            'keyAccounts.emptyMessage',
-            'Flag strategically important companies as Key Accounts from the Companies page.',
-          )}
-          action={
-            <Link to="/companies" className="btn btn-primary">
-              <Icon name="building" size={14} />
-              {t('keyAccounts.emptyCta', 'Browse companies')}
-            </Link>
-          }
-        />
+        // `debouncedSearch` is what the request actually used. Keep the filter-miss
+        // copy until that request catches up, so clearing the box does not flash
+        // "No key accounts yet" over a page that is still the filtered result.
+        search || debouncedSearch || industry ? (
+          // A server filter that matched nothing is not an empty portfolio.
+          // The first-run copy ("flag companies") sends people to create key
+          // accounts that may already exist outside this search or industry.
+          <EmptyState
+            title={t('keyAccounts.emptyFilteredTitle', 'No key accounts match your filters')}
+            message={t(
+              'keyAccounts.emptyFilteredMessage',
+              'No key accounts match the current search or industry. Clear it to see the full list.',
+            )}
+            action={
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setSearch('');
+                  setIndustry('');
+                }}
+              >
+                {t('keyAccounts.clearFilters', 'Clear filters')}
+              </button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('keyAccounts.emptyTitle', 'No key accounts yet')}
+            message={t(
+              'keyAccounts.emptyMessage',
+              'Flag strategically important companies as Key Accounts from the Companies page.',
+            )}
+            action={
+              <Link to="/companies" className="btn btn-primary">
+                <Icon name="building" size={14} />
+                {t('keyAccounts.emptyCta', 'Browse companies')}
+              </Link>
+            }
+          />
+        )
       ) : (
         <>
           <motion.div layout className="grid grid-cols-1 gap-4">
