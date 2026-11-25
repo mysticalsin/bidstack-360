@@ -380,6 +380,8 @@ export function PipelinePage() {
                 stageId={stage.id}
                 stageName={stage.name}
                 stageColor={stage.color}
+                stageWon={stage.isWon}
+                stageLost={stage.isLost}
                 items={items}
                 total={total}
                 conversion={conversion}
