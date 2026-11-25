@@ -9,6 +9,8 @@
 .mi-empty { font-size: 14px; color: var(--fg-tertiary); margin: 0; padding: 8px 0; }
 .mi-link { font-size: 13px; font-weight: 500; color: var(--brand-primary); min-height: 32px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; }
 .mi-link:hover { text-decoration: underline; }
+.mi-link:focus-visible, .mi-retry:focus-visible { outline: 2px solid var(--focus-ring-color, var(--brand-primary)); outline-offset: 2px; }
+.mi-retry { font-size: 13px; font-weight: 600; color: var(--fg-primary); background: none; border: 0; cursor: pointer; min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; border-radius: 6px; }
 .mi-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 32px; }
 @media (max-width: 900px) { .mi-split { grid-template-columns: 1fr; gap: 24px; } }
 

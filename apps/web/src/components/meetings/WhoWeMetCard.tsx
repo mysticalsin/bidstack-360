@@ -21,6 +21,22 @@ import { PeopleDrill } from './PeopleDrill';
 const TOP_CHALLENGES = 3;
 const TOP_RECENT = 4;
 
+// A missing payload is not an empty account. Empty copy is only legal after
+// the read succeeds. A later failure that still has a payload stays ready.
+function readGate(q: { data?: unknown; isError: boolean }): 'ready' | 'error' | 'loading' {
+  if (q.data != null) return 'ready';
+  if (q.isError) return 'error';
+  return 'loading';
+}
+
+function ReadRetry({ onRetry }: { onRetry: () => void }) {
+  return (
+    <button type="button" className="mi-retry" onClick={onRetry}>
+      Retry
+    </button>
+  );
+}
+
 export function WhoWeMetCard({ companyId, companyName }: { companyId: string; companyName?: string }) {
   const coverage = useCoverage(companyId);
   const challenges = useChallenges(companyId);
@@ -32,6 +48,9 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
 
   if (coverage.error instanceof ApiError && coverage.error.status === 403) return null;
 
+  const coverageGate = readGate(coverage);
+  const meetingsGate = readGate(recent);
+  const challengesGate = readGate(challenges);
   const cov = coverage.data;
   const people = cov?.cells.reduce((n, c) => n + c.people, 0) ?? 0;
   const meetings = recent.data?.items ?? [];
@@ -61,9 +80,15 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
         </span>
       </header>
 
-      {coverage.isLoading ? <p className="mi-empty">Loading coverage…</p> : coverage.isError ? (
+      {coverageGate === 'loading' ? <p className="mi-empty" aria-busy="true">Loading coverage…</p> : coverageGate === 'error' ? (
         <p className="mi-empty" role="alert">
-          Couldn&apos;t load meeting coverage. <button type="button" className="mi-link" onClick={() => void coverage.refetch()}>Retry</button>
+          Couldn&apos;t load meeting coverage. <ReadRetry onRetry={() => void coverage.refetch()} />
+        </p>
+      ) : meetingsGate === 'loading' && people === 0 ? (
+        <p className="mi-empty" aria-busy="true">Loading meetings</p>
+      ) : meetingsGate === 'error' && people === 0 ? (
+        <p className="mi-empty" role="alert">
+          Couldn&apos;t load meetings. <ReadRetry onRetry={() => void recent.refetch()} />
         </p>
       ) : !hasAny ? (
         <p className="mi-empty">
@@ -86,7 +111,13 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
           <div style={{ display: 'grid', gap: 24, alignContent: 'start', minWidth: 0 }}>
             <div>
               <h3 style={{ fontSize: 14, fontWeight: 500, margin: "0 0 8px", color: "var(--fg-primary)" }}>What they keep raising</h3>
-              {items.length === 0 ? <p className="mi-empty">No challenges captured yet.</p> : (
+              {challengesGate === 'loading' ? (
+                <p className="mi-empty" aria-busy="true">Loading challenges</p>
+              ) : challengesGate === 'error' ? (
+                <p className="mi-empty" role="alert">
+                  Couldn&apos;t load challenges. <ReadRetry onRetry={() => void challenges.refetch()} />
+                </p>
+              ) : items.length === 0 ? <p className="mi-empty">No challenges captured yet.</p> : (
                 <>
                   <ul className="mi-list" data-testid="challenge-rollup">
                     {(allChallenges ? items : items.slice(0, TOP_CHALLENGES)).map((c) => (
@@ -109,6 +140,15 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
             </div>
             <div>
               <h3 style={{ fontSize: 14, fontWeight: 500, margin: '0 0 8px', color: 'var(--fg-primary)' }}>Latest meetings</h3>
+              {meetingsGate === 'loading' ? (
+                <p className="mi-empty" aria-busy="true">Loading meetings</p>
+              ) : meetingsGate === 'error' ? (
+                <p className="mi-empty" role="alert">
+                  Couldn&apos;t load meetings. <ReadRetry onRetry={() => void recent.refetch()} />
+                </p>
+              ) : meetings.length === 0 ? (
+                <p className="mi-empty">No meetings in this window.</p>
+              ) : (
               <ol className="mi-timeline" data-testid="meeting-timeline">
                 {meetings.slice(0, TOP_RECENT).map((m) => (
                   <li key={m.id}>
@@ -120,7 +160,8 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
                   </li>
                 ))}
               </ol>
-              {meetings.length > TOP_RECENT ? <Link className="mi-link" to={base}>See all meetings</Link> : null}
+              )}
+              {meetingsGate === 'ready' && meetings.length > TOP_RECENT ? <Link className="mi-link" to={base}>See all meetings</Link> : null}
             </div>
           </div>
         </div>
