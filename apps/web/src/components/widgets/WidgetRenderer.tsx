@@ -27,6 +27,7 @@ import {
   TableChart,
 } from '@/components/charts/charts';
 import { KpiCard } from '@/components/charts/KpiCard';
+import { readGaugePercent } from '@/components/widgets/gauge-figure';
 import type { DashboardWidget } from '@/hooks/useDashboards';
 import { useReportRun, useRunReport, type ReportRun } from '@/hooks/useAnalyticsReports';
 
@@ -89,6 +90,7 @@ function ChartBody({
   widget: DashboardWidget;
   data: DataRow[];
 }) {
+  const { t } = useTranslation('crm');
   const cfg = widget.config as {
     xKey?: string;
     yKey?: string | string[];
@@ -164,14 +166,24 @@ function ChartBody({
           aria-label={widget.title}
         />
       );
-    case 'gauge':
+    case 'gauge': {
+      // gaugeValue is not what the form saves. A missing row figure is not 0%.
+      const figure = readGaugePercent(data[0], yKey);
+      if (figure === null) {
+        return (
+          <p className="py-6 text-center text-xs text-[var(--fg-tertiary)]">
+            {t('widgetRenderer.gaugeEmpty', 'No figure for this gauge.')}
+          </p>
+        );
+      }
       return (
         <GaugeChart
-          value={cfg.gaugeValue ?? 0}
+          value={figure}
           label={cfg.gaugeLabel ?? widget.title}
           aria-label={widget.title}
         />
       );
+    }
     case 'heatmap':
       return (
         <HeatmapChart
