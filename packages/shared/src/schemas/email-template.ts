@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { emailCatalogAmount } from './email-catalog-amount.js';
+
 /**
  * Sprint 1 — Krayin import.
  * Email templates with mustache-style placeholders. The placeholder catalog
@@ -23,7 +25,7 @@ export const PLACEHOLDER_CATALOG = [
   { token: 'account.industry', label: 'Account — industry', sample: 'Manufacturing' },
   // Opportunity context
   { token: 'opportunity.name', label: 'Opportunity — name', sample: 'Q3 platform rollout' },
-  { token: 'opportunity.amount', label: 'Opportunity — amount', sample: '€120,000' },
+  { token: 'opportunity.amount', label: 'Opportunity — amount', sample: emailCatalogAmount(120_000_000_000n) },
   // Authoring user context
   { token: 'user.firstName', label: 'You — first name', sample: 'Tony' },
   { token: 'user.fullName', label: 'You — full name', sample: 'Tony Walteur' },
