@@ -64,6 +64,25 @@ describe('TechCoverageLine', () => {
     expect(screen.getByTestId('tech-coverage-line').textContent).toContain('Apollo asked to fill gaps.');
   });
 
+  it('does not call demo sample technology a live check that found nothing', () => {
+    // WHY: demo seed backdates sample technology by two days and marks unused
+    // lanes empty. The account stack then said "Checked 7 Nov 2026" and
+    // "Nothing found in Jobs" as if a detector had run and come up empty.
+    render(
+      <TechCoverageLine
+        coverage={coverage({ sample: true, apolloFallback: 'not_configured', openItems: 1 })}
+      />,
+    );
+    const text = screen.getByTestId('tech-coverage-line').textContent ?? '';
+    expect(text).toContain('Sample data, not a live check.');
+    expect(text).not.toMatch(/Checked/i);
+    expect(text).not.toMatch(/Nothing found/i);
+    expect(text).not.toMatch(/Could not reach/i);
+    expect(text).not.toMatch(/Not checked/i);
+    expect(text).not.toMatch(/Coverage:/);
+    expect(text).not.toContain('\u2014');
+  });
+
   it('renders nothing before the first check', () => {
     const { container } = render(<TechCoverageLine coverage={null} />);
     expect(container.textContent).toBe('');
@@ -78,6 +97,24 @@ describe('TechEvidenceChip', () => {
     fireEvent.click(chip);
     expect(screen.getByText('MX x.mail.protection.outlook.com')).toBeTruthy();
     expect(screen.getByText(/Seen 7 Nov 2026/)).toBeTruthy();
+  });
+
+  it('does not date a sample technology as seen', () => {
+    // WHY: the same backdated fixture date was "Seen 7 Nov 2026" on a row
+    // whose record already says it is sample data.
+    render(
+      <TechEvidenceChip
+        item={{
+          ...dnsItem,
+          sample: true,
+          evidence: { url: null, record: 'Sample: MX points to Microsoft 365', observedAt: CHECKED },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Microsoft 365 evidence, DNS, 95% confidence/ }));
+    expect(screen.getByText(/sample data/i)).toBeTruthy();
+    expect(screen.getByText('Sample: MX points to Microsoft 365')).toBeTruthy();
+    expect(screen.queryByText(/Seen /)).toBeNull();
   });
 
   it('links to the public record when there is one', () => {
