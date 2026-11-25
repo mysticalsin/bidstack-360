@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CompanyDetail } from '@bidstack/shared';
@@ -79,5 +79,83 @@ describe('CompanyDetailsForm — companies:write gating', () => {
     const save = screen.getByRole('button', { name: /save changes/i }) as HTMLButtonElement;
     expect(save.disabled).toBe(false);
     expect(screen.queryByText(/don.t have permission to save changes/i)).toBeNull();
+  });
+});
+
+const CI = 'c0000000-0000-4000-8000-000000000001';
+const DNB = 'c0000000-0000-4000-8000-000000000008';
+
+function named(id: string, name: string, domain: string, countryCode: string, employeeCount: number) {
+  return {
+    ...baseCompany(),
+    id,
+    name,
+    domain,
+    industry: 'financial_services',
+    employeeCount,
+    countryCode,
+    tier: 'key' as const,
+  };
+}
+
+describe('CompanyDetailsForm — account switch', () => {
+  afterEach(() => {
+    cleanup();
+    hookMocks.canWrite = true;
+    hookMocks.mutate.mockClear();
+  });
+
+  it('replaces the open draft when the page stays on Edit details for the next demo account', () => {
+    // The company route reuses this form. A cached account skips the loading
+    // skeleton, so the draft must follow the record or Save writes CI
+    // Financial onto DNB Bank.
+    const onDone = vi.fn();
+    const view = render(
+      <CompanyDetailsForm
+        company={named(CI, 'CI Financial', 'ci.com', 'CA', 2500)}
+        onDone={onDone}
+      />,
+    );
+    expect((screen.getByRole('textbox', { name: /company name/i }) as HTMLInputElement).value).toBe(
+      'CI Financial',
+    );
+
+    view.rerender(
+      <CompanyDetailsForm company={named(DNB, 'DNB Bank', 'dnb.no', 'NO', 9000)} onDone={onDone} />,
+    );
+
+    expect((screen.getByRole('textbox', { name: /company name/i }) as HTMLInputElement).value).toBe(
+      'DNB Bank',
+    );
+    expect((screen.getByRole('textbox', { name: /^domain/i }) as HTMLInputElement).value).toBe(
+      'dnb.no',
+    );
+    expect((screen.getByRole('textbox', { name: /employees/i }) as HTMLInputElement).value).toBe(
+      '9000',
+    );
+    expect((screen.getByRole('textbox', { name: /country code/i }) as HTMLInputElement).value).toBe(
+      'NO',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(hookMocks.mutate).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a name the person typed when the same account refreshes', () => {
+    const company = named(CI, 'CI Financial', 'ci.com', 'CA', 2500);
+    const view = render(<CompanyDetailsForm company={company} onDone={vi.fn()} />);
+    fireEvent.change(screen.getByRole('textbox', { name: /company name/i }), {
+      target: { value: 'CI Financial Group' },
+    });
+    view.rerender(
+      <CompanyDetailsForm
+        company={{ ...company, updatedAt: '2026-11-20T00:00:00.000Z' }}
+        onDone={vi.fn()}
+      />,
+    );
+    expect((screen.getByRole('textbox', { name: /company name/i }) as HTMLInputElement).value).toBe(
+      'CI Financial Group',
+    );
   });
 });
