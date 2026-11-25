@@ -121,4 +121,34 @@ describe('proposal.draft grounded builder', () => {
       ]),
     );
   });
+
+  it('does not price a synthetic bid of 61520 as euros', () => {
+    // WHY: opportunity valueMicros has no currency column. A grounded pricing
+    // draft that prints EUR turns 61520 units into a euro baseline the CRM
+    // never recorded. The figure stays 61520 and the draft does not name EUR.
+    const result = buildGroundedProposalDraft({
+      opportunity: {
+        id: 'opp-61520',
+        code: 'OP-6152',
+        customer: 'Example Industrial',
+        name: 'Plant Controls',
+        stage: 's3_technical_iteration',
+        valueMicros: 61_520_000_000n,
+        probability: 40,
+        dueDate: new Date('2026-09-01T00:00:00.000Z'),
+        industry: 'Manufacturing',
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      },
+      section: 'pricing',
+      sectionTitle: 'Pricing',
+      tone: 'concise',
+      references: [],
+      tasks: [],
+      contacts: [],
+      notes: [],
+    });
+
+    expect(result.markdown).not.toMatch(/EUR|€/);
+    expect(result.markdown.replace(/\D/g, '')).toContain('61520');
+  });
 });
