@@ -109,7 +109,7 @@ export function NotificationsBell() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute right-0 top-[calc(100%+6px)] z-30 w-80 rounded-lg glass-menu p-1.5 focus:outline-none"
+            className="absolute right-0 top-[calc(100%+6px)] z-30 w-80 rounded-lg glass-menu p-1.5 focus:outline-none max-md:fixed max-md:left-2 max-md:right-2 max-md:top-14 max-md:w-auto"
           >
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2 mb-1">
               <span className="text-sm font-semibold text-[var(--fg-primary)]">
@@ -118,7 +118,7 @@ export function NotificationsBell() {
               {unreadCount > 0 && (
                 <button
                   type="button"
-                  className="text-xs text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:underline disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center text-xs text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:underline disabled:opacity-50"
                   onClick={() => markAll.mutate()}
                   disabled={markAll.isPending}
                 >
@@ -126,7 +126,7 @@ export function NotificationsBell() {
                 </button>
               )}
             </div>
-            <div className="max-h-80 overflow-y-auto flex flex-col gap-0.5">
+            <div className="max-h-80 overflow-y-auto flex flex-col gap-0.5 max-md:max-h-[calc(100dvh-8rem-env(safe-area-inset-bottom,0px))]">
               {notifications.isError ? (
                 <div className="px-4 py-6 text-center text-sm text-[var(--danger)]">
                   {t('topbarNotifications.errorMessage', 'Could not load notifications')}
@@ -167,7 +167,7 @@ export function NotificationsBell() {
                       data-testid="notification-item"
                       aria-label={n.title}
                       onClick={() => openItem(n.id, n.url, isRead)}
-                      className={`flex w-full items-start gap-3 border-b border-[var(--border-subtle)] last:border-0 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--surface-hover)] ${
+                      className={`flex min-h-11 w-full items-start gap-3 border-b border-[var(--border-subtle)] last:border-0 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:bg-[var(--surface-hover)] ${
                         clickable ? '' : 'cursor-default'
                       }`}
                     >
