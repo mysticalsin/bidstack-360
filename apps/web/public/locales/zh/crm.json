@@ -247,6 +247,12 @@
   "tasks": {
     "title": "任务",
     "subtitle": "{{count}} 个活动跟进。",
+    "subtitleTodayEmpty": "今天没有到期。",
+    "subtitleTodayOne": "今天到期 1 个。",
+    "subtitleToday": "今天到期 {{count}} 个。",
+    "subtitleOverdueEmpty": "此列表中没有逾期。",
+    "subtitleOverdueOne": "逾期 1 个。",
+    "subtitleOverdue": "逾期 {{count}} 个。",
     "actions": {
       "exportCsv": "导出 CSV"
     },

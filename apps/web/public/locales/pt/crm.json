@@ -247,6 +247,12 @@
   "tasks": {
     "title": "Tarefas",
     "subtitle": "{{count}} acompanhamentos ativos.",
+    "subtitleTodayEmpty": "Nada vence hoje.",
+    "subtitleTodayOne": "1 vence hoje.",
+    "subtitleToday": "{{count}} vencem hoje.",
+    "subtitleOverdueEmpty": "Nada atrasado nesta lista.",
+    "subtitleOverdueOne": "1 atrasado.",
+    "subtitleOverdue": "{{count}} atrasados.",
     "actions": {
       "exportCsv": "Exportar CSV"
     },

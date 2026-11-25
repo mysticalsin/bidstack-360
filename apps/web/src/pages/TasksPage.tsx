@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
+import { taskListCaption } from '@/components/task/task-list-caption';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
@@ -141,6 +142,10 @@ export function TasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredItems, sort, ordinalOf]);
 
+  // Today and Overdue run on the loaded page. The header counts those rows,
+  // so an empty Today view does not keep the loaded length.
+  const caption = taskListCaption(filter, items.length, data?.items.length ?? 0);
+
   const moveTask = useCallback(
     (fromIndex: number, toIndex: number) => {
       if (toIndex < 0 || toIndex >= items.length) return;
@@ -194,9 +199,9 @@ export function TasksPage() {
             {t('tasks.title', 'Tasks')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('tasks.subtitle', '{{count}} active follow-ups.', {
-              count: data?.items.length ?? 0,
-            })}
+            {caption.count === undefined
+              ? t(caption.key, caption.fallback)
+              : t(caption.key, caption.fallback, { count: caption.count })}
           </p>
         </div>
         <div className="flex items-center gap-2">
