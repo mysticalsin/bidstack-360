@@ -9,9 +9,10 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
+
+import { recentOpportunityAmount } from './recent-opportunity-amount';
 
 interface Props {
   opps: ReturnType<typeof useOpportunities>;
@@ -25,7 +26,6 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
   items,
 }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const visibleItems = items ?? opps.data?.items ?? [];
   const accountScoped = Boolean(accountName);
@@ -103,7 +103,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
                 </div>
                 <div className="proto-row-right">
                   <span className="proto-row-money">
-                    <AnimatedMetric value={formatMoney(o.value, 'EUR')} />
+                    <AnimatedMetric value={recentOpportunityAmount(o.value)} />
                   </span>
                   <Badge tone="purple">{formatStage(o.stage ?? 'unknown')}</Badge>
                 </div>
