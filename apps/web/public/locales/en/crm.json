@@ -1712,8 +1712,10 @@
     "sectionCaption": "{{count}} forecast groups",
     "errorTitle": "Failed to load forecasts",
     "retry": "Retry",
-    "emptyTitle": "No forecasts found",
-    "emptyMessage": "Try changing the period filter or create your first forecast.",
+    "emptyTitle": "No manual overrides",
+    "emptyMessage": "The projection above stands until a rep enters one.",
+    "emptyFilterTitle": "No forecasts in this period",
+    "emptyFilterMessage": "Try another period filter.",
     "newForecast": "New Forecast",
     "tableLabel": "Revenue forecasts",
     "columnOwner": "Owner",
@@ -2243,7 +2245,9 @@
     "toastDeleteFailed": "Failed to delete forecasts",
     "deleteConfirmTitle": "Delete forecasts for {{period}}?",
     "deleteConfirmDescription": "This will remove all category forecasts for this period and owner.",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "manualSectionCaption": "Rep-entered figures override the projection for their period.",
+    "manualSectionCaptionEmpty": "None are set. The projection above stands."
   },
   "cartesianCharts": {
     "lineChartAriaLabel": "Line chart",

@@ -7,6 +7,7 @@ import {
   FORECAST_LIST_PAGE,
   forecastGroupCaption,
   forecastTotalsNote,
+  showForecastPeriodFilter,
 } from './forecast-list-caption';
 
 /**
@@ -74,5 +75,16 @@ describe('forecast group caption', () => {
       /not every/i,
     );
     expect(forecastTotalsNote(false)).toBeNull();
+  });
+
+  it('hides the period filter until a loaded forecast can be hidden by it', () => {
+    // WHY: the demo book has no manual forecasts. Monthly, Quarterly, and
+    // Yearly are then the same empty list. The filter is only a control
+    // once a row exists to include or leave out. A read that has not
+    // settled is not an empty book.
+    expect(showForecastPeriodFilter(0, true)).toBe(false);
+    expect(showForecastPeriodFilter(0, false)).toBe(false);
+    expect(showForecastPeriodFilter(1, false)).toBe(false);
+    expect(showForecastPeriodFilter(1, true)).toBe(true);
   });
 });
