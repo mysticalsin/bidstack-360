@@ -66,7 +66,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
     const leads = s?.leads ?? 0;
     const opportunities = s?.opportunities ?? 0;
     const openOpportunities = s?.openOpportunities ?? 0;
-    const tasks = s?.tasks ?? 0;
+    // `tasks` counts every row, including a finished handover. On the demo
+    // sign-in book that handover is already due, and overdue stays 0, so a
+    // bare 5 reads as five live follow-ups. The cell uses the open count.
+    const tasks = s?.openTasks ?? s?.tasks ?? 0;
     const overdueTasks = s?.overdueTasks ?? 0;
     const activeTasks = Math.max(0, tasks - overdueTasks);
     const stageSignals =
