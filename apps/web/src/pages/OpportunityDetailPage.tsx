@@ -48,6 +48,7 @@ import {
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 import { LessonsLearnedCard } from './opportunityDetail/LessonsLearnedCard';
+import { opportunityRecordPlace } from './opportunityDetail/opportunity-record-place';
 import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
@@ -60,7 +61,7 @@ const BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'ros
 };
 
 export function OpportunityDetailPage() {
-  const { t } = useTranslation('crm');
+  const { t, i18n } = useTranslation('crm');
   const stageOptions: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
     { value: 's1_lead', label: t('opportunityDetail.stageS1Lead', 'S1 Lead') },
     { value: 's1_ongoing', label: t('opportunityDetail.stageS1Ongoing', 'S1 Ongoing') },
@@ -183,6 +184,10 @@ export function OpportunityDetailPage() {
     );
   }
 
+  const place = opportunityRecordPlace(
+    { territoryName: data.territoryName, country: data.country },
+    i18n.language,
+  );
   const isWon = data.pipelineStage?.isWon || data.stage === 'closed_won';
   const isLost = data.pipelineStage?.isLost || data.stage === 'closed_lost';
   const isOutcomeLocked = isWon || isLost;
@@ -289,12 +294,16 @@ export function OpportunityDetailPage() {
                 <span className="opacity-30">|</span>
                 <span className="flex items-center gap-1.5">
                   <Icon name="globe" size={14} className="text-[var(--success)]" />
-                  {data.territoryName ? (
-                    <Badge tone="teal">{data.territoryName}</Badge>
-                  ) : data.country ? (
-                    <span className="text-sm">{data.country}</span>
+                  {place.kind === 'territory' ? (
+                    <Badge tone="teal">{place.label}</Badge>
+                  ) : place.kind === 'country' ? (
+                    <span className="text-sm">{place.label}</span>
+                  ) : place.kind === 'code' ? (
+                    <span className="text-sm">{place.code}</span>
                   ) : (
-                    <span className="text-sm text-[var(--fg-tertiary)]">—</span>
+                    <span className="text-sm text-[var(--fg-tertiary)]">
+                      {t('opportunityDetail.noCountry', 'No country')}
+                    </span>
                   )}
                 </span>
                 {data.bidClass ? (

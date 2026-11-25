@@ -11,9 +11,27 @@ describe('opportunity record place under demo data', () => {
       kind: 'country',
       label: 'Canada',
     });
-    expect(opportunityRecordPlace({ territoryName: null, country: 'us' }, 'en').kind).toBe(
-      'country',
-    );
+    // The rest of the demo book: US, ES, DE, PT, NO.
+    expect(opportunityRecordPlace({ territoryName: null, country: 'us' }, 'en')).toEqual({
+      kind: 'country',
+      label: 'United States',
+    });
+    expect(opportunityRecordPlace({ territoryName: null, country: 'ES' }, 'en')).toEqual({
+      kind: 'country',
+      label: 'Spain',
+    });
+    expect(opportunityRecordPlace({ territoryName: null, country: 'DE' }, 'en')).toEqual({
+      kind: 'country',
+      label: 'Germany',
+    });
+    expect(opportunityRecordPlace({ territoryName: null, country: 'PT' }, 'en')).toEqual({
+      kind: 'country',
+      label: 'Portugal',
+    });
+    expect(opportunityRecordPlace({ territoryName: null, country: 'NO' }, 'en')).toEqual({
+      kind: 'country',
+      label: 'Norway',
+    });
   });
 
   it('keeps a territory name ahead of the country code', () => {
