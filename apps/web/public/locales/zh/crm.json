@@ -846,6 +846,7 @@
     "editRowLabel": "编辑 {{name}}",
     "editAction": "编辑",
     "deleteRowLabel": "删除 {{name}}",
+    "callPhone": "呼叫 {{phone}}",
     "deleteAction": "删除"
   },
   "companies": {
