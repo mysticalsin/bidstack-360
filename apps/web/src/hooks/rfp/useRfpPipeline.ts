@@ -85,6 +85,26 @@ function deriveStage(frame: ServerSseFrame): PipelineEvent['stage'] {
   return 'extracting';
 }
 
+/**
+ * Stage and bar for a run the page restored from rfp-latest.
+ * Same map as the SSE frame, so a refresh paints the saved phase instead of
+ * the upload zone. The stream still replaces this once it connects.
+ */
+export function resumePipelineView(
+  state: string,
+  currentPhase: string | null,
+): { stage: PipelineEvent['stage']; progress: number } {
+  const frame: ServerSseFrame = {
+    phase: currentPhase,
+    state,
+    progress: null,
+    message: null,
+    updatedAt: '1970-01-01T00:00:00.000Z',
+  };
+  const stage = deriveStage(frame);
+  return { stage, progress: deriveProgress(frame, stage) ?? 0 };
+}
+
 function deriveProgress(frame: ServerSseFrame, stage: PipelineEvent['stage']): number | undefined {
   if (stage === 'awaiting_approval' || stage === 'approved' || stage === 'completed') return 100;
   if (stage === 'queued') return 0;

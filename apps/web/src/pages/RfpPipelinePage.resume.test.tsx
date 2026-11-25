@@ -161,6 +161,24 @@ describe('RfpPipelinePage resume', () => {
     expect(screen.queryByRole('heading', { name: 'Draft Sections' })).toBeNull();
   });
 
+  it('leaves a finished bid on the upload zone so a new file can start', () => {
+    // WHY: approved, completed, and failed are not resumable. Painting those
+    // stages again would trap the page on a bid that is already done.
+    latest.data = {
+      orchestration: {
+        id: ORCHESTRATION_ID,
+        state: 'approved',
+        currentPhase: null,
+      },
+    };
+
+    renderPage();
+
+    expect(screen.getByText('Upload RFP Document')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Draft Sections' })).toBeNull();
+    expect(useRfpPipelineStore.getState().stage).toBe('idle');
+  });
+
   it('shows the in-flight stage after refresh instead of the upload zone', () => {
     // WHY: state stays "running" for the whole job. The visible stage is the
     // saved phase. A section draft must not look like a new upload.

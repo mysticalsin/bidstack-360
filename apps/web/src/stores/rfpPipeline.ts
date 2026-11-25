@@ -66,6 +66,14 @@ interface RfpPipelineState {
   // Actions
   setOrchestrationId: (id: string) => void;
   setBidWorkspaceId: (id: string) => void;
+  // Paint a saved run before SSE connects. Does not set lastEventAt, so the
+  // stream's first frame (the row's updatedAt) is still applied.
+  seedResume: (seed: {
+    bidWorkspaceId: string;
+    orchestrationId: string;
+    stage: PipelineStage;
+    progress: number;
+  }) => void;
   setUpload: (
     partial: Partial<Pick<RfpPipelineState, 'uploadProgress' | 'isUploading' | 'uploadError'>>,
   ) => void;
@@ -87,6 +95,16 @@ export const useRfpPipelineStore = create<RfpPipelineState>((set) => ({
   uploadError: null,
   setOrchestrationId: (id) => set({ orchestrationId: id }),
   setBidWorkspaceId: (id) => set({ bidWorkspaceId: id }),
+  seedResume: (seed) =>
+    set((s) => {
+      if (s.orchestrationId || s.isUploading || s.stage !== 'idle') return s;
+      return {
+        bidWorkspaceId: seed.bidWorkspaceId,
+        orchestrationId: seed.orchestrationId,
+        stage: seed.stage,
+        progress: seed.progress,
+      };
+    }),
   setUpload: (partial) => set(partial),
   applyEvent: (event) =>
     set((s) => {

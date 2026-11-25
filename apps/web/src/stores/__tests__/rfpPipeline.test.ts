@@ -234,6 +234,51 @@ describe('rfpPipelineStore — reset()', () => {
 // setOrchestrationId / setBidWorkspaceId
 // ---------------------------------------------------------------------------
 
+describe('rfpPipelineStore — seedResume', () => {
+  it('paints the saved stage and still accepts the next SSE frame', () => {
+    // WHY: lastEventAt stays empty so a frame whose updatedAt is the row we
+    // already restored is not discarded as a replay.
+    getState().seedResume({
+      bidWorkspaceId: 'ws-1',
+      orchestrationId: 'orch-1',
+      stage: 'awaiting_approval',
+      progress: 100,
+    });
+
+    expect(getState().stage).toBe('awaiting_approval');
+    expect(getState().progress).toBe(100);
+    expect(getState().lastEventAt).toBeNull();
+    expect(getState().events).toHaveLength(0);
+
+    getState().applyEvent(
+      makeEvent('section_drafting', {
+        message: 'Still drafting',
+        timestamp: '2026-11-25T12:00:00.000Z',
+        progress: 60,
+      }),
+    );
+
+    expect(getState().stage).toBe('section_drafting');
+    expect(getState().events).toHaveLength(1);
+    expect(getState().lastEventAt).toBe('2026-11-25T12:00:00.000Z');
+  });
+
+  it('does not replace a run that is already on screen', () => {
+    getState().setOrchestrationId('orch-live');
+    getState().applyEvent(makeEvent('qa_review', { progress: 80 }));
+
+    getState().seedResume({
+      bidWorkspaceId: 'ws-other',
+      orchestrationId: 'orch-old',
+      stage: 'awaiting_approval',
+      progress: 100,
+    });
+
+    expect(getState().orchestrationId).toBe('orch-live');
+    expect(getState().stage).toBe('qa_review');
+  });
+});
+
 describe('rfpPipelineStore — setters', () => {
   it('stores the orchestration ID', () => {
     getState().setOrchestrationId('orch-001');

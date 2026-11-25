@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { PresenceAvatars } from '@/components/presence/PresenceAvatars';
-import { useRfpPipeline } from '@/hooks/rfp/useRfpPipeline';
+import { resumePipelineView, useRfpPipeline } from '@/hooks/rfp/useRfpPipeline';
 import { useRfpLatestOrchestration, RESUMABLE_STATES } from '@/hooks/rfp/useRfpLatestOrchestration';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { useRfpDraft } from '@/hooks/rfp/useRfpDraft';
@@ -52,8 +52,7 @@ export function RfpPipelinePage() {
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
   const orchestrationId = useRfpPipelineStore((s) => s.orchestrationId);
   const isUploading = useRfpPipelineStore((s) => s.isUploading);
-  const setOrchestrationId = useRfpPipelineStore((s) => s.setOrchestrationId);
-  const setBidWorkspaceId = useRfpPipelineStore((s) => s.setBidWorkspaceId);
+  const seedResume = useRfpPipelineStore((s) => s.seedResume);
   const reset = useRfpPipelineStore((s) => s.reset);
 
   const { query: draftQuery } = useRfpDraft(bidWorkspaceId);
@@ -82,16 +81,35 @@ export function RfpPipelinePage() {
 
   // Resume after a refresh: seed the store from the opportunity's latest
   // orchestration so a running pipeline / pending approval picks up where it
-  // left off instead of reverting to the upload zone. Guarded so it never
-  // clobbers a fresh upload already in flight, and only for resumable states.
+  // left off instead of reverting to the upload zone. The saved state is
+  // painted immediately. SSE still owns later frames because seedResume
+  // leaves lastEventAt empty. Guarded so it never clobbers a fresh upload
+  // already in flight, and only for resumable states.
   useEffect(() => {
     if (!opportunityId || orchestrationId || isUploading) return;
     const o = latest?.orchestration;
-    if (o && RESUMABLE_STATES.has(o.state)) {
-      setBidWorkspaceId(opportunityId);
-      setOrchestrationId(o.id);
-    }
-  }, [latest, opportunityId, orchestrationId, isUploading, setBidWorkspaceId, setOrchestrationId]);
+    if (!o || !RESUMABLE_STATES.has(o.state)) return;
+    const view = resumePipelineView(o.state, o.currentPhase);
+    seedResume({
+      bidWorkspaceId: opportunityId,
+      orchestrationId: o.id,
+      stage: view.stage,
+      progress: view.progress,
+    });
+  }, [latest, opportunityId, orchestrationId, isUploading, seedResume]);
+
+  // The effect above commits the stage after paint. Until that commit, the
+  // store is still idle, which is the upload zone. Use the saved run for
+  // this render so the drop zone is not offered on a bid that is already
+  // in review or still drafting.
+  const saved =
+    stage === 'idle' && !orchestrationId && !isUploading ? (latest?.orchestration ?? null) : null;
+  const savedView =
+    saved && RESUMABLE_STATES.has(saved.state)
+      ? resumePipelineView(saved.state, saved.currentPhase)
+      : null;
+  const visibleStage = savedView?.stage ?? stage;
+  const visibleProgress = savedView?.progress ?? progress;
 
   return (
     <div className="space-y-6">
@@ -135,13 +153,15 @@ export function RfpPipelinePage() {
       </header>
 
       {/* Stage progress bar (only shown once pipeline has started) */}
-      {stage !== 'idle' && stage !== 'failed' && <PipelineProgress currentStage={stage} />}
+      {visibleStage !== 'idle' && visibleStage !== 'failed' && (
+        <PipelineProgress currentStage={visibleStage} />
+      )}
 
       {/* Live crew board — the role-based agents working this RFP, from the
           moment it starts running through review and final approval. */}
-      {(isActiveProcessing(stage) || stage === 'awaiting_approval' || stage === 'approved') && (
-        <RfpCrewBoard />
-      )}
+      {(isActiveProcessing(visibleStage) ||
+        visibleStage === 'awaiting_approval' ||
+        visibleStage === 'approved') && <RfpCrewBoard />}
 
       {/* Stage-conditional panels */}
 
@@ -156,18 +176,18 @@ export function RfpPipelinePage() {
       )}
 
       {/* 1. Idle — show upload zone */}
-      {stage === 'idle' && !resolvingResume && <RfpUploadZone />}
+      {visibleStage === 'idle' && !resolvingResume && <RfpUploadZone />}
 
       {/* 2. Uploading — show progress bar */}
-      {stage === 'queued' && <RfpUploadProgress />}
+      {visibleStage === 'queued' && <RfpUploadProgress />}
 
       {/* 3-8. Active processing — stage card with event log */}
-      {isActiveProcessing(stage) && (
-        <PipelineStageCard stage={stage} progress={progress} events={events} />
+      {isActiveProcessing(visibleStage) && (
+        <PipelineStageCard stage={visibleStage} progress={visibleProgress} events={events} />
       )}
 
       {/* 9. Awaiting approval — show full review suite */}
-      {stage === 'awaiting_approval' && (
+      {visibleStage === 'awaiting_approval' && (
         <div className="space-y-4">
           <RequirementsList />
           <StoryMatchPanel />
@@ -178,7 +198,7 @@ export function RfpPipelinePage() {
       )}
 
       {/* 10. Approved — final confirmation */}
-      {stage === 'approved' && (
+      {visibleStage === 'approved' && (
         <div
           role="status"
           className="rounded-2xl border border-[var(--success)] bg-[var(--success-tint)] p-6 text-center"
@@ -196,7 +216,7 @@ export function RfpPipelinePage() {
       )}
 
       {/* 11. Failed — error banner with retry */}
-      {stage === 'failed' && <PipelineErrorBanner error={error} />}
+      {visibleStage === 'failed' && <PipelineErrorBanner error={error} />}
     </div>
   );
 }
