@@ -34,6 +34,7 @@ import { DuplicatesDialog } from '@/components/company/DuplicatesDialog';
 import { CompanyIntelView, IntelDirection } from '@bidstack/shared';
 
 import { CompanyRow } from './companiesPage/CompanyRow';
+import { visibleIndustryCount } from './companiesPage/company-list-industries';
 import { INTEL_COLUMNS } from './companiesPage/IntelCells';
 import { IntelImportProgress } from './companiesPage/IntelImportProgress';
 import { IntelViewsBar } from './companiesPage/IntelViewsBar';
@@ -152,7 +153,7 @@ export function CompaniesPage() {
 
   const stats = useMemo(() => {
     const withDomain = items.filter((company) => Boolean(company.domain)).length;
-    const withIndustry = items.filter((company) => Boolean(company.industry)).length;
+    const industries = visibleIndustryCount(items.map((company) => company.industry));
     const countries = new Set(items.map((company) => company.countryCode).filter(Boolean));
     return [
       {
@@ -167,8 +168,8 @@ export function CompaniesPage() {
       },
       {
         label: t('companies.stats.industriesLabel', 'Industries'),
-        value: withIndustry.toLocaleString(),
-        detail: t('companies.stats.industriesDetail', 'classified profiles'),
+        value: industries.toLocaleString(),
+        detail: t('companies.stats.industriesDetail', 'on this page'),
       },
       {
         label: t('companies.stats.countriesLabel', 'Countries'),
