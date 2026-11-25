@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
@@ -22,6 +22,8 @@ import {
   MEMBER_SETTINGS,
   NAV_SECTIONS,
   isNavItemVisible,
+  navItemOwnsPath,
+  navSectionOwnsPath,
   type NavItem,
   type NavSection,
 } from './navConfig';
@@ -37,9 +39,7 @@ type Badges = { openBids: number; overdueTasks: number };
 // disclosure and never participates in the accordion.
 function findSectionKeyForPath(pathname: string): string | undefined {
   return NAV_SECTIONS.find(
-    (section) =>
-      section.key !== 'home' &&
-      section.items.some((it) => pathname === it.to || pathname.startsWith(`${it.to}/`)),
+    (section) => section.key !== 'home' && navSectionOwnsPath(section, pathname),
   )?.key;
 }
 
@@ -230,9 +230,7 @@ function SidebarSection({
   // Accordion: a section is collapsed by default unless it holds the active
   // route — so only one section's items show at once and the rail never needs
   // an internal scroll. An explicit user toggle (override) wins and persists.
-  const isActiveSection = section.items.some(
-    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
-  );
+  const isActiveSection = navSectionOwnsPath(section, location.pathname);
   const sectionCollapsed = override === undefined ? !isActiveSection : override;
 
   if (collapsed) {
@@ -269,11 +267,17 @@ function SidebarSection({
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+              const current = navItemOwnsPath(item, location.pathname);
               return (
-                <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  aria-current={current ? 'page' : undefined}
+                  className="sb-flyout-item"
+                >
                   <span>{t(item.labelKey, item.label)}</span>
                   {badge > 0 && <span className="sb-badge">{badge}</span>}
-                </NavLink>
+                </Link>
               );
             })}
           </div>
@@ -346,33 +350,15 @@ function SidebarItem({
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const prefetch = () => prefetchRoute(item.to);
-
-  const isActive = useMemo(() => {
-    try {
-      const toUrl = new URL(item.to, window.location.origin);
-      const toPath = toUrl.pathname;
-      const toTab = toUrl.searchParams.get('tab');
-
-      const currentTab = new URLSearchParams(location.search).get('tab');
-
-      if (location.pathname !== toPath) return false;
-
-      if (toTab) {
-        return currentTab === toTab;
-      } else {
-        return !currentTab || currentTab === 'overview';
-      }
-    } catch {
-      return false;
-    }
-  }, [location, item.to]);
+  // Link, not NavLink: NavLink drops aria-current unless its own `to` matches,
+  // so the board at /pipeline could never light the Opportunities door.
+  const current = navItemOwnsPath(item, location.pathname);
 
   const link = (
-    <NavLink
+    <Link
       to={item.to}
-      end={item.end}
-      aria-current={isActive ? 'page' : undefined}
-      className={cn('sb-item', isActive && 'is-active')}
+      aria-current={current ? 'page' : undefined}
+      className={cn('sb-item', current && 'is-active')}
       aria-label={label}
       title={collapsed ? undefined : label}
       onMouseEnter={prefetch}
@@ -382,7 +368,7 @@ function SidebarItem({
       <Icon name={item.icon} size={16} />
       <span>{label}</span>
       {badge > 0 && <span className="sb-badge">{badge}</span>}
-    </NavLink>
+    </Link>
   );
   // Tooltips only when the label is hidden (collapsed mode) — otherwise
   // the label itself is the affordance and a tooltip would be redundant.
