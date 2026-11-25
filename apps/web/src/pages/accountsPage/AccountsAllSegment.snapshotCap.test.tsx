@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CrmCompany } from '@bidstack/shared';
+import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
 import { AccountsAllSegment } from './AccountsAllSegment';
 
@@ -128,11 +128,29 @@ function company(i: number): CrmCompany {
   } as CrmCompany;
 }
 
-function setDashboard(companyCount: number) {
+function openDeal(companyId: string, amountMicros: number): CrmDeal {
+  return {
+    id: `deal-${companyId}`,
+    source: 'external_crm',
+    companyId,
+    companyName: null,
+    name: 'Open bid',
+    stage: 'proposal',
+    amountMicros,
+    currencyCode: 'EUR',
+    probability: 100,
+    closeDate: null,
+    ownerId: null,
+    ownerName: null,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function setDashboard(companyCount: number, deals: CrmDeal[] = []) {
   dashboardState.current = {
     data: {
       companies: Array.from({ length: companyCount }, (_v, i) => company(i)),
-      deals: [],
+      deals,
       providerHealth: [],
     },
     isLoading: false,
@@ -222,5 +240,73 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     expect(
       screen.getByRole('link', { name: /import accounts from csv/i }),
     ).toBeTruthy();
+  });
+});
+
+// Health bands on the portfolio cockpit (Strong / Good / Watch / At risk).
+// Pipeline micros at probability 100: 0 → At risk, 100k → Watch,
+// 500k → Good, 3M → Strong. See deriveAccount.
+const WATCH_MICROS = 100_000_000_000;
+const GOOD_MICROS = 500_000_000_000;
+const STRONG_MICROS = 3_000_000_000_000;
+
+function setHealthPortfolio() {
+  setDashboard(4, [
+    openDeal('c-1', WATCH_MICROS),
+    openDeal('c-2', GOOD_MICROS),
+    openDeal('c-3', STRONG_MICROS),
+  ]);
+}
+
+describe('AccountsAllSegment health bands', () => {
+  // WHY: those four counts are the way a salesperson picks who to work.
+  // They sit in the same summary as the segment controls, which do filter.
+  // If a band is only a painted bar, pressing it leaves the full portfolio
+  // on screen. The other bands must keep their counts so the next band is
+  // one press, not a reset followed by a guess.
+  beforeEach(() => {
+    dashboardState.current = null;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  function healthGroup() {
+    // Scoped so "Watch" here is the health band, not the segment button of the same name.
+    return within(screen.getByRole('group', { name: 'Account health' }));
+  }
+
+  it('narrows the account cards to the health band that was pressed', () => {
+    setHealthPortfolio();
+    renderSegment();
+
+    expect(screen.getAllByTestId('account-card')).toHaveLength(4);
+
+    fireEvent.click(healthGroup().getByRole('button', { name: /^Strong\b/ }));
+
+    expect(screen.getAllByTestId('account-card')).toHaveLength(1);
+    expect(healthGroup().getByRole('button', { name: /^Strong\b/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(healthGroup().getByRole('button', { name: /^Good\b/ }).textContent).toMatch(/1/);
+    expect(healthGroup().getByRole('button', { name: /^Watch\b/ }).textContent).toMatch(/1/);
+    expect(healthGroup().getByRole('button', { name: /^At risk\b/ }).textContent).toMatch(/1/);
+
+    fireEvent.click(healthGroup().getByRole('button', { name: /^Strong\b/ }));
+
+    expect(screen.getAllByTestId('account-card')).toHaveLength(4);
+    expect(healthGroup().getByRole('button', { name: /^Strong\b/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('clears the health band from Reset with the other filters', () => {
+    setHealthPortfolio();
+    renderSegment();
+
+    fireEvent.click(healthGroup().getByRole('button', { name: /^At risk\b/ }));
+    expect(screen.getAllByTestId('account-card')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+
+    expect(screen.getAllByTestId('account-card')).toHaveLength(4);
+    expect(healthGroup().getByRole('button', { name: /^At risk\b/ })).toHaveAttribute('aria-pressed', 'false');
   });
 });
