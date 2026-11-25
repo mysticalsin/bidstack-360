@@ -11,6 +11,8 @@ import { useImportMeetingNotes } from '@/hooks/useNotes';
 import { springSnap, springSoft } from '@/lib/motion';
 import type { MeetingNotesImportResponse } from '@bidstack/shared';
 
+import { meetingImportRecordBadge, meetingImportSavedLine } from './meeting-import-saved-line';
+
 interface Props {
   accountId: string | undefined;
   companyName: string | undefined;
@@ -58,9 +60,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
       });
       setResult(next);
       toast.success(t('crm.meetingImport.toastTitle', 'Meeting notes imported'), {
-        description: t('crm.meetingImport.toastDescription', '{{count}} records were created or refreshed.', {
-          count: totalCreated(next),
-        }),
+        description: t('crm.meetingImport.toastDescription', meetingImportSavedLine(next.created)),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('crm.meetingImport.importFailed', 'Import failed'));
@@ -167,9 +167,7 @@ export function MeetingNotesImportDialog({ accountId, companyName, domain, trigg
                     </strong>
                   </div>
                   <Badge tone="jade">
-                    {t('crm.meetingImport.recordsBadge', '{{count}} records', {
-                      count: totalCreated(result),
-                    })}
+                    {t('crm.meetingImport.recordsBadge', meetingImportRecordBadge(result.created))}
                   </Badge>
                 </div>
 
@@ -244,12 +242,3 @@ function SignalSection({ title, empty, items }: { title: string; empty: string; 
   );
 }
 
-function totalCreated(result: MeetingNotesImportResponse): number {
-  return (
-    result.created.contacts +
-    result.created.risks +
-    result.created.compliance +
-    result.created.tasks +
-    result.created.techStackItems
-  );
-}
