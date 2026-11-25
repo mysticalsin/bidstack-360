@@ -6,8 +6,9 @@ import type { AccountWatchdog } from '@/hooks/useAccountWatchdog';
 
 const state: { data?: AccountWatchdog; isLoading: boolean; isError: boolean } = { isLoading: false, isError: false };
 const mutate = vi.fn();
+const refetch = vi.fn();
 vi.mock('@/hooks/useAccountWatchdog', () => ({
-  useAccountWatchdog: () => ({ ...state, refetch: vi.fn() }),
+  useAccountWatchdog: () => ({ ...state, refetch }),
   useSetWatchEventStatus: () => ({ mutate, isError: false }),
 }));
 const perms = { write: true };
@@ -31,7 +32,15 @@ const base: AccountWatchdog = {
 };
 
 describe('AccountWatchdogSection', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    state.data = undefined;
+    state.isLoading = false;
+    state.isError = false;
+    mi.data = undefined;
+    enr.data = undefined;
+    perms.write = true;
+  });
   it('explains an empty feed with the watched identifiers', () => {
     state.data = base;
     render(<AccountWatchdogSection companyId="c1" />);
@@ -44,15 +53,49 @@ describe('AccountWatchdogSection', () => {
     expect(screen.getByText('No related history yet')).toBeTruthy();
   });
 
-  it('always shows previous projects and related history, even before the watchdog loads', () => {
+  it('holds projects, history, and results dates until the watchdog read settles', () => {
+    // An in-flight read is not an empty account. "No closed projects" while
+    // the book is still loading sends a salesperson looking for work that
+    // may already be on the record.
     state.data = undefined;
     state.isLoading = true;
+    state.isError = false;
     render(<AccountWatchdogSection companyId="c1" />);
     expect(screen.getByRole('heading', { name: 'Previous projects with us' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Related history' })).toBeTruthy();
-    expect(screen.getByText('No closed projects yet')).toBeTruthy();
-    expect(screen.getByText('No related history yet')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Upcoming results' })).toBeTruthy();
+    expect(screen.getByText('Loading closed projects')).toBeTruthy();
+    expect(screen.getByText('Loading related history')).toBeTruthy();
+    expect(screen.getByText('Loading results dates')).toBeTruthy();
+    expect(screen.queryByText('No closed projects yet')).toBeNull();
+    expect(screen.queryByText('No related history yet')).toBeNull();
+    expect(screen.queryByText('No results dates announced')).toBeNull();
+    expect(screen.queryByText('Nothing new in public filings')).toBeNull();
+  });
+
+  it('says the watchdog read failed instead of describing an empty account', () => {
+    // A failed read is not "no results" and not "no history". Those sentences
+    // are only true after a successful empty payload.
+    state.data = undefined;
     state.isLoading = false;
+    state.isError = true;
+    refetch.mockClear();
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.queryByText('No closed projects yet')).toBeNull();
+    expect(screen.queryByText('No related history yet')).toBeNull();
+    expect(screen.queryByText('No results dates announced')).toBeNull();
+    expect(screen.queryByText('Nothing new in public filings')).toBeNull();
+    expect(screen.getByText("Couldn't load signals")).toBeTruthy();
+    expect(screen.getByText("Couldn't load results dates")).toBeTruthy();
+    expect(screen.getByText("Couldn't load closed projects")).toBeTruthy();
+    expect(screen.getByText("Couldn't load related history")).toBeTruthy();
+    const retries = screen.getAllByRole('button', { name: /Retry loading/ });
+    expect(retries).toHaveLength(4);
+    for (const button of retries) {
+      expect(button.className).toContain('wd-retry');
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading closed projects' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it('lists meetings, MSAs and signals in related history', () => {
@@ -115,6 +158,38 @@ describe('AccountWatchdogSection', () => {
     id: `e${n}`, source: 'sec_edgar', kind: 'RESTRUCTURING', title: `8-K Item 2.05 exit costs ${n}`,
     summary: `Restructuring announced ${n}.`, sourceUrl: `https://www.sec.gov/${n}`, occurredAt: '2026-10-20T00:00:00Z',
     implication, implicationRationale: null, severity: 4, status: 'NEW',
+  });
+
+  it('keeps the last watchdog record when a later refresh fails', () => {
+    // A refresh that fails after a payload arrived must not replace the
+    // account's projects, results, or signals with an error empty-state.
+    state.data = {
+      ...base,
+      events: [ev(1)],
+      earnings: [
+        {
+          id: 'earn-1',
+          fiscalPeriod: 'FY2026-Q3',
+          expectedAt: '2026-11-20T00:00:00Z',
+          confirmed: true,
+          source: 'sec',
+          sourceUrl: 'https://example.test/earnings',
+        },
+      ],
+      pastProjects: [
+        { id: 'p1', name: 'Core banking RFP', outcome: 'won', valueMicros: '3000000000000', closedAt: '2026-03-01T00:00:00Z' },
+      ],
+      history: [{ id: 'op:p1', at: '2026-03-01T00:00:00Z', type: 'opportunity', title: 'Core banking RFP', detail: 'Closed won' }],
+    };
+    state.isLoading = false;
+    state.isError = true;
+    render(<AccountWatchdogSection companyId="c1" />);
+    expect(screen.getByText('1 won, 0 lost')).toBeTruthy();
+    expect(screen.getByText('FY2026 Q3 results')).toBeTruthy();
+    expect(screen.getAllByText('Core banking RFP').length).toBeGreaterThan(0);
+    expect(screen.queryByText("Couldn't load closed projects")).toBeNull();
+    expect(screen.queryByText("Couldn't load signals")).toBeNull();
+    expect(screen.getByRole('button', { name: /exit costs 1/ })).toBeTruthy();
   });
 
   it('shows the top 3 signals as one line each with a single pill, details on click', () => {

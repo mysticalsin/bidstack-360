@@ -143,3 +143,7 @@
 @media (max-width: 640px) { .wd-seg button { min-height: 44px; } }
 /* Dark: text accents use the foreground green (--brand-deep), not the fill. */
 [data-theme='dark'] .wd-more, [data-theme='dark'] .wd-link, [data-theme='dark'] .wd-row-btn:hover .wd-row-title { color: var(--brand-deep, #3fbe93); }
+/* Retry is an action on a failed read. Primary ink clears 4.5:1; the brand
+   green used by ordinary wd-more links does not on every surface. */
+.wd-more.wd-retry,
+[data-theme='dark'] .wd-more.wd-retry { color: var(--fg-primary, #171717); }

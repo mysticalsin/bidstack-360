@@ -24,6 +24,7 @@ import { mergeMeetingSignals } from '@/lib/meeting-intel/watchdog';
 import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
 import { mergeEnrichmentSignals } from '@/lib/enrichment/aggregate';
 import { daysUntil } from '@/lib/format';
+import { watchdogPanelState, type WatchdogPanel } from './watchdog-read';
 
 const PILL: Record<WatchImplication, string> = {
   OPPORTUNITY: 'Opportunity',
@@ -266,7 +267,45 @@ function Results({ data }: { data: AccountWatchdog }) {
 
 const amount = (micros: bigint) => formatUnspecifiedAmount(Number(micros / 1_000_000n));
 
-function TrackRecord({ data }: { data: AccountWatchdog }) {
+function ReadHold({
+  panel,
+  loadingLabel,
+  errorTitle,
+  retryLabel,
+  onRetry,
+}: {
+  panel: Exclude<WatchdogPanel, 'ready'>;
+  loadingLabel: string;
+  errorTitle: string;
+  retryLabel: string;
+  onRetry: () => void;
+}) {
+  if (panel === 'loading') {
+    return (
+      <p className="wd-empty" role="status">
+        <span>{loadingLabel}</span>
+      </p>
+    );
+  }
+  return (
+    <p className="wd-empty" role="alert">
+      <span>{errorTitle}</span>
+      <button type="button" className="wd-more wd-retry" onClick={onRetry} aria-label={retryLabel}>
+        Retry
+      </button>
+    </p>
+  );
+}
+
+function TrackRecord({
+  data,
+  panel,
+  onRetry,
+}: {
+  data: AccountWatchdog;
+  panel: WatchdogPanel;
+  onRetry: () => void;
+}) {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const projectsId = useId();
   const won = data.pastProjects.filter((p) => p.outcome === 'won');
@@ -287,7 +326,15 @@ function TrackRecord({ data }: { data: AccountWatchdog }) {
   return (
     <section className="wd-surface" aria-labelledby="wd-track-h">
       <h2 id="wd-track-h" className="wd-h">Previous projects with us</h2>
-      {data.pastProjects.length === 0 ? (
+      {panel !== 'ready' ? (
+        <ReadHold
+          panel={panel}
+          loadingLabel="Loading closed projects"
+          errorTitle="Couldn't load closed projects"
+          retryLabel="Retry loading closed projects"
+          onRetry={onRetry}
+        />
+      ) : data.pastProjects.length === 0 ? (
         <p className="wd-empty"><span>No closed projects yet</span>Won and lost bids appear here.</p>
       ) : (
         <div className="wd-track-grid">
@@ -353,7 +400,15 @@ const HISTORY_TYPE: Record<AccountWatchdog['history'][number]['type'], string> =
   signal: 'Signal',
 };
 
-function RelatedHistory({ data }: { data: AccountWatchdog }) {
+function RelatedHistory({
+  data,
+  panel,
+  onRetry,
+}: {
+  data: AccountWatchdog;
+  panel: WatchdogPanel;
+  onRetry: () => void;
+}) {
   const [all, setAll] = useState(false);
   const listId = useId();
   const shown = all ? data.history : data.history.slice(0, 8);
@@ -362,7 +417,15 @@ function RelatedHistory({ data }: { data: AccountWatchdog }) {
       <header className="wd-head">
         <h2 id="wd-hist-h" className="wd-h">Related history</h2>
       </header>
-      {data.history.length === 0 ? (
+      {panel !== 'ready' ? (
+        <ReadHold
+          panel={panel}
+          loadingLabel="Loading related history"
+          errorTitle="Couldn't load related history"
+          retryLabel="Retry loading related history"
+          onRetry={onRetry}
+        />
+      ) : data.history.length === 0 ? (
         <p className="wd-empty">
           <span>No related history yet</span>Meetings, MSAs and signals appear here.
         </p>
@@ -408,6 +471,12 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
     [raw.data, meetings.data, enrichment.data, companyId],
   );
   const q = { ...raw, data };
+  const panel = watchdogPanelState({
+    hasPayload: Boolean(q.data),
+    isLoading: q.isLoading,
+    isError: q.isError,
+  });
+  const retry = () => void q.refetch();
   const shown = q.data ?? emptyWatchdog(companyId);
   const checked = q.data?.monitoring.lastCheckedAt;
   const fresh = q.data?.events.filter((e) => e.status === 'NEW').length ?? 0;
@@ -424,13 +493,19 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
               </span>
             ) : null}
           </header>
-          {q.isLoading ? (
-            <div aria-busy="true"><div className="wd-skel" /><div className="wd-skel" /><div className="wd-skel" /></div>
-          ) : q.isError ? (
-            <p className="wd-empty" role="alert">
-              <span>Couldn&apos;t load signals</span>
-              <button type="button" className="wd-more" onClick={() => void q.refetch()}>Retry</button>
-            </p>
+          {panel === 'loading' ? (
+            <div aria-busy="true">
+              <p className="wd-empty" role="status"><span>Loading signals</span></p>
+              <div className="wd-skel" /><div className="wd-skel" /><div className="wd-skel" />
+            </div>
+          ) : panel === 'error' ? (
+            <ReadHold
+              panel="error"
+              loadingLabel="Loading signals"
+              errorTitle="Couldn't load signals"
+              retryLabel="Retry loading signals"
+              onRetry={retry}
+            />
           ) : q.data ? (
             <>
               {q.data.monitoring.lastError ? (
@@ -446,11 +521,21 @@ export function AccountWatchdogSection({ companyId }: { companyId: string }) {
           <header className="wd-head">
             <h2 id="wd-cal-h" className="wd-h">Upcoming results</h2>
           </header>
-          {q.isLoading ? <div className="wd-skel" /> : <Results data={shown} />}
+          {panel === 'ready' ? (
+            <Results data={shown} />
+          ) : (
+            <ReadHold
+              panel={panel}
+              loadingLabel="Loading results dates"
+              errorTitle="Couldn't load results dates"
+              retryLabel="Retry loading results dates"
+              onRetry={retry}
+            />
+          )}
         </section>
       </div>
-      <TrackRecord data={shown} />
-      <RelatedHistory data={shown} />
+      <TrackRecord data={shown} panel={panel} onRetry={retry} />
+      <RelatedHistory data={shown} panel={panel} onRetry={retry} />
     </div>
   );
 }
