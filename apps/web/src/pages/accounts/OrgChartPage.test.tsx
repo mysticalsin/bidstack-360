@@ -71,7 +71,7 @@ describe('OrgChartPage', () => {
     expect(await screen.findByText('Sample')).toBeTruthy();
     const mj = await node('Michael Johnson');
     expect(mj.dataset.met).toBe('true');
-    expect((await node('Alex Morgan')).dataset.dim).toBe('true'); // placeholder, not met
+    expect((await node('Sample Chief Executive Officer')).dataset.dim).toBe('true'); // placeholder, not met
     fireEvent.click(mj);
     const panel = await screen.findByTestId('orgchart-panel');
     expect(within(panel).getByText('Cloud cost review with the CIO')).toBeTruthy();
@@ -83,7 +83,7 @@ describe('OrgChartPage', () => {
     // Sample: an unmet Head of (director) is a gap.
     const sample = renderPage();
     expect(await screen.findByText('Sample')).toBeTruthy();
-    expect((await node('Samuel Reyes')).dataset.gap).toBe('true');
+    expect((await node('Sample Head of Group Treasury')).dataset.gap).toBe('true');
     sample.unmount();
     // Live chart: the API list (c_level, vp, director) drives both the page and the card.
     const ceo = srv.add({ name: 'Ana Silva', title: 'Chief Executive Officer', seniority: 'c_level', meetingCount: 1, lastMetAt: '2026-10-25T10:00:00Z' }, null);
@@ -169,7 +169,7 @@ describe('OrgChartPage', () => {
 
   it('keyboard: arrows move between people and Enter opens the panel', async () => {
     renderPage();
-    const ceo = (await node('Alex Morgan')).closest<HTMLElement>('.react-flow__node')!;
+    const ceo = (await node('Sample Chief Executive Officer')).closest<HTMLElement>('.react-flow__node')!;
     ceo.focus();
     fireEvent.keyDown(ceo, { key: 'ArrowDown' });
     await waitFor(() => expect(document.activeElement?.querySelector('[data-testid="orgchart-node"]')).toBeTruthy());

@@ -28,32 +28,38 @@ export function bestParent(nodes: OrgNode[], rootId: string | null, p: { title: 
   return cands[0]?.id ?? rootId;
 }
 
-const SAMPLE: Array<[string, string, SeniorityLevel, string | null, number | null]> = [
-  // name, title, seniority, region, parent index
-  ['Alex Morgan', 'Chief Executive Officer', 'c_level', 'CA', null],
-  ['Priya Raman', 'Chief Financial Officer', 'c_level', 'CA', 0],
-  ['Daniel Okafor', 'Chief Operating Officer', 'c_level', 'CA', 0],
-  ['Chief Information Officer', 'Chief Information Officer', 'c_level', 'CA', 0],
-  ['Laura Chen', 'Chief Risk Officer', 'c_level', 'CA', 0],
-  ['Marc Dubois', 'Chief Commercial Officer', 'c_level', 'CA', 0],
-  ['Hannah Weiss', 'VP Data & Analytics', 'vp', 'CA', 3],
-  ['Samuel Reyes', 'Head of Group Treasury', 'director', 'CA', 1],
-  ['Ines Duarte', 'VP Operations, Europe', 'vp', 'GB', 2],
-  ['Kenji Watanabe', 'Head of Distribution, US', 'director', 'US', 5],
+const SAMPLE: Array<[string, SeniorityLevel, string | null, number | null]> = [
+  // title, seniority, region, parent index
+  ['Chief Executive Officer', 'c_level', 'CA', null],
+  ['Chief Financial Officer', 'c_level', 'CA', 0],
+  ['Chief Operating Officer', 'c_level', 'CA', 0],
+  ['Chief Information Officer', 'c_level', 'CA', 0],
+  ['Chief Risk Officer', 'c_level', 'CA', 0],
+  ['Chief Commercial Officer', 'c_level', 'CA', 0],
+  ['VP Data & Analytics', 'vp', 'CA', 3],
+  ['Head of Group Treasury', 'director', 'CA', 1],
+  ['VP Operations, Europe', 'vp', 'GB', 2],
+  ['Head of Distribution, US', 'director', 'US', 5],
 ];
+
+/** Unmet Sample slots are roles. The name says so, so it cannot be read as a contact. */
+function sampleSlotName(title: string): string {
+  return `Sample ${title}`;
+}
 
 /**
  * A Sample structure for an account nobody has charted yet: a typical
  * executive backbone, with every person we have actually met placed in it.
- * Met people keep their real names and titles; the rest are labelled Sample.
+ * Met people keep their real names and titles. An unmet slot is named
+ * "Sample <role>".
  */
 export function sampleChart(companyId: string, people: PersonCoverage[]): OrgChart {
   let nodes: OrgNode[] = [];
   const ids: string[] = [];
-  for (const [name, title, seniority, region, parent] of SAMPLE) {
+  for (const [title, seniority, region, parent] of SAMPLE) {
     const id = `s-${ids.length}`;
     ids.push(id);
-    nodes.push({ id, parentId: parent === null ? null : ids[parent]!, name, title, photoUrl: null, seniority, region, contactId: null, email: null, ownerName: null, source: 'sample' });
+    nodes.push({ id, parentId: parent === null ? null : ids[parent]!, name: sampleSlotName(title), title, photoUrl: null, seniority, region, contactId: null, email: null, ownerName: null, source: 'sample' });
   }
   const rootId = ids[0]!;
   const result = mergePeople({ companyId, rootId, version: 0, updatedAt: null, updatedBy: null, sample: true, nodes }, people, 'meetings');
@@ -72,8 +78,16 @@ export function mergePeople(chart: OrgChart, people: Array<Pick<PersonCoverage, 
   for (const p of ordered) {
     const key = personKey(p);
     if (have.has(key) || have.has(personKey({ contactId: null, name: p.name }))) continue;
-    // A placeholder with exactly this title (e.g. the sample CIO) becomes this person.
-    const slot = nodes.find((n) => n.source === 'sample' && n.name === n.title && p.title && n.title?.toLowerCase() === p.title.toLowerCase());
+    // A Sample role slot with this title becomes this person. The name is
+    // "Sample <role>" (or, on older drafts, the title itself), so matching
+    // the title is what frees the slot. A filled slot is no longer source sample.
+    const slot = nodes.find(
+      (n) =>
+        n.source === 'sample' &&
+        n.contactId == null &&
+        Boolean(p.title) &&
+        n.title?.toLowerCase() === p.title?.toLowerCase(),
+    );
     if (slot) {
       nodes = nodes.map((n) => (n.id === slot.id ? { ...n, name: p.name, contactId: p.contactId, region: p.region ?? n.region, source } : n));
     } else {
