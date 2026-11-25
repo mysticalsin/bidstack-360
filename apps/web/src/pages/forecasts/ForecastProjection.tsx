@@ -28,6 +28,8 @@ import { useForecastProjection } from '@/hooks/useForecasts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
+import { forecastProjectionAmount } from './forecast-projection-amount';
+
 type FormatMoney = (micros: number, currency?: string) => string;
 
 export function ForecastProjection() {
@@ -136,7 +138,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
               c.accent ? 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]' : 'text-[var(--fg-primary)]'
             }`}
           >
-            {formatMoneyMicros(c.value, 'EUR')}
+            {c.key === 'weighted' ? forecastProjectionAmount(c.value) : formatMoneyMicros(c.value, 'EUR')}
           </div>
         </div>
       ))}
