@@ -450,6 +450,18 @@ function NotDisclosed({ source }: { source: string }) {
   );
 }
 
+/** A blank line on a sample book was never filed. A real filing that omitted it was. */
+function missingBookFigure(sample: boolean, source: string) {
+  if (sample) {
+    return (
+      <span className="ci-nd" title="Not part of the sample book">
+        Not in sample
+      </span>
+    );
+  }
+  return <NotDisclosed source={source} />;
+}
+
 /** Financials: one row per fiscal year with its source, registry facts and fallback. */
 /** When `company` is given, registry rows get Edit and an empty registry offers Refresh and Add manually. */
 export function FinancialsPanel({ f, company }: { f: AccountFinancialsIntel; company?: { id: string; name: string } }) {
@@ -475,14 +487,16 @@ export function FinancialsPanel({ f, company }: { f: AccountFinancialsIntel; com
               {f.years.map((y) => (
                 <tr key={y.fiscalYear} data-testid={`intel-fin-year-${y.fiscalYear}`}>
                   <th scope="row">FY{y.fiscalYear}</th>
-                  <td>{money(y.revenue, y.currency) ?? <NotDisclosed source={y.source} />}</td>
-                  <td>{y.operatingMargin === null ? <NotDisclosed source={y.source} /> : `${y.operatingMargin.toFixed(1)}%`}</td>
-                  <td>{money(y.capex, y.currency) ?? <NotDisclosed source={y.source} />}</td>
-                  <td>{money(y.rnd, y.currency) ?? <NotDisclosed source={y.source} />}</td>
-                  <td>{money(y.acquisitions, y.currency) ?? <NotDisclosed source={y.source} />}</td>
-                  <td>{y.headcount === null ? <NotDisclosed source={y.source} /> : y.headcount.toLocaleString('en-GB')}</td>
+                  <td>{money(y.revenue, y.currency) ?? missingBookFigure(y.sample, y.source)}</td>
+                  <td>{y.operatingMargin === null ? missingBookFigure(y.sample, y.source) : `${y.operatingMargin.toFixed(1)}%`}</td>
+                  <td>{money(y.capex, y.currency) ?? missingBookFigure(y.sample, y.source)}</td>
+                  <td>{money(y.rnd, y.currency) ?? missingBookFigure(y.sample, y.source)}</td>
+                  <td>{money(y.acquisitions, y.currency) ?? missingBookFigure(y.sample, y.source)}</td>
+                  <td>{y.headcount === null ? missingBookFigure(y.sample, y.source) : y.headcount.toLocaleString('en-GB')}</td>
                   <td>
-                    {safeHref(y.sourceUrl) ? (
+                    {y.sample ? (
+                      'Sample'
+                    ) : safeHref(y.sourceUrl) ? (
                       <a href={safeHref(y.sourceUrl)} target="_blank" rel="noopener noreferrer">
                         {y.source}
                       </a>
