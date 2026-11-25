@@ -282,6 +282,12 @@
     "empty": {
       "title": "Ancora nessuna attività",
       "filteredTitle": "Nessuna attività corrisponde a questo filtro",
+      "todayAheadTitle": "Niente è in scadenza oggi",
+      "overdueClearTitle": "Niente è in ritardo",
+      "nextTomorrow": "Il prossimo è {{title}}, domani.",
+      "nextDays": "Il prossimo è {{title}}, tra {{count}} giorni.",
+      "overdueClearMany": "{{count}} follow-up aperti in questo elenco sono ancora avanti. Il prossimo è {{title}}, tra {{days}} giorni.",
+      "overdueClearManyTomorrow": "{{count}} follow-up aperti in questo elenco sono ancora avanti. Il prossimo è {{title}}, domani.",
       "message": "Crea un follow-up per iniziare."
     },
     "reorder": {

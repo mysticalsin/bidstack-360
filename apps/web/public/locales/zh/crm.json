@@ -282,6 +282,12 @@
     "empty": {
       "title": "暂无任务",
       "filteredTitle": "没有任务匹配此筛选条件",
+      "todayAheadTitle": "今天没有到期",
+      "overdueClearTitle": "没有逾期",
+      "nextTomorrow": "下一个是{{title}}，明天。",
+      "nextDays": "下一个是{{title}}，{{count}}天后。",
+      "overdueClearMany": "此列表还有{{count}}个未完成的跟进。下一个是{{title}}，{{days}}天后。",
+      "overdueClearManyTomorrow": "此列表还有{{count}}个未完成的跟进。下一个是{{title}}，明天。",
       "message": "创建一个跟进以开始。"
     },
     "reorder": {

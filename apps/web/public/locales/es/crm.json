@@ -291,6 +291,12 @@
     "empty": {
       "title": "Aún no hay tareas",
       "filteredTitle": "Ninguna tarea coincide con este filtro",
+      "todayAheadTitle": "Nada vence hoy",
+      "overdueClearTitle": "Nada está atrasado",
+      "nextTomorrow": "Lo siguiente es {{title}}, mañana.",
+      "nextDays": "Lo siguiente es {{title}}, en {{count}} días.",
+      "overdueClearMany": "{{count}} seguimientos abiertos en esta lista siguen por delante. Lo siguiente es {{title}}, en {{days}} días.",
+      "overdueClearManyTomorrow": "{{count}} seguimientos abiertos en esta lista siguen por delante. Lo siguiente es {{title}}, mañana.",
       "message": "Crea un seguimiento para empezar."
     },
     "reorder": {

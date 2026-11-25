@@ -282,6 +282,12 @@
     "empty": {
       "title": "Ainda não há tarefas",
       "filteredTitle": "Nenhuma tarefa corresponde a este filtro",
+      "todayAheadTitle": "Nada vence hoje",
+      "overdueClearTitle": "Nada está atrasado",
+      "nextTomorrow": "O próximo é {{title}}, amanhã.",
+      "nextDays": "O próximo é {{title}}, em {{count}} dias.",
+      "overdueClearMany": "{{count}} acompanhamentos abertos nesta lista ainda estão à frente. O próximo é {{title}}, em {{days}} dias.",
+      "overdueClearManyTomorrow": "{{count}} acompanhamentos abertos nesta lista ainda estão à frente. O próximo é {{title}}, amanhã.",
       "message": "Crie um acompanhamento para começar."
     },
     "reorder": {

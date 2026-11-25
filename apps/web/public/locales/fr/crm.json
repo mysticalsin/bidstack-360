@@ -291,6 +291,12 @@
     "empty": {
       "title": "Aucune tâche pour le moment",
       "filteredTitle": "Aucune tâche ne correspond à ce filtre",
+      "todayAheadTitle": "Rien n'est dû aujourd'hui",
+      "overdueClearTitle": "Rien n'est en retard",
+      "nextTomorrow": "La suite est {{title}}, demain.",
+      "nextDays": "La suite est {{title}}, dans {{count}} jours.",
+      "overdueClearMany": "{{count}} suivis ouverts dans cette liste sont encore à venir. La suite est {{title}}, dans {{days}} jours.",
+      "overdueClearManyTomorrow": "{{count}} suivis ouverts dans cette liste sont encore à venir. La suite est {{title}}, demain.",
       "message": "Créez une relance pour commencer."
     },
     "reorder": {
