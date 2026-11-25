@@ -1300,7 +1300,8 @@
     "snoozeTask": "Snooze {{title}}",
     "statusAction": "Status: {{status}}. Activate to change to {{next}}.",
     "statusTitle": "Activate to change status to {{next}}",
-    "readOnlyHint": "You need task write access to edit this task."
+    "readOnlyHint": "You need task write access to edit this task.",
+    "assignedTo": "Assigned to {{assignee}}"
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} is editing",

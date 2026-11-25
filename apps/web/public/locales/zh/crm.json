@@ -1299,7 +1299,8 @@
     "snoozeTask": "延后{{title}}",
     "statusAction": "状态：{{status}}。激活以更改为{{next}}。",
     "statusTitle": "激活以将状态更改为{{next}}",
-    "readOnlyHint": "您需要任务写入权限才能编辑此任务。"
+    "readOnlyHint": "您需要任务写入权限才能编辑此任务。",
+    "assignedTo": "分配给 {{assignee}}"
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} 正在编辑",
