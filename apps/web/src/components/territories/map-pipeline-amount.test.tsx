@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCurrencyStore } from '@/stores/currency';
 import type { TerritoryAnalyticsItem } from '@/hooks/useTerritories';
 
+import { mapPipelineAmount } from './map-pipeline-amount';
 import { WorldMap } from './WorldMap';
 
 vi.mock('react-simple-maps', () => ({
@@ -58,5 +59,13 @@ describe('territory map pipeline amount under demo data', () => {
     expect(top).not.toMatch(/EUR|€/);
     expect(digits(top)).toBe('61520');
     expect(legend?.textContent ?? '').not.toMatch(/EUR|€/);
+  });
+
+  it('does not invent a euro zero when the micros are not a safe integer', () => {
+    // WHY: a map label that is not an integer micros value is not an amount.
+    // It must not fall through to an EUR zero. The color scale is separate.
+    expect(mapPipelineAmount(Number.NaN)).toBe('Not a number');
+    expect(mapPipelineAmount(1.5)).toBe('Not a number');
+    expect(mapPipelineAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });
