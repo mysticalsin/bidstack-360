@@ -1510,6 +1510,7 @@
     "footerImporting": "Importing {{done}} of {{total}}…",
     "footerReady": "{{ready}}/{{total}} ready to import",
     "footerAwaiting": "Awaiting paste",
+    "noContactRows": "That paste has no contact rows.",
     "cancelButton": "Cancel",
     "importButtonImporting": "Importing {{done}} / {{total}}…",
     "importButton": "Import {{label}}",

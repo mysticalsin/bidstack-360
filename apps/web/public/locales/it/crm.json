@@ -1509,6 +1509,7 @@
     "footerImporting": "Importazione di {{done}} di {{total}}…",
     "footerReady": "{{ready}}/{{total}} pronti per l'importazione",
     "footerAwaiting": "In attesa di incollare",
+    "noContactRows": "Il testo incollato non ha righe di contatto.",
     "cancelButton": "Annulla",
     "importButtonImporting": "Importazione di {{done}} / {{total}}…",
     "importButton": "Importa {{label}}",

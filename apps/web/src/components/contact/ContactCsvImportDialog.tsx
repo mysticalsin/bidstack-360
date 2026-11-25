@@ -31,10 +31,12 @@ interface ParsedRow {
 }
 
 function parseCsv(input: string): { headers: Header[]; rows: ParsedRow[]; headerLine: string } {
+  // Drop blank records before the header is chosen. A leading ",,," would
+  // otherwise become the header and the real contacts would look empty.
   const lines = input
     .replace(/\r/g, '')
     .split('\n')
-    .filter((l) => l.trim().length > 0);
+    .filter((l) => l.trim().length > 0 && !isBlankRecord(l));
   if (lines.length === 0) return { headers: [], rows: [], headerLine: '' };
   // Auto-detect comma vs tab — Excel pastes are tab-delimited, web copy
   // is usually comma. Whichever appears more in the first line wins.
@@ -46,7 +48,8 @@ function parseCsv(input: string): { headers: Header[]; rows: ParsedRow[]; header
   const headers: Header[] = rawHeaders.map((h) => h as Header).filter((h) => HEADERS.includes(h));
   const rows: ParsedRow[] = [];
   for (const line of lines.slice(1)) {
-    const cells = line.split(sep).map((c) => c.trim());
+    const cells = line.split(sep).map((c) => normalizeCell(c));
+    if (cells.every((cell) => cell === '')) continue;
     const values: Partial<Record<Header, string>> = {};
     rawHeaders.forEach((h, i) => {
       if (HEADERS.includes(h as Header)) {
@@ -74,6 +77,22 @@ function parseCsv(input: string): { headers: Header[]; rows: ParsedRow[]; header
 
 const blankToNull = (value: string | undefined): string | null => (value ? value : null);
 
+/** Excel writes an empty cell as "". A plain split leaves that pair as text. */
+function normalizeCell(value: string): string {
+  const trimmed = value.trim();
+  return trimmed === '""' ? '' : trimmed;
+}
+
+/**
+ * A spreadsheet blank is commas or tabs, not a contact. Check both, because
+ * the header (and therefore the delimiter) may be this line.
+ */
+function isBlankRecord(line: string): boolean {
+  const commaBlank = line.split(',').every((cell) => normalizeCell(cell) === '');
+  const tabBlank = line.split('\t').every((cell) => normalizeCell(cell) === '');
+  return commaBlank || tabBlank;
+}
+
 interface Props {
   trigger?: React.ReactNode;
 }
@@ -97,6 +116,8 @@ export function ContactCsvImportDialog({ trigger }: Props) {
   const { headers, rows, headerLine } = useMemo(() => parseCsv(pasted), [pasted]);
   const importable = rows.filter((r) => r.errors.length === 0);
   const invalidRows = rows.length - importable.length;
+  // Text was pasted, and every record in it was blank. That is not an empty box.
+  const noContactRows = pasted.trim().length > 0 && rows.length === 0;
 
   const reset = () => {
     setPasted('');
@@ -229,8 +250,10 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                     placeholder={'name,customer,email\nAlice Singh,Mantu,alice@example.test'}
                     rows={8}
                     spellCheck={false}
-                    aria-describedby={invalidRows > 0 ? `${guidanceId} ${errorId}` : guidanceId}
-                    aria-invalid={invalidRows > 0}
+                    aria-describedby={
+                      invalidRows > 0 || noContactRows ? `${guidanceId} ${errorId}` : guidanceId
+                    }
+                    aria-invalid={invalidRows > 0 || noContactRows}
                     className="dialog-input w-full font-mono text-xs"
                   />
                   {invalidRows > 0 ? (
@@ -240,6 +263,10 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                         '{{count}} row need fixes before import. Check missing required fields, email format, and sentiment values.',
                         { count: invalidRows },
                       )}
+                    </p>
+                  ) : noContactRows ? (
+                    <p id={errorId} className="text-xs text-[var(--danger)]">
+                      {t('contactCsvImport.noContactRows', 'That paste has no contact rows.')}
                     </p>
                   ) : null}
                   {rows.length > 0 ? (
@@ -310,7 +337,9 @@ export function ContactCsvImportDialog({ trigger }: Props) {
                             ready: importable.length,
                             total: rows.length,
                           })
-                        : t('contactCsvImport.footerAwaiting', 'Awaiting paste')}
+                        : noContactRows
+                          ? t('contactCsvImport.noContactRows', 'That paste has no contact rows.')
+                          : t('contactCsvImport.footerAwaiting', 'Awaiting paste')}
                   </span>
                   <div className="flex gap-2">
                     {/* Disabled (not a Dialog.Close) during import — closing mid-flight

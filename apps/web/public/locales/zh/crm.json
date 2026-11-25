@@ -1509,6 +1509,7 @@
     "footerImporting": "正在导入 {{total}} 中的 {{done}}…",
     "footerReady": "{{ready}}/{{total}} 可导入",
     "footerAwaiting": "等待粘贴",
+    "noContactRows": "这次粘贴没有联系人行。",
     "cancelButton": "取消",
     "importButtonImporting": "正在导入 {{done}} / {{total}}…",
     "importButton": "导入 {{label}}",
