@@ -7,15 +7,15 @@ import { LookupFieldPicker, type LookupOption } from '@/components/ui/LookupFiel
 import { Select } from '@/components/ui/Select';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCreateOpportunity } from '@/hooks/useOpportunities';
+import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { api } from '@/lib/api';
 import {
   INDUSTRIES,
   type OpportunityCreate,
   OpportunityCreate as OpportunityCreateSchema,
-  OpportunityStage,
 } from '@bidstack/shared';
 
-const STAGES = OpportunityStage.options;
+import { createStageGate } from './create-opportunity-stage';
 
 type FieldErrors = Partial<Record<keyof OpportunityCreate, string[]>>;
 
@@ -55,6 +55,30 @@ export function CreateOpportunityDialog({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   // Force form remount on every open so uncontrolled inputs clear stale DOM values.
   const [formKey, setFormKey] = useState(0);
+  // Null until the user picks. The gate then uses the first open board column.
+  const [pipelineStageId, setPipelineStageId] = useState<string | null>(null);
+  const stagesQuery = usePipelineStages({ enabled: open });
+  const stageGate = createStageGate({
+    isLoading: stagesQuery.isLoading,
+    isPending: stagesQuery.isPending,
+    isError: stagesQuery.isError,
+    stages: (stagesQuery.data?.items ?? []).map((stage) => ({
+      id: stage.id,
+      key: stage.key,
+      name: stage.name,
+      isWon: stage.isWon,
+      isLost: stage.isLost,
+    })),
+    selectedId: pipelineStageId,
+  });
+  const stageHold =
+    stageGate.status === 'loading'
+      ? t('createOpportunity.stagesLoading', 'Loading pipeline stages…')
+      : stageGate.status === 'error'
+        ? t('createOpportunity.stagesError', "Couldn't load pipeline stages.")
+        : stageGate.status === 'empty'
+          ? t('createOpportunity.stagesEmpty', 'No pipeline stages yet.')
+          : null;
 
   // Company lookup (Twenty pattern A4 — LookupFieldPicker).
   // We track the selected company separately so we can pass its name as the
@@ -88,7 +112,7 @@ export function CreateOpportunityDialog({
     // Belt-and-braces: the submit button is disabled without canWrite, but a
     // dialog opened programmatically by a controlled caller (e.g. the quick-add
     // menu) could still be submitted via Enter — refuse before hitting the API.
-    if (!canWrite) return;
+    if (!canWrite || stageGate.status !== 'ready') return;
     setError(null);
     setFieldErrors({});
     const fd = new FormData(e.currentTarget);
@@ -97,7 +121,10 @@ export function CreateOpportunityDialog({
     const candidate = {
       customer: (selectedCompany?.label ?? String(fd.get('customer') ?? '')).trim(),
       name: String(fd.get('name') ?? '').trim(),
-      stage: fd.get('stage'),
+      // The create route ignores a legacy stage key and files the bid on the
+      // first column. pipelineStageId is the board column the user picked.
+      stage: stageGate.status === 'ready' ? stageGate.payload.stage : null,
+      pipelineStageId: stageGate.status === 'ready' ? stageGate.payload.pipelineStageId : null,
       value: Number(fd.get('value') ?? 0),
       probability: Number(fd.get('probability') ?? 0),
       dueDate: (fd.get('dueDate') as string) || null,
@@ -121,6 +148,7 @@ export function CreateOpportunityDialog({
     create.mutate(parsed.data, {
       onSuccess: () => {
         setOpen(false);
+        setPipelineStageId(null);
         setError(null);
         setFieldErrors({});
         setSelectedCompany(defaultCustomer ? { id: '', label: defaultCustomer } : null);
@@ -141,6 +169,7 @@ export function CreateOpportunityDialog({
         // Reset picker when dialog closes without submitting.
         if (!next) {
           setSelectedCompany(defaultCustomer ? { id: '', label: defaultCustomer } : null);
+          setPipelineStageId(null);
           setError(null);
           setFieldErrors({});
         }
@@ -200,19 +229,41 @@ export function CreateOpportunityDialog({
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field
-              label={t('createOpportunity.stageLabel', 'Stage')}
-              htmlFor="stage"
-              error={fieldErrors.stage?.[0]}
-            >
-              <Select id="stage" name="stage" defaultValue="s1_ongoing">
-                {STAGES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <div>
+              <Field
+                label={t('createOpportunity.stageLabel', 'Stage')}
+                htmlFor="stage"
+                error={fieldErrors.stage?.[0] ?? fieldErrors.pipelineStageId?.[0]}
+              >
+                <Select
+                  id="stage"
+                  name="pipelineStageId"
+                  value={stageGate.status === 'ready' ? stageGate.payload.pipelineStageId : ''}
+                  onChange={(event) => setPipelineStageId(event.target.value)}
+                  isLoading={stageGate.status === 'loading'}
+                  disabled={stageGate.status !== 'ready'}
+                  options={
+                    stageGate.status === 'ready' ? stageGate.options : [{ value: '', label: '—' }]
+                  }
+                />
+              </Field>
+              {stageGate.status === 'error' ? (
+                <p role="alert" className="mt-1 text-xs text-[var(--danger)]">
+                  {stageHold}{' '}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => void stagesQuery.refetch()}
+                  >
+                    {t('createOpportunity.stagesRetry', 'Retry')}
+                  </button>
+                </p>
+              ) : stageHold ? (
+                <p role="status" className="mt-1 text-xs text-[var(--fg-tertiary)]">
+                  {stageHold}
+                </p>
+              ) : null}
+            </div>
             <Field
               label={t('createOpportunity.industryLabel', 'Industry')}
               htmlFor="industry"
@@ -294,12 +345,14 @@ export function CreateOpportunityDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={create.isPending || !canWrite}
-              title={canWrite ? undefined : readOnlyHint}
+              disabled={create.isPending || !canWrite || stageGate.status !== 'ready'}
+              title={!canWrite ? readOnlyHint : (stageHold ?? undefined)}
               aria-label={
-                canWrite
-                  ? undefined
-                  : `${t('createOpportunity.submit', 'Create opportunity')} — ${readOnlyHint}`
+                !canWrite
+                  ? `${t('createOpportunity.submit', 'Create opportunity')} — ${readOnlyHint}`
+                  : stageHold
+                    ? `${t('createOpportunity.submit', 'Create opportunity')} — ${stageHold}`
+                    : undefined
               }
             >
               {create.isPending
