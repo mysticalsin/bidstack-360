@@ -10,6 +10,12 @@ import { useOnboardingStore } from '@/stores/onboarding';
 
 import { ProductTour } from './ProductTour';
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (_key: string, fallback?: string) => fallback ?? _key,
+  }),
+}));
+
 function rect(top: number): DOMRect {
   return {
     x: 0,
@@ -44,7 +50,7 @@ describe('ProductTour activity spotlight', () => {
     });
 
     render(
-      <MemoryRouter>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div data-tour="activity-timeline">Recent activity</div>
         <ProductTour />
       </MemoryRouter>,

@@ -49,11 +49,14 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'activity-timeline',
-    title: 'Log calls, emails, notes',
-    body: 'Every interaction is captured on the contact timeline. Polo PreSales surfaces the next best action so nothing falls through the cracks.',
+    title: 'Recent activity',
+    // Contacts has no timeline marker, so this step used to dim the whole
+    // list. CI Financial is the seeded account (ACCOUNT_KEY ci-financial)
+    // whose open follow-up fills the cockpit timeline.
+    body: 'Follow-ups, calls, and notes for this account sit on its timeline.',
     target: '[data-tour="activity-timeline"]',
-    route: '/contacts',
-    placement: 'left',
+    route: '/accounts/ci-financial',
+    placement: 'top',
   },
   {
     id: 'reports',
