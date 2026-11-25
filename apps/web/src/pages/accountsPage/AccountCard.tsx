@@ -9,12 +9,13 @@ import { Link } from 'react-router-dom';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { TechLogo } from '@/components/company/TechLogo';
 import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout, springSnap } from '@/lib/motion';
 
+import { accountPipelineAmount } from './accountPipelineAmount';
 import {
   healthLabel,
   healthTone,
@@ -33,8 +34,9 @@ export const AccountCard = memo(function AccountCard({
   index: number;
 }) {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
+  const pipelineAmount = accountPipelineAmount(pipelineMicros);
+  const pipelineBasis = t('accounts.currencyBasis', UNSPECIFIED_CURRENCY_BASIS);
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
   const rankedTech = rankedTechFor(company);
@@ -136,7 +138,10 @@ export const AccountCard = memo(function AccountCard({
             <div>
               <dt>{t('account.pipeline', 'Pipeline')}</dt>
               <dd>
-                <AnimatedMetric value={formatMoneyMicros(pipelineMicros, 'EUR')} />
+                <AnimatedMetric value={pipelineAmount} />
+                <span className="mt-0.5 block text-xs font-medium normal-case tracking-normal text-[var(--fg-secondary)]">
+                  {pipelineBasis}
+                </span>
               </dd>
             </div>
             <div>

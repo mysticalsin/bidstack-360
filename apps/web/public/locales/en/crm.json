@@ -374,6 +374,7 @@
   },
   "accounts": {
     "title": "Accounts",
+    "currencyBasis": "currency not recorded; not a euro forecast",
     "error": {
       "title": "Couldn't load accounts",
       "message": "The dashboard endpoint did not respond."
