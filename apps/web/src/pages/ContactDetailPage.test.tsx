@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -87,13 +87,18 @@ describe('ContactDetailPage customer account', () => {
     );
   }
 
+  function subtitle() {
+    return screen.getByRole('heading', { name: 'Hank Scorpio' }).parentElement!;
+  }
+
   it('does not search companies by a customer name that can match another account', () => {
     // WHY: the word Globex used to open /companies?search=Globex. That search
     // is a contains match on name, domain, and industry, so Globex Labs can
     // sit in the results. An unlinked contact has no company to open.
     renderContact();
 
-    expect(screen.getByText('Globex')).toBeTruthy();
+    expect(subtitle().textContent).toContain('Globex');
+    expect(within(subtitle()).queryByRole('link')).toBeNull();
     expect(screen.queryByRole('link', { name: /Globex/ })).toBeNull();
     expect(document.querySelector('a[href*="search="]')).toBeNull();
   });
@@ -117,6 +122,6 @@ describe('ContactDetailPage customer account', () => {
 
     expect(screen.queryByRole('link', { name: /Globex/ })).toBeNull();
     expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
-    expect(screen.getByText('Globex')).toBeTruthy();
+    expect(subtitle().textContent).toContain('Globex');
   });
 });
