@@ -87,6 +87,12 @@ export function DemoSignIn() {
   const [step, setStep] = useState<Step>('checking');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sign-out deletes the resume token. The next submit provisions a new
+  // sandbox (demo-auth releases the email and seeds again). The edge email
+  // can still be prefilled, so the form has to say the last sandbox stays closed.
+  const [leftSession] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem(DEMO_SIGNED_OUT_KEY) === '1',
+  );
 
   const enter = useCallback(
     async (address: string) => {
@@ -396,6 +402,19 @@ export function DemoSignIn() {
               >
                 {t('demoSignIn.changeEmail', 'Use a different email')}
               </button>
+            ) : null}
+
+            {leftSession && (step === 'email' || step === 'code') ? (
+              <p
+                role="status"
+                data-testid="demo-signed-out-notice"
+                className="mt-3 max-w-md text-sm text-slate-700"
+              >
+                {t(
+                  'demoSignIn.signedOutNotice',
+                  'You signed out. Entering again opens a new sandbox. The one you left stays closed.',
+                )}
+              </p>
             ) : null}
 
             {error ? (
