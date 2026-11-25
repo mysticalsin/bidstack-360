@@ -1,4 +1,4 @@
-import { formatMicrosDecimal } from '@bidstack/shared';
+import { dustPushAmount } from './dust-push-amount.js';
 
 export function serializeOpportunityToMarkdown(opp: {
   name: string;
@@ -11,9 +11,10 @@ export function serializeOpportunityToMarkdown(opp: {
   industry: string | null;
   intel: unknown;
 }): string {
+  // Exact units. The column has no currency, so the label does not name EUR.
   const value =
     typeof opp.valueMicros === 'bigint' || typeof opp.valueMicros === 'number'
-      ? formatMicrosDecimal(opp.valueMicros)
+      ? dustPushAmount(opp.valueMicros)
       : String(opp.valueMicros);
 
   return [
@@ -22,7 +23,7 @@ export function serializeOpportunityToMarkdown(opp: {
     `- **Code:** ${opp.code}`,
     `- **Customer:** ${opp.customer}`,
     `- **Stage:** ${opp.stage}`,
-    `- **Value (EUR):** ${value}`,
+    `- **Value:** ${value}`,
     `- **Probability:** ${opp.probability}%`,
     `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
     `- **Industry:** ${opp.industry ?? 'N/A'}`,
