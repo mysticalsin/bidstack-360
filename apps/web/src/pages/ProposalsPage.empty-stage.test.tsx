@@ -36,12 +36,8 @@ vi.mock('@/lib/api', () => ({ api: apiMock }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: () => true }));
 
 import { ProposalsPage } from './ProposalsPage';
+import { proposalsListQueryKey } from './proposals-list-window';
 import type { ProposalPage } from './proposals-search-params';
-
-/** Same key ProposalsPage passes to useQuery. */
-function proposalsListQueryKey(status: string, search: string) {
-  return ['proposals', 'list', { status, search }] as const;
-}
 
 const WON = {
   id: '11111111-1111-4111-8111-111111111111',
