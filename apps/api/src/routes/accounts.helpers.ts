@@ -7,6 +7,8 @@
 import { prisma } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 
+import { ACCOUNT_RANK_EXCLUDED_STAGE, rankValueUnits } from './account-rank-value.js';
+
 export interface AccountStats {
   totalValue: number;
   wonValue: number;
@@ -24,8 +26,9 @@ const EMPTY_STATS: AccountStats = {
 };
 
 /**
- * Aggregates pipeline value, won value, open-deal/opportunity counts and
- * contact counts for a set of companies. All aggregation happens in Postgres
+ * Aggregates pipeline-plus-won value, won value, open-deal/opportunity counts
+ * and contact counts for a set of companies. Lost bids stay in the opportunity
+ * count and stay out of the value. All aggregation happens in Postgres
  * via groupBy, so totals are exact regardless of how many opportunities an
  * account has (an in-JS reduce over a take-capped findMany silently
  * undercounts pipeline-heavy accounts).
@@ -37,12 +40,19 @@ export async function fetchAccountStats(
   if (companyIds.length === 0) return new Map();
 
   const where = { orgId, companyId: { in: companyIds }, deletedAt: null };
-  const [totals, won, open, contacts] = await Promise.all([
+  const [totals, lost, won, open, contacts] = await Promise.all([
     prisma.opportunity.groupBy({
       by: ['companyId'],
       where,
       _sum: { valueMicros: true },
       _count: { _all: true },
+    }),
+    // Lost bids stay in the opportunity count. They do not stay in the value
+    // Strategic Accounts and Account Ranking show.
+    prisma.opportunity.groupBy({
+      by: ['companyId'],
+      where: { ...where, stage: ACCOUNT_RANK_EXCLUDED_STAGE },
+      _sum: { valueMicros: true },
     }),
     prisma.opportunity.groupBy({
       by: ['companyId'],
@@ -61,6 +71,11 @@ export async function fetchAccountStats(
     }),
   ]);
 
+  const lostMicros = new Map(
+    lost.flatMap((row) =>
+      row.companyId ? [[row.companyId, row._sum.valueMicros ?? 0n] as const] : [],
+    ),
+  );
   const stats = new Map<string, AccountStats>();
   const statsFor = (companyId: string): AccountStats => {
     const existing = stats.get(companyId);
@@ -77,7 +92,7 @@ export async function fetchAccountStats(
     // the BigInt→Number conversion before dividing, corrupting totals past
     // ~$9.007B. Postgres already summed exactly via groupBy; don't reintroduce
     // float error converting the result.
-    s.totalValue = microsToUnits(row._sum.valueMicros ?? 0);
+    s.totalValue = rankValueUnits(row._sum.valueMicros ?? 0, lostMicros.get(row.companyId) ?? 0);
     s.opportunityCount = row._count._all;
   }
   for (const row of won) {
