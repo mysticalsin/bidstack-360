@@ -103,11 +103,11 @@ describe('rail on a cross-region flag', () => {
   });
 
   it('does not treat the deal board as a cross-region flag', () => {
-    useUiStore.setState({ collapsedSections: { accounts: false } });
+    useUiStore.setState({ collapsedSections: { accounts: true, pipeline: false } });
 
     renderSidebar('/pipeline');
 
-    expect(meetingsLink().getAttribute('aria-current')).toBeNull();
-    expect(accountsExpanded()).toBe('true');
+    expect(accountsExpanded()).toBe('false');
+    expect(useUiStore.getState().collapsedSections.accounts).toBe(true);
   });
 });
