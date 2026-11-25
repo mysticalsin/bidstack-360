@@ -211,13 +211,28 @@ export function ForecastCard({ rows, projection, headingLevel }: {
   );
 }
 
+function WinRateBody({ data }: { data: ReturnType<typeof winRateByQuarter> }) {
+  // A line needs two quarters. The rate of the closed book does not: the demo
+  // book closes both bids in Q2 2026, and that 50% was hidden behind the line's
+  // empty state. Open bids never enter `data`.
+  if (data.length > 1) return <WinRateLine data={data} />;
+  const single = data[0];
+  if (!single) return <p className="viz-empty">No closed bids.</p>;
+  return (
+    <div data-testid="win-rate-single-quarter">
+      <p className="dash-hero-num">{single.rate}%</p>
+      <p className="viz-meta">{single.won} of {single.won + single.lost} closed bids · {single.x}</p>
+    </div>
+  );
+}
+
 export function WinRateTrendCard({ rows, headingLevel }: { rows: OppRow[]; headingLevel?: 2 | 3 }) {
   const data = winRateByQuarter(rows);
   return (
     <ChartCard headingLevel={headingLevel} title="Win rate over time" meta="Share of closed bids won, by close quarter"
       summary={data.map((d) => `${d.x}: ${d.rate}% (${d.won} of ${d.won + d.lost})`).join('; ') || 'No closed bids'}
       table={{ columns: ['Quarter', 'Won', 'Lost', 'Win rate'], rows: data.map((d) => [d.x, d.won, d.lost, `${d.rate}%`]) }}>
-      {data.length > 1 ? <WinRateLine data={data} /> : <p className="viz-empty">Needs closed bids in two quarters.</p>}
+      <WinRateBody data={data} />
     </ChartCard>
   );
 }
