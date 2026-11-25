@@ -23,6 +23,7 @@ import { useAccountHistory } from '@/stores/accountHistory';
 import type { AccountCockpitMaybeScored, CompanyHealth } from '@bidstack/shared';
 
 import { deriveNextMove } from './CommandCenter';
+import { companyWebsiteHref, publicHttpUrl } from './companyWebsite';
 import { labelForBand } from './_tokens';
 
 interface Props {
@@ -134,7 +135,9 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
                       {t('pageHead.notScored', 'Not scored yet')}
                     </span>
                   )}
-                  {cockpit.company.domain ? <span className="acct-domain">{cockpit.company.domain}</span> : null}
+                  {cockpit.company.domain ? (
+                    <AccountDomain domain={cockpit.company.domain} website={cockpit.company.website} />
+                  ) : null}
                 </span>
                 <span className="acct-health-text" title={nextMove}>{nextMove}</span>
               </span>
@@ -276,6 +279,17 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   );
 });
 
+function AccountDomain({ domain, website }: { domain: string; website: string | null }) {
+  const href = companyWebsiteHref(domain, website);
+  if (!href) return <span className="acct-domain">{domain}</span>;
+  return (
+    <a className="acct-domain" href={href} target="_blank" rel="noopener noreferrer">
+      {domain}
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  );
+}
+
 // Compact data brief shown when hovering the company logo. Picks
 // from whichever fields the CRM data verification surfaced; nullable fields are
 // quietly skipped rather than rendered as "Unknown" placeholders.
@@ -292,6 +306,7 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitMaybeScored }) {
     rows.push([t('pageHead.briefLegalName', 'Legal name'), c.legalName]);
   if (c.incorporationDate)
     rows.push([t('pageHead.briefFounded', 'Founded'), c.incorporationDate.slice(0, 4)]);
+  const site = publicHttpUrl(c.website);
   return (
     <div>
       {imageUrl ? (
@@ -304,14 +319,15 @@ function CompanyBrief({ cockpit }: { cockpit: AccountCockpitMaybeScored }) {
         />
       ) : null}
       <div className="text-sm font-semibold text-[var(--fg-primary)]">{c.name}</div>
-      {c.website ? (
+      {site ? (
         <a
-          href={c.website}
+          href={site}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-[var(--brand-primary)] hover:underline"
         >
-          {c.website.replace(/^https?:\/\//, '')}
+          {site.replace(/^https?:\/\//, '')}
+          <span className="sr-only"> (opens in a new tab)</span>
         </a>
       ) : null}
       {rows.length > 0 ? (

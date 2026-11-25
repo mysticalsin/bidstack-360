@@ -5,7 +5,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import type { AccountCockpitMaybeScored, CrmCompany } from '@bidstack/shared';
@@ -49,7 +49,14 @@ function renderHead(domain: string, website: string | null) {
 }
 
 describe('account domain opens the company site', () => {
-  afterEach(cleanup);
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('links ci.com to the https site the account already stores', () => {
     // WHY: the domain is the first identity on the cockpit. Leaving it as
