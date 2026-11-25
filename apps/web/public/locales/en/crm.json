@@ -870,6 +870,7 @@
     "resultsCountOne": "{{count}} result for \"{{term}}\"",
     "resultsCountMany": "{{count}} results for \"{{term}}\"",
     "showingLatest": "Showing latest 50 companies",
+    "showingFilter": "Showing {{filters}}",
     "clear": "Clear",
     "error": {
       "title": "Failed to load companies",
@@ -881,7 +882,11 @@
       "searchMessage": "Nothing matched \"{{term}}\". Try a company name or domain.",
       "message": "Create the first company to start building your account list.",
       "clearSearch": "Clear search",
-      "addCompany": "Add company"
+      "addCompany": "Add company",
+      "filteredTitle": "No companies match these filters",
+      "filteredMessage": "{{filters}} matched no companies.",
+      "filteredSearchMessage": "Nothing matched \"{{term}}\" in {{filters}}.",
+      "clearFilters": "Clear filters"
     },
     "toast": {
       "nothingToExport": "Nothing to export",

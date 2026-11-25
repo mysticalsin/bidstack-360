@@ -954,6 +954,7 @@
     "resultsCountOne": "{{count}} résultat pour « {{term}} »",
     "resultsCountMany": "{{count}} résultats pour « {{term}} »",
     "showingLatest": "Affichage des 50 dernières entreprises",
+    "showingFilter": "Affichage de {{filters}}",
     "clear": "Effacer",
     "error": {
       "title": "Échec du chargement des entreprises",
@@ -965,7 +966,11 @@
       "searchMessage": "Aucun résultat pour « {{term}} ». Essayez un nom d'entreprise ou un domaine.",
       "message": "Créez la première entreprise pour commencer à constituer votre liste de comptes.",
       "clearSearch": "Effacer la recherche",
-      "addCompany": "Ajouter une entreprise"
+      "addCompany": "Ajouter une entreprise",
+      "filteredTitle": "Aucune entreprise ne correspond à ces filtres",
+      "filteredMessage": "{{filters}} ne correspond à aucune entreprise.",
+      "filteredSearchMessage": "Aucun résultat pour « {{term}} » dans {{filters}}.",
+      "clearFilters": "Effacer les filtres"
     },
     "toast": {
       "nothingToExport": "Rien à exporter",

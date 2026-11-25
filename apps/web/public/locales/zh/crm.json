@@ -869,6 +869,7 @@
     "resultsCountOne": "“{{term}}” 的 {{count}} 个结果",
     "resultsCountMany": "“{{term}}” 的 {{count}} 个结果",
     "showingLatest": "显示最近 50 家公司",
+    "showingFilter": "正在显示 {{filters}}",
     "clear": "清除",
     "error": {
       "title": "加载公司失败",
@@ -880,7 +881,11 @@
       "searchMessage": "没有匹配 “{{term}}” 的结果。请尝试公司名称或域名。",
       "message": "创建第一家公司，开始构建您的客户列表。",
       "clearSearch": "清除搜索",
-      "addCompany": "添加公司"
+      "addCompany": "添加公司",
+      "filteredTitle": "没有公司符合这些筛选",
+      "filteredMessage": "{{filters}} 没有匹配的公司。",
+      "filteredSearchMessage": "在 {{filters}} 中没有匹配 “{{term}}” 的结果。",
+      "clearFilters": "清除筛选"
     },
     "toast": {
       "nothingToExport": "没有可导出的内容",

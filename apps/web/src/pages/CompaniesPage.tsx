@@ -34,6 +34,7 @@ import { DuplicatesDialog } from '@/components/company/DuplicatesDialog';
 import { CompanyIntelView, IntelDirection } from '@bidstack/shared';
 
 import { CompanyRow } from './companiesPage/CompanyRow';
+import { companyListFilterLabel } from './companiesPage/company-list-narrowing';
 import { INTEL_COLUMNS } from './companiesPage/IntelCells';
 import { IntelImportProgress } from './companiesPage/IntelImportProgress';
 import { IntelViewsBar } from './companiesPage/IntelViewsBar';
@@ -60,21 +61,33 @@ export function CompaniesPage() {
   // 100k-company scale). The raw URL param still drives the input for responsive
   // typing. Same pattern Round 1 used for KeyAccountsPage.
   const debouncedSearch = useDebouncedValue(searchParam, 250);
+  // An empty box is empty now. Debounce delays new characters, not the absence
+  // of a term, so Clear filters does not keep the previous query for 250ms.
+  const querySearch = searchParam ? debouncedSearch : undefined;
   const viewParse = CompanyIntelView.safeParse(params.get('view'));
   const view = viewParse.success ? viewParse.data : null;
   const directionParse = IntelDirection.safeParse(params.get('direction'));
   const direction = directionParse.success ? directionParse.data : null;
-  const pager = useCursorPagination(`${debouncedSearch ?? ''}|${view ?? ''}|${direction ?? ''}`);
+  const pager = useCursorPagination(`${querySearch ?? ''}|${view ?? ''}|${direction ?? ''}`);
   const filter = useMemo(
     () => ({
-      search: debouncedSearch,
+      search: querySearch,
       limit: 50,
       ...(view ? { view } : {}),
       ...(direction ? { direction } : {}),
       ...(pager.cursor ? { cursor: pager.cursor } : {}),
     }),
-    [debouncedSearch, view, direction, pager.cursor],
+    [querySearch, view, direction, pager.cursor],
   );
+  // A saved view or a direction is not "the latest 50". Search stays separate.
+  const filterLabel = companyListFilterLabel(view, direction);
+  const clearListFilters = () => {
+    const next = new URLSearchParams(params);
+    next.delete('search');
+    next.delete('view');
+    next.delete('direction');
+    setParams(next, { replace: true });
+  };
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -344,7 +357,9 @@ export function CompaniesPage() {
                       count: items.length,
                       term: searchTerm,
                     })
-                : t('companies.showingLatest', 'Showing latest 50 companies')}
+                : filterLabel
+                  ? t('companies.showingFilter', 'Showing {{filters}}', { filters: filterLabel })
+                  : t('companies.showingLatest', 'Showing latest 50 companies')}
             </span>
             {searchTerm ? (
               <Button
@@ -415,33 +430,49 @@ export function CompaniesPage() {
         />
       ) : !companies.data || companies.data.items.length === 0 ? (
         <EmptyState
-          icon={searchTerm ? 'search' : 'building'}
+          icon={searchTerm || filterLabel ? 'search' : 'building'}
           title={
-            searchTerm
-              ? t('companies.empty.searchTitle', 'No companies match your search')
-              : t('companies.empty.headline', 'No accounts on the radar')
+            filterLabel
+              ? t('companies.empty.filteredTitle', 'No companies match these filters')
+              : searchTerm
+                ? t('companies.empty.searchTitle', 'No companies match your search')
+                : t('companies.empty.headline', 'No accounts on the radar')
           }
           message={
-            searchTerm
-              ? t(
-                  'companies.empty.searchMessage',
-                  'Nothing matched "{{term}}". Try a company name or domain.',
-                  { term: searchTerm },
-                )
-              : t(
-                  'companies.empty.body',
-                  'Add the companies you bid into. Contacts, intel signals, and every opportunity hang off an account — start with your top target.',
-                )
+            filterLabel
+              ? searchTerm
+                ? t(
+                    'companies.empty.filteredSearchMessage',
+                    'Nothing matched "{{term}}" in {{filters}}.',
+                    { term: searchTerm, filters: filterLabel },
+                  )
+                : t('companies.empty.filteredMessage', '{{filters}} matched no companies.', {
+                    filters: filterLabel,
+                  })
+              : searchTerm
+                ? t(
+                    'companies.empty.searchMessage',
+                    'Nothing matched "{{term}}". Try a company name or domain.',
+                    { term: searchTerm },
+                  )
+                : t(
+                    'companies.empty.body',
+                    'Add the companies you bid into. Contacts, intel signals, and every opportunity hang off an account — start with your top target.',
+                  )
           }
           secondary={
-            searchTerm ? null : (
+            searchTerm || filterLabel ? null : (
               <EmptyStateLink to="/settings?tab=data-import">
                 {t('companies.empty.importCsv', 'Or import accounts from CSV')}
               </EmptyStateLink>
             )
           }
           action={
-            searchTerm ? (
+            filterLabel ? (
+              <Button size="lg" variant="secondary" onClick={clearListFilters}>
+                {t('companies.empty.clearFilters', 'Clear filters')}
+              </Button>
+            ) : searchTerm ? (
               <Button
                 size="sm"
                 variant="secondary"
