@@ -9,11 +9,11 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
 
+import { pipelineCardAmount } from './pipeline-card-amount';
 import { getStageName } from './pipelineUtils';
 
 interface PipelineCardProps {
@@ -47,8 +47,8 @@ export const PipelineCard = memo(function PipelineCard({
 }: PipelineCardProps) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
+  const valueLabel = pipelineCardAmount(opp.value);
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
   // DueDateChip below said "Due today". Tint/aria-label must agree with the chip.
@@ -99,14 +99,14 @@ export const PipelineCard = memo(function PipelineCard({
                   code: opp.code,
                   name: opp.name,
                   stage: stageName,
-                  value: formatMoney(opp.value, 'EUR'),
+                  value: valueLabel,
                 },
               )
             : t('crm.pipelineCardAriaLabelReadOnly', '{{code}}: {{name}}, {{stage}}, {{value}}.', {
                 code: opp.code,
                 name: opp.name,
                 stage: stageName,
-                value: formatMoney(opp.value, 'EUR'),
+                value: valueLabel,
               })) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
         className={cn(
@@ -123,7 +123,7 @@ export const PipelineCard = memo(function PipelineCard({
             {opp.customer}
           </span>
           <span className="tabular-nums text-xs font-bold text-[var(--fg-primary)] shrink-0">
-            {formatMoney(opp.value, 'EUR')}
+            {valueLabel}
           </span>
         </div>
 
