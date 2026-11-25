@@ -87,4 +87,14 @@ describe('DueDateChip rendering', () => {
     render(<DueDateChip dueDate={null} />);
     expect(screen.getByText('No date')).toBeDefined();
   });
+
+  it('names the absolute day the caller prints', () => {
+    // The record passes a calendar-day printer. The chip must use that
+    // string in its accessible name, so a date-only due day is not read
+    // as the previous evening.
+    render(
+      <DueDateChip dueDate="2026-07-22" formatAbsoluteDate={() => '22 July 2026'} />,
+    );
+    expect(screen.getByLabelText('Due 22 July 2026')).toBeTruthy();
+  });
 });

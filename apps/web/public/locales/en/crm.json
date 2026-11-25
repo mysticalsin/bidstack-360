@@ -1645,6 +1645,7 @@
     "editProbabilityLabel": "Edit probability",
     "likely": "likely",
     "editDueDateLabel": "Edit due date",
+    "noDueDate": "No due date",
     "liveCollaborationLabel": "Live collaboration",
     "readOnlyHint": "You need opportunities write access to edit this opportunity."
   },

@@ -32,7 +32,7 @@ import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import { formatDate, formatStage } from '@/lib/format';
+import { formatStage } from '@/lib/format';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 import { StatusPill } from '@/components/vendor/tuffui/status-pill';
 import type { OpportunityStage, IntelPayload } from '@bidstack/shared';
@@ -49,6 +49,7 @@ import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 import { LessonsLearnedCard } from './opportunityDetail/LessonsLearnedCard';
 import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
+import { formatOpportunityDueDay } from './opportunityDetail/opportunity-due-day';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
 const BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
@@ -60,7 +61,10 @@ const BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'ros
 };
 
 export function OpportunityDetailPage() {
-  const { t } = useTranslation('crm');
+  const { t, i18n } = useTranslation('crm');
+  const dueDayText = (value: string | null) =>
+    formatOpportunityDueDay(value, i18n.resolvedLanguage ?? i18n.language) ??
+    t('opportunityDetail.noDueDate', 'No due date');
   const stageOptions: ReadonlyArray<{ value: OpportunityStage; label: string }> = [
     { value: 's1_lead', label: t('opportunityDetail.stageS1Lead', 'S1 Lead') },
     { value: 's1_ongoing', label: t('opportunityDetail.stageS1Ongoing', 'S1 Ongoing') },
@@ -505,12 +509,12 @@ export function OpportunityDetailPage() {
                         value={data.dueDate}
                         onSave={(v) => patch.mutateAsync({ id: id!, patch: { dueDate: v } })}
                         label={t('opportunityDetail.editDueDateLabel', 'Edit due date')}
-                        display={(v) => formatDate(v)}
+                        display={dueDayText}
                       />
                     ) : (
-                      <span title={readOnlyHint}>{formatDate(data.dueDate)}</span>
+                      <span title={readOnlyHint}>{dueDayText(data.dueDate)}</span>
                     )}
-                    <DueDateChip dueDate={data.dueDate} size="lg" />
+                    <DueDateChip dueDate={data.dueDate} size="lg" formatAbsoluteDate={dueDayText} />
                   </span>
                 </div>
               </div>
