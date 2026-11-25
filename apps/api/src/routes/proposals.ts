@@ -21,6 +21,7 @@ import {
   proposalApprovalRoutes,
   proposalIsImmutable,
 } from './proposals.approval.js';
+import { proposalListStamp } from './proposal-list-stamp.js';
 import { DEFAULT_SECTIONS, serializeProposal } from './proposals.helpers.js';
 
 // DEFAULT_SECTIONS and serializeProposal extracted to ./proposals.helpers.ts (BS-R1)
@@ -349,13 +350,25 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const content = req.body.content ?? section.content;
       const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+      const wrote = req.body.title !== undefined || req.body.content !== undefined;
 
-      const updated = await prisma.proposalSection.update({
-        where: { id: req.params.sectionId },
-        data: {
-          ...(req.body.title !== undefined ? { title: req.body.title } : {}),
-          ...(req.body.content !== undefined ? { content, wordCount } : {}),
-        },
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.proposalSection.update({
+          where: { id: req.params.sectionId },
+          data: {
+            ...(req.body.title !== undefined ? { title: req.body.title } : {}),
+            ...(req.body.content !== undefined ? { content, wordCount } : {}),
+          },
+        });
+        // The desk sorts by the proposal row. A section write does not
+        // touch that row unless we stamp it.
+        if (wrote) {
+          await tx.proposal.update({
+            where: { id: req.params.id },
+            data: proposalListStamp(),
+          });
+        }
+        return row;
       });
       return { id: updated.id, wordCount: updated.wordCount };
     },
@@ -441,9 +454,17 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
 
       const wordCount = draft.content.trim().split(/\s+/).filter(Boolean).length;
 
-      await prisma.proposalSection.update({
-        where: { id: section.id },
-        data: { content: draft.content, wordCount, aiDrafted: true },
+      await prisma.$transaction(async (tx) => {
+        await tx.proposalSection.update({
+          where: { id: section.id },
+          data: { content: draft.content, wordCount, aiDrafted: true },
+        });
+        // Same parent stamp as a hand edit. The draft lives on the section.
+        // The desk orders by the proposal.
+        await tx.proposal.update({
+          where: { id: proposal.id },
+          data: proposalListStamp(),
+        });
       });
 
       return {
