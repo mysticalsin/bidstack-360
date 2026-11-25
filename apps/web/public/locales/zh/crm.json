@@ -2582,7 +2582,7 @@
       "ariaLabel": "工作区搜索"
     },
     "input": {
-      "placeholder": "在商机、联系人、公司、任务、备注和订单中搜索…",
+      "placeholder": "在商机、联系人、公司、任务、备注、提案、需求和参考资料中搜索…",
       "ariaLabel": "搜索工作区"
     },
     "tab": {
@@ -2592,7 +2592,10 @@
       "contact": "联系人",
       "company": "公司",
       "task": "任务",
-      "note": "备注"
+      "note": "备注",
+      "proposal": "提案",
+      "rfp_requirement": "需求",
+      "reference": "参考资料"
     },
     "type": {
       "opportunity": "商机",
@@ -2600,7 +2603,10 @@
       "contact": "联系人",
       "company": "公司",
       "task": "任务",
-      "note": "备注"
+      "note": "备注",
+      "proposal": "提案",
+      "rfp_requirement": "需求",
+      "reference": "参考"
     },
     "results": {
       "ariaLabel": "搜索结果",
@@ -2618,7 +2624,7 @@
     "guidance": {
       "ariaLabel": "搜索指引",
       "title": "在整个工作区中搜索",
-      "message": "在上方输入关键词以查找商机、联系人、公司、任务、备注和销售订单。"
+      "message": "在上方输入关键词以查找商机、联系人、公司、任务、备注、提案、需求和参考资料。"
     }
   },
   "createWebhook": {
