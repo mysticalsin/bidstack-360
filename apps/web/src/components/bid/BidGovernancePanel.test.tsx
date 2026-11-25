@@ -46,15 +46,21 @@ vi.mock('@/hooks/useBidGovernance', () => ({
 
 import { BidGovernancePanel } from './BidGovernancePanel';
 
-function renderPanel(saved: {
-  bidClass: string | null;
-  fteEstimate: number | null;
-  commitmentLevel: string | null;
-} | null) {
+function renderPanel(
+  saved: {
+    bidClass: string | null;
+    fteEstimate: number | null;
+    commitmentLevel: string | null;
+  } | null,
+  // null = the scratch calculator, with no deal selected. undefined keeps the
+  // default deal id so existing cases stay bound to a record.
+  opportunityId?: string | null,
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const id = opportunityId === undefined ? 'opp-1' : opportunityId;
   render(
     <QueryClientProvider client={queryClient}>
-      <BidGovernancePanel opportunityId="opp-1" saved={saved} />
+      <BidGovernancePanel {...(id ? { opportunityId: id } : {})} saved={saved} />
     </QueryClientProvider>,
   );
 }
@@ -184,5 +190,45 @@ describe('BidGovernancePanel', () => {
   it('shows an empty state when nothing has been signed off yet', () => {
     renderPanel({ bidClass: 'C1', fteEstimate: 3, commitmentLevel: 'low' });
     expect(screen.getByText('No gate decisions recorded yet.')).toBeTruthy();
+  });
+
+  it('does not invent a class on an unclassified demo bid', () => {
+    // Siemens and the rest of the demo book store no bid class, no FTE, and
+    // no commitment. The panel used to open on 5 FTE × medium and paint that
+    // result as if it were the bid. A larger placeholder used to read as C3.
+    // C3 stays off this screen. The scratch calculator (no deal selected)
+    // is a different surface and is not this case.
+    renderPanel({ bidClass: null, fteEstimate: null, commitmentLevel: null });
+
+    expect(screen.getByText(/no class yet/i)).toBeTruthy();
+    expect(screen.queryByText('C0')).toBeNull();
+    expect(screen.queryByText('C1')).toBeNull();
+    expect(screen.queryByText('C2')).toBeNull();
+    expect(screen.queryByText('C3')).toBeNull();
+    expect(screen.queryByText('C4')).toBeNull();
+    expect(screen.queryByText(/^Save C/)).toBeNull();
+    expect(screen.queryByLabelText('Gate')).toBeNull();
+    expect((screen.getByLabelText('Team size (FTE)') as HTMLInputElement).value).toBe('');
+    expect(screen.getByRole('button', { name: 'Medium' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+  });
+
+  it('previews a class only after team size and commitment are entered', () => {
+    renderPanel({ bidClass: null, fteEstimate: null, commitmentLevel: null });
+    fireEvent.change(screen.getByLabelText('Team size (FTE)'), { target: { value: '2' } });
+    expect(screen.queryByText(/^Save C/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Low' }));
+    // 2 FTE × low is a small bid. The preview must not be the deleted C3 placeholder.
+    expect(screen.getByText('Save C1 to this opportunity')).toBeTruthy();
+    expect(screen.queryByText('C3')).toBeNull();
+    expect(screen.queryByLabelText('Gate')).toBeNull();
+  });
+
+  it('keeps the scratch calculator when no deal is selected', () => {
+    renderPanel(null, null);
+    expect(screen.getByText('C1')).toBeTruthy();
+    expect(screen.queryByText('C3')).toBeNull();
+    expect(screen.getByText(/Select an opportunity above/)).toBeTruthy();
   });
 });
