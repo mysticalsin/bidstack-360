@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -26,6 +27,7 @@ import {
   shownOpportunityDocuments,
 } from './opportunity-document-caption';
 
+import { taskRecordHref } from './task-record-href';
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
 // Call status → Badge tone. Calls live in this tab now rather than a standalone
@@ -225,6 +227,25 @@ function DecisionUnitPanel({
   );
 }
 
+function DealTaskTitle({ id, title }: { id: string; title: string }) {
+  const { t } = useTranslation('crm');
+  // A title search can match a different follow-up. Only a task uuid opens
+  // the record.
+  const href = taskRecordHref(id);
+  if (!href) {
+    return <div className="text-sm font-medium text-[var(--fg-primary)]">{title}</div>;
+  }
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center rounded text-sm font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:text-[var(--brand-deep)]"
+    >
+      {title}
+      <span className="sr-only">{t('opportunityTabs.openTask', ', open follow-up')}</span>
+    </Link>
+  );
+}
+
 function TasksPanel({ oppId }: { oppId: string }) {
   const { t: translate } = useTranslation('crm');
   // This deal's page. The route reads one row past the limit and drops it.
@@ -255,7 +276,7 @@ function TasksPanel({ oppId }: { oppId: string }) {
         {tasks.map((t: Task) => (
           <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div>
-              <div className="text-sm text-[var(--fg-primary)]">{t.title}</div>
+              <DealTaskTitle id={t.id} title={t.title} />
               <div className="text-xs text-[var(--fg-tertiary)]">
                 {translate('opportunityTabs.taskDue', 'Due {{date}}', {
                   date: formatDate(t.dueDate),
