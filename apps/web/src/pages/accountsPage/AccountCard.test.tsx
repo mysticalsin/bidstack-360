@@ -165,3 +165,31 @@ describe('AccountCard tech logos', () => {
     expect(screen.getByText('Tech stack pending')).toBeTruthy();
   });
 });
+
+describe('AccountCard past close', () => {
+  beforeEach(cleanup);
+
+  // WHY: the whole card is one link whose aria-label replaces the visible
+  // text. A past-close count that is only a color, or only inside the link
+  // body, never reaches a screen-reader user. The words have to be on screen
+  // and in the link name. A deal due today is still current.
+  const today = '2026-11-25';
+
+  it('names the open deal that is already past close', () => {
+    renderCard(
+      deriveAccount(company(), [deal({ closeDate: '2026-07-22', stage: 'proposal' })], today),
+    );
+
+    expect(screen.getByTestId('account-card-past-close').textContent).toBe('1 past close');
+    expect(
+      screen.getByRole('link', { name: 'Open Acme customer cockpit, 1 open deal past close' }),
+    ).toBeTruthy();
+  });
+
+  it('stays quiet when the open deal closes today', () => {
+    renderCard(deriveAccount(company(), [deal({ closeDate: today, stage: 'proposal' })], today));
+
+    expect(screen.queryByTestId('account-card-past-close')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Open Acme customer cockpit' })).toBeTruthy();
+  });
+});

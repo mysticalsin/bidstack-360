@@ -9,6 +9,9 @@ export type AccountSegmentKey = 'all' | 'enriched' | 'with_tech' | 'needs_data' 
 export interface AccountRow {
   company: CrmCompany;
   openDeals: number;
+  // Open deals whose close date is a previous UTC day. They stay in openDeals
+  // (they are not won or lost) but the list must not present them as current.
+  pastCloseDeals: number;
   pipelineMicros: number;
   totalDeals: number;
   // Coarse health proxy until real data enhancement lands: weighted-pipeline / open-deals
@@ -24,6 +27,11 @@ export interface AccountRow {
   };
 }
 
+/** UTC calendar day `YYYY-MM-DD`. A close date on this day is not past close. */
+export function utcDay(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
 const COVERAGE_NEXT_ACTIONS: Record<string, string> = {
   Industry: 'Assign an industry to unlock sector routing.',
   Domain: 'Add the official domain to improve enrichment.',
@@ -33,12 +41,17 @@ const COVERAGE_NEXT_ACTIONS: Record<string, string> = {
   Pipeline: 'Link open opportunities to make this actionable.',
 };
 
-export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow {
+export function deriveAccount(
+  company: CrmCompany,
+  deals: CrmDeal[],
+  todayUtc: string = utcDay(),
+): AccountRow {
   const matched = deals.filter(
     (d) =>
       d.companyId === company.id || d.companyName?.toLowerCase() === company.name.toLowerCase(),
   );
   const open = matched.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
+  const pastCloseDeals = open.filter((d) => d.closeDate != null && d.closeDate < todayUtc).length;
   const pipelineMicros = open.reduce(
     (acc, d) => acc + Math.round(d.amountMicros * ((d.probability ?? 50) / 100)),
     0,
@@ -78,6 +91,7 @@ export function deriveAccount(company: CrmCompany, deals: CrmDeal[]): AccountRow
   return {
     company,
     openDeals: open.length,
+    pastCloseDeals,
     pipelineMicros,
     totalDeals: matched.length,
     health,
