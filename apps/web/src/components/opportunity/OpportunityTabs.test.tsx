@@ -56,7 +56,8 @@ describe('OpportunityTabs — DocumentsPanel send-for-signature trigger', () => 
 
     const trigger = screen.getByRole('button', { name: 'Send for Signature' });
     expect(trigger).toHaveProperty('disabled', true);
-    expect(trigger.getAttribute('title')).toBe('Upload a document before sending it for signature');
+    expect(trigger.getAttribute('title')).toBe('Nothing is attached to this bid yet');
+    expect(screen.queryByText(/upload an rfp/i)).toBeNull();
 
     fireEvent.click(trigger);
     expect(screen.queryByTestId('signature-modal')).toBeNull();
@@ -71,5 +72,26 @@ describe('OpportunityTabs — DocumentsPanel send-for-signature trigger', () => 
     fireEvent.click(trigger);
     const modal = screen.getByTestId('signature-modal');
     expect(modal.getAttribute('data-document-id')).toBe('doc-1');
+  });
+
+  it('calls the one demo proposal a single file, not a raw enum', () => {
+    // WHY: seed attaches exactly one document, Test Contract.pdf, kind
+    // "proposal", with no byte count. The header said "1 files" and the row
+    // printed the enum. One file is "1 file". The kind is Proposal. The size
+    // stays unknown because none was stored.
+    renderPanel([
+      {
+        id: 'd0c00000-0000-0000-0000-000000000000',
+        name: 'Test Contract.pdf',
+        kind: 'proposal',
+        bytes: null,
+      },
+    ]);
+
+    expect(screen.getByText('1 file')).toBeTruthy();
+    expect(screen.queryByText('1 files')).toBeNull();
+    expect(screen.getAllByText('Proposal').length).toBeGreaterThan(0);
+    expect(screen.queryByText('proposal')).toBeNull();
+    expect(screen.getByText(/unknown size/)).toBeTruthy();
   });
 });

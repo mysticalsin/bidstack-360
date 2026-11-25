@@ -7,6 +7,7 @@ import { OPPORTUNITY_DOCUMENTS_DRAWN } from '@bidstack/shared';
 
 import {
   opportunityDocumentCaption,
+  opportunityDocumentKindLabel,
   opportunityDocumentPage,
   shownOpportunityDocuments,
 } from './opportunity-document-caption';
@@ -88,5 +89,37 @@ describe('deal document page', () => {
       /not every/i,
     );
     expect(opportunityDocumentCaption(OPPORTUNITY_DOCUMENTS_DRAWN, false)).toBe('50 files');
+    // The demo seed attaches one proposal. "1 files" names that file as a pile.
+    expect(opportunityDocumentCaption(1, false)).toBe('1 file');
+    expect(opportunityDocumentCaption(1, false)).not.toBe('1 files');
+  });
+
+  it('names the stored document kind instead of the database enum', () => {
+    // WHY: the demo file is kind "proposal" with no byte count. The row printed
+    // the enum and a badge that repeated it. A person reading the bid should
+    // see Proposal, RFP, SoW, Q&A, or Reference. An unrecognized kind stays as
+    // stored. No size is invented when bytes were not recorded.
+    const panel = readFileSync(
+      path.resolve(process.cwd(), 'src/components/opportunity/OpportunityTabs.tsx'),
+      'utf8',
+    );
+    const docs = panel.slice(panel.indexOf('function DocumentsPanel'));
+    expect(docs).toContain('opportunityDocumentKindLabel(');
+    expect(docs).not.toMatch(/\{d\.kind\}/);
+    const english = readFileSync(
+      path.resolve(process.cwd(), 'public/locales/en/crm.json'),
+      'utf8',
+    );
+    expect(english).toContain(
+      '"documentsEmptyMessage": "Nothing is attached to this bid, so there is nothing to send."',
+    );
+    expect(english).not.toContain('Upload an RFP, SoW, or proposal draft.');
+
+    expect(opportunityDocumentKindLabel('proposal')).toBe('Proposal');
+    expect(opportunityDocumentKindLabel('rfp')).toBe('RFP');
+    expect(opportunityDocumentKindLabel('sow')).toBe('SoW');
+    expect(opportunityDocumentKindLabel('qa')).toBe('Q&A');
+    expect(opportunityDocumentKindLabel('reference')).toBe('Reference');
+    expect(opportunityDocumentKindLabel('RFP')).toBe('RFP');
   });
 });

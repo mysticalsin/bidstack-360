@@ -938,7 +938,7 @@
     "callScheduledAt": "Agendada {{date}}",
     "callDurationMinutes": "{{count}} min",
     "documentsEmptyTitle": "Nenhum documento anexado",
-    "documentsEmptyMessage": "Envie uma RFP, um SoW ou um rascunho de proposta.",
+    "documentsEmptyMessage": "Nenhum documento está anexado a esta proposta, então não há nada para enviar.",
     "documentsTitle": "Documentos",
     "documentsCount": "{{count}} arquivos",
     "documentUnknownSize": "tamanho desconhecido",

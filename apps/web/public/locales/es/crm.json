@@ -1001,7 +1001,7 @@
     "callScheduledAt": "Programada {{date}}",
     "callDurationMinutes": "{{count}} min",
     "documentsEmptyTitle": "No hay documentos adjuntos",
-    "documentsEmptyMessage": "Sube una RFP, un SoW o un borrador de propuesta.",
+    "documentsEmptyMessage": "No hay ningún documento adjunto a esta oferta, así que no hay nada que enviar.",
     "documentsTitle": "Documentos",
     "documentsCount": "{{count}} archivos",
     "documentUnknownSize": "tamaño desconocido",
