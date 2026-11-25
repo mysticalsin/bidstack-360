@@ -26,7 +26,15 @@ import type { CalendarEvent } from './types';
 /** 07:00, the hour the grid opens on. Hour rows are 48px. */
 const OPEN_AT_SEVEN = 7 * 48;
 
-const WEEK = ['2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29'];
+const WEEK = [
+  '2026-11-23',
+  '2026-11-24',
+  '2026-11-25',
+  '2026-11-26',
+  '2026-11-27',
+  '2026-11-28',
+  '2026-11-29',
+];
 
 function hold(): CalendarEvent {
   return {
