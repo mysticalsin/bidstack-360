@@ -98,9 +98,10 @@ export function OpportunitiesPage() {
     ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
     ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
-  // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
-  // rows, so headline totals must come from the server, not data.items.
+  // Unfiltered headlines use the server aggregate: the page holds 50 rows.
+  // A stage, due, or search filter is this page, so that aggregate stays off.
   const orgSummary = useOrgSummary();
+  const listFiltered = Boolean(search || stageFilter || dueFilter);
   const configuredStages = usePipelineStages();
   const configuredStageOptions = useMemo<PipelineStage[]>(
     () =>
@@ -352,7 +353,12 @@ export function OpportunitiesPage() {
           ))}
         </div>
       ) : data && data.items.length > 0 ? (
-        <OppKpiBar opps={data.items} summary={orgSummary.data} />
+        <OppKpiBar
+          opps={data.items}
+          summary={orgSummary.data}
+          filtered={listFiltered}
+          pageContinues={Boolean(data.nextCursor)}
+        />
       ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}

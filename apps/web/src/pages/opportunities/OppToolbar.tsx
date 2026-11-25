@@ -26,92 +26,67 @@ import { useTranslation } from 'react-i18next';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
+import { opportunityKpiView } from './opportunity-kpi';
+
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
 /**
- * Headline KPIs. Tenant-wide counts/pipeline come from the server aggregate
- * (`/api/crm/summary`) so they reflect the whole org, not just the current 50-row
- * cursor page — at 100k-company scale a page-derived total under-reports the
- * pipeline by orders of magnitude. Weighted revenue has no server aggregate, so
- * it stays page-derived and is explicitly labelled "(page)" to avoid
- * misrepresenting it as a tenant total.
+ * Headline KPIs. With no filter, counts and open pipeline come from the server
+ * aggregate so a 50-row page is not mistaken for the book. Weighted revenue
+ * has no server aggregate, so it stays on the loaded rows and is labelled
+ * "(page)". A stage, due, or search filter is that page only — the aggregate
+ * is the whole book and must not sit above the shorter list.
  */
-export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
+export function OppKpiBar({
+  opps,
+  summary,
+  filtered = false,
+  pageContinues = false,
+}: {
+  opps: Opportunity[];
+  summary?: OrgSummary;
+  /** True when stage, due, or search is narrowing the list. */
+  filtered?: boolean;
+  /** The filtered read has another page, so these figures are not every match. */
+  pageContinues?: boolean;
+}) {
   const { t } = useTranslation('crm');
-  const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
-  const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
-  const kpis = summary
-    ? [
-        {
-          label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
-          value: summary.opportunities.toLocaleString(),
-        },
-        {
-          label: t('oppToolbar.kpiOpenCount', 'Open'),
-          value: summary.openOpportunities.toLocaleString(),
-        },
-        {
-          label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: `${formatUnspecifiedAmount(summary.pipelineValue)}`,
-          basis: true,
-        },
-        {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)}`,
-          basis: true,
-        },
-      ]
-    : [
-        // Fallback before the summary resolves: page-derived totals, all labelled
-        // "(page)" so they are never mistaken for tenant-wide figures.
-        {
-          label: t('oppToolbar.kpiOpportunitiesPage', 'Opportunities (page)'),
-          value: String(opps.length),
-        },
-        {
-          label: t('oppToolbar.kpiRevenuePage', 'Revenue (page)'),
-          value: `${formatUnspecifiedAmount(opps.reduce((acc, o) => acc + o.value, 0))}`,
-          basis: true,
-        },
-        {
-          label: t('oppToolbar.kpiWeightedRevenuePage', 'WR (page)'),
-          value: `${formatUnspecifiedAmount(weighted)}`,
-          basis: true,
-        },
-        {
-          label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))}`,
-          basis: true,
-        },
-      ];
+  const view = opportunityKpiView({ opps, summary, filtered });
+  const regionLabel =
+    view.region === 'filtered'
+      ? t('oppToolbar.kpiRegionFiltered', 'Filtered opportunities on this page')
+      : t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary');
   return (
-    <div
-      role="region"
-      aria-label={t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')}
-      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-    >
-      {kpis.map((kpi) => (
-        <div
-          key={kpi.label}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
-        >
-          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-            {kpi.label}
-          </div>
-          {/* One line each, so the card height never depends on which values
-              have arrived (the summary swap used to rewrap and shift the page:
-              CLS 0.064 against the 0.05 budget). */}
-          <div className="mt-1 truncate text-lg font-bold tabular-nums text-[var(--fg-primary)]">
-            {kpi.value}
-          </div>
+    <div role="region" aria-label={regionLabel} className="space-y-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {view.cards.map((card) => (
           <div
-            className="truncate text-xs text-[var(--fg-tertiary)]"
-            title={'basis' in kpi && kpi.basis ? UNSPECIFIED_CURRENCY_BASIS : undefined}
+            key={card.key}
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
           >
-            {'basis' in kpi && kpi.basis ? UNSPECIFIED_CURRENCY_BASIS : '\u00a0'}
+            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+              {t(card.labelKey, card.label)}
+            </div>
+            {/* One line each, so the card height never depends on which values
+                have arrived (the summary swap used to rewrap and shift the page:
+                CLS 0.064 against the 0.05 budget). */}
+            <div className="mt-1 truncate text-lg font-bold tabular-nums text-[var(--fg-primary)]">
+              {card.money ? formatUnspecifiedAmount(card.amount) : card.amount.toLocaleString()}
+            </div>
+            <div
+              className="truncate text-xs text-[var(--fg-tertiary)]"
+              title={card.money ? UNSPECIFIED_CURRENCY_BASIS : undefined}
+            >
+              {card.money ? UNSPECIFIED_CURRENCY_BASIS : '\u00a0'}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      {filtered && pageContinues ? (
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('oppToolbar.kpiPagePartial', 'These figures are this page, not every match.')}
+        </p>
+      ) : null}
     </div>
   );
 }
