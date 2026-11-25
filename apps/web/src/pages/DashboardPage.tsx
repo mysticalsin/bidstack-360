@@ -65,6 +65,7 @@ import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { useTasks } from '@/hooks/useTasks';
+import { companyIdParam } from '@/lib/company-id-param';
 import { daysUntil } from '@/lib/format';
 import { useAccountHistory } from '@/stores/accountHistory';
 import { useCockpitLayout } from '@/stores/cockpitLayout';
@@ -101,7 +102,10 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const { t } = useTranslation('crm');
   const dashboard = useCrmDashboard(accountId);
   const report = usePipelineReport();
-  const opps = useOpportunities({ limit: 5 });
+  const linkedCompanyId = companyIdParam(accountId);
+  const opps = useOpportunities(
+    linkedCompanyId ? { limit: 5, companyId: linkedCompanyId } : { limit: 5 },
+  );
   const tasks = useTasks();
   // Hooks must be called in the same order every render — including after
   // any early returns below. The visit-tracker reads the resolved company
@@ -211,9 +215,11 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   const cockpit = snapshot.cockpit;
   const isAccountView = Boolean(accountId);
   const accountRecordKey = accountId.trim() || cockpit.company.name;
-  const accountOpps = opps.data?.items.filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
+  const accountOpps = linkedCompanyId
+    ? opps.data?.items
+    : opps.data?.items.filter(
+        (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+      );
   // A card shows unless the user explicitly hid it (default-visible).
   const show = (id: string) => visibleCards[id] !== false;
   // This account's closed deals, for win/loss reason capture.
@@ -272,6 +278,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
               <RecentOpportunitiesCard
                 opps={opps}
                 accountName={cockpit.company.name}
+                accountId={linkedCompanyId}
                 items={accountOpps}
               />
             </Reveal>

@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import type { AccountCockpitMaybeScored, CrmCompany } from '@bidstack/shared';
 import { useOpportunities } from '@/hooks/useOpportunities';
+import '@/i18n';
 
 import { PageHead } from './PageHead';
 
