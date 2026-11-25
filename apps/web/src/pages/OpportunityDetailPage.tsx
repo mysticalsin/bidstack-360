@@ -31,6 +31,7 @@ import { MagneticButton } from '@/components/ui/MagneticButton';
 import { usePatchOpportunity, useOpportunity } from '@/hooks/useOpportunities';
 import { useCommandContext } from '@/hooks/useCommandContext';
 import { useHasPermission } from '@/hooks/useCapabilities';
+import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { formatDate, formatStage } from '@/lib/format';
 import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
@@ -48,6 +49,11 @@ import {
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 import { LessonsLearnedCard } from './opportunityDetail/LessonsLearnedCard';
+import {
+  dealRecordStageChoices,
+  dealRecordStageMove,
+  dealRecordStagePresentation,
+} from './opportunityDetail/deal-record-stage';
 import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
@@ -77,6 +83,8 @@ export function OpportunityDetailPage() {
   const { data, isLoading, isError, error, refetch } = useOpportunity(id);
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
+  const configuredStageQuery = usePipelineStages();
+  const configuredStages = configuredStageQuery.data?.items ?? [];
   // Delete/patch/stage-move all 403 server-side without opportunities:write
   // (apps/api/src/routes/opportunities.mutations.ts,
   // opportunities.transitions.ts) — hide/disable those affordances instead
@@ -428,31 +436,78 @@ export function OpportunityDetailPage() {
                   </Button>
                 )}
               </div>
-              {canWrite ? (
-                <InlineEditSelect<OpportunityStage>
-                  value={data.stage as OpportunityStage}
-                  onSave={(v) => patch.mutateAsync({ id: id!, patch: { stage: v } })}
-                  options={stageOptions}
-                  label={t('opportunityDetail.changeStageLabel', 'Change stage')}
-                  display={(v) => (
-                    <Badge
-                      tone={stageTone(v)}
-                      className="px-4 py-1 text-xs uppercase tracking-wider"
-                    >
-                      {formatStage(v)}
-                    </Badge>
-                  )}
-                />
-              ) : (
-                <span title={readOnlyHint}>
+              {(() => {
+                const presentation = dealRecordStagePresentation(data, configuredStages);
+                const stageBadge = (
                   <Badge
-                    tone={stageTone(data.stage as OpportunityStage)}
+                    tone={stageTone(presentation.toneKey)}
                     className="px-4 py-1 text-xs uppercase tracking-wider"
                   >
-                    {formatStage(data.stage as OpportunityStage)}
+                    {presentation.label}
                   </Badge>
-                </span>
-              )}
+                );
+                const stagesFailed =
+                  configuredStageQuery.isError && configuredStages.length === 0;
+                const usingPipeline = configuredStages.length > 0;
+                if (stagesFailed) {
+                  return (
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      {stageBadge}
+                      <span role="alert" className="text-xs text-[var(--danger)]">
+                        {t(
+                          'opportunityDetail.stageListFailed',
+                          'Could not load stages.',
+                        )}
+                      </span>
+                    </span>
+                  );
+                }
+                if (!canWrite || configuredStageQuery.isLoading) {
+                  return <span title={canWrite ? undefined : readOnlyHint}>{stageBadge}</span>;
+                }
+                return (
+                  <InlineEditSelect<string>
+                    value={usingPipeline ? presentation.value : (data.stage ?? '')}
+                    onSave={async (next) => {
+                      if (!usingPipeline) {
+                        await patch.mutateAsync({
+                          id: id!,
+                          patch: { stage: next as OpportunityStage },
+                        });
+                        return;
+                      }
+                      // The board groups by pipelineStageId. PATCH { stage }
+                      // updates the legacy enum and leaves that id on the
+                      // open column, so the card never moves.
+                      const move = dealRecordStageMove(configuredStages, next);
+                      try {
+                        await stageMove.mutateAsync({
+                          id: data.id,
+                          pipelineStageId: move.pipelineStageId,
+                          pipelineStage: move.pipelineStage,
+                        });
+                      } catch {
+                        toast.error(
+                          t(
+                            'opportunityDetail.stageUpdateFailed',
+                            'Could not change stage.',
+                          ),
+                        );
+                      }
+                    }}
+                    options={
+                      usingPipeline
+                        ? dealRecordStageChoices(configuredStages)
+                        : stageOptions.map((option) => ({
+                            value: option.value,
+                            label: option.label,
+                          }))
+                    }
+                    label={t('opportunityDetail.changeStageLabel', 'Change stage')}
+                    display={() => stageBadge}
+                  />
+                );
+              })()}
               <div className="text-right border-l border-[var(--border-subtle)] pl-4">
                 <div className="text-3xl font-bold tabular-nums text-[var(--fg-primary)] tracking-tight">
                   {canWrite ? (

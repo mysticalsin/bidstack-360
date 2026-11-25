@@ -21,6 +21,15 @@ vi.mock('@/hooks/useStageMutation', () => ({
   useStageMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+vi.mock('@/hooks/usePipelineStages', () => ({
+  usePipelineStages: vi.fn(() => ({
+    data: { items: [], pageContinues: false },
+    isLoading: false,
+    isError: false,
+    isSuccess: true,
+  })),
+}));
+
 const capabilitiesMocks = vi.hoisted(() => ({ useHasPermission: vi.fn(() => true) }));
 // Default to full access so a future unrelated test in this file isn't
 // surprised by the gating default; the gating describe block below sets it
