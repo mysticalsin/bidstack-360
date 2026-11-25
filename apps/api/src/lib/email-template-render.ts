@@ -107,7 +107,7 @@ async function buildRenderContext(args: {
     args.opportunityId
       ? prisma.opportunity.findFirst({
           where: { id: args.opportunityId, orgId: args.orgId, deletedAt: null },
-          select: { name: true, valueMicros: true, country: true },
+          select: { name: true, valueMicros: true },
         })
       : null,
     args.contactId
@@ -141,9 +141,8 @@ async function buildRenderContext(args: {
     opportunity: opportunity
       ? {
           name: opportunity.name,
-          // Polo PreSales stores values as micros (millionths) to avoid float math.
-          // Render in the opportunity's country-implied currency (EUR fallback).
-          amount: emailOpportunityAmount(opportunity.valueMicros, opportunity.country),
+          // Exact units. The column has no currency, so the token does not name EUR.
+          amount: emailOpportunityAmount(opportunity.valueMicros),
         }
       : null,
     contact: contact
