@@ -7,7 +7,7 @@
 // preview surface. Untrusted content is escaped before regex replacement
 // to avoid HTML injection from a note body.
 
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
@@ -32,15 +32,22 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
   const list = useNotes(accountId);
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // A save returns the note before the list query replaces its previous page.
+  // Hold that note until the page includes it, or the empty demo page stays up.
+  const [kept, setKept] = useState<Note[]>([]);
 
-  // Filter out auto-generated meeting import notes with numeric timestamps
-  // (e.g. "Meeting Import 1778695956797") — these are noise in the UI.
-  const filteredNotes =
-    list.data?.items.filter((note) => {
+  const visibleNotes = useMemo(() => {
+    const server = list.data?.items ?? [];
+    const serverIds = new Set(server.map((note) => note.id));
+    const saved = kept.filter((note) => !serverIds.has(note.id));
+    const pinned = server.filter((note) => note.pinned);
+    const rest = server.filter((note) => !note.pinned);
+    return [...pinned, ...saved, ...rest].filter((note) => {
       if (!note.title) return true;
-      const isNumericImport = /Meeting\s*Import\s*\d{10,}/i.test(note.title);
-      return !isNumericImport;
-    }) ?? [];
+      // Auto-generated meeting import titles with numeric timestamps are noise.
+      return !/Meeting\s*Import\s*\d{10,}/i.test(note.title);
+    });
+  }, [kept, list.data?.items]);
 
   return (
     <Card>
@@ -74,7 +81,12 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
         {composing && accountId ? (
           <NoteEditor
             accountId={accountId}
-            onDone={() => setComposing(false)}
+            onDone={(note) => {
+              if (note) {
+                setKept((prev) => [note, ...prev.filter((item) => item.id !== note.id)]);
+              }
+              setComposing(false);
+            }}
             onCancel={() => setComposing(false)}
           />
         ) : null}
@@ -95,20 +107,27 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
                 : t('notes.unknownError', 'Unknown error')
             }
           />
-        ) : filteredNotes.length === 0 ? (
+        ) : visibleNotes.length === 0 ? (
           <EmptyState
             title={t('notes.emptyTitle', 'No notes yet')}
             message={t('notes.emptyMessage', 'Capture a meeting summary or context.')}
           />
         ) : (
           <ul className="divide-y divide-[var(--border-subtle)]">
-            {filteredNotes.map((note) =>
+            {visibleNotes.map((note) =>
               editingId === note.id ? (
                 <li key={note.id} className="py-3">
                   <NoteEditor
                     accountId={accountId}
                     initial={note}
-                    onDone={() => setEditingId(null)}
+                    onDone={(saved) => {
+                      if (saved) {
+                        setKept((prev) =>
+                          prev.map((item) => (item.id === saved.id ? saved : item)),
+                        );
+                      }
+                      setEditingId(null);
+                    }}
                     onCancel={() => setEditingId(null)}
                   />
                 </li>
@@ -118,6 +137,7 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
                   note={note}
                   accountId={accountId}
                   onEdit={() => setEditingId(note.id)}
+                  onRemoved={(id) => setKept((prev) => prev.filter((item) => item.id !== id))}
                 />
               ),
             )}
@@ -132,9 +152,10 @@ interface RowProps {
   note: Note;
   accountId: string;
   onEdit: () => void;
+  onRemoved: (id: string) => void;
 }
 
-function NoteRow({ note, accountId, onEdit }: RowProps) {
+function NoteRow({ note, accountId, onEdit, onRemoved }: RowProps) {
   const { t } = useTranslation('crm');
   const update = useUpdateNote(accountId);
   const remove = useDeleteNote(accountId);
@@ -154,7 +175,10 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
     });
     if (!ok) return;
     remove.mutate(note.id, {
-      onSuccess: () => toast.success(t('notes.deleteSuccess', 'Note deleted')),
+      onSuccess: () => {
+        onRemoved(note.id);
+        toast.success(t('notes.deleteSuccess', 'Note deleted'));
+      },
       onError: (err) =>
         toast.error(t('notes.deleteErrorTitle', 'Delete failed'), {
           description:
@@ -227,7 +251,7 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
 interface EditorProps {
   accountId: string;
   initial?: Note;
-  onDone: () => void;
+  onDone: (saved?: Note) => void;
   onCancel: () => void;
 }
 
@@ -248,12 +272,10 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
       return;
     }
     try {
-      if (initial) {
-        await update.mutateAsync({ id: initial.id, patch: { title: cleanTitle, bodyMd } });
-      } else {
-        await create.mutateAsync({ title: cleanTitle, bodyMd, pinned: false });
-      }
-      onDone();
+      const saved = initial
+        ? await update.mutateAsync({ id: initial.id, patch: { title: cleanTitle, bodyMd } })
+        : await create.mutateAsync({ title: cleanTitle, bodyMd, pinned: false });
+      onDone(saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('notes.saveFailed', 'Save failed'));
     }
