@@ -3,13 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Liquid } from 'liquid-gooey';
 
+import { chooseQuickAdd, type QuickAddEntity } from '@/components/quickadd/quickAddOptions';
 import { Icon } from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
 
-// A floating quick-actions button. Tapping the "+" morphs three round actions
-// out of it with a liquid/gooey merge (liquid-gooey) — the fastest way to start
-// the three core moves (new account / opportunity / task) from anywhere.
-type QuickAction = { key: string; icon: IconName; to: string; label: string; y: number };
+// A floating quick-actions button. Tapping "+" morphs three round actions out
+// of it. On a phone this is the create control: there is no N key in the thumb
+// zone. Opportunity and task open the same dialogs as the command palette.
+// The third disc opens the company directory, so it is named Companies.
+type QuickAction = {
+  key: string;
+  icon: IconName;
+  label: string;
+  y: number;
+  entity?: QuickAddEntity;
+  to?: string;
+};
 
 const FAB = 52; // px — keep in lockstep with --fab-size in index.css
 
@@ -19,14 +28,36 @@ export function LiquidQuickActions() {
   const { t } = useTranslation('common');
 
   const actions: QuickAction[] = [
-    { key: 'opp', icon: 'briefcase', to: '/opportunities', label: t('quickActions.opportunity', 'New opportunity'), y: -186 },
-    { key: 'acct', icon: 'building', to: '/companies', label: t('quickActions.account', 'New account'), y: -124 },
-    { key: 'task', icon: 'tasks', to: '/tasks', label: t('quickActions.task', 'New task'), y: -62 },
+    {
+      key: 'opp',
+      icon: 'briefcase',
+      entity: 'opportunity',
+      label: t('quickActions.opportunity', 'New opportunity'),
+      y: -186,
+    },
+    {
+      key: 'acct',
+      icon: 'building',
+      to: '/companies',
+      label: t('nav.companies', 'Companies'),
+      y: -124,
+    },
+    {
+      key: 'task',
+      icon: 'tasks',
+      entity: 'task',
+      label: t('quickActions.task', 'New task'),
+      y: -62,
+    },
   ];
 
-  const go = (to: string) => {
+  const go = (action: QuickAction) => {
     setOpen(false);
-    navigate(to);
+    if (action.entity) {
+      chooseQuickAdd(action.entity, navigate);
+      return;
+    }
+    if (action.to) navigate(action.to);
   };
 
   return (
@@ -55,12 +86,12 @@ export function LiquidQuickActions() {
           >
             <button
               type="button"
-              onClick={() => go(a.to)}
+              onClick={() => go(a)}
               aria-label={a.label}
               title={a.label}
               tabIndex={open ? 0 : -1}
               // Collapsed actions are invisible: keep them out of the a11y tree
-              // too, so "New account" etc. resolve to the visible page control.
+              // too, so these names resolve to the visible page control.
               aria-hidden={open ? undefined : true}
               style={{
                 width: FAB,
