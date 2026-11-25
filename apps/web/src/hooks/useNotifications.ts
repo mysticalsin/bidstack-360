@@ -49,18 +49,22 @@ export function useNotifications(options: { enabled?: boolean } = {}) {
 
 /**
  * Live alerts: listens on the realtime socket, refreshes the bell and shows a
- * toast with an Open link. Mount once (the topbar bell does). A coalesced
- * alert replaces its earlier toast instead of stacking a second one.
+ * toast with an Open link. Open marks that alert read, the same as the tray.
+ * Mount once (the topbar bell does). A coalesced alert replaces its earlier
+ * toast instead of stacking a second one.
  */
 export function useNotificationStream(
   options: { enabled?: boolean; socketFactory?: (url: string) => WebSocket } = {},
 ) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const markRead = useMarkNotificationRead();
   const navigateRef = useRef(navigate);
+  const markReadRef = useRef(markRead.mutate);
   useEffect(() => {
     navigateRef.current = navigate;
-  }, [navigate]);
+    markReadRef.current = markRead.mutate;
+  }, [navigate, markRead.mutate]);
   const enabled = options.enabled ?? true;
   const factory = options.socketFactory;
 
@@ -75,7 +79,15 @@ export function useNotificationStream(
       const toastId = toast.info(n.title, {
         description: n.body ?? undefined,
         duration: 8000,
-        action: url ? { label: 'Open', onClick: () => navigateRef.current(url) } : undefined,
+        action: url
+          ? {
+              label: 'Open',
+              onClick: () => {
+                markReadRef.current(n.id);
+                navigateRef.current(url);
+              },
+            }
+          : undefined,
       });
       shown.set(n.id, toastId);
     };
