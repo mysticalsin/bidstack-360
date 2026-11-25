@@ -4,6 +4,10 @@ import path from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { TOP_ACCOUNTS_MAX } from '@bidstack/shared';
+
+import { topAccountsWorkspaceCaption } from './top-accounts-workspace-caption';
+
 // WHY: Settings, Top accounts, tells an admin the curated list belongs to
 // Mantu. Demo data is a synthetic workspace. The English catalog still carries
 // that sentence, and another draft owns the catalog file. This screen has to
@@ -15,9 +19,6 @@ const catalog = JSON.parse(
 ) as {
   topAccounts: { subtitle: string };
 };
-
-const WORKSPACE_CAPTION =
-  'Hand-pick and order up to 10 accounts for this workspace. This is separate from Key Accounts (regional strategic accounts flagged per company). Saving an empty list reverts the Top Accounts page to the automatic pipeline-value ranking.';
 
 function translate(
   key: string,
@@ -70,13 +71,24 @@ describe('top accounts workspace caption', () => {
     cleanup();
   });
 
+  it('prints the slot cap for this workspace', () => {
+    const caption = topAccountsWorkspaceCaption(TOP_ACCOUNTS_MAX);
+    expect(caption).toContain(`up to ${TOP_ACCOUNTS_MAX} accounts`);
+    expect(caption).toContain('this workspace');
+    expect(caption).not.toMatch(/Mantu/);
+    expect(topAccountsWorkspaceCaption(3)).toContain('up to 3 accounts');
+  });
+
   it('does not name Mantu on the curated list', () => {
     expect(catalog.topAccounts.subtitle).toMatch(/Mantu/);
 
     render(<TopAccountsSection />);
 
-    expect(screen.getByText(WORKSPACE_CAPTION)).toBeTruthy();
+    const src = readFileSync(SECTION_SRC, 'utf8');
+    expect(screen.getByText(topAccountsWorkspaceCaption(TOP_ACCOUNTS_MAX))).toBeTruthy();
     expect(screen.queryByText(/Mantu/)).toBeNull();
-    expect(readFileSync(SECTION_SRC, 'utf8')).not.toMatch(/Mantu/);
+    expect(src).not.toMatch(/Mantu/);
+    expect(src).toContain('topAccountsWorkspaceCaption');
+    expect(src).not.toContain("'topAccounts.subtitle'");
   });
 });
