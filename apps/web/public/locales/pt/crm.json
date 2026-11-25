@@ -253,6 +253,7 @@
     "filters": {
       "groupLabel": "Filtrar tarefas",
       "all": "Todas",
+      "mine": "Minhas",
       "today": "Hoje",
       "overdue": "Atrasadas"
     },
@@ -282,6 +283,8 @@
     "empty": {
       "title": "Ainda não há tarefas",
       "filteredTitle": "Nenhuma tarefa corresponde a este filtro",
+      "mineTitle": "Nenhum destes acompanhamentos é seu",
+      "mineUnknown": "Não foi possível saber quais acompanhamentos são seus.",
       "message": "Crie um acompanhamento para começar."
     },
     "reorder": {

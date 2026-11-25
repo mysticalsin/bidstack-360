@@ -253,6 +253,7 @@
     "filters": {
       "groupLabel": "Filtra le attività",
       "all": "Tutte",
+      "mine": "Mie",
       "today": "Oggi",
       "overdue": "In ritardo"
     },
@@ -282,6 +283,8 @@
     "empty": {
       "title": "Ancora nessuna attività",
       "filteredTitle": "Nessuna attività corrisponde a questo filtro",
+      "mineTitle": "Nessuno di questi follow-up è tuo",
+      "mineUnknown": "Impossibile capire quali follow-up sono tuoi.",
       "message": "Crea un follow-up per iniziare."
     },
     "reorder": {
