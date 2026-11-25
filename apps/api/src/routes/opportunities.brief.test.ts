@@ -48,7 +48,8 @@ describe('buildOpportunityBrief', () => {
     expect(brief).toContain('Validate margin model');
     expect(brief).toContain('Avery Sponsor');
     expect(brief).not.toMatch(/stub|DUST_API_KEY|DUST_AGENT_EXEC_BRIEF/i);
-    expect(brief).toContain('EUR 1250000');
+    expect(brief).toContain('1250000');
+    expect(brief).not.toMatch(/EUR|€/);
     expect(estimateBriefTokens(brief)).toBeGreaterThan(50);
   });
 
@@ -93,8 +94,10 @@ describe('buildOpportunityBrief', () => {
     });
 
     expect((Number(large) / 1_000_000).toString()).not.toBe('9007199254.740993');
-    expect(largeBrief).toContain('EUR 9007199254.740993');
-    expect(centsBrief).toContain('EUR 1.234567');
+    expect(largeBrief).toContain('9007199254.740993');
+    expect(largeBrief).not.toMatch(/EUR|€/);
+    expect(centsBrief).toContain('1.234567');
+    expect(centsBrief).not.toMatch(/EUR|€/);
   });
 
   it('redacts opted-out stakeholder names', () => {
