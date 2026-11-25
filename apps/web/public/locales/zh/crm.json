@@ -3308,7 +3308,8 @@
     "weekdayWed": "周三",
     "weekdayThu": "周四",
     "weekdayFri": "周五",
-    "weekdaySat": "周六"
+    "weekdaySat": "周六",
+    "finishedOnly": "已完成的跟进不显示在此日历上。"
   },
   "recentActivity": {
     "heading": "最近活动",

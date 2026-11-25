@@ -3341,7 +3341,8 @@
     "weekdayWed": "Mié",
     "weekdayThu": "Jue",
     "weekdayFri": "Vie",
-    "weekdaySat": "Sáb"
+    "weekdaySat": "Sáb",
+    "finishedOnly": "Los seguimientos terminados no aparecen en este calendario."
   },
   "recentActivity": {
     "heading": "Actividad reciente",

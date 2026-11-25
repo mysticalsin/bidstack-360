@@ -3308,7 +3308,8 @@
     "weekdayWed": "Qua",
     "weekdayThu": "Qui",
     "weekdayFri": "Sex",
-    "weekdaySat": "Sáb"
+    "weekdaySat": "Sáb",
+    "finishedOnly": "Os acompanhamentos concluídos ficam fora deste calendário."
   },
   "recentActivity": {
     "heading": "Atividade recente",
