@@ -4029,7 +4029,12 @@
     "viewAll": "View all",
     "errorMessage": "Couldn't load bids closing this week.",
     "retry": "Retry",
-    "empty": "No bids closing this week."
+    "empty": "No bids closing this week.",
+    "pastCloseWindow": "No bids are due in the next 7 days.",
+    "pastCloseOne": "1 open bid is already past close.",
+    "pastClose": "{{count}} open bids are already past close.",
+    "viewPastClose": "View past close",
+    "pastCloseError": "Couldn't load bids that are already past close."
   },
   "crm": {
     "pipelineCardAriaLabelReadOnly": "{{code}}: {{name}}, {{stage}}, {{value}}.",
