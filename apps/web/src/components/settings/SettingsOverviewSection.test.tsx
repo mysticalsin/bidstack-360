@@ -122,8 +122,20 @@ describe('SettingsOverviewSection', () => {
     hookMocks.useWebhookSubscriptions.mockReturnValue({
       data: {
         items: [
-          { active: true, failureCount: 2 },
-          { active: false, failureCount: 0 },
+          {
+            active: true,
+            failureCount: 2,
+            events: ['bid.updated'],
+            lastDeliveryAt: null,
+            lastFailureAt: null,
+          },
+          {
+            active: false,
+            failureCount: 0,
+            events: [],
+            lastDeliveryAt: null,
+            lastFailureAt: null,
+          },
         ],
         pageContinues: false,
       },
