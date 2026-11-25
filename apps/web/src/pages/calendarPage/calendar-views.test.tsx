@@ -86,7 +86,39 @@ describe('multi-day timed events', () => {
     expect(agenda.textContent).not.toContain('All day');
   });
 
-  it('still labels a true all-day event as all day', () => {
+  // WHY: a row created in Polo is stored with a provider name even though it
+// never reaches that calendar. The card must not repeat the name.
+it('does not call a Polo-only event a Google or Microsoft event', () => {
+  render(
+    <MemoryRouter>
+      <EventPanel
+        event={event({ localOnly: true, provider: 'google_workspace', subject: 'Pricing review' })}
+        tz={TZ}
+        onClose={() => {}}
+      />
+    </MemoryRouter>,
+  );
+  const panel = screen.getByTestId('calendar-event-panel');
+  expect(panel.textContent).toContain('Only in Polo');
+  expect(panel.textContent).not.toMatch(/Google|Microsoft/);
+});
+
+it('names the provider when the event is actually on that calendar', () => {
+  render(
+    <MemoryRouter>
+      <EventPanel
+        event={event({ localOnly: false, provider: 'microsoft_graph', subject: 'Kickoff' })}
+        tz={TZ}
+        onClose={() => {}}
+      />
+    </MemoryRouter>,
+  );
+  const panel = screen.getByTestId('calendar-event-panel');
+  expect(panel.textContent).toContain('Microsoft');
+  expect(panel.textContent).not.toContain('Only in Polo');
+});
+
+it('still labels a true all-day event as all day', () => {
     render(
       <MemoryRouter>
         <EventPanel

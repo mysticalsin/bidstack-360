@@ -69,12 +69,15 @@ export function EventPanel({ event, tz, onClose }: EventPanelProps) {
           </dl>
 
           <div className="flex flex-wrap gap-2">
-            <Badge tone={event.provider === 'microsoft_graph' ? 'purple' : 'blue'}>
-              {event.provider === 'microsoft_graph'
-                ? t('calendar.providerMicrosoft', 'Microsoft')
-                : t('calendar.providerGoogle', 'Google')}
-            </Badge>
-            {event.localOnly ? <Badge tone="gray">{t('calendar.localOnly', 'Only in Polo')}</Badge> : null}
+            {event.localOnly ? (
+              <Badge tone="gray">{t('calendar.localOnly', 'Only in Polo')}</Badge>
+            ) : (
+              <Badge tone={event.provider === 'microsoft_graph' ? 'purple' : 'blue'}>
+                {event.provider === 'microsoft_graph'
+                  ? t('calendar.providerMicrosoft', 'Microsoft')
+                  : t('calendar.providerGoogle', 'Google')}
+              </Badge>
+            )}
             {event.syncState === 'CONFLICT' ? (
               <Badge tone="amber">{t('calendar.syncConflict', 'Sync conflict')}</Badge>
             ) : null}

@@ -46,9 +46,6 @@ export function CreateEventModal({
   const [startTime, setStartTime] = useState(hhmm(startHour * 60));
   const [endTime, setEndTime] = useState(hhmm(startHour * 60 + 30));
   const [location, setLocation] = useState('');
-  const [provider, setProvider] = useState<'google_workspace' | 'microsoft_graph'>(
-    'google_workspace',
-  );
   const [formError, setFormError] = useState<string | null>(null);
   // One key per dialog, so a double submit or a network retry creates one event.
   const [clientRequestId] = useState(() => crypto.randomUUID());
@@ -65,7 +62,6 @@ export function CreateEventModal({
       startAt: zonedWallTimeToUtc(`${date}T${startTime}:00`, tz).toISOString(),
       endAt: zonedWallTimeToUtc(`${date}T${endTime}:00`, tz).toISOString(),
       location: location || undefined,
-      provider,
       clientRequestId,
     });
   }
@@ -103,36 +99,18 @@ export function CreateEventModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="evt-date" className={LABEL}>
-                {t('createEvent.dateLabel', 'Date')}
-              </label>
-              <input
-                id="evt-date"
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={FIELD}
-              />
-            </div>
-            <div>
-              <label htmlFor="evt-provider" className={LABEL}>
-                {t('createEvent.calendarLabel', 'Calendar')}
-              </label>
-              <select
-                id="evt-provider"
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as typeof provider)}
-                className={FIELD}
-              >
-                <option value="google_workspace">{t('createEvent.providerGoogle', 'Google')}</option>
-                <option value="microsoft_graph">
-                  {t('createEvent.providerMicrosoft', 'Microsoft')}
-                </option>
-              </select>
-            </div>
+          <div>
+            <label htmlFor="evt-date" className={LABEL}>
+              {t('createEvent.dateLabel', 'Date')}
+            </label>
+            <input
+              id="evt-date"
+              type="date"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={FIELD}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -164,6 +142,9 @@ export function CreateEventModal({
             </div>
           </div>
           <p className="text-xs text-(--fg-tertiary)">{timeZoneLabel(tz)}</p>
+          <p className="text-xs text-(--fg-secondary)">
+            {t('createEvent.staysInPolo', 'This event stays in Polo.')}
+          </p>
 
           <div>
             <label htmlFor="evt-location" className={LABEL}>
