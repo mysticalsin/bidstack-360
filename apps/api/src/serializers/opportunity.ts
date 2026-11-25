@@ -38,6 +38,7 @@ type SerializedOpportunity = {
   bidClass?: string | null;
   fteEstimate?: number | null;
   commitmentLevel?: string | null;
+  companyId?: string | null;
   // Only the detail/full path reads intel; the list query omits the column to
   // avoid fetching the large JSONB per row, so this is optional here.
   intel?: unknown;
@@ -100,6 +101,7 @@ export function serializeOpportunity(
     bidClass: o.bidClass ?? null,
     fteEstimate: o.fteEstimate ?? null,
     commitmentLevel: o.commitmentLevel ?? null,
+    companyId: o.companyId ?? null,
   };
 }
 

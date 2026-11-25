@@ -163,7 +163,17 @@ export const Row = memo(function Row({
           </Badge>
         ) : null}
         <div className="text-xs text-[var(--fg-tertiary)]">
-          <span>{opp.customer}</span>
+          {opp.companyId ? (
+            <Link
+              to={`/accounts/${encodeURIComponent(opp.companyId)}`}
+              aria-label={`Open ${opp.customer} account`}
+              className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)]"
+            >
+              {opp.customer}
+            </Link>
+          ) : (
+            <span>{opp.customer}</span>
+          )}
           <UpdatedAgo iso={opp.updatedAt} />
         </div>
       </td>

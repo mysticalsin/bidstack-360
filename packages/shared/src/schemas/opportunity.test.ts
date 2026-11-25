@@ -59,6 +59,18 @@ describe('Opportunity', () => {
   it('accepts legacy persisted codes on read so historical records do not crash list views', () => {
     expect(() => Opportunity.parse({ ...valid, code: 'RFP-ABCD-1234' })).not.toThrow();
   });
+
+  it('keeps the company id a bid uses to open its account', () => {
+    // WHY: the list and the deal header link the customer to /accounts/:id.
+    // A name is not that id. CI Financial's cockpit is the company row.
+    const companyId = '00000000-0000-4000-8000-0000000000aa';
+    expect(Opportunity.parse({ ...valid, companyId }).companyId).toBe(companyId);
+    expect(Opportunity.parse({ ...valid, companyId: null }).companyId).toBeNull();
+  });
+
+  it('rejects a customer name stored in the company id', () => {
+    expect(() => Opportunity.parse({ ...valid, companyId: 'CI Financial' })).toThrow();
+  });
 });
 
 describe('OpportunityCreate', () => {
@@ -79,6 +91,26 @@ describe('OpportunityCreate', () => {
         territoryName: null,
       }),
     ).not.toThrow();
+  });
+
+  it('drops a company id on create so the client cannot point a bid at an account', () => {
+    // WHY: the server re-links from the customer name. A caller-supplied id
+    // would let a bid open a cockpit it is not filed on.
+    const parsed = OpportunityCreate.parse({
+      customer: 'CI Financial',
+      name: 'CI Financial — IT Modernization',
+      pipelineStageId: '00000000-0000-0000-0000-000000000001',
+      value: 100,
+      probability: 30,
+      dueDate: null,
+      owner: null,
+      industry: null,
+      logo: null,
+      country: null,
+      territoryId: null,
+      companyId: '00000000-0000-4000-8000-0000000000aa',
+    });
+    expect(parsed).not.toHaveProperty('companyId');
   });
 
   it('rejects noncanonical supplied codes on write', () => {
