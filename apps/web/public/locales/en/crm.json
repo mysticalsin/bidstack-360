@@ -4022,7 +4022,10 @@
     "dueToday": "Due today",
     "daysLeft": "{{count}}d left",
     "ariaLabel": "Due {{date}}",
-    "ariaLabelNoDate": "No due date set"
+    "ariaLabelNoDate": "No due date set",
+    "closed": "Closed",
+    "ariaClosed": "Closed bid. Due {{date}}",
+    "ariaClosedNoDate": "Closed bid. No due date set"
   },
   "closingThisWeek": {
     "heading": "Closing this week",

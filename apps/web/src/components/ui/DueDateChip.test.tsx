@@ -88,3 +88,28 @@ describe('DueDateChip rendering', () => {
     expect(screen.getByText('No date')).toBeDefined();
   });
 });
+
+describe('DueDateChip on a decided bid', () => {
+  // A closed won/lost bid keeps its due date as history. Counting it down
+  // ("211d overdue", "12d left") tells a bid lead the clock is still running.
+  // Demo OP-2046 is closed won, due 2026-04-28, and still sits on the board.
+  it('stops the clock on a past due date instead of calling the bid overdue', () => {
+    render(<DueDateChip dueDate="2020-01-01" settled />);
+    expect(screen.getByText('Closed')).toBeDefined();
+    expect(screen.queryByText(/overdue/i)).toBeNull();
+    expect(screen.getByLabelText(/Closed bid/i).getAttribute('aria-label')).toMatch(/2020/);
+  });
+
+  it('stops the clock on a future due date instead of counting days left', () => {
+    render(<DueDateChip dueDate="2099-12-31" settled />);
+    expect(screen.getByText('Closed')).toBeDefined();
+    expect(screen.queryByText(/d left/i)).toBeNull();
+    expect(screen.queryByText(/due today/i)).toBeNull();
+  });
+
+  it('says the bid is closed when a decided bid has no due date', () => {
+    render(<DueDateChip dueDate={null} settled />);
+    expect(screen.getByText('Closed')).toBeDefined();
+    expect(screen.queryByText('No date')).toBeNull();
+  });
+});

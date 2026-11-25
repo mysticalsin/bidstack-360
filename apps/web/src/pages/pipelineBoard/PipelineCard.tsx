@@ -12,9 +12,8 @@ import { Icon } from '@/components/ui/Icon';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
+import { resolvePipelineStage } from '@/lib/pipeline-stages';
 import type { Opportunity } from '@bidstack/shared';
-
-import { getStageName } from './pipelineUtils';
 
 interface PipelineCardProps {
   opp: Opportunity;
@@ -48,14 +47,15 @@ export const PipelineCard = memo(function PipelineCard({
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
-  const stageName = getStageName(opp);
+  const stage = resolvePipelineStage(opp);
+  const stageName = stage.name;
+  // A won or lost stage has stopped. Name checks miss a custom "Won" stage
+  // whose isWon flag is set, and that card would still wear an overdue clock.
+  const decided = stage.isWon || stage.isLost;
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
   // DueDateChip below said "Due today". Tint/aria-label must agree with the chip.
-  const isStalled =
-    dueDateUrgency(opp.dueDate).urgency === 'danger' &&
-    stageName !== 'Closed Won' &&
-    stageName !== 'Closed Lost';
+  const isStalled = dueDateUrgency(opp.dueDate).urgency === 'danger' && !decided;
 
   return (
     <motion.li
@@ -172,7 +172,7 @@ export const PipelineCard = memo(function PipelineCard({
             WCAG 1.4.1) — a separate static "Overdue" badge used to render
             alongside it, duplicating the same state as two tomato pills. */}
         <div className="mt-2 flex items-center justify-between text-xs text-[var(--fg-tertiary)]">
-          <DueDateChip dueDate={opp.dueDate} size="sm" />
+          <DueDateChip dueDate={opp.dueDate} size="sm" settled={decided} />
           <span className="font-mono">{opp.code}</span>
         </div>
       </Link>

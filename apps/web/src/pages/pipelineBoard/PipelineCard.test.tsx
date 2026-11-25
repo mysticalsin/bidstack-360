@@ -125,4 +125,54 @@ describe('PipelineCard overdue affordance', () => {
     const link = screen.getByRole('link');
     expect(link.getAttribute('aria-label')).not.toContain(', overdue');
   });
+
+  it('does not call a closed-won bid overdue when its due date is in the past', () => {
+    // Demo OP-2046 is closed won, due 2026-04-28. The column already says
+    // the outcome. The card clock must not keep counting days late.
+    renderCard({
+      ...BASE_OPP,
+      code: 'OP-2046',
+      stage: 'closed_won',
+      dueDate: '2020-01-01',
+    });
+
+    expect(screen.getByText('Closed')).toBeDefined();
+    expect(screen.queryByText(/overdue/i)).toBeNull();
+    const link = screen.getByRole('link');
+    expect(link.getAttribute('aria-label')).not.toContain(', overdue');
+    expect(link.className).not.toContain('border-red-300/40');
+  });
+
+  it('does not count days left on a closed-lost bid whose due date is still ahead', () => {
+    renderCard({
+      ...BASE_OPP,
+      code: 'OP-2047',
+      stage: 'closed_lost',
+      dueDate: '2099-12-31',
+    });
+
+    expect(screen.getByText('Closed')).toBeDefined();
+    expect(screen.queryByText(/d left/i)).toBeNull();
+  });
+
+  it('treats a custom won stage as decided, not only the name Closed Won', () => {
+    renderCard({
+      ...BASE_OPP,
+      stage: 'closed_won',
+      pipelineStageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      pipelineStage: {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        name: 'Won',
+        probability: 100,
+        color: '#10b981',
+        isWon: true,
+        isLost: false,
+      },
+      dueDate: '2020-01-01',
+    });
+
+    expect(screen.getByText('Closed')).toBeDefined();
+    expect(screen.queryByText(/overdue/i)).toBeNull();
+    expect(screen.getByRole('link').className).not.toContain('border-red-300/40');
+  });
 });

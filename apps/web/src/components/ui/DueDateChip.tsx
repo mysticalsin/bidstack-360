@@ -72,6 +72,11 @@ export interface DueDateChipProps {
   /** sm = kanban card / dense table cell. md = default. lg = detail-page header. */
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  /**
+   * The bid is already won or lost. The date stays on the record, but the
+   * countdown has stopped: a past date is history, not an overdue open bid.
+   */
+  settled?: boolean;
 }
 
 const SIZE_CLASS: Record<'sm' | 'md' | 'lg', string> = {
@@ -82,8 +87,19 @@ const SIZE_CLASS: Record<'sm' | 'md' | 'lg', string> = {
 
 const ICON_SIZE: Record<'sm' | 'md' | 'lg', number> = { sm: 10, md: 12, lg: 13 };
 
-export function DueDateChip({ dueDate, size = 'md', className }: DueDateChipProps) {
+export function DueDateChip({ dueDate, size = 'md', className, settled = false }: DueDateChipProps) {
   const { t } = useTranslation('crm');
+  if (settled) {
+    const ariaLabel = dueDate
+      ? t('dueDateChip.ariaClosed', 'Closed bid. Due {{date}}', { date: formatDate(dueDate) })
+      : t('dueDateChip.ariaClosedNoDate', 'Closed bid. No due date set');
+    return (
+      <Badge tone="gray" aria-label={ariaLabel} className={cn('font-medium', SIZE_CLASS[size], className)}>
+        <Icon name="clock" size={ICON_SIZE[size]} strokeWidth={2} />
+        {t('dueDateChip.closed', 'Closed')}
+      </Badge>
+    );
+  }
   const { tone, days } = dueDateUrgency(dueDate);
 
   const label =
