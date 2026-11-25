@@ -125,6 +125,7 @@ export function OppPageHeader({
   itemCount,
   hasData,
   isExporting = false,
+  listNotice,
   onClearSearch,
   onClearStageFilter,
   onExportCsv,
@@ -136,6 +137,11 @@ export function OppPageHeader({
   hasData: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
+  /**
+   * The bid list has no payload yet. Loading and failure are not zero bids.
+   * Omit once a page, including an empty one, has settled.
+   */
+  listNotice?: 'loading' | 'failed';
   onClearSearch: () => void;
   onClearStageFilter: () => void;
   onExportCsv: () => void;
@@ -153,8 +159,15 @@ export function OppPageHeader({
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <h1 className="page-title">{t('oppToolbar.title', 'Opportunities')}</h1>
-        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {search ? (
+        <p
+          className="mt-1 text-sm text-[var(--fg-secondary)]"
+          aria-busy={listNotice === 'loading' ? true : undefined}
+        >
+          {listNotice === 'loading' ? (
+            t('oppToolbar.listLoading', 'Loading the bid list.')
+          ) : listNotice === 'failed' ? (
+            t('oppToolbar.listFailed', 'The bid list did not load.')
+          ) : search ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
               {t('oppToolbar.resultsFor', 'results for')}{' '}

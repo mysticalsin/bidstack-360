@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
@@ -84,7 +85,7 @@ export function OpportunitiesPage() {
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
   const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
-  const { data, isLoading, isError, error } = useOpportunities({
+  const { data, isLoading, isError, error, refetch } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
     ...(search ? { search } : {}),
@@ -98,6 +99,11 @@ export function OpportunitiesPage() {
     ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
     ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
+  // A missing payload is not an empty book. A later refresh that fails keeps
+  // the last page. Only the first miss is loading or an error.
+  const listMissing = data == null;
+  const listPending = isLoading && listMissing;
+  const listFailed = isError && listMissing;
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
   const orgSummary = useOrgSummary();
@@ -399,6 +405,7 @@ export function OpportunitiesPage() {
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
         isExporting={isExporting}
+        listNotice={listPending ? 'loading' : listFailed ? 'failed' : undefined}
         onClearSearch={clearSearch}
         onClearStageFilter={() => setStageFilter(null)}
         onExportCsv={() => void exportCsv()}
@@ -445,13 +452,18 @@ export function OpportunitiesPage() {
       )}
 
       <Card className="overflow-hidden">
-        {isLoading ? (
+        {listPending ? (
           <TableSkeleton rows={8} columns={6} headless />
-        ) : isError ? (
+        ) : listFailed ? (
           <ErrorState
             title={t('opportunities.error.title', "Couldn't load opportunities")}
             message={
               error?.message ?? t('opportunities.error.message', 'Try again in a moment.')
+            }
+            action={
+              <Button variant="secondary" size="lg" onClick={() => void refetch()}>
+                {t('opportunities.error.retry', 'Retry')}
+              </Button>
             }
           />
         ) : data?.items.length === 0 ? (

@@ -122,7 +122,8 @@
     },
     "error": {
       "title": "无法加载商机",
-      "message": "请稍后重试。"
+      "message": "请稍后重试。",
+      "retry": "重试"
     },
     "empty": {
       "title": "暂无商机",
@@ -2135,6 +2136,8 @@
     "stageOpportunities": "{{stage}}商机",
     "clearFilter": "清除筛选",
     "bidsInFlight": "{{count}} 个进行中的投标 · 点击任意单元格即可行内编辑。",
+    "listLoading": "正在加载投标列表。",
+    "listFailed": "投标列表没有加载。",
     "exportingLabel": "正在导出商机…",
     "exportLabel": "将可见商机导出为 CSV",
     "exporting": "正在导出…",
