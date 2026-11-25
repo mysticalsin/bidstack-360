@@ -198,8 +198,18 @@ export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
 /** Set by an explicit sign-out so /login does not re-enter from the edge identity. */
 export const DEMO_SIGNED_OUT_KEY = 'bidstack:demo-signed-out';
 
+function readStoredDemoEmail(): string | null {
+  if (typeof window === 'undefined') return null;
+  const stored = localStorage.getItem(DEMO_EMAIL_KEY);
+  return stored ? stored : null;
+}
+
 function DemoAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
+  // The session banner reads this on each render. localStorage writes from
+  // demo login do not render by themselves, and setSignedIn(true) is a no-op
+  // when the visitor is already signed in, so the email has to be state.
+  const [email, setEmail] = useState(readStoredDemoEmail);
 
   // Register the token provider SYNCHRONOUSLY, during this component's own
   // render — not in a useEffect. React commits child effects before parent
@@ -233,6 +243,7 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(DEMO_EMAIL_KEY);
       writeSessionMarker(null);
       setSignedIn(false);
+      setEmail(null);
     });
     return () => setAuthInvalidHandler(null);
   }, []);
@@ -246,6 +257,7 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback((cb?: () => void) => {
     const hasToken = localStorage.getItem(DEMO_TOKEN_KEY) !== null;
     setSignedIn(hasToken);
+    setEmail(hasToken ? readStoredDemoEmail() : null);
     if (hasToken) writeSessionMarker('demo');
     cb?.();
   }, []);
@@ -255,6 +267,7 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(DEMO_EMAIL_KEY);
     localStorage.setItem(DEMO_SIGNED_OUT_KEY, '1');
     setSignedIn(false);
+    setEmail(null);
     writeSessionMarker(null);
     // Behind the polo-preview Worker this clears the Polo session cookie. An
     // Access session outlives it, which is what DEMO_SIGNED_OUT_KEY covers.
@@ -266,8 +279,6 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => undefined);
     cb?.();
   }, []);
-
-  const email = typeof window !== 'undefined' ? localStorage.getItem(DEMO_EMAIL_KEY) : null;
 
   return (
     <AuthContext.Provider
