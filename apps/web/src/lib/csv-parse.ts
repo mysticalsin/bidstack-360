@@ -9,6 +9,16 @@ export interface ParsedCsv {
   rows: Record<string, string>[];
 }
 
+/**
+ * The export prefixes a leading + with one apostrophe so a spreadsheet will
+ * not run a demo phone as a formula. That mark is not part of the number.
+ * A name such as O'Brien, or a signed amount, does not match.
+ */
+function unescapeExportedPhone(value: string): string {
+  if (value.startsWith("'+") && /\d/.test(value)) return value.slice(1);
+  return value;
+}
+
 /** Split raw CSV text into a header row + record objects keyed by header. */
 export function parseCsv(text: string): ParsedCsv {
   const matrix = toMatrix(text);
@@ -26,7 +36,7 @@ export function parseCsv(text: string): ParsedCsv {
     for (let c = 0; c < headers.length; c++) {
       const key = headers[c];
       if (key === undefined) continue;
-      row[key] = (cells[c] ?? '').trim();
+      row[key] = unescapeExportedPhone((cells[c] ?? '').trim());
     }
     rows.push(row);
   }
