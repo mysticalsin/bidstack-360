@@ -28,6 +28,9 @@ const LIVE_OR_SECURITY_QUERY_PREFIXES = new Set([
   'integrations:setup-guide',
   'me',
   'permissions',
+  // The shell data-mode banner. A restored real or demo answer labels the
+  // workspace the visitor is in now with the mode from the last session.
+  'polo-identity',
   'roles',
   'user-groups',
   'user-integrations-status',
@@ -103,8 +106,9 @@ function isQueryKeySerializable(key: unknown[]): boolean {
 }
 
 function shouldPersistQueryKey(key: unknown[]): boolean {
-  // Live control-plane and health surfaces must always hit the backend after
-  // reload; a persisted "healthy" snapshot is worse than a skeleton there.
+  // Live control-plane, health, and the data-mode banner must always hit the
+  // backend after reload. A persisted "healthy" or "real" snapshot is worse
+  // than a skeleton there.
   const prefix = typeof key[0] === 'string' ? key[0] : '';
   if (
     key[0] === 'serum' ||
