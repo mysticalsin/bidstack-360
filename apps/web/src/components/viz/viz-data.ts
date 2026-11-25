@@ -94,6 +94,27 @@ export function wonByQuarter(rows: OppRow[]) {
 }
 
 const monFmt = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });
+/**
+ * Won value whose close falls in the UTC year of `now`.
+ * Close is closedAt when it was recorded, otherwise the due date.
+ * A win in another year stays out. The hero "Won this year" figure and the
+ * sheet that opens from it both use this year, so a later due date cannot
+ * show a total the sheet then leaves empty.
+ */
+export function wonThisYear(rows: OppRow[], now = Date.now()): number {
+  const year = new Date(now).getUTCFullYear();
+  let sum = 0;
+  for (const o of rows) {
+    if (!isWon(o)) continue;
+    const at = closeDate(o);
+    if (!at) continue;
+    const d = new Date(at);
+    if (Number.isNaN(d.getTime()) || d.getUTCFullYear() !== year) continue;
+    sum += o.value ?? 0;
+  }
+  return sum;
+}
+
 /** Cumulative won value by close month for the year of the latest close. */
 export function cumulativeWon(rows: OppRow[]) {
   const won = rows.filter(isWon).map((o) => ({ at: closeDate(o), v: o.value ?? 0 })).filter((r): r is { at: string; v: number } => Boolean(r.at));
