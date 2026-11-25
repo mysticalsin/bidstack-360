@@ -15,6 +15,7 @@ import {
   type ProposalStatus,
 } from '@/components/rfp/shared/ProposalStatusChip';
 import { useHasPermission } from '@/hooks/useCapabilities';
+import { formatProposalDueDate } from './proposals-search-params';
 
 interface ProposalSection {
   id: string;
@@ -49,7 +50,7 @@ export function ProposalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { t } = useTranslation('rfp');
+  const { t, i18n } = useTranslation('rfp');
   const canWrite = useHasPermission('proposals:write');
   useDocumentTitle();
 
@@ -344,7 +345,7 @@ export function ProposalDetailPage() {
             {t('proposalDetail.version', 'v{{version}}', { version: proposal.version })}
             {proposal.dueDate
               ? ` · ${t('proposalDetail.due', 'Due {{date}}', {
-                  date: new Date(proposal.dueDate).toLocaleDateString(),
+                  date: formatProposalDueDate(proposal.dueDate, i18n?.language),
                 })}`
               : ''}
           </p>
