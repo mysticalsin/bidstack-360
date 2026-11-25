@@ -51,7 +51,8 @@ export const KamHandoffPayload = z.object({
       id: z.string().uuid(),
       code: z.string(),
       valueMicros: z.number(),
-      currency: z.string(),
+      // Null when the opportunity row has no currency. Do not invent EUR.
+      currency: z.string().nullable(),
     })
     .nullable(),
 });
