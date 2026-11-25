@@ -3308,7 +3308,9 @@
     "weekdayWed": "Qua",
     "weekdayThu": "Qui",
     "weekdayFri": "Sex",
-    "weekdaySat": "Sáb"
+    "weekdaySat": "Sáb",
+    "lateMonth": "O acompanhamento em aberto mais recente desta lista está neste mês.",
+    "upcomingMonth": "O próximo acompanhamento em aberto desta lista está neste mês."
   },
   "recentActivity": {
     "heading": "Atividade recente",

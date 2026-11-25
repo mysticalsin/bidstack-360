@@ -308,7 +308,18 @@ export function TasksPage() {
       </p>
 
       {view === 'calendar' ? (
-        <TaskCalendar tasks={data?.items ?? []} />
+        isError ? (
+          <ErrorState
+            title={t('tasks.error.title', 'Could not load tasks')}
+            message={
+              error instanceof Error ? error.message : t('tasks.error.generic', 'Something went wrong')
+            }
+          />
+        ) : isLoading ? (
+          <LoadingSkeleton />
+        ) : (
+          <TaskCalendar tasks={data?.items ?? []} />
+        )
       ) : (
         <>
           <div className="sr-only" aria-live="polite" aria-atomic="true">

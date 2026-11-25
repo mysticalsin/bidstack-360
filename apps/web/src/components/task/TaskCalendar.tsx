@@ -8,61 +8,96 @@ import { daysUntil } from '@/lib/format';
 
 import type { Task } from '@bidstack/shared';
 
+import { calendarFocusMonth, taskDueUtcDay, taskRecordHref } from './task-calendar-focus';
+
 interface TaskCalendarProps {
   tasks: Task[];
+  /** Clock for the open month and the today cell. Defaults to now. */
+  now?: Date;
 }
 
-export function TaskCalendar({ tasks }: TaskCalendarProps) {
+export function TaskCalendar({ tasks, now }: TaskCalendarProps) {
   const { t } = useTranslation('crm');
-  const [month, setMonth] = useState(() => new Date());
+  const [clock] = useState(() => now ?? new Date());
+  const focus = calendarFocusMonth(tasks, clock);
+  const [cursor, setCursor] = useState(() => ({ year: focus.year, monthIndex: focus.monthIndex }));
 
-  const year = month.getFullYear();
-  const monthIndex = month.getMonth();
+  const { year, monthIndex } = cursor;
+  const startOffset = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
+  const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 
-  const firstDay = new Date(year, monthIndex, 1);
-  const lastDay = new Date(year, monthIndex + 1, 0);
-  const startOffset = firstDay.getDay(); // 0 = Sunday
-  const daysInMonth = lastDay.getDate();
-
-  const prevMonth = () => setMonth(new Date(year, monthIndex - 1, 1));
-  const nextMonth = () => setMonth(new Date(year, monthIndex + 1, 1));
+  const prevMonth = () =>
+    setCursor((current) =>
+      current.monthIndex === 0
+        ? { year: current.year - 1, monthIndex: 11 }
+        : { year: current.year, monthIndex: current.monthIndex - 1 },
+    );
+  const nextMonth = () =>
+    setCursor((current) =>
+      current.monthIndex === 11
+        ? { year: current.year + 1, monthIndex: 0 }
+        : { year: current.year, monthIndex: current.monthIndex + 1 },
+    );
 
   const tasksByDay = useMemo(() => {
     const map = new Map<number, Task[]>();
     for (const task of tasks) {
-      if (!task.dueDate) continue;
-      const d = new Date(task.dueDate);
-      if (d.getFullYear() === year && d.getMonth() === monthIndex) {
-        const day = d.getDate();
-        const list = map.get(day) ?? [];
-        list.push(task);
-        map.set(day, list);
-      }
+      const due = taskDueUtcDay(task.dueDate);
+      if (!due || due.year !== year || due.monthIndex !== monthIndex) continue;
+      const list = map.get(due.day) ?? [];
+      list.push(task);
+      map.set(due.day, list);
     }
     return map;
   }, [tasks, year, monthIndex]);
 
-  const monthLabel = month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const monthLabel = new Date(Date.UTC(year, monthIndex, 1)).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const todayUtc = {
+    year: clock.getUTCFullYear(),
+    monthIndex: clock.getUTCMonth(),
+  };
+  const showingFocus = year === focus.year && monthIndex === focus.monthIndex;
+  const focusIsCurrent = focus.year === todayUtc.year && focus.monthIndex === todayUtc.monthIndex;
+  const focusBeforeCurrent =
+    focus.year < todayUtc.year ||
+    (focus.year === todayUtc.year && focus.monthIndex < todayUtc.monthIndex);
 
   const cells: Array<{ day: number | null; tasks: Task[]; isToday: boolean }> = [];
   // Empty cells before the 1st
   for (let i = 0; i < startOffset; i++) {
     cells.push({ day: null, tasks: [], isToday: false });
   }
-  const today = new Date();
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({
       day: d,
       tasks: tasksByDay.get(d) ?? [],
-      isToday:
-        today.getDate() === d && today.getMonth() === monthIndex && today.getFullYear() === year,
+      isToday: clock.getUTCDate() === d && year === todayUtc.year && monthIndex === todayUtc.monthIndex,
     });
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--fg-primary)]">{monthLabel}</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--fg-primary)]">{monthLabel}</h2>
+          {showingFocus && !focusIsCurrent ? (
+            <p className="text-xs text-[var(--fg-secondary)]">
+              {focusBeforeCurrent
+                ? t(
+                    'taskCalendar.lateMonth',
+                    'The latest open follow-up in this list is in this month.',
+                  )
+                : t(
+                    'taskCalendar.upcomingMonth',
+                    'The next open follow-up in this list is in this month.',
+                  )}
+            </p>
+          ) : null}
+        </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -122,7 +157,7 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
                   {cell.tasks.map((t) => (
                     <Link
                       key={t.id}
-                      to={`/tasks?search=${encodeURIComponent(t.title)}`}
+                      to={taskRecordHref(t.id)}
                       className="block truncate rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-[var(--surface-hover)]"
                       style={{
                         backgroundColor:

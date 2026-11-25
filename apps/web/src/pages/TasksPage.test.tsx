@@ -53,10 +53,10 @@ function mockTasks(value: Partial<ReturnType<typeof useTasks>>) {
   vi.mocked(useTasks).mockReturnValue(value as ReturnType<typeof useTasks>);
 }
 
-function renderPage() {
+function renderPage(path = '/tasks') {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <TasksPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -128,6 +128,71 @@ describe('TasksPage — tasks:write gating', () => {
     expect((snoozeButton as HTMLButtonElement).disabled).toBe(true);
     expect(snoozeButton.getAttribute('title')).toBe(
       'You need task write access to edit this task.',
+    );
+  });
+});
+
+// Demo follow-ups are due in May 2026. The calendar used to open on the
+// current month, so on 25 Nov 2026 the grid was empty and a chip linked to
+// ?search=, which this page does not read.
+describe('TasksPage calendar', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-25T18:00:00.000Z'));
+    vi.clearAllMocks();
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it('holds the grid until the task read settles', () => {
+    mockTasks({ data: undefined, isLoading: true, isError: false, error: null });
+    renderPage('/tasks?view=calendar');
+
+    expect(document.querySelector('[aria-busy="true"]')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'November 2026' })).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('says when the task read failed instead of painting an empty month', () => {
+    mockTasks({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('tasks down'),
+    });
+    renderPage('/tasks?view=calendar');
+
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getByText('Could not load tasks')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /2026/ })).toBeNull();
+  });
+
+  it('opens on the month that holds the open follow-ups and links the chip to the task', () => {
+    mockTasks({
+      data: {
+        items: [
+          {
+            ...TASK,
+            id: 'mapfre',
+            title: 'Confirm MAPFRE budget owner',
+            dueDate: '2026-05-23',
+          },
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    renderPage('/tasks?view=calendar');
+
+    expect(screen.getByRole('heading', { name: 'May 2026' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Confirm MAPFRE budget owner' }).getAttribute('href')).toBe(
+      '/tasks/mapfre',
     );
   });
 });

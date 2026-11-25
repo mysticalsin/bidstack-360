@@ -3308,7 +3308,9 @@
     "weekdayWed": "周三",
     "weekdayThu": "周四",
     "weekdayFri": "周五",
-    "weekdaySat": "周六"
+    "weekdaySat": "周六",
+    "lateMonth": "此列表中最近一个未完成的跟进在本月。",
+    "upcomingMonth": "此列表中下一个未完成的跟进在本月。"
   },
   "recentActivity": {
     "heading": "最近活动",
