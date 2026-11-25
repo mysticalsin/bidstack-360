@@ -2365,7 +2365,10 @@
       "colName": "名称",
       "colStage": "阶段",
       "colValue": "金额",
-      "colProbability": "概率"
+      "colProbability": "概率",
+      "colDue": "到期",
+      "dueClosed": "已关闭",
+      "dueClosedAria": "到期计时已停止。此投标已关闭。"
     },
     "cases": {
       "emptyTitle": "无未结案例",

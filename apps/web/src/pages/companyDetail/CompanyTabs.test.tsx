@@ -60,3 +60,55 @@ describe('CompanyTabs — OpportunityTab stage label', () => {
     expect(screen.getByText('Closed Won')).toBeTruthy();
   });
 });
+
+// The company Opportunities tab receives dueDate and drops it. On the demo
+// book an open bid such as Logistec SOC 2 (due 2026-08-15, still S1) is
+// already late, and the tab still looks current. A won bid such as Aritzia
+// Endpoint Refresh (closed 2026-04-28) has a past due date because it already
+// closed — that must not read as overdue.
+function renderDue(stage: string, dueDate: string | null, name = 'Logistec — SOC 2 Readiness') {
+  return render(
+    <MemoryRouter>
+      <OpportunityTab
+        opportunities={[
+          {
+            id: 'opp-due',
+            code: 'OP-2042',
+            name,
+            stage,
+            valueMicros: '320000000000',
+            probability: 35,
+            dueDate,
+          },
+        ]}
+      />
+    </MemoryRouter>,
+  );
+}
+
+describe('CompanyTabs — OpportunityTab due clock', () => {
+  it('says an open bid is overdue when its due date is already past', () => {
+    renderDue('s1_ongoing', '2020-01-01');
+
+    expect(screen.getByText(/d overdue/)).toBeTruthy();
+    expect(screen.queryByText('Closed')).toBeNull();
+  });
+
+  it('keeps a bid due today off the overdue count', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    renderDue('s3_technical_iteration', today, 'CI Financial — IT Modernization');
+
+    expect(screen.getByText('Due today')).toBeTruthy();
+    expect(screen.queryByText(/overdue/)).toBeNull();
+  });
+
+  it('stops the clock once the bid is won or lost, even if the due date is past', () => {
+    for (const stage of ['closed_won', 'closed_lost'] as const) {
+      cleanup();
+      renderDue(stage, '2020-01-01', 'Aritzia — Endpoint Refresh');
+
+      expect(screen.getByText('Closed')).toBeTruthy();
+      expect(screen.queryByText(/overdue/)).toBeNull();
+    }
+  });
+});

@@ -2365,7 +2365,10 @@
       "colName": "Nome",
       "colStage": "Estágio",
       "colValue": "Valor",
-      "colProbability": "Probabilidade"
+      "colProbability": "Probabilidade",
+      "colDue": "Vencimento",
+      "dueClosed": "Encerrada",
+      "dueClosedAria": "O prazo parou. Esta proposta está encerrada."
     },
     "cases": {
       "emptyTitle": "Nenhum caso aberto",
