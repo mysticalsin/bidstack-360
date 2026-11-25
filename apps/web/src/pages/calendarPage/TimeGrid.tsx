@@ -136,7 +136,7 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
         </div>
       )}
 
-      {showDeadlines && <DeadlinesRow days={keys.map(keyToLocalDate)} />}
+      {showDeadlines && <DeadlinesRow days={keys.map(keyToLocalDate)} todayKey={todayKey} />}
 
       <div className="grid" style={columns(keys.length)}>
         <div aria-hidden="true">

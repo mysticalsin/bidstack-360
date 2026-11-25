@@ -18,7 +18,14 @@ vi.mock('react-i18next', () => ({
 const apiMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api', () => ({ api: apiMock }));
 
+// date-only due dates are UTC midnight. Local formatDate shifts them to the
+// previous evening in the Americas, so the lane must not speak that string.
+vi.mock('@/lib/format', () => ({
+  formatDate: () => 'Mar 9, 2026',
+}));
+
 import { DeadlinesRow } from './DeadlinesRow';
+import { formatDayLabel } from './layout';
 
 // Frozen clock (Date only — React Query needs real task timers): Tuesday
 // 2026-03-10. Deadlines relative to this day exercise all three urgency
@@ -56,12 +63,12 @@ const DEADLINES = [
   },
 ];
 
-function renderRow() {
+function renderRow(todayKey = '2026-03-10') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <DeadlinesRow days={WEEK} />
+        <DeadlinesRow days={WEEK} todayKey={todayKey} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -80,6 +87,7 @@ describe('DeadlinesRow', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.setSystemTime(NOW);
   });
 
   // WHY: deadlines must land on the calendar day of their date STRING, deep-
@@ -161,5 +169,41 @@ describe('DeadlinesRow', () => {
     expect(
       await screen.findByText('No deadlines'),
     ).toBeTruthy();
+  });
+
+  // WHY: the lane buckets by the calendar day string, but urgency used to
+  // follow the UTC date. After UTC midnight a Toronto (or any western) evening
+  // is still "today" on the grid; marking that column overdue tells a bid
+  // team the submission already slipped. todayKey is the selected time zone's
+  // today, which can lag the UTC date.
+  it('marks a deadline due on the calendar today as due today, not overdue, after UTC midnight', async () => {
+    vi.setSystemTime(new Date('2026-03-11T04:00:00.000Z'));
+    apiMock.mockResolvedValue({ items: DEADLINES });
+
+    renderRow('2026-03-10');
+
+    const todayChip = await screen.findByRole('link', { name: /Rail proposal/ });
+    expect(todayChip.getAttribute('aria-label')).toMatch(/due today/);
+    expect(todayChip.getAttribute('aria-label')).not.toMatch(/overdue/);
+    expect(todayChip.className).toContain('--warning');
+    expect(todayChip.className).not.toContain('--danger');
+
+    const overdueChip = screen.getByRole('link', { name: /Bridge RFP/ });
+    expect(overdueChip.getAttribute('aria-label')).toMatch(/overdue/);
+    expect(overdueChip.className).toContain('--danger');
+  });
+
+  // WHY: the spoken due date must name the same calendar day as the column.
+  // formatDate of a date-only string is the previous local evening west of
+  // UTC; the mock stands in for that shift so this stays red in a UTC runner.
+  it('speaks the due date as the calendar day, not the UTC-midnight local shift', async () => {
+    apiMock.mockResolvedValue({ items: DEADLINES });
+
+    renderRow();
+
+    const futureChip = await screen.findByRole('link', { name: /Port tender/ });
+    const calendarDay = formatDayLabel('2026-03-13', { month: 'short', day: 'numeric', year: 'numeric' });
+    expect(futureChip.getAttribute('aria-label')).toContain(calendarDay);
+    expect(futureChip.getAttribute('aria-label')).not.toContain('Mar 9, 2026');
   });
 });

@@ -9,7 +9,15 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 vi.mock('@/components/ai/MeetingPrepCard', () => ({ MeetingPrepCard: () => null }));
-vi.mock('./DeadlinesRow', () => ({ DeadlinesRow: () => null }));
+const deadlinesProps = vi.hoisted(() => ({
+  current: null as { todayKey?: string } | null,
+}));
+vi.mock('./DeadlinesRow', () => ({
+  DeadlinesRow: (props: { todayKey?: string }) => {
+    deadlinesProps.current = props;
+    return null;
+  },
+}));
 
 import { AgendaList } from './AgendaList';
 import { EventPanel } from './EventPanel';
@@ -45,6 +53,25 @@ const conference = event({
 });
 
 afterEach(() => cleanup());
+
+describe('TimeGrid deadlines lane', () => {
+  it('passes the selected time zone today into the deadlines lane', () => {
+    deadlinesProps.current = null;
+    render(
+      <TimeGrid
+        keys={['2026-03-09', '2026-03-10']}
+        tz="America/Toronto"
+        events={[]}
+        todayKey="2026-03-10"
+        showDeadlines
+        onSlot={() => {}}
+        onSelect={() => {}}
+      />,
+    );
+    // The lane's overdue mark has to use this day, not UTC midnight.
+    expect(deadlinesProps.current?.todayKey).toBe('2026-03-10');
+  });
+});
 
 describe('TimeGrid event targets', () => {
   it('keeps short meetings selectable: 24px floor on fine pointers, 44px on coarse pointers', () => {
