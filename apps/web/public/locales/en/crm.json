@@ -1133,6 +1133,8 @@
     "upload": {
       "entityLabel": "What are you importing?",
       "chooseFile": "Choose a CSV or Excel file",
+      "dropHint": "Or drop a file here",
+      "dropEmpty": "Drop a CSV or Excel file.",
       "maxRows": "Up to {{rows}} rows"
     },
     "map": {
