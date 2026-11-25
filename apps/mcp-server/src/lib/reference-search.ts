@@ -13,6 +13,8 @@ import {
   checkSerumRetrievalRuntimePolicy,
 } from '@bidstack/db/serum-runtime-policy';
 
+import { referenceSearchValue } from './reference-search-amount.js';
+
 const COHERE_MODEL = 'embed-multilingual-v3.0';
 const EMBED_DIM = 1024;
 
@@ -29,7 +31,10 @@ export interface RankedReference {
   title: string;
   description: string | null;
   industry: string | null;
-  valueEur: number | null;
+  /** Units from value_micros. Search sets this and does not set valueEur. */
+  valueUnits?: number | null;
+  /** Older draft fixtures may still carry this key. Search does not set it. */
+  valueEur?: number | null;
   usageCount: number;
   documentUrl: string | null;
   tags: string[];
@@ -206,7 +211,7 @@ export async function searchReferences(
       title: r.title,
       description: r.description,
       industry: r.industry,
-      valueEur: r.value_micros !== null ? Number(r.value_micros) / 1_000_000 : null,
+      ...referenceSearchValue(r.value_micros),
       usageCount: r.usage_count,
       documentUrl: r.document_url,
       tags: r.tags,

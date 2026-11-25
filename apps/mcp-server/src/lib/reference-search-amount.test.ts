@@ -13,6 +13,7 @@ describe('reference search amount under demo data', () => {
     expect(row).toEqual({ valueUnits: 61520 });
     expect(row).not.toHaveProperty('valueEur');
     expect(JSON.stringify(row)).not.toMatch(/EUR|€/);
+    expect(referenceSearchValue(61_520_500_000n)).toEqual({ valueUnits: 61520.5 });
   });
 
   it('does not invent a euro zero when the micros are not a safe integer', () => {
