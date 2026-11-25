@@ -45,6 +45,14 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
   const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
   const months = pipelineByCloseMonth(rows, now);
   const fullLabels = months.keys.map(closeMonthLabel);
+  // A zero series is not "overdue hanging below the line". The demo sign-in
+  // book dates every bid 45 days out, so that sentence was a stale caption.
+  const overdueTotal = months.overdue.reduce((sum, value) => sum + value, 0);
+  const hasDates = months.keys.length > 0;
+  const caption = [
+    overdueTotal > 0 ? 'Overdue bids hang below the line.' : '',
+    hasDates ? 'Select a month or a number to see the bids.' : '',
+  ].filter(Boolean).join(' ');
   return (
     <ChartCard
       testId="dashboard-hero"
@@ -90,14 +98,14 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
             { id: 'lost', label: 'Lost', values: months.lost, color: 'var(--fg-tertiary)' },
             { id: 'open', label: 'Open', values: months.open, color: 'var(--brand-deep)' },
           ]}
-          below={{ id: 'overdue', label: 'Overdue', values: months.overdue }}
+          below={overdueTotal > 0 ? { id: 'overdue', label: 'Overdue', values: months.overdue } : undefined}
           format={fmtCompact}
           onActivate={onDrill ? (i) => onDrill({ status: 'all', closeMonth: months.keys[i] }) : undefined}
         />
       ) : (
         <p className="viz-empty">No dated bids yet.</p>
       )}
-      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
+      {caption ? <div className="viz-caption">{caption}</div> : null}
     </ChartCard>
   );
 }
