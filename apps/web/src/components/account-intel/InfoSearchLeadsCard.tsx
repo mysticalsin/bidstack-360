@@ -49,15 +49,22 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
       <SectionHeader
         title={t('infoSearchLeads.title', 'InfoSearch leads')}
         caption={
-          preview
+          leads.isLoading
             ? t(
-                'infoSearchLeads.captionPreview',
-                'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists',
+                'infoSearchLeads.captionLoading',
+                'Checking InfoSearch for this account.',
               )
-            : t(
-                'infoSearchLeads.captionLive',
-                'Call lists and lead intel for this account — pulled live from InfoSearch',
-              )
+            : leads.isError && leads.data == null
+              ? t('infoSearchLeads.captionError', 'InfoSearch could not be checked.')
+              : preview
+                ? t(
+                    'infoSearchLeads.captionPreview',
+                    'Sample lead intel. Connect InfoSearch (INFOSEARCH_ENABLED) for live call lists.',
+                  )
+                : t(
+                    'infoSearchLeads.captionLive',
+                    'Call lists and lead intel for this account, pulled live from InfoSearch.',
+                  )
         }
       />
       <div className="px-5 pb-5">
