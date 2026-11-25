@@ -199,6 +199,113 @@ describe('finalizePaletteItems — frecency integration', () => {
     expect(getFrecencyScores().get('contact:c1')).toBeGreaterThan(0);
   });
 
+  it('keeps one row when the dashboard and global search name the same company', () => {
+    // WHY: CI Financial is on the demo dashboard and in workspace search.
+    // The palette minted account:<id> and search:company:<id> for that one
+    // record, so ⌘K showed the key account twice. One destination, one row.
+    const ci = 'c0000000-0000-4000-8000-000000000001';
+    const ranked = finalizePaletteItems(
+      [
+        {
+          item: item(`account:${ci}`, 'CI Financial'),
+          score: 40,
+          route: `/accounts/${ci}`,
+        },
+        {
+          item: item(`search:company:${ci}`, 'CI Financial'),
+          score: 28,
+          route: `/accounts/${ci}`,
+        },
+      ],
+      'ci financial',
+      new Map(),
+    );
+    expect(ranked.map((row) => row.id)).toEqual([`account:${ci}`]);
+  });
+
+  it('keeps one row when deal search and workspace search return the same bid', () => {
+    // WHY: typing a bid name fires /api/opportunities and /api/search.
+    // Both rows open /opportunities/<id>. OP-2041 is the demo bid; its id
+    // is assigned at seed time, so the alias pair is what has to collapse.
+    const bid = '00000000-0000-4000-8000-000000000041';
+    const ranked = finalizePaletteItems(
+      [
+        {
+          item: item(`search:opportunity:${bid}`, 'OP-2041 — CI Financial — IT Modernization & MSP'),
+          score: 22,
+          route: `/opportunities/${bid}`,
+        },
+        {
+          item: item(`opp:${bid}`, 'OP-2041 — CI Financial — IT Modernization & MSP'),
+          score: 22,
+          route: `/opportunities/${bid}`,
+        },
+      ],
+      'op-2041',
+      new Map(),
+    );
+    expect(ranked.map((row) => row.id)).toEqual([`search:opportunity:${bid}`]);
+  });
+
+  it('keeps a search-only note and a different company', () => {
+    // WHY: collapsing aliases must not drop a hit that exists only in
+    // workspace search, or a second account that merely shares a word.
+    const ci = 'c0000000-0000-4000-8000-000000000001';
+    const mahle = 'c0000000-0000-4000-8000-000000000005';
+    const note = '00000000-0000-4000-8000-00000000n001';
+    const ranked = finalizePaletteItems(
+      [
+        { item: item(`account:${ci}`, 'CI Financial'), score: 40, route: `/accounts/${ci}` },
+        { item: item(`account:${mahle}`, 'MAHLE'), score: 10, route: `/accounts/${mahle}` },
+        {
+          item: item(`search:note:${note}`, 'Sample: MAHLE test bench review'),
+          score: 0,
+          route: `/accounts/${mahle}`,
+        },
+      ],
+      'mahle',
+      new Map(),
+    );
+    expect(ranked.map((row) => row.id)).toEqual([
+      `account:${ci}`,
+      `account:${mahle}`,
+      `search:note:${note}`,
+    ]);
+  });
+
+  it('keeps the record address when the same contact is also a list search', () => {
+    // WHY: the local contact row still addresses /contacts?search=<name>,
+    // which the contacts list does not read. Workspace search already
+    // addresses /contacts/<id>. Dropping the record row to hide the
+    // duplicate would leave only the list search. This does not change
+    // how the local row builds its own href.
+    const michael = '00000000-0000-4000-8000-000000000001';
+    let opened = '';
+    const ranked = finalizePaletteItems(
+      [
+        {
+          item: item(`contact:${michael}`, 'Michael Johnson', () => {
+            opened = 'list';
+          }),
+          score: 30,
+          route: '/contacts?search=Michael%20Johnson',
+        },
+        {
+          item: item(`search:contact:${michael}`, 'Michael Johnson', () => {
+            opened = 'record';
+          }),
+          score: 12,
+          route: `/contacts/${michael}`,
+        },
+      ],
+      'michael',
+      new Map(),
+    );
+    expect(ranked).toHaveLength(1);
+    ranked[0]?.onSelect();
+    expect(opened).toBe('record');
+  });
+
   it('does not double-record nav rows (selectNavTarget owns those)', () => {
     const [wrapped] = finalizePaletteItems(
       [{ item: item('nav:/dashboard', 'Go to Dashboard'), score: 5 }],

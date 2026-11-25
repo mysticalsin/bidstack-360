@@ -191,6 +191,12 @@ export function matchTasks(tasks: Task[], q: string, limit: number): ScoredResul
 export interface RankedPaletteEntry {
   item: Item;
   score: number;
+  /**
+   * Where the row navigates. Two sources can mint different ids for one
+   * record; the route decides which copy survives when one of them is only
+   * a list search.
+   */
+  route?: string;
 }
 
 /** Stable descending sort — ties keep source insertion order (contextual →
@@ -201,24 +207,70 @@ export function rankPaletteItems(entries: readonly RankedPaletteEntry[]): Item[]
 }
 
 /**
- * Final assembly for the palette list: boost text scores with frecency and
- * rank (only when a query is typed — the empty-query palette keeps its
- * curated section order), then wrap every row's onSelect so repeat
- * selections accrue frecency for future opens.
+ * A list `?search=` is not a record. The contacts and tasks pages do not
+ * read it. A path without that query is the record the other row already
+ * opened. Missing routes sit between the two so an unknown address is not
+ * replaced by a list search, and a record still wins over an unknown one.
+ */
+function routeQuality(route: string | undefined): number {
+  if (!route) return 1;
+  if (/[?&]search=/.test(route)) return 0;
+  return 2;
+}
+
+/**
+ * One row per record. Dashboard companies, the opportunity search, and
+ * workspace search each mint an id (`account:x`, `opp:x`, `search:company:x`,
+ * `search:opportunity:x`) for the same destination. The first row wins when
+ * both addresses are records, so the dashboard copy (logo, industry) stays.
+ * A later row replaces it only when that later row is the record and the
+ * earlier row is a list search.
+ */
+export function dedupePaletteEntries(
+  entries: readonly RankedPaletteEntry[],
+): RankedPaletteEntry[] {
+  const indexById = new Map<string, number>();
+  const kept: RankedPaletteEntry[] = [];
+  for (const entry of entries) {
+    const id = canonicalPaletteId(entry.item.id);
+    const at = indexById.get(id);
+    if (at === undefined) {
+      indexById.set(id, kept.length);
+      kept.push(entry);
+      continue;
+    }
+    const current = kept[at];
+    if (!current) continue;
+    const score = Math.max(current.score, entry.score);
+    if (routeQuality(entry.route) > routeQuality(current.route)) {
+      kept[at] = { ...entry, score };
+    } else {
+      kept[at] = { ...current, score };
+    }
+  }
+  return kept;
+}
+
+/**
+ * Final assembly for the palette list: collapse aliases of one record, boost
+ * text scores with frecency and rank (only when a query is typed — the
+ * empty-query palette keeps its curated section order), then wrap every
+ * row's onSelect so repeat selections accrue frecency for future opens.
  */
 export function finalizePaletteItems(
   entries: readonly RankedPaletteEntry[],
   q: string,
   frecency: ReadonlyMap<string, number>,
 ): Item[] {
+  const unique = dedupePaletteEntries(entries);
   const ranked = q
     ? rankPaletteItems(
-        entries.map(({ item, score }) => ({
+        unique.map(({ item, score }) => ({
           item,
           score: score + frecencyBoost(frecency.get(canonicalPaletteId(item.id)) ?? 0),
         })),
       )
-    : entries.map((entry) => entry.item);
+    : unique.map((entry) => entry.item);
   return ranked.map(withSelectionRecording);
 }
 
