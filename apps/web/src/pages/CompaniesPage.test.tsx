@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -131,6 +131,15 @@ describe('CompaniesPage — companies:write gating', () => {
 
   // The floating "New account" action lands on this URL. A writer must see the
   // form immediately; a reader must not get a form the server will reject.
+  it('opens the create form from the New company button', () => {
+    vi.mocked(useHasAdminPermission).mockReturnValue(true);
+
+    renderWithProviders(<CompaniesPage />);
+    fireEvent.click(screen.getByRole('button', { name: /^New company$/i }));
+
+    expect(screen.getByRole('dialog', { name: /New company/i })).toBeTruthy();
+  });
+
   it('opens the create form when a writer arrives with ?new=1', () => {
     vi.mocked(useHasAdminPermission).mockReturnValue(true);
 
