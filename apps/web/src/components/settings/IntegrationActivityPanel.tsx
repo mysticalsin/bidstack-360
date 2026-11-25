@@ -1,13 +1,20 @@
 // v24: integration activity lives here (Settings > Integrations, admin), not
 // on account pages. Provider health for the whole workspace, plus the sources
 // Polo listens to for one account, filtered by account.
+//
+// Health comes from the provider-health read, not the workspace dashboard.
+// An unset key and a row that was not probed stay out of the failure count.
+// The status rail is mounted only when that read has rows: its empty list
+// paints ERP and External CRM as healthy.
 import '@/components/signals/signals.css';
 
 import { useId, useMemo, useState } from 'react';
 
 import { useAccountPulse, usePortfolioMomentum } from '@/hooks/useAccountSignals';
-import { useCrmDashboard } from '@/hooks/useCrmDashboard';
+import { useProviderHealth } from '@/hooks/useCrmIntegrations';
 import { IntegrationMotionRail } from '@/pages/accountsPage/AccountDashboardWidgets';
+
+import { integrationHealthLine } from './integration-health-caption';
 
 function AccountSources({ companyId }: { companyId: string }) {
   const q = useAccountPulse(companyId);
@@ -40,13 +47,18 @@ function AccountSources({ companyId }: { companyId: string }) {
 
 export function IntegrationActivityPanel() {
   const selectId = useId();
-  const dashboard = useCrmDashboard();
+  const health = useProviderHealth();
   const portfolio = usePortfolioMomentum(100);
   const accounts = useMemo(() => [...(portfolio.data?.accounts ?? [])].sort((a, b) => a.companyName.localeCompare(b.companyName)), [portfolio.data]);
   const [picked, setPicked] = useState('');
   const companyId = picked || accounts[0]?.companyId || '';
-  const providers = dashboard.data?.providerHealth ?? [];
-  const healthy = providers.filter((p) => p.status === 'healthy').length;
+  const providers = health.data?.items ?? [];
+  const caption = integrationHealthLine({
+    items: providers,
+    isLoading: health.isLoading,
+    isError: health.isError,
+  });
+  const showRetry = health.isError && providers.length === 0;
   return (
     <section
       className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5 shadow-[var(--shadow-xs)]"
@@ -55,13 +67,24 @@ export function IntegrationActivityPanel() {
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="int-activity-h" className="text-base font-semibold text-[var(--fg-primary)]">Integration activity</h2>
-        <span className="text-xs text-[var(--fg-tertiary)]">
-          {providers.length ? `${healthy} of ${providers.length} providers healthy` : 'Provider health loading'}
+        <span className="flex flex-wrap items-center gap-2 text-xs text-[var(--fg-tertiary)]">
+          <span>{caption}</span>
+          {showRetry ? (
+            <button
+              type="button"
+              onClick={() => void health.refetch()}
+              className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-[var(--brand-primary)] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+            >
+              Retry
+            </button>
+          ) : null}
         </span>
       </div>
-      <div className="mt-3">
-        <IntegrationMotionRail providers={providers.map((p) => ({ name: p.provider, status: p.status }))} />
-      </div>
+      {providers.length > 0 ? (
+        <div className="mt-3">
+          <IntegrationMotionRail providers={providers.map((p) => ({ name: p.provider, status: p.status }))} />
+        </div>
+      ) : null}
       <div className="mt-5 grid gap-2">
         <label htmlFor={selectId} className="text-sm font-medium text-[var(--fg-primary)]">
           Sources by account
