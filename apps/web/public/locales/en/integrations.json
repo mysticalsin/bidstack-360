@@ -192,7 +192,13 @@
       "connect": "Connect",
       "requiresKey": "requires key",
       "open": "open",
-      "slackWriteHint": "You need integrations write access to disconnect the shared Slack workspace."
+      "slackWriteHint": "You need integrations write access to disconnect the shared Slack workspace.",
+      "slackNotSetUpHint": "An admin must add the Slack app first.",
+      "slackConnectWriteHint": "You need integrations write access to connect the shared Slack workspace.",
+      "slackNotLinked": "This workspace is not connected. Connect to send alerts.",
+      "slackConnectFailed": "Could not start the Slack connection. Try again.",
+      "notConnected": "Not connected",
+      "notSetUp": "Not set up"
     },
     "status": {
       "healthy": "healthy",

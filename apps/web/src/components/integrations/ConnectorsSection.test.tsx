@@ -125,7 +125,7 @@ describe('ConnectorsSection — Slack disconnect RBAC gate', () => {
 // still returns Slack as DISCONNECTED, and the catalog says the app is
 // disabled. Connect must not look like it can start, and a credential on the
 // server must not be described as this workspace already being connected.
-describe('ConnectorsSection — Slack connect under demo data', () => {
+describe('ConnectorsSection: Slack connect under demo data', () => {
   it('does not start a connect when the Slack app is not set up', () => {
     hookMocks.canWriteIntegrations = true;
     hookMocks.integrations = [disconnectedSlack];
