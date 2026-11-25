@@ -26,6 +26,10 @@ import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
 import { forecastTotalsNote } from './forecasts/forecast-list-caption';
 import {
+  MANUAL_TOTALS_EMPTY,
+  manualForecastTotalsVisible,
+} from './forecasts/forecast-manual-totals';
+import {
   buildChartData,
   groupForecasts,
   matchesPeriodFilter,
@@ -64,6 +68,13 @@ export function ForecastsPage() {
   // pageContinues is the forecast the list read past this page and dropped.
   const pageContinues = Boolean(forecasts.data?.pageContinues);
   const totalsNote = forecastTotalsNote(pageContinues);
+  const manualBookSettled =
+    !forecasts.isLoading && !forecasts.isError && forecasts.data !== undefined;
+  const manualTotalsVisible = manualForecastTotalsVisible({
+    settled: manualBookSettled,
+    loadedCount: forecasts.data?.items.length ?? 0,
+  });
+  const manualTotalsEmpty = t('forecasts.manualTotalsEmpty', MANUAL_TOTALS_EMPTY);
 
   const rows = useMemo(() => groupForecasts(filteredItems), [filteredItems]);
   const chartData = useMemo(() => buildChartData(rows), [rows]);
@@ -233,35 +244,42 @@ export function ForecastsPage() {
       ) : null}
 
       {/* ── Headline totals — the page's answer at a glance ── */}
-      <motion.div
-        variants={reducedMotion ? undefined : staggerChild}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
-      >
-        {(
-          [
-            { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
-            { key: 'best_case', label: t('forecasts.totalBestCase', 'Best case'), accent: false },
-            { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
-            { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
-          ] as const
-        ).map((k) => (
+      <motion.div variants={reducedMotion ? undefined : staggerChild}>
+        {manualTotalsVisible ? (
           <div
-            key={k.key}
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+            aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
           >
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-              {k.label}
-            </div>
-            <div
-              className={`mt-1 text-lg font-bold tabular-nums ${
-                k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
-              }`}
-            >
-              {formatMoneyMicros(totals[k.key], 'EUR')}
-            </div>
+            {(
+              [
+                { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
+                { key: 'best_case', label: t('forecasts.totalBestCase', 'Best case'), accent: false },
+                { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
+                { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
+              ] as const
+            ).map((k) => (
+              <div
+                key={k.key}
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+              >
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                  {k.label}
+                </div>
+                <div
+                  className={`mt-1 text-lg font-bold tabular-nums ${
+                    k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
+                  }`}
+                >
+                  {formatMoneyMicros(totals[k.key], 'EUR')}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          <p role="status" aria-label={manualTotalsEmpty} className="text-sm text-[var(--fg-secondary)]">
+            {manualTotalsEmpty}
+          </p>
+        )}
       </motion.div>
 
       {/* ── Chart (desktop only; returns null when empty) ── */}
