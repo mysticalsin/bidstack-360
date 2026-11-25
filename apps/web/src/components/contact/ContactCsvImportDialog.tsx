@@ -19,6 +19,8 @@ import { useCreateContact } from '@/hooks/useContacts';
 import { springModal } from '@/lib/motion';
 import type { ContactCreate, Sentiment } from '@bidstack/shared';
 
+import { restoreExportedContactCell } from './contact-csv-cell';
+
 const HEADERS = ['name', 'customer', 'role', 'email', 'phone', 'influence', 'sentiment'] as const;
 type Header = (typeof HEADERS)[number];
 
@@ -41,12 +43,14 @@ function parseCsv(input: string): { headers: Header[]; rows: ParsedRow[]; header
   const sep = (lines[0]!.split('\t').length > lines[0]!.split(',').length ? '\t' : ',') as
     | ','
     | '\t';
-  const rawHeaders = lines[0]!.split(sep).map((h) => h.trim().toLowerCase());
+  const rawHeaders = lines[0]!
+    .split(sep)
+    .map((h) => restoreExportedContactCell(h.trim()).toLowerCase());
   // Normalize to the canonical header set; unknown columns are ignored.
   const headers: Header[] = rawHeaders.map((h) => h as Header).filter((h) => HEADERS.includes(h));
   const rows: ParsedRow[] = [];
   for (const line of lines.slice(1)) {
-    const cells = line.split(sep).map((c) => c.trim());
+    const cells = line.split(sep).map((c) => restoreExportedContactCell(c.trim()));
     const values: Partial<Record<Header, string>> = {};
     rawHeaders.forEach((h, i) => {
       if (HEADERS.includes(h as Header)) {
