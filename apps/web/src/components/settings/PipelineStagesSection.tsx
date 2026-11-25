@@ -12,6 +12,7 @@ import {
   type PipelineStageSettings,
 } from '@/hooks/usePipelineStages';
 import { stageListCaption } from './stage-list-caption';
+import { stageProbabilityDraft } from './stage-probability-draft';
 
 export function PipelineStagesSection() {
   const { t } = useTranslation('settings');
@@ -104,19 +105,22 @@ function StageRow({
   const [name, setName] = useState(stage.name);
   const [probability, setProbability] = useState(String(stage.probability));
   const [color, setColor] = useState(stage.color ?? '#64748b');
+  const draft = stageProbabilityDraft(probability, stage.probability);
+  const probabilityId = `pipeline-stage-probability-${stage.id}`;
+  const probabilityErrorId = `pipeline-stage-probability-error-${stage.id}`;
 
-  const parsedProbability = Math.max(0, Math.min(100, Math.round(Number(probability))));
   const dirty =
     name.trim() !== stage.name ||
-    parsedProbability !== stage.probability ||
+    (draft.ok && draft.changed) ||
     color !== (stage.color ?? '#64748b');
+  const canSave = dirty && draft.ok && name.trim().length > 0 && !isSaving;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!dirty || !name.trim() || !Number.isFinite(parsedProbability)) return;
+    if (!canSave || !draft.ok) return;
     await onSave(stage.id, {
       name: name.trim(),
-      probability: parsedProbability,
+      probability: draft.probability,
       color,
     });
   };
@@ -147,17 +151,31 @@ function StageRow({
           ) : null}
         </span>
       </label>
-      <label className="text-xs text-[var(--fg-secondary)]">
-        {t('pipelineStages.probabilityLabel', 'Probability')}
-        <input
-          className="input mt-1 w-full text-sm"
-          type="number"
-          min={0}
-          max={100}
-          value={probability}
-          onChange={(e) => setProbability(e.target.value)}
-        />
-      </label>
+      <div>
+        <label className="text-xs text-[var(--fg-secondary)]" htmlFor={probabilityId}>
+          {t('pipelineStages.probabilityLabel', 'Probability')}
+          <input
+            id={probabilityId}
+            className="input mt-1 w-full text-sm"
+            type="number"
+            min={0}
+            max={100}
+            inputMode="decimal"
+            value={probability}
+            aria-label={t('pipelineStages.probabilityFieldLabel', 'Probability, {{stage}}', {
+              stage: stage.name,
+            })}
+            aria-invalid={draft.ok ? undefined : true}
+            aria-describedby={draft.ok ? undefined : probabilityErrorId}
+            onChange={(e) => setProbability(e.target.value)}
+          />
+        </label>
+        {draft.ok ? null : (
+          <p id={probabilityErrorId} role="alert" className="mt-1 text-xs text-[var(--danger)]">
+            {t('pipelineStages.probabilityInvalid', 'Enter a probability from 0 to 100.')}
+          </p>
+        )}
+      </div>
       <label className="text-xs text-[var(--fg-secondary)]">
         {t('pipelineStages.colorLabel', 'Color')}
         <input
@@ -168,8 +186,19 @@ function StageRow({
         />
       </label>
       <div className="flex items-end">
-        <Button type="submit" size="sm" disabled={!dirty || isSaving || !name.trim()}>
-          {isSaving ? t('pipelineStages.savingButton', 'Saving...') : t('pipelineStages.saveButton', 'Save')}
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!canSave}
+          aria-label={
+            isSaving
+              ? t('pipelineStages.savingStageButton', 'Saving {{stage}}', { stage: stage.name })
+              : t('pipelineStages.saveStageButton', 'Save {{stage}}', { stage: stage.name })
+          }
+        >
+          {isSaving
+            ? t('pipelineStages.savingButton', 'Saving...')
+            : t('pipelineStages.saveButton', 'Save')}
         </Button>
       </div>
     </form>
