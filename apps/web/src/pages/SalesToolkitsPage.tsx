@@ -26,6 +26,14 @@ export default function SalesToolkitsPage() {
     }
     return [...tags].sort();
   }, [toolkits.data?.items]);
+  const preview = toolkits.data?.preview === true;
+  const coursePhase = toolkits.isLoading ? 'loading' : preview ? 'sample' : 'academy';
+  const courseHeading =
+    coursePhase === 'sample'
+      ? t('salesToolkits.coursesHeadingSample', 'Sample courses')
+      : coursePhase === 'loading'
+        ? t('salesToolkits.coursesHeadingPending', 'Courses')
+        : t('salesToolkits.coursesHeading', 'Mantu Academy courses');
 
   return (
     <div className="space-y-5">
@@ -40,8 +48,11 @@ export default function SalesToolkitsPage() {
       <div className="page-head" style={{ marginTop: 8 }}>
         <div>
           <h2 className="page-title" style={{ fontSize: '1.05rem' }}>
-            {t('salesToolkits.coursesHeading', 'Mantu Academy courses')}
+            {courseHeading}
           </h2>
+          {coursePhase === 'loading' ? (
+            <div className="page-sub">{t('salesToolkits.coursesSubLoading', 'Checking the course list.')}</div>
+          ) : null}
         </div>
       </div>
 
@@ -62,10 +73,14 @@ export default function SalesToolkitsPage() {
               ? t('salesToolkits.emptyFilteredTitle', 'No courses tagged "{{sector}}"', { sector })
               : t('salesToolkits.emptyTitle', 'No courses published yet')
           }
-          message={t(
-            'salesToolkits.emptyMessage',
-            'Courses appear here as soon as Mantu Academy publishes them with sector tags.',
-          )}
+          message={
+            preview
+              ? t('salesToolkits.emptyMessageSample', 'No sample courses are in this list.')
+              : t(
+                  'salesToolkits.emptyMessage',
+                  'Courses appear here as soon as Mantu Academy publishes them with sector tags.',
+                )
+          }
         />
       ) : (
         <>
@@ -120,7 +135,7 @@ export default function SalesToolkitsPage() {
                     </p>
                   ) : null}
                 </div>
-                {course.url ? (
+                {course.url && !preview ? (
                   <a
                     href={course.url}
                     target="_blank"
@@ -173,15 +188,12 @@ function SampleBanner() {
       className="flex items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-sunken)] p-3 text-sm text-[var(--fg-primary)]"
     >
       <Icon name="info" size={16} aria-hidden />
-      <div>
-        <strong className="font-semibold">{t('salesToolkits.sampleDataLabel', 'Sample data.')}</strong>{' '}
-        {t('salesToolkits.sampleDataIntro', 'These are illustrative toolkits. Set')}{' '}
-        <code className="text-xs">LMS_360L_ENABLED</code>{' '}
+      <p>
         {t(
-          'salesToolkits.sampleDataOutro',
-          '+ credentials to pull live courses from Mantu Academy.',
+          'salesToolkits.sampleBanner',
+          'Sample data. These courses are not a connected academy catalog.',
         )}
-      </div>
+      </p>
     </div>
   );
 }
