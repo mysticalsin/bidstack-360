@@ -13,6 +13,8 @@ export interface AccountNewsItem {
 
 export interface AccountNewsResponse {
   source: 'google-news';
+  /** `unavailable` means the courtesy feed did not answer. That is not an empty match. */
+  read?: 'ok' | 'unavailable';
   fetchedAt: string;
   sourceAttribution?: SourceAttribution;
   items: AccountNewsItem[];
