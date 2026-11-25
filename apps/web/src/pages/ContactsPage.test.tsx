@@ -37,6 +37,8 @@ function baseContact(): Contact {
     influence: 4,
     sentiment: 'warm',
     createdAt: new Date().toISOString(),
+    companyId: null,
+    linkState: 'needs_review',
   };
 }
 
@@ -143,6 +145,58 @@ describe('ContactsPage — contacts:write gating', () => {
     renderWithProviders(<ContactsPage />);
 
     expect(screen.getByRole('button', { name: /Import contacts from CSV/i })).toBeTruthy();
+  });
+
+  it('opens the linked account from the customer name and leaves an unlinked name as text', () => {
+    // WHY: the customer column is the account. A linked contact already has
+    // the company id, so the name should open that cockpit. A name search
+    // can match a different company, and a script id must not become a link.
+    vi.mocked(useHasPermission).mockReturnValue(true);
+    const linkedId = '22222222-2222-4222-8222-222222222222';
+    mockContacts({
+      data: {
+        items: [
+          {
+            ...baseContact(),
+            id: '33333333-3333-4333-8333-333333333333',
+            name: 'Ada North',
+            customer: 'Northwind',
+            companyId: linkedId,
+            linkState: 'linked',
+          },
+          {
+            ...baseContact(),
+            customer: 'Globex Labs',
+            companyId: null,
+            linkState: 'needs_review',
+          },
+          {
+            ...baseContact(),
+            id: '44444444-4444-4444-8444-444444444444',
+            name: 'Script Person',
+            customer: 'Script Co',
+            companyId: 'javascript:alert(1)',
+            linkState: 'needs_review',
+          } as Contact,
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<ContactsPage />);
+
+    const account = screen.getByRole('link', { name: /Northwind/ });
+    expect(account.getAttribute('href')).toBe(`/accounts/${linkedId}`);
+    expect(account.getAttribute('href')).not.toContain('Northwind');
+    expect(screen.queryByRole('link', { name: /Globex Labs/ })).toBeNull();
+    expect(screen.getByText('Globex Labs')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Script Co/ })).toBeNull();
+    expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
+    expect(document.querySelector('a[href*="search="]')).toBeNull();
   });
 
   it('hides the empty-state "Add first contact" action for a user without contacts:write', () => {
