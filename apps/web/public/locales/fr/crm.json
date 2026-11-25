@@ -2400,6 +2400,10 @@
     "errorMessage": "Le point de terminaison des comptes clés n'a pas répondu.",
     "emptyTitle": "Aucun compte clé pour le moment",
     "emptyMessage": "Marquez les entreprises stratégiquement importantes comme comptes clés depuis la page Entreprises.",
+    "emptyFilteredTitle": "Aucun compte clé ne correspond à ces filtres",
+    "emptyFilteredMessage": "Rien dans le portefeuille stratégique ne correspond à cette recherche ou à ce secteur. Effacez les filtres pour revoir les comptes déjà signalés.",
+    "clearFilters": "Effacer les filtres",
+    "resultSearch": "correspondant à « {{search}} »",
     "metricPipeline": "pipeline",
     "metricOpenDeals": "affaires ouvertes",
     "metricContacts": "contacts"

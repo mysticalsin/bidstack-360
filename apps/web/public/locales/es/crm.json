@@ -2378,6 +2378,10 @@
     "errorMessage": "El endpoint de cuentas clave no respondió.",
     "emptyTitle": "Aún no hay cuentas clave",
     "emptyMessage": "Marca como cuentas clave las empresas estratégicamente importantes desde la página de Empresas.",
+    "emptyFilteredTitle": "Ninguna cuenta clave coincide con estos filtros",
+    "emptyFilteredMessage": "Nada del libro estratégico coincide con esta búsqueda o sector. Quite los filtros para ver las cuentas que ya marcó.",
+    "clearFilters": "Quitar filtros",
+    "resultSearch": "que coinciden con \"{{search}}\"",
     "metricPipeline": "pipeline",
     "metricOpenDeals": "oportunidades abiertas",
     "metricContacts": "contactos"

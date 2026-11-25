@@ -2345,6 +2345,10 @@
     "errorMessage": "O endpoint de contas-chave não respondeu.",
     "emptyTitle": "Ainda não há contas-chave",
     "emptyMessage": "Marque as empresas estrategicamente importantes como contas-chave na página de Empresas.",
+    "emptyFilteredTitle": "Nenhuma conta-chave corresponde a estes filtros",
+    "emptyFilteredMessage": "Nada no livro estratégico corresponde a esta pesquisa ou setor. Limpe os filtros para ver as contas que você já marcou.",
+    "clearFilters": "Limpar filtros",
+    "resultSearch": "correspondentes a \"{{search}}\"",
     "metricPipeline": "pipeline",
     "metricOpenDeals": "negócios abertos",
     "metricContacts": "contactos"

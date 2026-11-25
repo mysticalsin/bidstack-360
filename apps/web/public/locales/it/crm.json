@@ -2345,6 +2345,10 @@
     "errorMessage": "L'endpoint degli account chiave non ha risposto.",
     "emptyTitle": "Nessun account chiave ancora",
     "emptyMessage": "Contrassegna le aziende strategicamente importanti come account chiave dalla pagina Aziende.",
+    "emptyFilteredTitle": "Nessun account chiave corrisponde a questi filtri",
+    "emptyFilteredMessage": "Niente nel portafoglio strategico corrisponde a questa ricerca o a questo settore. Cancella i filtri per vedere gli account già contrassegnati.",
+    "clearFilters": "Cancella filtri",
+    "resultSearch": "corrispondenti a \"{{search}}\"",
     "metricPipeline": "pipeline",
     "metricOpenDeals": "trattative aperte",
     "metricContacts": "contatti"

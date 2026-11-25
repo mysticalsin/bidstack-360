@@ -228,7 +228,11 @@ export function AccountsKeySegment() {
               items.length === 1
                 ? t('keyAccounts.resultCount_one', '{{count}} account', { count: items.length })
                 : t('keyAccounts.resultCount_other', '{{count}} accounts', { count: items.length })
-            }${industry ? ` · ${industry}` : ''}`
+            }${industry ? ` · ${industry}` : ''}${
+              debouncedSearch
+                ? ` · ${t('keyAccounts.resultSearch', 'matching "{{search}}"', { search: debouncedSearch })}`
+                : ''
+            }`
           : ''}
       </p>
 
@@ -293,19 +297,41 @@ export function AccountsKeySegment() {
           }
         />
       ) : items.length === 0 ? (
-        <EmptyState
-          title={t('keyAccounts.emptyTitle', 'No key accounts yet')}
-          message={t(
-            'keyAccounts.emptyMessage',
-            'Flag strategically important companies as Key Accounts from the Companies page.',
-          )}
-          action={
-            <Link to="/companies" className="btn btn-primary">
-              <Icon name="building" size={14} />
-              {t('keyAccounts.emptyCta', 'Browse companies')}
-            </Link>
-          }
-        />
+        debouncedSearch || industry ? (
+          <EmptyState
+            title={t('keyAccounts.emptyFilteredTitle', 'No key accounts match these filters')}
+            message={t(
+              'keyAccounts.emptyFilteredMessage',
+              'Nothing in the strategic book matches this search or industry. Clear the filters to see the accounts you already flagged.',
+            )}
+            action={
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setSearch('');
+                  setIndustry('');
+                }}
+              >
+                {t('keyAccounts.clearFilters', 'Clear filters')}
+              </button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('keyAccounts.emptyTitle', 'No key accounts yet')}
+            message={t(
+              'keyAccounts.emptyMessage',
+              'Flag strategically important companies as Key Accounts from the Companies page.',
+            )}
+            action={
+              <Link to="/companies" className="btn btn-primary">
+                <Icon name="building" size={14} />
+                {t('keyAccounts.emptyCta', 'Browse companies')}
+              </Link>
+            }
+          />
+        )
       ) : (
         <>
           <motion.div layout className="grid grid-cols-1 gap-4">

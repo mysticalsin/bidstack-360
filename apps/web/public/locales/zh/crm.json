@@ -2345,6 +2345,10 @@
     "errorMessage": "关键客户接口未响应。",
     "emptyTitle": "暂无关键客户",
     "emptyMessage": "在公司页面将具有战略重要性的公司标记为关键客户。",
+    "emptyFilteredTitle": "没有关键客户符合这些筛选",
+    "emptyFilteredMessage": "战略客户名册中没有与此搜索或行业匹配的客户。清除筛选以查看已标记的客户。",
+    "clearFilters": "清除筛选",
+    "resultSearch": "匹配“{{search}}”",
     "metricPipeline": "销售管道",
     "metricOpenDeals": "进行中的交易",
     "metricContacts": "联系人"
