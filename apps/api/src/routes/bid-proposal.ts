@@ -1,8 +1,9 @@
 /**
  * Which proposal a bid workspace opens when one opportunity holds several.
  *
- * The row touched last is the active draft. Callers pass live section counts
- * so a later change can prefer the proposal that actually has sections.
+ * A proposal with live sections beats one with none, even when the empty
+ * row was touched later. Among proposals in the same class, the latest
+ * update is the active draft (a revise copies sections onto a new row).
  */
 
 export type BidProposalCandidate = {
@@ -10,6 +11,7 @@ export type BidProposalCandidate = {
   status: string;
   /** Epoch milliseconds. */
   updatedAt: number;
+  /** Non-deleted sections. Zero means the row has no draft to review. */
   sectionCount: number;
 };
 
@@ -19,6 +21,12 @@ export function pickBidProposal<T extends BidProposalCandidate>(
   if (candidates.length === 0) return null;
   let picked = candidates[0]!;
   for (const candidate of candidates) {
+    const pickedHas = picked.sectionCount > 0;
+    const candidateHas = candidate.sectionCount > 0;
+    if (candidateHas !== pickedHas) {
+      if (candidateHas) picked = candidate;
+      continue;
+    }
     if (candidate.updatedAt >= picked.updatedAt) picked = candidate;
   }
   return picked;
