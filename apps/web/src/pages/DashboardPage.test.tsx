@@ -131,23 +131,27 @@ vi.mock('@/components/skeletons/PageSkeletons', () => ({
   DashboardSkeleton: () => <div data-testid="dashboard-skeleton" />,
 }));
 
-vi.mock('@/components/ui/StateMessages', () => ({
-  ErrorState: ({
-    title,
-    message,
-    action,
-  }: {
-    title: string;
-    message: string;
-    action?: ReactNode;
-  }) => (
-    <section role="alert">
-      <h2>{title}</h2>
-      <p>{message}</p>
-      {action}
-    </section>
-  ),
-}));
+vi.mock('@/components/ui/StateMessages', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/ui/StateMessages')>();
+  return {
+    ...actual,
+    ErrorState: ({
+      title,
+      message,
+      action,
+    }: {
+      title: string;
+      message: string;
+      action?: ReactNode;
+    }) => (
+      <section role="alert">
+        <h2>{title}</h2>
+        <p>{message}</p>
+        {action}
+      </section>
+    ),
+  };
+});
 
 vi.mock('@/hooks/useCrmDashboard', () => ({ useCrmDashboard: vi.fn() }));
 vi.mock('@/hooks/useEnrichCompany', () => ({ useEnrichCompany: vi.fn() }));

@@ -1084,6 +1084,8 @@
     "srHeading": "仪表板",
     "cockpitErrorTitle": "无法加载客户驾驶舱",
     "cockpitErrorMessage": "仪表板接口未响应。",
+    "accountNotFoundTitle": "未找到客户",
+    "accountNotFoundMessage": "此客户不在当前工作区。它可能已被移除，或者你可能无权访问。",
     "retry": "重试",
     "backToAccounts": "返回客户列表",
     "liveRefreshFailed": "警告：实时刷新失败，显示最后一次已验证的快照。",

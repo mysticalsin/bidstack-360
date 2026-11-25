@@ -1085,6 +1085,8 @@
     "srHeading": "Dashboard",
     "cockpitErrorTitle": "Couldn't load the account cockpit",
     "cockpitErrorMessage": "The dashboard endpoint did not respond.",
+    "accountNotFoundTitle": "Account not found",
+    "accountNotFoundMessage": "This account is not in the workspace. It may have been removed, or you may not have access to it.",
     "retry": "Retry",
     "backToAccounts": "Back to accounts",
     "liveRefreshFailed": "Warning: Live refresh failed, showing the last verified snapshot.",
