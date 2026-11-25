@@ -100,4 +100,45 @@ describe('CsvImportWizard empty CSV', () => {
     expect(screen.getByText('Northwind Freight')).toBeTruthy();
     expect(screen.queryByText(/2 rows\. Match each column/)).toBeNull();
   });
+
+  it('drops a blank row that an Excel parse returns', async () => {
+    // WHY: .xlsx is parsed on the server, not by the CSV parser. A blank
+    // sheet row in that result is the same leftover and must not count.
+    stubHooks();
+    hookMocks.useParseSpreadsheet.mockReturnValue({
+      mutateAsync: vi.fn(async () => ({
+        headers: ['name', 'domain'],
+        rows: [
+          { name: 'Northwind Freight', domain: 'northwind.example' },
+          { name: '', domain: '  ' },
+        ],
+      })),
+    });
+    render(<CsvImportWizard />);
+
+    chooseFile('not-a-real-workbook', 'book.xlsx');
+
+    expect(await screen.findByText(/1 row\. Match each column/)).toBeTruthy();
+    expect(screen.getByText('Northwind Freight')).toBeTruthy();
+    expect(hookMocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it('stays on upload when an Excel parse is only blank rows', async () => {
+    // WHY: an empty workbook must say there is nothing to import. Mapping a
+    // blank row would offer an account that is not in the file.
+    stubHooks();
+    hookMocks.useParseSpreadsheet.mockReturnValue({
+      mutateAsync: vi.fn(async () => ({
+        headers: ['name', 'domain'],
+        rows: [{ name: '', domain: '  ' }],
+      })),
+    });
+    render(<CsvImportWizard />);
+
+    chooseFile('not-a-real-workbook', 'empty.xlsx');
+
+    expect(await screen.findByText('That file has no data rows.')).toBeTruthy();
+    expect(screen.queryByText(/Match each column/)).toBeNull();
+    expect(hookMocks.mutate).not.toHaveBeenCalled();
+  });
 });

@@ -9,6 +9,11 @@ export interface ParsedCsv {
   rows: Record<string, string>[];
 }
 
+/** A row Excel leaves as commas or spaces is not a record. */
+export function csvRowHasValue(row: Record<string, string>): boolean {
+  return Object.values(row).some((cell) => cell.trim() !== '');
+}
+
 /** Split raw CSV text into a header row + record objects keyed by header. */
 export function parseCsv(text: string): ParsedCsv {
   const matrix = toMatrix(text);
@@ -20,14 +25,15 @@ export function parseCsv(text: string): ParsedCsv {
 
   for (let r = 1; r < matrix.length; r++) {
     const cells = matrix[r] ?? [];
-    // Skip fully-empty trailing lines (common with a final newline).
-    if (cells.length === 1 && cells[0] === '') continue;
     const row: Record<string, string> = {};
     for (let c = 0; c < headers.length; c++) {
       const key = headers[c];
       if (key === undefined) continue;
       row[key] = (cells[c] ?? '').trim();
     }
+    // A trailing newline is one empty cell. Excel also writes an empty sheet
+    // row as commas. Neither is a record, so it must not be imported.
+    if (!csvRowHasValue(row)) continue;
     rows.push(row);
   }
 
