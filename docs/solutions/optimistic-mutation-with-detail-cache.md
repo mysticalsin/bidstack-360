@@ -60,3 +60,10 @@ when we have a third example.
 **Where else this pattern applies:** task `done` toggle (list + detail),
 contact `sentiment` change (list + opp detail's Decision Unit panel),
 opportunity `value` patch (list + dashboard KPIs).
+
+The contact list key is `['contacts', …]` and the record key is
+`['contact', id]`. The list prefix does not cover the record, so a saved
+phone stayed on the row while the open record kept dialing the number it
+loaded. `useUpdateContact` now patches and rolls back `['contact', id]`
+with the list, and invalidates that record when the save settles. Custom
+field values stay off the optimistic write, matching the opportunity patch.
