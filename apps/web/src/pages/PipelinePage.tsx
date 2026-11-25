@@ -213,7 +213,7 @@ export function PipelinePage() {
             <button
               type="button"
               onClick={clearAccount}
-              className="mt-1 inline-flex min-h-11 items-center rounded px-2 text-sm text-[var(--fg-secondary)] underline hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+              className="mt-1 inline-flex min-h-11 items-center rounded px-2 text-sm text-[var(--fg-secondary)] underline hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
             >
               {t('pipeline.showEveryDeal', 'Show every deal')}
             </button>
