@@ -152,6 +152,17 @@ export const OrgDashboard = memo(function OrgDashboard() {
         label: t('orgDashboard.kpiTasksLabel', 'Tasks'),
         value: tasks,
         detail: t('orgDashboard.kpiTasksDetail', 'follow-ups'),
+        // The count is every follow-up, including ones already past due.
+        // On the Polo seed all seven are due in May 2026 and none are done,
+        // so a bare 7 reads as a current book. A zero says there are none.
+        caption:
+          overdueTasks > 0
+            ? t('orgDashboard.kpiTasksOverdue', `${overdueTasks.toLocaleString()} overdue`, {
+                count: overdueTasks,
+              })
+            : tasks === 0
+              ? t('orgDashboard.kpiTasksNone', 'No follow-ups')
+              : undefined,
         tone: 'rose',
         icon: 'tasks',
         href: '/tasks',
