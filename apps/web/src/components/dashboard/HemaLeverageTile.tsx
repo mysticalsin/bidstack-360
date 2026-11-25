@@ -6,7 +6,23 @@ import { useMsaLeverageSummary } from '@/hooks/useMsaLeverage';
 
 export function HemaLeverageTile() {
   const q = useMsaLeverageSummary();
-  if (q.isLoading || q.isError || !q.data) return null;
+  if (!q.data) {
+    if (q.isError) {
+      return (
+        <div className="agr-dash-tile" role="alert" data-testid="hema-leverage-error">
+          <span className="l">Could not load under-leveraged MSAs.</span>
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center justify-self-start rounded-md px-3 text-sm font-medium text-[var(--brand-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+            onClick={() => void q.refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return null;
+  }
   const count = q.data.hemaPharmaAccounts;
   return (
     <Link
