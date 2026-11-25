@@ -10,6 +10,7 @@ import {
   OVERDUE_DEDUPE_THRESHOLD,
   daysUntilDue,
   deadlineDedupeUrl,
+  deadlineScanWhere,
   dueInLabel,
   isOverdue,
   nearestCrossedThreshold,
@@ -141,6 +142,23 @@ describe('overdueByLabel', () => {
     // would misleadingly imply the deadline hasn't passed yet.
     expect(overdueByLabel(1)).toBe('overdue by 1 day'); // singular
     expect(overdueByLabel(3)).toBe('overdue by 3 days');
+  });
+});
+
+describe('deadlineScanWhere', () => {
+  it('leaves a bid that the board already decided out of the deadline scan', () => {
+    // WHY: the board can mark a bid won or lost on the pipeline stage while
+    // the legacy stage column is still open. That bid has no live deadline.
+    // Paging the owner that it is due in three days sends them after a bid
+    // the board already closed.
+    const where = deadlineScanWhere(at('2026-06-01T00:00:00Z'), at('2026-06-08T00:00:00Z'));
+    expect(where.stage).toEqual({ notIn: ['closed_won', 'closed_lost'] });
+    expect(where.deletedAt).toBeNull();
+    expect(where.ownerId).toEqual({ not: null });
+    expect(where.OR).toEqual([
+      { pipelineStageId: null },
+      { pipelineStage: { isWon: false, isLost: false } },
+    ]);
   });
 });
 
