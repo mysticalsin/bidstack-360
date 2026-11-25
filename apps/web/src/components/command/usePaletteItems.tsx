@@ -50,6 +50,7 @@ import {
   taskSubtitle,
 } from './commandPaletteUtils';
 import { getFrecencyScores, recordPaletteSelection } from './paletteFrecency';
+import { taskRecordPath } from './task-record-path';
 
 // Non-label hits (hint text, quick-add key) score just above zero: findable,
 // but never outranking a real label match.
@@ -334,7 +335,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
       pushNavigable(
         score,
         { id: `task:${task.id}`, group: 'task', label: task.title, hint: taskSubtitle(task) },
-        `/tasks?search=${encodeURIComponent(task.title)}`,
+        taskRecordPath(task.id),
         true,
       );
     }
