@@ -1,10 +1,10 @@
-import { formatMoney } from '@/lib/format';
+import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 
 /**
- * Closing-this-week rows print a value. Red: the label is still an EUR
- * price, so the 61520 case can fail before the units change.
+ * Closing-this-week rows print a value. Those rows do not store a currency,
+ * so the label is the grouped units and not a euro conversion.
  */
 export function closingThisWeekAmount(value: number): string {
   if (!Number.isFinite(value)) return 'Not a number';
-  return formatMoney(value, 'EUR');
+  return formatUnspecifiedAmount(value);
 }
