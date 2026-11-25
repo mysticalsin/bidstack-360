@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { EmptyState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { cn } from '@/lib/cn';
 import {
@@ -27,7 +27,7 @@ import { emailTemplateListCaption } from './email-template-list-caption';
  */
 export function EmailTemplatesSection() {
   const { t } = useTranslation('settings');
-  const { data, isLoading } = useEmailTemplates({ includeArchived: false });
+  const { data, isLoading, isError, refetch } = useEmailTemplates({ includeArchived: false });
   const create = useCreateEmailTemplate();
   const update = useUpdateEmailTemplate();
   const del = useDeleteEmailTemplate();
@@ -136,14 +136,16 @@ export function EmailTemplatesSection() {
                 })
               : t('emailTemplates.listHeading', 'Templates')}
           </h3>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={startNew}
-            aria-label={t('emailTemplates.newTemplateAria', 'New template')}
-          >
-            <Icon name="plus" size={14} />
-          </Button>
+          {data ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={startNew}
+              aria-label={t('emailTemplates.newTemplateAria', 'New template')}
+            >
+              <Icon name="plus" size={14} />
+            </Button>
+          ) : null}
         </div>
         <ul
           className="max-h-[60vh] overflow-y-auto"
@@ -163,6 +165,21 @@ export function EmailTemplatesSection() {
                   <span className="bs-shimmer h-3 w-5/6" />
                 </div>
               ))}
+            </li>
+          ) : data == null && isError ? (
+            <li className="px-3 py-6">
+              <ErrorState
+                title={t('emailTemplates.loadErrorTitle', 'Could not load email templates')}
+                message={t(
+                  'emailTemplates.loadErrorMessage',
+                  'This is not an empty template list. Retry the list before creating a template.',
+                )}
+                action={
+                  <Button size="sm" variant="secondary" onClick={() => void refetch()}>
+                    {t('emailTemplates.retry', 'Retry')}
+                  </Button>
+                }
+              />
             </li>
           ) : templates.length === 0 ? (
             <li className="px-3 py-6">
