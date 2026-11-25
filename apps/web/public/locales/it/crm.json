@@ -833,6 +833,7 @@
     "colName": "Nome",
     "colRole": "Ruolo",
     "colCustomer": "Cliente",
+    "openAccount": "Apri l'account {{customer}}",
     "colContact": "Contatto",
     "colInfluence": "Influenza",
     "colSentiment": "Sentiment",

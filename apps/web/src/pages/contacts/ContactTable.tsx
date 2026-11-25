@@ -9,7 +9,7 @@
  * Exports ContactSortKey and ContactSortState so ContactsPage can type its
  * URL-persisted sort state without duplicating the union.
  *
- * Import DAG: no local sibling imports. Imported by ContactsPage.
+ * Import DAG: the account href helper is the only sibling import. Imported by ContactsPage.
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -29,6 +29,8 @@ import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTabl
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import type { useDeleteContact, useUpdateContact } from '@/hooks/useContacts';
 import type { Contact, Sentiment } from '@bidstack/shared';
+
+import { contactAccountHref } from './contact-account-href';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +89,27 @@ export interface ContactTableProps {
    * DELETE otherwise, so the row action is disabled with a hint instead. */
   canWrite: boolean;
   readOnlyHint: string;
+}
+
+function ContactAccountName({
+  customer,
+  companyId,
+}: {
+  customer: string;
+  companyId: string | null;
+}) {
+  const { t } = useTranslation('crm');
+  const href = contactAccountHref(companyId);
+  if (!href) return customer;
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-[44px] items-center rounded text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)] dark:focus-visible:ring-[var(--brand-deep)]"
+      aria-label={t('contactTable.openAccount', 'Open account {{customer}}', { customer })}
+    >
+      {customer}
+    </Link>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -326,7 +349,9 @@ export function ContactTable({
                       display={(v) => v || <span className="text-[var(--fg-tertiary)]">—</span>}
                     />
                   </td>
-                  <td className="px-5 py-3 text-[var(--fg-secondary)]">{c.customer}</td>
+                  <td className="px-5 py-3 text-[var(--fg-secondary)]">
+                    <ContactAccountName customer={c.customer} companyId={c.companyId} />
+                  </td>
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">
                     <div className="flex flex-col">
                       {c.email ? (
