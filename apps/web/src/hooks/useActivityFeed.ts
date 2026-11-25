@@ -6,6 +6,9 @@ export interface ActivityFeedItem {
   id: string;
   type: string;
   occurredAt: string;
+  subject?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
 }
 
 /** The org's latest activities (newest first, capped at the API's page size). */
