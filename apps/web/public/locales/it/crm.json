@@ -869,6 +869,8 @@
     "resultsCountOne": "{{count}} risultato per \"{{term}}\"",
     "resultsCountMany": "{{count}} risultati per \"{{term}}\"",
     "showingLatest": "Mostra le ultime 50 aziende",
+    "showingAllOne": "Mostra 1 azienda",
+    "showingAllMany": "Mostra {{count}} aziende",
     "clear": "Cancella",
     "error": {
       "title": "Impossibile caricare le aziende",

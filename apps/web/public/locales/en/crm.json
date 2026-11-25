@@ -870,6 +870,8 @@
     "resultsCountOne": "{{count}} result for \"{{term}}\"",
     "resultsCountMany": "{{count}} results for \"{{term}}\"",
     "showingLatest": "Showing latest 50 companies",
+    "showingAllOne": "Showing 1 company",
+    "showingAllMany": "Showing {{count}} companies",
     "clear": "Clear",
     "error": {
       "title": "Failed to load companies",

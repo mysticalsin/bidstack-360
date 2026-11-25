@@ -954,6 +954,8 @@
     "resultsCountOne": "{{count}} résultat pour « {{term}} »",
     "resultsCountMany": "{{count}} résultats pour « {{term}} »",
     "showingLatest": "Affichage des 50 dernières entreprises",
+    "showingAllOne": "Affichage de 1 entreprise",
+    "showingAllMany": "Affichage de {{count}} entreprises",
     "clear": "Effacer",
     "error": {
       "title": "Échec du chargement des entreprises",

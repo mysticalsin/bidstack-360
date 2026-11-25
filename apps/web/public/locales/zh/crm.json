@@ -869,6 +869,8 @@
     "resultsCountOne": "“{{term}}” 的 {{count}} 个结果",
     "resultsCountMany": "“{{term}}” 的 {{count}} 个结果",
     "showingLatest": "显示最近 50 家公司",
+    "showingAllOne": "显示 1 家公司",
+    "showingAllMany": "显示 {{count}} 家公司",
     "clear": "清除",
     "error": {
       "title": "加载公司失败",
