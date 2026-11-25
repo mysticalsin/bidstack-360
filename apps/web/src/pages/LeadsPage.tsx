@@ -22,7 +22,7 @@ import { useDeleteLead, useLeads, useUpdateLeadById } from '@/hooks/useLeads';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
-import { LeadStatus, LeadPriority } from '@bidstack/shared';
+import { LeadStatus, LeadPriority, type LeadSummary } from '@bidstack/shared';
 import { LeadRow } from './leadsPage/LeadRow';
 
 const STATUS_OPTIONS: { value: LeadStatus | ''; label: string }[] = [
@@ -187,28 +187,7 @@ export function LeadsPage() {
       toast.info(t('leads.toast.nothingToExport', 'Nothing to export'));
       return;
     }
-    const csv = rowsToCsv(
-      bulk.selectedItems.map((l) => ({
-        name: `${l.firstName} ${l.lastName}`,
-        company: l.companyName ?? '',
-        email: l.email ?? '',
-        status: l.status,
-        priority: l.priority,
-        score: l.score.toString(),
-        source: l.source ?? '',
-        createdAt: l.createdAt.slice(0, 10),
-      })),
-      [
-        { key: 'name', label: t('leads.csv.name', 'Name') },
-        { key: 'company', label: t('leads.csv.company', 'Company') },
-        { key: 'email', label: t('leads.csv.email', 'Email') },
-        { key: 'status', label: t('leads.csv.status', 'Status') },
-        { key: 'priority', label: t('leads.csv.priority', 'Priority') },
-        { key: 'score', label: t('leads.csv.score', 'Score') },
-        { key: 'source', label: t('leads.csv.source', 'Source') },
-        { key: 'createdAt', label: t('leads.csv.created', 'Created') },
-      ],
-    );
+    const csv = rowsToCsv(bulk.selectedItems.map(leadCsvRow), leadCsvColumns(t));
     downloadCsv(`polo-presales-leads-${new Date().toISOString().slice(0, 10)}`, csv);
     toast.success(
       t('leads.toast.exported', 'Exported {{count}} lead', { count: bulk.selectedItems.length }),
@@ -257,26 +236,7 @@ export function LeadsPage() {
                 toast.info(t('leads.toast.nothingToExport', 'Nothing to export'));
                 return;
               }
-              const csv = rowsToCsv(
-                items.map((l) => ({
-                  name: `${l.firstName} ${l.lastName}`,
-                  company: l.companyName ?? '',
-                  title: l.title ?? '',
-                  status: l.status,
-                  score: l.score,
-                  source: l.source ?? '',
-                  createdAt: l.createdAt.slice(0, 10),
-                })),
-                [
-                  { key: 'name', label: t('leads.csv.name', 'Name') },
-                  { key: 'company', label: t('leads.csv.company', 'Company') },
-                  { key: 'title', label: t('leads.csv.title', 'Title') },
-                  { key: 'status', label: t('leads.csv.status', 'Status') },
-                  { key: 'score', label: t('leads.csv.scoreRange', 'Score (0-100)') },
-                  { key: 'source', label: t('leads.csv.source', 'Source') },
-                  { key: 'createdAt', label: t('leads.csv.created', 'Created') },
-                ],
-              );
+              const csv = rowsToCsv(items.map(leadCsvRow), leadCsvColumns(t));
               downloadCsv(`polo-presales-leads-${new Date().toISOString().slice(0, 10)}`, csv);
               toast.success(
                 t('leads.toast.exported', 'Exported {{count}} lead', { count: items.length }),
@@ -536,4 +496,47 @@ export function LeadsPage() {
       )}
     </div>
   );
+}
+
+type LeadCsvRow = {
+  name: string;
+  company: string;
+  email: string;
+  title: string;
+  status: string;
+  priority: string;
+  score: number;
+  source: string;
+  createdAt: string;
+};
+
+function leadCsvRow(lead: LeadSummary): LeadCsvRow {
+  return {
+    name: `${lead.firstName} ${lead.lastName}`,
+    company: lead.companyName ?? '',
+    email: lead.email ?? '',
+    title: lead.title ?? '',
+    status: lead.status,
+    priority: lead.priority,
+    score: lead.score,
+    source: lead.source ?? '',
+    createdAt: lead.createdAt.slice(0, 10),
+  };
+}
+
+function leadCsvColumns(t: (key: string, fallback: string) => string): Array<{
+  key: keyof LeadCsvRow;
+  label: string;
+}> {
+  return [
+    { key: 'name', label: t('leads.csv.name', 'Name') },
+    { key: 'company', label: t('leads.csv.company', 'Company') },
+    { key: 'email', label: t('leads.csv.email', 'Email') },
+    { key: 'title', label: t('leads.csv.title', 'Title') },
+    { key: 'status', label: t('leads.csv.status', 'Status') },
+    { key: 'priority', label: t('leads.csv.priority', 'Priority') },
+    { key: 'score', label: t('leads.csv.scoreRange', 'Score (0-100)') },
+    { key: 'source', label: t('leads.csv.source', 'Source') },
+    { key: 'createdAt', label: t('leads.csv.created', 'Created') },
+  ];
 }
