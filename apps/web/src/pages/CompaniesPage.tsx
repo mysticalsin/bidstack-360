@@ -92,6 +92,11 @@ export function CompaniesPage() {
   const imports = useIntelImports();
 
   const companies = useCompanies(filter);
+  // A missing payload is not an empty book. A later refresh that fails keeps
+  // the last page. Only the first miss is loading or an error.
+  const listMissing = companies.data == null;
+  const listPending = companies.isLoading && listMissing;
+  const listFailed = companies.isError && listMissing;
   const createCompany = useCreateCompany();
   const deleteCompany = useDeleteCompany();
   // Company writes are gated server-side behind companies:write + the literal
@@ -262,12 +267,18 @@ export function CompaniesPage() {
       <header className="page-head flex-wrap">
         <div>
           <h1 className="page-title">{t('companies.title', 'Companies')}</h1>
-          <p className="page-sub">
-            {items.length === 1
-              ? t('companies.subtitleOne', '{{count}} company visible.', { count: items.length })
-              : t('companies.subtitleMany', '{{count}} companies visible.', {
-                  count: items.length,
-                })}
+          <p className="page-sub" aria-busy={listPending ? true : undefined}>
+            {listPending
+              ? t('companies.listLoading', 'Loading the company list.')
+              : listFailed
+                ? t('companies.listFailed', 'The company list did not load.')
+                : items.length === 1
+                  ? t('companies.subtitleOne', '{{count}} company visible.', {
+                      count: items.length,
+                    })
+                  : t('companies.subtitleMany', '{{count}} companies visible.', {
+                      count: items.length,
+                    })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -289,20 +300,22 @@ export function CompaniesPage() {
         </div>
       </header>
 
-      <section
-        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-        aria-label={t('companies.summaryAriaLabel', 'Company list summary')}
-      >
-        {stats.map((stat) => (
-          <Card key={stat.label} className="px-4 py-3">
-            <span className="text-xs font-medium text-[var(--fg-tertiary)]">{stat.label}</span>
-            <strong className="mt-1 block text-xl font-semibold text-[var(--fg-primary)] tabular-nums">
-              {stat.value}
-            </strong>
-            <span className="text-xs text-[var(--fg-tertiary)]">{stat.detail}</span>
-          </Card>
-        ))}
-      </section>
+      {listMissing ? null : (
+        <section
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          aria-label={t('companies.summaryAriaLabel', 'Company list summary')}
+        >
+          {stats.map((stat) => (
+            <Card key={stat.label} className="px-4 py-3">
+              <span className="text-xs font-medium text-[var(--fg-tertiary)]">{stat.label}</span>
+              <strong className="mt-1 block text-xl font-semibold text-[var(--fg-primary)] tabular-nums">
+                {stat.value}
+              </strong>
+              <span className="text-xs text-[var(--fg-tertiary)]">{stat.detail}</span>
+            </Card>
+          ))}
+        </section>
+      )}
 
       <Card className="overflow-hidden">
         <div className="card-body flex flex-wrap items-center justify-between gap-3 pt-4">
@@ -333,19 +346,21 @@ export function CompaniesPage() {
             onToggleColumn={columns.toggle}
           />
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--fg-tertiary)]">
-            <span role="status" aria-live="polite">
-              {searchTerm
-                ? items.length === 1
-                  ? t('companies.resultsCountOne', '{{count}} result for "{{term}}"', {
-                      count: items.length,
-                      term: searchTerm,
-                    })
-                  : t('companies.resultsCountMany', '{{count}} results for "{{term}}"', {
-                      count: items.length,
-                      term: searchTerm,
-                    })
-                : t('companies.showingLatest', 'Showing latest 50 companies')}
-            </span>
+            {listPending || listFailed ? null : (
+              <span role="status" aria-live="polite">
+                {searchTerm
+                  ? items.length === 1
+                    ? t('companies.resultsCountOne', '{{count}} result for "{{term}}"', {
+                        count: items.length,
+                        term: searchTerm,
+                      })
+                    : t('companies.resultsCountMany', '{{count}} results for "{{term}}"', {
+                        count: items.length,
+                        term: searchTerm,
+                      })
+                  : t('companies.showingLatest', 'Showing latest 50 companies')}
+              </span>
+            )}
             {searchTerm ? (
               <Button
                 size="sm"
@@ -402,15 +417,20 @@ export function CompaniesPage() {
         isDeleting={deleteCompany.isPending}
       />
 
-      {companies.isLoading ? (
+      {listPending ? (
         <LoadingSkeleton rows={8} />
-      ) : companies.isError ? (
+      ) : listFailed ? (
         <ErrorState
           title={t('companies.error.title', 'Failed to load companies')}
           message={
             companies.error instanceof Error
               ? companies.error.message
               : t('companies.error.fallback', 'Something went wrong')
+          }
+          action={
+            <Button variant="secondary" size="lg" onClick={() => void companies.refetch()}>
+              {t('companies.error.retry', 'Retry')}
+            </Button>
           }
         />
       ) : !companies.data || companies.data.items.length === 0 ? (

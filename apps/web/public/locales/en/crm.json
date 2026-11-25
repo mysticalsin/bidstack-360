@@ -853,6 +853,8 @@
     "title": "Companies",
     "subtitleOne": "{{count}} company visible.",
     "subtitleMany": "{{count}} companies visible.",
+    "listLoading": "Loading the company list.",
+    "listFailed": "The company list did not load.",
     "newCompany": "New company",
     "summaryAriaLabel": "Company list summary",
     "stats": {
@@ -873,7 +875,8 @@
     "clear": "Clear",
     "error": {
       "title": "Failed to load companies",
-      "fallback": "Something went wrong"
+      "fallback": "Something went wrong",
+      "retry": "Retry"
     },
     "empty": {
       "searchTitle": "No companies match your search",

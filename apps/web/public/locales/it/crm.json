@@ -852,6 +852,8 @@
     "title": "Aziende",
     "subtitleOne": "{{count}} azienda visibile.",
     "subtitleMany": "{{count}} aziende visibili.",
+    "listLoading": "Caricamento dell'elenco delle aziende.",
+    "listFailed": "L'elenco delle aziende non si è caricato.",
     "newCompany": "Nuova azienda",
     "summaryAriaLabel": "Riepilogo elenco aziende",
     "stats": {
@@ -872,7 +874,8 @@
     "clear": "Cancella",
     "error": {
       "title": "Impossibile caricare le aziende",
-      "fallback": "Qualcosa è andato storto"
+      "fallback": "Qualcosa è andato storto",
+      "retry": "Riprova"
     },
     "empty": {
       "searchTitle": "Nessuna azienda corrisponde alla tua ricerca",
