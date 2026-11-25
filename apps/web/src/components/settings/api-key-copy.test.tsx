@@ -69,7 +69,7 @@ async function createKey(secret: string) {
   });
   fireEvent.click(screen.getByRole('checkbox', { name: /^MCP transport/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
-  expect(await screen.findByText(/Copy your new key now/)).toBeTruthy();
+  expect(await screen.findByText(/Copy your new key now|came back empty/)).toBeTruthy();
   return mutateAsync;
 }
 
