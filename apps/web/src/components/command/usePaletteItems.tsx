@@ -136,6 +136,15 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
 
   const quickAddOptions = useMemo(() => buildQuickAddOptions(t), [t]);
 
+  // The box moves on the keystroke. The server page stays on the debounced
+  // term until that timer commits. They are one search only when the trimmed
+  // terms match. A shorter term never starts those searches (both wait for
+  // two characters), so it is not "still searching".
+  const liveTerm = query.trim().toLowerCase();
+  const fetchedTerm = debouncedQuery.trim().toLowerCase();
+  const serverPageMatchesLiveQuery = liveTerm === fetchedTerm;
+  const serverSearchPending = liveTerm.length >= 2 && !serverPageMatchesLiveQuery;
+
   const selectNavTarget = useCallback(
     (target: NavTarget) => {
       // Recorded here (not in the item wrapper) so the Enter-to-exact-route
@@ -339,9 +348,14 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
       );
     }
 
-    // Server searches matched on fields we may not display — keep every row
-    // (score-0 floor), but let label matches rank alongside local sources.
-    for (const g of globalSearch.data?.items ?? []) {
+    // Server searches matched on fields we may not display. Keep every row
+    // from the page that belongs to the live query (score 0 floor) so a
+    // hidden-field hit still ranks beside a label hit. A page fetched for
+    // the previous prefix is not that hit: the debounce has not caught up,
+    // and a score of 0 would leave those rows on the new prefix and on a
+    // cleared box.
+    const serverItems = serverPageMatchesLiveQuery ? (globalSearch.data?.items ?? []) : [];
+    for (const g of serverItems) {
       pushNavigable(
         q ? (fuzzyMatch(q, g.title)?.score ?? 0) : 0,
         { id: `search:${g.type}:${g.id}`, group: g.type, label: g.title, hint: g.subtitle },
@@ -350,7 +364,8 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
       );
     }
 
-    for (const o of oppSearch.data?.items ?? []) {
+    const serverOpps = serverPageMatchesLiveQuery ? (oppSearch.data?.items ?? []) : [];
+    for (const o of serverOpps) {
       const label = `${o.code} — ${o.name}`;
       pushNavigable(
         q ? (fuzzyMatch(q, label)?.score ?? 0) : 0,
@@ -379,6 +394,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     quickAddOptions,
     frecency,
     t,
+    serverPageMatchesLiveQuery,
   ]);
 
   const findDirectNavTarget = useCallback(
@@ -387,12 +403,13 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   );
 
   // Both server searches feed the merged items list, so loading must reflect
-  // BOTH — reporting only oppSearch here made the palette flash "No matches."
+  // both. Reporting only oppSearch here made the palette flash "No matches."
   // whenever the opportunity search resolved empty while the global search
-  // was still in flight (false negative on the app's main discovery surface).
+  // was still in flight. The same flash happens while the live term is ahead
+  // of the debounced term, before either request has started.
   return {
     items,
-    isFetching: oppSearch.isFetching || globalSearch.isFetching,
+    isFetching: serverSearchPending || oppSearch.isFetching || globalSearch.isFetching,
     selectNavTarget,
     findDirectNavTarget,
   };

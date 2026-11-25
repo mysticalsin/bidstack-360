@@ -353,3 +353,95 @@ describe('CommandPalette — loading state while server searches are pending', (
     expect(screen.queryByText('Searching…')).toBeNull();
   });
 });
+
+// The two server searches are debounced. Until that timer commits, React
+// Query still holds the previous page. Those rows are pinned at score 0 so a
+// hidden-field hit can stay, which also kept the previous prefix on screen
+// after the next letter, and inside the empty palette after the box was cleared.
+describe('CommandPalette server rows belong to the query that fetched them', () => {
+  afterEach(() => {
+    vi.mocked(api).mockImplementation(async () => ({ items: [] }));
+  });
+
+  async function showSettledPrefix(): Promise<HTMLElement> {
+    mockAppModules({});
+    const searchRequest = deferredResponse();
+    const oppRequest = deferredResponse();
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (path.startsWith('/api/search')) return searchRequest.promise;
+      if (path.startsWith('/api/opportunities')) return oppRequest.promise;
+      return Promise.resolve({ items: [] });
+    });
+
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    // "zzgap" matches nothing already on the palette, so the only rows are
+    // the server page. CI Financial's title does not contain that query:
+    // the row is a hidden-field hit and has to stay once THIS search settles.
+    fireEvent.change(input, { target: { value: 'zzgap' } });
+
+    await waitFor(() =>
+      expect(vi.mocked(api)).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search?q=zzgap'),
+        expect.anything(),
+      ),
+    );
+
+    searchRequest.resolve({
+      items: [
+        {
+          id: 'co_ci',
+          type: 'company',
+          title: 'CI Financial',
+          subtitle: 'Financial services',
+          url: '/accounts/co_ci',
+          score: 1,
+        },
+      ],
+      total: 1,
+      query: 'zzgap',
+    });
+    oppRequest.resolve({
+      items: [
+        {
+          id: 'opp_1',
+          code: 'BID-9',
+          name: 'North grid upgrade',
+          customer: 'Demo buyer',
+        },
+      ],
+    });
+
+    await screen.findByText('CI Financial');
+    expect(screen.getByText(/North grid upgrade/)).toBeTruthy();
+    return input;
+  }
+
+  it('drops the previous prefix on the next letter and says it is still searching', async () => {
+    const input = await showSettledPrefix();
+
+    fireEvent.change(input, { target: { value: 'zzgapq' } });
+
+    // WHY: "zzgapq" is a different search. CI Financial and the bid were
+    // fetched for "zzgap". Leaving them up teaches the new prefix.
+    expect(screen.queryByText('CI Financial')).toBeNull();
+    expect(screen.queryByText(/North grid upgrade/)).toBeNull();
+    // The debounce has not fired, so this is not a miss yet.
+    expect(screen.getByText('Searching…')).toBeTruthy();
+    expect(screen.queryByText('No matches.')).toBeNull();
+  });
+
+  it('drops the previous prefix when the box is cleared and keeps the browse list', async () => {
+    const input = await showSettledPrefix();
+
+    fireEvent.change(input, { target: { value: '' } });
+
+    // WHY: an empty box is the browse palette. The last server page is not
+    // a browse row, and it is not "No matches."
+    expect(screen.queryByText('CI Financial')).toBeNull();
+    expect(screen.queryByText(/North grid upgrade/)).toBeNull();
+    expect(screen.queryByText('No matches.')).toBeNull();
+    expect(screen.queryByText('Searching…')).toBeNull();
+    expect(screen.getByText('Go to Dashboard')).toBeTruthy();
+  });
+});
