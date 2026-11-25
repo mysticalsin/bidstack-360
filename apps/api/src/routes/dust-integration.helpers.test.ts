@@ -32,10 +32,12 @@ describe('serializeOpportunityToMarkdown', () => {
     const large = 9_007_199_254_740_993n;
     expect((Number(large) / 1_000_000).toString()).not.toBe('9007199254.740993');
     expect(serializeOpportunityToMarkdown(stubOpp(large))).toContain(
-      '**Value (EUR):** 9007199254.740993',
+      '**Value:** 9007199254.740993',
     );
+    expect(serializeOpportunityToMarkdown(stubOpp(large))).not.toMatch(/EUR|€/);
     expect(serializeOpportunityToMarkdown(stubOpp(1_234_567n))).toContain(
-      '**Value (EUR):** 1.234567',
+      '**Value:** 1.234567',
     );
+    expect(serializeOpportunityToMarkdown(stubOpp(1_234_567n))).not.toMatch(/EUR|€/);
   });
 });

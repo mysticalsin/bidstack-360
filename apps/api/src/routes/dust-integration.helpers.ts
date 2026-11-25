@@ -5,13 +5,13 @@
 import { type z } from 'zod';
 
 import { prisma, type Opportunity } from '@bidstack/db';
-import { formatMicrosDecimal } from '@bidstack/shared';
 
 import { getOrgDust, resolveOrgDustCredentials } from '../lib/dust-credentials.js';
 
 import { config } from '../env.js';
 import { isPublicHostname } from '../lib/ssrf-guard.js';
 import { assertUrlResolvesPublic } from '@bidstack/shared/server';
+import { dustMarkdownAmount } from './dust-markdown-amount.js';
 import {
   type DustStatusPayload,
   type DustStatusCacheEntry,
@@ -361,7 +361,8 @@ export function buildIntegrationSetupGuide() {
 // Opportunity serialization
 
 export function serializeOpportunityToMarkdown(opp: Opportunity): string {
-  const value = formatMicrosDecimal(opp.valueMicros);
+  // Exact units. The column has no currency, so the label does not name EUR.
+  const value = dustMarkdownAmount(opp.valueMicros);
 
   return [
     `# ${opp.name}`,
@@ -369,7 +370,7 @@ export function serializeOpportunityToMarkdown(opp: Opportunity): string {
     `- **Code:** ${opp.code}`,
     `- **Customer:** ${opp.customer}`,
     `- **Stage:** ${opp.stage}`,
-    `- **Value (EUR):** ${value}`,
+    `- **Value:** ${value}`,
     `- **Probability:** ${opp.probability}%`,
     `- **Due Date:** ${opp.dueDate?.toISOString() ?? 'N/A'}`,
     `- **Industry:** ${opp.industry ?? 'N/A'}`,
