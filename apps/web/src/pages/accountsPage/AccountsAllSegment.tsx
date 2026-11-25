@@ -16,6 +16,7 @@ import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
+import { leverageListGate } from './leverage-list-gate';
 import { isSyntheticAccountName } from './testDataFilter';
 import {
   deriveAccount,
@@ -60,6 +61,12 @@ export function AccountsAllSegment() {
   const [params] = useSearchParams();
   const [leverageOnly, setLeverageOnly] = useState(() => params.get('leverage') === 'hema');
   const leverage = useMsaLeverage(undefined, true);
+  const leverageGate = leverageListGate({
+    active: leverageOnly,
+    isLoading: leverage.isLoading,
+    isError: leverage.isError,
+    hasPayload: leverage.data != null,
+  });
   const [page, setPage] = useState(0);
   const syncError = autopopulate.error instanceof Error ? autopopulate.error.message : null;
 
@@ -274,17 +281,23 @@ export function AccountsAllSegment() {
         <SegmentHeader
           title={t('accounts.title', 'Accounts')}
           subtitle={
-            <>
-              {rows.length === 1
-                ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
-                : t('accounts.summary.companyCount_other', '{{count}} companies', {
-                    count: rows.length,
-                  })}{' '}
-              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
-              {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: formatMoneyMicros(totalPipeline, 'EUR'),
-              })}
-            </>
+            leverageGate === 'loading' ? (
+              t('accounts.leverageRead.loading', 'Loading under-leveraged accounts')
+            ) : leverageGate === 'failed' ? (
+              t('accounts.leverageRead.errorTitle', "Couldn't load under-leveraged accounts")
+            ) : (
+              <>
+                {rows.length === 1
+                  ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
+                  : t('accounts.summary.companyCount_other', '{{count}} companies', {
+                      count: rows.length,
+                    })}{' '}
+                · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
+                {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
+                  amount: formatMoneyMicros(totalPipeline, 'EUR'),
+                })}
+              </>
+            )
           }
           actions={
             <>
@@ -359,6 +372,8 @@ export function AccountsAllSegment() {
         </div>
       ) : null}
 
+      {leverageGate === 'settled' ? (
+      <>
       <section
         aria-label={t('accounts.stats.regionLabel', 'Account source coverage')}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
@@ -422,6 +437,8 @@ export function AccountsAllSegment() {
           })}
         </div>
       </InsightPanel>
+      </>
+      ) : null}
 
       <motion.div
         className="space-y-3"
@@ -518,7 +535,11 @@ export function AccountsAllSegment() {
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {search
+        {leverageGate === 'loading'
+          ? t('accounts.leverageRead.loading', 'Loading under-leveraged accounts')
+          : leverageGate === 'failed'
+            ? t('accounts.leverageRead.errorTitle', "Couldn't load under-leveraged accounts")
+            : search
           ? rows.length === 1
             ? t('accounts.liveRegion.matching_one', '{{count}} account matching "{{query}}"', {
                 count: rows.length,
@@ -563,7 +584,31 @@ export function AccountsAllSegment() {
         </p>
       ) : null}
 
-      {rows.length === 0 ? (
+      {leverageGate === 'loading' ? (
+        <div data-testid="accounts-leverage-loading">
+          <p className="text-sm text-[var(--fg-secondary)]">
+            {t('accounts.leverageRead.loading', 'Loading under-leveraged accounts')}
+          </p>
+          <LoadingSkeleton rows={4} />
+        </div>
+      ) : leverageGate === 'failed' ? (
+        <ErrorState
+          title={t('accounts.leverageRead.errorTitle', "Couldn't load under-leveraged accounts")}
+          message={t(
+            'accounts.leverageRead.errorMessage',
+            'The MSA leverage list did not respond.',
+          )}
+          action={
+            <button
+              type="button"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-semibold text-[var(--fg-primary)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+              onClick={() => void leverage.refetch()}
+            >
+              {t('accounts.leverageRead.retry', 'Retry')}
+            </button>
+          }
+        />
+      ) : rows.length === 0 ? (
         orgHasNoAccounts ? (
           <EmptyState
             icon="building"
