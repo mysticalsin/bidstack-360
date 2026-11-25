@@ -8,6 +8,7 @@
  * schedule timer re-renders only this span, not the whole row.
  */
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
@@ -23,13 +24,13 @@ import {
 import { useLiveRelativeTime } from '@/hooks/useLiveRelativeTime';
 import type { usePatchOpportunity } from '@/hooks/useOpportunities';
 import { cn } from '@/lib/cn';
-import { formatDate } from '@/lib/format';
 import { isPipelineStageIdUuid, resolvePipelineStage } from '@/lib/pipeline-stages';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { DateCell, NumberCell, StageCell } from './OppInlineEditCells';
+import { formatOpportunityDueDate } from './opportunity-due-date';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
 const ROW_BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
@@ -77,7 +78,10 @@ export const Row = memo(function Row({
    * 403s the PATCH otherwise, so every inline-edit cell renders read-only. */
   canWrite: boolean;
 }) {
+  const { i18n } = useTranslation('crm');
   const fireConfetti = useConfetti((s) => s.fire);
+  const printDueDate = (value: string | null) =>
+    formatOpportunityDueDate(value, i18n.resolvedLanguage ?? i18n.language);
 
   // Per-field flash timestamp. Bumping a field's value re-triggers the
   // SavedFlash chip next to that cell, independent of the others.
@@ -289,7 +293,7 @@ export const Row = memo(function Row({
         <div className="flex items-center gap-2 whitespace-nowrap">
           <DateCell
             value={opp.dueDate}
-            format={(v) => formatDate(v)}
+            format={printDueDate}
             isSaving={saving.dueDate}
             canEdit={canWrite}
             onSave={(next) => {
@@ -310,7 +314,11 @@ export const Row = memo(function Row({
               );
             }}
           />
-          <DueDateChip dueDate={opp.dueDate} size="sm" />
+          <DueDateChip
+            dueDate={opp.dueDate}
+            size="sm"
+            formatAbsoluteDate={(iso) => formatOpportunityDueDate(iso, i18n.resolvedLanguage ?? i18n.language)}
+          />
         </div>
         <SavedFlash trigger={saved.dueDate} />
       </td>
