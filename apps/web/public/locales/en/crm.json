@@ -3278,6 +3278,7 @@
     "statusDone": "Done",
     "idLabel": "ID",
     "createdLabel": "Created",
+    "dueDateLabel": "Due date",
     "toast": {
       "updateFailedTitle": "Could not update task",
       "serverRejected": "The server rejected the request."

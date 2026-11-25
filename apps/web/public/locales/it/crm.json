@@ -3262,6 +3262,7 @@
     "statusDone": "Completata",
     "idLabel": "ID",
     "createdLabel": "Creata",
+    "dueDateLabel": "Data di scadenza",
     "toast": {
       "updateFailedTitle": "Impossibile aggiornare l’attività",
       "serverRejected": "Il server ha rifiutato la richiesta."

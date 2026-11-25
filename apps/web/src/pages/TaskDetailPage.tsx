@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
+import { taskDetailPatch } from '@/components/task/task-detail-patch';
 import { formatDate } from '@/lib/format';
 
 export function TaskDetailPage() {
@@ -25,6 +26,7 @@ export function TaskDetailPage() {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('');
+  const [dueDate, setDueDate] = useState('');
 
   const task = tasks.data?.items.find((t) => t.id === id);
 
@@ -51,14 +53,12 @@ export function TaskDetailPage() {
   const startEdit = () => {
     setTitle(task.title);
     setStatus(task.status);
+    setDueDate(task.dueDate ?? '');
     setEditing(true);
   };
 
   const save = () => {
-    const patch: { title?: string; status?: 'open' | 'in_progress' | 'done' | 'blocked' } = {};
-    if (title !== task.title) patch.title = title;
-    if (status !== task.status)
-      patch.status = status as 'open' | 'in_progress' | 'done' | 'blocked';
+    const patch = taskDetailPatch(task, { title, status, dueDate });
     if (Object.keys(patch).length === 0) {
       setEditing(false);
       return;
@@ -188,6 +188,20 @@ export function TaskDetailPage() {
               </Badge>
             )}
           </div>
+          {editing ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-[var(--fg-secondary)]">
+                {t('taskDetail.dueDateLabel', 'Due date')}
+              </span>
+              <input
+                type="date"
+                aria-label={t('taskDetail.dueDateLabel', 'Due date')}
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="input text-sm"
+              />
+            </div>
+          ) : null}
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--fg-secondary)]">
               {t('taskDetail.idLabel', 'ID')}

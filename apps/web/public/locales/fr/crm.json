@@ -3317,6 +3317,7 @@
     "statusDone": "Terminée",
     "idLabel": "ID",
     "createdLabel": "Créée",
+    "dueDateLabel": "Date d'échéance",
     "toast": {
       "updateFailedTitle": "Impossible de mettre à jour la tâche",
       "serverRejected": "Le serveur a rejeté la requête."

@@ -3262,6 +3262,7 @@
     "statusDone": "Concluída",
     "idLabel": "ID",
     "createdLabel": "Criada",
+    "dueDateLabel": "Data de vencimento",
     "toast": {
       "updateFailedTitle": "Não foi possível atualizar a tarefa",
       "serverRejected": "O servidor rejeitou a solicitação."
