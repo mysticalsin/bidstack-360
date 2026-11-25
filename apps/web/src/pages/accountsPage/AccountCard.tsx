@@ -12,7 +12,6 @@ import { displayableLogoUrl } from '@/components/company/logoUrlSafety';
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout, springSnap } from '@/lib/motion';
 
 import {
@@ -24,6 +23,7 @@ import {
   titleCase,
   type AccountRow,
 } from './accountUtils';
+import { accountCardPipelineAmount } from './account-card-pipeline-amount';
 
 export const AccountCard = memo(function AccountCard({
   row,
@@ -33,7 +33,6 @@ export const AccountCard = memo(function AccountCard({
   index: number;
 }) {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
@@ -136,7 +135,7 @@ export const AccountCard = memo(function AccountCard({
             <div>
               <dt>{t('account.pipeline', 'Pipeline')}</dt>
               <dd>
-                <AnimatedMetric value={formatMoneyMicros(pipelineMicros, 'EUR')} />
+                <AnimatedMetric value={accountCardPipelineAmount(pipelineMicros)} />
               </dd>
             </div>
             <div>
