@@ -43,6 +43,10 @@ describe('parseCsv', () => {
     const { headers, rows } = parseCsv('name;domain\nLumen Freight;lumen.example\n');
     expect(headers).toEqual(['name', 'domain']);
     expect(rows).toEqual([{ name: 'Lumen Freight', domain: 'lumen.example' }]);
+    // A decimal comma is part of the amount, not a new column.
+    expect(parseCsv('name;amount\nLumen Freight;1234,56\n').rows).toEqual([
+      { name: 'Lumen Freight', amount: '1234,56' },
+    ]);
   });
 
   it('drops an Excel sep hint so the hint is not imported as a company', () => {

@@ -9,9 +9,49 @@ export interface ParsedCsv {
   rows: Record<string, string>[];
 }
 
+type CsvDelimiter = ',' | ';' | '\t';
+
+/**
+ * Excel in a comma-decimal locale separates cells with ';' and may write
+ * `sep=;` on the first line. A tie stays a comma, which is what this app
+ * exports. The hint line is not a header and not a company.
+ */
+function prepareCsv(text: string): { text: string; delimiter: CsvDelimiter } {
+  const src = text.replace(/^\uFEFF/, '');
+  const breakAt = src.search(/\r\n|\n|\r/);
+  const firstLine = breakAt === -1 ? src : src.slice(0, breakAt);
+  const hinted = /^sep=(,|;|\t)$/i.exec(firstLine);
+  if (hinted) {
+    const rest = breakAt === -1 ? '' : src.slice(breakAt).replace(/^(?:\r\n|\n|\r)/, '');
+    return { text: rest, delimiter: hinted[1] as CsvDelimiter };
+  }
+  return { text: src, delimiter: sniffDelimiter(firstLine) };
+}
+
+function sniffDelimiter(header: string): CsvDelimiter {
+  const counts: Record<CsvDelimiter, number> = { ',': 0, ';': 0, '\t': 0 };
+  let inQuotes = false;
+  for (let i = 0; i < header.length; i++) {
+    const ch = header[i];
+    if (ch === '"') {
+      if (inQuotes && header[i + 1] === '"') {
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (!inQuotes && (ch === ',' || ch === ';' || ch === '\t')) counts[ch] += 1;
+  }
+  if (counts[';'] > counts[','] && counts[';'] > counts['\t']) return ';';
+  if (counts['\t'] > counts[','] && counts['\t'] > counts[';']) return '\t';
+  return ',';
+}
+
 /** Split raw CSV text into a header row + record objects keyed by header. */
 export function parseCsv(text: string): ParsedCsv {
-  const matrix = toMatrix(text);
+  const prepared = prepareCsv(text);
+  const matrix = toMatrix(prepared.text, prepared.delimiter);
   const headerRow = matrix[0];
   if (!headerRow) return { headers: [], rows: [] };
 
@@ -35,7 +75,7 @@ export function parseCsv(text: string): ParsedCsv {
 }
 
 /** Tokenize CSV text into a 2D array of raw cell strings. */
-function toMatrix(text: string): string[][] {
+function toMatrix(text: string, delimiter: CsvDelimiter): string[][] {
   const matrix: string[][] = [];
   let field = '';
   let row: string[] = [];
@@ -62,7 +102,7 @@ function toMatrix(text: string): string[][] {
 
     if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ',') {
+    } else if (ch === delimiter) {
       row.push(field);
       field = '';
     } else if (ch === '\n') {
