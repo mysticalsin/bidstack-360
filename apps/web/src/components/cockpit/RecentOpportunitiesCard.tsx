@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
+import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -12,6 +13,16 @@ import type { useOpportunities } from '@/hooks/useOpportunities';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
+
+// A closed bid's close date is the day it was decided. The due chip stays on
+// open bids, which still have a deadline.
+function isClosedBid(opp: {
+  stage: string | null;
+  pipelineStage: { isWon: boolean; isLost: boolean } | null;
+}): boolean {
+  if (opp.pipelineStage?.isWon || opp.pipelineStage?.isLost) return true;
+  return opp.stage === 'closed_won' || opp.stage === 'closed_lost';
+}
 
 interface Props {
   opps: ReturnType<typeof useOpportunities>;
@@ -106,6 +117,7 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
                     <AnimatedMetric value={formatMoney(o.value, 'EUR')} />
                   </span>
                   <Badge tone="purple">{formatStage(o.stage ?? 'unknown')}</Badge>
+                  {isClosedBid(o) ? null : <DueDateChip dueDate={o.dueDate} size="md" />}
                 </div>
               </Link>
             </motion.li>
