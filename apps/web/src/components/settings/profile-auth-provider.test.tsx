@@ -33,6 +33,7 @@ vi.mock('@/hooks/usePoloIdentity', () => ({
   usePoloPublicIdentity: () => identity.current,
 }));
 
+import { profileAuthLabel } from './profile-auth-provider';
 import { ProfileSection } from './ProfileSection';
 
 function settled(
@@ -146,5 +147,40 @@ describe('settings profile auth provider', () => {
     expect(screen.getByText('Cloudflare Access (per-user email)')).toBeTruthy();
     expect(screen.queryByText('Demo')).toBeNull();
     expect(screen.queryByText('Dev stub')).toBeNull();
+  });
+});
+
+describe('profileAuthLabel', () => {
+  it('names the reported door and leaves a missing answer unlabeled', () => {
+    // WHY: the profile card exists so a visitor can see which door they
+    // used. Demo stays demo. Clerk, Cloudflare Access, and the local stub
+    // stay themselves. A load, a failure, or a ready payload with no
+    // provider is not a door.
+    expect(profileAuthLabel({ status: 'ready', authProvider: 'demo' })).toEqual({
+      state: 'ready',
+      kind: 'demo',
+    });
+    expect(profileAuthLabel({ status: 'ready', authProvider: 'clerk' })).toEqual({
+      state: 'ready',
+      kind: 'clerk',
+    });
+    expect(profileAuthLabel({ status: 'ready', authProvider: 'cf-access' })).toEqual({
+      state: 'ready',
+      kind: 'cf-access',
+    });
+    expect(profileAuthLabel({ status: 'ready', authProvider: 'stub' })).toEqual({
+      state: 'ready',
+      kind: 'stub',
+    });
+    expect(profileAuthLabel({ status: 'loading', authProvider: 'demo' })).toEqual({
+      state: 'loading',
+    });
+    expect(profileAuthLabel({ status: 'error', authProvider: 'clerk' })).toEqual({
+      state: 'error',
+    });
+    expect(profileAuthLabel({ status: 'ready', authProvider: null })).toEqual({
+      state: 'error',
+    });
+    expect(profileAuthLabel({ status: 'ready' })).toEqual({ state: 'error' });
   });
 });

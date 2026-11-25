@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { usePoloPublicIdentity } from '@/hooks/usePoloIdentity';
 import { useAuth, useUser, useRole } from '@/lib/auth';
+import { profileAuthLabel, type ProfileAuthLabel } from './profile-auth-provider';
 
 export function ProfileSection() {
   const { t } = useTranslation('settings');
@@ -16,8 +17,10 @@ export function ProfileSection() {
 
   const seed = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Guest';
   const identity = usePoloPublicIdentity();
-  const provider = identity.data?.authProvider;
-  const usingClerk = provider === 'clerk' || Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+  const auth = profileAuthLabel({
+    status: identity.isLoading ? 'loading' : identity.isError ? 'error' : 'ready',
+    authProvider: identity.data?.authProvider,
+  });
 
   return (
     <div className="space-y-6">
@@ -39,13 +42,7 @@ export function ProfileSection() {
               {role ? (
                 <Badge tone="purple">{role}</Badge>
               ) : null}
-              <Badge tone={provider === 'cf-access' || usingClerk ? 'jade' : 'amber'}>
-                {provider === 'cf-access'
-                  ? t('profile.providerCfAccessShort', 'Cloudflare Access')
-                  : usingClerk
-                    ? t('profile.providerClerkShort', 'Clerk')
-                    : t('profile.providerStubShort', 'Dev stub')}
-              </Badge>
+              <ProfileAuthValue label={auth} variant="short" />
             </div>
           </div>
         </div>
@@ -64,13 +61,7 @@ export function ProfileSection() {
             <span className="capitalize">{role ?? '—'}</span>
           </DetailRow>
           <DetailRow label={t('profile.authProviderLabel', 'Auth provider')}>
-            <span className="text-[var(--fg-secondary)]">
-              {provider === 'cf-access'
-                ? t('profile.providerCfAccessLong', 'Cloudflare Access (per-user email)')
-                : usingClerk
-                  ? t('profile.providerClerkLong', 'Clerk (production)')
-                  : t('profile.providerStubLong', 'Stub (development) — not for real data')}
-            </span>
+            <ProfileAuthValue label={auth} variant="long" />
           </DetailRow>
           <DetailRow label={t('profile.statusLabel', 'Status')}>
             <Badge tone={isSignedIn ? 'jade' : 'gray'}>
@@ -91,5 +82,75 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
       </dt>
       <dd className="text-[var(--fg-primary)]">{children}</dd>
     </div>
+  );
+}
+
+function ProfileAuthValue({
+  label,
+  variant,
+}: {
+  label: ProfileAuthLabel;
+  variant: 'short' | 'long';
+}) {
+  const { t } = useTranslation('settings');
+  if (label.state === 'loading') {
+    return (
+      <span
+        role="status"
+        aria-label={t('profile.providerLoading', 'Loading')}
+        className="text-xs text-[var(--fg-tertiary)]"
+      >
+        {t('profile.providerLoading', 'Loading')}
+      </span>
+    );
+  }
+  if (label.state === 'error') {
+    return (
+      <span
+        role="status"
+        aria-label={t('profile.providerError', 'Could not load')}
+        className="text-xs text-[var(--fg-tertiary)]"
+      >
+        {t('profile.providerError', 'Could not load')}
+      </span>
+    );
+  }
+  if (variant === 'short') {
+    if (label.kind === 'demo') {
+      return <Badge tone="amber">{t('profile.providerDemoShort', 'Demo')}</Badge>;
+    }
+    if (label.kind === 'clerk') {
+      return <Badge tone="jade">{t('profile.providerClerkShort', 'Clerk')}</Badge>;
+    }
+    if (label.kind === 'cf-access') {
+      return (
+        <Badge tone="jade">{t('profile.providerCfAccessShort', 'Cloudflare Access')}</Badge>
+      );
+    }
+    return <Badge tone="amber">{t('profile.providerStubShort', 'Dev stub')}</Badge>;
+  }
+  if (label.kind === 'demo') {
+    return (
+      <span className="text-[var(--fg-secondary)]">{t('profile.providerDemoLong', 'Demo session')}</span>
+    );
+  }
+  if (label.kind === 'clerk') {
+    return (
+      <span className="text-[var(--fg-secondary)]">
+        {t('profile.providerClerkLong', 'Clerk (production)')}
+      </span>
+    );
+  }
+  if (label.kind === 'cf-access') {
+    return (
+      <span className="text-[var(--fg-secondary)]">
+        {t('profile.providerCfAccessLong', 'Cloudflare Access (per-user email)')}
+      </span>
+    );
+  }
+  return (
+    <span className="text-[var(--fg-secondary)]">
+      {t('profile.providerStubLong', 'Stub (development) \u2014 not for real data')}
+    </span>
   );
 }
