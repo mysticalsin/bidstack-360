@@ -126,11 +126,14 @@
     },
     "empty": {
       "title": "No opportunities yet",
-      "message": "Create your first opportunity to start tracking bids."
+      "message": "Create your first opportunity to start tracking bids.",
+      "accountTitle": "No bids for this account",
+      "accountMessage": "Nothing linked to this account is on the bid list."
     },
     "caption": {
       "matching": "Opportunities matching \"{{search}}\"",
-      "all": "All opportunities, sorted by most recent activity. Cells are inline-editable."
+      "all": "All opportunities, sorted by most recent activity. Cells are inline-editable.",
+      "account": "This account's bids"
     },
     "pagerLabel": "opportunities"
   },
@@ -2138,6 +2141,9 @@
     "kpiRevenuePage": "Revenue (page)",
     "kpiOpenPage": "Open (page)",
     "kpiRegionLabel": "Opportunities KPI summary",
+    "kpiFilteredRegionLabel": "Filtered opportunities on this page",
+    "accountBids": "This account's bids",
+    "showEveryAccount": "Show every account",
     "title": "Opportunities",
     "resultsFor": "results for",
     "clear": "clear",
@@ -3708,6 +3714,7 @@
     "accountCaption": "Open opportunities linked to {{accountName}}",
     "recentCaption": "Latest portfolio activity across all customers",
     "openPipeline": "Open pipeline",
+    "openAccountPipeline": "Open this account's bids",
     "viewAll": "View all",
     "emptyAccountTitle": "No opportunities for this account yet",
     "emptyTitle": "No opportunities yet",

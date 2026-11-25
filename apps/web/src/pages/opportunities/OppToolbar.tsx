@@ -36,23 +36,33 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
  * it stays page-derived and is explicitly labelled "(page)" to avoid
  * misrepresenting it as a tenant total.
  */
-export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
+export function OppKpiBar({
+  opps,
+  summary,
+  scoped = false,
+}: {
+  opps: Opportunity[];
+  summary?: OrgSummary;
+  /** This page is one account, not the book. Ignore the workspace summary. */
+  scoped?: boolean;
+}) {
   const { t } = useTranslation('crm');
   const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
   const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
-  const kpis = summary
+  const book = scoped ? undefined : summary;
+  const kpis = book
     ? [
         {
           label: t('oppToolbar.kpiOpportunities', 'Opportunities'),
-          value: summary.opportunities.toLocaleString(),
+          value: book.opportunities.toLocaleString(),
         },
         {
           label: t('oppToolbar.kpiOpenCount', 'Open'),
-          value: summary.openOpportunities.toLocaleString(),
+          value: book.openOpportunities.toLocaleString(),
         },
         {
           label: t('oppToolbar.kpiOpenPipeline', 'Open pipeline'),
-          value: `${formatUnspecifiedAmount(summary.pipelineValue)}`,
+          value: `${formatUnspecifiedAmount(book.pipelineValue)}`,
           basis: true,
         },
         {
@@ -87,7 +97,11 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
   return (
     <div
       role="region"
-      aria-label={t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')}
+      aria-label={
+        scoped
+          ? t('oppToolbar.kpiFilteredRegionLabel', 'Filtered opportunities on this page')
+          : t('oppToolbar.kpiRegionLabel', 'Opportunities KPI summary')
+      }
       className="grid grid-cols-2 gap-3 sm:grid-cols-4"
     >
       {kpis.map((kpi) => (
@@ -122,22 +136,27 @@ export function OppPageHeader({
   search,
   stageFilter,
   stageOptions,
+  accountScoped = false,
   itemCount,
   hasData,
   isExporting = false,
   onClearSearch,
   onClearStageFilter,
+  onClearAccount,
   onExportCsv,
 }: {
   search: string | undefined;
   stageFilter: string | null;
   stageOptions: PipelineStage[];
+  /** The list was opened for one company. The subtitle must not say the book. */
+  accountScoped?: boolean;
   itemCount: number;
   hasData: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
   onClearSearch: () => void;
   onClearStageFilter: () => void;
+  onClearAccount?: () => void;
   onExportCsv: () => void;
 }) {
   const { t } = useTranslation('crm');
@@ -154,7 +173,14 @@ export function OppPageHeader({
       <div className="min-w-0">
         <h1 className="page-title">{t('oppToolbar.title', 'Opportunities')}</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {search ? (
+          {accountScoped ? (
+            <>
+              {t('oppToolbar.accountBids', "This account's bids")}
+              <button type="button" onClick={onClearAccount} className={`${clearBtnClass} inline-flex min-h-11 items-center`}>
+                {t('oppToolbar.showEveryAccount', 'Show every account')}
+              </button>
+            </>
+          ) : search ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
               {t('oppToolbar.resultsFor', 'results for')}{' '}

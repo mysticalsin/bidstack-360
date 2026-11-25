@@ -126,11 +126,14 @@
     },
     "empty": {
       "title": "暂无商机",
-      "message": "创建您的第一个商机以开始跟踪投标。"
+      "message": "创建您的第一个商机以开始跟踪投标。",
+      "accountTitle": "此客户没有投标",
+      "accountMessage": "列表里没有与此客户关联的投标。"
     },
     "caption": {
       "matching": "匹配 “{{search}}” 的商机",
-      "all": "所有商机，按最近活动排序。单元格可内联编辑。"
+      "all": "所有商机，按最近活动排序。单元格可内联编辑。",
+      "account": "此客户的投标"
     },
     "pagerLabel": "商机"
   },
@@ -2129,6 +2132,9 @@
     "kpiWeightedRevenue": "加权",
     "kpiOpen": "进行中",
     "kpiRegionLabel": "商机关键指标摘要",
+    "kpiFilteredRegionLabel": "本页已筛选的商机",
+    "accountBids": "此客户的投标",
+    "showEveryAccount": "显示全部客户",
     "title": "商机",
     "resultsFor": "个结果，搜索",
     "clear": "清除",
@@ -3692,6 +3698,7 @@
     "accountCaption": "与 {{accountName}} 关联的开放机会",
     "recentCaption": "所有客户的最新组合动态",
     "openPipeline": "打开管道",
+    "openAccountPipeline": "打开此客户的投标",
     "viewAll": "查看全部",
     "emptyAccountTitle": "此客户暂无机会",
     "emptyTitle": "暂无机会",

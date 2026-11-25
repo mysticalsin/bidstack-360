@@ -366,11 +366,14 @@
     },
     "empty": {
       "title": "Aucune opportunité pour l'instant",
-      "message": "Créez votre première opportunité pour commencer à suivre les appels d'offres."
+      "message": "Créez votre première opportunité pour commencer à suivre les appels d'offres.",
+      "accountTitle": "Aucune offre pour ce compte",
+      "accountMessage": "Aucune offre liée à ce compte n'est dans la liste."
     },
     "caption": {
       "matching": "Opportunités correspondant à \"{{search}}\"",
-      "all": "Toutes les opportunités, triées par activité la plus récente. Les cellules sont modifiables en ligne."
+      "all": "Toutes les opportunités, triées par activité la plus récente. Les cellules sont modifiables en ligne.",
+      "account": "Offres de ce compte"
     },
     "pagerLabel": "opportunités"
   },
@@ -2184,6 +2187,9 @@
     "kpiWeightedRevenue": "RP",
     "kpiOpen": "Ouvertes",
     "kpiRegionLabel": "Résumé des KPI des opportunités",
+    "kpiFilteredRegionLabel": "Opportunités filtrées sur cette page",
+    "accountBids": "Offres de ce compte",
+    "showEveryAccount": "Afficher tous les comptes",
     "title": "Opportunités",
     "resultsFor": "résultats pour",
     "clear": "effacer",
@@ -3741,6 +3747,7 @@
     "accountCaption": "Opportunités ouvertes liées à {{accountName}}",
     "recentCaption": "Dernière activité du portefeuille pour tous les clients",
     "openPipeline": "Ouvrir le pipeline",
+    "openAccountPipeline": "Ouvrir les offres de ce compte",
     "viewAll": "Tout voir",
     "emptyAccountTitle": "Aucune opportunité pour ce compte pour l'instant",
     "emptyTitle": "Aucune opportunité pour l'instant",

@@ -10,18 +10,22 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { accountPipelineHref, opportunityCompanyIdParam } from '@/lib/account-pipeline-href';
 import { formatStage } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
 
 interface Props {
   opps: ReturnType<typeof useOpportunities>;
   accountName?: string;
+  /** Company uuid for "Open pipeline". A name-only cockpit keeps the name search. */
+  companyId?: string | null;
   items?: NonNullable<ReturnType<typeof useOpportunities>['data']>['items'];
 }
 
 export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
   opps,
   accountName,
+  companyId,
   items,
 }: Props) {
   const reducedMotion = useReducedMotion();
@@ -29,6 +33,11 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
   const { t } = useTranslation('crm');
   const visibleItems = items ?? opps.data?.items ?? [];
   const accountScoped = Boolean(accountName);
+  const opensThisCompany = Boolean(opportunityCompanyIdParam(companyId ?? null));
+  const pipelineHref = accountPipelineHref({
+    companyId,
+    accountName: accountScoped ? accountName : null,
+  });
   return (
     <Card
       role="region"
@@ -53,12 +62,13 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
         }
         action={
           <Link
-            to={
-              accountScoped
-                ? `/opportunities?search=${encodeURIComponent(accountName ?? '')}`
-                : '/opportunities'
-            }
+            to={pipelineHref}
             className="link-arrow"
+            aria-label={
+              opensThisCompany
+                ? t('recentOpportunities.openAccountPipeline', "Open this account's bids")
+                : undefined
+            }
           >
             {accountScoped
               ? t('recentOpportunities.openPipeline', 'Open pipeline')

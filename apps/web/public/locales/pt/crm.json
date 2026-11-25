@@ -126,11 +126,14 @@
     },
     "empty": {
       "title": "Ainda não há oportunidades",
-      "message": "Crie sua primeira oportunidade para começar a acompanhar as propostas."
+      "message": "Crie sua primeira oportunidade para começar a acompanhar as propostas.",
+      "accountTitle": "Nenhuma proposta para esta conta",
+      "accountMessage": "Nenhuma proposta ligada a esta conta está na lista."
     },
     "caption": {
       "matching": "Oportunidades correspondentes a \"{{search}}\"",
-      "all": "Todas as oportunidades, ordenadas pela atividade mais recente. As células são editáveis em linha."
+      "all": "Todas as oportunidades, ordenadas pela atividade mais recente. As células são editáveis em linha.",
+      "account": "Propostas desta conta"
     },
     "pagerLabel": "oportunidades"
   },
@@ -2129,6 +2132,9 @@
     "kpiWeightedRevenue": "RP",
     "kpiOpen": "Abertas",
     "kpiRegionLabel": "Resumo de KPIs de oportunidades",
+    "kpiFilteredRegionLabel": "Oportunidades filtradas nesta página",
+    "accountBids": "Propostas desta conta",
+    "showEveryAccount": "Mostrar todas as contas",
     "title": "Oportunidades",
     "resultsFor": "resultados para",
     "clear": "limpar",
@@ -3692,6 +3698,7 @@
     "accountCaption": "Oportunidades abertas vinculadas a {{accountName}}",
     "recentCaption": "Atividade mais recente da carteira de todos os clientes",
     "openPipeline": "Abrir pipeline",
+    "openAccountPipeline": "Abrir as propostas desta conta",
     "viewAll": "Ver tudo",
     "emptyAccountTitle": "Ainda não há oportunidades para esta conta",
     "emptyTitle": "Ainda não há oportunidades",
