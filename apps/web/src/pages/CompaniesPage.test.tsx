@@ -58,10 +58,10 @@ function baseCompany() {
   };
 }
 
-function renderWithProviders(ui: React.ReactElement) {
+function renderWithProviders(ui: React.ReactElement, path = '/companies') {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -127,5 +127,25 @@ describe('CompaniesPage — companies:write gating', () => {
 
     expect(useHasAdminPermission).toHaveBeenCalledWith('companies:write');
     expect(screen.queryByRole('button', { name: /New company/i })).toBeNull();
+  });
+
+  // The floating "New account" action lands on this URL. A writer must see the
+  // form immediately; a reader must not get a form the server will reject.
+  it('opens the create form when a writer arrives with ?new=1', () => {
+    vi.mocked(useHasAdminPermission).mockReturnValue(true);
+
+    renderWithProviders(<CompaniesPage />, '/companies?new=1');
+
+    expect(screen.getByRole('dialog', { name: /New company/i })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: /Company name/i })).toBeTruthy();
+  });
+
+  it('keeps the create form closed on ?new=1 without companies:write', () => {
+    vi.mocked(useHasAdminPermission).mockReturnValue(false);
+
+    renderWithProviders(<CompaniesPage />, '/companies?new=1');
+
+    expect(screen.queryByRole('dialog', { name: /New company/i })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Company name/i })).toBeNull();
   });
 });
