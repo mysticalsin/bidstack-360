@@ -325,8 +325,9 @@
     "closeAria": "Chiudi scorciatoie",
     "groupGlobal": "Globale",
     "groupNavigation": "Navigazione",
-    "groupRecords": "Record",
     "openCommandPalette": "Apri la palette dei comandi",
+    "openJarvis": "Apri Jarvis",
+    "focusSearch": "Attiva la ricerca",
     "quickAddMenu": "Menu di aggiunta rapida",
     "openThisDrawer": "Apri questo pannello",
     "closeCurrentDialog": "Chiudi la finestra di dialogo corrente",
@@ -339,11 +340,7 @@
     "goToAccounts": "Vai agli account",
     "goToSettings": "Vai alle impostazioni",
     "goToSearch": "Vai alla ricerca",
-    "moveSelectionInLists": "Sposta la selezione negli elenchi",
-    "openRecord": "Apri record",
-    "editSelectedRecord": "Modifica il record selezionato",
-    "deleteWithConfirmation": "Elimina con conferma",
-    "footer": "La maggior parte delle scorciatoie funziona ovunque tranne che nei campi di testo. Premi ? in qualsiasi momento per riaprire questo pannello."
+    "footer": "Le scorciatoie di una lettera si fermano in un campo di testo. Ctrl e Comando aprono ancora la ricerca, Jarvis e la palette dei comandi. Premi ? fuori da un campo per riaprire questo pannello."
   },
   "breadcrumbs": {
     "dashboard": "Dashboard",

@@ -327,8 +327,9 @@
     "closeAria": "Fechar atalhos",
     "groupGlobal": "Global",
     "groupNavigation": "Navegação",
-    "groupRecords": "Registros",
     "openCommandPalette": "Abrir paleta de comandos",
+    "openJarvis": "Abrir o Jarvis",
+    "focusSearch": "Focar a pesquisa",
     "quickAddMenu": "Menu de adição rápida",
     "openThisDrawer": "Abrir este painel",
     "closeCurrentDialog": "Fechar o diálogo atual",
@@ -341,11 +342,7 @@
     "goToAccounts": "Ir para Contas",
     "goToSettings": "Ir para Configurações",
     "goToSearch": "Ir para Pesquisa",
-    "moveSelectionInLists": "Mover a seleção nas listas",
-    "openRecord": "Abrir registro",
-    "editSelectedRecord": "Editar o registro selecionado",
-    "deleteWithConfirmation": "Excluir com confirmação",
-    "footer": "A maioria dos atalhos funciona em todos os lugares, exceto dentro de campos de texto. Pressione ? a qualquer momento para reabrir este painel."
+    "footer": "Os atalhos de uma letra pausam dentro de um campo de texto. Ctrl e Command ainda abrem a pesquisa, o Jarvis e a paleta de comandos. Pressione ? fora de um campo para reabrir este painel."
   },
   "breadcrumbs": {
     "dashboard": "Painel",
