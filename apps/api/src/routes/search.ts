@@ -5,6 +5,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/shared';
 
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
+import { searchNoteSubtitle } from '../lib/search-note-subtitle.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
 
 const VALID_TYPES = [
@@ -369,7 +370,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   type: 'note' as const,
                   id: n.id,
                   title: n.title,
-                  subtitle: n.accountId,
+                  subtitle: searchNoteSubtitle(n.bodyMd, q, n.accountId),
                   url: `/accounts/${encodeURIComponent(n.accountId)}`,
                   score: scoreMatch(q, [
                     { text: n.title, weight: 3 },
