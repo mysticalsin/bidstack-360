@@ -135,6 +135,30 @@ describe('DemoSignIn', () => {
     expect(localStorage.getItem('demo-signed-out')).toBeNull();
   });
 
+  it('tells a signed-out visitor that the next entry opens a new sandbox', async () => {
+    // Sign-out drops the resume token. The prefilled edge email is the last
+    // visitor, not a live session. The form has to say the next entry starts
+    // over, or it reads as a return to the sandbox they just left.
+    localStorage.setItem('demo-signed-out', '1');
+    route('/__auth/me', jsonResponse(200, { email: 'ada.visitor@example.test', via: 'access' }));
+    renderPage();
+    const notice = await screen.findByTestId('demo-signed-out-notice');
+    expect(notice.textContent).toBe(
+      'You signed out. Entering again opens a new sandbox. The one you left stays closed.',
+    );
+    expect((screen.getByLabelText('Work email') as HTMLInputElement).value).toBe(
+      'ada.visitor@example.test',
+    );
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('does not tell a first visit that a previous sandbox was left', async () => {
+    route('/__auth/me', new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } }));
+    renderPage();
+    await screen.findByLabelText('Work email');
+    expect(screen.queryByTestId('demo-signed-out-notice')).toBeNull();
+  });
+
   it('treats a failed gate check as unknown and rechecks before choosing the flow', async () => {
     let calls = 0;
     fetchMock.mockImplementation(async (url: string) => {
