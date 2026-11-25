@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { RestrictedCompanyLabel } from '@/components/RestrictedCompanyLabel';
+import { formatStage } from '@/lib/format';
 import { isRestrictedCompany } from '@/lib/restrictedCompany';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -175,7 +176,7 @@ export function CompanyDetailPage() {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--fg-secondary)]">
-            {c.industry && <Badge tone="gray">{c.industry}</Badge>}
+            {c.industry && <Badge tone="gray">{formatStage(c.industry)}</Badge>}
             {c.domain && (
               <a
                 href={`https://${c.domain}`}
