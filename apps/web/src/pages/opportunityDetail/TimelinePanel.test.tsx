@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -178,6 +178,34 @@ describe('TimelinePanel — merged deal narrative', () => {
 
     expect(await screen.findByText('Procurement timeline check')).toBeTruthy();
     expect(screen.queryByText('This deal is already closed won')).toBeNull();
+    expect(screen.queryByText('No activity yet')).toBeNull();
+  });
+
+  it('waits for the deal record before calling an empty list a new bid', async () => {
+    // WHY: the timeline can settle empty before the deal record arrives. Painting
+    // "No activity yet" in that gap is the same lie, one frame earlier.
+    let resolveDeal: (deal: { stage: string; pipelineStage: null }) => void = () => {};
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/opportunities/opp-1/timeline') return Promise.resolve({ items: [] });
+      if (path === '/api/opportunities/opp-1') {
+        return new Promise((resolve) => {
+          resolveDeal = resolve;
+        });
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    renderPanel();
+
+    await waitFor(() => {
+      expect(document.querySelector('[aria-busy="true"]')).toBeTruthy();
+    });
+    expect(screen.queryByText('No activity yet')).toBeNull();
+    expect(screen.queryByText('This deal is already closed won')).toBeNull();
+
+    resolveDeal({ stage: 'closed_won', pipelineStage: null });
+
+    expect(await screen.findByText('This deal is already closed won')).toBeTruthy();
     expect(screen.queryByText('No activity yet')).toBeNull();
   });
 });
