@@ -38,16 +38,24 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
 
   const startEdit = () => {
     setSaveError(false);
+    // Sample fixtures are not the account's stack. Copying them into the
+    // draft and saving would freeze that fixture as the override.
     setDraft({
       companyId,
-      stack: categories.map((cat) => ({ ...cat, items: [...cat.items] })),
+      stack: withoutSample(categories).map((cat) => ({ ...cat, items: [...cat.items] })),
     });
   };
   const commit = async () => {
     if (!activeDraft || draft?.companyId !== companyId) return;
+    const next = cleanDraft(activeDraft);
+    const baseline = cleanDraft(withoutSample(categories));
+    if (JSON.stringify(next) === JSON.stringify(baseline)) {
+      setDraft(null);
+      return;
+    }
     setSaveError(false);
     try {
-      await save.mutateAsync(cleanDraft(activeDraft));
+      await save.mutateAsync(next);
       setDraft(null);
     } catch {
       setSaveError(true);
@@ -129,6 +137,11 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
                             <span className="min-w-0 truncate text-sm text-[var(--fg-primary)]" title={item.name}>
                               {item.name}
                             </span>
+                            {item.sample ? (
+                              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 text-xs font-semibold text-[var(--fg-tertiary)]">
+                                Sample
+                              </span>
+                            ) : null}
                             <TechEvidenceChip item={item} />
                           </span>
                         ))}
@@ -303,6 +316,16 @@ function reindexPending(pending: Record<number, string>, removedIndex: number): 
     else if (index > removedIndex) next[index - 1] = value;
   }
   return next;
+}
+
+function withoutSample(categories: TechnicalStackCategory[]): TechnicalStackCategory[] {
+  return categories
+    .map((cat) => ({
+      ...(cat.stack ? { stack: cat.stack } : {}),
+      label: cat.label,
+      items: cat.items.filter((item) => item.sample !== true),
+    }))
+    .filter((cat) => cat.items.length > 0);
 }
 
 function cleanDraft(draft: TechnicalStackCategory[]): TechnicalStackCategory[] {
