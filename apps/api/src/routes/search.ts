@@ -5,6 +5,7 @@ import { prisma, Prisma } from '@bidstack/db';
 import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/shared';
 
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
+import { searchProposalStatusLabel } from '../lib/search-proposal-status.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
 
 const VALID_TYPES = [
@@ -401,7 +402,7 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
                   type: 'proposal' as const,
                   id: p.id,
                   title: p.name,
-                  subtitle: p.status,
+                  subtitle: searchProposalStatusLabel(p.status),
                   url: `/proposals/${p.id}`,
                   score: scoreMatch(q, [{ text: p.name, weight: 3 }]),
                 },
