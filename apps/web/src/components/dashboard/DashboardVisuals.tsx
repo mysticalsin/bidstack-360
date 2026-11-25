@@ -185,11 +185,57 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
   );
 }
 
-export function ForecastCard({ rows, projection, headingLevel }: {
+export function ForecastCard({
+  rows,
+  projection,
+  headingLevel,
+  pending = false,
+  failed = false,
+  onRetry,
+}: {
   rows: OppRow[];
   headingLevel?: 2 | 3;
   projection?: { periods: Array<{ label: string; weightedMicros: number; wonMicros: number; openMicros: number; manualCommitMicros: number | null }> };
+  /** True while the forecast read has not returned a payload. */
+  pending?: boolean;
+  /** True when that read failed. Ignored once a payload is already on screen. */
+  failed?: boolean;
+  onRetry?: () => void;
 }) {
+  // Wins already in the bid rows are not a forecast. Until the projection
+  // settles, "no target" would describe a read that has not answered.
+  if (!projection && (failed || pending)) {
+    const loading = !failed;
+    const title = loading ? 'Loading the forecast' : "Couldn't load the forecast";
+    return (
+      <ChartCard
+        headingLevel={headingLevel}
+        title="Revenue and forecast"
+        meta={title}
+        summary={loading ? title : "Couldn't load the forecast. Please try again."}
+        interactive
+      >
+        {loading ? (
+          <div className="dash-hero-chart-skel" aria-busy="true" data-testid="dashboard-forecast-placeholder" />
+        ) : (
+          <div role="alert" className="space-y-2 py-4">
+            <p className="text-sm font-medium text-[var(--fg-primary)]">{"Couldn't load the forecast."}</p>
+            <p className="text-xs text-[var(--fg-secondary)]">Please try again.</p>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-xs font-semibold text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
+              >
+                Retry
+              </button>
+            ) : null}
+          </div>
+        )}
+      </ChartCard>
+    );
+  }
+
   const actuals = wonByQuarter(rows).map((q) => ({ label: q.label, won: q.won, weighted: 0, open: 0 }));
   const future = (projection?.periods ?? [])
     .filter((p) => p.openMicros > 0 || p.weightedMicros > 0)
@@ -285,10 +331,13 @@ export function SignalsCard({ feed }: { feed?: WatchdogFeed }) {
 /** Revenue, win rate and top accounts in one card with kokonutui SmoothTab
  *  (MIT): one surface instead of three, each view keeps its own summary and
  *  table toggle. */
-export function PerformanceCard({ rows, projection, onDrill }: {
+export function PerformanceCard({ rows, projection, onDrill, pending = false, failed = false, onRetry }: {
   rows: OppRow[];
   projection?: Parameters<typeof ForecastCard>[0]['projection'];
   onDrill?: OnDrill;
+  pending?: boolean;
+  failed?: boolean;
+  onRetry?: () => void;
 }) {
   const [tab, setTab] = useState('revenue');
   const headId = useId();
@@ -310,7 +359,7 @@ export function PerformanceCard({ rows, projection, onDrill }: {
         value={tab}
         onChange={setTab}
         items={[
-          { id: 'revenue', title: 'Revenue', content: <ForecastCard rows={rows} projection={projection} headingLevel={3} /> },
+          { id: 'revenue', title: 'Revenue', content: <ForecastCard rows={rows} projection={projection} headingLevel={3} pending={pending} failed={failed} onRetry={onRetry} /> },
           { id: 'winrate', title: 'Win rate', content: <WinRateTrendCard rows={rows} headingLevel={3} /> },
           { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} onDrill={onDrill} /> },
         ]}
