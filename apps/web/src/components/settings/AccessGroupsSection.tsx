@@ -291,70 +291,87 @@ function GroupEditor({ group }: { group: UserGroup }) {
         </h4>
         {detail.isLoading ? (
           <LoadingSkeleton rows={2} />
-        ) : members.length === 0 ? (
-          <p className="text-sm text-[var(--fg-tertiary)]">
-            {t('accessGroups.noMembers', 'No members yet.')}
-          </p>
+        ) : detail.isError && detail.data == null ? (
+          <ErrorState
+            title={t('accessGroups.membersErrorTitle', 'Could not load members')}
+            message={t(
+              'accessGroups.membersErrorMessage',
+              'This is not an empty member list. Retry the list before adding a member.',
+            )}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void detail.refetch()}>
+                {t('accessGroups.retry', 'Retry')}
+              </Button>
+            }
+          />
         ) : (
-          <ul
-            className="space-y-1"
-            aria-label={t('accessGroups.membersListAriaLabel', 'Members of {{name}}', {
-              name: group.name,
-            })}
-          >
-            {members.map((m) => (
-              <li key={m.id} className="flex items-center gap-2 text-sm">
-                <span className="flex-1 truncate text-[var(--fg-primary)]">
-                  {m.name ?? m.email}
-                  {m.name && (
-                    <span className="ml-1.5 text-xs text-[var(--fg-tertiary)]">{m.email}</span>
-                  )}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={t('accessGroups.removeMemberAriaLabel', 'Remove {{member}} from {{group}}', {
-                    member: m.name ?? m.email,
-                    group: group.name,
-                  })}
-                  onClick={() =>
-                    void removeMember
-                      .mutateAsync({ groupId: group.id, userId: m.userId })
-                      .catch(() =>
-                        toast.error(
-                          t('accessGroups.toastMemberRemoveError', 'Could not remove member'),
-                        ),
-                      )
-                  }
-                >
-                  {t('accessGroups.remove', 'Remove')}
-                </Button>
-              </li>
-            ))}
-          </ul>
+          <>
+            {members.length === 0 ? (
+              <p className="text-sm text-[var(--fg-tertiary)]">
+                {t('accessGroups.noMembers', 'No members yet.')}
+              </p>
+            ) : (
+              <ul
+                className="space-y-1"
+                aria-label={t('accessGroups.membersListAriaLabel', 'Members of {{name}}', {
+                  name: group.name,
+                })}
+              >
+                {members.map((m) => (
+                  <li key={m.id} className="flex items-center gap-2 text-sm">
+                    <span className="flex-1 truncate text-[var(--fg-primary)]">
+                      {m.name ?? m.email}
+                      {m.name && (
+                        <span className="ml-1.5 text-xs text-[var(--fg-tertiary)]">{m.email}</span>
+                      )}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t('accessGroups.removeMemberAriaLabel', 'Remove {{member}} from {{group}}', {
+                        member: m.name ?? m.email,
+                        group: group.name,
+                      })}
+                      onClick={() =>
+                        void removeMember
+                          .mutateAsync({ groupId: group.id, userId: m.userId })
+                          .catch(() =>
+                            toast.error(
+                              t('accessGroups.toastMemberRemoveError', 'Could not remove member'),
+                            ),
+                          )
+                      }
+                    >
+                      {t('accessGroups.remove', 'Remove')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select
+                value={pickedUserId}
+                onChange={(e) => setPickedUserId(e.target.value)}
+                aria-label={t('accessGroups.addMemberLabel', 'Add a member')}
+                className="h-9 min-w-[220px] rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+              >
+                <option value="">{t('accessGroups.addMemberPlaceholder', 'Add a member…')}</option>
+                {candidates.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name ?? u.email}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="secondary"
+                onClick={() => void handleAdd()}
+                disabled={!pickedUserId || addMember.isPending}
+              >
+                {t('accessGroups.add', 'Add')}
+              </Button>
+            </div>
+          </>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select
-            value={pickedUserId}
-            onChange={(e) => setPickedUserId(e.target.value)}
-            aria-label={t('accessGroups.addMemberLabel', 'Add a member')}
-            className="h-9 min-w-[220px] rounded-md border border-[var(--border-default)] bg-[var(--surface-input)] px-2 text-sm text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
-          >
-            <option value="">{t('accessGroups.addMemberPlaceholder', 'Add a member…')}</option>
-            {candidates.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name ?? u.email}
-              </option>
-            ))}
-          </select>
-          <Button
-            variant="secondary"
-            onClick={() => void handleAdd()}
-            disabled={!pickedUserId || addMember.isPending}
-          >
-            {t('accessGroups.add', 'Add')}
-          </Button>
-        </div>
       </div>
     </div>
   );
