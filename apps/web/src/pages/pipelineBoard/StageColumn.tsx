@@ -4,14 +4,15 @@ import { memo, type DragEvent, type KeyboardEvent } from 'react';
 
 import { AnimatePresence } from 'framer-motion';
 
+import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Badge, stageTone } from '@/components/ui/Badge';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
 
+import { DealBoardAmount } from './deal-board-amount';
 import { pipelineColumnCaption } from './pipeline-board-caption';
 import { PipelineCard } from './PipelineCard';
 
@@ -65,7 +66,6 @@ export const StageColumn = memo(function StageColumn({
   onCardBlur,
   onCardKey,
 }: StageColumnProps) {
-  const { formatMoney } = useFormatMoney();
   const countLabel = pipelineColumnCaption(items.length, pageContinues, latest);
   const ariaLabel = pageContinues
     ? `${stageName} column, ${countLabel}`
@@ -97,15 +97,16 @@ export const StageColumn = memo(function StageColumn({
         <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
           {pageContinues ? countLabel : <AnimatedNumber value={items.length} duration={0.6} />}
           {' · '}
-          <AnimatedNumber
-            value={total}
-            duration={0.7}
-            // Use the app's money formatter (source = EUR, like PipelineCard)
-            // so the column total honors the selected display currency instead
-            // of always rendering euros. Round to whole units so the cents
-            // portion doesn't jitter during the tween.
-            format={(n) => formatMoney(Math.round(n), 'EUR')}
-          />
+          <DealBoardAmount>
+            <AnimatedNumber
+              value={total}
+              duration={0.7}
+              // Bids do not store a currency, so this total is not converted
+              // from euros. Round to whole units so the cents portion doesn't
+              // jitter during the tween.
+              format={(n) => formatUnspecifiedAmount(Math.round(n))}
+            />
+          </DealBoardAmount>
         </span>
       </div>
       <GlassCard

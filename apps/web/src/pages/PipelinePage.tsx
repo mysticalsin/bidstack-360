@@ -16,6 +16,10 @@ import { useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { KanbanSkeleton } from '@/components/skeletons/PageSkeletons';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
@@ -24,7 +28,6 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -42,7 +45,6 @@ export function PipelinePage() {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const navigate = useNavigate();
-  const { formatMoney } = useFormatMoney();
   const { data, isLoading, isError, error } = useOpportunities({ limit: PIPELINE_BOARD_LIMIT });
   const pageContinues = Boolean(data?.nextCursor);
   const latest = data?.items.length ?? 0;
@@ -270,23 +272,23 @@ export function PipelinePage() {
             return [
               {
                 label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
-                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
-                tone: 'blue' as const,
+                value: loading ? '…' : formatUnspecifiedAmount(totalValue),
+                basis: !loading,
               },
               {
                 label: t('pipeline.kpiOpenValue', 'Open value'),
-                value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
-                tone: 'jade' as const,
+                value: loading ? '…' : formatUnspecifiedAmount(rep?.totalValueOpen ?? 0),
+                basis: !loading,
               },
               {
                 label: t('pipeline.kpiWinRate', 'Win rate'),
                 value: loading ? '…' : winRate,
-                tone: 'amber' as const,
+                basis: false,
               },
               {
                 label: t('pipeline.kpiActiveDeals', 'Active deals'),
                 value: loading ? '…' : String(rep?.totalOpen ?? 0),
-                tone: 'purple' as const,
+                basis: false,
               },
             ];
           })().map((kpi) => (
@@ -297,8 +299,17 @@ export function PipelinePage() {
               <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 {kpi.label}
               </div>
-              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
+              {/* One line for the figure. The basis sits under it, and the
+                  other tiles keep a blank line, so the row height does not
+                  depend on which figures are money. */}
+              <div className="mt-1 truncate text-lg font-bold tabular-nums text-[var(--fg-primary)]">
                 {kpi.value}
+              </div>
+              <div
+                className="truncate text-xs text-[var(--fg-tertiary)]"
+                title={kpi.basis ? UNSPECIFIED_CURRENCY_BASIS : undefined}
+              >
+                {kpi.basis ? UNSPECIFIED_CURRENCY_BASIS : '\u00a0'}
               </div>
             </div>
           ))}
