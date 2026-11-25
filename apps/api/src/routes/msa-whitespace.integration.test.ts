@@ -217,7 +217,7 @@ describe('who works with them', () => {
     }
   });
 
-  it('keeps person totals per currency and never sums EUR with USD', async () => {
+  it('keeps a stored USD total and does not price an opportunity as euros', async () => {
     const sub = await prisma.subscription.create({
       data: {
         orgId: org.orgId,
@@ -237,14 +237,19 @@ describe('who works with them', () => {
     try {
       const res = await call({ method: 'GET', url: `/companies/${pfizerId}/relationship-map` });
       expect(res.statusCode, res.body).toBe(200);
-      const map = res.json() as { people: Array<{ owner: { id: string }; totals: Array<{ currency: string; valueMicros: number }> }> };
+      const map = res.json() as {
+        rows: Array<{ id: string; currency: string | null; valueMicros: number | null }>;
+        people: Array<{ owner: { id: string }; totals: Array<{ currency: string; valueMicros: number }> }>;
+      };
+      const row = map.rows.find((r) => r.id === opp.id);
       const me = map.people.find((p) => p.owner.id === adminId)!;
       expect(me).not.toHaveProperty('valueMicros');
+      expect(row?.valueMicros).toBe(200_000_000_000);
+      expect(row?.currency).toBeNull();
       const usd = me.totals.find((t) => t.currency === 'USD');
-      const eur = me.totals.find((t) => t.currency === 'EUR');
       expect(usd?.valueMicros).toBe(300_000_000_000);
-      expect(eur?.valueMicros).toBeGreaterThanOrEqual(200_000_000_000);
-      expect(me.totals.map((t) => t.currency).sort()).toEqual(['EUR', 'USD']);
+      expect(me.totals.some((t) => t.currency === 'EUR')).toBe(false);
+      expect(me.totals.map((t) => t.currency)).toEqual(['USD']);
     } finally {
       await prisma.subscription.delete({ where: { id: sub.id } });
       await prisma.opportunity.delete({ where: { id: opp.id } });
