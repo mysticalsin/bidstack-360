@@ -275,21 +275,44 @@ function resolveCockpitTechnicalStack(
 
 // ─── Activity serializer ──────────────────────────────────────────────────────
 
+/** Whole UTC days from the due day to today. Due today is 0, not late. */
+function utcDaysLate(due: Date, now: Date): number {
+  const nowDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dueDay = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+  return Math.round((nowDay - dueDay) / 86_400_000);
+}
+
+/**
+ * Status sentence for a follow-up on the account activity row. An open,
+ * in-progress, or blocked follow-up whose due day is before today (UTC) is
+ * late. A finished follow-up, a follow-up due today, and one with no date
+ * keep the status sentence only.
+ */
+function taskActivityBody(status: string, dueDate: Date | null, now: Date): string {
+  const base = `Task is ${status.replace('_', ' ')}.`;
+  if (status === 'done' || !dueDate) return base;
+  const late = utcDaysLate(dueDate, now);
+  if (late <= 0) return base;
+  return `${base} Overdue: ${late}d late.`;
+}
+
 export function buildActivities(
   tasks: Array<{
     id: string;
     title: string;
     status: string;
+    dueDate: Date | null;
     opportunity?: { id: string; customer: string; name: string } | null;
     assignee?: { name: string | null; email: string } | null;
     createdAt: Date;
   }>,
+  now: Date = new Date(),
 ): Array<z.infer<typeof CrmActivity>> {
   return tasks.map((task) => ({
     id: task.id,
     source: 'external_crm',
     subject: task.title,
-    body: `Task is ${task.status.replace('_', ' ')}.`,
+    body: taskActivityBody(task.status, task.dueDate, now),
     kind: 'task',
     companyId: task.opportunity ? normalizeName(task.opportunity.customer) : null,
     dealId: task.opportunity?.id ?? null,

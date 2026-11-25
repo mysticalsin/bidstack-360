@@ -8,6 +8,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -34,6 +35,21 @@ const KIND_ICON: Record<CrmActivity['kind'], IconName> = {
   job: 'settings',
   dust: 'sparkle',
 };
+
+const OVERDUE_MARK = 'Overdue:';
+
+function ActivityBody({ body }: { body: string }) {
+  const at = body.indexOf(OVERDUE_MARK);
+  if (at < 0) {
+    return <p className="mt-0.5 text-xs text-[var(--fg-secondary)] line-clamp-2">{body}</p>;
+  }
+  return (
+    <p className="mt-0.5 text-xs text-[var(--fg-secondary)] line-clamp-2">
+      {body.slice(0, at)}
+      <span className="font-semibold text-[var(--danger)]">{body.slice(at)}</span>
+    </p>
+  );
+}
 
 const KIND_TONE: Record<CrmActivity['kind'], 'gray' | 'blue' | 'jade' | 'purple' | 'amber'> = {
   note: 'gray',
@@ -98,39 +114,54 @@ export const ActivityTimelineCard = memo(function ActivityTimelineCard({
           className="absolute left-[26px] top-3 bottom-3 w-px bg-[var(--border-subtle)]"
         />
         <ol className="relative">
-          {items.map((activity, i) => (
-            <motion.li
-              key={activity.id}
-              initial={reduced ? { opacity: 0 } : { opacity: 0, x: -8 }}
-              animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }}
-              transition={{ ...springSoft, delay: Math.min(i, 10) * 0.04 }}
-              className="relative flex items-start gap-3 py-2.5"
-            >
-              <span
-                aria-hidden
-                className="activity-kind-icon mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-card)]"
+          {items.map((activity, i) => {
+            const taskHref = activity.kind === 'task' ? `/tasks/${activity.id}` : null;
+            const row = (
+              <>
+                <span
+                  aria-hidden
+                  className="activity-kind-icon mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-card)]"
+                >
+                  <Icon name={KIND_ICON[activity.kind]} size={11} strokeWidth={2} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`truncate text-sm font-medium text-[var(--fg-primary)]${taskHref ? ' group-hover:text-[var(--brand-primary)] dark:group-hover:text-[var(--brand-deep)]' : ''}`}
+                    >
+                      {activity.subject}
+                    </span>
+                    <Badge tone={KIND_TONE[activity.kind]}>{activity.kind}</Badge>
+                  </div>
+                  {activity.body ? <ActivityBody body={activity.body} /> : null}
+                  <div className="mt-1 text-[11px] text-[var(--fg-tertiary)]">
+                    {activity.actorName ? `${activity.actorName} · ` : ''}
+                    {relativeTime(activity.occurredAt)}
+                  </div>
+                </div>
+              </>
+            );
+            return (
+              <motion.li
+                key={activity.id}
+                initial={reduced ? { opacity: 0 } : { opacity: 0, x: -8 }}
+                animate={reduced ? { opacity: 1 } : { opacity: 1, x: 0 }}
+                transition={{ ...springSoft, delay: Math.min(i, 10) * 0.04 }}
+                className="relative"
               >
-                <Icon name={KIND_ICON[activity.kind]} size={11} strokeWidth={2} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[var(--fg-primary)] truncate">
-                    {activity.subject}
-                  </span>
-                  <Badge tone={KIND_TONE[activity.kind]}>{activity.kind}</Badge>
-                </div>
-                {activity.body ? (
-                  <p className="mt-0.5 text-xs text-[var(--fg-secondary)] line-clamp-2">
-                    {activity.body}
-                  </p>
-                ) : null}
-                <div className="mt-1 text-[11px] text-[var(--fg-tertiary)]">
-                  {activity.actorName ? `${activity.actorName} · ` : ''}
-                  {relativeTime(activity.occurredAt)}
-                </div>
-              </div>
-            </motion.li>
-          ))}
+                {taskHref ? (
+                  <Link
+                    to={taskHref}
+                    className="group flex min-h-11 items-start gap-3 rounded-md py-2.5 text-inherit no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
+                  >
+                    {row}
+                  </Link>
+                ) : (
+                  <div className="flex items-start gap-3 py-2.5">{row}</div>
+                )}
+              </motion.li>
+            );
+          })}
         </ol>
       </div>
     </Card>

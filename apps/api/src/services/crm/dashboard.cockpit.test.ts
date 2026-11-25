@@ -8,6 +8,7 @@ import { AccountCockpitMaybeScored, AccountCockpitSnapshot, type CrmCompany } fr
 
 import {
   applyFieldOverrides,
+  buildActivities,
   buildCockpit,
   buildCockpitFromCompany,
   computeSignalCoverage,
@@ -419,5 +420,70 @@ describe('buildCockpit roadmap is scoped to the account', () => {
     });
     expect(cockpit.roadmap).toEqual([]);
     expect(JSON.stringify(cockpit)).not.toMatch(/Windows 11 migration|Zero Trust initiative/);
+  });
+});
+
+describe('buildActivities follow-up clock', () => {
+  // WHY: demo follow-ups are due in May 2026. On a later day the account
+  // cockpit still said only "Task is in progress." A finished follow-up and
+  // a follow-up due today are not late.
+  const now = new Date('2026-11-25T22:30:00.000Z');
+
+  function lateDays(dueIso: string): number {
+    const due = new Date(dueIso);
+    const nowDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const dueDay = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+    return Math.round((nowDay - dueDay) / 86_400_000);
+  }
+
+  function task(partial: {
+    status: string;
+    dueDate: Date | null;
+    title?: string;
+  }) {
+    return {
+      id: '00000000-0000-4000-8000-000000010001',
+      title: partial.title ?? 'Submit revised pricing & SoW v2',
+      status: partial.status,
+      dueDate: partial.dueDate,
+      opportunity: { id: 'opp-1', customer: 'CI Financial', name: 'Bridge' },
+      assignee: { name: 'Jordan', email: 'jordan@example.com' },
+      createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    };
+  }
+
+  it('says an open, in-progress, or blocked follow-up is late once its UTC day has passed', () => {
+    const rows = buildActivities(
+      [
+        task({ status: 'open', dueDate: new Date('2026-05-20T00:00:00.000Z'), title: 'Workshop' }),
+        task({ status: 'in_progress', dueDate: new Date('2026-05-15T00:00:00.000Z') }),
+        task({ status: 'blocked', dueDate: new Date('2026-05-12T00:00:00.000Z'), title: 'Chase' }),
+      ],
+      now,
+    );
+    expect(rows[0]?.body).toBe(`Task is open. Overdue: ${lateDays('2026-05-20T00:00:00.000Z')}d late.`);
+    expect(rows[1]?.body).toBe(
+      `Task is in progress. Overdue: ${lateDays('2026-05-15T00:00:00.000Z')}d late.`,
+    );
+    expect(rows[2]?.body).toBe(`Task is blocked. Overdue: ${lateDays('2026-05-12T00:00:00.000Z')}d late.`);
+  });
+
+  it('keeps a follow-up due today, a future follow-up, a finished follow-up, and an undated follow-up off the late clock', () => {
+    const rows = buildActivities(
+      [
+        task({ status: 'open', dueDate: new Date('2026-11-25T00:00:00.000Z'), title: 'Due today' }),
+        task({ status: 'open', dueDate: new Date('2026-12-01T00:00:00.000Z'), title: 'Later' }),
+        task({ status: 'done', dueDate: new Date('2026-05-15T00:00:00.000Z'), title: 'Done' }),
+        task({ status: 'open', dueDate: null, title: 'No date' }),
+      ],
+      now,
+    );
+    expect(rows.map((row) => row.body)).toEqual([
+      'Task is open.',
+      'Task is open.',
+      'Task is done.',
+      'Task is open.',
+    ]);
+    expect(rows.some((row) => row.body?.includes('Overdue'))).toBe(false);
   });
 });
