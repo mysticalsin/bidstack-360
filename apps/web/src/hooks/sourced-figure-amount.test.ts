@@ -27,6 +27,9 @@ describe('sourced revenue under demo data', () => {
     );
     expect(text).not.toMatch(/EUR|€/);
     expect(digits(text)).toBe('61520');
+    expect(
+      figureText(revenue({ value: 1_700_000_000, unit: 'money', currency: 'EUR' })),
+    ).toBe('EUR 1.7B');
   });
 
   it('does not invent a euro zero when the micros are not a safe integer', () => {
