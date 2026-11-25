@@ -71,6 +71,34 @@ describe('queryCache', () => {
     expect(query?.state.dataUpdatedAt).toBe(cachedAt.getTime());
   });
 
+  it('does not restore a stored data mode onto the next page', () => {
+    // WHY: the shell banner is the environment label over synthetic demo
+    // records. A persisted real answer from an earlier session would call
+    // those records live until the stale window ends.
+    const cachedAt = Date.now();
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        [JSON.stringify(['polo-identity'])]: {
+          state: {
+            data: {
+              dataMode: 'real',
+              authProvider: 'clerk',
+              demoBanner: false,
+              cfAccessEnabled: false,
+            },
+          },
+          timestamp: cachedAt,
+        },
+      }),
+    );
+
+    const hydratedClient = new QueryClient();
+    hydrateCache(hydratedClient);
+
+    expect(hydratedClient.getQueryData(['polo-identity'])).toBeUndefined();
+  });
+
   it('does not persist the tasks badge across reload', () => {
     // WHY: the nav badge is overdue count. A reload that restores 7 while the
     // list is already 8 keeps the discrepancy until the stale window ends.
