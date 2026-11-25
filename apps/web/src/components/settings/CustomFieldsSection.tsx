@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import {
   useCustomFieldDefinitions,
   useCreateCustomFieldDefinition,
@@ -46,7 +46,12 @@ export function CustomFieldsSection() {
   const patch = usePatchCustomFieldDefinition(editingId ?? undefined);
   const remove = useDeleteCustomFieldDefinition();
 
-  const activeItems = defs.data?.items.filter((d) => d.active) ?? [];
+  // A missing page is not an empty book. Add stays hidden until that page arrives,
+  // including while the request is in flight and after it fails.
+  const page = defs.data;
+  const waiting = page == null && !defs.isError;
+  const failed = page == null && defs.isError;
+  const activeItems = page?.items.filter((d) => d.active) ?? [];
 
   return (
     <Card>
@@ -74,18 +79,20 @@ export function CustomFieldsSection() {
               </option>
             ))}
           </select>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditingId(null);
-              setShowForm(true);
-            }}
-          >
-            {t('customFields.addField', '+ Add field')}
-          </Button>
+          {page != null ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingId(null);
+                setShowForm(true);
+              }}
+            >
+              {t('customFields.addField', '+ Add field')}
+            </Button>
+          ) : null}
         </div>
 
-        {showForm && (
+        {page != null && showForm && (
           <FieldForm
             key={editingId ?? 'new'}
             initial={editingId ? defs.data?.items.find((d) => d.id === editingId) : undefined}
@@ -106,7 +113,22 @@ export function CustomFieldsSection() {
           />
         )}
 
-        {activeItems.length === 0 ? (
+        {waiting ? (
+          <LoadingSkeleton rows={3} />
+        ) : failed ? (
+          <ErrorState
+            title={t('customFields.loadErrorTitle', 'Could not load custom fields')}
+            message={t(
+              'customFields.loadErrorMessage',
+              'This is not an empty field book. Retry the list before adding a field.',
+            )}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void defs.refetch()}>
+                {t('customFields.retry', 'Retry')}
+              </Button>
+            }
+          />
+        ) : activeItems.length === 0 ? (
           <EmptyState
             title={t('customFields.empty.title', 'No custom fields')}
             message={t('customFields.empty.message', 'Add fields to capture extra data.')}
