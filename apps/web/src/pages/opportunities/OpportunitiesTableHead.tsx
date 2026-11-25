@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 
 import { getSortableHeaderAriaSort, SortableHeader } from '@/components/ui/SortableHeader';
 
+import type { OpportunityPlaceColumn } from './opportunity-place';
+
 type OppSortKey = 'code' | 'name' | 'customer' | 'stage' | 'value' | 'probability' | 'dueDate';
 
 interface SortState {
@@ -24,6 +26,7 @@ interface Props {
   allSelected: boolean;
   someSelected: boolean;
   toggleAll: () => void;
+  placeColumn: OpportunityPlaceColumn;
 }
 
 export function OpportunitiesTableHead({
@@ -32,6 +35,7 @@ export function OpportunitiesTableHead({
   allSelected,
   someSelected,
   toggleAll,
+  placeColumn,
 }: Props) {
   const { t } = useTranslation('crm');
   return (
@@ -74,7 +78,9 @@ export function OpportunitiesTableHead({
           </SortableHeader>
         </th>
         <th scope="col" className="px-5 py-3 font-semibold">
-          {t('opportunitiesTableHead.columnTerritory', 'Territory')}
+          {placeColumn === 'country'
+            ? t('opportunitiesTableHead.columnCountry', 'Country')
+            : t('opportunitiesTableHead.columnTerritory', 'Territory')}
         </th>
         <th
           scope="col"
