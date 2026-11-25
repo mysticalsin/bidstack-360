@@ -30,6 +30,7 @@ import {
 } from './calendarPage/layout';
 import { TimeGrid } from './calendarPage/TimeGrid';
 import type { CalendarEvent, CreateEventBody } from './calendarPage/types';
+import { useMoveCalendarEvent } from './calendarPage/useMoveCalendarEvent';
 
 type View = 'week' | 'day' | 'agenda';
 type ProviderFilter = 'all' | 'google_workspace' | 'microsoft_graph';
@@ -91,6 +92,12 @@ export function CalendarPage() {
 
   const { data, isLoading, isError, refetch } = useCalendarEvents(from, to);
   const createEvent = useCreateEvent();
+  const moveEvent = useMoveCalendarEvent();
+  // The card follows the loaded row, so a conflict badge leaves when that
+  // row is no longer in conflict.
+  const selectedLive = selected
+    ? (data?.items?.find((item) => item.id === selected.id) ?? selected)
+    : null;
 
   const events = useMemo(() => {
     const all = data?.items ?? [];
@@ -263,10 +270,14 @@ export function CalendarPage() {
           showDeadlines={showDeadlines}
           onSlot={(key, hour) => setDraftSlot({ key, hour })}
           onSelect={setSelected}
+          onMove={async (ev, move) => {
+            const saved = await moveEvent.mutateAsync({ id: ev.id, move });
+            setSelected((current) => (current?.id === saved.id ? saved : current));
+          }}
         />
       )}
 
-      <EventPanel event={selected} tz={tz} onClose={() => setSelected(null)} />
+      <EventPanel event={selectedLive} tz={tz} onClose={() => setSelected(null)} />
 
       {draftSlot ? (
         <CreateEventModal
