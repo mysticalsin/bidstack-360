@@ -54,6 +54,19 @@ describe('viz-data', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
   });
 
+  it('keeps a bid due today out of past due, and ignores a decided bid', () => {
+    // WHY: the dashboard "Needs you" count and the opportunities Overdue chip
+    // share one UTC day. A bid due later today is still due today. A won bid
+    // whose close date has passed is not an open bid waiting on you.
+    const now = Date.parse('2026-11-25T18:00:00.000Z');
+    const book = [
+      row({ stage: 's2_sent', dueDate: '2026-11-25', customer: 'Today' }),
+      row({ stage: 's2_sent', dueDate: '2026-11-24', customer: 'Yesterday' }),
+      row({ stage: 'closed_won', dueDate: '2026-04-28', customer: 'Won' }),
+    ];
+    expect(pastDueOpen(book, now).map((o) => o.customer)).toEqual(['Yesterday']);
+  });
+
   it('keeps two compact digits when they name the same amount', () => {
     // WHY: 7,860,000 was 7.9m, and an exact 11,890,000 stays 11.89m rather than 11.9m.
     // A non-exact amount uses one digit, so it does not spill the full figure.

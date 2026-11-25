@@ -120,7 +120,7 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
   const pastDue = pastDueOpen(rows, now);
   const soon = (feed?.earnings ?? []).filter((e) => new Date(e.expectedAt).getTime() - now < 14 * 86_400_000);
   const items = [
-    pastDue.length > 0 && { key: 'due', to: '/opportunities', title: `${pastDue.length} open bid${pastDue.length === 1 ? '' : 's'} past due date`, meta: pastDue.slice(0, 2).map((o) => o.customer).filter(Boolean).join(', '), kind: 'RISK' },
+    pastDue.length > 0 && { key: 'due', to: '/opportunities?due=overdue', title: `${pastDue.length} open bid${pastDue.length === 1 ? '' : 's'} past due date`, meta: pastDue.slice(0, 2).map((o) => o.customer).filter(Boolean).join(', '), kind: 'RISK' },
     overdueTasks > 0 && { key: 'tasks', to: '/tasks?filter=overdue', title: `${overdueTasks} overdue task${overdueTasks === 1 ? '' : 's'}`, meta: 'Follow-ups waiting on you', kind: 'RISK' },
     (feed?.newAlertCount ?? 0) > 0 && { key: 'alerts', to: `/accounts/${feed!.alerts[0]!.companyId}`, title: `${feed!.newAlertCount} new account signal${feed!.newAlertCount === 1 ? '' : 's'}`, meta: feed!.alerts[0]!.title, kind: feed!.alerts[0]!.implication },
     ...soon.slice(0, 2).map((e) => ({ key: e.id, to: `/accounts/${e.companyId}`, title: `${e.companyName} results ${dayFmt.format(new Date(e.expectedAt))}`, meta: `${e.fiscalPeriod}${e.confirmed ? ' · confirmed' : ''}`, kind: 'NEUTRAL' })),

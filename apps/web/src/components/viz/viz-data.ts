@@ -123,9 +123,20 @@ export function accountBars(rows: OppRow[], n = 6) {
     .slice(0, n);
 }
 
-/** Open bids whose due date has already passed. */
+/**
+ * Open bids whose close day is before today's UTC day.
+ * dueDate is a calendar date (midnight UTC). Comparing raw milliseconds marks
+ * a bid due later today as already past due, which the Overdue list does not.
+ */
 export function pastDueOpen(rows: OppRow[], now = Date.now()) {
-  return rows.filter((o) => !isClosed(o) && o.dueDate && new Date(o.dueDate).getTime() < now);
+  const clock = new Date(now);
+  const todayUtc = Date.UTC(clock.getUTCFullYear(), clock.getUTCMonth(), clock.getUTCDate());
+  return rows.filter((o) => {
+    if (isClosed(o) || !o.dueDate) return false;
+    const due = new Date(o.dueDate);
+    const dueUtc = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+    return dueUtc < todayUtc;
+  });
 }
 
 /** Running win rate after each closed bid, in close order (sparkline). */
