@@ -70,10 +70,12 @@ function mockOpportunities(value: Partial<ReturnType<typeof useOpportunities>>) 
   vi.mocked(useOpportunities).mockReturnValue(value as ReturnType<typeof useOpportunities>);
 }
 
-function renderWithProviders(ui: React.ReactElement) {
+const GLOBEX = '11111111-1111-4111-8111-111111111111';
+
+function renderWithProviders(ui: React.ReactElement, path = '/opportunities') {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -237,6 +239,56 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href')).toBe(
       '/settings?tab=data-import',
     );
+  });
+
+  it('asks for this account when companyId is a uuid, and ignores a name or a script', () => {
+    // WHY: the cockpit used to open /opportunities?search=Globex. That search
+    // also matches Globex Labs and any bid whose title contains the word.
+    // The list must send the company id, and must not send a value the API
+    // would reject with a 400 for the whole page.
+    mockOpportunities({
+      data: { items: [seededOpportunity()], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    const linked = renderWithProviders(
+      <OpportunitiesPage />,
+      `/opportunities?companyId=${GLOBEX}`,
+    );
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({
+      companyId: GLOBEX,
+    });
+    expect(screen.getByText('This account only')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Opportunities KPI summary' })).toBeNull();
+    linked.unmount();
+
+    const named = renderWithProviders(<OpportunitiesPage />, '/opportunities?companyId=Globex');
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('companyId');
+    named.unmount();
+
+    renderWithProviders(
+      <OpportunitiesPage />,
+      '/opportunities?companyId=%3Cscript%3Ealert(1)%3C%2Fscript%3E',
+    );
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('companyId');
+  });
+
+  it('clears the account filter and says so when that account has no deals', () => {
+    mockOpportunities({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />, `/opportunities?companyId=${GLOBEX}`);
+    expect(screen.getByText('No deals linked to this account')).toBeTruthy();
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show every deal' }));
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('companyId');
   });
 });
 

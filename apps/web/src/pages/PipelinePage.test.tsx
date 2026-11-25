@@ -242,3 +242,57 @@ describe('PipelinePage — opportunities:write gating', () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 });
+
+describe('PipelinePage account scope', () => {
+  const GLOBEX = '11111111-1111-4111-8111-111111111111';
+
+  beforeEach(() => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    vi.mocked(useOpportunities).mockReturnValue({
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunities>);
+    vi.mocked(usePipelineStages).mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+    } as unknown as ReturnType<typeof usePipelineStages>);
+    vi.mocked(useStageMutation).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useStageMutation>);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    cleanup();
+  });
+
+  it('loads the board for the company id and ignores a name in that param', () => {
+    // WHY: the list and the board are one book. An account filter that the
+    // board ignores shows every other company's cards after one click.
+    const { unmount } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[`/pipeline?companyId=${GLOBEX}`]}>
+          <PipelinePage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toMatchObject({
+      companyId: GLOBEX,
+    });
+    expect(screen.getByRole('button', { name: 'Show every deal' })).toBeTruthy();
+    unmount();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/pipeline?companyId=Globex']}>
+          <PipelinePage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).not.toHaveProperty('companyId');
+    expect(screen.queryByRole('button', { name: 'Show every deal' })).toBeNull();
+  });
+});
