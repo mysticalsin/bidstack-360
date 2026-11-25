@@ -239,8 +239,9 @@ const realtimePluginImpl: FastifyPluginAsync = async (server) => {
         // Clean up all subscriptions.
         for (const unsub of unsubs.values()) unsub();
         unsubs.clear();
-        // Remove presence immediately.
-        await removePresence(auth.orgId, auth.userId);
+        // Remove this socket's row only. A newer socket, or the team-list
+        // heartbeat, owns the key now and must stay online.
+        await removePresence(auth.orgId, auth.userId, sessionId);
       });
 
       socket.on('error', () => {
