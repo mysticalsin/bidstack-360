@@ -49,10 +49,13 @@ export function StatTile({
   label,
   value,
   sublabel,
+  alert,
 }: {
   label: string;
   value: string;
   sublabel?: string;
+  /** Status that must stay readable on its own, not as tertiary caption text. */
+  alert?: ReactNode;
 }) {
   return (
     <div
@@ -73,6 +76,7 @@ export function StatTile({
       <div className="mt-2 truncate text-xl font-bold leading-tight tabular-nums text-[var(--fg-primary)]">
         {value}
       </div>
+      {alert ? <div className="mt-1.5">{alert}</div> : null}
       {sublabel ? (
         <div className="mt-1.5 text-xs font-medium text-[var(--fg-tertiary)]">{sublabel}</div>
       ) : null}

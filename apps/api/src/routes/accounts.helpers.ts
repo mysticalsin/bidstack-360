@@ -7,10 +7,14 @@
 import { prisma } from '@bidstack/db';
 import { microsToUnits } from '@bidstack/shared';
 
+import { utcDayStart } from './accounts.overdue.js';
+
 export interface AccountStats {
   totalValue: number;
   wonValue: number;
   openDeals: number;
+  /** Open deals whose close date is a previous UTC day. Today is not late. */
+  overdueDeals: number;
   opportunityCount: number;
   contactCount: number;
 }
@@ -19,6 +23,7 @@ const EMPTY_STATS: AccountStats = {
   totalValue: 0,
   wonValue: 0,
   openDeals: 0,
+  overdueDeals: 0,
   opportunityCount: 0,
   contactCount: 0,
 };
@@ -37,7 +42,8 @@ export async function fetchAccountStats(
   if (companyIds.length === 0) return new Map();
 
   const where = { orgId, companyId: { in: companyIds }, deletedAt: null };
-  const [totals, won, open, contacts] = await Promise.all([
+  const now = new Date();
+  const [totals, won, open, overdue, contacts] = await Promise.all([
     prisma.opportunity.groupBy({
       by: ['companyId'],
       where,
@@ -52,6 +58,15 @@ export async function fetchAccountStats(
     prisma.opportunity.groupBy({
       by: ['companyId'],
       where: { ...where, stage: { notIn: ['closed_won', 'closed_lost'] } },
+      _count: { _all: true },
+    }),
+    prisma.opportunity.groupBy({
+      by: ['companyId'],
+      where: {
+        ...where,
+        stage: { notIn: ['closed_won', 'closed_lost'] },
+        dueDate: { lt: utcDayStart(now) },
+      },
       _count: { _all: true },
     }),
     prisma.contact.groupBy({
@@ -87,6 +102,10 @@ export async function fetchAccountStats(
   for (const row of open) {
     if (!row.companyId) continue;
     statsFor(row.companyId).openDeals = row._count._all;
+  }
+  for (const row of overdue) {
+    if (!row.companyId) continue;
+    statsFor(row.companyId).overdueDeals = row._count._all;
   }
   for (const c of contacts) {
     if (!c.companyId) continue;

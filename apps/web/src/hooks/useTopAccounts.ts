@@ -12,6 +12,8 @@ export interface TopAccount {
   totalValue: number;
   wonValue: number;
   openDeals: number;
+  /** Open deals whose close date is a previous UTC day. Absent on an older payload. */
+  overdueDeals?: number;
   contactCount: number;
   opportunityCount: number;
 }

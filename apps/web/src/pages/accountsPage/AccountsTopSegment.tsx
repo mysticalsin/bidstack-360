@@ -49,6 +49,10 @@ export function AccountsTopSegment() {
   );
   const wonPipeline = useMemo(() => items.reduce((sum, account) => sum + account.wonValue, 0), [items]);
   const openDeals = useMemo(() => items.reduce((sum, account) => sum + account.openDeals, 0), [items]);
+  const overdueDeals = useMemo(
+    () => items.reduce((sum, account) => sum + (account.overdueDeals ?? 0), 0),
+    [items],
+  );
   const contactCount = useMemo(
     () => items.reduce((sum, account) => sum + account.contactCount, 0),
     [items],
@@ -173,10 +177,10 @@ export function AccountsTopSegment() {
             }
             sub={
               leader
-                ? t('topAccounts.leaderDetail', '{{pipeline}} pipeline / {{deals}} open deals', {
+                ? `${t('topAccounts.leaderDetail', '{{pipeline}} pipeline / {{deals}} open deals', {
                     pipeline: formatMoney(leader.totalValue, 'EUR'),
                     deals: leader.openDeals,
-                  })
+                  })}${(leader.overdueDeals ?? 0) > 0 ? ` · ${t('topAccounts.overdueDeals', '{{count}} overdue', { count: leader.overdueDeals })}` : ''}`
                 : t('topAccounts.leaderEmpty', 'Add opportunity value to create a ranking.')
             }
             aside={
@@ -191,7 +195,17 @@ export function AccountsTopSegment() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatTile label={t('topAccounts.statPipeline', 'Pipeline')} value={formatMoney(totalPipeline, 'EUR')} />
               <StatTile label={t('topAccounts.statWon', 'Won')} value={formatMoney(wonPipeline, 'EUR')} />
-              <StatTile label={t('topAccounts.statOpenDeals', 'Open deals')} value={openDeals.toLocaleString()} />
+              <StatTile
+                label={t('topAccounts.statOpenDeals', 'Open deals')}
+                value={openDeals.toLocaleString()}
+                alert={
+                  overdueDeals > 0 ? (
+                    <Badge tone="tomato">
+                      {t('topAccounts.overdueDeals', '{{count}} overdue', { count: overdueDeals })}
+                    </Badge>
+                  ) : undefined
+                }
+              />
               <StatTile label={t('topAccounts.statContacts', 'Contacts')} value={contactCount.toLocaleString()} />
             </div>
           </InsightPanel>
@@ -336,8 +350,18 @@ export function AccountsTopSegment() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
                         to={`/accounts/${encodeURIComponent(account.id)}`}
-                        aria-label={t('topAccounts.openCockpitAria', 'Open {{name}} customer cockpit', { name: account.name })}
-                        className="font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] truncate"
+                        aria-label={
+                          (account.overdueDeals ?? 0) > 0
+                            ? t(
+                                'topAccounts.openCockpitOverdueAria',
+                                'Open {{name}} customer cockpit, {{count}} overdue',
+                                { name: account.name, count: account.overdueDeals },
+                              )
+                            : t('topAccounts.openCockpitAria', 'Open {{name}} customer cockpit', {
+                                name: account.name,
+                              })
+                        }
+                        className="truncate rounded-sm font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2"
                       >
                         {account.name}
                       </Link>
@@ -362,7 +386,16 @@ export function AccountsTopSegment() {
                         {t('topAccounts.won', 'won')}
                       </span>
                       <span>·</span>
-                      <span>{t('topAccounts.openDeals', '{{count}} open deals', { count: account.openDeals })}</span>
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        <span>{t('topAccounts.openDeals', '{{count}} open deals', { count: account.openDeals })}</span>
+                        {(account.overdueDeals ?? 0) > 0 ? (
+                          <Badge tone="tomato">
+                            {t('topAccounts.overdueDeals', '{{count}} overdue', {
+                              count: account.overdueDeals,
+                            })}
+                          </Badge>
+                        ) : null}
+                      </span>
                       <span>·</span>
                       <span>{t('topAccounts.contacts', '{{count}} contacts', { count: account.contactCount })}</span>
                     </div>
