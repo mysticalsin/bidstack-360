@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ConnectorsSection } from './ConnectorsSection';
@@ -23,6 +23,7 @@ function renderSection() {
 const hookMocks = vi.hoisted(() => ({
   canWriteIntegrations: false,
   integrations: [] as UserIntegrationStatus[],
+  connectors: [] as CrmConnector[],
 }));
 
 vi.mock('react-i18next', () => ({
@@ -40,7 +41,7 @@ vi.mock('@/hooks/useCapabilities', () => ({
 
 vi.mock('@/hooks/useCrmIntegrations', () => ({
   useConnectorCatalog: () => ({
-    data: { items: connectors },
+    data: { items: hookMocks.connectors },
     isLoading: false,
     isError: false,
     error: null,
@@ -49,7 +50,8 @@ vi.mock('@/hooks/useCrmIntegrations', () => ({
   useUserIntegrationsStatus: () => ({ data: { integrations: hookMocks.integrations } }),
 }));
 
-vi.mock('@/lib/api', () => ({ api: vi.fn() }));
+const apiMocks = vi.hoisted(() => ({ api: vi.fn() }));
+vi.mock('@/lib/api', () => ({ api: apiMocks.api }));
 
 const baseConnector = {
   kind: 'official_widget' as const,
@@ -67,12 +69,23 @@ const connectors: CrmConnector[] = [
   { ...baseConnector, id: 'gmail', name: 'Gmail', category: 'people' },
 ];
 
+const disconnectedSlack: UserIntegrationStatus = {
+  provider: 'slack',
+  status: 'DISCONNECTED',
+  connectedEmail: null,
+  lastSyncedAt: null,
+  errorMessage: null,
+  scopes: [],
+};
+
 beforeEach(() => {
   hookMocks.canWriteIntegrations = false;
+  hookMocks.connectors = connectors;
   hookMocks.integrations = [
     { provider: 'slack', status: 'CONNECTED', connectedEmail: null, lastSyncedAt: null, errorMessage: null, scopes: [] },
     { provider: 'gmail', status: 'CONNECTED', connectedEmail: 'rep@example.test', lastSyncedAt: null, errorMessage: null, scopes: [] },
   ];
+  apiMocks.api.mockReset();
 });
 
 afterEach(() => cleanup());
@@ -105,5 +118,127 @@ describe('ConnectorsSection — Slack disconnect RBAC gate', () => {
 
     expect(screen.queryByTestId('integration-card-gmail')).toBeNull();
     expect(screen.getByTestId('integration-card-slack')).toBeTruthy();
+  });
+});
+
+// A demo workspace has no Slack app and no linked workspace. The status read
+// still returns Slack as DISCONNECTED, and the catalog says the app is
+// disabled. Connect must not look like it can start, and a credential on the
+// server must not be described as this workspace already being connected.
+describe('ConnectorsSection — Slack connect under demo data', () => {
+  it('does not start a connect when the Slack app is not set up', () => {
+    hookMocks.canWriteIntegrations = true;
+    hookMocks.integrations = [disconnectedSlack];
+    hookMocks.connectors = [
+      {
+        ...baseConnector,
+        id: 'slack',
+        name: 'Slack',
+        category: 'people',
+        kind: 'credentialed_api',
+        status: 'disabled',
+        requiresCredential: true,
+        message: 'Connect Slack workspace for DMs and alerts. (SLACK_CLIENT_ID not set)',
+      },
+    ];
+    renderSection();
+
+    const slackRow = screen.getByTestId('integration-card-slack');
+    const connectButton = within(slackRow).getByRole('button', { name: /connect/i });
+
+    expect(connectButton.hasAttribute('disabled')).toBe(true);
+    expect(connectButton.getAttribute('title')).toMatch(/add the Slack app first/i);
+    expect(within(slackRow).getByText('Not set up')).toBeTruthy();
+    expect(within(slackRow).queryByText(/healthy/i)).toBeNull();
+    expect(within(slackRow).queryByText(/Slack connection active/i)).toBeNull();
+    expect(within(slackRow).queryByText(/SLACK_CLIENT_ID/)).toBeNull();
+
+    fireEvent.click(connectButton);
+    expect(apiMocks.api).not.toHaveBeenCalled();
+  });
+
+  it('does not call a configured app a connected workspace when this user has not connected', () => {
+    hookMocks.canWriteIntegrations = true;
+    hookMocks.integrations = [disconnectedSlack];
+    hookMocks.connectors = [
+      {
+        ...baseConnector,
+        id: 'slack',
+        name: 'Slack',
+        category: 'people',
+        kind: 'credentialed_api',
+        status: 'healthy',
+        requiresCredential: true,
+        message: 'Slack connection active.',
+      },
+    ];
+    renderSection();
+
+    const slackRow = screen.getByTestId('integration-card-slack');
+    const connectButton = within(slackRow).getByRole('button', { name: /^connect$/i });
+
+    expect(within(slackRow).getByText('Not connected')).toBeTruthy();
+    expect(within(slackRow).queryByText('Slack connection active.')).toBeNull();
+    expect(within(slackRow).queryByText(/^healthy$/i)).toBeNull();
+    expect(within(slackRow).queryByText(/^disabled$/i)).toBeNull();
+    expect(connectButton.hasAttribute('disabled')).toBe(false);
+    // The catalog calls the app healthy because a server credential exists.
+    // This workspace is not linked, so the section total must not count it.
+    expect(screen.getByText('Healthy').closest('div')?.parentElement?.textContent).toContain('0');
+  });
+
+  it('does not start a connect without integrations write access', () => {
+    hookMocks.canWriteIntegrations = false;
+    hookMocks.integrations = [disconnectedSlack];
+    hookMocks.connectors = [
+      {
+        ...baseConnector,
+        id: 'slack',
+        name: 'Slack',
+        category: 'people',
+        kind: 'credentialed_api',
+        status: 'healthy',
+        requiresCredential: true,
+        message: 'Slack connection active.',
+      },
+    ];
+    renderSection();
+
+    const connectButton = within(screen.getByTestId('integration-card-slack')).getByRole('button', {
+      name: /connect/i,
+    });
+    expect(connectButton.hasAttribute('disabled')).toBe(true);
+    expect(connectButton.getAttribute('title')).toMatch(/integrations write access/i);
+    fireEvent.click(connectButton);
+    expect(apiMocks.api).not.toHaveBeenCalled();
+  });
+
+  it('says the connect did not start when the server returns no consent URL', async () => {
+    hookMocks.canWriteIntegrations = true;
+    hookMocks.integrations = [disconnectedSlack];
+    hookMocks.connectors = [
+      {
+        ...baseConnector,
+        id: 'slack',
+        name: 'Slack',
+        category: 'people',
+        kind: 'credentialed_api',
+        status: 'healthy',
+        requiresCredential: true,
+        message: 'Slack connection active.',
+      },
+    ];
+    apiMocks.api.mockResolvedValue({ authUrl: '' });
+    const assign = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, assign },
+    });
+    renderSection();
+
+    fireEvent.click(within(screen.getByTestId('integration-card-slack')).getByRole('button', { name: /^connect$/i }));
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/could not start the slack connection/i);
+    expect(assign).not.toHaveBeenCalled();
   });
 });
