@@ -5,6 +5,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { OwnerDrilldown } from '@/pages/workload/OwnerDrilldown';
 import { useCurrencyStore } from '@/stores/currency';
 
+import { ownerDrilldownAmount } from './owner-drilldown-amount';
+
 const items = vi.hoisted(() => ({
   current: [] as Array<Record<string, unknown>>,
 }));
@@ -79,5 +81,13 @@ describe('owner drilldown amount under demo data', () => {
     const text = amount?.textContent ?? '';
     expect(text).not.toMatch(/EUR|€/);
     expect(digits(text)).toBe('61520');
+  });
+
+  it('does not invent a euro zero when the units are not a safe integer', () => {
+    // WHY: a drilldown figure that is not an integer unit value is not an
+    // amount. It must not fall through to an EUR zero. The desk row is separate.
+    expect(ownerDrilldownAmount(Number.NaN)).toBe('Not a number');
+    expect(ownerDrilldownAmount(1.5)).toBe('Not a number');
+    expect(ownerDrilldownAmount(Number.NaN)).not.toMatch(/EUR|€/);
   });
 });
