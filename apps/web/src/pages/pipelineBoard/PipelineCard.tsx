@@ -1,10 +1,10 @@
 // Memoized kanban card. Re-renders only when its own opp or drag/focus state
 // changes — prevents the whole column from repainting when a sibling card moves.
-import { memo, type KeyboardEvent } from 'react';
+import { memo, useRef, type KeyboardEvent } from 'react';
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
@@ -31,7 +31,7 @@ interface PipelineCardProps {
   onDragEnd: () => void;
   onFocus: (id: string) => void;
   onBlur: (id: string) => void;
-  onKey: (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => void;
+  onKey: (e: KeyboardEvent<HTMLDivElement>, opp: Opportunity) => void;
 }
 
 export const PipelineCard = memo(function PipelineCard({
@@ -46,8 +46,10 @@ export const PipelineCard = memo(function PipelineCard({
   onKey,
 }: PipelineCardProps) {
   const { t } = useTranslation('crm');
+  const navigate = useNavigate();
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
+  const dragged = useRef(false);
   const stageName = getStageName(opp);
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
@@ -56,6 +58,7 @@ export const PipelineCard = memo(function PipelineCard({
     dueDateUrgency(opp.dueDate).urgency === 'danger' &&
     stageName !== 'Closed Won' &&
     stageName !== 'Closed Lost';
+  const openRecord = () => navigate(`/opportunities/${opp.id}`);
 
   return (
     <motion.li
@@ -70,21 +73,43 @@ export const PipelineCard = memo(function PipelineCard({
       whileHover={reduced || isDragging ? undefined : { y: -2 }}
       transition={springLayout}
     >
-      <Link
-        to={`/opportunities/${opp.id}`}
+      <div
+        role="button"
+        tabIndex={0}
         data-testid="pipeline-card"
         data-opportunity-id={opp.id}
         draggable={canWrite}
+        onClick={() => {
+          // A dragend on this card synthesizes a click. Opening the record
+          // then would leave the board after a stage move.
+          if (dragged.current) return;
+          openRecord();
+        }}
         onDragStart={(e) => {
           if (!canWrite) return;
+          // text/plain is the bid id. An anchor would replace it with the
+          // record URL, and the drop would not find the bid.
           e.dataTransfer.setData('text/plain', opp.id);
           e.dataTransfer.effectAllowed = 'move';
+          dragged.current = true;
           onDragStart(opp.id);
         }}
-        onDragEnd={onDragEnd}
+        onDragEnd={() => {
+          onDragEnd();
+          window.setTimeout(() => {
+            dragged.current = false;
+          }, 0);
+        }}
         onFocus={() => onFocus(opp.id)}
         onBlur={() => onBlur(opp.id)}
-        onKeyDown={(e) => onKey(e, opp)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openRecord();
+            return;
+          }
+          onKey(e, opp);
+        }}
         aria-roledescription={canWrite ? 'draggable opportunity' : undefined}
         aria-label={
           // Base label + an ", overdue" suffix so the past-due state reaches
@@ -110,7 +135,7 @@ export const PipelineCard = memo(function PipelineCard({
               })) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
         className={cn(
-          'block rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
+          'block w-full text-left rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
           canWrite ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
           isFocused &&
             'ring-2 ring-offset-1 ring-[var(--brand-primary)] ring-offset-[var(--surface-page)]',
@@ -175,7 +200,7 @@ export const PipelineCard = memo(function PipelineCard({
           <DueDateChip dueDate={opp.dueDate} size="sm" />
           <span className="font-mono">{opp.code}</span>
         </div>
-      </Link>
+      </div>
     </motion.li>
   );
 });

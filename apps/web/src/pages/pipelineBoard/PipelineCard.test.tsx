@@ -91,7 +91,7 @@ describe('PipelineCard overdue affordance', () => {
     expect(screen.getByText(/overdue/i)).toBeDefined();
 
     // The accessible name carries the state for screen readers.
-    const link = screen.getByRole('link');
+    const link = screen.getByRole('button');
     expect(link.getAttribute('aria-label')).toContain(', overdue');
 
     // The red tint accompanies the text cue — asserting it here anchors the
@@ -113,7 +113,7 @@ describe('PipelineCard overdue affordance', () => {
     expect(screen.getByText(/due today/i)).toBeDefined();
     // ...and no overdue signal anywhere: visible text, accessible name, tint.
     expect(screen.queryByText(/overdue/i)).toBeNull();
-    const link = screen.getByRole('link');
+    const link = screen.getByRole('button');
     expect(link.getAttribute('aria-label')).not.toContain(', overdue');
     expect(link.className).not.toContain('border-red-300/40');
   });
@@ -122,7 +122,7 @@ describe('PipelineCard overdue affordance', () => {
     renderCard({ ...BASE_OPP, dueDate: '2099-12-31' });
 
     expect(screen.queryByText(/overdue/i)).toBeNull();
-    const link = screen.getByRole('link');
+    const link = screen.getByRole('button');
     expect(link.getAttribute('aria-label')).not.toContain(', overdue');
   });
 });

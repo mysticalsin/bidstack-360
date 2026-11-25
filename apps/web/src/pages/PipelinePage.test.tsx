@@ -226,7 +226,8 @@ describe('PipelinePage — opportunities:write gating', () => {
     // The board and its cards stay visible/navigable ...
     expect(screen.getByText('Enterprise CRM rollout')).toBeTruthy();
     const card = screen.getByTestId('pipeline-card');
-    expect(card.getAttribute('href')).toBe(`/opportunities/${OPPORTUNITY.id}`);
+    expect(card.tagName).not.toBe('A');
+    expect(card.getAttribute('role')).toBe('button');
 
     // ... but neither move path is reachable.
     expect(card.getAttribute('draggable')).toBe('false');

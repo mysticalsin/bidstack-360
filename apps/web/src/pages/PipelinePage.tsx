@@ -124,7 +124,7 @@ export function PipelinePage() {
     return map;
   }, [data?.items, getVisibleStageId, stages]);
 
-  const handleKey = (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => {
+  const handleKey = (e: KeyboardEvent<HTMLDivElement>, opp: Opportunity) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     if (!canWrite) return;
     const ids = stages.map((s) => s.id);
