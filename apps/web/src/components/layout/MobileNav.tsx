@@ -5,7 +5,7 @@
 // element that opened it.
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
@@ -24,6 +24,17 @@ import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type N
 import { useIsWideShell } from './shellBreakpoint';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// A cross-region flag opens at /meeting-intel/flags/:id (the notification
+// and the account watchdog). The meetings list is /meetings, and the
+// in-app flags tab is /meetings/flags. Neither prefix owns this path, so
+// the phone drawer left Accounts shut: section headers and Settings, with
+// no door for the page.
+const MEETING_FLAG_PATH = /^\/meeting-intel\/flags\/[^/]+$/;
+
+function isMeetingFlagPath(pathname: string): boolean {
+  return MEETING_FLAG_PATH.test(pathname);
+}
 
 export function MobileNav() {
   const wide = useIsWideShell();
@@ -157,6 +168,7 @@ function NavDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function MobileNavContent({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation('common');
+  const location = useLocation();
   const oppsCount = useOpportunityCount({ excludeClosed: true });
   const taskSummary = useTaskSummary();
   const isAdmin = useIsAdmin();
@@ -167,6 +179,15 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
   const overdueTasks = taskSummary.data?.overdue ?? 0;
 
   const badges = { openBids, overdueTasks };
+  // A collapse recorded on an earlier visit must not hide Meetings once the
+  // flag is the page. Same write the rail uses when a route enters a
+  // section that was left shut. A later tap can still close Accounts; this
+  // runs again only when the path changes.
+  useEffect(() => {
+    if (!isMeetingFlagPath(location.pathname)) return;
+    if (useUiStore.getState().collapsedSections.accounts !== true) return;
+    useUiStore.getState().expandSectionForRoute('accounts');
+  }, [location.pathname]);
   const { data: appModules } = useAppModules();
   const sections = NAV_SECTIONS.map((s) => ({
     ...s,
@@ -257,9 +278,11 @@ function MobileNavSection({
   const { t } = useTranslation('common');
   const override = useUiStore((s) => s.collapsedSections[section.key]);
   const setSectionCollapsed = useUiStore((s) => s.setSectionCollapsed);
-  const isActive = section.items.some(
-    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
-  );
+  const isActive =
+    section.items.some(
+      (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
+    ) ||
+    (section.key === 'accounts' && isMeetingFlagPath(location.pathname));
   const collapsed = override === undefined ? !isActive : override;
   return (
     <div className="py-1">
@@ -293,40 +316,40 @@ function MobileNavItem({
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const location = useLocation();
+  // NavLink clears aria-current unless `to` is this URL. The flag is a
+  // different URL, so that case uses Link. The href stays the meetings list.
+  const flagCurrent = item.to === '/meetings' && isMeetingFlagPath(location.pathname);
 
-  const isActive = (() => {
-    try {
-      const toUrl = new URL(item.to, window.location.origin);
-      const toPath = toUrl.pathname;
-      const toTab = toUrl.searchParams.get('tab');
+  const isActive =
+    flagCurrent ||
+    (() => {
+      try {
+        const toUrl = new URL(item.to, window.location.origin);
+        const toPath = toUrl.pathname;
+        const toTab = toUrl.searchParams.get('tab');
 
-      const currentTab = new URLSearchParams(location.search).get('tab');
+        const currentTab = new URLSearchParams(location.search).get('tab');
 
-      if (location.pathname !== toPath) return false;
+        if (location.pathname !== toPath) return false;
 
-      if (toTab) {
-        return currentTab === toTab;
-      } else {
-        return !currentTab || currentTab === 'overview';
+        if (toTab) {
+          return currentTab === toTab;
+        } else {
+          return !currentTab || currentTab === 'overview';
+        }
+      } catch {
+        return false;
       }
-    } catch {
-      return false;
-    }
-  })();
+    })();
 
-  return (
-    <NavLink
-      to={item.to}
-      className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-        isActive
-          ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
-          : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
-      )}
-      end={item.end ?? item.to === '/'}
-      onClick={onNavigate}
-      onMouseEnter={() => prefetchRoute(item.to)}
-    >
+  const className = cn(
+    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+    isActive
+      ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
+      : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
+  );
+  const body = (
+    <>
       <Icon name={item.icon} size={16} />
       <span className="flex-1">{label}</span>
       {badge > 0 && (
@@ -334,6 +357,30 @@ function MobileNavItem({
           {badge}
         </span>
       )}
+    </>
+  );
+  if (flagCurrent) {
+    return (
+      <Link
+        to={item.to}
+        className={className}
+        aria-current="page"
+        onClick={onNavigate}
+        onMouseEnter={() => prefetchRoute(item.to)}
+      >
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <NavLink
+      to={item.to}
+      className={className}
+      end={item.end ?? item.to === '/'}
+      onClick={onNavigate}
+      onMouseEnter={() => prefetchRoute(item.to)}
+    >
+      {body}
     </NavLink>
   );
 }
