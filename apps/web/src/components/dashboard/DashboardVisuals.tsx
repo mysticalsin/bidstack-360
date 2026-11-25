@@ -20,6 +20,7 @@ import {
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
+import { performanceBreakdown } from './performance-breakdown';
 
 /** Opens the bid drill-down sheet with a starting filter. */
 export type OnDrill = (f: OppDrillFilter) => void;
@@ -300,7 +301,7 @@ export function PerformanceCard({ rows, projection, onDrill }: {
           <div className="viz-meta">Revenue, win rate and top accounts from your bids</div>
         </div>
         {onDrill ? (
-          <button type="button" className="drill-more" onClick={() => onDrill({ status: tab === 'revenue' ? 'won' : 'all' })}>
+          <button type="button" className="drill-more" onClick={() => onDrill(performanceBreakdown(tab))}>
             Breakdown
           </button>
         ) : null}

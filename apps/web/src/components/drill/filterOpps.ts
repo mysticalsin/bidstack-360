@@ -10,12 +10,26 @@ export interface OppDrillFilter {
   thisYear?: boolean;
   /** Close month as 'YYYY-MM' (hero "Bids by close month" column). */
   closeMonth?: string | null;
+  /**
+   * Chart book, used when status is unset or "all".
+   * forecast / accounts: won and open (a lost bid is not on those bars).
+   * closed: won and lost (an open bid is not in the win rate).
+   * An explicit status other than "all" replaces this.
+   */
+  book?: 'forecast' | 'accounts' | 'closed';
 }
 
 export function filterOpps(rows: OppRow[], f: OppDrillFilter, q = '', year = new Date().getUTCFullYear()): OppRow[] {
   const needle = q.trim().toLowerCase();
   return rows.filter((o) => {
-    if (f.status && f.status !== 'all' && oppStatus(o) !== f.status) return false;
+    const status = oppStatus(o);
+    if (f.status && f.status !== 'all') {
+      if (status !== f.status) return false;
+    } else if (f.book === 'closed') {
+      if (status === 'open') return false;
+    } else if (f.book === 'forecast' || f.book === 'accounts') {
+      if (status === 'lost') return false;
+    }
     if (f.stage && stageKey(o.stage) !== f.stage) return false;
     if (f.account && (o.customer ?? '').toLowerCase() !== f.account.toLowerCase()) return false;
     if (f.thisYear) {

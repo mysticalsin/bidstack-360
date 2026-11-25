@@ -31,6 +31,19 @@ describe('filterOpps', () => {
     expect(filterOpps(rows, { status: 'won', thisYear: true }, '', 2026).map((o) => o.id)).toEqual(['c']);
     expect(filterOpps(rows, {}, 'beta').map((o) => o.id)).toEqual(['b']);
   });
+
+  it('keeps a performance chart on the bids it draws', () => {
+    const book: OppRow[] = [
+      ...rows,
+      { id: 'd', name: 'Delta loss', customer: 'Delta', stage: 'closed_lost', value: 40, dueDate: '2026-04-12' },
+    ];
+    // Forecast and top accounts omit a lost bid. Win rate omits an open bid.
+    expect(filterOpps(book, { book: 'forecast' }).map((o) => o.id)).toEqual(['a', 'b', 'c']);
+    expect(filterOpps(book, { book: 'accounts' }).map((o) => o.id)).toEqual(['a', 'b', 'c']);
+    expect(filterOpps(book, { book: 'closed' }).map((o) => o.id)).toEqual(['c', 'd']);
+    // A status chip the person picks after that is the whole constraint.
+    expect(filterOpps(book, { book: 'forecast', status: 'lost' }).map((o) => o.id)).toEqual(['d']);
+  });
 });
 
 describe('OppDrill', () => {
@@ -46,6 +59,29 @@ describe('OppDrill', () => {
     expect(screen.getByRole('link', { name: 'Beta pilot' })).toBeTruthy();
     fireEvent.click(within(trail).getByRole('button', { name: 'Dashboard' }));
     expect(screen.getByText('closed:true')).toBeTruthy();
+  });
+
+  it('names won and open bids and keeps a lost bid out until Lost is chosen', () => {
+    const bookRows: OppRow[] = [
+      ...rows,
+      { id: 'd', name: 'Delta loss', customer: 'Delta', stage: 'closed_lost', value: 40, dueDate: '2026-04-12' },
+    ];
+    function Local() {
+      const [f, setF] = useState<OppDrillFilter | null>({ book: 'forecast' });
+      return (
+        <MemoryRouter>
+          <OppDrill rows={bookRows} filter={f} onFilterChange={setF} onClose={() => setF(null)} />
+        </MemoryRouter>
+      );
+    }
+    render(<Local />);
+    expect(screen.getByRole('heading', { name: 'Won and open' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Delta loss' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Alpha rollout' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'All bids' }).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: 'Lost' }));
+    expect(screen.getByRole('link', { name: 'Delta loss' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Alpha rollout' })).toBeNull();
   });
 
   it('narrows to an account from a row', () => {
