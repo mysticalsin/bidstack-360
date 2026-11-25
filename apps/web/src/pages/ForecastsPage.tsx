@@ -24,6 +24,7 @@ import { ForecastChart } from './forecasts/ForecastChart';
 import { ForecastProjection } from './forecasts/ForecastProjection';
 import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
+import { forecastPageAmount } from './forecasts/forecast-page-amount';
 import { forecastTotalsNote } from './forecasts/forecast-list-caption';
 import {
   buildChartData,
@@ -258,7 +259,7 @@ export function ForecastsPage() {
                 k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
               }`}
             >
-              {formatMoneyMicros(totals[k.key], 'EUR')}
+              {forecastPageAmount(totals[k.key])}
             </div>
           </div>
         ))}
