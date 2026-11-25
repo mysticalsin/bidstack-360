@@ -193,3 +193,103 @@ describe('ProposalDetailPage — AI draft section', () => {
     ).toBeNull();
   });
 });
+
+describe('ProposalDetailPage — list order after a section write', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function renderWithClient() {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ProposalDetailPage />
+      </QueryClientProvider>,
+    );
+    return invalidate;
+  }
+
+  it('drops the proposals list when a section is saved, so the desk does not keep the old Updated order', async () => {
+    // WHY: the desk sorts by the proposal row's updatedAt and keeps that
+    // response for two minutes. Saving the executive summary only refreshed
+    // the open proposal. Back on the desk, that bid stayed on its old day
+    // and did not move above rows that had not been edited.
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(CAPABILITIES);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) {
+        return Promise.resolve(PROPOSAL_WITH_SECTION);
+      }
+      if (path === '/api/v1/proposals/p1/sections/s1' && opts?.method === 'PATCH') {
+        return Promise.resolve({ id: 's1', wordCount: 6 });
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    const invalidate = renderWithClient();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Executive Summary section' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Edit content for Executive Summary' }), {
+      target: { value: 'Win themes for the demo bid.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['proposals'] });
+    });
+  });
+
+  it('drops the proposals list when an AI draft lands, so the new text is not hidden behind the old Updated day', async () => {
+    // WHY: an AI draft writes the section, not the proposal row the desk
+    // sorts. The open page refreshed. The desk kept the previous order
+    // until the two-minute cache expired.
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(CAPABILITIES);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) {
+        return Promise.resolve(PROPOSAL_WITH_SECTION);
+      }
+      if (path === '/api/v1/proposals/p1/draft' && opts?.method === 'POST') {
+        return Promise.resolve({
+          sectionKey: 'executive_summary',
+          content: 'Draft win themes.',
+          wordCount: 3,
+          sources: [],
+        });
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    const invalidate = renderWithClient();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'AI Draft for Executive Summary' }));
+
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['proposals'] });
+    });
+  });
+
+  it('drops the proposals list when the due date changes, so the deadline and the Updated day move together', async () => {
+    // WHY: changing the due date already writes the proposal row, which
+    // moves updatedAt. The desk cache was left in place, so the Due cell
+    // and the Updated cell stayed on the previous day for two minutes.
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(CAPABILITIES);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) return Promise.resolve(PROPOSAL);
+      if (path === '/api/v1/proposals/p1' && opts?.method === 'PATCH') {
+        return Promise.resolve({ ...PROPOSAL, dueDate: '2026-12-31' });
+      }
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    const invalidate = renderWithClient();
+
+    fireEvent.change(await screen.findByLabelText('Due date'), {
+      target: { value: '2026-12-31' },
+    });
+
+    await waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['proposals'] });
+    });
+  });
+});
