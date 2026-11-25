@@ -5,12 +5,20 @@ import type { Forecast, ForecastProjection } from '@bidstack/shared';
 
 /**
  * Pipeline-weighted forecast projection derived from open opportunities.
- * Non-empty whenever open pipeline exists — the page's primary view.
+ * Non-empty whenever open pipeline exists. The page's primary view.
+ *
+ * `rereadOnOpen` is for the forecast page. The app cache keeps a query fresh
+ * for 2 minutes, and a stage move or a new stage probability happens on
+ * another screen without dropping this key. Without the reread, the page
+ * keeps the old weight. The home dashboard calls this with no options and
+ * stays on that shared cache.
  */
-export function useForecastProjection() {
+export function useForecastProjection(options?: { rereadOnOpen?: boolean }) {
+  const rereadOnOpen = options?.rereadOnOpen === true;
   return useQuery({
     queryKey: ['forecast-projection'],
     queryFn: ({ signal }) => api<ForecastProjection>('/api/forecasts/projection', { signal }),
+    ...(rereadOnOpen ? { staleTime: 0, refetchOnMount: 'always' as const } : {}),
   });
 }
 

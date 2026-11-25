@@ -3,12 +3,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ForecastProjection } from './ForecastProjection';
 
-const projection = vi.hoisted(() => ({ result: { data: undefined as unknown, isLoading: false, isError: false } }));
+const projection = vi.hoisted(() => {
+  const state = { result: { data: undefined as unknown, isLoading: false, isError: false } };
+  return { state, useForecastProjection: vi.fn(() => state.result) };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
 }));
-vi.mock('@/hooks/useForecasts', () => ({ useForecastProjection: () => projection.result }));
+vi.mock('@/hooks/useForecasts', () => ({
+  useForecastProjection: projection.useForecastProjection,
+}));
 vi.mock('@/hooks/useFormatMoney', () => ({
   useFormatMoney: () => ({ formatMoneyMicros: (m: number) => `R$${m / 1e6}` }),
 }));
@@ -27,12 +32,15 @@ const period = (label: string, open: number, weighted: number, won: number) => (
 
 describe('ForecastProjection', () => {
   it('draws every quarter as stacked won, weighted and unweighted bars', () => {
-    projection.result = {
+    projection.state.result = {
       data: { periods: [period('Q4 2026', 73_000_000, 39_100_000, 0), period('Q1 2027', 10_000_000, 4_000_000, 0)] },
       isLoading: false,
       isError: false,
     };
     render(<ForecastProjection />);
+    // The page has to opt in. The hook's default cache is what the home
+    // dashboard still uses, and that cache would keep a weight for 2 minutes.
+    expect(projection.useForecastProjection).toHaveBeenCalledWith({ rereadOnOpen: true });
     expect(screen.getByRole('group', { name: /projection by quarter/i })).toBeTruthy();
     const table = screen.getAllByRole('table').find((t) => within(t).queryByText('Unweighted'))!;
     expect(within(table).getByText('Q1 2027')).toBeTruthy();
