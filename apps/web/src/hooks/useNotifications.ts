@@ -35,6 +35,61 @@ interface NotificationPage {
 
 const NOTIFICATIONS_KEY = ['notifications'] as const;
 
+const NOTIFICATION_TYPES: ReadonlySet<string> = new Set([
+  'mention',
+  'assignment',
+  'bid_override',
+  'gate_decision',
+  'stage_change',
+  'task_due',
+  'system',
+  'account_activity',
+]);
+
+function notificationType(type: string): NotificationType {
+  return NOTIFICATION_TYPES.has(type) ? (type as NotificationType) : 'system';
+}
+
+/**
+ * Put a socket alert on the page the bell already holds. A new id counts as
+ * unread immediately. The same id is a coalesced update: one row, same count.
+ * A row that is already read stays read.
+ */
+function applyLiveNotification(
+  page: NotificationPage | undefined,
+  live: LiveNotification,
+  now = new Date().toISOString(),
+): NotificationPage {
+  const current = page ?? { items: [], unread: 0 };
+  const index = current.items.findIndex((item) => item.id === live.id);
+  const previous = index >= 0 ? current.items[index] : undefined;
+  if (previous) {
+    const updated: AppNotification = {
+      ...previous,
+      type: notificationType(live.type),
+      title: live.title,
+      body: live.body === undefined ? previous.body : live.body,
+      url: live.url,
+    };
+    return {
+      unread: current.unread,
+      items: [updated, ...current.items.filter((item) => item.id !== live.id)],
+    };
+  }
+  const item: AppNotification = {
+    id: live.id,
+    type: notificationType(live.type),
+    title: live.title,
+    body: live.body ?? null,
+    entityType: null,
+    entityId: null,
+    url: live.url,
+    readAt: null,
+    createdAt: now,
+  };
+  return { unread: current.unread + 1, items: [item, ...current.items] };
+}
+
 /** List the user's notifications (newest first) plus the live unread count. */
 export function useNotifications(options: { enabled?: boolean } = {}) {
   return useQuery({
@@ -68,6 +123,11 @@ export function useNotificationStream(
     if (!enabled) return undefined;
     const shown = new Map<string, string>();
     const onNotification = (n: LiveNotification) => {
+      // Drop a list request that started before this alert was written, then
+      // show it on the bell before the reload. A reload that fails keeps this
+      // page; the tray reads it instead of an empty error.
+      void qc.cancelQueries({ queryKey: NOTIFICATIONS_KEY });
+      qc.setQueryData<NotificationPage>(NOTIFICATIONS_KEY, (page) => applyLiveNotification(page, n));
       void qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
       const previous = shown.get(n.id);
       if (previous) toast.dismiss(previous);

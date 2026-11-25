@@ -127,7 +127,7 @@ export function NotificationsBell() {
               )}
             </div>
             <div className="max-h-80 overflow-y-auto flex flex-col gap-0.5">
-              {notifications.isError ? (
+              {notifications.isError && notifications.data == null ? (
                 <div className="px-4 py-6 text-center text-sm text-[var(--danger)]">
                   {t('topbarNotifications.errorMessage', 'Could not load notifications')}
                 </div>
