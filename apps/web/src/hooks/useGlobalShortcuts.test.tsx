@@ -70,9 +70,12 @@ describe('reports chord on the shortcuts sheet', () => {
     pressChord('r');
 
     // The empty saved-reports library is /reports/list. The chord must not
-    // land there, and the sheet must not stay up and hide the dashboard.
+    // land there. The sheet's exit animation may still hold the node, but
+    // it has to be dismissed so it does not stay open over the dashboard.
     expect(screen.getByTestId('path').textContent).toBe('/analytics');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(useHelpDrawer.getState().open).toBe(false);
+    const dialog = screen.queryByRole('dialog');
+    expect(dialog?.getAttribute('data-state') ?? 'closed').toBe('closed');
   });
 
   it('names Analytics and Reports on the open sheet', () => {
