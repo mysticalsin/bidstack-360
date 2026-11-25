@@ -18,7 +18,7 @@ import { useWatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { springSoft } from '@/lib/motion';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { fmtCompact } from '@/components/viz/viz-data';
+import { fmtCompact, openBook } from '@/components/viz/viz-data';
 import type { OrgKpi } from './widgets/dashboard-types';
 import { stageColor, stageLabel } from './widgets/dashboard-types';
 import { KpiRow } from './widgets/KpiRow';
@@ -48,6 +48,10 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const oppRows = useMemo(() => opps.data?.items ?? [], [opps.data?.items]);
   // Empty is a result only after this read succeeds. A later failure keeps the last rows.
   const bidsFailed = opps.isError && !opps.data;
+  // The chart, the headline, and the page subtitle share this read. The
+  // pipeline report and the workspace summary are a different book.
+  const book = openBook(oppRows);
+  const pipelineHeld = oppRows.length === 0 && (opps.isLoading || bidsFailed);
   const retryBids = () => {
     void opps.refetch();
   };
@@ -219,20 +223,31 @@ export const OrgDashboard = memo(function OrgDashboard() {
             <h1 className="page-title">{t('orgDashboard.pageTitle', 'Dashboard')}</h1>
           </div>
           <div className="page-sub">
-            {t(
-              'orgDashboard.pageSubtitle',
-              '{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline',
-              {
-                companies: s?.companies ?? 0,
-                openDeals: s?.openOpportunities ?? 0,
-                pipeline: fmtCompact(s?.pipelineValue ?? 0),
-              },
+            {pipelineHeld
+              ? t(
+                  'orgDashboard.pageSubtitleHeld',
+                  '{{companies}} companies · {{openDeals}} open deals',
+                  {
+                    companies: s?.companies ?? 0,
+                    openDeals: s?.openOpportunities ?? 0,
+                  },
+                )
+              : t(
+                  'orgDashboard.pageSubtitle',
+                  '{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline',
+                  {
+                    companies: s?.companies ?? 0,
+                    openDeals: s?.openOpportunities ?? 0,
+                    pipeline: fmtCompact(book.value),
+                  },
+                )}
+            {pipelineHeld ? null : (
+              <Tooltip content={`${formatUnspecifiedAmount(book.value)} · ${UNSPECIFIED_CURRENCY_BASIS}`}>
+                <button type="button" className="page-sub-info" aria-label={`Pipeline ${formatUnspecifiedAmount(book.value)}: ${UNSPECIFIED_CURRENCY_BASIS}`}>
+                  <Icon name="info" size={12} />
+                </button>
+              </Tooltip>
             )}
-            <Tooltip content={`${formatUnspecifiedAmount(s?.pipelineValue ?? 0)} · ${UNSPECIFIED_CURRENCY_BASIS}`}>
-              <button type="button" className="page-sub-info" aria-label={`Pipeline ${formatUnspecifiedAmount(s?.pipelineValue ?? 0)}: ${UNSPECIFIED_CURRENCY_BASIS}`}>
-                <Icon name="info" size={12} />
-              </button>
-            </Tooltip>
           </div>
         </div>
         <div className="page-actions">
@@ -253,9 +268,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
         <div className="viz-grid-3">
           <DashboardHero
             rows={oppRows}
-            openValue={pipelineReport.data?.totalValueOpen ?? s?.pipelineValue ?? 0}
-            weighted={pipelineReport.data?.weightedPipeline ?? 0}
-            openCount={s?.openOpportunities ?? 0}
+            openValue={book.value}
+            weighted={book.weighted}
+            openCount={book.count}
             feed={feed.data}
             onDrill={setDrill}
             rowsPending={opps.isLoading}

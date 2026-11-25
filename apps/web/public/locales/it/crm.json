@@ -1429,6 +1429,7 @@
     "greetingEvening": "Buonasera",
     "pageTitle": "Centro di comando dell'area di lavoro",
     "pageSubtitle": "{{companies}} aziende · {{openDeals}} trattative aperte · {{pipeline}} pipeline",
+    "pageSubtitleHeld": "{{companies}} aziende · {{openDeals}} trattative aperte",
     "allAccounts": "Tutti gli account",
     "opportunities": "Opportunità",
     "errorTitle": "Impossibile caricare la dashboard",

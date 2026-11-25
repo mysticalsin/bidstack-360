@@ -1462,6 +1462,7 @@
     "greetingEvening": "Buenas noches",
     "pageTitle": "Centro de mando del espacio de trabajo",
     "pageSubtitle": "{{companies}} empresas · {{openDeals}} negocios abiertos · {{pipeline}} embudo",
+    "pageSubtitleHeld": "{{companies}} empresas · {{openDeals}} negocios abiertos",
     "allAccounts": "Todas las cuentas",
     "opportunities": "Oportunidades",
     "errorTitle": "No se pudo cargar el panel",
