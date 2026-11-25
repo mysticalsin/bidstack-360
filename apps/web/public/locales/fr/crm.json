@@ -3305,6 +3305,7 @@
     "opportunityLink": "Opportunité",
     "assignedTo": "Attribué à {{assignee}}",
     "due": "Échéance {{date}}",
+    "overdue": "En retard : {{count}} j de retard",
     "noDate": "aucune date",
     "cancel": "Annuler",
     "save": "Enregistrer",
