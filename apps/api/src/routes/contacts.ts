@@ -19,6 +19,7 @@ import {
 import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitAccountEventSafe } from '../services/account-events.service.js';
+import { contactListSearchOr } from './contact-list-search.js';
 
 function linkStateFor(companyId: string | null): ContactLinkState {
   // Reads do not invent a link. A historical row with a null companyId stays
@@ -84,16 +85,9 @@ export const contactsRoutes: FastifyPluginAsyncZod = async (server) => {
           orgId: req.auth.orgId,
           deletedAt: null,
           ...(customer ? { customer } : {}),
-          ...(s
+          ...(s?.trim()
             ? {
-                // email omitted: it is PII-encrypted at rest, and the
-                // pii-encryption middleware throws on `contains` (only
-                // equality/in via emailHash) — searching it would 500 the list.
-                OR: [
-                  { name: { contains: s, mode: 'insensitive' } },
-                  { customer: { contains: s, mode: 'insensitive' } },
-                  { role: { contains: s, mode: 'insensitive' } },
-                ],
+                OR: contactListSearchOr(s),
               }
             : {}),
         },
