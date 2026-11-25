@@ -2398,7 +2398,8 @@
       "colName": "Nombre",
       "colStage": "Etapa",
       "colValue": "Valor",
-      "colProbability": "Probabilidad"
+      "colProbability": "Probabilidad",
+      "colDue": "Vencimiento"
     },
     "cases": {
       "emptyTitle": "No hay casos abiertos",

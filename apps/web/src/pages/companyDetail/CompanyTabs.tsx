@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import {
@@ -112,6 +113,7 @@ export function OpportunityTab({
             <TableHead>{t('companyTabs.opportunities.colStage', 'Stage')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colValue', 'Value')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colProbability', 'Probability')}</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colDue', 'Due')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -136,6 +138,9 @@ export function OpportunityTab({
                 {formatMoneyMicros(o.valueMicros)}
               </TableCell>
               <TableCell>{o.probability}%</TableCell>
+              <TableCell>
+                <DueDateChip dueDate={o.dueDate} size="md" />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

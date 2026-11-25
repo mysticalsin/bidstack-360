@@ -2377,7 +2377,8 @@
       "colName": "Name",
       "colStage": "Stage",
       "colValue": "Value",
-      "colProbability": "Probability"
+      "colProbability": "Probability",
+      "colDue": "Due"
     },
     "cases": {
       "emptyTitle": "No open cases",

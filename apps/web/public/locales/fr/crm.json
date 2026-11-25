@@ -2420,7 +2420,8 @@
       "colName": "Nom",
       "colStage": "Étape",
       "colValue": "Valeur",
-      "colProbability": "Probabilité"
+      "colProbability": "Probabilité",
+      "colDue": "Échéance"
     },
     "cases": {
       "emptyTitle": "Aucun ticket ouvert",

@@ -2365,7 +2365,8 @@
       "colName": "Nome",
       "colStage": "Fase",
       "colValue": "Valore",
-      "colProbability": "Probabilità"
+      "colProbability": "Probabilità",
+      "colDue": "Scadenza"
     },
     "cases": {
       "emptyTitle": "Nessun caso aperto",
