@@ -9,8 +9,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useContacts } from '@/hooks/useContacts';
 import {
   useLinkContact,
@@ -32,13 +33,18 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
   const update = useUpdateContactRole();
   const allContacts = useContacts();
   const page = shownOpportunityContacts(contacts.data?.items ?? [], contacts.data?.contactsContinue);
+  // A count is only true after the read settles. While it is loading or failed,
+  // "0 contacts" would say the buying committee is empty.
+  const caption = contacts.isSuccess
+    ? opportunityContactCaption(page.items.length, page.pageContinues)
+    : undefined;
 
   return (
     <Card>
       <div className="flex items-center justify-between px-5 py-4">
         <SectionHeader
           title={t('contacts.linkedTitle', 'Linked contacts')}
-          caption={opportunityContactCaption(page.items.length, page.pageContinues)}
+          caption={caption}
         />
         <button className="btn btn-secondary btn-sm" onClick={() => setShowLink(true)}>
           {t('contacts.linkAction', '+ Link contact')}
@@ -77,6 +83,17 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
 
       {contacts.isLoading ? (
         <LoadingSkeleton rows={3} />
+      ) : contacts.isError ? (
+        // A failed read is not an empty buying committee. Retry reloads the list.
+        <ErrorState
+          title={t('contacts.loadErrorTitle', "Couldn't load linked contacts")}
+          message={t('contacts.loadErrorMessage', 'Please try again.')}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void contacts.refetch()}>
+              {t('contacts.retry', 'Retry')}
+            </Button>
+          }
+        />
       ) : page.items.length === 0 ? (
         <EmptyState
           title={t('contacts.emptyTitle', 'No linked contacts')}
