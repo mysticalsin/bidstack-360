@@ -28,7 +28,13 @@ interface CreateFormState {
   description: string;
   icon: string;
   color: string;
+  /** True after the admin types in the key field. Until then the key tracks the label. */
+  keyEdited: boolean;
+  /** True after the admin types in the plural field. Until then the plural tracks the label. */
+  pluralEdited: boolean;
 }
+
+type CreateFormField = Exclude<keyof CreateFormState, 'keyEdited' | 'pluralEdited'>;
 
 const INITIAL_FORM: CreateFormState = {
   key: '',
@@ -37,7 +43,17 @@ const INITIAL_FORM: CreateFormState = {
   description: '',
   icon: 'box',
   color: '#6366f1',
+  keyEdited: false,
+  pluralEdited: false,
 };
+
+function slugFromLabel(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+}
 
 const PRESET_COLORS = [
   '#6366f1', // indigo
@@ -60,20 +76,16 @@ export function CustomObjectsAdminPage() {
   const [form, setForm] = useState<CreateFormState>(INITIAL_FORM);
   const [formError, setFormError] = useState<string | null>(null);
 
-  function handleField(field: keyof CreateFormState, value: string) {
+  function handleField(field: CreateFormField, value: string) {
     setForm((prev) => {
-      const next = { ...prev, [field]: value };
-      // Auto-generate key from labelSingular if key hasn't been manually edited
-      if (field === 'labelSingular' && !prev.key) {
-        next.key = value
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '_')
-          .replace(/_+/g, '_')
-          .replace(/^_|_$/g, '');
-      }
-      // Auto-generate plural if it hasn't been manually edited
-      if (field === 'labelSingular' && !prev.labelPlural) {
-        next.labelPlural = `${value}s`;
+      const next: CreateFormState = { ...prev, [field]: value };
+      if (field === 'key') next.keyEdited = true;
+      if (field === 'labelPlural') next.pluralEdited = true;
+      // Keep deriving until the admin types in that field. The key is
+      // immutable after the object is created.
+      if (field === 'labelSingular') {
+        if (!prev.keyEdited) next.key = slugFromLabel(value);
+        if (!prev.pluralEdited) next.labelPlural = value ? `${value}s` : '';
       }
       return next;
     });
