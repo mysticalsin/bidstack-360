@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PipelinePage } from './PipelinePage';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunities } from '@/hooks/useOpportunities';
+import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
@@ -240,5 +241,78 @@ describe('PipelinePage — opportunities:write gating', () => {
       dataTransfer: { getData: () => OPPORTUNITY.id },
     });
     expect(mutate).not.toHaveBeenCalled();
+  });
+});
+
+// The board draws cards from the opportunity list. The four headline figures
+// come from a separate pipeline report. A missing report is not an empty book:
+// printing €0, "0" active deals, and "No closed bids" would contradict the
+// cards still on the board.
+describe('PipelinePage — pipeline totals', () => {
+  const refetch = vi.fn();
+
+  beforeEach(() => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    vi.mocked(useOpportunities).mockReturnValue({
+      data: { items: [OPPORTUNITY], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunities>);
+    vi.mocked(usePipelineStages).mockReturnValue({
+      data: { items: [STAGE_1, STAGE_2].map((s, i) => ({ ...s, key: s.id, orderIndex: i, forecastCategory: '', updatedAt: '' })) },
+      isLoading: false,
+    } as unknown as ReturnType<typeof usePipelineStages>);
+    vi.mocked(useStageMutation).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useStageMutation>);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.mocked(usePipelineReport).mockReset();
+    vi.mocked(usePipelineReport).mockImplementation(() => ({ data: undefined, isLoading: false }));
+  });
+
+  it('does not call a missing pipeline report a zero book while bids are on the board', () => {
+    vi.mocked(usePipelineReport).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    } as unknown as ReturnType<typeof usePipelineReport>);
+
+    renderPage();
+
+    expect(screen.getByText('Enterprise CRM rollout')).toBeTruthy();
+    // The lie: a missing report currently renders as a settled empty book.
+    expect(screen.queryByText('No closed bids')).toBeNull();
+    const status = screen.getByRole('status', { name: /Pipeline totals are unavailable/ });
+    expect(status.textContent).toMatch(/latest bids/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry pipeline totals' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still says there are no closed bids when the report settled on an empty book', () => {
+    vi.mocked(usePipelineReport).mockReturnValue({
+      data: {
+        byStage: [],
+        totalOpen: 0,
+        totalValueOpen: 0,
+        weightedPipeline: 0,
+        velocity: { avgDaysOpen: 0, closedThisQuarter: 0 },
+      },
+      isLoading: false,
+      isError: false,
+      refetch,
+    } as unknown as ReturnType<typeof usePipelineReport>);
+
+    renderPage();
+
+    expect(screen.getByText('No closed bids')).toBeTruthy();
+    expect(screen.getByText('Active deals').nextElementSibling?.textContent).toBe('0');
+    expect(screen.queryByRole('status', { name: /Pipeline totals are unavailable/ })).toBeNull();
   });
 });
