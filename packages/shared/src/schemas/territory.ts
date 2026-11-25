@@ -90,6 +90,10 @@ export const ForecastProjectionPeriod = z.object({
   openMicros: z.number().nonnegative(),
   weightedMicros: z.number().nonnegative(),
   wonMicros: z.number().nonnegative(),
+  // Open value whose close date is before this quarter. Still inside
+  // openMicros — the bid is live — and zero when every open row is in-quarter
+  // or has no close date. A blank date is not past due.
+  overdueOpenMicros: z.number().nonnegative(),
   // Manual commit forecast for this period, when a rep has set one — the
   // override that takes precedence over the derived baseline. Null = none.
   manualCommitMicros: z.number().nonnegative().nullable(),

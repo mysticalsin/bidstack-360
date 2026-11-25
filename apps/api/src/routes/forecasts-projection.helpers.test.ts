@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -72,6 +74,7 @@ describe('aggregateProjection', () => {
     ownerName: 'Jane',
     stage: 's2_sent',
     valueMicros: '1000000',
+    overdue: false,
     ...over,
   });
 
@@ -94,7 +97,27 @@ describe('aggregateProjection', () => {
   it('returns every requested period even when empty, in order', () => {
     const result = aggregateProjection([], window, probs, new Map());
     expect(result.map((p) => p.period)).toEqual(['2026-Q2', '2026-Q3', '2026-Q4']);
-    expect(result.every((p) => p.openMicros === 0 && p.byOwner.length === 0)).toBe(true);
+    expect(result.every((p) => p.openMicros === 0 && p.overdueOpenMicros === 0 && p.byOwner.length === 0)).toBe(true);
+  });
+
+  it('keeps a close date before the quarter inside open pipeline and reports that portion', () => {
+    // A slipped bid is still live, so it stays in the current quarter's open
+    // total. Hiding that portion makes the quarter look like new business.
+    const result = aggregateProjection(
+      [
+        row({ valueMicros: '1000000', overdue: true }),
+        row({ valueMicros: '500000', overdue: false }),
+        row({ stage: 'closed_won', valueMicros: '250000', overdue: true }),
+      ],
+      window,
+      probs,
+      new Map(),
+    );
+    const q2 = result.find((p) => p.period === '2026-Q2')!;
+    expect(q2.openMicros).toBe(1_500_000);
+    expect(q2.overdueOpenMicros).toBe(1_000_000);
+    expect(q2.wonMicros).toBe(250_000);
+    expect(result.find((p) => p.period === '2026-Q3')!.overdueOpenMicros).toBe(0);
   });
 
   it('skips rows outside the window (null period)', () => {
@@ -127,6 +150,14 @@ describe('aggregateProjection', () => {
     );
     expect(result.find((p) => p.period === '2026-Q2')!.manualCommitMicros).toBeNull();
     expect(result.find((p) => p.period === '2026-Q3')!.manualCommitMicros).toBe(9_000_000);
+  });
+});
+
+describe('projection query', () => {
+  it('marks an open row dated before the quarter as overdue and leaves a blank close date out of that mark', () => {
+    const src = readFileSync(new URL('./forecasts-projection.ts', import.meta.url), 'utf8');
+    expect(src).toContain('AS overdue');
+    expect(src).toMatch(/o\.due_date IS NOT NULL AND o\.due_date </);
   });
 });
 

@@ -40,6 +40,16 @@ export function ForecastProjection() {
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
   const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
   const bars = forecastPeriodBars(periods);
+  const overdueOpenMicros = activePeriod?.overdueOpenMicros ?? 0;
+  const pastClose =
+    activePeriod && overdueOpenMicros > 0
+      ? [
+          activePeriod.label,
+          t('forecastProjection.pastCloseLead', 'open pipeline includes'),
+          formatMoneyMicros(overdueOpenMicros, 'EUR'),
+          t('forecastProjection.pastCloseRest', 'past its close date.'),
+        ].join(' ')
+      : null;
 
   return (
     <Card>
@@ -78,6 +88,11 @@ export function ForecastProjection() {
             format={fmtCompact}
             onActivate={(i) => setSelected(bars.periods[i]?.period ?? null)}
           />
+          {pastClose ? (
+            <p className="text-sm font-medium text-[var(--fg-tomato)]" role="status">
+              {pastClose}
+            </p>
+          ) : null}
           <Tabs value={activePeriod.period} onValueChange={setSelected}>
             <TabsList aria-label={t('forecastProjection.periodLabel', 'Forecast period')}>
               {periods.map((p) => (
