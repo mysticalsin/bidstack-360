@@ -9,10 +9,13 @@ import { useHelpDrawer } from '@/components/help/useHelpDrawer';
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useSignOut, useUser, useRole } from '@/lib/auth';
+import { useAccountHistory } from '@/stores/accountHistory';
 import { useThemeStore } from '@/stores/theme';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useUiStore } from '@/stores/ui';
 import { useOnboardingStore } from '@/stores/onboarding';
+import { accountCrumbName, buildCrumbs, type Crumb } from './crumbs';
+import { CrumbsNav } from './CrumbsNav';
 import { CurrencySelector } from './CurrencySelector';
 import { OrgCurrencySync } from './OrgCurrencySync';
 import { SearchBar } from './topbar/TopbarSearch';
@@ -36,34 +39,22 @@ const CRUMB_KEYS: Record<string, string> = {
   search: 'nav.search',
 };
 
-function useCrumbs(): { label: string; here: boolean }[] {
+function useCrumbs(): Crumb[] {
   const { t } = useTranslation('common');
   const { pathname } = useLocation();
-  const segments = pathname.split('/').filter(Boolean);
-  const root = segments[0];
-  const portfolio = t('topbar.portfolio', 'Portfolio');
-  if (!root) return [{ label: portfolio, here: true }];
-
-  const rootLabel = CRUMB_KEYS[root] ? t(CRUMB_KEYS[root]) : capitalize(root);
-  const second = segments[1];
-  if (!second) {
-    return [{ label: rootLabel, here: true }];
-  }
-  // Second segment is typically an id — show a generic "Detail" rather than
-  // a raw UUID, until we wire per-record names through React Query cache.
-  return [
-    { label: rootLabel, here: false },
-    { label: prettifySegment(second, t('topbar.detail', 'Detail')), here: true },
-  ];
+  const recents = useAccountHistory((s) => s.recents);
+  const favorites = useAccountHistory((s) => s.favorites);
+  return buildCrumbs(pathname, {
+    portfolio: t('topbar.portfolio', 'Portfolio'),
+    detail: t('topbar.detail', 'Detail'),
+    orgChart: t('topbar.orgChart', 'Org chart'),
+    sectionLabel: (segment) => (CRUMB_KEYS[segment] ? t(CRUMB_KEYS[segment]) : capitalize(segment)),
+    accountName: (id) => accountCrumbName(id, recents, favorites),
+  });
 }
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function prettifySegment(s: string, detailLabel: string): string {
-  if (/^[0-9a-f-]{12,}$/i.test(s)) return detailLabel;
-  return capitalize(s.replace(/-/g, ' '));
 }
 
 // Real-auth (Clerk) account + organization management. Clerk mounts these
@@ -113,24 +104,7 @@ export function Topbar() {
         <Icon name="menu" size={18} ariaHidden />
       </button>
 
-      <nav aria-label="Breadcrumb" className="crumbs">
-        {crumbs.map((c, i) => (
-          <span key={`${c.label}-${i}`} className="crumbs-seg">
-            {i > 0 && (
-              <span className="sep" aria-hidden>
-                /
-              </span>
-            )}
-            <span
-              className={c.here ? 'here' : undefined}
-              aria-current={c.here ? 'page' : undefined}
-              title={c.label}
-            >
-              {c.label}
-            </span>
-          </span>
-        ))}
-      </nav>
+      <CrumbsNav crumbs={crumbs} label={t('nav.breadcrumb', 'Breadcrumb')} />
 
       <div className="tb-spacer" />
 

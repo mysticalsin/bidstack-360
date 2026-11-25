@@ -4,7 +4,7 @@
 // stored name is text only; the link is always a path we built.
 import { describe, expect, it } from 'vitest';
 
-import { buildCrumbs, type CrumbCopy } from './crumbs';
+import { accountCrumbName, buildCrumbs, type CrumbCopy } from './crumbs';
 
 const HELIOS = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -146,5 +146,22 @@ describe('account breadcrumb trail', () => {
 
   it('names the empty path Portfolio', () => {
     expect(buildCrumbs('/', copy())).toEqual([{ label: 'Portfolio' }]);
+  });
+});
+
+describe('account crumb name', () => {
+  const recent = { slug: HELIOS, name: 'Helios Grid', visitedAt: '2026-01-01T00:00:00.000Z' };
+  const favorite = { slug: HELIOS, name: 'Old Helios', visitedAt: '2026-01-01T00:00:00.000Z' };
+
+  it('uses the latest visit ahead of a star, and a star when there is no visit', () => {
+    // A visit rewrites the name. The star is only the fallback for an account
+    // that was saved and not opened again in this browser.
+    expect(accountCrumbName(HELIOS, [recent], [favorite])).toBe('Helios Grid');
+    expect(accountCrumbName(HELIOS, [], [favorite])).toBe('Old Helios');
+  });
+
+  it('skips a blank visit and does not borrow another account', () => {
+    expect(accountCrumbName(HELIOS, [{ ...recent, name: '  ' }], [favorite])).toBe('Old Helios');
+    expect(accountCrumbName(OTHER, [recent], [favorite])).toBeUndefined();
   });
 });

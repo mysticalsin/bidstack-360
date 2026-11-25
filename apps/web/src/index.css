@@ -1626,11 +1626,20 @@ select:focus-visible {
 .crumbs-seg > .sep {
   flex: none;
 }
-.crumbs-seg > span:not(.sep) {
+.crumbs-seg > span:not(.sep),
+.crumbs-seg > a {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.crumbs a {
+  color: inherit;
+  text-decoration-line: underline;
+  text-underline-offset: 2px;
+}
+.crumbs a:hover {
+  color: var(--fg-primary);
 }
 
 /* CRM-style inline-edit trigger. Read-mode button looks like static
