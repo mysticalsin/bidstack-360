@@ -2956,7 +2956,8 @@
     "markAllRead": "全部标为已读",
     "errorMessage": "无法加载通知",
     "loading": "加载中…",
-    "empty": "已全部查看"
+    "emptyTitle": "暂无新通知",
+    "emptyBody": "有更新时会显示在这里。"
   },
   "createEvent": {
     "modalLabel": "创建日历事件",

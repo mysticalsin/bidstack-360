@@ -3011,7 +3011,8 @@
     "markAllRead": "Tout marquer comme lu",
     "errorMessage": "Impossible de charger les notifications",
     "loading": "Chargement…",
-    "empty": "Vous êtes à jour"
+    "emptyTitle": "Aucune nouvelle notification",
+    "emptyBody": "Les mises à jour s'affichent ici dès qu'elles arrivent."
   },
   "createEvent": {
     "modalLabel": "Créer un événement",

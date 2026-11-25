@@ -2956,7 +2956,8 @@
     "markAllRead": "Marcar tudo como lido",
     "errorMessage": "Não foi possível carregar as notificações",
     "loading": "Carregando…",
-    "empty": "Você está em dia"
+    "emptyTitle": "Nenhuma notificação nova",
+    "emptyBody": "As atualizações aparecem aqui quando chegam."
   },
   "createEvent": {
     "modalLabel": "Criar evento de calendário",

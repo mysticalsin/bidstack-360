@@ -6,7 +6,7 @@
 // bell did not, so a keyboard user who opened an empty inbox was stuck.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -86,14 +86,29 @@ describe('empty notification tray', () => {
     expect(queryByText(/caught up/i)).toBeNull();
   });
 
-  it('closes on Escape and returns focus to the bell', () => {
+  it('closes on Escape and returns focus to the bell', async () => {
     const { getByTestId, queryByTestId } = renderBell();
     const bell = getByTestId('notification-bell');
     fireEvent.click(bell);
     const tray = getByTestId('notification-tray');
     fireEvent.keyDown(tray, { key: 'Escape' });
-    expect(queryByTestId('notification-tray')).toBeNull();
+    expect(bell.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(bell);
+    await waitFor(() => {
+      expect(queryByTestId('notification-tray')).toBeNull();
+    });
+  });
+
+  it('does not describe a loading tray as empty', () => {
+    hook.notifications = {
+      data: { items: [], unread: 0 },
+      isError: false,
+      isLoading: true,
+    };
+    const { getByTestId, queryByTestId } = renderBell();
+    fireEvent.click(getByTestId('notification-bell'));
+    expect(queryByTestId('notification-empty')).toBeNull();
+    expect(getByTestId('notification-tray').querySelector('[aria-busy="true"]')).toBeTruthy();
   });
 
   it('keeps an unread fixture follow-up on the badge and in the tray', () => {

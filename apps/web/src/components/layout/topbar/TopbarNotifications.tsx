@@ -32,6 +32,7 @@ export function NotificationsBell() {
   const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   // Always poll for the badge; only fetch eagerly while the tray is open is
   // unnecessary since the list is small (top 30) and cheap.
@@ -61,8 +62,22 @@ export function NotificationsBell() {
     }
   }
 
+  function closeTray() {
+    setOpen(false);
+    bellRef.current?.focus();
+  }
+
   return (
-    <div ref={ref} className="relative">
+    <div
+      ref={ref}
+      className="relative"
+      onKeyDown={(e) => {
+        if (!open || e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        closeTray();
+      }}
+    >
       <Tooltip
         content={
           unreadCount > 0
@@ -73,6 +88,7 @@ export function NotificationsBell() {
         }
       >
         <button
+          ref={bellRef}
           type="button"
           className="iconbtn relative"
           data-testid="notification-bell"
@@ -152,8 +168,20 @@ export function NotificationsBell() {
                   ))}
                 </div>
               ) : items.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-[var(--fg-secondary)]">
-                  {t('topbarNotifications.empty', 'You’re all caught up')}
+                <div
+                  role="status"
+                  data-testid="notification-empty"
+                  className="px-4 py-6 text-center"
+                >
+                  <p className="text-sm text-[var(--fg-secondary)]">
+                    {t('topbarNotifications.emptyTitle', 'No new notifications')}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
+                    {t(
+                      'topbarNotifications.emptyBody',
+                      'Updates appear here as they happen.',
+                    )}
+                  </p>
                 </div>
               ) : (
                 items.map((n) => {
