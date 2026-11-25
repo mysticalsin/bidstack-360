@@ -6,6 +6,7 @@ import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/s
 
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
+import { referenceRecordHref } from './reference-record-href.js';
 
 const VALID_TYPES = [
   'opportunity',
@@ -468,21 +469,29 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               take: perTypeLimit + 1,
             });
             addResults(
-              references.map((r) => ({
-                item: {
-                  type: 'reference' as const,
-                  id: r.id,
-                  title: r.title,
-                  subtitle: [r.industry, r.description].filter(Boolean).join(' · '),
-                  url: `/references?search=${encodeURIComponent(r.title)}`,
-                  score: scoreMatch(q, [
-                    { text: r.title, weight: 3 },
-                    { text: r.industry ?? '', weight: 2 },
-                    { text: r.description ?? '', weight: 1 },
-                  ]),
-                },
-                recency: recencyMs(r.createdAt),
-              })),
+              references.flatMap((r) => {
+                const url = referenceRecordHref(r.id);
+                // A non-uuid id is not a case study. Omit it rather than
+                // building a title search the library does not read.
+                if (!url) return [];
+                return [
+                  {
+                    item: {
+                      type: 'reference' as const,
+                      id: r.id,
+                      title: r.title,
+                      subtitle: [r.industry, r.description].filter(Boolean).join(' · '),
+                      url,
+                      score: scoreMatch(q, [
+                        { text: r.title, weight: 3 },
+                        { text: r.industry ?? '', weight: 2 },
+                        { text: r.description ?? '', weight: 1 },
+                      ]),
+                    },
+                    recency: recencyMs(r.createdAt),
+                  },
+                ];
+              }),
             );
           })(),
         );
