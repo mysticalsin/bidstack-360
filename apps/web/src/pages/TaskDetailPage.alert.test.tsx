@@ -8,7 +8,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
 
 import { TaskDetailPage } from './TaskDetailPage';
@@ -101,5 +101,26 @@ describe('task alert record', () => {
       `/api/tasks/${FIXTURE_ID}`,
       expect.objectContaining({ signal: expect.anything() }),
     );
+  });
+
+  it('says the follow-up is gone only when the record read answers 404', async () => {
+    vi.mocked(api).mockRejectedValue(new ApiError('Task not found', 404, null));
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Task not found' })).toBeTruthy();
+    });
+    expect(screen.queryByText('Failed to load task')).toBeNull();
+    expect(screen.queryByRole('heading', { name: FIXTURE_TITLE })).toBeNull();
+  });
+
+  it('does not call a failed record read a missing follow-up', async () => {
+    vi.mocked(api).mockRejectedValue(new ApiError('Server error', 500, null));
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to load task')).toBeTruthy();
+    });
+    expect(screen.queryByText('Task not found')).toBeNull();
   });
 });

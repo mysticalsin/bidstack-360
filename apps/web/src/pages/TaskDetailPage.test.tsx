@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TaskDetailPage } from './TaskDetailPage';
 import { toast } from '@/components/ui/Toast';
-import { useTasks, useUpdateTask } from '@/hooks/useTasks';
+import { useTask, useUpdateTask } from '@/hooks/useTasks';
 import type { Task } from '@bidstack/shared';
 
 vi.mock('react-i18next', () => ({
@@ -31,7 +31,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('@/hooks/useTasks', () => ({
-  useTasks: vi.fn(),
+  useTask: vi.fn(),
   useUpdateTask: vi.fn(),
 }));
 
@@ -80,12 +80,12 @@ describe('TaskDetailPage — save() error surfacing', () => {
   });
 
   it('keeps the editor open and toasts when the PATCH is rejected, instead of silently reverting', () => {
-    vi.mocked(useTasks).mockReturnValue({
-      data: { items: [TASK], nextCursor: null },
+    vi.mocked(useTask).mockReturnValue({
+      data: TASK,
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof useTasks>);
+    } as unknown as ReturnType<typeof useTask>);
 
     const mutate = vi.fn(
       (
@@ -121,12 +121,12 @@ describe('TaskDetailPage — save() error surfacing', () => {
   });
 
   it('closes the editor once the save succeeds', () => {
-    vi.mocked(useTasks).mockReturnValue({
-      data: { items: [TASK], nextCursor: null },
+    vi.mocked(useTask).mockReturnValue({
+      data: TASK,
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof useTasks>);
+    } as unknown as ReturnType<typeof useTask>);
 
     const mutate = vi.fn(
       (_vars: unknown, opts?: { onSuccess?: () => void; onError?: (err: unknown) => void }) => {
@@ -162,12 +162,12 @@ describe('TaskDetailPage — tasks:write gating', () => {
   });
 
   function mockLoadedTask() {
-    vi.mocked(useTasks).mockReturnValue({
-      data: { items: [TASK], nextCursor: null },
+    vi.mocked(useTask).mockReturnValue({
+      data: TASK,
       isLoading: false,
       isError: false,
       error: null,
-    } as unknown as ReturnType<typeof useTasks>);
+    } as unknown as ReturnType<typeof useTask>);
     vi.mocked(useUpdateTask).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
