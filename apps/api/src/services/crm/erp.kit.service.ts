@@ -132,18 +132,27 @@ export function buildPresalesKit({
         mode: 'read',
       },
     ],
-    nextActions: configured
-      ? reachable
-        ? [
-            'Map res.partner rows into Polo PreSales verified data cache.',
-            'Sync ERP crm.lead stage changes into bid opportunity audit logs.',
-            'Attach sale.order commercial context to proposal readiness scoring.',
-          ]
-        : ['Fix ERP_MCP_URL or sidecar credentials; local Polo PreSales fallback remains active.']
-      : [
-          'Set ERP_MCP_URL when the ERP sidecar is ready.',
-          'Keep using Polo PreSales verified data and verified data connectors until then.',
-        ],
+    // A lastError means the tool list never arrived. That is not the local
+    // fallback, and it is not an empty kit. The module catalog stays so the
+    // card does not collapse to no modules. A settled unset kit still names
+    // ERP_MCP_URL. A list that arrived still maps partners.
+    nextActions:
+      lastError !== null
+        ? ['The ERP tool list has not arrived.']
+        : configured
+          ? reachable
+            ? [
+                'Map res.partner rows into Polo PreSales verified data cache.',
+                'Sync ERP crm.lead stage changes into bid opportunity audit logs.',
+                'Attach sale.order commercial context to proposal readiness scoring.',
+              ]
+            : [
+                'Fix ERP_MCP_URL or sidecar credentials; local Polo PreSales fallback remains active.',
+              ]
+          : [
+              'Set ERP_MCP_URL when the ERP sidecar is ready.',
+              'Keep using Polo PreSales verified data and verified data connectors until then.',
+            ],
     lastError,
   };
 }
