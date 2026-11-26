@@ -5,7 +5,8 @@
  * field values, pagination, and a "New" button to create records.
  *
  * The object definition is resolved from the org's def list by matching :objectKey.
- * If no match, we show a 404-style state.
+ * If a settled catalog has no match, we show a 404-style state. A paused,
+ * in-flight, or failed catalog read is not that miss.
  *
  * WCAG 2.2 AA. Dark mode. prefers-reduced-motion via CSS transitions only.
  */
@@ -23,14 +24,25 @@ import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
+import { ErrorState } from '@/components/ui/StateMessages';
+
+import { customObjectCatalogPhase } from './custom-object-catalog-read';
 
 export function CustomObjectListPage() {
   const { objectKey = '' } = useParams<{ objectKey: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation('crm');
 
-  const { data: defsData, isLoading: defsLoading } = useCustomObjectDefs();
-  const def = defsData?.items.find((d) => d.key === objectKey);
+  const defs = useCustomObjectDefs();
+  const def = defs.data?.items.find((d) => d.key === objectKey);
+  const catalogPhase = customObjectCatalogPhase({
+    matched: def != null,
+    isError: defs.isError,
+    isLoading: defs.isLoading,
+    isPending: defs.isPending,
+    fetchStatus: defs.fetchStatus,
+    status: defs.status,
+  });
 
   const [page, setPage] = useState(1);
   const limit = 50;
@@ -64,18 +76,41 @@ export function CustomObjectListPage() {
     }
   }
 
-  if (defsLoading) {
+  // A pause reports isLoading false, so the old order fell through to
+  // "not found" before the catalog had arrived. A failed read used that
+  // same 404.
+  if (catalogPhase === 'unread') {
+    const checking = t('customObjectList.checkingTitle', 'Checking this object');
+    const waiting = t('customObjectList.checkingMessage', 'The object has not arrived.');
     return (
       // Shared bs-shimmer skeleton — surface-card blocks were invisible on the
       // white page background in light mode.
       <div className="p-6 max-w-5xl mx-auto space-y-4" role="status" aria-busy="true">
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {checking}. {waiting}
+        </p>
         <div className="bs-shimmer h-8 w-48" aria-hidden />
         <div className="bs-shimmer h-64 rounded-xl" aria-hidden />
       </div>
     );
   }
 
-  if (!def) {
+  if (catalogPhase === 'failed') {
+    return (
+      <div className="p-6 max-w-5xl mx-auto">
+        <ErrorState
+          title={t('customObjectList.catalogErrorTitle', 'Could not load this object')}
+          message={
+            defs.error instanceof Error
+              ? defs.error.message
+              : t('customObjectList.catalogErrorMessage', 'The object list did not arrive.')
+          }
+        />
+      </div>
+    );
+  }
+
+  if (catalogPhase === 'missing' || !def) {
     return (
       <div className="p-6 text-center text-[var(--fg-secondary)]">
         <p className="text-2xl mb-2">404</p>
