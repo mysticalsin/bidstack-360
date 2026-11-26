@@ -23,7 +23,7 @@ export function HemaLeverageTile() {
         <span className="l">Could not refresh this count.</span>
         <button
           type="button"
-          className="inline-flex min-h-11 items-center justify-center justify-self-start rounded-md px-3 text-sm font-medium text-[var(--brand-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+          className="inline-flex min-h-11 items-center justify-center justify-self-start rounded-md px-3 text-sm font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
           onClick={() => void q.refetch()}
         >
           Retry
