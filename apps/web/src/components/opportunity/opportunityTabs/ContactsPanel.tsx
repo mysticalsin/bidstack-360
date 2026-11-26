@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState } from '@/components/ui/StateMessages';
 import { useContacts } from '@/hooks/useContacts';
 import {
   useLinkContact,
@@ -23,6 +23,8 @@ import {
   shownOpportunityContacts,
 } from '@/components/opportunity/opportunity-contact-caption';
 
+import { contactsPanelPhase } from './contacts-panel-read';
+
 export function ContactsPanel({ oppId }: { oppId: string }) {
   const { t } = useTranslation('crm');
   const [showLink, setShowLink] = useState(false);
@@ -31,6 +33,12 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
   const unlink = useUnlinkContact();
   const update = useUpdateContactRole();
   const allContacts = useContacts();
+  // A list that has not arrived is not zero contacts. Error wins over a stale row.
+  const phase = contactsPanelPhase({
+    data: contacts.data,
+    isError: contacts.isError,
+    status: contacts.status,
+  });
   const page = shownOpportunityContacts(contacts.data?.items ?? [], contacts.data?.contactsContinue);
 
   return (
@@ -38,14 +46,20 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
       <div className="flex items-center justify-between px-5 py-4">
         <SectionHeader
           title={t('contacts.linkedTitle', 'Linked contacts')}
-          caption={opportunityContactCaption(page.items.length, page.pageContinues)}
+          caption={
+            phase === 'ready'
+              ? opportunityContactCaption(page.items.length, page.pageContinues)
+              : undefined
+          }
         />
-        <button className="btn btn-secondary btn-sm" onClick={() => setShowLink(true)}>
-          {t('contacts.linkAction', '+ Link contact')}
-        </button>
+        {phase === 'ready' ? (
+          <button className="btn btn-secondary btn-sm" onClick={() => setShowLink(true)}>
+            {t('contacts.linkAction', '+ Link contact')}
+          </button>
+        ) : null}
       </div>
 
-      {showLink && (
+      {phase === 'ready' && showLink && (
         <div className="px-5 pb-4">
           <div className="flex gap-2">
             <select
@@ -75,8 +89,14 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
         </div>
       )}
 
-      {contacts.isLoading ? (
-        <LoadingSkeleton rows={3} />
+      {phase === 'unread' ? (
+        <p role="status" className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
+          {t('contacts.linkedUnread', 'Checking linked contacts. The list has not arrived.')}
+        </p>
+      ) : phase === 'failed' ? (
+        <p role="alert" className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
+          {t('contacts.linkedFailed', 'Could not load linked contacts.')}
+        </p>
       ) : page.items.length === 0 ? (
         <EmptyState
           title={t('contacts.emptyTitle', 'No linked contacts')}
