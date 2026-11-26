@@ -67,6 +67,29 @@ export function RfpAnalyticsSection() {
     );
   }
 
+  // A paused first read has isLoading false and no payload, so the KPI strip
+  // printed 0 (and €0) and the status card said "No RFPs yet". An in-flight
+  // read kept the shimmer but still counted "0 won · 0 closed". Neither is
+  // an empty book. The payload has not arrived.
+  if (q.isPending && q.data == null) {
+    return (
+      <div className="space-y-6">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('rfpAnalytics.checking', 'Checking proposals. The analytics have not arrived.')}
+        </p>
+        <div
+          className="flex flex-wrap gap-2"
+          aria-busy="true"
+          aria-label={t('rfpAnalytics.loading', 'Loading…')}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <span key={i} className="bs-shimmer h-6 w-24 rounded-full" aria-hidden />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* KPI strip */}
