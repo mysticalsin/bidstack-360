@@ -76,7 +76,6 @@ const NOT_CONFIGURED = 'not configured';
 const LOCAL = 'local';
 const STATUS_WAITING = 'The status has not arrived.';
 const KIT_WAITING = 'The ERP kit has not arrived.';
-const KIT_FAILED = 'Could not load the ERP kit.';
 const EMPTY_LOOKUP = 'No company suggestions yet';
 
 function renderCard() {
@@ -195,7 +194,7 @@ describe('ErpConnectorCard unread ERP status', () => {
 
     renderCard();
 
-    expect(await screen.findByText(KIT_FAILED)).toBeTruthy();
+    expect(await screen.findByText(/Could not load the ERP kit\./)).toBeTruthy();
     expect(screen.getByText(/It has not arrived/)).toBeTruthy();
     expect(screen.queryByText(LOCAL)).toBeNull();
   });
