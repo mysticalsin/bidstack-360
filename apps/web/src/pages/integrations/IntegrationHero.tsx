@@ -17,7 +17,9 @@ import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { cn } from '@/lib/cn';
 
 import { webhookEventCaption } from './webhook-event-caption';
+import { webhookEventsPhase } from './webhook-events-phase';
 import type { IntegrationSummary } from './types';
+import { useWebhookEventsRead } from './useWebhookEventsRead';
 
 // ─── Metric card ───────────────────────────────────────────────────────────────
 
@@ -73,8 +75,17 @@ export function IntegrationHero({
   onAddWebhook: () => void;
 }) {
   const { t } = useTranslation('integrations');
+  const eventsRead = useWebhookEventsRead();
+  const eventsPhase = webhookEventsPhase({
+    data: eventsRead.data,
+    isError: eventsRead.isError,
+    status: eventsRead.status,
+  });
   return (
-    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-6">
+    <section
+      data-events-phase={eventsPhase}
+      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-6"
+    >
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <h1 className="text-[28px] font-medium text-[var(--fg-primary)]">
