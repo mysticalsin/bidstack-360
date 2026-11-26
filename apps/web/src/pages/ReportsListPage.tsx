@@ -30,12 +30,15 @@ import {
   useDeleteReport,
   type Report,
 } from '@/hooks/useAnalyticsReports';
+import { reportsListPhase } from './reports-list-read';
 
 type SortKey = 'name' | 'lastRunAt' | 'createdAt';
 
 export function ReportsListPage() {
   const { t } = useTranslation('reports');
-  const { data: reports = [], isLoading, error } = useAnalyticsReportsList();
+  const list = useAnalyticsReportsList();
+  const reports = list.data ?? [];
+  const phase = reportsListPhase(list);
   const runMutation = useRunReport();
   const duplicateMutation = useDuplicateReport();
   const deleteMutation = useDeleteReport();
@@ -83,9 +86,12 @@ export function ReportsListPage() {
       return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
 
-  if (isLoading) {
+  if (phase === 'unread') {
     return (
       <div className="p-8 space-y-3">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('reportsList.unread', 'Checking reports. The list has not arrived.')}
+        </p>
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
@@ -96,12 +102,12 @@ export function ReportsListPage() {
     );
   }
 
-  if (error) {
+  if (phase === 'failed') {
     return (
       <div className="p-8">
         <ErrorState
           title={t('reportsList.errorTitle', 'Failed to load reports')}
-          message={(error as Error).message}
+          message={(list.error as Error).message}
         />
       </div>
     );
@@ -170,13 +176,12 @@ export function ReportsListPage() {
 
       {/* sr-only live region — announces search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!isLoading &&
-          (search
-            ? t('reportsList.resultsCountMatching', '{{count}} reports matching "{{search}}"', {
-                count: filtered.length,
-                search,
-              })
-            : t('reportsList.resultsCount', '{{count}} reports', { count: filtered.length }))}
+        {search
+          ? t('reportsList.resultsCountMatching', '{{count}} reports matching "{{search}}"', {
+              count: filtered.length,
+              search,
+            })
+          : t('reportsList.resultsCount', '{{count}} reports', { count: filtered.length })}
       </p>
 
       {filtered.length === 0 ? (
