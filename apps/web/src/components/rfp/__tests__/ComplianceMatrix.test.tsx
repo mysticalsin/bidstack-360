@@ -199,15 +199,18 @@ describe('ComplianceMatrix — fetch states', () => {
     expect(screen.getByRole('alert')).toBeDefined();
   });
 
-  it('shows the empty state for an empty matrix and for no data at all', () => {
+  it('shows the empty state only after an empty matrix arrives', () => {
     mockCompliance({ data: result([]) });
     renderMatrix();
     expect(screen.getByTestId('empty-state')).toBeDefined();
     cleanup();
 
+    // A missing payload is not an empty matrix. isLoading is false here, which
+    // is also how a paused read looks.
     mockCompliance({ data: undefined });
     renderMatrix();
-    expect(screen.getByTestId('empty-state')).toBeDefined();
+    expect(screen.queryByTestId('empty-state')).toBeNull();
+    expect(screen.getByText('compliance.unread')).toBeTruthy();
   });
 });
 

@@ -53,6 +53,7 @@ import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 
 import { ComplianceMatrixToolbar } from './ComplianceMatrixToolbar';
 import { complianceMatrixCaption, shownComplianceMatrix } from './compliance-matrix-caption';
+import { compliancePhase } from './compliance-matrix-read';
 import { ComplianceRow } from './ComplianceRow';
 import {
   ALL,
@@ -78,7 +79,10 @@ const STATUS_FALLBACK: Record<string, string> = {
 
 export function ComplianceMatrix() {
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
-  const { data, isLoading, isError, error } = useRfpCompliance(bidWorkspaceId);
+  const complianceQuery = useRfpCompliance(bidWorkspaceId);
+  const { data, error } = complianceQuery;
+  // A missing payload is not an empty matrix. Empty is only a settled read.
+  const phase = compliancePhase(complianceQuery);
   const saveRow = useSaveComplianceRow(bidWorkspaceId);
   const { query } = useTableQuery(complianceMatrixSearchParams);
 
@@ -113,18 +117,15 @@ export function ComplianceMatrix() {
   );
   const decide = useDecideBidFact({ subjectType: 'matrix_row', workspaceId: bidWorkspaceId });
 
-  const settled = !isLoading && !isError;
-
   return (
     <Card>
       <MatrixHeader caption={caption} allRows={allRows} query={query} />
       <MatrixFetchStates
-        isLoading={isLoading}
-        isError={isError}
+        phase={phase}
         error={error}
-        isEmpty={settled && allRows.length === 0}
+        isEmpty={phase === 'ready' && allRows.length === 0}
       />
-      {settled && allRows.length > 0 && (
+      {phase === 'ready' && allRows.length > 0 && (
         <div className="flex flex-col gap-3 p-3">
           <MatrixTable
             rows={pageRows}
@@ -181,28 +182,29 @@ function MatrixHeader({
   );
 }
 
-/** Loading, error and empty — the three states a data surface may never skip. */
+/** Unread, failed, and empty. A missing payload is not an empty matrix. */
 function MatrixFetchStates({
-  isLoading,
-  isError,
+  phase,
   error,
   isEmpty,
 }: {
-  isLoading: boolean;
-  isError: boolean;
+  phase: 'unread' | 'failed' | 'ready';
   error: unknown;
   isEmpty: boolean;
 }) {
   const { t } = useTranslation('rfp');
 
-  if (isLoading) {
+  if (phase === 'unread') {
     return (
       <div className="p-4">
+        <p role="status" className="mb-3 text-sm text-fg-secondary">
+          {t('compliance.unread', 'Checking compliance. The matrix has not arrived.')}
+        </p>
         <LoadingSkeleton rows={6} />
       </div>
     );
   }
-  if (isError) {
+  if (phase === 'failed') {
     return (
       <div className="p-4">
         <p role="alert" className="text-sm text-danger">
