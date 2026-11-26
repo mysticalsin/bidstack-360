@@ -75,13 +75,18 @@ export function ForecastsPage() {
     [chartData],
   );
 
-  // Headline totals for the selected period — so the page answers "what's the
-  // number?" in one glance, led by Commit (the figure the bid team is held to).
+  // Headline totals for the selected period, once the forecast list has
+  // arrived. A missing list is not a zero commit. Led by Commit (the figure
+  // the bid team is held to).
+  const forecastItems = forecasts.data?.items;
+  const totalsArrived = Array.isArray(forecastItems);
+  const totalsFailed = !totalsArrived && (forecasts.isError || forecasts.isSuccess);
   const totals = useMemo(() => {
-    const t = { pipeline: 0, best_case: 0, commit: 0, closed: 0 };
-    for (const item of filteredItems) t[item.category] += item.amountMicros;
-    return t;
-  }, [filteredItems]);
+    const sums = { pipeline: 0, best_case: 0, commit: 0, closed: 0 };
+    if (!totalsArrived) return sums;
+    for (const item of filteredItems) sums[item.category] += item.amountMicros;
+    return sums;
+  }, [filteredItems, totalsArrived]);
 
   // ownerId identifies the row being edited — the grid shows every owner's
   // forecasts, so the write MUST carry it through or it silently overwrites the
@@ -228,40 +233,66 @@ export function ForecastsPage() {
         </Tabs>
       </motion.div>
 
-      {totalsNote ? (
+      {totalsArrived && totalsNote ? (
         <p className="text-xs text-[var(--fg-tertiary)]">{totalsNote}</p>
       ) : null}
 
-      {/* ── Headline totals — the page's answer at a glance ── */}
-      <motion.div
-        variants={reducedMotion ? undefined : staggerChild}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-        aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
-      >
-        {(
-          [
-            { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
-            { key: 'best_case', label: t('forecasts.totalBestCase', 'Best case'), accent: false },
-            { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
-            { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
-          ] as const
-        ).map((k) => (
+      {/* ── Headline totals, only after the forecast list has arrived ── */}
+      <motion.div variants={reducedMotion ? undefined : staggerChild}>
+        {totalsArrived ? (
           <div
-            key={k.key}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+            aria-label={t('forecasts.totalsLabel', 'Forecast totals for the selected period')}
+          >
+            {(
+              [
+                { key: 'commit', label: t('forecasts.totalCommit', 'Commit'), accent: true },
+                {
+                  key: 'best_case',
+                  label: t('forecasts.totalBestCase', 'Best case'),
+                  accent: false,
+                },
+                { key: 'pipeline', label: t('forecasts.totalPipeline', 'Pipeline'), accent: false },
+                { key: 'closed', label: t('forecasts.totalClosed', 'Closed'), accent: false },
+              ] as const
+            ).map((k) => (
+              <div
+                key={k.key}
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+              >
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                  {k.label}
+                </div>
+                <div
+                  className={`mt-1 text-lg font-bold tabular-nums ${
+                    k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
+                  }`}
+                >
+                  {formatMoneyMicros(totals[k.key], 'EUR')}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : totalsFailed ? (
+          <div
+            role="alert"
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
           >
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-              {k.label}
-            </div>
-            <div
-              className={`mt-1 text-lg font-bold tabular-nums ${
-                k.accent ? 'text-[var(--success)]' : 'text-[var(--fg-primary)]'
-              }`}
-            >
-              {formatMoneyMicros(totals[k.key], 'EUR')}
-            </div>
+            <p className="text-sm text-[var(--fg-secondary)]">
+              {t(
+                'forecasts.totalsFailed',
+                'Could not load the forecast totals. They have not arrived.',
+              )}
+            </p>
+            <Button className="mt-3" size="sm" onClick={() => void forecasts.refetch()}>
+              {t('forecasts.totalsRetry', 'Retry')}
+            </Button>
           </div>
-        ))}
+        ) : (
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t('forecasts.totalsChecking', 'Checking the forecast totals. They have not arrived.')}
+          </p>
+        )}
       </motion.div>
 
       {/* ── Chart (desktop only; returns null when empty) ── */}
