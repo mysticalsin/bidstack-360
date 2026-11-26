@@ -2,7 +2,7 @@
  * OrgCommandHero tests — the org /dashboard hero band must show REAL
  * portfolio numbers (win rate derived from closed stages, closing-week value
  * at stake, weighted coverage), skeleton-load the report-backed cells, and
- * degrade to explicit "unavailable" copy instead of breaking when a source
+ * say a failed report did not load instead of breaking when a source
  * query fails. Each assertion encodes the business derivation, not just
  * render success — if the win-rate math or the open/closed filter changes,
  * these fail.
@@ -126,13 +126,14 @@ describe('OrgCommandHero', () => {
     expect(screen.getByText('6')).toBeDefined();
   });
 
-  it('degrades to explicit unavailable copy when the report errors, keeping summary data live', () => {
+  it('says the pipeline report did not load when that read fails, keeping summary data live', () => {
     mockQueries({ reportState: { data: undefined, isLoading: false, isError: true } });
     render(<OrgCommandHero summary={summary} />);
 
-    // Win rate + weighted both say why they are blank instead of showing 0s
-    // (a silent 0% win rate would misread as real performance data).
-    expect(screen.getAllByText('report unavailable')).toHaveLength(2);
+    // A failed report is not a 0% win rate and not an empty closed-bid book.
+    expect(screen.getAllByText('The pipeline report did not load.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('report unavailable')).toBeNull();
+    expect(screen.queryByText('No closed bids yet')).toBeNull();
     expect(screen.getByText('across 4 accounts')).toBeDefined();
     expect(screen.getByText(/850,000/)).toBeDefined();
   });
