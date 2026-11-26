@@ -42,17 +42,48 @@ const COMPANIES: CrmCompany[] = [
   company({ id: 'co_canada-goose', name: 'Canada Goose', industry: 'Apparel' }),
 ];
 
+// Companies, contacts, and tasks are separate reads. Tests flip a catalog to
+// pending or failed when the empty sentence must not treat a missing payload
+// as a miss. The default is a settled empty book plus the company fixtures.
+const catalogMocks = vi.hoisted(() => ({
+  contacts: {
+    data: { items: [] as unknown[] } as { items: unknown[] } | undefined,
+    isPending: false,
+    isError: false,
+  },
+  tasks: {
+    data: { items: [] as unknown[] } as { items: unknown[] } | undefined,
+    isPending: false,
+    isError: false,
+  },
+  companies: 'ready' as 'ready' | 'pending' | 'failed',
+}));
+
+function resetCatalogMocks(): void {
+  catalogMocks.contacts = { data: { items: [] }, isPending: false, isError: false };
+  catalogMocks.tasks = { data: { items: [] }, isPending: false, isError: false };
+  catalogMocks.companies = 'ready';
+}
+
 vi.mock('@/hooks/useCrmDashboard', () => ({
-  useCrmDashboard: () => ({ data: { companies: COMPANIES } }),
+  useCrmDashboard: () => {
+    if (catalogMocks.companies === 'pending') {
+      return { data: undefined, isPending: true, isError: false };
+    }
+    if (catalogMocks.companies === 'failed') {
+      return { data: undefined, isPending: false, isError: true };
+    }
+    return { data: { companies: COMPANIES }, isPending: false, isError: false };
+  },
 }));
 
 // The palette also pulls contacts + tasks for cross-entity search; mock those
 // with empty arrays so the assertions only see the account row.
 vi.mock('@/hooks/useContacts', () => ({
-  useContacts: () => ({ data: { items: [] } }),
+  useContacts: () => catalogMocks.contacts,
 }));
 vi.mock('@/hooks/useTasks', () => ({
-  useTasks: () => ({ data: { items: [] } }),
+  useTasks: () => catalogMocks.tasks,
 }));
 
 // CompanyLogo would otherwise try to render <img>, which is noisy in jsdom but
@@ -162,6 +193,7 @@ afterEach(() => {
   // override it via mockReturnValue(true) must not leak into the next test.
   vi.mocked(useIsAdmin).mockReturnValue(false);
   permissionMocks.canReadAudit = false;
+  resetCatalogMocks();
 });
 
 describe('CommandPalette — accounts section', () => {
@@ -351,5 +383,107 @@ describe('CommandPalette — loading state while server searches are pending', (
     });
     await screen.findByText('Globex Industries');
     expect(screen.queryByText('Searching…')).toBeNull();
+  });
+});
+
+// The palette matches companies, contacts, and tasks from their own reads.
+// Those payloads are not /api/search. After both server searches succeed
+// empty, a catalog that has not arrived is still not a miss.
+const CATALOG_PENDING = 'Checking companies, contacts, and tasks. They have not arrived.';
+const CATALOG_FAILED = 'Could not load companies, contacts, or tasks. They have not arrived.';
+
+describe('CommandPalette unread catalogs are not an empty match list', () => {
+  afterEach(() => {
+    vi.mocked(api).mockImplementation(async () => ({ items: [] }));
+  });
+
+  async function settleEmptyServerSearch(): Promise<void> {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const oppRequest = deferredResponse();
+    const globalRequest = deferredResponse();
+    vi.mocked(api).mockImplementation((path: string) =>
+      path.startsWith('/api/search') ? globalRequest.promise : oppRequest.promise,
+    );
+    mockAppModules({});
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+          <CommandPalette open={true} onOpenChange={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    fireEvent.change(input, { target: { value: 'zzgap' } });
+    await waitFor(() =>
+      expect(vi.mocked(api)).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search'),
+        expect.anything(),
+      ),
+    );
+    oppRequest.resolve({ items: [] });
+    globalRequest.resolve({ items: [], total: 0, query: 'zzgap' });
+    await waitFor(() => {
+      expect(client.getQueryState(['global-search', 'zzgap'])?.status).toBe('success');
+      expect(client.getQueryState(['palette:opps', 'zzgap'])?.status).toBe('success');
+      expect(client.getQueryState(['global-search', 'zzgap'])?.fetchStatus).toBe('idle');
+      expect(client.getQueryState(['palette:opps', 'zzgap'])?.fetchStatus).toBe('idle');
+    });
+  }
+
+  it('does not call an unread contact book an empty match list', async () => {
+    // WHY: both server searches can succeed with no rows while the contact
+    // book is still pending. "No matches." would say that book was searched
+    // and came back empty. The payload has not arrived.
+    catalogMocks.contacts = { data: undefined, isPending: true, isError: false };
+    await settleEmptyServerSearch();
+
+    expect(screen.queryByText('No matches.')).toBeNull();
+    expect(screen.getByText(CATALOG_PENDING)).toBeTruthy();
+    expect(screen.queryByText(CATALOG_FAILED)).toBeNull();
+  });
+
+  it('does not call an unread company snapshot an empty match list', async () => {
+    // WHY: account rows come from the dashboard snapshot, not from the
+    // server search. A pending snapshot is not an empty account list.
+    catalogMocks.companies = 'pending';
+    await settleEmptyServerSearch();
+
+    expect(screen.queryByText('No matches.')).toBeNull();
+    expect(screen.getByText(CATALOG_PENDING)).toBeTruthy();
+  });
+
+  it('does not call a failed task read an empty match list', async () => {
+    // WHY: a rejected task read left no payload. The empty sentence would
+    // hide that failure as if the task list had been read and had no match.
+    catalogMocks.tasks = { data: undefined, isPending: false, isError: true };
+    await settleEmptyServerSearch();
+
+    expect(screen.queryByText('No matches.')).toBeNull();
+    expect(screen.getByText(CATALOG_FAILED)).toBeTruthy();
+    expect(screen.queryByText(CATALOG_PENDING)).toBeNull();
+  });
+
+  it('says nothing matched only after the catalogs and the server searches have arrived empty', async () => {
+    // WHY: a real miss must still say so. Waiting on unread catalogs must
+    // not leave the checking sentence up after every read settled empty.
+    await settleEmptyServerSearch();
+
+    expect(screen.getByText('No matches.')).toBeTruthy();
+    expect(screen.queryByText(CATALOG_PENDING)).toBeNull();
+    expect(screen.queryByText(CATALOG_FAILED)).toBeNull();
+  });
+
+  it('keeps a company row that has arrived while the contact book has not', async () => {
+    // WHY: the checking sentence replaces a false empty state. It must not
+    // replace Aritzia, which is already on screen from the company snapshot.
+    catalogMocks.contacts = { data: undefined, isPending: true, isError: false };
+    mockAppModules({});
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    fireEvent.change(input, { target: { value: 'Aritzia' } });
+
+    expect(screen.getAllByText('Aritzia').length).toBeGreaterThan(0);
+    expect(screen.queryByText(CATALOG_PENDING)).toBeNull();
+    expect(screen.queryByText('No matches.')).toBeNull();
   });
 });
