@@ -11,7 +11,10 @@ import {
 } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
+import { useRoles } from '@/hooks/useRoles';
+import { useUserGroups } from '@/hooks/useUserGroups';
 
+import { catalogPhase, type CatalogPhase, type CatalogRead } from './policy-catalog-read';
 import { DAY_LABEL, RESOURCE_LABEL, actionsFor, describeRule, newRuleId, parseCountries } from './policy-format';
 
 export interface PolicyBuilderOptions {
@@ -103,15 +106,35 @@ function CountriesInput({
   );
 }
 
+type NamedCatalog =
+  | { phase: Exclude<CatalogPhase, 'ready'>; message: string }
+  | { phase: 'ready'; items: readonly string[] };
+
+function catalogCopy(
+  read: CatalogRead,
+  copy: { unread: string; failed: string; empty: string },
+): NamedCatalog {
+  const phase = catalogPhase(read);
+  if (phase === 'ready') return { phase, items: read.items ?? [] };
+  return { phase, message: copy[phase] };
+}
+
+function namesFrom(data: { items: { name: string }[] } | undefined): string[] | undefined {
+  if (!data) return undefined;
+  return data.items.map((item) => item.name).sort();
+}
+
 function SubjectFields({
   match,
-  options,
+  roles,
+  teams,
   onChange,
   withCountries,
   disabled,
 }: {
   match: AccessPolicySubjectMatch;
-  options: PolicyBuilderOptions;
+  roles: NamedCatalog;
+  teams: NamedCatalog;
   onChange: (next: AccessPolicySubjectMatch) => void;
   withCountries: boolean;
   disabled?: boolean;
@@ -119,20 +142,28 @@ function SubjectFields({
   const { t } = useTranslation('settings');
   return (
     <div className="space-y-2">
-      <Checks
-        label={t('accessPolicies.roles', 'Roles')}
-        values={options.roles}
-        selected={match.roles}
-        disabled={disabled}
-        onToggle={(v, on) => onChange({ ...match, roles: toggle(match.roles, v, on) })}
-      />
-      <Checks
-        label={t('accessPolicies.teams', 'Teams')}
-        values={options.teams}
-        selected={match.teams}
-        disabled={disabled}
-        onToggle={(v, on) => onChange({ ...match, teams: toggle(match.teams, v, on) })}
-      />
+      {roles.phase === 'ready' ? (
+        <Checks
+          label={t('accessPolicies.roles', 'Roles')}
+          values={roles.items}
+          selected={match.roles}
+          disabled={disabled}
+          onToggle={(v, on) => onChange({ ...match, roles: toggle(match.roles, v, on) })}
+        />
+      ) : (
+        <p className="text-sm text-fg-secondary">{roles.message}</p>
+      )}
+      {teams.phase === 'ready' ? (
+        <Checks
+          label={t('accessPolicies.teams', 'Teams')}
+          values={teams.items}
+          selected={match.teams}
+          disabled={disabled}
+          onToggle={(v, on) => onChange({ ...match, teams: toggle(match.teams, v, on) })}
+        />
+      ) : (
+        <p className="text-sm text-fg-secondary">{teams.message}</p>
+      )}
       {withCountries && (
         <CountriesInput
           label={t('accessPolicies.userCountries', 'User countries')}
@@ -149,7 +180,8 @@ function RuleCard({
   rule,
   index,
   total,
-  options,
+  roles,
+  teams,
   readOnly,
   onChange,
   onMove,
@@ -158,7 +190,8 @@ function RuleCard({
   rule: AccessPolicyRule;
   index: number;
   total: number;
-  options: PolicyBuilderOptions;
+  roles: NamedCatalog;
+  teams: NamedCatalog;
   readOnly?: boolean;
   onChange: (rule: AccessPolicyRule) => void;
   onMove: (delta: -1 | 1) => void;
@@ -231,7 +264,8 @@ function RuleCard({
           <legend className={legendClass}>{t('accessPolicies.when', 'When')}</legend>
           <SubjectFields
             match={rule.when}
-            options={options}
+            roles={roles}
+            teams={teams}
             withCountries
             disabled={readOnly}
             onChange={(when) => onChange({ ...rule, when })}
@@ -335,7 +369,8 @@ function RuleCard({
           <legend className={legendClass}>{t('accessPolicies.except', 'Except')}</legend>
           <SubjectFields
             match={rule.except}
-            options={options}
+            roles={roles}
+            teams={teams}
             withCountries={false}
             disabled={readOnly}
             onChange={(except) => onChange({ ...rule, except })}
@@ -346,9 +381,36 @@ function RuleCard({
   );
 }
 
+function toRead(query: {
+  status: string;
+  fetchStatus: string;
+  data?: { items: { name: string }[] };
+}): CatalogRead {
+  const status = query.status === 'error' || query.status === 'success' ? query.status : 'pending';
+  const fetchStatus =
+    query.fetchStatus === 'paused' || query.fetchStatus === 'fetching' ? query.fetchStatus : 'idle';
+  return { status, fetchStatus, items: namesFrom(query.data) };
+}
+
 /** When / Then / Except rule rows. Rules apply in order only for display; any matching deny wins. */
 export function PolicyBuilder({ rules, onChange, options, readOnly }: PolicyBuilderProps) {
   const { t } = useTranslation('settings');
+  // Writers load the role catalog. Viewers do not, so a read-only rule keeps the
+  // names the parent already holds instead of calling a missing list empty.
+  const rolesQuery = useRoles({ enabled: !readOnly });
+  const teamsQuery = useUserGroups();
+  const roles: NamedCatalog = readOnly
+    ? { phase: 'ready', items: options.roles }
+    : catalogCopy(toRead(rolesQuery), {
+        unread: t('accessPolicies.rolesUnread', 'The role list has not arrived.'),
+        failed: t('accessPolicies.rolesFailed', 'The role list did not load.'),
+        empty: t('accessPolicies.rolesEmpty', 'No roles yet.'),
+      });
+  const teams = catalogCopy(toRead(teamsQuery), {
+    unread: t('accessPolicies.teamsUnread', 'The team list has not arrived.'),
+    failed: t('accessPolicies.teamsFailed', 'The team list did not load.'),
+    empty: t('accessPolicies.teamsEmpty', 'No teams yet.'),
+  });
 
   const add = () =>
     onChange([
@@ -384,7 +446,8 @@ export function PolicyBuilder({ rules, onChange, options, readOnly }: PolicyBuil
                 rule={rule}
                 index={i}
                 total={rules.length}
-                options={options}
+                roles={roles}
+                teams={teams}
                 readOnly={readOnly}
                 onChange={(next) => onChange(rules.map((r, j) => (j === i ? next : r)))}
                 onMove={(delta) => move(i, delta)}
