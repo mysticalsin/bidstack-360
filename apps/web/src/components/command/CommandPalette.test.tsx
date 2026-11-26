@@ -143,10 +143,12 @@ function renderPaletteWithQuickAdd(onOpenChange: (open: boolean) => void = () =>
 // palette's two independent server searches resolve.
 function deferredResponse() {
   let resolve!: (value: unknown) => void;
-  const promise = new Promise<unknown>((res) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<unknown>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { resolve, promise };
+  return { resolve, reject, promise };
 }
 
 afterEach(() => {
@@ -351,5 +353,121 @@ describe('CommandPalette — loading state while server searches are pending', (
     });
     await screen.findByText('Globex Industries');
     expect(screen.queryByText('Searching…')).toBeNull();
+  });
+});
+
+// A typed query with no local row used to print "No matches." while the
+// debounced server search had not started, and again after that search
+// failed. The empty sentence is only true once both server reads succeed
+// and come back empty.
+describe('CommandPalette — empty state waits for a finished server read', () => {
+  afterEach(() => {
+    vi.mocked(api).mockImplementation(async () => ({ items: [] }));
+  });
+
+  function typeGap() {
+    mockAppModules({});
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    fireEvent.change(input, { target: { value: 'zzgap' } });
+    return input;
+  }
+
+  it('does not say nothing matched before the workspace search has started', () => {
+    // WHY: the server searches wait 200ms after the last key. During that
+    // pause the list is empty because nothing local matches, but the read
+    // has not happened. "No matches." would be a false miss.
+    vi.mocked(api).mockImplementation(() => new Promise(() => undefined));
+    typeGap();
+
+    expect(screen.queryByText('No matches.')).toBeNull();
+    expect(screen.getByText('Searching…')).toBeTruthy();
+    expect(vi.mocked(api)).not.toHaveBeenCalledWith(
+      expect.stringContaining('/api/search'),
+      expect.anything(),
+    );
+  });
+
+  it('does not call a failed workspace search an empty match list', async () => {
+    // WHY: a rejected /api/search is not an empty catalog. The palette used
+    // to drop into "No matches." once isFetching flipped false, which hides
+    // a failed read as if the workspace had been searched and found nothing.
+    const oppRequest = deferredResponse();
+    const globalRequest = deferredResponse();
+    vi.mocked(api).mockImplementation((path: string) =>
+      path.startsWith('/api/search') ? globalRequest.promise : oppRequest.promise,
+    );
+    typeGap();
+
+    await waitFor(() =>
+      expect(vi.mocked(api)).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search'),
+        expect.anything(),
+      ),
+    );
+
+    oppRequest.resolve({ items: [] });
+    globalRequest.reject(new Error('search down'));
+
+    expect(await screen.findByText('Search could not be completed.')).toBeTruthy();
+    expect(screen.queryByText('No matches.')).toBeNull();
+    expect(screen.queryByText('Searching…')).toBeNull();
+  });
+
+  it('says nothing matched only after both server searches come back empty', async () => {
+    // WHY: a real miss must still say so. Waiting for the read must not
+    // leave the palette on "Searching…" after both catalogs returned no rows.
+    const oppRequest = deferredResponse();
+    const globalRequest = deferredResponse();
+    vi.mocked(api).mockImplementation((path: string) =>
+      path.startsWith('/api/search') ? globalRequest.promise : oppRequest.promise,
+    );
+    typeGap();
+
+    await waitFor(() =>
+      expect(vi.mocked(api)).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search'),
+        expect.anything(),
+      ),
+    );
+
+    oppRequest.resolve({ items: [] });
+    globalRequest.resolve({ items: [], total: 0, query: 'zzgap' });
+
+    expect(await screen.findByText('No matches.')).toBeTruthy();
+    expect(screen.queryByText('Search could not be completed.')).toBeNull();
+    expect(screen.queryByText('Searching…')).toBeNull();
+  });
+
+  it('keeps a local account row when the workspace search fails', async () => {
+    // WHY: the failure sentence replaces the false empty state. It must not
+    // replace rows the palette already has, or a failed read hides Aritzia.
+    const oppRequest = deferredResponse();
+    const globalRequest = deferredResponse();
+    vi.mocked(api).mockImplementation((path: string) =>
+      path.startsWith('/api/search') ? globalRequest.promise : oppRequest.promise,
+    );
+    mockAppModules({});
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    fireEvent.change(input, { target: { value: 'Aritzia' } });
+
+    await waitFor(() =>
+      expect(vi.mocked(api)).toHaveBeenCalledWith(
+        expect.stringContaining('/api/search'),
+        expect.anything(),
+      ),
+    );
+
+    oppRequest.resolve({ items: [] });
+    globalRequest.reject(new Error('search down'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Searching…')).toBeNull();
+    });
+    // The logo and the highlighted label both carry the name.
+    expect(screen.getAllByText('Aritzia').length).toBeGreaterThan(0);
+    expect(screen.queryByText('No matches.')).toBeNull();
+    expect(screen.queryByText('Search could not be completed.')).toBeNull();
   });
 });
