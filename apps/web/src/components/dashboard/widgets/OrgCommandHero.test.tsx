@@ -60,6 +60,18 @@ const summary: OrgSummary = {
   recentActivity: [],
 };
 
+// Open bids are already on the summary. Overdue follow-ups are clear, so the
+// hero line is about the week. That line is only true after the due list settles.
+const openBook: OrgSummary = { ...summary, overdueTasks: 0 };
+
+const emptyClosedReport = {
+  byStage: [{ stage: 'proposal', count: 6, valueSum: 500_000 }],
+  totalOpen: 6,
+  totalValueOpen: 500_000,
+  weightedPipeline: 200_000,
+  velocity: { avgDaysOpen: 21.4, closedThisQuarter: 0 },
+};
+
 const report = {
   byStage: [
     { stage: 'closed_won', count: 3, valueSum: 300_000 },
@@ -149,5 +161,60 @@ describe('OrgCommandHero', () => {
     expect(
       screen.getByText('2 bids close within 7 days — run those reviews first.'),
     ).toBeDefined();
+  });
+
+  it('does not call a closing read in progress a clear runway', () => {
+    // WHY: the due list has not arrived. Open bids are already on the summary.
+    // "Runway is clear" and "No closed bids yet" are only true after those reads settle.
+    mockQueries({
+      reportState: { data: undefined, isLoading: true, isError: false },
+      closingState: { data: undefined, isLoading: true, isError: false },
+    });
+    render(<OrgCommandHero summary={openBook} />);
+
+    expect(screen.queryByText(/runway is clear/)).toBeNull();
+    expect(screen.queryByText('No closed bids yet')).toBeNull();
+    expect(screen.getByText('Checking which bids are due this week.')).toBeTruthy();
+    expect(screen.getByText('Checking closed bids')).toBeTruthy();
+  });
+
+  it('does not call a failed closing read a clear runway', () => {
+    // WHY: a failed due list is not an empty week, and a failed report is not
+    // an empty closed book.
+    mockQueries({
+      reportState: { data: undefined, isLoading: false, isError: true },
+      closingState: { data: undefined, isLoading: false, isError: true },
+    });
+    render(<OrgCommandHero summary={openBook} />);
+
+    expect(screen.queryByText(/runway is clear/)).toBeNull();
+    expect(screen.queryByText('No closed bids yet')).toBeNull();
+    expect(screen.getByText('The closing window did not load.')).toBeTruthy();
+    expect(screen.getByText('Closed bids not loaded')).toBeTruthy();
+  });
+
+  it('still says the runway is clear after a settled week with nothing due', () => {
+    // WHY: a finished read with no bids due this week, and a finished report
+    // with no closed stages, stay empty. Those sentences are the settled states.
+    mockQueries({
+      reportState: { data: emptyClosedReport, isLoading: false, isError: false },
+      closingState: { data: { items: [] }, isLoading: false, isError: false },
+    });
+    render(<OrgCommandHero summary={openBook} />);
+
+    expect(screen.getByText(/runway is clear/)).toBeTruthy();
+    expect(screen.getByText('No closed bids yet')).toBeTruthy();
+    expect(screen.queryByText('Checking which bids are due this week.')).toBeNull();
+    expect(screen.queryByText('Closed bids not loaded')).toBeNull();
+  });
+
+  it('still names a loaded closing week and a loaded win rate', () => {
+    mockQueries();
+    render(<OrgCommandHero summary={openBook} />);
+
+    expect(screen.getByText('2 bids close within 7 days — run those reviews first.')).toBeTruthy();
+    expect(screen.getByText('75% win rate')).toBeTruthy();
+    expect(screen.queryByText(/runway is clear/)).toBeNull();
+    expect(screen.queryByText('No closed bids yet')).toBeNull();
   });
 });
