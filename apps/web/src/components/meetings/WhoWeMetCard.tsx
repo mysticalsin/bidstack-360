@@ -17,6 +17,7 @@ import { CoverageMap } from './CoverageMap';
 import { LogMeetingDialog } from './LogMeetingDialog';
 import { meetingChallengeLabel, shownMeetingChallenges } from './meeting-challenge-caption';
 import { PeopleDrill } from './PeopleDrill';
+import { listRead } from './who-we-met-read';
 
 const TOP_CHALLENGES = 3;
 const TOP_RECENT = 4;
@@ -34,11 +35,14 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
 
   const cov = coverage.data;
   const people = cov?.cells.reduce((n, c) => n + c.people, 0) ?? 0;
-  const meetings = recent.data?.items ?? [];
-  const hasAny = people > 0 || meetings.length > 0;
+  const meetingRead = listRead(recent.status, recent.data?.items);
+  const meetings = Array.isArray(recent.data?.items) ? recent.data.items : [];
+  // A missing meetings payload is not an empty book, even when coverage has no people.
+  const hasAny = people > 0 || meetingRead === 'ready';
   const senior = cov?.cells.filter((c) => SENIOR_LEVELS.has(c.seniority)).reduce((n, c) => n + c.people, 0) ?? 0;
+  const challengeRead = listRead(challenges.status, challenges.data?.items);
   const challengePage = shownMeetingChallenges(
-    challenges.data?.items ?? [],
+    Array.isArray(challenges.data?.items) ? challenges.data.items : [],
     challenges.data?.challengesContinue,
   );
   const items = challengePage.items;
@@ -65,6 +69,13 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
         <p className="mi-empty" role="alert">
           Couldn&apos;t load meeting coverage. <button type="button" className="mi-link" onClick={() => void coverage.refetch()}>Retry</button>
         </p>
+      ) : people === 0 && meetingRead === 'checking' ? (
+        <p className="mi-empty" role="status">Checking meetings. They have not arrived.</p>
+      ) : people === 0 && meetingRead === 'failed' ? (
+        <p className="mi-empty" role="alert">
+          Could not load meetings. The meetings have not arrived.{' '}
+          <button type="button" className="mi-link" onClick={() => void recent.refetch()}>Retry</button>
+        </p>
       ) : !hasAny ? (
         <p className="mi-empty">
           No meetings recorded for this account yet. Log one, or <Link to="/settings?tab=meeting-sources">connect Métis or ABC</Link> to bring them in.
@@ -86,7 +97,14 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
           <div style={{ display: 'grid', gap: 24, alignContent: 'start', minWidth: 0 }}>
             <div>
               <h3 style={{ fontSize: 14, fontWeight: 500, margin: "0 0 8px", color: "var(--fg-primary)" }}>What they keep raising</h3>
-              {items.length === 0 ? <p className="mi-empty">No challenges captured yet.</p> : (
+              {challengeRead === 'checking' ? (
+                <p className="mi-empty" role="status">Checking challenges. They have not arrived.</p>
+              ) : challengeRead === 'failed' ? (
+                <p className="mi-empty" role="alert">
+                  Could not load challenges. The challenges have not arrived.{' '}
+                  <button type="button" className="mi-link" onClick={() => void challenges.refetch()}>Retry</button>
+                </p>
+              ) : items.length === 0 ? <p className="mi-empty">No challenges captured yet.</p> : (
                 <>
                   <ul className="mi-list" data-testid="challenge-rollup">
                     {(allChallenges ? items : items.slice(0, TOP_CHALLENGES)).map((c) => (
@@ -109,18 +127,29 @@ export function WhoWeMetCard({ companyId, companyName }: { companyId: string; co
             </div>
             <div>
               <h3 style={{ fontSize: 14, fontWeight: 500, margin: '0 0 8px', color: 'var(--fg-primary)' }}>Latest meetings</h3>
-              <ol className="mi-timeline" data-testid="meeting-timeline">
-                {meetings.slice(0, TOP_RECENT).map((m) => (
-                  <li key={m.id}>
-                    <Link className="mi-row-title" to={`/meetings/${m.id}`}>{m.title}</Link>
-                    <span className="mi-row-meta">
-                      <time dateTime={m.heldAt}>{fmtMeetingDate(m.heldAt)}</time> · {m.companyName}
-                      {COVERAGE_LEVELS.includes(m.topSeniority) ? <span className="mi-chip" data-tone={SENIOR_LEVELS.has(m.topSeniority) ? 'senior' : undefined}>{SENIORITY_SHORT[m.topSeniority]}</span> : null}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-              {meetings.length > TOP_RECENT ? <Link className="mi-link" to={base}>See all meetings</Link> : null}
+              {meetingRead === 'checking' ? (
+                <p className="mi-empty" role="status">Checking meetings. They have not arrived.</p>
+              ) : meetingRead === 'failed' ? (
+                <p className="mi-empty" role="alert">
+                  Could not load meetings. The meetings have not arrived.{' '}
+                  <button type="button" className="mi-link" onClick={() => void recent.refetch()}>Retry</button>
+                </p>
+              ) : (
+                <>
+                  <ol className="mi-timeline" data-testid="meeting-timeline">
+                    {meetings.slice(0, TOP_RECENT).map((m) => (
+                      <li key={m.id}>
+                        <Link className="mi-row-title" to={`/meetings/${m.id}`}>{m.title}</Link>
+                        <span className="mi-row-meta">
+                          <time dateTime={m.heldAt}>{fmtMeetingDate(m.heldAt)}</time> · {m.companyName}
+                          {COVERAGE_LEVELS.includes(m.topSeniority) ? <span className="mi-chip" data-tone={SENIOR_LEVELS.has(m.topSeniority) ? 'senior' : undefined}>{SENIORITY_SHORT[m.topSeniority]}</span> : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  {meetings.length > TOP_RECENT ? <Link className="mi-link" to={base}>See all meetings</Link> : null}
+                </>
+              )}
             </div>
           </div>
         </div>

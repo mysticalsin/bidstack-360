@@ -110,7 +110,9 @@ describe('Who we met does not call an unread meetings list empty', () => {
       },
     });
     renderCard();
-    const alert = await screen.findByRole('alert');
+    // The list retries twice before it settles as a failure. Until then the
+    // card stays on "not arrived", which is still not an empty book.
+    const alert = await screen.findByRole('alert', undefined, { timeout: 8000 });
     expect(alert.textContent).toContain('Could not load meetings.');
     expect(alert.textContent).toContain('The meetings have not arrived.');
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
@@ -175,10 +177,26 @@ describe('Who we met does not call an unread meetings list empty', () => {
     });
     renderCard();
     expect(await screen.findByText('Cloud cost review')).toBeTruthy();
-    const alert = await screen.findByRole('alert');
+    const alert = await screen.findByRole('alert', undefined, { timeout: 8000 });
     expect(alert.textContent).toContain('Could not load challenges.');
     expect(alert.textContent).toContain('The challenges have not arrived.');
     expect(screen.queryByText('No challenges captured yet.')).toBeNull();
+  });
+
+  it('keeps coverage on screen when the meetings list fails', async () => {
+    route({
+      coverage: () => coverageWithPerson,
+      challenges: () => ({ items: [] }),
+      meetings: () => {
+        throw new Error('meetings down');
+      },
+    });
+    renderCard();
+    expect(await screen.findByTestId('coverage-map')).toBeTruthy();
+    const alert = await screen.findByRole('alert', undefined, { timeout: 8000 });
+    expect(alert.textContent).toContain('Could not load meetings.');
+    expect(alert.textContent).toContain('The meetings have not arrived.');
+    expect(screen.queryByTestId('meeting-timeline')).toBeNull();
   });
 
   it('still says no challenges when that empty rollup has arrived', async () => {
