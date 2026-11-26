@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button';
 import { useUsers } from '@/hooks/useUsers';
 import type { Territory, TerritoryCreate, TerritoryPatch } from '@bidstack/shared';
 
+import { territoryOwnerPhase } from './territory-owner-read';
+
 interface TerritoryDialogProps {
   territory?: Territory | null;
   open: boolean;
@@ -28,6 +30,11 @@ function TerritoryDialogForm({
   // Owner picker: no server-side user search exists, so request the route
   // maximum (200) instead of the default 100 to avoid silently dropping owners.
   const users = useUsers({ limit: 200 });
+  const ownerPhase = territoryOwnerPhase({
+    data: users.data,
+    isError: users.isError,
+    status: users.status,
+  });
   const [name, setName] = useState(territory?.name ?? '');
   const [region, setRegion] = useState(territory?.region ?? '');
   const [countryCodes, setCountryCodes] = useState(territory?.countryCodes.join(', ') ?? '');
@@ -116,23 +123,47 @@ function TerritoryDialogForm({
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor="t-owner" className="text-sm font-medium text-[var(--fg-primary)]">
+        <label
+          id="t-owner-label"
+          htmlFor={ownerPhase === 'ready' ? 't-owner' : undefined}
+          className="text-sm font-medium text-[var(--fg-primary)]"
+        >
           {t('territory.fieldOwner', 'Owner')}
         </label>
-        <select
-          id="t-owner"
-          value={ownerId}
-          onChange={(e) => setOwnerId(e.target.value)}
-          required
-          className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
-        >
-          <option value="">{t('territory.ownerPlaceholder', 'Select an owner')}</option>
-          {users.data?.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name ?? u.email}
-            </option>
-          ))}
-        </select>
+        {ownerPhase === 'failed' ? (
+          <p
+            id="t-owner-status"
+            role="alert"
+            aria-labelledby="t-owner-label"
+            className="text-sm text-[var(--fg-secondary)]"
+          >
+            {t('territory.ownerFailed', 'Could not load owners.')}
+          </p>
+        ) : ownerPhase === 'unread' ? (
+          <p
+            id="t-owner-status"
+            role="status"
+            aria-labelledby="t-owner-label"
+            className="text-sm text-[var(--fg-secondary)]"
+          >
+            {t('territory.ownerChecking', 'Checking owners. The list has not arrived.')}
+          </p>
+        ) : (
+          <select
+            id="t-owner"
+            value={ownerId}
+            onChange={(e) => setOwnerId(e.target.value)}
+            required
+            className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]"
+          >
+            <option value="">{t('territory.ownerPlaceholder', 'Select an owner')}</option>
+            {users.data?.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name ?? u.email}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <label className="flex items-center gap-2 text-sm text-[var(--fg-primary)]">
