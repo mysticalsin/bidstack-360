@@ -9,6 +9,8 @@ import { useRelationshipMap } from '@/hooks/useMsaWhitespace';
 import { fmtDate, fmtMoneyMicros } from '@/lib/msa/labels';
 import { whoRows } from '@/lib/msa/whitespace';
 
+import { whoWorksReadKind } from './who-works-read';
+
 export function WhoWorksWithThem({ companyId, as = 'section' }: { companyId: string | null | undefined; as?: 'section' | 'div' }) {
   const map = useRelationshipMap(companyId);
   const headingId = useId();
@@ -16,15 +18,23 @@ export function WhoWorksWithThem({ companyId, as = 'section' }: { companyId: str
   const Wrap = as;
   const rows = map.data ? whoRows(map.data) : [];
   const affiliates = (Array.isArray(map.data?.companies) ? map.data.companies : []).filter((c) => c.relation !== 'self');
+  const kind = whoWorksReadKind({
+    isLoading: map.isLoading,
+    isError: map.isError,
+    hasPayload: map.data !== undefined,
+    rowCount: rows.length,
+  });
   return (
     <Wrap className={as === 'section' ? 'agr-section' : 'agr-who'} aria-labelledby={headingId} data-testid="who-works-with-them">
       <h2 id={headingId} className="agr-who-title">Who works with them</h2>
-      {map.isLoading ? (
+      {kind === 'loading' ? (
         <LoadingSkeleton rows={3} />
-      ) : map.isError ? (
-        <p className="agr-error" role="alert">Couldn&apos;t load who works with them.</p>
-      ) : rows.length === 0 ? (
-        <p className="drill-empty">No one in the group works with them yet.</p>
+      ) : kind === 'unread' ? (
+        <p className="drill-empty" role="status" data-testid="who-works-read">Who works with them has not arrived.</p>
+      ) : kind === 'failed' ? (
+        <p className="agr-error" role="alert" data-testid="who-works-read">Couldn&apos;t load who works with them.</p>
+      ) : kind === 'empty' ? (
+        <p className="drill-empty" data-testid="who-works-read">No one in the group works with them yet.</p>
       ) : (
         <div className="agr-table-wrap">
           <table className="drill-table agr-who-table">
