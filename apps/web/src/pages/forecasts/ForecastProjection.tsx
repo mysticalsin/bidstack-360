@@ -28,6 +28,8 @@ import { useForecastProjection } from '@/hooks/useForecasts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
+import { forecastProjectionPhase } from './forecast-projection-read';
+
 type FormatMoney = (micros: number, currency?: string) => string;
 
 export function ForecastProjection() {
@@ -36,7 +38,12 @@ export function ForecastProjection() {
   const projection = useForecastProjection();
   const [selected, setSelected] = useState<string | null>(null);
 
-  const periods = projection.data?.periods ?? [];
+  const phase = forecastProjectionPhase({
+    data: projection.data,
+    isError: projection.isError,
+    status: projection.status,
+  });
+  const periods = phase === 'ready' ? (projection.data?.periods ?? []) : [];
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
   const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
   const bars = forecastPeriodBars(periods);
@@ -45,7 +52,14 @@ export function ForecastProjection() {
     <Card>
       <SectionHeader title={t('forecastProjection.title', 'Weighted pipeline projection')} />
 
-      {projection.isError ? (
+      {phase === 'unread' ? (
+        <p role="status" className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+          {t(
+            'forecastProjection.checking',
+            'Checking the weighted pipeline. The projection has not arrived.',
+          )}
+        </p>
+      ) : phase === 'failed' ? (
         <ErrorState
           title={t('forecastProjection.errorTitle', 'Failed to load projection')}
           message={projection.error instanceof Error ? projection.error.message : undefined}
