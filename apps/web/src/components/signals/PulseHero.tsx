@@ -17,6 +17,8 @@ import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { TransitionPanel } from '@/components/motion-primitives/transition-panel';
 import { useAccountPulse } from '@/hooks/useAccountSignals';
 
+import { accountPulsePhase } from './account-pulse-read';
+
 type Driver = AccountPulse['drivers'][number];
 
 const TREND_WORD: Record<AccountPulse['trend'], string> = { gaining: 'Gaining', steady: 'Steady', declining: 'Declining' };
@@ -173,8 +175,13 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
 
 export function PulseHero({ companyId }: { companyId: string }) {
   const q = useAccountPulse(companyId);
-  if (q.isLoading) return <div className="sg sg-pulse" aria-busy="true"><div className="sg-skel" style={{ gridColumn: '1 / -1', minHeight: 252 }} /></div>;
-  if (q.isError || !q.data) {
+  const phase = accountPulsePhase({
+    data: q.data,
+    isError: q.isError,
+    status: q.status,
+  });
+  if (phase === 'ready' && q.data) return <PulseView pulse={q.data} />;
+  if (phase === 'failed') {
     return (
       <section className="sg sg-surface" style={{ marginBottom: 24 }}>
         <p className="sg-empty" role="alert">
@@ -184,7 +191,13 @@ export function PulseHero({ companyId }: { companyId: string }) {
       </section>
     );
   }
-  return <PulseView pulse={q.data} />;
+  return (
+    <section className="sg sg-surface" style={{ marginBottom: 24 }}>
+      <p className="sg-empty" role="status">
+        Checking this pulse. The record has not arrived.
+      </p>
+    </section>
+  );
 }
 
 export default PulseHero;
