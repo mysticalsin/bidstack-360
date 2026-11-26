@@ -11,10 +11,15 @@
 //   Both coexist: this component is the "scratch pad" surface; the notes
 //   sidebar remains for structured threaded notes.
 
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Button } from '@/components/ui/Button';
+import { ErrorState } from '@/components/ui/StateMessages';
+import { useYjsField } from '@/hooks/useYjsField';
 import { useUser } from '@/lib/auth';
+
+import { collaborativeNotesPhase, type CollaborativeNotesPhase } from './collaborative-notes-read';
 
 // Tiptap + Y.js are heavy (~hundreds of KB) and only mount on the three detail
 // pages, below the fold. Lazy-loading splits them into their own async chunk so
@@ -34,22 +39,54 @@ interface Props {
   readOnly?: boolean;
 }
 
-export function CollaborativeNotesSection({
+export function CollaborativeNotesSection(props: Props) {
+  const [attempt, setAttempt] = useState(0);
+  return (
+    <CollaborativeNotesBody
+      key={`${attempt}:${props.entityId ?? ''}:${props.fieldKey ?? 'notes'}`}
+      {...props}
+      onRetry={() => setAttempt((n) => n + 1)}
+    />
+  );
+}
+
+function CollaborativeNotesBody({
   entityType,
   entityId,
   fieldKey = 'notes',
   label,
   readOnly = false,
-}: Props) {
+  onRetry,
+}: Props & { onRetry: () => void }) {
   const { user } = useUser();
   const { t } = useTranslation('crm');
+  const [latch, setLatch] = useState<Extract<CollaborativeNotesPhase, 'empty' | 'ready'> | null>(
+    null,
+  );
+
+  // Once the document has arrived, this observer steps aside so the editor
+  // owns the only socket. A missing payload stays unread and does not open
+  // the pad.
+  const field = useYjsField({
+    entityType,
+    entityId,
+    fieldKey,
+    enabled: Boolean(entityId) && latch === null,
+  });
+  const text = field.yText == null ? null : field.yText.toString();
+  const live = collaborativeNotesPhase({ text, connectionState: field.connectionState });
+  if (latch === null && (live === 'empty' || live === 'ready')) {
+    setLatch(live);
+  }
+  const phase = latch ?? live;
 
   const heading = label ?? t('collaborativeNotes.heading', 'Live collaboration');
+  const headingId = `collab-notes-${entityId ?? 'loading'}`;
 
   return (
-    <section aria-labelledby={`collab-notes-${entityId ?? 'loading'}`}>
+    <section aria-labelledby={headingId}>
       <h2
-        id={`collab-notes-${entityId ?? 'loading'}`}
+        id={headingId}
         className="text-sm font-semibold text-[var(--fg-secondary)] uppercase tracking-wider mb-2"
       >
         {heading}
@@ -58,29 +95,53 @@ export function CollaborativeNotesSection({
         </span>
       </h2>
 
-      <Suspense
-        fallback={
-          <div
-            className="min-h-[8rem] animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)]"
-            aria-busy="true"
-            aria-label={t('collaborativeNotes.loadingEditor', 'Loading editor')}
-          />
-        }
-      >
-        <CollaborativeRichTextEditor
-          yjsOptions={{
-            entityType,
-            entityId,
-            fieldKey,
-            enabled: Boolean(entityId),
-          }}
-          userName={user?.fullName ?? undefined}
-          userId={user?.id ?? undefined}
-          placeholder={t('collaborativeNotes.placeholder', 'Start writing collaborative notes…')}
-          readOnly={readOnly || !entityId}
-          className="min-h-[8rem]"
+      {phase === 'unread' ? (
+        <p role="status" aria-busy="true" className="text-sm text-[var(--fg-secondary)]">
+          {t('collaborativeNotes.checking', 'Checking collaborative notes. They have not arrived.')}
+        </p>
+      ) : null}
+
+      {phase === 'failed' ? (
+        <ErrorState
+          title={t('collaborativeNotes.loadErrorTitle', "Couldn't load collaborative notes")}
+          message={t('collaborativeNotes.loadErrorMessage', 'The notes did not load.')}
+          action={
+            <Button size="sm" variant="secondary" onClick={onRetry}>
+              {t('collaborativeNotes.retry', 'Retry')}
+            </Button>
+          }
         />
-      </Suspense>
+      ) : null}
+
+      {phase === 'empty' || phase === 'ready' ? (
+        <Suspense
+          fallback={
+            <div
+              className="min-h-[8rem] animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)]"
+              aria-busy="true"
+              aria-label={t('collaborativeNotes.loadingEditor', 'Loading editor')}
+            />
+          }
+        >
+          <CollaborativeRichTextEditor
+            yjsOptions={{
+              entityType,
+              entityId,
+              fieldKey,
+              enabled: Boolean(entityId),
+            }}
+            userName={user?.fullName ?? undefined}
+            userId={user?.id ?? undefined}
+            placeholder={
+              phase === 'empty'
+                ? t('collaborativeNotes.placeholder', 'Start writing collaborative notes…')
+                : undefined
+            }
+            readOnly={readOnly || !entityId}
+            className="min-h-[8rem]"
+          />
+        </Suspense>
+      ) : null}
     </section>
   );
 }
