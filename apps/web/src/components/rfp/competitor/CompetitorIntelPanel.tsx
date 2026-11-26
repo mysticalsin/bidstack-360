@@ -13,6 +13,7 @@ import {
   useTriggerCompetitorResearch,
   type CompetitorInsight,
 } from '@/hooks/rfp/useCompetitorIntel';
+import { competitorInsightsPhase } from './competitor-insights-read';
 
 const CATEGORY_LABEL: Record<string, string> = {
   pricing: 'Pricing',
@@ -150,6 +151,8 @@ function ResearchControls({ opportunityId }: { opportunityId: string }) {
 export function CompetitorIntelPanel({ opportunityId }: { opportunityId: string | null | undefined }) {
   const { t } = useTranslation('rfp');
   const insights = useOpportunityCompetitorInsights(opportunityId);
+  // A missing payload is not an empty research pass. Empty is only a settled read.
+  const phase = competitorInsightsPhase(insights);
   const items = insights.data?.items ?? [];
 
   return (
@@ -166,30 +169,33 @@ export function CompetitorIntelPanel({ opportunityId }: { opportunityId: string 
         {opportunityId && <ResearchControls opportunityId={opportunityId} />}
       </div>
 
-      {insights.isLoading && (
+      {phase === 'unread' ? (
         <div className="p-4">
+          <p role="status" className="mb-2 text-sm text-[var(--fg-secondary)]">
+            {t('competitor.unread', 'Checking competitor findings. They have not arrived.')}
+          </p>
           <LoadingSkeleton rows={3} />
         </div>
-      )}
+      ) : null}
 
-      {insights.isError && (
+      {phase === 'failed' ? (
         <div className="p-4">
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
             {insights.error instanceof Error ? insights.error.message : t('competitor.error')}
           </p>
         </div>
-      )}
+      ) : null}
 
-      {!insights.isLoading && !insights.isError && items.length === 0 && (
+      {phase === 'ready' && items.length === 0 ? (
         <div className="p-6">
           <EmptyState
             title={t('competitor.emptyTitle')}
             message={t('competitor.emptyMessage')}
           />
         </div>
-      )}
+      ) : null}
 
-      {items.length > 0 && (
+      {phase === 'ready' && items.length > 0 ? (
         <ul
           aria-label={t('competitor.listLabel')}
           role="list"
@@ -199,7 +205,7 @@ export function CompetitorIntelPanel({ opportunityId }: { opportunityId: string 
             <InsightCard key={insight.id} insight={insight} />
           ))}
         </ul>
-      )}
+      ) : null}
     </Card>
   );
 }
