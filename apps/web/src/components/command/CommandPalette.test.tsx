@@ -148,6 +148,9 @@ function deferredResponse() {
     resolve = res;
     reject = rej;
   });
+  // A consumer (the query) still rejects. This observer only stops Vitest
+  // from treating that rejection as an unhandled error.
+  promise.catch(() => undefined);
   return { resolve, reject, promise };
 }
 
@@ -378,6 +381,7 @@ describe('CommandPalette — empty state waits for a finished server read', () =
     // pause the list is empty because nothing local matches, but the read
     // has not happened. "No matches." would be a false miss.
     vi.mocked(api).mockImplementation(() => new Promise(() => undefined));
+    vi.mocked(api).mockClear();
     typeGap();
 
     expect(screen.queryByText('No matches.')).toBeNull();

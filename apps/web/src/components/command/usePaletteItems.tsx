@@ -6,9 +6,9 @@
  * (paletteFrecency) so frequently-used targets float to the top.
  *
  * Extracted from CommandPalette.tsx to keep the palette shell under the
- * 400-line file cap. Returns items + loading state + selectNavTarget so the
- * keyboard handler in PaletteBody can trigger direct nav without re-deriving
- * the navigate callback.
+ * 400-line file cap. Returns items, the server-read verdict, and
+ * selectNavTarget so the keyboard handler in PaletteBody can trigger direct
+ * nav without re-deriving the navigate callback.
  */
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
@@ -34,7 +34,9 @@ import type { OpportunityPage } from '@bidstack/shared';
 import {
   ACCOUNT_RESULT_LIMIT,
   CONTACT_RESULT_LIMIT,
+  PALETTE_SERVER_QUERY_MIN,
   TASK_RESULT_LIMIT,
+  paletteServerRead,
   buildNavTargets,
   finalizePaletteItems,
   findDirectNavTarget as findDirectNavTargetIn,
@@ -57,7 +59,8 @@ const WEAK_MATCH_SCORE = 1;
 
 export interface UsePaletteItemsResult {
   items: Item[];
-  isFetching: boolean;
+  /** Whether the empty sentence is allowed. See `paletteServerRead`. */
+  serverRead: 'searching' | 'failed' | 'settled';
   selectNavTarget: (target: NavTarget) => void;
   /** Bound to the current (flag-filtered) nav target list — see CommandPalette's
    *  Enter-key "jump straight to an exact route match" shortcut. */
@@ -88,7 +91,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   const debouncedQuery = useDebouncedValue(query, 200);
 
   const oppSearch = useQuery({
-    enabled: debouncedQuery.trim().length >= 2,
+    enabled: debouncedQuery.trim().length >= PALETTE_SERVER_QUERY_MIN,
     queryKey: ['palette:opps', debouncedQuery],
     queryFn: ({ signal }) =>
       api<OpportunityPage>(
@@ -386,13 +389,23 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     [navTargets],
   );
 
-  // Both server searches feed the merged items list, so loading must reflect
-  // BOTH — reporting only oppSearch here made the palette flash "No matches."
-  // whenever the opportunity search resolved empty while the global search
-  // was still in flight (false negative on the app's main discovery surface).
+  // Both server searches feed the merged list. The empty sentence waits
+  // until both have succeeded: the debounce pause and a failed read are
+  // not an empty catalog.
+  const serverRead = paletteServerRead({
+    query,
+    debouncedQuery,
+    opportunityPending: oppSearch.isPending,
+    opportunityFetching: oppSearch.isFetching,
+    opportunityError: oppSearch.isError,
+    globalPending: globalSearch.isPending,
+    globalFetching: globalSearch.isFetching,
+    globalError: globalSearch.isError,
+  });
+
   return {
     items,
-    isFetching: oppSearch.isFetching || globalSearch.isFetching,
+    serverRead,
     selectNavTarget,
     findDirectNavTarget,
   };
