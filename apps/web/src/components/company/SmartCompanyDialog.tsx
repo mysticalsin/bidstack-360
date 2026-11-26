@@ -14,6 +14,7 @@ import { springSnap, springSoft } from '@/lib/motion';
 
 import type { CompanyLookupResponse, CrmCompany } from '@bidstack/shared';
 
+import { companyLookupPhase } from './company-lookup-read';
 import { displayableLogoUrl } from './logoUrlSafety';
 import {
   initialsFor,
@@ -74,7 +75,9 @@ export function SmartCompanyDialog({ trigger }: Props) {
     staleTime: 30_000,
   });
 
-  const company = createdCompany ?? lookup.data?.company ?? null;
+  const phase = companyLookupPhase(lookup);
+  const lookupPayload = phase === 'ready' ? (lookup.data ?? null) : null;
+  const company = createdCompany ?? lookupPayload?.company ?? null;
   const confidence = Math.round((company?.confidence ?? (normalizedDomain ? 0.72 : 0.54)) * 100);
   const previewName = company?.name ?? displayName;
   const previewDomain = company?.domain ?? normalizedDomain;
@@ -163,7 +166,10 @@ export function SmartCompanyDialog({ trigger }: Props) {
     },
   });
 
-  const existing = lookup.data?.match && lookup.data.match !== 'none' && lookup.data.company;
+  const existing =
+    lookupPayload?.match && lookupPayload.match !== 'none' && lookupPayload.company
+      ? lookupPayload.company
+      : null;
   const canCreate = previewName.trim().length > 1 && !createCompany.isPending && canWrite;
 
   const handleQueryChange = (value: string) => {
@@ -235,12 +241,14 @@ export function SmartCompanyDialog({ trigger }: Props) {
                   )}
               </span>
             </div>
-            <div className="smart-confidence">
-              <span>{t('smartCompany.preview.confidence', 'Confidence')}</span>
-              <strong>
-                <AnimatedMetric value={`${confidence}%`} />
-              </strong>
-            </div>
+            {phase === 'ready' ? (
+              <div className="smart-confidence">
+                <span>{t('smartCompany.preview.confidence', 'Confidence')}</span>
+                <strong>
+                  <AnimatedMetric value={`${confidence}%`} />
+                </strong>
+              </div>
+            ) : null}
           </motion.div>
 
           <div className="smart-company-form">
@@ -285,87 +293,98 @@ export function SmartCompanyDialog({ trigger }: Props) {
             </div>
 
             <div className="smart-intel-card">
-              <div className="smart-intel-head">
-                <div>
-                  <span>
-                    {existing
-                      ? t('smartCompany.intel.existingAccount', 'Existing account')
-                      : t('smartCompany.intel.newData', 'New data')}
-                  </span>
-                  <strong>
-                    {lookup.isFetching
-                      ? t('smartCompany.intel.resolving', 'Resolving profile...')
-                      : statusLabel(lookup.data?.match)}
-                  </strong>
-                </div>
-                <motion.span
-                  className="smart-live-dot"
-                  aria-hidden
-                  animate={reducedMotion ? undefined : { scale: [1, 1.22, 1] }}
-                  transition={{ duration: 1.8, repeat: Infinity }}
-                />
-              </div>
-              <div className="smart-source-pills">
-                {sourceItems.map((source, index) => (
-                  <motion.span
-                    key={`${source}-${index}`}
-                    initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.035 }}
+              {phase === 'unread' ? (
+                <p>
+                  {t(
+                    'smartCompany.lookup.checking',
+                    'Checking the company lookup. The profile has not arrived.',
+                  )}
+                </p>
+              ) : phase === 'failed' ? (
+                <p role="alert" className="smart-error">
+                  {t('smartCompany.lookup.failed', 'Could not load the company lookup.')}
+                </p>
+              ) : (
+                <>
+                  <div className="smart-intel-head">
+                    <div>
+                      <span>
+                        {existing
+                          ? t('smartCompany.intel.existingAccount', 'Existing account')
+                          : t('smartCompany.intel.newData', 'New data')}
+                      </span>
+                      <strong>{statusLabel(lookupPayload?.match)}</strong>
+                    </div>
+                    <motion.span
+                      className="smart-live-dot"
+                      aria-hidden
+                      animate={reducedMotion ? undefined : { scale: [1, 1.22, 1] }}
+                      transition={{ duration: 1.8, repeat: Infinity }}
+                    />
+                  </div>
+                  <div className="smart-source-pills">
+                    {sourceItems.map((source, index) => (
+                      <motion.span
+                        key={`${source}-${index}`}
+                        initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.035 }}
+                      >
+                        {source}
+                      </motion.span>
+                    ))}
+                  </div>
+                  <div
+                    className="smart-autofill-map"
+                    aria-label={t('smartCompany.autofill.mapLabel', 'Autofill readiness map')}
                   >
-                    {source}
-                  </motion.span>
-                ))}
-              </div>
-              <div
-                className="smart-autofill-map"
-                aria-label={t('smartCompany.autofill.mapLabel', 'Autofill readiness map')}
-              >
-                {autofillItems.map((item, index) => (
-                  <motion.div
-                    key={item.label}
-                    initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ ...springSnap, delay: reducedMotion ? 0 : 0.05 + index * 0.035 }}
-                  >
-                    <span>
-                      <strong>{item.label}</strong>
-                      <em>{item.value}</em>
-                    </span>
-                    <i aria-hidden>
-                      <motion.b
-                        initial={{ width: reducedMotion ? `${item.progress}%` : '0%' }}
-                        animate={{ width: `${item.progress}%` }}
-                        transition={{
-                          ...springSnap,
-                          delay: reducedMotion ? 0 : 0.14 + index * 0.035,
-                        }}
-                      />
-                    </i>
-                  </motion.div>
-                ))}
-              </div>
-              {lookup.data?.alternatives.length ? (
-                <div className="smart-alternatives">
-                  {lookup.data.alternatives.slice(0, 2).map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      aria-label={t('smartCompany.alternatives.select', 'Select {{name}}', {
-                        name: item.name,
-                      })}
-                      onClick={() => {
-                        setQuery(item.name);
-                        setDomain(item.domain ?? '');
-                        setWebsite(item.website ?? '');
-                      }}
-                      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
-                    >
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+                    {autofillItems.map((item, index) => (
+                      <motion.div
+                        key={item.label}
+                        initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ ...springSnap, delay: reducedMotion ? 0 : 0.05 + index * 0.035 }}
+                      >
+                        <span>
+                          <strong>{item.label}</strong>
+                          <em>{item.value}</em>
+                        </span>
+                        <i aria-hidden>
+                          <motion.b
+                            initial={{ width: reducedMotion ? `${item.progress}%` : '0%' }}
+                            animate={{ width: `${item.progress}%` }}
+                            transition={{
+                              ...springSnap,
+                              delay: reducedMotion ? 0 : 0.14 + index * 0.035,
+                            }}
+                          />
+                        </i>
+                      </motion.div>
+                    ))}
+                  </div>
+                  {lookupPayload?.alternatives.length ? (
+                    <div className="smart-alternatives">
+                      {lookupPayload.alternatives.slice(0, 2).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          aria-label={t('smartCompany.alternatives.select', 'Select {{name}}', {
+                            name: item.name,
+                          })}
+                          onClick={() => {
+                            setQuery(item.name);
+                            setDomain(item.domain ?? '');
+                            setWebsite(item.website ?? '');
+                          }}
+                          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+                        >
+                          {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
 
             {createCompany.isError ? (
