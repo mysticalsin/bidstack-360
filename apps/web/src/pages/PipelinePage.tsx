@@ -185,6 +185,12 @@ export function PipelinePage() {
   };
 
   const visibleStages = stageFilter ? stages.filter((s) => s.id === stageFilter) : stages;
+  // A bid list that has not arrived is not an empty book. Idle and paused
+  // reads leave isLoading false and data undefined, and the page said
+  // "No opportunities yet". A failed read with no cards still says the
+  // pipeline could not load. A failed refresh keeps cards already drawn.
+  const bidsArrived = data !== undefined;
+  const cardsOnBoard = (data?.items.length ?? 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -305,7 +311,7 @@ export function PipelinePage() {
         </div>
       )}
 
-      {isError ? (
+      {isError && !cardsOnBoard ? (
         <ErrorState
           title={t('pipeline.errorTitle', 'Could not load pipeline')}
           message={
@@ -323,6 +329,10 @@ export function PipelinePage() {
             </button>
           }
         />
+      ) : !bidsArrived ? (
+        <div data-testid="pipeline-board-waiting" aria-busy="true">
+          <KanbanSkeleton />
+        </div>
       ) : isLoading || (configuredStages.isLoading && configuredStageOptions.length === 0) ? (
         <KanbanSkeleton />
       ) : (data?.items.length ?? 0) === 0 ? (
