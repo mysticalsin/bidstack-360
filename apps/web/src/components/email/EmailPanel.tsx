@@ -14,6 +14,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { DraftComposer, type DraftLink } from './DraftComposer';
+import { emailListPhase } from './email-list-read';
 import { EmailThreadView } from './EmailThreadView';
 
 const LIMIT = 25;
@@ -57,6 +58,8 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
     () => latestPerThread(list.data?.pages.flatMap((p) => p.messages) ?? []),
     [list.data],
   );
+  // A missing payload is not an empty mailbox. Empty is only a settled read.
+  const phase = emailListPhase(list);
 
   return (
     <Card data-testid="email-panel">
@@ -69,11 +72,14 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
           </Button>
         }
       />
-      {list.isLoading ? (
+      {phase === 'unread' ? (
         <div className="p-5">
+          <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+            {t('emailPanel.unread', 'Checking email. The list has not arrived.')}
+          </p>
           <LoadingSkeleton rows={3} />
         </div>
-      ) : list.isError ? (
+      ) : phase === 'failed' ? (
         <ErrorState
           title={t('emailPanel.loadError', 'Could not load email')}
           action={
