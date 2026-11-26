@@ -321,6 +321,17 @@ export function TerritoriesPage() {
               <div className="h-[420px] flex items-center justify-center">
                 <TableSkeleton rows={6} columns={4} headless />
               </div>
+            ) : analytics.data == null ? (
+              // Idle and paused reads have isLoading false and no payload yet.
+              <div className="flex h-[420px] items-center justify-center px-6">
+                <p
+                  role="status"
+                  aria-busy="true"
+                  className="max-w-sm text-center text-sm text-[var(--fg-secondary)]"
+                >
+                  {t('territories.mapChecking', 'Checking the map. It has not arrived.')}
+                </p>
+              </div>
             ) : aItems.length === 0 ? (
               <div className="h-[420px] flex items-center justify-center">
                 <EmptyState
