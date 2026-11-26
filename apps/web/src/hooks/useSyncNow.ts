@@ -65,6 +65,11 @@ export function useSyncNow(source: SyncSource, pollMs = DEFAULT_POLL_MS) {
   return {
     lastSyncedAt: overview.data?.lastSyncedAt ?? null,
     overviewLoading: overview.isLoading,
+    overview: {
+      data: overview.data,
+      isError: overview.isError,
+      status: overview.status,
+    },
     run: current ?? null,
     busy,
     startError: start.error,

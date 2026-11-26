@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { useSyncNow } from '@/hooks/useSyncNow';
 import { cn } from '@/lib/cn';
 
+import { syncStatusPhase } from './sync-status-read';
+
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const STEPS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
   ['day', 86_400_000],
@@ -21,6 +23,12 @@ function relative(iso: string): string {
   return 'just now';
 }
 
+function loadedSyncTime(data: unknown): string | null {
+  if (!data || typeof data !== 'object' || !('lastSyncedAt' in data)) return null;
+  const value = (data as { lastSyncedAt: unknown }).lastSyncedAt;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 /**
  * Reusable "Sync now" control for pull sources: the button, when the source
  * last synced, a progress row while a run is going, and the run result.
@@ -34,10 +42,16 @@ export function SyncNowControl({
   pollMs?: number;
   className?: string;
 }) {
-  const { lastSyncedAt, run, busy, startError, start } = useSyncNow(source, pollMs);
+  const { overview, run, busy, startError, start } = useSyncNow(source, pollMs);
+  const phase = syncStatusPhase(overview);
+  const visibleRun = phase === 'ready' ? run : null;
+  const lastSyncedAt = phase === 'ready' ? loadedSyncTime(overview.data) : null;
   const going = busy || run?.state === 'queued' || run?.state === 'running';
-  const showProgress = going && run !== null;
-  const result = run?.state === 'completed' || run?.state === 'failed' ? run : null;
+  const showProgress = going && visibleRun !== null;
+  const result =
+    visibleRun && (visibleRun.state === 'completed' || visibleRun.state === 'failed')
+      ? visibleRun
+      : null;
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
@@ -53,7 +67,11 @@ export function SyncNowControl({
           {going ? 'Syncing' : 'Sync now'}
         </Button>
         <span className="text-xs text-[var(--fg-tertiary)]">
-          {lastSyncedAt ? (
+          {phase === 'unread' ? (
+            'Checking the last sync. The status has not arrived.'
+          ) : phase === 'failed' ? (
+            <span role="alert">Could not load the sync status.</span>
+          ) : lastSyncedAt ? (
             <time dateTime={lastSyncedAt} title={new Date(lastSyncedAt).toLocaleString()}>
               {`Last synced ${relative(lastSyncedAt)}`}
             </time>
@@ -63,26 +81,26 @@ export function SyncNowControl({
         </span>
       </div>
 
-      {showProgress && (
+      {showProgress && visibleRun ? (
         <div className="flex items-center gap-3">
           <div
             role="progressbar"
             aria-label="Sync progress"
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={run.progress}
+            aria-valuenow={visibleRun.progress}
             className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-sunken)]"
           >
             <div
               className="h-full rounded-full bg-[var(--brand-primary)] transition-[width] duration-300 ease-out"
-              style={{ width: `${Math.max(run.progress, 4)}%` }}
+              style={{ width: `${Math.max(visibleRun.progress, 4)}%` }}
             />
           </div>
           <span className="w-10 text-right font-mono text-xs text-[var(--fg-tertiary)] tabular-nums">
-            {`${run.progress}%`}
+            {`${visibleRun.progress}%`}
           </span>
         </div>
-      )}
+      ) : null}
 
       {startError && (
         <span role="alert" className="flex items-center gap-1.5 text-xs text-[var(--fg-error)]">
