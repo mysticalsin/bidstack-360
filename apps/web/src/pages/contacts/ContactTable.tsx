@@ -118,6 +118,23 @@ export function ContactTable({
   readOnlyHint,
 }: ContactTableProps) {
   const { t } = useTranslation('crm');
+  const notArrived = t('contactTable.notArrived', 'The contacts have not arrived.');
+  // A count of zero is the book only after a payload arrives. A load and a
+  // failed read have no rows yet, so the live region must not say the buying
+  // group is empty.
+  const announcement = isLoading
+    ? t('contactTable.checking', 'Checking contacts. They have not arrived.')
+    : isError
+      ? `${t('contactTable.errorTitle', 'Could not load contacts')}. ${notArrived}`
+      : search
+        ? t(
+            'contactTable.announceFiltered',
+            'Showing {{count}} of {{total}} contacts matching {{search}}.',
+            { count: items.length, total: raw.length, search },
+          )
+        : t('contactTable.announceTotal', 'Showing {{count}} contacts.', {
+            count: items.length,
+          });
 
   return (
     <>
@@ -125,15 +142,7 @@ export function ContactTable({
           readers. Visually hidden; updates only when the count actually
           changes so SR doesn't fire on every keystroke. */}
       <p className="sr-only" role="status" aria-live="polite">
-        {search
-          ? t(
-              'contactTable.announceFiltered',
-              'Showing {{count}} of {{total}} contacts matching {{search}}.',
-              { count: items.length, total: raw.length, search },
-            )
-          : t('contactTable.announceTotal', 'Showing {{count}} contacts.', {
-              count: items.length,
-            })}
+        {announcement}
       </p>
 
       <Card className="overflow-hidden">
@@ -142,7 +151,9 @@ export function ContactTable({
         ) : isError ? (
           <ErrorState
             title={t('contactTable.errorTitle', 'Could not load contacts')}
-            message={error instanceof Error ? error.message : undefined}
+            message={
+              error instanceof Error ? `${error.message} ${notArrived}` : notArrived
+            }
             action={
               <Button size="sm" variant="secondary" onClick={() => refetch()}>
                 {t('contactTable.tryAgain', 'Try again')}
