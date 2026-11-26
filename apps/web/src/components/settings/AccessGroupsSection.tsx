@@ -31,9 +31,14 @@ import { accessGroupListCaption } from './access-group-list-caption';
  */
 export function AccessGroupsSection() {
   const { t } = useTranslation('settings');
-  const { data, isLoading, isError, refetch } = useUserGroups();
+  const { data, isLoading, isError, isPending, refetch } = useUserGroups();
+  const arrived = data != null;
   const groups = data?.items ?? [];
   const pageContinues = Boolean(data?.pageContinues);
+  // A list that has not arrived is not an empty workspace. A later failure
+  // keeps groups that already arrived.
+  const failedUnread = isError && !arrived;
+  const unread = !arrived && !failedUnread && (isPending || isLoading || data == null);
   const create = useCreateUserGroup();
   const del = useDeleteUserGroup();
 
@@ -133,31 +138,42 @@ export function AccessGroupsSection() {
         <div className="border-b border-[var(--border-subtle)] px-4 py-2">
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('accessGroups.listHeading', 'Groups')}{' '}
-            <span className="font-normal text-[var(--fg-tertiary)]">
-              {pageContinues
-                ? `(${t(
-                    'accessGroups.listCountPartial',
-                    accessGroupListCaption(groups.length, true),
-                  )})`
-                : `(${groups.length})`}
-            </span>
+            {arrived ? (
+              <span className="font-normal text-[var(--fg-tertiary)]">
+                {pageContinues
+                  ? `(${t(
+                      'accessGroups.listCountPartial',
+                      accessGroupListCaption(groups.length, true),
+                    )})`
+                  : `(${groups.length})`}
+              </span>
+            ) : null}
           </h3>
         </div>
-        {isLoading ? (
-          <div className="p-4">
-            <LoadingSkeleton rows={3} />
-          </div>
-        ) : isError ? (
+        {failedUnread ? (
           <div className="p-6">
             <ErrorState
-              title={t('accessGroups.errorTitle', 'Could not load access groups')}
-              message={t('accessGroups.errorMessage', 'Check your connection and try again.')}
+              title={t(
+                'accessGroups.listFailed',
+                'Could not load access groups. The list has not arrived.',
+              )}
+              message={t(
+                'accessGroups.listFailedMessage',
+                'This is not an empty group list. Retry before treating the workspace as unrestricted.',
+              )}
               action={
                 <Button variant="secondary" onClick={() => void refetch()}>
                   {t('accessGroups.retry', 'Retry')}
                 </Button>
               }
             />
+          </div>
+        ) : unread || isLoading ? (
+          <div className="p-4">
+            <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+              {t('accessGroups.listChecking', 'Checking access groups. The list has not arrived.')}
+            </p>
+            <LoadingSkeleton rows={3} />
           </div>
         ) : !groups || groups.length === 0 ? (
           <div className="p-6">
