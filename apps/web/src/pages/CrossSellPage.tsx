@@ -11,11 +11,13 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CrossSellStatusControls } from '@/components/account-intel/CrossSellStatusControls';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCrossSellActions, usePatchCrossSellAction } from '@/hooks/useCrossSell';
 import type { CrossSellAction, GovernanceStatus } from '@bidstack/shared';
+
+import { crossSellReadPhase } from './cross-sell-read';
 
 const STATUSES: { key: GovernanceStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -62,6 +64,10 @@ export default function CrossSellPage() {
   // selecting "Done" made Active/Overdue/Unassigned all read 0). React Query
   // dedupes this with `actions` when status === 'all'.
   const allActions = useCrossSellActions({});
+  // A missing payload is not an empty log. isLoading is false while a read
+  // is paused, so that flag alone still painted zero counts and the empty sentence.
+  const listPhase = crossSellReadPhase(actions);
+  const summaryPhase = crossSellReadPhase(allActions);
   const patch = usePatchCrossSellAction();
   const canWrite = useHasPermission('accounts:write');
   const today = new Date().toISOString().slice(0, 10);
@@ -112,6 +118,12 @@ export default function CrossSellPage() {
     );
   };
 
+  const checkingLog = (
+    <p className="py-6 text-center text-sm text-[var(--fg-secondary)]" role="status">
+      {t('crossSell.unread', 'Checking cross-sell actions. The list has not arrived.')}
+    </p>
+  );
+
   return (
     <div className="space-y-5">
       <div className="page-head">
@@ -120,6 +132,8 @@ export default function CrossSellPage() {
         </div>
       </div>
 
+      {summaryPhase === 'ready' ? (
+      <>
       <div className="grid gap-3 md:grid-cols-4">
         <Card className="px-4 py-3">
           <p className="text-xs font-medium text-[var(--fg-tertiary)]">
@@ -212,6 +226,15 @@ export default function CrossSellPage() {
           </div>
         </div>
       </Card>
+      </>
+      ) : summaryPhase === 'failed' && listPhase !== 'failed' ? (
+        <ErrorState
+          title={t('crossSell.errorTitle', 'Could not load cross-sell actions')}
+          message={allActions.error?.message ?? t('crossSell.errorMessage', 'Try again shortly.')}
+        />
+      ) : summaryPhase === 'unread' && listPhase !== 'unread' ? (
+        checkingLog
+      ) : null}
 
       <div
         className="flex flex-wrap gap-2"
@@ -235,13 +258,13 @@ export default function CrossSellPage() {
         ))}
       </div>
 
-      {actions.isLoading ? (
-        <LoadingSkeleton rows={6} />
-      ) : actions.isError ? (
+      {listPhase === 'failed' ? (
         <ErrorState
           title={t('crossSell.errorTitle', 'Could not load cross-sell actions')}
           message={actions.error?.message ?? t('crossSell.errorMessage', 'Try again shortly.')}
         />
+      ) : listPhase === 'unread' ? (
+        checkingLog
       ) : items.length === 0 ? (
         status !== 'all' ? (
           <EmptyState
