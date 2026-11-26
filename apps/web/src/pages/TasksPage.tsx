@@ -4,6 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
+import {
+  taskSliceRead,
+  taskSliceReadKey,
+  taskSliceReadMessage,
+  type TaskSlice,
+} from '@/components/task/task-slice-read';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
@@ -67,7 +73,7 @@ export function TasksPage() {
   const serverStatus =
     filter === 'all' || filter === 'overdue' || filter === 'today' ? undefined : filter;
   const pager = useCursorPagination(filter);
-  const { data, isLoading, isError, error } = useTasks({
+  const { data, isLoading, isPending, isError, error } = useTasks({
     ...(serverStatus ? { status: serverStatus } : {}),
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
@@ -141,6 +147,20 @@ export function TasksPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredItems, sort, ordinalOf]);
 
+  // Recent is the default order. A missing payload is not an empty book, and
+  // a count of zero is not honest until that payload arrives.
+  const slice: TaskSlice = sort === 'natural' ? 'recent' : 'list';
+  const read = taskSliceRead({
+    isError,
+    isPending: Boolean(isPending) || isLoading || data == null,
+    count: data ? items.length : null,
+  });
+  const readMessage =
+    read.phase === 'unread' || read.phase === 'failed'
+      ? t(taskSliceReadKey(slice, read.phase), taskSliceReadMessage(slice, read.phase))
+      : null;
+  const awaitingPayload = readMessage !== null;
+
   const moveTask = useCallback(
     (fromIndex: number, toIndex: number) => {
       if (toIndex < 0 || toIndex >= items.length) return;
@@ -194,16 +214,20 @@ export function TasksPage() {
             {t('tasks.title', 'Tasks')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('tasks.subtitle', '{{count}} active follow-ups.', {
-              count: data?.items.length ?? 0,
-            })}
+            {readMessage ??
+              t('tasks.subtitle', '{{count}} active follow-ups.', {
+                count: data?.items.length ?? 0,
+              })}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
             size="sm"
+            disabled={awaitingPayload}
+            title={awaitingPayload ? (readMessage ?? undefined) : undefined}
             onClick={() => {
+              if (awaitingPayload) return;
               const rows = items.map((t) => ({
                 title: t.title,
                 status: t.status,
@@ -302,13 +326,29 @@ export function TasksPage() {
 
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!isLoading
-          ? `${t('tasks.srCount', '{{count}} task', { count: items.length })}${filter !== 'all' ? ` · ${filter.replace('_', ' ')}` : ''}`
-          : ''}
+        {readMessage ??
+          `${t('tasks.srCount', '{{count}} task', { count: items.length })}${filter !== 'all' ? ` · ${filter.replace('_', ' ')}` : ''}`}
       </p>
 
-      {view === 'calendar' ? (
+      {view === 'calendar' && !awaitingPayload ? (
         <TaskCalendar tasks={data?.items ?? []} />
+      ) : view === 'calendar' ? (
+        <Card>
+          {read.phase === 'failed' ? (
+            <ErrorState
+              title={t('tasks.error.title', 'Could not load tasks')}
+              message={
+                error instanceof Error
+                  ? error.message
+                  : t('tasks.error.generic', 'Something went wrong')
+              }
+            />
+          ) : isLoading ? (
+            <LoadingSkeleton />
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]">{readMessage}</p>
+          )}
+        </Card>
       ) : (
         <>
           <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -322,7 +362,7 @@ export function TasksPage() {
               isFilterPending && 'opacity-70',
             )}
           >
-            {isError ? (
+            {read.phase === 'failed' ? (
               <ErrorState
                 title={t('tasks.error.title', 'Could not load tasks')}
                 message={
@@ -331,8 +371,14 @@ export function TasksPage() {
                     : t('tasks.error.generic', 'Something went wrong')
                 }
               />
-            ) : isLoading ? (
-              <LoadingSkeleton />
+            ) : read.phase === 'unread' ? (
+              isLoading ? (
+                <LoadingSkeleton />
+              ) : (
+                <p className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]">
+                  {readMessage}
+                </p>
+              )
             ) : items.length === 0 ? (
               <EmptyState
                 icon={filter === 'all' ? 'tasks' : 'search'}

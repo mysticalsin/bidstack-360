@@ -138,6 +138,24 @@ describe('TasksPage recent read honesty', () => {
     expect(screen.queryByText('0 task')).toBeNull();
   });
 
+  it('does not count zero while Recent is still loading', () => {
+    // The first paint is isLoading. That used the same zero caption as an empty book.
+    mockTasks({
+      data: undefined,
+      isLoading: true,
+      isPending: true,
+      isError: false,
+      error: null,
+    });
+
+    renderAt('/tasks');
+
+    expect(screen.getAllByText('Checking recent follow-ups.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Nothing on the bid clock')).toBeNull();
+    expect(screen.queryByText('0 active follow-ups.')).toBeNull();
+    expect(screen.queryByText('0 task')).toBeNull();
+  });
+
   it('keeps an arrived empty Recent book at zero', () => {
     mockTasks({
       data: { items: [], nextCursor: null },
