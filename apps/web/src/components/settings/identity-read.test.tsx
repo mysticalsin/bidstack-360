@@ -132,6 +132,7 @@ describe('IdentitySection read honesty', () => {
 
     expect(screen.getByText(EMPTY_ALLOWLIST)).toBeTruthy();
     expect(screen.getByText('Ada Example')).toBeTruthy();
+    expect(screen.getByText(/Dev stub/)).toBeTruthy();
     expect(screen.queryByText('Checking the allowlist. It has not arrived.')).toBeNull();
   });
 
@@ -174,7 +175,7 @@ describe('IdentitySection read honesty', () => {
 
     render(<IdentitySection />);
 
-    expect(screen.queryByText(/Jane Smith/)).toBeNull();
+    expect(screen.queryByText(/Dev stub/)).toBeNull();
     expect(screen.queryByText('Demo')).toBeNull();
     expect(screen.queryByText(EMPTY_ALLOWLIST)).toBeNull();
     expect(screen.getByText('Could not load the auth provider. It has not arrived.')).toBeTruthy();
