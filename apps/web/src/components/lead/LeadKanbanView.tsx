@@ -22,6 +22,11 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 
 import { LeadPriorityBadge, LeadStatusBadge } from '@/components/lead/LeadStatusBadge';
+import {
+  recoveryMenuFailedMessage,
+  recoveryMenuPhase,
+  recoveryMenuUnreadMessage,
+} from '@/components/lead/recovery-menu-read';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { cn } from '@/lib/cn';
@@ -277,15 +282,23 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
   const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const [plays, setPlays] = useState<RecoveryPlay[]>([]);
+  const [request, setRequest] = useState<'idle' | 'pending' | 'failed' | 'settled'>('idle');
   const suggest = useRecoverySuggest();
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const onOpen = async () => {
     setOpen(true);
-    if (plays.length === 0) {
+    if (plays.length > 0) return;
+    // A suggest that has not arrived is not an empty play list. The menu
+    // used to say "No suggestions." for both the wait and a rejection.
+    setRequest('pending');
+    try {
       const res = await suggest.mutateAsync(leadId);
       setPlays(res.plays);
+      setRequest('settled');
+    } catch {
+      setRequest('failed');
     }
   };
 
@@ -311,6 +324,8 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
       document.removeEventListener('pointerdown', onPointer);
     };
   }, [open, plays.length]);
+
+  const menuPhase = recoveryMenuPhase({ request, playCount: plays.length });
 
   return (
     <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
@@ -340,11 +355,15 @@ function RotBadge({ leadId, daysOver }: { leadId: string; daysOver: number }) {
           <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
             {t('leadKanban.recoveryHeading', 'Suggested recovery')}
           </div>
-          {suggest.isPending ? (
-            <p className="px-2 py-1 text-xs text-[var(--fg-secondary)]">
-              {t('leadKanban.recoveryLoading', 'Thinking…')}
+          {menuPhase === 'unread' ? (
+            <p className="px-2 py-1 text-xs text-[var(--fg-secondary)]" role="status">
+              {t('leadKanban.recoveryChecking', recoveryMenuUnreadMessage())}
             </p>
-          ) : plays.length === 0 ? (
+          ) : menuPhase === 'failed' ? (
+            <p className="px-2 py-1 text-xs text-[var(--danger)]" role="alert">
+              {t('leadKanban.recoveryFailed', recoveryMenuFailedMessage())}
+            </p>
+          ) : menuPhase === 'empty' ? (
             <p className="px-2 py-1 text-xs text-[var(--fg-secondary)]">
               {t('leadKanban.recoveryEmpty', 'No suggestions.')}
             </p>
