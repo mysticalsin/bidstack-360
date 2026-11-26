@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { computeSlots, type AvailabilityRule, type BlockingEvent } from './availability.js';
+import { bookingDayWindow, computeSlots, type AvailabilityRule, type BlockingEvent } from './availability.js';
 
 // Fixed "now" for deterministic notice tests: 2024-01-15 10:00 UTC
 const FIXED_NOW = new Date('2024-01-15T10:00:00Z');
@@ -223,12 +223,14 @@ function zonedDay(iso: string, tz: string): string {
 
 describe('one booking calendar day', () => {
   // WHY: the seeded discovery page offers 09:00–17:00 every day. The public
-  // window is noon UTC through 23:59 UTC of the requested date. In Paris that
-  // end is already 00:59 the next morning, so Thursday's page also offers
-  // Friday 09:00. A guest books the wrong day.
+  // window used to run from noon UTC through 23:59 UTC. In Paris that end is
+  // already 00:59 the next morning, so Thursday's page also offered Friday
+  // 09:00. The window is the guest's calendar day. Clipping at 23:59 UTC
+  // would hide a late Honolulu slot, which is still Thursday there.
   it('does not offer the next morning when the guest is ahead of UTC', () => {
     const date = '2026-11-26';
     const tz = 'Europe/Paris';
+    const { rangeStart, rangeEnd } = bookingDayWindow(date, tz);
     const rules: AvailabilityRule[] = [4, 5].map((dayOfWeek) => ({
       dayOfWeek,
       startTime: '09:00',
@@ -237,14 +239,52 @@ describe('one booking calendar day', () => {
     const slots = computeSlots({
       rules,
       existingEvents: [],
-      rangeStart: new Date(`${date}T12:00:00.000Z`),
-      rangeEnd: new Date(`${date}T23:59:59.000Z`),
+      rangeStart,
+      rangeEnd,
       durationMinutes: 30,
       tz,
       minNoticeHours: 0,
     });
 
-    expect(slots.length).toBeGreaterThan(0);
+    expect(slots).toEqual(['2026-11-26T08:00:00.000Z', '2026-11-26T08:30:00.000Z']);
     expect(slots.every((slot) => zonedDay(slot, tz) === date)).toBe(true);
+  });
+
+  it('keeps a late Honolulu slot on the requested Thursday', () => {
+    const date = '2026-11-26';
+    const tz = 'Pacific/Honolulu';
+    const { rangeStart, rangeEnd } = bookingDayWindow(date, tz);
+    const slots = computeSlots({
+      rules: [{ dayOfWeek: 4, startTime: '16:00', endTime: '17:00' }],
+      existingEvents: [],
+      rangeStart,
+      rangeEnd,
+      durationMinutes: 30,
+      tz,
+      minNoticeHours: 0,
+    });
+
+    expect(slots).toEqual(['2026-11-27T02:00:00.000Z', '2026-11-27T02:30:00.000Z']);
+    expect(slots.every((slot) => zonedDay(slot, tz) === date)).toBe(true);
+  });
+
+  // WHY: 1 Nov 2026 is the Toronto fall-back Sunday, 25 hours long. Walking
+  // the day with +24h still lands before local midnight, so 09:00 was listed
+  // twice. A discovery page that offers Sunday would show the same time twice.
+  it('lists a Toronto fall-back Sunday once', () => {
+    const date = '2026-11-01';
+    const tz = 'America/Toronto';
+    const { rangeStart, rangeEnd } = bookingDayWindow(date, tz);
+    const slots = computeSlots({
+      rules: [{ dayOfWeek: 0, startTime: '09:00', endTime: '10:00' }],
+      existingEvents: [],
+      rangeStart,
+      rangeEnd,
+      durationMinutes: 30,
+      tz,
+      minNoticeHours: 0,
+    });
+
+    expect(slots).toEqual(['2026-11-01T14:00:00.000Z', '2026-11-01T14:30:00.000Z']);
   });
 });

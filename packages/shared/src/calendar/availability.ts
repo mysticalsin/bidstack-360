@@ -72,10 +72,11 @@ export function computeSlots(opts: SlotComputeOptions): Slot[] {
 
   const results: Slot[] = [];
 
-  const dayMs = 24 * 60 * 60 * 1000;
+  // One local calendar day, not 24 hours. A 25-hour fall-back day walked
+  // with +24h still has an hour left, so the same Sunday was listed twice.
   let cursor = startOfDayInTz(rangeStart, tz);
 
-  while (cursor <= rangeEnd) {
+  while (cursor.getTime() <= rangeEnd.getTime()) {
     const dow = getDayOfWeekInTz(cursor, tz);
     const rulesForDay = rules.filter((r) => r.dayOfWeek === dow);
 
@@ -110,10 +111,36 @@ export function computeSlots(opts: SlotComputeOptions): Slot[] {
       }
     }
 
-    cursor = new Date(cursor.getTime() + dayMs);
+    const parts = getZonedDateTimeParts(cursor, tz);
+    const next = zonedTimeToUtc(parts.year, parts.month, parts.day + 1, 0, 0, 0, tz);
+    if (next.getTime() <= cursor.getTime()) break;
+    cursor = next;
   }
 
   return results;
+}
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Local midnight through the instant before the next local midnight.
+ *
+ * The booking route used to pass noon UTC through 23:59 UTC. In a zone
+ * ahead of UTC, 23:59 UTC is already the next morning, so that morning
+ * was offered on the previous day's page.
+ */
+export function bookingDayWindow(date: string, tz: string): { rangeStart: Date; rangeEnd: Date } {
+  const match = DATE_ONLY.exec(date);
+  if (!match) {
+    const invalid = new Date(Number.NaN);
+    return { rangeStart: invalid, rangeEnd: invalid };
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const rangeStart = zonedTimeToUtc(year, month, day, 0, 0, 0, tz);
+  const nextStart = zonedTimeToUtc(year, month, day + 1, 0, 0, 0, tz);
+  return { rangeStart, rangeEnd: new Date(nextStart.getTime() - 1) };
 }
 
 function collidesWithEvents(
