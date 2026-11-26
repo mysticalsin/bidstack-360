@@ -36,6 +36,7 @@ import {
   type CallStatus,
   type CallSession,
 } from '@/hooks/useCalls';
+import { callsListPhase } from './calls-list-read';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { BadgeTone } from '@/components/ui/Badge';
@@ -273,11 +274,12 @@ export default function CallsPage() {
     [t],
   );
 
-  const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useCalls({
-      entityType: entityType || undefined,
-      provider: provider || undefined,
-    });
+  const list = useCalls({
+    entityType: entityType || undefined,
+    provider: provider || undefined,
+  });
+  const phase = callsListPhase(list);
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = list;
 
   // Flatten all pages
   const allCalls = useMemo(
@@ -299,12 +301,25 @@ export default function CallsPage() {
     setSelectedId(call.id);
   };
 
-  if (isLoading) return <LoadingSkeleton rows={8} />;
-  if (isError) {
+  if (phase === 'unread') {
+    return (
+      <div className="flex flex-col gap-5 p-6">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('calls.unread', 'Checking calls. The list has not arrived.')}
+        </p>
+        <LoadingSkeleton rows={8} />
+      </div>
+    );
+  }
+  if (phase === 'failed') {
     return (
       <ErrorState
         title={t('calls.error.title', 'Failed to load calls')}
-        message={error instanceof Error ? error.message : t('calls.error.fallback', 'Something went wrong')}
+        message={
+          list.error instanceof Error
+            ? list.error.message
+            : t('calls.error.fallback', 'Something went wrong')
+        }
       />
     );
   }
