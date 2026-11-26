@@ -21,6 +21,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useSerumStatus } from '@/hooks/useSerumStatus';
 import { cn } from '@/lib/cn';
+import { serumStatusPhase } from './serum-status-read';
 
 const CARD_ICONS: Record<string, IconName> = {
   enabled: 'sparkle',
@@ -47,20 +48,24 @@ export function SerumMissionControlPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const snapshot = status.data;
+  const phase = serumStatusPhase(status);
   const selectedModule = useMemo<SerumModuleStatus | null>(() => {
     if (!snapshot) return null;
     return snapshot.modules.find((module) => module.id === selectedId) ?? snapshot.modules[0] ?? null;
   }, [selectedId, snapshot]);
 
-  if (status.isLoading) {
+  if (phase === 'unread') {
     return (
       <div className="space-y-6">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('serum.statusUnread', 'Checking SERUM. The status has not arrived.')}
+        </p>
         <LoadingSkeleton rows={8} />
       </div>
     );
   }
 
-  if (status.isError || !snapshot) {
+  if (phase === 'failed' || !snapshot) {
     return <SerumErrorState error={status.error} onRetry={() => void status.refetch()} />;
   }
 
