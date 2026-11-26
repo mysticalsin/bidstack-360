@@ -83,6 +83,36 @@ describe('AccountTeamCard', () => {
     render(<AccountTeamCard companyId={COMPANY} />);
     expect(screen.getByText('No one on the team yet')).toBeTruthy();
   });
+
+  it('does not call an unread team an empty team', () => {
+    // WHY: the team query can be pending while isLoading is still false
+    // (first paint, paused, or not fetched yet). "No one on the team yet"
+    // is only true after a settled payload with no owner and no members.
+    vi.mocked(useAccountTeam).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      isPending: true,
+    } as never);
+    render(<AccountTeamCard companyId={COMPANY} />);
+    expect(screen.queryByText('No one on the team yet')).toBeNull();
+    expect(document.querySelector('[aria-busy="true"]')).toBeTruthy();
+  });
+
+  it('does not call a failed team read an empty team', () => {
+    // WHY: a failed read is unknown, not a team of zero. Sellers must not
+    // add members against a list that only looks empty because the load failed.
+    vi.mocked(useAccountTeam).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      isPending: false,
+      error: new Error('team down'),
+    } as never);
+    render(<AccountTeamCard companyId={COMPANY} />);
+    expect(screen.queryByText('No one on the team yet')).toBeNull();
+    expect(screen.getByText('The account team could not be loaded.')).toBeTruthy();
+  });
 });
 
 describe('allocation warning', () => {
