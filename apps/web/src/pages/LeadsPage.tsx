@@ -24,6 +24,11 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { LeadStatus, LeadPriority } from '@bidstack/shared';
 import { LeadRow } from './leadsPage/LeadRow';
+import {
+  leadsListFailedMessage,
+  leadsListRead,
+  leadsListUnreadMessage,
+} from './leadsPage/leads-list-read';
 
 const STATUS_OPTIONS: { value: LeadStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
@@ -59,7 +64,7 @@ export function LeadsPage() {
   const hasLeadFilters = Boolean(deferredSearch.trim() || statusFilter || priorityFilter);
   const [searchParams, setSearchParams] = useSearchParams();
   const pager = useCursorPagination(`${deferredSearch}|${statusFilter}|${priorityFilter}`);
-  const { data, isLoading, isError, error, refetch } = useLeads({
+  const { data, isLoading, isPending, isError, error, refetch } = useLeads({
     search: deferredSearch.trim() || undefined,
     status: statusFilter || undefined,
     priority: priorityFilter || undefined,
@@ -144,6 +149,20 @@ export function LeadsPage() {
   // stats) take a mutable array. `sorted` is memoized so this keeps a stable
   // identity — we never mutate it.
   const items = sorted as LeadItem[];
+  // A missing payload is not an empty funnel, and Pipeline-ready 0 is not
+  // honest until that payload arrives. Pending wins over a caller-supplied [].
+  const read = leadsListRead({
+    isError,
+    isPending: Boolean(isPending) || isLoading || data == null,
+    items: data ? data.items : null,
+  });
+  const leadsNotArrived = t('leads.read.notArrived', 'The leads have not arrived.');
+  const leadsChecking = t('leads.read.checking', leadsListUnreadMessage());
+  const leadsFailed =
+    error instanceof Error && error.message
+      ? `${error.message} ${leadsNotArrived}`
+      : t('leads.read.failed', leadsListFailedMessage());
+  const summaryReady = read.phase === 'empty' || read.phase === 'ready';
   const bulk = useBulkSelection(items);
   const leadStats = useMemo(() => {
     const total = items.length;
@@ -347,7 +366,7 @@ export function LeadsPage() {
         </div>
       </Card>
 
-      {!isLoading && !isError ? (
+      {summaryReady ? (
         <section
           className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
           aria-label={t('leads.summary.label', 'Lead list summary')}
@@ -366,7 +385,7 @@ export function LeadsPage() {
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!isLoading && !isError
+        {summaryReady
           ? `${t('leads.liveRegion.count', '{{count}} lead', { count: items.length })}${
               deferredSearch
                 ? t('leads.liveRegion.matching', ' matching "{{query}}"', { query: deferredSearch })
@@ -383,14 +402,21 @@ export function LeadsPage() {
         isDeleting={del.isPending}
       />
 
-      {isError ? (
+      {read.phase === 'failed' ? (
         <ErrorState
           title={t('leads.error.title', 'Failed to load leads')}
-          message={error?.message ?? t('leads.error.message', 'Something went wrong')}
+          message={leadsFailed}
           action={<Button onClick={() => refetch()}>{t('leads.error.retry', 'Retry')}</Button>}
         />
-      ) : isLoading ? (
+      ) : read.phase === 'unread' && isLoading ? (
         <TableSkeleton rows={8} />
+      ) : read.phase === 'unread' ? (
+        <p
+          className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]"
+          role="status"
+        >
+          {leadsChecking}
+        </p>
       ) : items.length === 0 ? (
         <EmptyState
           icon={hasLeadFilters ? 'search' : 'zap'}
