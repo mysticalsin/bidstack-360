@@ -33,8 +33,12 @@ export function buildIntegrationSummary(
     Boolean(guide?.webhooks.subscriptionsUrl),
   ];
   const attentionEvents = events.filter((event) => event.status === 'error').length;
+  // Undefined is an unread or failed read. It is not a settled "off" contract
+  // and it is not a Dust status with no sync timestamp.
+  const guideArrived = guide !== undefined;
   const needsSetup =
-    !guide || !guide.mcp.configured || !guide.dust.configured || !guide.dust.dataSourceConfigured;
+    guideArrived &&
+    (!guide.mcp.configured || !guide.dust.configured || !guide.dust.dataSourceConfigured);
 
   return {
     readyPaths: pathStates.filter(Boolean).length,
@@ -43,9 +47,26 @@ export function buildIntegrationSummary(
     webhookEvents: events.length,
     attentionEvents,
     activeMcpTools: MCP_TOOLS.filter((tool) => tool.group === 'crm').length,
-    latestSyncLabel: dust?.lastSyncAt ? relativeTime(dust.lastSyncAt) : 'Not synced',
-    postureLabel: needsSetup ? 'Needs setup' : attentionEvents > 0 ? 'Review events' : 'Ready',
-    postureTone: needsSetup ? 'amber' : attentionEvents > 0 ? 'tomato' : 'jade',
+    latestSyncLabel:
+      dust === undefined
+        ? 'Sync time has not arrived'
+        : dust.lastSyncAt
+          ? relativeTime(dust.lastSyncAt)
+          : 'Not synced',
+    postureLabel: !guideArrived
+      ? 'Setup contract has not arrived'
+      : needsSetup
+        ? 'Needs setup'
+        : attentionEvents > 0
+          ? 'Review events'
+          : 'Ready',
+    postureTone: !guideArrived
+      ? 'gray'
+      : needsSetup
+        ? 'amber'
+        : attentionEvents > 0
+          ? 'tomato'
+          : 'jade',
   };
 }
 
