@@ -1,6 +1,6 @@
-// FieldPicker — combobox showing fields available for a given entity type.
-// Field metadata is fetched from /api/entities/:type/fields.
-// Falls back to a hard-coded schema when the endpoint is unavailable.
+// FieldPicker: combobox of fields for one entity type.
+// The catalog comes from /api/entities/:type/fields.
+// An unread or failed read does not substitute a hard-coded schema.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -11,58 +11,14 @@ import { cn } from '@/lib/cn';
 import { api } from '@/lib/api';
 import type { ReportEntityType } from '@/hooks/useAnalyticsReports';
 
+import { fieldListPhase } from './field-list-read';
+
 interface FieldDef {
   key: string;
   label: string;
   type: 'string' | 'number' | 'date' | 'boolean' | 'enum';
   enumValues?: string[];
 }
-
-// Hard-coded fallback schema per entity — keeps UI functional without the endpoint.
-const FALLBACK_FIELDS: Record<ReportEntityType, FieldDef[]> = {
-  lead: [
-    { key: 'status', label: 'Status', type: 'enum', enumValues: ['new', 'contacted', 'qualified', 'disqualified', 'converted'] },
-    { key: 'source', label: 'Source', type: 'string' },
-    { key: 'score', label: 'Score', type: 'number' },
-    { key: 'createdAt', label: 'Created', type: 'date' },
-  ],
-  opportunity: [
-    { key: 'stage', label: 'Stage', type: 'string' },
-    { key: 'valueMicros', label: 'Value', type: 'number' },
-    { key: 'probability', label: 'Probability', type: 'number' },
-    { key: 'dueDate', label: 'Due date', type: 'date' },
-    { key: 'customer', label: 'Customer', type: 'string' },
-  ],
-  contact: [
-    { key: 'name', label: 'Name', type: 'string' },
-    { key: 'email', label: 'Email', type: 'string' },
-    { key: 'role', label: 'Role', type: 'string' },
-    { key: 'createdAt', label: 'Created', type: 'date' },
-  ],
-  company: [
-    { key: 'name', label: 'Name', type: 'string' },
-    { key: 'industry', label: 'Industry', type: 'string' },
-    { key: 'size', label: 'Size', type: 'string' },
-    { key: 'createdAt', label: 'Created', type: 'date' },
-  ],
-  task: [
-    { key: 'status', label: 'Status', type: 'enum', enumValues: ['todo', 'in_progress', 'done', 'cancelled'] },
-    { key: 'priority', label: 'Priority', type: 'enum', enumValues: ['low', 'medium', 'high', 'urgent'] },
-    { key: 'dueDate', label: 'Due date', type: 'date' },
-    { key: 'createdAt', label: 'Created', type: 'date' },
-  ],
-  activity: [
-    { key: 'type', label: 'Type', type: 'string' },
-    { key: 'occurredAt', label: 'Date', type: 'date' },
-    { key: 'actorType', label: 'Actor type', type: 'string' },
-  ],
-  goal: [
-    { key: 'metric', label: 'Metric', type: 'string' },
-    { key: 'status', label: 'Status', type: 'string' },
-    { key: 'period', label: 'Period', type: 'string' },
-    { key: 'endDate', label: 'End date', type: 'date' },
-  ],
-};
 
 interface Props {
   entity: ReportEntityType;
@@ -85,21 +41,23 @@ export function FieldPicker({ entity, value, onChange, onResolve, placeholder, c
 
   const resolvedPlaceholder = placeholder ?? t('fieldPicker.placeholder', 'Pick a field…');
 
-  const { data: remoteFields } = useQuery<FieldDef[]>({
+  const fieldQuery = useQuery<FieldDef[]>({
     queryKey: ['entity-fields', entity],
     queryFn: () => api<FieldDef[]>(`/api/entities/${entity}/fields`),
     staleTime: Infinity,
-    // Don't throw on error — fall back to local
     retry: false,
   });
+  const phase = fieldListPhase({
+    data: fieldQuery.data,
+    isError: fieldQuery.isError,
+    status: fieldQuery.status,
+  });
 
-  // WHY useMemo on `fields`: the `remoteFields ?? FALLBACK ?? []` expression
-  // creates a fresh `[]` literal on every render when both sides are null,
-  // which busts the downstream `useMemo([fields, query])` deps and re-runs
-  // the filter every render. Memoizing on the explicit inputs prevents that.
+  // WHY useMemo on `fields`: an unread or failed read must not keep a new
+  // empty array identity on every render. That would bust the filter memo.
   const fields = useMemo(
-    () => remoteFields ?? FALLBACK_FIELDS[entity] ?? [],
-    [remoteFields, entity],
+    () => (phase === 'ready' ? fieldQuery.data ?? [] : []),
+    [phase, fieldQuery.data],
   );
 
   const filtered = useMemo(
@@ -114,6 +72,25 @@ export function FieldPicker({ entity, value, onChange, onResolve, placeholder, c
   useEffect(() => {
     if (selectedField) onResolve?.(selectedField);
   }, [selectedField, onResolve]);
+
+  const statusClass = cn(
+    'flex min-h-11 items-center px-3 text-sm text-[var(--fg-secondary)]',
+    className,
+  );
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className={statusClass}>
+        {t('fieldPicker.loadError', 'Could not load fields.')}
+      </p>
+    );
+  }
+  if (phase === 'unread') {
+    return (
+      <p role="status" className={statusClass}>
+        {t('fieldPicker.checking', 'Checking fields. The list has not arrived.')}
+      </p>
+    );
+  }
 
   return (
     <div className={cn('relative', className)}>
