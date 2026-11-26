@@ -204,4 +204,19 @@ describe('PipelinePage report read', () => {
     expect(kpiValue('Open value')).toMatch(/400/);
     expect(screen.queryByText('Could not load')).toBeNull();
   });
+
+  it('keeps a loaded report when a later read fails', () => {
+    // WHY: a refresh that fails does not erase totals already on screen.
+    // The last report stays. "Could not load" is for a read that never arrived.
+    renderBoard({
+      data: LOADED_REPORT,
+      isLoading: false,
+      isPending: false,
+      isError: true,
+    });
+
+    expect(kpiValue('Win rate')).toBe('50%');
+    expect(kpiValue('Active deals')).toBe('4');
+    expect(screen.queryByText('Could not load')).toBeNull();
+  });
 });

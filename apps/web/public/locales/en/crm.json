@@ -1221,6 +1221,7 @@
     "kpiOpenValue": "Open value",
     "kpiWinRate": "Win rate",
     "winRateNoClosedBids": "No closed bids",
+    "kpiReportFailed": "Could not load",
     "kpiActiveDeals": "Active deals",
     "errorTitle": "Could not load pipeline",
     "errorMessage": "Please try again.",

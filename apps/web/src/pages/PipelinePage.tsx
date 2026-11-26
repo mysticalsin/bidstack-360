@@ -266,26 +266,36 @@ export function PipelinePage() {
               closedTotal > 0
                 ? `${Math.round((closedWon / closedTotal) * 100)}%`
                 : t('pipeline.winRateNoClosedBids', 'No closed bids');
-            const loading = isLoading || report.isLoading;
+            // The row stays up while the board loads. A report that has not
+            // arrived is not a zero book, and a failed report with no payload
+            // is not "No closed bids". A later failure keeps the report already
+            // on screen. Only a loaded report may print 0.
+            const reportMissing = report.data == null;
+            const reportFailed = report.isError && reportMissing;
+            const reportUnread =
+              !reportFailed && (report.isPending || report.isLoading || reportMissing);
+            const loading = isLoading || reportUnread;
+            const failedLabel = t('pipeline.kpiReportFailed', 'Could not load');
+            const figure = (value: string) => (loading ? '…' : reportFailed ? failedLabel : value);
             return [
               {
                 label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
-                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
+                value: figure(formatMoney(totalValue, 'EUR')),
                 tone: 'blue' as const,
               },
               {
                 label: t('pipeline.kpiOpenValue', 'Open value'),
-                value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
+                value: figure(formatMoney(rep?.totalValueOpen ?? 0, 'EUR')),
                 tone: 'jade' as const,
               },
               {
                 label: t('pipeline.kpiWinRate', 'Win rate'),
-                value: loading ? '…' : winRate,
+                value: figure(winRate),
                 tone: 'amber' as const,
               },
               {
                 label: t('pipeline.kpiActiveDeals', 'Active deals'),
-                value: loading ? '…' : String(rep?.totalOpen ?? 0),
+                value: figure(String(rep?.totalOpen ?? 0)),
                 tone: 'purple' as const,
               },
             ];
