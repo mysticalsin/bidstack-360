@@ -79,17 +79,27 @@ type ComplianceResult = {
 function mockCompliance(value: {
   data?: ComplianceResult;
   isLoading?: boolean;
+  isFetching?: boolean;
+  isPaused?: boolean;
+  fetchStatus?: 'fetching' | 'paused' | 'idle';
+  status?: 'pending' | 'error' | 'success';
   isError?: boolean;
   error?: Error | null;
 }) {
+  const isLoading = value.isLoading ?? false;
+  const isError = value.isError ?? false;
   vi.mocked(useRfpCompliance).mockReturnValue({
     data: value.data,
-    isLoading: value.isLoading ?? false,
-    isError: value.isError ?? false,
+    isLoading,
+    isFetching: value.isFetching ?? isLoading,
+    isPaused: value.isPaused ?? false,
+    fetchStatus: value.fetchStatus ?? (isLoading ? 'fetching' : 'idle'),
+    isError,
     error: value.error ?? null,
-    isPending: value.isLoading ?? false,
-    isSuccess: !!value.data,
-    status: value.isLoading ? 'pending' : value.isError ? 'error' : 'success',
+    isPending: value.status === 'pending' || isLoading,
+    isSuccess: value.status === 'success' || (!!value.data && !isError && !isLoading),
+    status:
+      value.status ?? (isLoading ? 'pending' : isError ? 'error' : value.data ? 'success' : 'pending'),
   } as ReturnType<typeof useRfpCompliance>);
 }
 
@@ -199,15 +209,90 @@ describe('ComplianceMatrix — fetch states', () => {
     expect(screen.getByRole('alert')).toBeDefined();
   });
 
-  it('shows the empty state for an empty matrix and for no data at all', () => {
+  it('shows the empty state for a settled matrix with no rows', () => {
     mockCompliance({ data: result([]) });
     renderMatrix();
     expect(screen.getByTestId('empty-state')).toBeDefined();
-    cleanup();
+    expect(screen.queryByTestId('loading-skeleton')).toBeNull();
+  });
+});
 
-    mockCompliance({ data: undefined });
+describe('ComplianceMatrix — unsettled read', () => {
+  function expectNotAnEmptyBook() {
+    expect(screen.queryByTestId('empty-state')).toBeNull();
+    expect(screen.queryByText('compliance.emptyTitle')).toBeNull();
+    expect(screen.queryByText('compliance.emptyMessage')).toBeNull();
+    expect(screen.queryByText(/0 \/ 0 compliant/)).toBeNull();
+    expect(screen.getByTestId('loading-skeleton')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+  }
+
+  it('does not call an unread compliance read an empty matrix', () => {
+    // WHY: the matrix mounts before the workspace read lands. The query is
+    // idle, isLoading is false, and there is no payload. "No compliance data
+    // yet" is only true after a settled list with zero rows. A demo bid that
+    // has not been read is not an empty compliance book.
+    mockCompliance({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isPaused: false,
+      fetchStatus: 'idle',
+      status: 'pending',
+    });
     renderMatrix();
-    expect(screen.getByTestId('empty-state')).toBeDefined();
+    expectNotAnEmptyBook();
+  });
+
+  it('does not call a paused compliance read an empty matrix', () => {
+    // WHY: a paused read also reports isLoading false and no payload. The
+    // empty sentence would tell a reviewer the fill produced nothing.
+    mockCompliance({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isPaused: true,
+      fetchStatus: 'paused',
+      status: 'pending',
+    });
+    renderMatrix();
+    expectNotAnEmptyBook();
+  });
+
+  it('does not call an in-flight compliance read an empty matrix', () => {
+    // WHY: a fetch can be in flight while isLoading is still false. The
+    // empty sentence has to wait until the payload arrives.
+    mockCompliance({
+      data: undefined,
+      isLoading: false,
+      isFetching: true,
+      isPaused: false,
+      fetchStatus: 'fetching',
+      status: 'pending',
+    });
+    renderMatrix();
+    expectNotAnEmptyBook();
+  });
+
+  it('keeps a failed compliance read on the error line', () => {
+    // WHY: a failed read is unknown, not a matrix of zero rows.
+    mockCompliance({ isError: true, error: new Error('Network failure'), data: undefined });
+    renderMatrix();
+    expect(screen.getByRole('alert').textContent).toBe('Network failure');
+    expect(screen.queryByTestId('empty-state')).toBeNull();
+    expect(screen.queryByTestId('loading-skeleton')).toBeNull();
+  });
+
+  it('keeps a loaded demo requirement on the matrix', () => {
+    // WHY: a settled payload still shows the synthetic requirement. The hold
+    // is only for a read that has not arrived.
+    mockCompliance({
+      data: result([makeRow({ requirement: 'Must provide SOC 2 Type II evidence' })]),
+    });
+    renderMatrix();
+    expect(screen.getByText('Must provide SOC 2 Type II evidence')).toBeTruthy();
+    expect(screen.queryByTestId('empty-state')).toBeNull();
+    expect(screen.queryByTestId('loading-skeleton')).toBeNull();
   });
 });
 
