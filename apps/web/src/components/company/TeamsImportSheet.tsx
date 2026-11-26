@@ -28,6 +28,8 @@ import {
   useTeamsTeams,
 } from '@/hooks/useTeamsImport';
 
+import { teamsAccessPhase } from './teams-access-read';
+
 const FOCUS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1';
 
@@ -543,10 +545,14 @@ export function TeamsImportSheet({
   const [picked, setPicked] = useState<Picked | null>(null);
   const [query, setQuery] = useState('');
 
-  const state = access.data?.state;
+  const phase = teamsAccessPhase({
+    data: access.data,
+    isError: access.isError,
+    status: access.status,
+  });
+  const record = phase === 'ready' ? access.data : undefined;
   let body: ReactNode;
-  if (access.isLoading) body = <LoadingSkeleton rows={4} />;
-  else if (access.isError || !access.data) {
+  if (phase === 'failed') {
     body = (
       <div role="alert" className="flex items-center justify-between gap-3 text-sm">
         <span className="text-[var(--fg-secondary)]">Teams access did not load.</span>
@@ -555,7 +561,15 @@ export function TeamsImportSheet({
         </Button>
       </div>
     );
-  } else if (state !== 'ready') body = <ConsentPrompt kind={state ?? 'not_connected'} />;
+  } else if (phase === 'unread') {
+    body = (
+      <p className="text-sm text-[var(--fg-secondary)]">
+        Checking Teams access. The status has not arrived.
+      </p>
+    );
+  } else if (record == null) {
+    body = <p className="text-sm text-[var(--fg-secondary)]">No Teams access record in this read.</p>;
+  } else if (record.state !== 'ready') body = <ConsentPrompt kind={record.state} />;
   else if (picked) {
     body = (
       <MessagesStep
@@ -592,7 +606,7 @@ export function TeamsImportSheet({
             <ChatsTab query={query} onPick={pick} />
           </TabsContent>
           <TabsContent value="channels" className="pt-3">
-            <ChannelsTab enabled={access.data.channels === 'ready'} query={query} onPick={pick} />
+            <ChannelsTab enabled={record.channels === 'ready'} query={query} onPick={pick} />
           </TabsContent>
         </Tabs>
       </>
@@ -606,7 +620,7 @@ export function TeamsImportSheet({
         title="Import from Teams"
         description={`Pick messages to file to ${companyName}. Polo only reads your chats.`}
         headerActions={
-          access.data?.accountEmail ? (
+          phase === 'ready' && access.data?.accountEmail ? (
             <span className="hidden max-w-[12rem] truncate text-xs text-[var(--fg-tertiary)] sm:inline" title={access.data.accountEmail}>
               {access.data.accountEmail}
             </span>
