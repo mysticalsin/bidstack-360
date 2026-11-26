@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
+import { taskRecordPhase } from '@/components/task/task-record-read';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatDate } from '@/lib/format';
 
@@ -26,10 +27,31 @@ export function TaskDetailPage() {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('');
 
-  const task = tasks.data?.items.find((t) => t.id === id);
-
-  if (tasks.isLoading) return <LoadingSkeleton rows={6} />;
-  if (tasks.isError)
+  const task = tasks.data?.items.find((item) => item.id === id);
+  const phase = taskRecordPhase({
+    hasTask: task != null,
+    hasPayload: tasks.data != null,
+    isError: tasks.isError,
+    isLoading: tasks.isLoading,
+    isPending: tasks.isPending,
+    fetchStatus: tasks.fetchStatus,
+    status: tasks.status,
+  });
+  // A pause reports isLoading false, so the old order fell through to
+  // "Task not found" before any list had arrived.
+  if (phase === 'unread') {
+    const checking = t('taskDetail.checkingTitle', 'Checking this follow-up');
+    const waiting = t('taskDetail.checkingMessage', 'The follow-up has not arrived.');
+    return (
+      <div className="space-y-4">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {checking}. {waiting}
+        </p>
+        <LoadingSkeleton rows={6} />
+      </div>
+    );
+  }
+  if (phase === 'failed')
     return (
       <ErrorState
         title={t('taskDetail.errorTitle', 'Failed to load task')}
@@ -40,7 +62,7 @@ export function TaskDetailPage() {
         }
       />
     );
-  if (!task)
+  if (phase === 'missing' || !task)
     return (
       <EmptyState
         title={t('taskDetail.notFoundTitle', 'Task not found')}
