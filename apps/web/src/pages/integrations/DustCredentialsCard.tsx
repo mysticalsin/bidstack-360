@@ -35,7 +35,10 @@ export function DustCredentialsCard() {
   const [error, setError] = useState<string | null>(null);
 
   const data = creds.data;
-  const isOrg = data?.source === 'org';
+  // An unread record is not an unconfigured workspace. Connect stays hidden
+  // until a saved record says there is no org key.
+  const record = !creds.isPending && !creds.isError ? data : undefined;
+  const isOrg = record?.source === 'org';
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -106,7 +109,7 @@ export function DustCredentialsCard() {
           'Connect your Dust workspace once — crew agents, RFP drafting, compliance and document intelligence all use it automatically.',
         )}
         action={
-          isAdmin ? (
+          isAdmin && record ? (
             <div className="flex items-center gap-2">
               {isOrg ? (
                 <Button
@@ -207,19 +210,25 @@ export function DustCredentialsCard() {
       />
 
       <div className="p-5">
-        {creds.isLoading ? (
-          <div className="bs-shimmer h-16 w-full rounded-lg" />
-        ) : creds.isError ? (
+        {creds.isPending ? (
+          <>
+            <p role="status">{t('dustCredentials.checking', 'Checking Dust credentials.')}</p>
+            <div className="bs-shimmer mt-3 h-16 w-full rounded-lg" />
+          </>
+        ) : creds.isError || !data ? (
           <ErrorState
             title={t('dustCredentials.loadErrorTitle', 'Could not load Dust credentials')}
-            message={t('dustCredentials.loadErrorMessage', 'Please try again.')}
+            message={t(
+              'dustCredentials.unreadMessage',
+              'The saved credentials have not arrived.',
+            )}
             action={
               <Button size="sm" variant="secondary" onClick={() => void creds.refetch()}>
                 {t('dustCredentials.retryButton', 'Retry')}
               </Button>
             }
           />
-        ) : data?.configured ? (
+        ) : data.configured ? (
           <ConfiguredView data={data} t={t} />
         ) : (
           <EmptyState
