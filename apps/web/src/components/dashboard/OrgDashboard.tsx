@@ -16,6 +16,7 @@ import { useForecastProjection } from '@/hooks/useForecasts';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 import { useWatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { springSoft } from '@/lib/motion';
+import { opportunityRowsRead, weightedPipelineRead } from './home-kpi-read';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { fmtCompact } from '@/components/viz/viz-data';
@@ -46,6 +47,18 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const projection = useForecastProjection();
   const feed = useWatchdogFeed(30);
   const oppRows = useMemo(() => opps.data?.items ?? [], [opps.data?.items]);
+  const bidRead = opportunityRowsRead({
+    isError: opps.isError,
+    isLoading: opps.isLoading,
+    isFetched: opps.isFetched,
+    data: opps.data,
+  });
+  const weightedRead = weightedPipelineRead({
+    isError: pipelineReport.isError,
+    isLoading: pipelineReport.isLoading,
+    isFetched: pipelineReport.isFetched,
+    data: pipelineReport.data,
+  });
   // Progressive disclosure (Tony 15:21): five visuals up top, every number,
   // stage, status and account opens this one drill-down sheet.
   const [drill, setDrill] = useState<OppDrillFilter | null>(null);
@@ -247,13 +260,20 @@ export const OrgDashboard = memo(function OrgDashboard() {
       <div className="dash-v" aria-label={t('orgDashboard.cockpitAriaLabel', 'Workspace cockpit')} role="region">
         <div className="viz-grid-3">
           <DashboardHero
-            rows={oppRows}
+            rows={bidRead.state === 'ready' ? bidRead.rows : []}
             openValue={pipelineReport.data?.totalValueOpen ?? s?.pipelineValue ?? 0}
-            weighted={pipelineReport.data?.weightedPipeline ?? 0}
+            weighted={weightedRead.state === 'ready' ? weightedRead.weighted : 0}
             openCount={s?.openOpportunities ?? 0}
             feed={feed.data}
             onDrill={setDrill}
-            rowsPending={opps.isLoading}
+            rowsPending={bidRead.state === 'pending'}
+            rowsFailed={bidRead.state === 'failed'}
+            weightedPending={weightedRead.state === 'pending'}
+            weightedFailed={weightedRead.state === 'failed'}
+            onRetry={() => {
+              void opps.refetch();
+              void pipelineReport.refetch();
+            }}
             feedPending={feed.isLoading}
           />
           <NeedsYou
