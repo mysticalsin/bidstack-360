@@ -56,18 +56,22 @@ describe('Predictive scoring model list', () => {
   // empty training history and telling the demo admin to train the first model.
   it('does not call a failed model read an empty training history', () => {
     idleRetrain();
+    const refetch = vi.fn();
     hookMocks.usePredictiveModels.mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: true,
-      refetch: vi.fn(),
+      refetch,
     });
 
     render(<PredictiveAdminPage />);
 
     expect(screen.queryAllByText(/models trained yet/)).toHaveLength(0);
     expect(screen.getAllByText('Could not load scoring models.')).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(2);
+    const retries = screen.getAllByRole('button', { name: 'Retry' });
+    expect(retries).toHaveLength(2);
+    retries[0]?.click();
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it('keeps a loaded empty history empty', () => {

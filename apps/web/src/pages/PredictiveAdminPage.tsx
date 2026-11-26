@@ -54,7 +54,7 @@ function MetricPill({ label, value }: { label: string; value: number }) {
 
 function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
   const { t } = useTranslation('crm');
-  const { data, isLoading } = usePredictiveModels(filter);
+  const { data, isLoading, isError, refetch } = usePredictiveModels(filter);
   const models = data?.items ?? [];
 
   if (isLoading) {
@@ -75,6 +75,29 @@ function ModelTable({ filter }: { filter: 'lead' | 'opportunity' }) {
             <span className="bs-shimmer h-4 w-20" />
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="py-4" role="alert">
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('predictiveAdmin.modelTableLoadError', 'Could not load scoring models.')}
+        </p>
+        <button
+          type="button"
+          className={[
+            'mt-3 inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium',
+            'min-h-[44px] min-w-[44px]',
+            'border border-[var(--border-default)] text-[var(--fg-primary)]',
+            'hover:bg-[var(--surface-hover)]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-1',
+          ].join(' ')}
+          onClick={() => void refetch()}
+        >
+          {t('predictiveAdmin.modelTableRetry', 'Retry')}
+        </button>
       </div>
     );
   }
