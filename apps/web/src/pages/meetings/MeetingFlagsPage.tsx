@@ -8,10 +8,11 @@ import { useParams } from 'react-router-dom';
 
 import { FlagCard } from '@/components/meetings/FlagCard';
 import { Button } from '@/components/ui/Button';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { useDismissFlag, useMeetingFlags } from '@/hooks/useMeetingIntel';
 
 import { shownMeetingFlags } from './meeting-flag-caption';
+import { meetingFlagsReadPhase } from './meeting-flags-read';
 import { MeetingsTabs } from './MeetingsTabs';
 
 type Status = 'open' | 'dismissed';
@@ -21,6 +22,8 @@ export default function MeetingFlagsPage() {
   const [status, setStatus] = useState<Status>('open');
   const flags = useMeetingFlags(flagId ? 'all' : status);
   const dismiss = useDismissFlag();
+  // A missing payload is not an empty list. Empty is only a settled read.
+  const phase = meetingFlagsReadPhase(flags);
   const page = shownMeetingFlags(flags.data?.items ?? [], flags.data?.flagsContinue);
   const items = page.items.filter((f) => (flagId ? true : f.status === status));
   const ordered = flagId ? [...items].sort((a, b) => Number(b.id === flagId) - Number(a.id === flagId)) : items;
@@ -45,7 +48,9 @@ export default function MeetingFlagsPage() {
           ))}
         </div>
       ) : null}
-      {flags.isLoading ? <LoadingSkeleton rows={3} /> : flags.isError ? (
+      {phase === 'unread' ? (
+        <p className="mi-empty" role="status">Checking flags. The list has not arrived.</p>
+      ) : phase === 'failed' ? (
         <ErrorState title="Couldn't load flags" action={<Button variant="secondary" onClick={() => void flags.refetch()}>Retry</Button>} />
       ) : ordered.length === 0 ? (
         <p className="mi-empty">{status === 'open' ? 'No open flags. When a colleague meets someone at a sister account, it shows up here.' : 'Nothing dismissed.'}</p>
