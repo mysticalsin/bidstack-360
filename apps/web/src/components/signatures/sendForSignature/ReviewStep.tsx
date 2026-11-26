@@ -1,9 +1,11 @@
 // Step 3: preview document, compose message, review recipients, and send.
 import { useTranslation } from 'react-i18next';
 import { useDocumentTemplate } from '@/hooks/useDocumentTemplates';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { DocumentPreviewIframe } from '../DocumentPreviewIframe';
 import { cn } from '@/lib/cn';
 import { type Recipient, FieldLabel, inputClass } from './signatureModalShared';
+import { documentTemplatePreviewPhase } from './document-template-preview-read';
 
 interface Props {
   templateId: string;
@@ -27,7 +29,16 @@ export function ReviewStep({
   isSending,
 }: Props) {
   const { t } = useTranslation('signatures');
-  const { data: template } = useDocumentTemplate(templateId);
+  const templateQuery = useDocumentTemplate(templateId);
+  // A missing payload is not an empty preview. Empty is only a settled read.
+  const phase = documentTemplatePreviewPhase({
+    templateId,
+    data: templateQuery.data,
+    isError: templateQuery.isError,
+    status: templateQuery.status,
+  });
+  const template = templateQuery.data;
+  const previewPending = phase === 'unread' || phase === 'failed';
 
   // Substitute variables into template body for the live preview.
   const previewHtml = template
@@ -40,14 +51,41 @@ export function ReviewStep({
   return (
     <div className="flex flex-col gap-4">
       {/* Document preview */}
-      {previewHtml && (
+      {phase === 'failed' ? (
+        <ErrorState
+          title={t('reviewStep.loadErrorTitle', 'Could not load the document template')}
+          message={
+            (templateQuery.error as Error | undefined)?.message ??
+            t('reviewStep.tryAgain', 'Please try again.')
+          }
+        />
+      ) : phase === 'unread' ? (
+        <>
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t(
+              'reviewStep.unread',
+              'Checking the document template. The preview has not arrived.',
+            )}
+          </p>
+          <div
+            className="h-10 animate-pulse rounded-lg bg-[var(--surface-sunken)]"
+            aria-hidden
+          />
+        </>
+      ) : phase === 'ready' && previewHtml ? (
         <DocumentPreviewIframe
           src={previewHtml}
           srcdoc
           title={template?.name ?? t('reviewStep.previewTitle', 'Document preview')}
           height={300}
         />
-      )}
+      ) : phase === 'ready' ? (
+        <DocumentPreviewIframe
+          src={null}
+          title={template?.name ?? t('reviewStep.previewTitle', 'Document preview')}
+          height={300}
+        />
+      ) : null}
 
       {/* Optional message to recipients */}
       <div>
@@ -101,8 +139,8 @@ export function ReviewStep({
         <button
           type="button"
           onClick={onSend}
-          disabled={isSending}
-          aria-busy={isSending}
+          disabled={isSending || previewPending}
+          aria-busy={isSending || previewPending}
           className={cn(
             'min-h-[44px] rounded-lg bg-brand px-4 text-sm font-medium text-fg-on-brand',
             'hover:bg-brand-hover transition-colors',
