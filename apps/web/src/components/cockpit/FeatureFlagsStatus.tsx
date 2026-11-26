@@ -1,12 +1,33 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
+import { featureFlagsPhase } from '@/hooks/feature-flags-read';
+import { useFeatureFlagQuery } from '@/hooks/useFeatureFlags';
 
-// Buggy stand-in: useFeatureFlags turns a missing payload into every flag
-// false, so this treats that as off and renders nothing.
 export function FeatureFlagsStatus({ children }: { children?: ReactNode }) {
-  const flags = useFeatureFlags();
-  const anyOn = Object.values(flags).some((value) => value === true);
-  if (!anyOn) return null;
+  const { t } = useTranslation('crm');
+  const query = useFeatureFlagQuery();
+  const phase = featureFlagsPhase({
+    data: query.data,
+    isError: query.isError,
+    status: query.status,
+  });
+
+  if (phase === 'failed') {
+    return (
+      <p role="alert">
+        {t('featureFlags.loadError', 'Could not load feature flags.')}
+      </p>
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p role="status">
+        {t('featureFlags.checking', 'Checking feature flags. The read has not arrived.')}
+      </p>
+    );
+  }
+
   return <>{children}</>;
 }

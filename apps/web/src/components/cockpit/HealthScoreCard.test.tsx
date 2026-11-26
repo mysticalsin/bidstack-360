@@ -1,10 +1,30 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import type { AccountCockpitMaybeScored, CrmCompany } from '@bidstack/shared';
+
+const SETTLED_OFF = vi.hoisted(() => ({
+  winLossDataAvailable: false,
+  showRevenueBlock: false,
+  infosearchEnabled: false,
+  lms360Enabled: false,
+  serumEnabled: false,
+  serumDemoModeEnabled: false,
+  msaLlmExtractEnabled: false,
+}));
+
+vi.mock('@/hooks/useFeatureFlags', () => ({
+  useFeatureFlags: () => SETTLED_OFF,
+  useFeatureFlagQuery: () => ({
+    data: SETTLED_OFF,
+    isError: false,
+    isLoading: false,
+    status: 'success',
+  }),
+}));
 
 import { HealthScoreCard } from './HealthScoreCard';
 import { PageHead } from './PageHead';
