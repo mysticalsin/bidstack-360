@@ -16,31 +16,47 @@ import type { DustStatus } from './types';
 
 export function DustAgentsCard({ data, isLoading }: { data?: DustStatus; isLoading: boolean }) {
   const { t } = useTranslation('integrations');
+  const caption = isLoading
+    ? t('dustAgents.captionChecking', 'Checking Dust agents')
+    : data
+      ? t(
+          'dustAgents.caption',
+          'Workspace agents available for account data verification workflows',
+        )
+      : t('dustAgents.captionNotLoaded', 'Dust agents are not loaded');
+  const badge = isLoading ? (
+    <Badge tone="gray">{t('dustAgents.statusChecking', 'checking')}</Badge>
+  ) : !data ? (
+    <Badge tone="amber">{t('dustAgents.statusNotLoaded', 'not loaded')}</Badge>
+  ) : data.agentsError ? (
+    <Badge tone="tomato">{t('dustAgents.statusDegraded', 'degraded')}</Badge>
+  ) : data.configured ? (
+    <Badge tone="jade">{t('dustAgents.statusConfigured', 'configured')}</Badge>
+  ) : (
+    <Badge tone="amber">{t('dustAgents.statusDisabled', 'disabled')}</Badge>
+  );
+
   return (
     <Card>
       <SectionHeader
         title={t('dustAgents.title', 'Dust agents')}
-        caption={t(
-          'dustAgents.caption',
-          'Workspace agents available for account data verification workflows',
-        )}
-        action={
-          data?.agentsError ? (
-            <Badge tone="tomato">{t('dustAgents.statusDegraded', 'degraded')}</Badge>
-          ) : data?.configured ? (
-            <Badge tone="jade">{t('dustAgents.statusConfigured', 'configured')}</Badge>
-          ) : (
-            <Badge tone="amber">{t('dustAgents.statusDisabled', 'disabled')}</Badge>
-          )
-        }
+        caption={caption}
+        action={badge}
       />
       {isLoading ? (
         <div className="p-5">
           <LoadingSkeleton rows={3} />
         </div>
-      ) : !data?.configured ? (
+      ) : !data ? (
+        <div className="px-5 py-6 text-sm text-[var(--fg-secondary)]" role="alert">
+          {t('dustAgents.notLoaded', 'Could not load Dust agents')}
+        </div>
+      ) : !data.configured ? (
         <div className="px-5 py-6 text-sm text-[var(--fg-secondary)]">
-          {t('dustAgents.notConfigured', 'Add Dust credentials to list available workspace agents.')}
+          {t(
+            'dustAgents.notConfigured',
+            'Add Dust credentials to list available workspace agents.',
+          )}
         </div>
       ) : data.agentsError ? (
         <div className="mx-5 my-5 rounded-md bg-[var(--danger-tint)] px-3 py-2 text-xs text-[var(--danger)]">

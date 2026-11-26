@@ -12,8 +12,7 @@ vi.mock('react-i18next', () => ({
 import { DustAgentsCard } from './DustAgentsCard';
 
 const CREDENTIALS = 'Add Dust credentials to list available workspace agents.';
-const AVAILABLE =
-  'Workspace agents available for account data verification workflows';
+const AVAILABLE = 'Workspace agents available for account data verification workflows';
 
 function status(overrides: Partial<DustStatus> = {}): DustStatus {
   return {
