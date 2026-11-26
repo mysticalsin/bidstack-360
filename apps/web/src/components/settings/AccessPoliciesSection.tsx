@@ -9,7 +9,7 @@ import { ImpactPreview } from '@/components/access-policies/ImpactPreview';
 import { PolicyBuilder } from '@/components/access-policies/PolicyBuilder';
 import { Button } from '@/components/ui/Button';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { Panel, Shell } from '@/components/vendor/tuffui/surface';
 import { StatusPill } from '@/components/vendor/tuffui/status-pill';
@@ -21,7 +21,7 @@ import {
   type AccessPolicyList,
   type AccessPolicySimulation,
 } from '@/hooks/useAccessPolicies';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
 import { useRoles } from '@/hooks/useRoles';
 import { useUserGroups } from '@/hooks/useUserGroups';
 
@@ -45,11 +45,12 @@ function errorMessage(err: unknown): string {
 
 export function AccessPoliciesSection() {
   const { t } = useTranslation('settings');
+  const caps = useCapabilities();
   const canRead = useHasPermission('access-policies:read');
   const canWrite = useHasPermission('access-policies:write');
   const canApprove = useHasPermission('access-policies:approve');
   const list = useAccessPolicies();
-  const roles = useRoles({ enabled: canWrite });
+  const roles = useRoles({ enabled: Boolean(caps.data) && canWrite });
   const groups = useUserGroups();
   const save = useSaveAccessPolicy();
   const transition = useAccessPolicyTransition();
@@ -59,6 +60,23 @@ export function AccessPoliciesSection() {
   const [simulation, setSimulation] = useState<AccessPolicySimulation | null>(null);
   const [announcement, setAnnouncement] = useState('');
 
+  // A missing manifest is not a denial. useHasPermission is false until the
+  // payload arrives, including a paused read and a failed read.
+  if (!caps.data) {
+    return (
+      <p role={caps.isError ? 'alert' : 'status'} className="text-sm text-fg-secondary">
+        {caps.isError
+          ? t(
+              'accessPolicies.permissionError',
+              'Could not load access. The permission has not arrived.',
+            )
+          : t(
+              'accessPolicies.permissionPending',
+              'Checking access. The permission has not arrived.',
+            )}
+      </p>
+    );
+  }
   if (!canRead) {
     return (
       <p className="text-sm text-fg-secondary">
@@ -66,13 +84,21 @@ export function AccessPoliciesSection() {
       </p>
     );
   }
-  if (list.isLoading) return <LoadingSkeleton />;
-  if (list.isError || !list.data) {
+  // A list that has not arrived is not a failed load. A later failure keeps
+  // the payload already on screen.
+  if (!list.data) {
+    if (list.isError) {
+      return (
+        <ErrorState
+          title={t('accessPolicies.loadErrorTitle', 'Access policies did not load')}
+          message={t('accessPolicies.loadError', 'Reload the page to try again.')}
+        />
+      );
+    }
     return (
-      <ErrorState
-        title={t('accessPolicies.loadErrorTitle', 'Access policies did not load')}
-        message={t('accessPolicies.loadError', 'Reload the page to try again.')}
-      />
+      <p role="status" className="text-sm text-fg-secondary">
+        {t('accessPolicies.listPending', 'Checking access policies. They have not arrived.')}
+      </p>
     );
   }
 
@@ -193,13 +219,21 @@ export function AccessPoliciesSection() {
                 </Button>
               )}
             </div>
-            <PolicyBuilder
-              rules={draft.rules}
-              onChange={(rules) => change({ rules })}
-              options={options}
-              readOnly={!canWrite}
-            />
-            {canWrite && (
+            {canWrite && !roles.data ? (
+              <p role={roles.isError ? 'alert' : 'status'} className="text-sm text-fg-secondary">
+                {roles.isError
+                  ? t('accessPolicies.rolesError', 'Could not load roles. They have not arrived.')
+                  : t('accessPolicies.rolesPending', 'Checking roles. They have not arrived.')}
+              </p>
+            ) : (
+              <PolicyBuilder
+                rules={draft.rules}
+                onChange={(rules) => change({ rules })}
+                options={options}
+                readOnly={!canWrite}
+              />
+            )}
+            {canWrite && roles.data && (
               <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
                 <Button variant="secondary" size="sm" disabled={!valid || busy} onClick={() => void persist()}>
                   {t('accessPolicies.saveDraft', 'Save draft')}
