@@ -54,14 +54,22 @@ export function MessageLog({ filters }: { filters: WebhookDeliveryFilters }) {
   const statusLabel = useStatusLabel();
 
   const items = list.data?.items ?? [];
+  // A read that has not arrived is not an empty log. A paused read has no
+  // payload and isLoading is false, so the empty sentence would say these
+  // filters already matched nothing. An in-flight read is the same unread
+  // log. A failed read with no payload keeps the error. A later failure
+  // keeps rows already on screen. A payload that arrived empty still says
+  // no messages match.
+  const logHold: 'unread' | 'failed' | 'ready' =
+    list.data == null ? (list.isError ? 'failed' : 'unread') : 'ready';
 
   return (
     <div className="space-y-3">
-      {list.isLoading ? (
-        <p className="text-sm text-[var(--fg-secondary)]">
-          {t('webhooks.log.loading', 'Loading messages…')}
+      {logHold === 'unread' ? (
+        <p role="status" aria-busy="true" className="text-sm text-[var(--fg-secondary)]">
+          {t('webhooks.log.checking', 'Checking the message log. It has not arrived.')}
         </p>
-      ) : list.isError ? (
+      ) : logHold === 'failed' ? (
         <p role="alert" className="text-sm text-[var(--error-fg)]">
           {t('webhooks.log.error', 'Could not load the message log. Refresh to try again.')}
         </p>
