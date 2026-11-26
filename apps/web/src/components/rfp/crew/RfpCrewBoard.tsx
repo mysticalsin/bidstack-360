@@ -112,6 +112,16 @@ export function RfpCrewBoard() {
   // setState-in-effect and an in-progress drag is never clobbered by a refetch.
   const [overrides, setOverrides] = useState<Record<string, CrewStation>>({});
 
+  // A workspace read that has not arrived is not the default roster, and a
+  // failed read with no payload is not an empty lane. A later failure keeps
+  // the map already on screen. No workspace id means the query never starts,
+  // so the local roster stays.
+  const layoutMissing = layoutQuery.data == null;
+  const serverLayout = Boolean(bidWorkspaceId);
+  const layoutFailed = serverLayout && layoutMissing && layoutQuery.isError;
+  const layoutUnread = serverLayout && layoutMissing && !layoutQuery.isError;
+  const layoutErrorText =
+    layoutQuery.error instanceof Error ? layoutQuery.error.message : null;
   const savedLayout = useMemo(
     () => (layoutQuery.data?.layout ?? {}) as Record<string, CrewStation>,
     [layoutQuery.data],
@@ -192,43 +202,63 @@ export function RfpCrewBoard() {
         </div>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-        {/* Oversight row — the master supervisor + executive sponsor. */}
-        <OversightRow
-          members={oversight}
-          finished={finished}
-          onSelect={(m) => setSelectedKey(m.key)}
-          selectedKey={selectedKey}
-        />
-
-        {/* Stage lanes — the bid flows left → right; agents light up at their stage. */}
-        <div
-          className="grid gap-3 overflow-x-auto pb-1"
-          style={{ gridTemplateColumns: `repeat(${CREW_STAGES.length}, minmax(190px, 1fr))` }}
+      {layoutUnread ? (
+        <p
+          role="status"
+          aria-busy="true"
+          className="rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-center text-xs text-[var(--fg-tertiary)]"
         >
-          {CREW_STAGES.map((s, i) => (
-            <Lane key={s} stage={s} label={t(`pipeline.stages.${s}`)} isActive={activeIdx === i}>
-              {(byStage.get(s) ?? []).map((m) => (
-                <RfpCrewCard
-                  key={m.key}
-                  member={m}
-                  status={memberStatus(stations[m.key] ?? m.station, activeIdx, finished)}
-                  selected={selectedKey === m.key}
-                  onSelect={(mm) => setSelectedKey(mm.key)}
-                  onMove={moveByKeyboard}
-                />
-              ))}
-              {(byStage.get(s) ?? []).length === 0 && (
-                <p className="rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-center text-[11px] text-[var(--fg-tertiary)]">
-                  {t('crew.dropHere')}
-                </p>
-              )}
-            </Lane>
-          ))}
+          {t('crew.layoutChecking', 'Checking the crew layout. It has not arrived.')}
+        </p>
+      ) : layoutFailed ? (
+        <div
+          role="alert"
+          className="space-y-1 rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-center text-xs text-[var(--fg-secondary)]"
+        >
+          <p>{t('crew.layoutFailed', 'The crew layout has not arrived.')}</p>
+          {layoutErrorText ? <p className="text-[var(--fg-tertiary)]">{layoutErrorText}</p> : null}
         </div>
-      </DndContext>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+          {/* Oversight row — the master supervisor + executive sponsor. */}
+          <OversightRow
+            members={oversight}
+            finished={finished}
+            onSelect={(m) => setSelectedKey(m.key)}
+            selectedKey={selectedKey}
+          />
 
-      {selected && <CrewMemberBrief member={selected} onClose={() => setSelectedKey(null)} />}
+          {/* Stage lanes — the bid flows left → right; agents light up at their stage. */}
+          <div
+            className="grid gap-3 overflow-x-auto pb-1"
+            style={{ gridTemplateColumns: `repeat(${CREW_STAGES.length}, minmax(190px, 1fr))` }}
+          >
+            {CREW_STAGES.map((s, i) => (
+              <Lane key={s} stage={s} label={t(`pipeline.stages.${s}`)} isActive={activeIdx === i}>
+                {(byStage.get(s) ?? []).map((m) => (
+                  <RfpCrewCard
+                    key={m.key}
+                    member={m}
+                    status={memberStatus(stations[m.key] ?? m.station, activeIdx, finished)}
+                    selected={selectedKey === m.key}
+                    onSelect={(mm) => setSelectedKey(mm.key)}
+                    onMove={moveByKeyboard}
+                  />
+                ))}
+                {(byStage.get(s) ?? []).length === 0 && (
+                  <p className="rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-center text-[11px] text-[var(--fg-tertiary)]">
+                    {t('crew.dropHere')}
+                  </p>
+                )}
+              </Lane>
+            ))}
+          </div>
+        </DndContext>
+      )}
+
+      {selected && !layoutUnread && !layoutFailed ? (
+        <CrewMemberBrief member={selected} onClose={() => setSelectedKey(null)} />
+      ) : null}
     </Card>
   );
 }
