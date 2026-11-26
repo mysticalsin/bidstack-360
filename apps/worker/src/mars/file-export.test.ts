@@ -86,4 +86,59 @@ describe('fileExportMarsSource', () => {
     expect(again.items).toEqual([]);
     expect(store.downloads).toEqual(['f2']);
   });
+
+  it('does not mark a zero-byte export as an empty snapshot', async () => {
+    // WHY: a listed file with no bytes has not arrived. Returning no rows and
+    // moving the cursor tells the sync the export was read and was empty, so
+    // the next poll skips the file.
+    const when = new Date('2026-10-30T06:00:00Z');
+    const store = mockExportStore([{ name: 'mars-unread.csv', modifiedAt: when, content: '' }]);
+    const src = fileExportMarsSource(store, DEFAULT_MARS_COLUMN_MAP);
+    await expect(
+      src.listEntries({ cursor: null, updatedSince: null, limit: 10, accountKeys: ['Northwind Energy'] }),
+    ).rejects.toThrow(/mars-unread\.csv was not read/);
+    expect(store.downloads).toEqual([]);
+  });
+
+  it('does not mark a blank CSV as an empty snapshot', async () => {
+    // WHY: a BOM or whitespace file is not a header row. The parser still
+    // invents a sheet, and an empty item list plus a new cursor reads as a
+    // finished export with no meetings.
+    const store = mockExportStore([
+      { name: 'mars-blank.csv', modifiedAt: new Date('2026-10-30T06:00:00Z'), content: '\uFEFF\n  ' },
+    ]);
+    const src = fileExportMarsSource(store, DEFAULT_MARS_COLUMN_MAP);
+    await expect(
+      src.listEntries({ cursor: null, updatedSince: null, limit: 10, accountKeys: ['Northwind Energy'] }),
+    ).rejects.toThrow(/mars-blank\.csv was not read/);
+  });
+
+  it('does not mark a non-workbook download as an empty snapshot', async () => {
+    // WHY: bytes that are not an xlsx zip are not a meeting export. Reading
+    // them as zero rows and advancing the cursor says the export completed empty.
+    const store = mockExportStore([
+      { name: 'mars-broken.xlsx', modifiedAt: new Date('2026-10-30T06:00:00Z'), content: 'this is not a workbook' },
+    ]);
+    const src = fileExportMarsSource(store, DEFAULT_MARS_COLUMN_MAP);
+    await expect(
+      src.listEntries({ cursor: null, updatedSince: null, limit: 10, accountKeys: ['Northwind Energy'] }),
+    ).rejects.toThrow(/mars-broken\.xlsx was not read/);
+  });
+
+  it('keeps a header-only CSV as an empty snapshot that was read', async () => {
+    // WHY: a header row arrived. No meeting rows is a real empty export, and
+    // the cursor may move past that file.
+    const when = new Date('2026-10-30T06:00:00Z');
+    const header = 'Account,Contact Name,Contact Email,Contact Title,Company,Meeting Date,Internal Attendee,Notes\n';
+    const store = mockExportStore([{ name: 'mars-empty.csv', modifiedAt: when, content: header }]);
+    const page = await fileExportMarsSource(store, DEFAULT_MARS_COLUMN_MAP).listEntries({
+      cursor: null,
+      updatedSince: null,
+      limit: 10,
+      accountKeys: ['Northwind Energy'],
+    });
+    expect(page.items).toEqual([]);
+    expect(page.nextCursor).toBe(encodeFileCursor({ name: 'mars-empty.csv', modifiedAt: when }));
+    expect(store.downloads).toEqual(['f1']);
+  });
 });
