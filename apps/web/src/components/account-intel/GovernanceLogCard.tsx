@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { SourceBadge } from '@/components/cockpit/SourceBadge';
 import { useIsAdmin } from '@/lib/auth';
@@ -109,6 +109,9 @@ export function GovernanceLogCard({ accountKey }: { accountKey: string }) {
   const meetings = useGovernanceMeetings(accountKey);
   const canWrite = useIsAdmin();
   const { t } = useTranslation('crm');
+  const page = meetings.data;
+  // No payload yet is not an empty log. isLoading is false while a read is
+  // paused, so that flag alone still painted the settled empty sentence.
 
   return (
     <Card role="region" aria-label={t('governanceLog.regionLabel', 'Governance meetings')}>
@@ -118,23 +121,35 @@ export function GovernanceLogCard({ accountKey }: { accountKey: string }) {
         action={canWrite ? <CreateMeeting accountKey={accountKey} /> : undefined}
       />
       <div className="px-5 pb-5">
-        {meetings.isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : meetings.isError ? (
+        {page === undefined && meetings.isError ? (
           <ErrorState
             title={t('governanceLog.errorTitle', 'Could not load governance log')}
             message={meetings.error?.message ?? t('governanceLog.errorMessage', 'Try again shortly.')}
           />
-        ) : (meetings.data?.items.length ?? 0) === 0 ? (
+        ) : page === undefined ? (
+          <p className="text-sm text-[var(--fg-tertiary)]" role="status">
+            {t('governanceLog.unread', 'Checking governance meetings. The log has not arrived.')}
+          </p>
+        ) : page.items.length === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
             {t('governanceLog.empty', 'No governance meetings recorded for this account yet.')}
           </p>
         ) : (
-          <ul className="space-y-4">
-            {meetings.data!.items.map((meeting) => (
-              <MeetingRow key={meeting.id} meeting={meeting} canWrite={canWrite} />
-            ))}
-          </ul>
+          <>
+            {meetings.isError ? (
+              <p className="mb-3 text-sm text-[var(--fg-secondary)]" role="status">
+                {t(
+                  'governanceLog.staleRead',
+                  'The latest governance read failed. The log already on screen stays.',
+                )}
+              </p>
+            ) : null}
+            <ul className="space-y-4">
+              {page.items.map((meeting) => (
+                <MeetingRow key={meeting.id} meeting={meeting} canWrite={canWrite} />
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </Card>
