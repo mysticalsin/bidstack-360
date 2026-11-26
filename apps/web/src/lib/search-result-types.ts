@@ -72,9 +72,10 @@ export function searchTabLabel(key: string): string {
 
 /** Badge on a result row. An unknown type, including sales_order, stays a word. */
 export function searchTypeLabel(type: string): string {
-  if (type === 'all') return 'Result';
-  if (isSearchTab(type)) return TYPE_LABELS[type];
-  return 'Result';
+  // `all` is a tab, not a row type. TYPE_LABELS omits it, and isSearchTab still
+  // returns that full tab union, so the index has to exclude `all` itself.
+  if (!isSearchTab(type) || type === 'all') return 'Result';
+  return TYPE_LABELS[type];
 }
 
 /** Accessible name for a palette group the nav list does not already name. */

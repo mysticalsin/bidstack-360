@@ -27,6 +27,8 @@ describe('search result types', () => {
     expect(searchTypeLabel('rfp_requirement')).toBe('Requirement');
     expect(searchTypeLabel('reference')).toBe('Reference');
     expect(searchTypeLabel('sales_order')).toBe('Result');
+    // All is a tab, not a row. The badge must not index TYPE_LABELS with it.
+    expect(searchTypeLabel('all')).toBe('Result');
     expect(isSearchTab('sales_order')).toBe(false);
     expect(isSearchTab('proposal')).toBe(true);
     expect(paletteGroupLabel('proposal')).toBe('Proposals');
