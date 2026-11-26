@@ -5,7 +5,15 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { api, ApiError } from '@/lib/api';
-import { DEMO_TOKEN_KEY, DEMO_EMAIL_KEY, DEMO_SIGNED_OUT_KEY, useSignInAction } from '@/lib/auth';
+import {
+  DEMO_TOKEN_KEY,
+  DEMO_EMAIL_KEY,
+  DEMO_SIGNED_OUT_KEY,
+  DEMO_RESUME_KEY,
+  DEMO_RESUME_EMAIL_KEY,
+  DEMO_SESSION_ENDED_KEY,
+  useSignInAction,
+} from '@/lib/auth';
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
 
 /**
@@ -80,7 +88,14 @@ export function DemoSignIn() {
   const { signIn } = useSignInAction();
   const reduceMotion = useReducedMotion();
   const { t } = useTranslation('auth');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    if (localStorage.getItem(DEMO_SESSION_ENDED_KEY) !== '1') return '';
+    return localStorage.getItem(DEMO_RESUME_EMAIL_KEY) ?? '';
+  });
+  const [sessionEnded] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem(DEMO_SESSION_ENDED_KEY) === '1',
+  );
   const [code, setCode] = useState('');
   const [otp, setOtp] = useState(false);
   const [gateUnknown, setGateUnknown] = useState(false);
@@ -93,14 +108,24 @@ export function DemoSignIn() {
       setError(null);
       setLoading(true);
       try {
+        const normalized = address.trim().toLowerCase();
+        const resume = localStorage.getItem(DEMO_RESUME_KEY);
+        const resumeEmail = localStorage.getItem(DEMO_RESUME_EMAIL_KEY);
+        const sendProof = Boolean(resume && resumeEmail && resumeEmail === normalized);
         const res = await api<DemoSessionResponse>('/api/v1/demo/session', {
           method: 'POST',
           body: { email: address },
+          ...(sendProof ? { headers: { Authorization: `Bearer ${resume}` } } : {}),
         });
         localStorage.setItem(DEMO_TOKEN_KEY, res.token);
         localStorage.setItem(DEMO_EMAIL_KEY, res.email);
         localStorage.setItem('bidstack:session', 'demo');
         localStorage.removeItem(DEMO_SIGNED_OUT_KEY);
+        localStorage.removeItem(DEMO_SESSION_ENDED_KEY);
+        if (sendProof) {
+          localStorage.removeItem(DEMO_RESUME_KEY);
+          localStorage.removeItem(DEMO_RESUME_EMAIL_KEY);
+        }
         signIn(() => navigate('/dashboard', { replace: true }));
       } catch (err) {
         setError(
@@ -130,7 +155,10 @@ export function DemoSignIn() {
       setEmail(gate.email);
       setGateUnknown(false);
       setOtp(false);
-      if (localStorage.getItem(DEMO_SIGNED_OUT_KEY)) {
+      if (
+        localStorage.getItem(DEMO_SIGNED_OUT_KEY) ||
+        localStorage.getItem(DEMO_SESSION_ENDED_KEY)
+      ) {
         setStep('email');
         return;
       }
@@ -396,6 +424,19 @@ export function DemoSignIn() {
               >
                 {t('demoSignIn.changeEmail', 'Use a different email')}
               </button>
+            ) : null}
+
+            {sessionEnded && (step === 'email' || step === 'code') ? (
+              <p
+                role="status"
+                data-testid="demo-session-ended"
+                className="mt-3 max-w-md text-sm text-slate-700"
+              >
+                {t(
+                  'demoSignIn.sessionEnded',
+                  'Your demo session ended. Enter again to reopen it, or to open a new one if that sandbox was reset.',
+                )}
+              </p>
             ) : null}
 
             {error ? (

@@ -37,6 +37,28 @@ describe('api fetch wrapper', () => {
     );
   });
 
+  it('keeps a caller resume proof when the live token is already cleared', async () => {
+    // WHY: a rejected demo session parks its token and clears the live one.
+    // The next sign-in must still send that proof, or the same sandbox cannot reopen.
+    const fetchMock = vi.fn(async () => jsonResponse({ token: 'next', email: 'ada.visitor@example.test', orgId: 'o' }));
+    vi.stubGlobal('fetch', fetchMock);
+    setApiTokenProvider(() => null);
+
+    await api('/api/demo/session', {
+      method: 'POST',
+      body: { email: 'ada.visitor@example.test' },
+      headers: { Authorization: 'Bearer demo_expired.proof' },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/demo/session',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ Authorization: 'Bearer demo_expired.proof' }),
+      }),
+    );
+  });
+
   it('keeps cookie credentials when no bearer token provider is configured', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);

@@ -230,15 +230,25 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   // Cleanup only — registration happens above, once, at first render.
   useEffect(() => () => setApiTokenProvider(null), []);
 
-  // When the API rejects the stored demo token as dead (e.g. an expired
-  // session left in localStorage from a previous visit), clear it and drop to
-  // signed-out so RequireAuth routes back to the passwordless sign-in — instead
-  // of every query 401ing forever behind "Failed to load…". Registered in an
-  // effect (only needed after mount, on a 401) so it can close over setSignedIn.
+  // When the API rejects the stored demo token (expired, or the sandbox was
+  // reset), drop the live session so RequireAuth returns to sign-in. A demo
+  // token is parked as the resume proof. Anything else is not proof. An
+  // explicit sign-out does not park one.
   useEffect(() => {
     setAuthInvalidHandler(() => {
+      const token = localStorage.getItem(DEMO_TOKEN_KEY);
+      const email = localStorage.getItem(DEMO_EMAIL_KEY)?.trim().toLowerCase() ?? '';
+      if (token?.startsWith('demo_')) {
+        localStorage.setItem(DEMO_RESUME_KEY, token);
+        if (email) localStorage.setItem(DEMO_RESUME_EMAIL_KEY, email);
+        else localStorage.removeItem(DEMO_RESUME_EMAIL_KEY);
+      } else {
+        localStorage.removeItem(DEMO_RESUME_KEY);
+        localStorage.removeItem(DEMO_RESUME_EMAIL_KEY);
+      }
       localStorage.removeItem(DEMO_TOKEN_KEY);
       localStorage.removeItem(DEMO_EMAIL_KEY);
+      localStorage.setItem(DEMO_SESSION_ENDED_KEY, '1');
       writeSessionMarker(null);
       setSignedIn(false);
     });
@@ -261,6 +271,9 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback((cb?: () => void) => {
     localStorage.removeItem(DEMO_TOKEN_KEY);
     localStorage.removeItem(DEMO_EMAIL_KEY);
+    localStorage.removeItem(DEMO_RESUME_KEY);
+    localStorage.removeItem(DEMO_RESUME_EMAIL_KEY);
+    localStorage.removeItem(DEMO_SESSION_ENDED_KEY);
     localStorage.setItem(DEMO_SIGNED_OUT_KEY, '1');
     setSignedIn(false);
     writeSessionMarker(null);

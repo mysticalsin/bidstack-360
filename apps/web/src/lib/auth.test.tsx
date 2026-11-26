@@ -269,10 +269,14 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
         <Probe />
       </AuthProvider>,
     );
+    localStorage.setItem(DEMO_RESUME_KEY, 'demo_left.proof');
+    localStorage.setItem(DEMO_RESUME_EMAIL_KEY, 'ada.visitor@example.test');
+    localStorage.setItem(DEMO_SESSION_ENDED_KEY, '1');
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(localStorage.getItem(DEMO_TOKEN_KEY)).toBeNull();
     expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
     expect(localStorage.getItem(DEMO_RESUME_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_RESUME_EMAIL_KEY)).toBeNull();
     expect(localStorage.getItem(DEMO_SESSION_ENDED_KEY)).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
