@@ -191,12 +191,19 @@ function asUtcDate(value: Date | null | unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Month the win counts as revenue: the close stamp, then the due date. */
+/**
+ * Month the win counts as revenue.
+ * A close stamp on or before the due date is the month it closed (a demo bid
+ * dated 45 days out). A close stamp after the due date is the insert trigger
+ * on a backdated fixture, so the due month stays.
+ */
 export function wonRevenueMonth(
   dueDate: Date | null | unknown,
   closedAt: Date | null | unknown,
 ): string | null {
-  const when = asUtcDate(closedAt) ?? asUtcDate(dueDate);
+  const closed = asUtcDate(closedAt);
+  const due = asUtcDate(dueDate);
+  const when = closed && due ? (closed.getTime() <= due.getTime() ? closed : due) : (closed ?? due);
   if (!when) return null;
   return `${when.getUTCFullYear()}-${String(when.getUTCMonth() + 1).padStart(2, '0')}`;
 }

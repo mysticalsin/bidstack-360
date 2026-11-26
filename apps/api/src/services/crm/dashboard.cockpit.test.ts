@@ -268,6 +268,26 @@ describe('buildCockpit win/loss + revenue derivation', () => {
     ]);
   });
 
+  it('keeps a backdated due month when the close stamp is the later insert', () => {
+    // WHY: fixture wins store the close on the due date and the trigger stamps
+    // closedAt at insert, which is later. That later stamp is not a later
+    // close. Revenue stays on the due month, and the dashboard charts that
+    // already read the stamp do not have to move.
+    const cockpit = buildCockpit(
+      baseArgs([
+        opp({
+          stage: 'closed_won',
+          valueMicros: 880_000_000_000n,
+          dueDate: new Date('2026-02-10T00:00:00.000Z'),
+          closedAt: new Date('2026-11-25T15:00:00.000Z'),
+        }),
+      ]),
+    );
+    expect(cockpit.revenueEvolution).toEqual([
+      { period: '2026-02', revenueMicros: 880_000_000_000 },
+    ]);
+  });
+
   it('keeps a closed win that has a close stamp and no due date', () => {
     // WHY: revenue evolution dropped any won deal with a null due date, so
     // the month chart read as no revenue after the deal had already closed.

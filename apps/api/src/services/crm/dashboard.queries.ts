@@ -562,7 +562,14 @@ async function fetchRevenueRows(
         ? Prisma.sql`o.company_id = ANY(ARRAY[${Prisma.join(scope.companyIds)}]::uuid[])`
         : Prisma.sql`FALSE`;
     return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
-      SELECT to_char(date_trunc('month', COALESCE(o.closed_at, o.due_date)), 'YYYY-MM') AS period,
+      SELECT to_char(date_trunc('month',
+               CASE
+                 WHEN o.closed_at IS NOT NULL
+                      AND (o.due_date IS NULL OR (o.closed_at AT TIME ZONE 'UTC')::date <= o.due_date)
+                   THEN (o.closed_at AT TIME ZONE 'UTC')
+                 ELSE o.due_date::timestamp
+               END
+             ), 'YYYY-MM') AS period,
              SUM(o.value_micros) AS revenue
       FROM opportunities o
       LEFT JOIN territories t ON t.id = o.territory_id
@@ -582,7 +589,14 @@ async function fetchRevenueRows(
   }
 
   return prismaClient.$queryRaw<Array<{ period: string; revenue: bigint | null }>>(Prisma.sql`
-    SELECT to_char(date_trunc('month', COALESCE(closed_at, due_date)), 'YYYY-MM') AS period,
+    SELECT to_char(date_trunc('month',
+             CASE
+               WHEN closed_at IS NOT NULL
+                    AND (due_date IS NULL OR (closed_at AT TIME ZONE 'UTC')::date <= due_date)
+                 THEN (closed_at AT TIME ZONE 'UTC')
+               ELSE due_date::timestamp
+             END
+           ), 'YYYY-MM') AS period,
            SUM(value_micros) AS revenue
     FROM opportunities
     WHERE org_id = ${orgId}::uuid

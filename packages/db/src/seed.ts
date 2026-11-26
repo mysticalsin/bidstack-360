@@ -161,11 +161,6 @@ async function main() {
   // Opportunities
   for (const o of fixtureOpps) {
     const ownerId = usersByInitials.get(o.ownerInitials) ?? null;
-    const dueDate = o.dueDate ? new Date(o.dueDate) : null;
-    // The close trigger stamps now() when the writer omits closedAt. A won
-    // fixture dated in April would then count as revenue in the seed month.
-    const closedAt =
-      (o.stage === 'closed_won' || o.stage === 'closed_lost') && dueDate ? dueDate : undefined;
     await prisma.opportunity.upsert({
       where: { orgId_code: { orgId: org.id, code: o.code } },
       create: {
@@ -176,8 +171,7 @@ async function main() {
         stage: o.stage,
         valueMicros: Math.round(o.value * 1_000_000),
         probability: o.probability,
-        dueDate,
-        closedAt,
+        dueDate: o.dueDate ? new Date(o.dueDate) : null,
         ownerId,
         industry: o.industry,
         logoUrl: o.logoUrl,
@@ -189,8 +183,7 @@ async function main() {
         stage: o.stage,
         valueMicros: Math.round(o.value * 1_000_000),
         probability: o.probability,
-        dueDate,
-        closedAt,
+        dueDate: o.dueDate ? new Date(o.dueDate) : null,
         ownerId,
         country: o.country,
         intel: intelFor(o.code) as Prisma.InputJsonValue,
@@ -406,7 +399,6 @@ async function main() {
         valueMicros: BigInt(h.value) * 1_000_000n,
         probability: h.stage === 'closed_won' ? 100 : 0,
         dueDate: closedAt,
-        closedAt,
         country: h.country,
         createdAt: openedAt,
       },
@@ -415,7 +407,6 @@ async function main() {
         stage: h.stage,
         valueMicros: BigInt(h.value) * 1_000_000n,
         dueDate: closedAt,
-        closedAt,
         country: h.country,
         createdAt: openedAt,
       },
