@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { useServiceCase, useUpdateServiceCase } from '@/hooks/useServiceCases';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
+import { serviceCaseRecordPhase } from './service-case-record-read';
 
 // Transition map keyed by the canonical CaseStatus enum (packages/shared
 // service-desk.ts: new | open | waiting_customer | waiting_internal |
@@ -41,8 +42,29 @@ export function ServiceCaseDetailPage() {
     'You need service desk write access to update this case.',
   );
 
-  if (c.isLoading) return <LoadingSkeleton rows={6} />;
-  if (c.isError)
+  const phase = serviceCaseRecordPhase({
+    data: c.data,
+    isError: c.isError,
+    isLoading: c.isLoading,
+    isPending: c.isPending,
+    fetchStatus: c.fetchStatus,
+    status: c.status,
+  });
+  // A pause reports isLoading false, so the old order fell through to
+  // "Case not found" before any record had arrived.
+  if (phase === 'unread') {
+    const checking = t('serviceCaseDetail.checkingTitle', 'Checking this case');
+    const waiting = t('serviceCaseDetail.checkingMessage', 'The case has not arrived.');
+    return (
+      <div className="space-y-4">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {checking}. {waiting}
+        </p>
+        <LoadingSkeleton rows={6} />
+      </div>
+    );
+  }
+  if (phase === 'failed')
     return (
       <ErrorState
         title={t('serviceCaseDetail.errorTitle', 'Failed to load case')}
@@ -53,7 +75,7 @@ export function ServiceCaseDetailPage() {
         }
       />
     );
-  if (!c.data)
+  if (phase === 'missing' || !c.data)
     return (
       <EmptyState
         title={t('serviceCaseDetail.notFoundTitle', 'Case not found')}
