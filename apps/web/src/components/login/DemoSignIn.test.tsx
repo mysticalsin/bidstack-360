@@ -14,6 +14,9 @@ vi.mock('@/lib/auth', () => ({
   DEMO_TOKEN_KEY: 'demo-token',
   DEMO_EMAIL_KEY: 'demo-email',
   DEMO_SIGNED_OUT_KEY: 'demo-signed-out',
+  DEMO_RESUME_KEY: 'demo-resume',
+  DEMO_RESUME_EMAIL_KEY: 'demo-resume-email',
+  DEMO_SESSION_ENDED_KEY: 'demo-session-ended',
   useSignInAction: () => ({ signIn: signInMock }),
 }));
 vi.mock('react-router-dom', async (orig) => ({
@@ -133,6 +136,59 @@ describe('DemoSignIn', () => {
     fireEvent.click(screen.getByRole('button', { name: /Enter the demo/ }));
     await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1));
     expect(localStorage.getItem('demo-signed-out')).toBeNull();
+  });
+
+  it('holds a rejected demo session on the form and reopens it with the parked proof', async () => {
+    // WHY: an edge identity would otherwise sign straight back in and drop the
+    // resume proof, so the visitor gets a new sandbox with no explanation.
+    localStorage.setItem('demo-session-ended', '1');
+    localStorage.setItem('demo-resume', 'demo_expired.proof');
+    localStorage.setItem('demo-resume-email', 'tony@example.com');
+    route('/__auth/me', jsonResponse(200, { email: 'tony@example.com', via: 'access' }));
+    renderPage();
+
+    const notice = await screen.findByTestId('demo-session-ended');
+    expect(notice.textContent).toBe(
+      'Your demo session ended. Enter again to reopen it, or to open a new one if that sandbox was reset.',
+    );
+    expect(apiMock).not.toHaveBeenCalled();
+    expect((screen.getByLabelText('Work email') as HTMLInputElement).value).toBe('tony@example.com');
+
+    fireEvent.click(screen.getByRole('button', { name: /Enter the demo/ }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/demo/session', {
+        method: 'POST',
+        body: { email: 'tony@example.com' },
+        headers: { Authorization: 'Bearer demo_expired.proof' },
+      }),
+    );
+    expect(localStorage.getItem('demo-session-ended')).toBeNull();
+    expect(localStorage.getItem('demo-resume')).toBeNull();
+    expect(localStorage.getItem('demo-resume-email')).toBeNull();
+  });
+
+  it('does not send a parked demo proof when the email is a different one', async () => {
+    // WHY: the parked token proves the previous address only. Sending it with
+    // another address is not a resume of that sandbox.
+    localStorage.setItem('demo-session-ended', '1');
+    localStorage.setItem('demo-resume', 'demo_expired.proof');
+    localStorage.setItem('demo-resume-email', 'ada.visitor@example.test');
+    route('/__auth/me', new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } }));
+    renderPage();
+
+    const input = (await screen.findByLabelText('Work email')) as HTMLInputElement;
+    expect(input.value).toBe('ada.visitor@example.test');
+    expect(screen.getByTestId('demo-session-ended')).toBeTruthy();
+    fireEvent.change(input, { target: { value: 'other@example.test' } });
+    fireEvent.click(screen.getByRole('button', { name: /Enter the demo/ }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/demo/session', {
+        method: 'POST',
+        body: { email: 'other@example.test' },
+      }),
+    );
+    expect(localStorage.getItem('demo-resume')).toBe('demo_expired.proof');
   });
 
   it('treats a failed gate check as unknown and rechecks before choosing the flow', async () => {

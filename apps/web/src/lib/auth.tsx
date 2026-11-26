@@ -197,6 +197,14 @@ export const DEMO_TOKEN_KEY = 'bidstack:demo-token';
 export const DEMO_EMAIL_KEY = 'bidstack:demo-email';
 /** Set by an explicit sign-out so /login does not re-enter from the edge identity. */
 export const DEMO_SIGNED_OUT_KEY = 'bidstack:demo-signed-out';
+/**
+ * Parked when a stored demo token is rejected. The next sign-in sends it as
+ * the resume proof. An explicit sign-out does not park one.
+ */
+export const DEMO_RESUME_KEY = 'bidstack:demo-resume';
+export const DEMO_RESUME_EMAIL_KEY = 'bidstack:demo-resume-email';
+/** Set when a stored demo token is rejected, so /login says the session ended. */
+export const DEMO_SESSION_ENDED_KEY = 'bidstack:demo-session-ended';
 
 function DemoAuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(() => localStorage.getItem(DEMO_TOKEN_KEY) !== null);
