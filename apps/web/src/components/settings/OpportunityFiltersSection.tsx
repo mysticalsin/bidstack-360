@@ -8,23 +8,53 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOpportunityFilters, useUpdateOpportunityFilters } from '@/hooks/useOpportunityFilters';
 import type { OpportunityFilterRules } from '@bidstack/shared';
 
+import { opportunityFiltersPhase } from './opportunity-filters-read';
+
 export function OpportunityFiltersSection() {
   const { t } = useTranslation('settings');
   const filters = useOpportunityFilters();
-  if (filters.isLoading) return <LoadingSkeleton rows={4} />;
-  if (filters.isError || !filters.data) {
+  const phase = opportunityFiltersPhase({
+    data: filters.data,
+    isError: filters.isError,
+    status: filters.status,
+  });
+
+  if (phase === 'failed') {
     return (
       <ErrorState
         title={t('opportunityFilters.loadErrorTitle', 'Could not load filter rules')}
-        message={filters.error?.message ?? t('opportunityFilters.loadErrorMessage', 'Try again shortly.')}
+        message={
+          filters.error?.message ??
+          t('opportunityFilters.loadErrorMessage', 'Try again shortly.')
+        }
       />
     );
   }
+
+  if (phase === 'unread') {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t(
+          'opportunityFilters.checking',
+          'Checking opportunity filters. The rules have not arrived.',
+        )}
+      </p>
+    );
+  }
+
+  if (filters.data == null) {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('opportunityFilters.none', 'No opportunity filters are saved.')}
+      </p>
+    );
+  }
+
   // Keyed remount seeds the editable form from server data once, without an
   // effect-driven setState (which the hooks linter rejects).
   return <FilterForm key={JSON.stringify(filters.data)} initial={filters.data} />;
