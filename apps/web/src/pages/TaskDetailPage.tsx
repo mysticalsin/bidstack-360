@@ -5,12 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatDate } from '@/lib/format';
+
+import { taskDetailPhase } from './task-detail-read';
 
 export function TaskDetailPage() {
   const { t } = useTranslation('crm');
@@ -26,10 +28,21 @@ export function TaskDetailPage() {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('');
 
-  const task = tasks.data?.items.find((t) => t.id === id);
+  const phase = taskDetailPhase({
+    data: tasks.data,
+    isError: tasks.isError,
+    status: tasks.status,
+  });
+  const task = phase === 'ready' ? tasks.data?.items?.find((item) => item.id === id) : undefined;
 
-  if (tasks.isLoading) return <LoadingSkeleton rows={6} />;
-  if (tasks.isError)
+  if (phase === 'unread') {
+    return (
+      <p role="status" className="text-sm text-[var(--fg-secondary)]">
+        {t('taskDetail.checking', 'Checking this task. It has not arrived.')}
+      </p>
+    );
+  }
+  if (phase === 'failed')
     return (
       <ErrorState
         title={t('taskDetail.errorTitle', 'Failed to load task')}
