@@ -237,7 +237,12 @@ export async function pullGoogleIncremental(
     if (!res.ok) throw new Error(`Google events list failed: ${res.status}`);
 
     const body = (await res.json()) as { items?: GoogleEventItem[]; nextSyncToken?: string; nextPageToken?: string };
-    const items = body.items ?? [];
+    // A missing list is not an empty calendar. Saving nextSyncToken here
+    // would skip the window on every later pull.
+    if (!body || !Array.isArray(body.items)) {
+      throw new Error('The calendar event list has not arrived.');
+    }
+    const items = body.items;
     count += items.length;
     const { failed, settled, captureHeld } = await upsertGoogleEvents(items, orgId, userId, ownerEmail, log);
     const pageKey = `google:${syncToken ?? ''}:${pageToken ?? ''}`;
