@@ -4,7 +4,6 @@ import { useId } from 'react';
 
 import { labelBusinessLine } from '@bidstack/shared';
 
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useRelationshipMap } from '@/hooks/useMsaWhitespace';
 import { fmtDate, fmtMoneyMicros } from '@/lib/msa/labels';
 import { whoRows } from '@/lib/msa/whitespace';
@@ -13,16 +12,33 @@ export function WhoWorksWithThem({ companyId, as = 'section' }: { companyId: str
   const map = useRelationshipMap(companyId);
   const headingId = useId();
   if (!companyId) return null;
+  // Copy the flags first. A paused read has isLoading false, and a failed status can
+  // leave isError false while a previous value is still attached.
+  const data = map.data ?? null;
+  const isError = map.isError;
+  const isPending = map.isPending;
+  const isLoading = map.isLoading;
+  const isFetching = map.isFetching;
+  const status = `${map.status}`;
+  const fetchStatus = `${map.fetchStatus}`;
+  const failed = isError || status === 'error';
+  const waiting =
+    !failed &&
+    data == null &&
+    (fetchStatus === 'paused' || status === 'pending' || isPending || isLoading || isFetching);
+  const rows = !failed && !waiting && data ? whoRows(data) : [];
+  const affiliates =
+    !failed && !waiting && Array.isArray(data?.companies)
+      ? data.companies.filter((c) => c.relation !== 'self')
+      : [];
   const Wrap = as;
-  const rows = map.data ? whoRows(map.data) : [];
-  const affiliates = (Array.isArray(map.data?.companies) ? map.data.companies : []).filter((c) => c.relation !== 'self');
   return (
     <Wrap className={as === 'section' ? 'agr-section' : 'agr-who'} aria-labelledby={headingId} data-testid="who-works-with-them">
       <h2 id={headingId} className="agr-who-title">Who works with them</h2>
-      {map.isLoading ? (
-        <LoadingSkeleton rows={3} />
-      ) : map.isError ? (
-        <p className="agr-error" role="alert">Couldn&apos;t load who works with them.</p>
+      {failed ? (
+        <p className="agr-error" role="alert">Could not load who works with them.</p>
+      ) : waiting ? (
+        <p className="agr-caption" role="status">Checking who works with them.</p>
       ) : rows.length === 0 ? (
         <p className="drill-empty">No one in the group works with them yet.</p>
       ) : (
