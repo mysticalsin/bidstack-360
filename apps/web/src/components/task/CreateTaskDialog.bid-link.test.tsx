@@ -63,8 +63,8 @@ describe('CreateTaskDialog bid link read', () => {
     renderDialog();
 
     expect(screen.getByRole('heading', { name: 'New task' })).toBeTruthy();
-    expect(screen.getByText('Checking bids to link.')).toBeTruthy();
-    expect(screen.getByText('Checking bids to link.')).not.toMatch(NOT_A_MISS);
+    const checking = screen.getByText('Checking bids to link.');
+    expect(checking.textContent).not.toMatch(NOT_A_MISS);
     expect(opportunityControl()).toBeNull();
     expect(screen.queryByText(/None/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Create task' })).toBeTruthy();
@@ -82,10 +82,8 @@ describe('CreateTaskDialog bid link read', () => {
 
     renderDialog();
 
-    expect(screen.getByText('Could not load bids to link. They have not arrived.')).toBeTruthy();
-    expect(screen.getByText('Could not load bids to link. They have not arrived.')).not.toMatch(
-      NOT_A_MISS,
-    );
+    const failed = screen.getByText('Could not load bids to link. They have not arrived.');
+    expect(failed.textContent).not.toMatch(NOT_A_MISS);
     expect(opportunityControl()).toBeNull();
     expect(screen.queryByText(/None/)).toBeNull();
   });

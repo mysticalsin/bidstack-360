@@ -12,6 +12,8 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { useCreateTask } from '@/hooks/useTasks';
 import type { TaskStatus } from '@bidstack/shared';
 
+import { taskBidLinkKey, taskBidLinkMessage, taskBidLinkPhase } from './task-bid-link';
+
 interface Props {
   /** Optional pre-filled opportunity id (when invoked from a record page). */
   oppId?: string;
@@ -33,6 +35,17 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
   const setOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
   const create = useCreateTask();
   const opps = useOpportunities({ limit: 100 });
+  // None means the bid book arrived with no rows. A pause reports isLoading
+  // false and no payload, so the select used to offer only None.
+  const linkPhase = taskBidLinkPhase({
+    isError: opps.isError,
+    hasPayload: opps.data != null,
+    count: opps.data?.items.length ?? 0,
+  });
+  const linkMessage =
+    linkPhase === 'unread' || linkPhase === 'failed'
+      ? t(taskBidLinkKey(linkPhase), taskBidLinkMessage(linkPhase))
+      : null;
 
   const [title, setTitle] = useState('');
   const [linkedOppId, setLinkedOppId] = useState<string>(oppId ?? '');
@@ -109,19 +122,28 @@ export function CreateTaskDialog({ oppId, trigger, open: controlledOpen, onOpenC
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t('createTask.fieldOpportunity', 'Opportunity')} htmlFor="task-opp">
-                <Select
-                  id="task-opp"
-                  value={linkedOppId}
-                  onChange={(e) => setLinkedOppId(e.target.value)}
-                >
-                  <option value="">{t('createTask.opportunityNone', '— None —')}</option>
-                  {opps.data?.items.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.code} · {o.name}
-                    </option>
-                  ))}
-                </Select>
+              <Field
+                label={t('createTask.fieldOpportunity', 'Opportunity')}
+                htmlFor={linkMessage ? 'task-opp-read' : 'task-opp'}
+              >
+                {linkMessage ? (
+                  <p id="task-opp-read" role="status" className="text-sm text-[var(--fg-secondary)]">
+                    {linkMessage}
+                  </p>
+                ) : (
+                  <Select
+                    id="task-opp"
+                    value={linkedOppId}
+                    onChange={(e) => setLinkedOppId(e.target.value)}
+                  >
+                    <option value="">{t('createTask.opportunityNone', '— None —')}</option>
+                    {opps.data?.items.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.code} · {o.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
               </Field>
               <Field label={t('createTask.fieldStatus', 'Status')} htmlFor="task-status">
                 <Select
