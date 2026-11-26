@@ -10,7 +10,7 @@
  * Hover popover: shows top 3 SHAP factors with plain-English labels.
  * Keyboard accessible: popover triggers on focus.
  *
- * Loading state: pulse skeleton — never shows stale 0 as actual score.
+ * Unread says the score has not arrived. A number, including 0, is only a settled score.
  */
 
 import { useState, useRef } from 'react';
@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
 import { useLeadScore } from '@/hooks/usePredictiveScore';
+import { leadScorePhase } from '@/components/scoring/lead-score-read';
 import { SCORE_TONE_CLASSES, leadScoreTone } from '@/components/scoring/scoreTone';
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -43,20 +44,6 @@ function featureLabel(feature: string): string {
     .replace('Bant ', 'BANT ')
     .replace('Log Value Micros', 'Deal Value')
     .replace('Owner Close Rate Last 90d', 'Owner Win Rate');
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────
-
-function ScoreSkeleton({ size = 'md' }: { size?: 'sm' | 'md' }) {
-  const { t } = useTranslation('crm');
-  const h = size === 'sm' ? 'h-5 w-12' : 'h-6 w-16';
-  return (
-    <span
-      className={`inline-block rounded-full animate-pulse bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] ${h}`}
-      aria-label={t('leadScoreBadge.loading', 'Loading score...')}
-      aria-busy="true"
-    />
-  );
 }
 
 // ─── Factor list ──────────────────────────────────────────────────────────
@@ -93,16 +80,36 @@ function FactorList({ factors }: { factors: ScoreFactor[] }) {
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function LeadScoreBadge({ leadId, prefetched, size = 'md' }: LeadScoreBadgeProps) {
-  const { data, isLoading, isError } = useLeadScore(prefetched ? undefined : leadId);
+  const query = useLeadScore(prefetched ? undefined : leadId);
   const { t } = useTranslation('crm');
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const score = prefetched?.score ?? data?.score;
-  const factors = prefetched?.factors ?? data?.factors ?? [];
+  const phase = leadScorePhase(
+    prefetched
+      ? { data: prefetched, isError: false, status: 'success' }
+      : { data: query.data, isError: query.isError, status: query.status },
+  );
 
-  if (isLoading) return <ScoreSkeleton size={size} />;
-  if (isError || score === undefined) return null;
+  if (phase === 'unread') {
+    return (
+      <p className="text-xs text-[var(--fg-secondary)]">
+        {t('leadScoreBadge.checking', 'Checking the lead score. The score has not arrived.')}
+      </p>
+    );
+  }
+
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className="text-xs text-[var(--danger)]">
+        {t('leadScoreBadge.loadError', 'Could not load the lead score.')}
+      </p>
+    );
+  }
+
+  const score = prefetched?.score ?? query.data?.score;
+  const factors = prefetched?.factors ?? query.data?.factors ?? [];
+  if (score === undefined) return null;
 
   const colorClasses = SCORE_TONE_CLASSES[leadScoreTone(score)];
   const label = scoreLabel(score, t);
