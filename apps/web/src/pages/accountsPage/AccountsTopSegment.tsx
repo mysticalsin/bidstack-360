@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { KeyAccountBadge, TopAccountBadge } from '@/components/company/AccountTierBadges';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useTopAccounts } from '@/hooks/useTopAccounts';
 import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
@@ -21,6 +21,7 @@ import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from '
 import { StrategicSignalInsight } from './StrategicSignalInsight';
 import { topAccountSignal } from './strategicSignals';
 import { isSyntheticAccountName } from './testDataFilter';
+import { topAccountsPhase } from './top-accounts-read';
 
 export function AccountsTopSegment() {
   const { t } = useTranslation('crm');
@@ -74,6 +75,36 @@ export function AccountsTopSegment() {
   }, [items, t]);
   const maxIndustryPipeline = Math.max(1, ...industryBreakdown.map((item) => item.pipeline));
   const leader = items[0] ?? null;
+  const phase = topAccountsPhase({
+    data: accounts.data,
+    isError: accounts.isError,
+    status: accounts.status,
+  });
+
+  if (phase === 'failed') {
+    return (
+      <ErrorState
+        title={t('topAccounts.listLoadErrorTitle', 'Could not load top accounts')}
+        message={
+          accountError ??
+          t('topAccounts.listLoadErrorMessage', 'The top accounts endpoint did not respond.')
+        }
+        action={
+          <button type="button" className="btn btn-secondary" onClick={() => void accounts.refetch()}>
+            {t('topAccounts.retry', 'Retry')}
+          </button>
+        }
+      />
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('topAccounts.listChecking', 'Checking top accounts. The list has not arrived.')}
+      </p>
+    );
+  }
 
   return (
     <motion.div
@@ -248,23 +279,7 @@ export function AccountsTopSegment() {
       </p>
 
       {/* Leaderboard */}
-      {accounts.isLoading ? (
-        <LoadingSkeleton rows={5} />
-      ) : accounts.isError ? (
-        <ErrorState
-          title={t('topAccounts.errorTitle', "Couldn't load top accounts")}
-          message={accountError ?? t('topAccounts.errorMessage', 'The top accounts endpoint did not respond.')}
-          action={
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => void accounts.refetch()}
-            >
-              {t('topAccounts.retry', 'Retry')}
-            </button>
-          }
-        />
-      ) : items.length === 0 ? (
+      {items.length === 0 ? (
         search || industry ? (
           <EmptyState
             title={t('topAccounts.emptyFilteredTitle', 'No accounts match your filters')}
