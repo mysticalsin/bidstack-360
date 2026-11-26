@@ -24,6 +24,17 @@ import { type MarsTabularRow, rowsToEntries } from './tabular.js';
 
 const require = createRequire(import.meta.url);
 
+/**
+ * The bytes were not an export we could read. Callers must not treat that as
+ * an empty snapshot or move the file cursor past it.
+ */
+export class ExportFileNotReadError extends Error {
+  constructor(fileName: string) {
+    super(`Export file ${fileName} was not read`);
+    this.name = 'ExportFileNotReadError';
+  }
+}
+
 export interface MarsExportFile {
   id: string;
   name: string;
@@ -63,12 +74,21 @@ interface XlsxModule {
 export function parseExportFile(name: string, buf: Buffer, map: MarsColumnMap): MarsTabularRow[] {
   const xlsx = require('@e965/xlsx') as XlsxModule;
   const isCsv = /\.csv$/i.test(name);
+  // A blank buffer still becomes a sheet with no cells. That is not an empty
+  // meeting export. An xlsx that is not a zip is not a workbook either.
+  if (buf.length === 0) throw new ExportFileNotReadError(name);
+  if (isCsv) {
+    const text = buf.toString('utf8').replace(/^\uFEFF/, '').trim();
+    if (text.length === 0) throw new ExportFileNotReadError(name);
+  } else if (!(buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b)) {
+    throw new ExportFileNotReadError(name);
+  }
   const wb = isCsv
     ? xlsx.read(buf.toString('utf8').replace(/^\uFEFF/, ''), { type: 'string', raw: true })
     : xlsx.read(buf, { type: 'buffer', cellDates: true });
   const sheetName = wb.SheetNames.find((s) => s.trim().toLowerCase() === map.table.trim().toLowerCase()) ?? wb.SheetNames[0];
   const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
-  if (!sheet) return [];
+  if (!sheet) throw new ExportFileNotReadError(name);
   const raw = xlsx.utils.sheet_to_json(sheet, { defval: null, raw: true });
   const byHeader = new Map<string, MarsTabularField>();
   for (const f of mappedFields(map)) byHeader.set(map.columns[f]!.trim().toLowerCase(), f);
@@ -117,6 +137,9 @@ export function fileExportMarsSource(
         .sort((a, b) => a.modifiedAt.getTime() - b.modifiedAt.getTime() || a.name.localeCompare(b.name));
       if (!files.length) return { items: [], nextCursor: cursor, hasMore: false };
       const file = mode === 'snapshot' ? files[files.length - 1]! : files[0]!;
+      // Size is known before the download. Zero bytes have not arrived, so
+      // this must not become an empty page with a cursor past the file.
+      if (file.size === 0) throw new ExportFileNotReadError(file.name);
       const rows = parseExportFile(file.name, await store.download(file.id), map);
       const { entries } = rowsToEntries(rows, { source: 'file', accountKeys: keys });
       return { items: entries, nextCursor: encodeFileCursor(file), hasMore: mode === 'incremental' && files.length > 1 };
