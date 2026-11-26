@@ -5,9 +5,11 @@ import { useState } from 'react';
 import { BUSINESS_LINES, labelBusinessLine } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCreateSigningEntity, usePatchSigningEntity, useSigningEntities } from '@/hooks/useSigningEntities';
+
+import { signingEntitiesPhase } from './signing-entities-read';
 
 export function SigningEntitiesSection() {
   const list = useSigningEntities();
@@ -47,9 +49,22 @@ export function SigningEntitiesSection() {
     }
   };
 
-  if (list.isLoading) return <LoadingSkeleton rows={5} />;
-  if (list.isError) {
+  const phase = signingEntitiesPhase({
+    data: list.data,
+    isError: list.isError,
+    status: list.status,
+  });
+
+  if (phase === 'failed') {
     return <ErrorState title="Could not load signing entities" message="Try again in a moment." />;
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        Checking signing entities. The list has not arrived.
+      </p>
+    );
   }
 
   return (
