@@ -16,6 +16,8 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 
+import { contactRecordPhase } from './contact-record-read';
+
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
@@ -29,8 +31,22 @@ export function ContactDetailPage() {
   const allTasks = useTasks();
   const allNotes = useNotes(contact.data?.customer);
 
-  if (contact.isLoading) return <DetailPageSkeleton columns={3} cards={3} />;
-  if (contact.isError)
+  const phase = contactRecordPhase(contact);
+  // A pause reports isLoading false, so the old order fell through to
+  // "Contact not found" before any person had arrived.
+  if (phase === 'unread') {
+    const checking = t('contactDetail.checkingTitle', 'Checking this contact');
+    const waiting = t('contactDetail.checkingMessage', 'The contact has not arrived.');
+    return (
+      <div className="space-y-4">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {checking}. {waiting}
+        </p>
+        <DetailPageSkeleton columns={3} cards={3} />
+      </div>
+    );
+  }
+  if (phase === 'failed')
     return (
       <ErrorState
         title={t('contactDetail.errorTitle', "Couldn't load contact")}
@@ -41,7 +57,7 @@ export function ContactDetailPage() {
         }
       />
     );
-  if (!contact.data) {
+  if (phase === 'missing' || !contact.data) {
     return (
       <EmptyState
         title={t('contactDetail.notFoundTitle', 'Contact not found')}
