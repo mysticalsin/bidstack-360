@@ -2064,6 +2064,7 @@
     "reportsLink": "Reports",
     "newReportLink": "New report",
     "addWidget": "Add widget",
+    "listChecking": "Checking dashboards. They have not arrived.",
     "noDashboardsTitle": "No dashboards",
     "noDashboardsMessage": "Create your first dashboard to start visualising your data.",
     "createDashboard": "Create dashboard",
