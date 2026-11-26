@@ -19,6 +19,8 @@ import { cn } from '@/lib/cn';
 import { SignaturePad, type SignaturePadHandle } from '@/components/signatures/SignaturePad';
 import { usePublicSignatureRequest, useSubmitSignature } from '@/hooks/useSignatureRequests';
 
+import { publicSignPhase } from './public-sign-read';
+
 // ─── Step management ─────────────────────────────────────────────────────────
 
 type Step = 'welcome' | 'sign' | 'submit' | 'confirm';
@@ -29,7 +31,10 @@ const STEP_ORDER: Step[] = ['welcome', 'sign', 'submit', 'confirm'];
 
 export function PublicSignPage() {
   const { token = '' } = useParams<{ token: string }>();
-  const { data, isLoading, error } = usePublicSignatureRequest(token);
+  const request = usePublicSignatureRequest(token);
+  const { data, error } = request;
+  // A missing payload is not a missing document. Empty is only a settled link.
+  const phase = publicSignPhase(request);
   const submitMutation = useSubmitSignature(token);
   const { t } = useTranslation('crm');
 
@@ -178,10 +183,20 @@ export function PublicSignPage() {
           className="mx-auto max-w-2xl px-4 py-8 outline-none print:py-4"
           aria-label={t('publicSign.mainAriaLabel', 'Document signing')}
         >
-          {isLoading && <LoadingState />}
-          {error && <ErrorState error={error} />}
-
-          {data && !isLoading && (
+          {phase === 'failed' ? (
+            <p className="py-12 text-center text-sm text-[var(--fg-secondary)]" role="alert">
+              {t('publicSign.loadFailed', 'Could not load this signing link.')}
+            </p>
+          ) : phase === 'unread' ? (
+            <p className="py-12 text-center text-sm text-[var(--fg-secondary)]" role="status">
+              {t(
+                'publicSign.unread',
+                'Checking this signing link. The document has not arrived.',
+              )}
+            </p>
+          ) : phase === 'settled' ? (
+            <ErrorState error={error} />
+          ) : data ? (
             <>
               {step === 'welcome' && (
                 <WelcomeStep
@@ -218,7 +233,7 @@ export function PublicSignPage() {
                 <ConfirmStep downloadUrl={downloadUrl} senderName={data.senderName} />
               )}
             </>
-          )}
+          ) : null}
         </main>
 
         {/* Footer — privacy note; no tracking pixels */}
@@ -672,25 +687,7 @@ function ConfirmStep({ downloadUrl, senderName }: { downloadUrl: string; senderN
   );
 }
 
-// ─── Loading / Error states ───────────────────────────────────────────────────
-
-function LoadingState() {
-  const { t } = useTranslation('crm');
-  return (
-    // Shared bs-shimmer sheen instead of the strobing pulse blocks.
-    <div
-      className="space-y-4"
-      role="status"
-      aria-label={t('publicSign.loadingAriaLabel', 'Loading document')}
-      aria-live="polite"
-    >
-      <div className="bs-shimmer h-8 w-2/3 rounded-lg" aria-hidden />
-      <div className="bs-shimmer h-4 w-1/2" aria-hidden />
-      <div className="bs-shimmer h-64 w-full rounded-xl" aria-hidden />
-      <div className="bs-shimmer h-12 w-full rounded-xl" aria-hidden />
-    </div>
-  );
-}
+// ─── Settled link errors ──────────────────────────────────────────────────────
 
 function ErrorState({ error }: { error: unknown }) {
   const { t } = useTranslation('crm');
