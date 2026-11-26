@@ -53,6 +53,17 @@ export async function searchErpPartners(
 
 function buildPartnerDomain(query: CompanyAutocompleteInput): unknown[] {
   const domain: unknown[] = [['is_company', '=', true]];
+  const website = query.domain ? normalizeDomain(query.domain) : null;
+  const name = query.q?.trim() || null;
+  // The partner box sends one typed domain as both q and domain. AND would
+  // require the legal name to contain the hostname, so the partner is empty.
+  // '|' is the ERP OR of the next two leaves. The company flag still applies.
+  if (name && website && normalizeDomain(name) === website) {
+    domain.push('|', ['website', 'ilike', website], ['name', 'ilike', name]);
+    if (query.vat) domain.push(['vat', 'ilike', query.vat]);
+    if (query.duns) domain.push(['duns', '=', query.duns]);
+    return domain;
+  }
   if (query.domain) domain.push(['website', 'ilike', normalizeDomain(query.domain)]);
   if (query.vat) domain.push(['vat', 'ilike', query.vat]);
   if (query.duns) domain.push(['duns', '=', query.duns]);
