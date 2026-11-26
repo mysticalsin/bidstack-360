@@ -10,17 +10,13 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
-import {
-  EmptyState,
-  EmptyStateLink,
-  ErrorState,
-  LoadingSkeleton,
-} from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useWorkload } from '@/hooks/useWorkload';
 import { staggerChild, staggerParent } from '@/lib/motion';
 
 import { teamTotals } from './workload/workloadConfig';
+import { workloadPagePhase } from './workload/workload-page-read';
 import { WorkloadTable } from './workload/WorkloadTable';
 
 export function WorkloadPage() {
@@ -28,6 +24,11 @@ export function WorkloadPage() {
   const reducedMotion = useReducedMotion();
   const { formatMoneyMicros } = useFormatMoney();
   const workload = useWorkload();
+  const phase = workloadPagePhase({
+    data: workload.data,
+    isError: workload.isError,
+    status: workload.status,
+  });
 
   const owners = useMemo(() => workload.data?.owners ?? [], [workload.data]);
   const totals = useMemo(() => teamTotals(owners), [owners]);
@@ -73,35 +74,18 @@ export function WorkloadPage() {
         </h1>
       </motion.header>
 
-      <motion.div
-        variants={reducedMotion ? undefined : staggerChild}
-        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
-        aria-label={t('workload.totalsLabel', 'Team totals')}
-      >
-        {tiles.map((tile) => (
-          <div
-            key={tile.key}
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
-          >
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-              {tile.label}
-            </div>
-            <div
-              data-testid={`workload-kpi-${tile.key}`}
-              className={`mt-1 text-lg font-bold tabular-nums ${
-                tile.alert ? 'text-[var(--danger)]' : 'text-[var(--fg-primary)]'
-              }`}
-            >
-              {tile.value}
-            </div>
-          </div>
-        ))}
-      </motion.div>
-
-      <motion.div variants={reducedMotion ? undefined : staggerChild}>
-        {workload.isLoading ? (
-          <LoadingSkeleton rows={6} />
-        ) : workload.isError ? (
+      {phase === 'unread' ? (
+        <motion.p
+          variants={reducedMotion ? undefined : staggerChild}
+          role="status"
+          aria-busy="true"
+          aria-live="polite"
+          className="text-sm text-[var(--fg-secondary)]"
+        >
+          {t('workload.pending', 'Checking team workload. The desks have not arrived.')}
+        </motion.p>
+      ) : phase === 'failed' ? (
+        <motion.div variants={reducedMotion ? undefined : staggerChild}>
           <ErrorState
             title={t('workload.errorTitle', "Couldn't load the team's workload")}
             message={workload.error instanceof Error ? workload.error.message : undefined}
@@ -111,20 +95,51 @@ export function WorkloadPage() {
               </Button>
             }
           />
-        ) : !hasAnyLoad ? (
-          <EmptyState
-            icon="briefcase"
-            title={t('workload.emptyTitle', 'No live bids on any desk')}
-            secondary={
-              <EmptyStateLink to="/opportunities">
-                {t('workload.emptyCta', 'Open the pipeline and assign owners')}
-              </EmptyStateLink>
-            }
-          />
-        ) : (
-          <WorkloadTable owners={owners} formatMoneyMicros={formatMoneyMicros} />
-        )}
-      </motion.div>
+        </motion.div>
+      ) : (
+        <motion.div
+          variants={reducedMotion ? undefined : staggerChild}
+          className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+          aria-label={t('workload.totalsLabel', 'Team totals')}
+        >
+          {tiles.map((tile) => (
+            <div
+              key={tile.key}
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+            >
+              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                {tile.label}
+              </div>
+              <div
+                data-testid={`workload-kpi-${tile.key}`}
+                className={`mt-1 text-lg font-bold tabular-nums ${
+                  tile.alert ? 'text-[var(--danger)]' : 'text-[var(--fg-primary)]'
+                }`}
+              >
+                {tile.value}
+              </div>
+            </div>
+          ))}
+        </motion.div>
+      )}
+
+      {phase === 'ready' ? (
+        <motion.div variants={reducedMotion ? undefined : staggerChild}>
+          {!hasAnyLoad ? (
+            <EmptyState
+              icon="briefcase"
+              title={t('workload.emptyTitle', 'No live bids on any desk')}
+              secondary={
+                <EmptyStateLink to="/opportunities">
+                  {t('workload.emptyCta', 'Open the pipeline and assign owners')}
+                </EmptyStateLink>
+              }
+            />
+          ) : (
+            <WorkloadTable owners={owners} formatMoneyMicros={formatMoneyMicros} />
+          )}
+        </motion.div>
+      ) : null}
     </motion.div>
   );
 }
