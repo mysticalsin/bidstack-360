@@ -24,6 +24,30 @@ export const ACCOUNT_RESULT_LIMIT = 6;
 export const CONTACT_RESULT_LIMIT = 6;
 export const TASK_RESULT_LIMIT = 6;
 
+export type PaletteCatalogRead = 'pending' | 'failed' | 'ready';
+
+export interface PaletteCatalogSource {
+  /** True while this catalog has no payload yet, including a paused read. */
+  pending: boolean;
+  /** True when the read failed and left no payload. */
+  failed: boolean;
+}
+
+/**
+ * Companies, contacts, and tasks are matched from their own reads. "No
+ * matches." is a miss only after each of those reads has a payload. A read
+ * that has not arrived, and a read that failed, are not an empty catalog.
+ * A pending read wins over a failed one so an in-flight retry stays on the
+ * checking sentence.
+ */
+export function paletteCatalogRead(
+  sources: readonly PaletteCatalogSource[],
+): PaletteCatalogRead {
+  if (sources.some((source) => source.pending)) return 'pending';
+  if (sources.some((source) => source.failed)) return 'failed';
+  return 'ready';
+}
+
 export interface Item {
   id: string;
   group:
