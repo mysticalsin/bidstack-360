@@ -23,10 +23,15 @@ export function TeamSection() {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   // 6 columns when admin (status, name, email, role, joined, actions).
   const expandedColSpan = 6;
-  // A5 — presence polling. Refetches every 30s (matches Redis TTL).
-  // Uses select to project to Set<userId> so callers get O(1) lookups.
-  // Presence errors never surface to the user — UI degrades to all-offline.
+  // Presence polls every 30s (matches the Redis TTL) and projects to a
+  // Set<userId>. A snapshot that has not arrived is not an offline team.
   const presence = useOrgPresence();
+  const rosterFailed = users.isError;
+  const rosterUnread =
+    !rosterFailed && (users.isPending || users.isLoading || users.data === undefined);
+  const presenceFailed = presence.isError;
+  const presenceUnread = !presenceFailed && (presence.isPending || presence.data === undefined);
+  const knownPresence = !presenceFailed && !presenceUnread ? presence.data : undefined;
 
   return (
     <Card>
@@ -35,14 +40,35 @@ export function TeamSection() {
         caption={t('team.caption', 'Members of your workspace. Admins can manage roles.')}
       />
       <div className="p-5">
-        {users.isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : !users.data || users.data.items.length === 0 ? (
+        {rosterFailed ? (
+          <p role="alert" className="text-sm text-[var(--danger)]">
+            {t('team.failed', 'Could not load the team. The roster has not arrived.')}
+          </p>
+        ) : rosterUnread || !users.data ? (
+          <>
+            <p role="status" className="text-sm text-[var(--fg-secondary)]">
+              {t('team.checking', 'Checking the team. The roster has not arrived.')}
+            </p>
+            <LoadingSkeleton rows={3} />
+          </>
+        ) : users.data.items.length === 0 ? (
           <p className="text-sm text-[var(--fg-secondary)]">
             {t('team.empty', 'No team members found.')}
           </p>
         ) : (
           <div className="overflow-x-auto">
+            {presenceFailed ? (
+              <p role="alert" className="mb-3 text-sm text-[var(--danger)]">
+                {t(
+                  'team.presence.failed',
+                  'Could not load presence. Status has not arrived.',
+                )}
+              </p>
+            ) : presenceUnread || !knownPresence ? (
+              <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+                {t('team.presence.unread', 'Checking presence. Status has not arrived.')}
+              </p>
+            ) : null}
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] text-left text-[var(--fg-tertiary)]">
@@ -73,24 +99,30 @@ export function TeamSection() {
               </thead>
               <tbody>
                 {users.data.items.map((u) => {
-                  const isOnline = presence.data?.has(u.id) ?? false;
+                  const isOnline = knownPresence?.has(u.id) ?? false;
                   const expanded = isAdmin && expandedUserId === u.id;
                   return (
                     <Fragment key={u.id}>
                     <tr
                       className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-sunken)] transition-colors"
                     >
-                      {/* A5 — online/offline dot; presence errors degrade to offline silently */}
                       <td className="py-2 pr-2 w-6">
-                        <OnlineDot
-                          online={isOnline}
-                          label={t('team.presence.label', '{{name}} {{status}}', {
-                            name: u.name ?? u.email,
-                            status: isOnline
-                              ? t('team.presence.online', 'online')
-                              : t('team.presence.offline', 'offline'),
-                          })}
-                        />
+                        {knownPresence ? (
+                          <OnlineDot
+                            online={isOnline}
+                            label={t('team.presence.label', '{{name}} {{status}}', {
+                              name: u.name ?? u.email,
+                              status: isOnline
+                                ? t('team.presence.online', 'online')
+                                : t('team.presence.offline', 'offline'),
+                            })}
+                          />
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-2.5 w-2.5 rounded-full border border-[var(--border-default)]"
+                          />
+                        )}
                       </td>
                       <td className="py-2 pr-4 text-[var(--fg-primary)]">{u.name ?? '—'}</td>
                       <td className="py-2 pr-4 text-[var(--fg-secondary)]">{u.email}</td>
