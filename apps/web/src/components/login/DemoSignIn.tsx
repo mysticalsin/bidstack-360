@@ -28,9 +28,9 @@ const VIDEO_URL =
 const LINKEDIN_URL = 'https://www.linkedin.com/in/tonywalteur/';
 
 // The polo-preview Worker answers /__auth/*. Anywhere else (plain Vercel, local
-// preview) the SPA fallback returns HTML, so only a JSON answer counts. A
-// request that fails or times out is 'unknown', not 'none': on an OTP Worker
-// the ungated flow would be rejected.
+// preview) the SPA fallback returns HTML, so a settled 200 HTML answer is
+// 'none'. A request that fails, times out, or comes back 408, 429, or 5xx is
+// 'unknown', not 'none': that failed read must not look like an open door.
 type Gate = { kind: 'signed-in'; email: string } | { kind: 'otp' } | { kind: 'none' } | { kind: 'unknown' };
 
 const GATE_TIMEOUT_MS = 2500;
@@ -42,6 +42,7 @@ async function readGate(signal: AbortSignal): Promise<Gate> {
       headers: { accept: 'application/json' },
       signal,
     });
+    if (res.status === 408 || res.status === 429 || res.status >= 500) return { kind: 'unknown' };
     if (!(res.headers.get('content-type') ?? '').includes('application/json')) return { kind: 'none' };
     const body = (await res.json()) as { email?: unknown; otp?: unknown };
     if (res.ok && typeof body.email === 'string' && body.email) return { kind: 'signed-in', email: body.email };
