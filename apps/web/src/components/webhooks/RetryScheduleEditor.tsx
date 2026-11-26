@@ -23,6 +23,7 @@ import { cn } from '@/lib/cn';
 
 import type { EndpointOption } from './DeliveriesPanel';
 import { endpointHost, formatDelay, formatLatency } from './webhook-format';
+import { webhookRetryReadPhase } from './webhook-retry-read';
 
 const FIELD =
   'h-9 rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2.5 text-sm tabular-nums text-[var(--fg-primary)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)] aria-[invalid=true]:border-[var(--danger)]';
@@ -59,34 +60,49 @@ export function RetryScheduleEditor({ subscriptions }: { subscriptions: Endpoint
   const save = useSaveWebhookRetryPolicy(selected);
   const reset = useResetWebhookRetryPolicy(selected);
   const stats = useWebhookDeliveryStats({ subscriptionId: selected ?? undefined, window: '7d' });
+  const policyPhase = webhookRetryReadPhase({
+    data: policy.data,
+    isError: policy.isError,
+    status: policy.status,
+  });
+  const statsPhase = webhookRetryReadPhase({
+    data: stats.data,
+    isError: stats.isError,
+    status: stats.status,
+  });
   // Unsaved edits, tied to the endpoint they were made on so they never carry
-  // over to another endpoint; null shows the stored policy.
+  // over to another endpoint. A missing payload is not the product default.
   const [edits, setEdits] = useState<{ endpointId: string | null; draft: Draft } | null>(null);
+  const storedPolicy = policyPhase === 'ready' && policy.data ? policy.data : null;
   const draft =
-    edits && edits.endpointId === selected
-      ? edits.draft
-      : toDraft(policy.data ?? DEFAULT_WEBHOOK_RETRY_POLICY);
-  const setDraft = (update: (d: Draft) => Draft) =>
+    storedPolicy == null
+      ? null
+      : edits && edits.endpointId === selected
+        ? edits.draft
+        : toDraft(storedPolicy);
+  const setDraft = (update: (d: Draft) => Draft) => {
+    if (!draft) return;
     setEdits({ endpointId: selected, draft: update(draft) });
+  };
 
-  const maxAttempts = inRange(draft.maxAttempts, WEBHOOK_RETRY_LIMITS.maxAttempts);
-  const base = inRange(draft.backoffBaseSeconds, WEBHOOK_RETRY_LIMITS.backoffBaseSeconds);
-  const timeoutMs = inRange(draft.timeoutMs, WEBHOOK_RETRY_LIMITS.timeoutMs);
-  const valid = maxAttempts !== null && base !== null && timeoutMs !== null;
-  const next: WebhookRetryPolicy | null = valid
-    ? { maxAttempts, backoffStrategy: draft.backoffStrategy, backoffBaseSeconds: base, timeoutMs }
-    : null;
+  const maxAttempts = draft ? inRange(draft.maxAttempts, WEBHOOK_RETRY_LIMITS.maxAttempts) : null;
+  const base = draft ? inRange(draft.backoffBaseSeconds, WEBHOOK_RETRY_LIMITS.backoffBaseSeconds) : null;
+  const timeoutMs = draft ? inRange(draft.timeoutMs, WEBHOOK_RETRY_LIMITS.timeoutMs) : null;
+  const valid = maxAttempts !== null && base !== null && timeoutMs !== null && draft !== null;
+  const next: WebhookRetryPolicy | null =
+    valid && draft
+      ? { maxAttempts, backoffStrategy: draft.backoffStrategy, backoffBaseSeconds: base, timeoutMs }
+      : null;
 
-  const preview = useMemo(
-    () =>
-      webhookRetrySchedule({
-        maxAttempts: maxAttempts ?? 1,
-        backoffStrategy: draft.backoffStrategy,
-        backoffBaseSeconds: base ?? DEFAULT_WEBHOOK_RETRY_POLICY.backoffBaseSeconds,
-        timeoutMs: timeoutMs ?? DEFAULT_WEBHOOK_RETRY_POLICY.timeoutMs,
-      }),
-    [maxAttempts, draft.backoffStrategy, base, timeoutMs],
-  );
+  const preview = useMemo(() => {
+    if (!draft) return [];
+    return webhookRetrySchedule({
+      maxAttempts: maxAttempts ?? 1,
+      backoffStrategy: draft.backoffStrategy,
+      backoffBaseSeconds: base ?? DEFAULT_WEBHOOK_RETRY_POLICY.backoffBaseSeconds,
+      timeoutMs: timeoutMs ?? DEFAULT_WEBHOOK_RETRY_POLICY.timeoutMs,
+    });
+  }, [draft, maxAttempts, base, timeoutMs]);
   const span = Math.max(1, preview.at(-1)?.atMs ?? 1);
 
   const strategyLabel: Record<WebhookBackoffStrategy, string> = {
@@ -124,8 +140,6 @@ export function RetryScheduleEditor({ subscriptions }: { subscriptions: Endpoint
     }
   };
 
-  const latency = stats.data?.latencyMs ?? [];
-
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,22rem),minmax(0,1fr)]">
       <Shell>
@@ -161,112 +175,131 @@ export function RetryScheduleEditor({ subscriptions }: { subscriptions: Endpoint
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              id="retry-max-attempts"
-              label={t('webhooks.retry.maxAttempts', 'Max attempts')}
-              value={draft.maxAttempts}
-              onChange={(v) => setDraft((d) => ({ ...d, maxAttempts: v }))}
-              error={
-                maxAttempts === null
-                  ? t('webhooks.retry.maxAttemptsError', 'Use 1 to 10 attempts.')
-                  : null
-              }
-            />
-            <NumberField
-              id="retry-base"
-              label={t('webhooks.retry.base', 'Base delay (s)')}
-              value={draft.backoffBaseSeconds}
-              onChange={(v) => setDraft((d) => ({ ...d, backoffBaseSeconds: v }))}
-              error={base === null ? t('webhooks.retry.baseError', 'Use 5 to 3600 seconds.') : null}
-            />
-          </div>
-          <label className="grid gap-1 text-xs font-medium text-[var(--fg-secondary)]">
-            {t('webhooks.retry.backoff', 'Backoff')}
-            <select
-              className={FIELD}
-              value={draft.backoffStrategy}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  backoffStrategy: e.target.value as WebhookBackoffStrategy,
-                }))
-              }
-            >
-              {WEBHOOK_BACKOFF_STRATEGIES.map((s) => (
-                <option key={s} value={s}>
-                  {strategyLabel[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <NumberField
-            id="retry-timeout"
-            label={t('webhooks.retry.timeout', 'Timeout (ms)')}
-            value={draft.timeoutMs}
-            onChange={(v) => setDraft((d) => ({ ...d, timeoutMs: v }))}
-            error={
-              timeoutMs === null ? t('webhooks.retry.timeoutError', 'Use 1000 to 30000 ms.') : null
-            }
-          />
-
-          <div>
-            <h4 className="mb-2 text-xs font-medium text-[var(--fg-tertiary)]">
-              {t('webhooks.retry.preview', 'Wait before each attempt')}
-            </h4>
-            <ol
-              aria-label={t('webhooks.retry.listLabel', 'Retry schedule')}
-              className="space-y-1.5"
-            >
-              {preview.map((step) => (
-                <li
-                  key={step.attempt}
-                  className="grid grid-cols-[5.5rem,4.5rem,minmax(0,1fr)] items-center gap-2 text-xs"
-                >
-                  <span className="text-[var(--fg-secondary)]">
-                    {t('webhooks.retry.attempt', 'Attempt {{n}}', { n: step.attempt })}
-                  </span>
-                  <span className="font-mono tabular-nums text-[var(--fg-primary)]">
-                    {step.attempt === 1
-                      ? t('webhooks.retry.now', 'now')
-                      : `+${formatDelay(step.delayMs)}`}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="relative h-1.5 rounded-full bg-[var(--surface-sunken)]"
-                  >
-                    <span
-                      className="absolute inset-y-0 left-0 rounded-full bg-[var(--brand-deep)] transition-[width] duration-200"
-                      style={{ width: `${Math.max(2, (step.atMs / span) * 100)}%` }}
-                    />
-                  </span>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-2 text-xs text-[var(--fg-tertiary)]">
-              {t('webhooks.retry.total', 'Last attempt {{when}} after the first.', {
-                when: formatDelay(preview.at(-1)?.atMs ?? 0),
-              })}
+          {policyPhase === 'unread' ? (
+            <p className="text-sm text-[var(--fg-secondary)]">
+              {t(
+                'webhooks.retry.checking',
+                'Checking the retry schedule. The schedule has not arrived.',
+              )}
             </p>
-          </div>
+          ) : policyPhase === 'failed' ? (
+            <p role="alert" className="text-sm text-[var(--danger)]">
+              {t('webhooks.retry.loadError', 'Could not load the retry schedule.')}
+            </p>
+          ) : draft ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <NumberField
+                  id="retry-max-attempts"
+                  label={t('webhooks.retry.maxAttempts', 'Max attempts')}
+                  value={draft.maxAttempts}
+                  onChange={(v) => setDraft((d) => ({ ...d, maxAttempts: v }))}
+                  error={
+                    maxAttempts === null
+                      ? t('webhooks.retry.maxAttemptsError', 'Use 1 to 10 attempts.')
+                      : null
+                  }
+                />
+                <NumberField
+                  id="retry-base"
+                  label={t('webhooks.retry.base', 'Base delay (s)')}
+                  value={draft.backoffBaseSeconds}
+                  onChange={(v) => setDraft((d) => ({ ...d, backoffBaseSeconds: v }))}
+                  error={base === null ? t('webhooks.retry.baseError', 'Use 5 to 3600 seconds.') : null}
+                />
+              </div>
+              <label className="grid gap-1 text-xs font-medium text-[var(--fg-secondary)]">
+                {t('webhooks.retry.backoff', 'Backoff')}
+                <select
+                  className={FIELD}
+                  value={draft.backoffStrategy}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      backoffStrategy: e.target.value as WebhookBackoffStrategy,
+                    }))
+                  }
+                >
+                  {WEBHOOK_BACKOFF_STRATEGIES.map((s) => (
+                    <option key={s} value={s}>
+                      {strategyLabel[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <NumberField
+                id="retry-timeout"
+                label={t('webhooks.retry.timeout', 'Timeout (ms)')}
+                value={draft.timeoutMs}
+                onChange={(v) => setDraft((d) => ({ ...d, timeoutMs: v }))}
+                error={
+                  timeoutMs === null ? t('webhooks.retry.timeoutError', 'Use 1000 to 30000 ms.') : null
+                }
+              />
 
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void onReset()}
-              disabled={reset.isPending || !selected}
-            >
-              {t('webhooks.retry.reset', 'Reset to default')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void onSave()}
-              disabled={!valid || save.isPending || !selected || !policy.data}
-            >
-              {t('webhooks.retry.save', 'Save')}
-            </Button>
-          </div>
+              <div>
+                <h4 className="mb-2 text-xs font-medium text-[var(--fg-tertiary)]">
+                  {t('webhooks.retry.preview', 'Wait before each attempt')}
+                </h4>
+                <ol
+                  aria-label={t('webhooks.retry.listLabel', 'Retry schedule')}
+                  className="space-y-1.5"
+                >
+                  {preview.map((step) => (
+                    <li
+                      key={step.attempt}
+                      className="grid grid-cols-[5.5rem,4.5rem,minmax(0,1fr)] items-center gap-2 text-xs"
+                    >
+                      <span className="text-[var(--fg-secondary)]">
+                        {t('webhooks.retry.attempt', 'Attempt {{n}}', { n: step.attempt })}
+                      </span>
+                      <span className="font-mono tabular-nums text-[var(--fg-primary)]">
+                        {step.attempt === 1
+                          ? t('webhooks.retry.now', 'now')
+                          : `+${formatDelay(step.delayMs)}`}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="relative h-1.5 rounded-full bg-[var(--surface-sunken)]"
+                      >
+                        <span
+                          className="absolute inset-y-0 left-0 rounded-full bg-[var(--brand-deep)] transition-[width] duration-200"
+                          style={{ width: `${Math.max(2, (step.atMs / span) * 100)}%` }}
+                        />
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-xs text-[var(--fg-tertiary)]">
+                  {t('webhooks.retry.total', 'Last attempt {{when}} after the first.', {
+                    when: formatDelay(preview.at(-1)?.atMs ?? 0),
+                  })}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void onReset()}
+                  disabled={reset.isPending || !selected}
+                >
+                  {t('webhooks.retry.reset', 'Reset to default')}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => void onSave()}
+                  disabled={!valid || save.isPending || !selected || !policy.data}
+                >
+                  {t('webhooks.retry.save', 'Save')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--fg-secondary)]">
+              {t('webhooks.retry.empty', 'No retry schedule is stored for this endpoint.')}
+            </p>
+          )}
         </Panel>
       </Shell>
 
@@ -279,19 +312,28 @@ export function RetryScheduleEditor({ subscriptions }: { subscriptions: Endpoint
           )}
         />
         <Panel className="p-4">
-          <DotHistogram
-            values={latency}
-            title={t('webhooks.retry.responseTime', 'Response time')}
-            threshold={timeoutMs ?? undefined}
-            thresholdLabel={t('webhooks.retry.overTimeout', 'at or over the timeout')}
-            unit={t('webhooks.retry.attemptsUnit', 'attempts')}
-            format={(v) => formatLatency(v)}
-            empty={
-              stats.isLoading
-                ? t('webhooks.retry.latencyLoading', 'Loading response times…')
-                : t('webhooks.retry.noLatency', 'No attempts in the last 7 days.')
-            }
-          />
+          {statsPhase === 'unread' ? (
+            <p className="text-sm text-[var(--fg-secondary)]">
+              {t(
+                'webhooks.retry.checkingTimes',
+                'Checking response times. The attempts have not arrived.',
+              )}
+            </p>
+          ) : statsPhase === 'failed' ? (
+            <p role="alert" className="text-sm text-[var(--danger)]">
+              {t('webhooks.retry.loadTimesError', 'Could not load response times.')}
+            </p>
+          ) : (
+            <DotHistogram
+              values={stats.data?.latencyMs ?? []}
+              title={t('webhooks.retry.responseTime', 'Response time')}
+              threshold={timeoutMs ?? undefined}
+              thresholdLabel={t('webhooks.retry.overTimeout', 'at or over the timeout')}
+              unit={t('webhooks.retry.attemptsUnit', 'attempts')}
+              format={(v) => formatLatency(v)}
+              empty={t('webhooks.retry.noLatency', 'No attempts in the last 7 days.')}
+            />
+          )}
         </Panel>
       </Shell>
     </div>
