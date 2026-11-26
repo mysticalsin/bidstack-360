@@ -23,6 +23,7 @@ import { useAccountHistory } from '@/stores/accountHistory';
 import type { AccountCockpitMaybeScored, CompanyHealth } from '@bidstack/shared';
 
 import { deriveNextMove } from './CommandCenter';
+import { opportunityLinkPhase } from './opportunity-link-read';
 import { labelForBand } from './_tokens';
 
 interface Props {
@@ -43,9 +44,16 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   // Briefs are scoped to a deal (the API endpoint is /opportunities/:id/brief)
   // — if no deal exists yet, the button stays disabled with a helpful tooltip.
   const opps = useOpportunities({ limit: 50 });
-  const linkedOpp = opps.data?.items.find(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
+  // A paused or in-flight read has no payload and isLoading false. That is
+  // not a settled zero, and a failed read does not keep a stale deal.
+  const linkPhase = opportunityLinkPhase(opps);
+  const accountOpps =
+    linkPhase === 'ready'
+      ? (opps.data?.items ?? []).filter(
+          (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
+        )
+      : [];
+  const linkedOpp = accountOpps[0];
 
   // Pulse a "Saved" chip whenever data verification finishes. Tracking a counter
   // lets the SavedFlash component re-trigger on each completion, even when
@@ -74,9 +82,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
   const { formatMoney } = useFormatMoney();
-  const accountOpps = (opps.data?.items ?? []).filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
   const openOpps = accountOpps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost');
   const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
@@ -191,7 +196,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
             {t('pageHead.print', 'Print')}
           </button>
         ) : null}
-        {linkedOpp ? (
+        {linkPhase === 'ready' && linkedOpp ? (
           <CommandButton
             tone="primary"
             shortcut="shift+b"
@@ -203,7 +208,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
             <Icon name="sparkle" size={14} />
             {t('pageHead.generateBrief', 'Generate brief')}
           </CommandButton>
-        ) : accountView ? (
+        ) : linkPhase === 'ready' && accountView ? (
           <CreateOpportunityDialog
             defaultCustomer={cockpit.company.name}
             trigger={
@@ -226,14 +231,26 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
         <div className="acct-keys" role="group" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
           <div>
             <span className="acct-key-label">{t('pageHead.keyOpenPipeline', 'Open pipeline')}</span>
-            <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
-            <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
-            <span>
-              {openOpps.length === 1
-                ? t('pageHead.keyOpenDeal', '1 open deal')
-                : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
-            </span>
-            {onDrill ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('open')}>{t('pageHead.showOpenBids', 'Show open bids')}</button> : null}
+            {linkPhase === 'unread' ? (
+              <span className="acct-key-value">
+                {t('pageHead.checkingOpportunities', 'Checking linked opportunities')}
+              </span>
+            ) : linkPhase === 'error' ? (
+              <span className="acct-key-value">
+                {t('pageHead.opportunitiesError', 'Could not check linked opportunities')}
+              </span>
+            ) : (
+              <>
+                <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
+                <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
+                <span>
+                  {openOpps.length === 1
+                    ? t('pageHead.keyOpenDeal', '1 open deal')
+                    : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
+                </span>
+                {onDrill ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('open')}>{t('pageHead.showOpenBids', 'Show open bids')}</button> : null}
+              </>
+            )}
           </div>
           <div>
             <span className="acct-key-label">{t('pageHead.keyWinRate', 'Win rate')}</span>
@@ -264,7 +281,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
         </div>
       ) : null}
 
-      {linkedOpp ? (
+      {linkPhase === 'ready' && linkedOpp ? (
         <BriefingDialog
           opportunityId={linkedOpp.id}
           opportunityLabel={linkedOpp.name}
