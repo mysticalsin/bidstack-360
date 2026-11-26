@@ -132,7 +132,14 @@ describe('BidNoBidPage switching opportunity', () => {
         overrideJustification: null,
       },
     };
-    const unscored = { data: undefined };
+    // A settled miss is a 404. data: undefined with no error is an unread
+    // score, which must not look like an unscored deal.
+    const unscored = {
+      data: undefined,
+      isError: true,
+      status: 'error' as const,
+      error: { status: 404 },
+    };
     bidScoreMocks.useBidScoreLatest.mockImplementation((id?: string) =>
       id === 'opp-1' ? scored : unscored,
     );
