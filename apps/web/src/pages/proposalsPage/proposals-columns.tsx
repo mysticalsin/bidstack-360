@@ -8,8 +8,9 @@
 // and not a layout choice:
 //   * a cell renderer returns `null` for absent data; DataTable turns that into
 //     `EmptyCellValue`'s em-dash (data-table.tsx:168-171). Never render '' here.
-//   * an owner that the roster could not resolve is "Unknown owner", not an
-//     em-dash — the proposal HAS an owner, and a blank cell would say otherwise.
+//   * a loaded roster that does not contain the id is "Unknown owner", not a
+//     blank. The proposal has an owner. An unread or failed roster says the
+//     name has not arrived. It does not say the owner is unknown.
 
 import { useMemo } from 'react';
 
@@ -49,19 +50,32 @@ const COMPLIANCE_FALLBACK: Record<(typeof COMPLIANCE_BANDS)[number], string> = {
 /** Owner id → display name, resolved against the org roster. */
 export function useOwnerLabel(): OwnerLabel {
   const { t } = useTranslation('rfp');
-  // The roster route caps at 200 (useUsers.ts:48-53); an owner outside that page
-  // resolves to "Unknown owner" rather than to an em-dash.
+  // The roster route caps at 200 (useUsers.ts:48-53). "Unknown owner" means
+  // that loaded page still misses the id. Until a page arrives, the cell says
+  // the name has not arrived.
   // Include former members so a proposal owned by someone who left still
   // shows their name instead of "Unknown owner".
   const users = useUsers({ limit: 200, includeDeleted: true });
   const byId = useMemo(
-    () => new Map((users.data ?? []).map((user) => [user.id, user.name ?? user.email])),
+    () =>
+      users.data
+        ? new Map(users.data.map((user) => [user.id, user.name ?? user.email]))
+        : null,
     [users.data],
   );
   return useMemo(
-    () => (id: string | null) =>
-      id === null ? null : (byId.get(id) ?? t('proposals.ownerUnknown', 'Unknown owner')),
-    [byId, t],
+    () => (id: string | null) => {
+      if (id === null) return null;
+      // A roster that arrived can miss an id. A roster that has not arrived
+      // cannot. Cached names survive a failed refetch.
+      if (byId) return byId.get(id) ?? t('proposals.ownerUnknown', 'Unknown owner');
+      if (users.isPending) return t('proposals.ownerChecking', 'Checking the owner');
+      return t(
+        'proposals.ownerUnread',
+        'Could not load the owner. The roster has not arrived.',
+      );
+    },
+    [byId, users.isPending, t],
   );
 }
 
