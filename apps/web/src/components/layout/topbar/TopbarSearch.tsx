@@ -14,6 +14,7 @@ export function SearchBar() {
   const [open, setOpen] = useState(false);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recents = useRecentSearches((s) => s.items);
+  const recentStatus = useRecentSearches((s) => s.status);
   const pushRecent = useRecentSearches((s) => s.push);
   const clearRecents = useRecentSearches((s) => s.clear);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -49,10 +50,17 @@ export function SearchBar() {
     runSearch(query);
   };
 
-  // Whether the recent-searches listbox is actually rendered. Drives
-  // aria-expanded and aria-controls so the combobox only advertises a popup
-  // when one exists (WCAG 4.1.2).
-  const listboxOpen = open && !query && recents.length > 0;
+  // Whether a recent-search popup is actually rendered. Drives aria-expanded
+  // and aria-controls so the combobox only advertises a popup when one exists
+  // (WCAG 4.1.2). A failed read is its own popup: the blank box used to match
+  // a history that arrived empty.
+  const historyFailed = open && !query && recentStatus === 'failed';
+  const listboxOpen = open && !query && recentStatus === 'ready' && recents.length > 0;
+  const popupId = historyFailed
+    ? 'tb-search-recent-failed'
+    : listboxOpen
+      ? 'tb-search-recent-listbox'
+      : undefined;
   const activeOptionId =
     listboxOpen && highlightedIndex >= 0 ? `tb-search-recent-${highlightedIndex}` : undefined;
 
@@ -98,8 +106,8 @@ export function SearchBar() {
         id="tb-search-input"
         type="search"
         role="combobox"
-        aria-expanded={listboxOpen}
-        aria-controls="tb-search-recent-listbox"
+        aria-expanded={historyFailed || listboxOpen}
+        aria-controls={popupId}
         aria-activedescendant={activeOptionId}
         aria-autocomplete="list"
         placeholder={t('topbarSearch.placeholder', 'Search or jump to…')}
@@ -114,6 +122,18 @@ export function SearchBar() {
         }}
       />
       <kbd aria-hidden>Ctrl+/</kbd>
+      {historyFailed && (
+        <div
+          id="tb-search-recent-failed"
+          role="status"
+          className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-lg glass-menu px-2.5 py-2 text-xs text-[var(--fg-secondary)]"
+        >
+          {t(
+            'topbarSearch.recentFailed',
+            'Recent searches could not be read. They have not arrived.',
+          )}
+        </div>
+      )}
       <AnimatePresence>
         {listboxOpen && (
           <motion.div

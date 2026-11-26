@@ -29,8 +29,10 @@ async function focusSearch(): Promise<void> {
 
 afterEach(() => {
   cleanup();
-  localStorage.clear();
+  // Restore before clear(). A spy that throws on the recent-search key
+  // would abort clear() and stay installed for the next test.
   vi.restoreAllMocks();
+  localStorage.clear();
   vi.resetModules();
 });
 
@@ -51,16 +53,30 @@ describe('header search recent history', () => {
   it('does not treat a blocked recent-search read as an empty history', async () => {
     // WHY: a thrown storage read has not arrived. Swallowing it leaves the
     // same blank box as no history, which says the list was read and was empty.
-    const original = Storage.prototype.getItem;
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
-      if (key === STORAGE_KEY) throw new Error('storage blocked');
-      return original.call(this, key);
+    // happy-dom ignores `localStorage.getItem = ...`, so the override has to
+    // be defined on the object. A Storage.prototype spy never reaches this read.
+    const original = localStorage.getItem;
+    Object.defineProperty(localStorage, 'getItem', {
+      configurable: true,
+      writable: true,
+      value(key: string) {
+        if (key === STORAGE_KEY) throw new Error('storage blocked');
+        return original.call(localStorage, key);
+      },
     });
-    await focusSearch();
+    try {
+      await focusSearch();
 
-    expect(screen.getByText(FAILED)).toBeTruthy();
-    expect(screen.queryByText('No recent searches')).toBeNull();
-    expect(screen.queryByText('No matches.')).toBeNull();
+      expect(screen.getByText(FAILED)).toBeTruthy();
+      expect(screen.queryByText('No recent searches')).toBeNull();
+      expect(screen.queryByText('No matches.')).toBeNull();
+    } finally {
+      Object.defineProperty(localStorage, 'getItem', {
+        configurable: true,
+        writable: true,
+        value: original,
+      });
+    }
   });
 
   it('stays quiet when the history arrived empty', async () => {
