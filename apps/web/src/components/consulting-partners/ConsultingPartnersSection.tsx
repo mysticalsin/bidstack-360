@@ -23,6 +23,7 @@ import { useHasPermission } from '@/hooks/useCapabilities';
 import { useConsultingPartners, usePartnerEvidence, useRefreshConsultingPartners } from '@/hooks/useConsultingPartners';
 
 import { fmtDate, safeHref } from '../company-intel/intel-format';
+import { consultingPartnersReadPhase } from './consulting-partners-read';
 
 const RadarChart = lazy(() => import('@/components/charts/PolarCharts').then((m) => ({ default: m.RadarChart })));
 
@@ -332,6 +333,9 @@ export function ConsultingPartnersSection({ companyId }: { companyId: string }) 
   const canRefresh = useHasPermission('account-intel:write');
   const refresh = useRefreshConsultingPartners(companyId);
   const q = useConsultingPartners(companyId, refresh.pollUntil);
+  // A missing payload is not an empty list. isLoading is false while a read
+  // is paused, so that flag alone still painted No consulting partners found.
+  const phase = consultingPartnersReadPhase(q);
   const [picked, setPicked] = useState<string | null>(null);
   const tiles = useRef<Array<HTMLLIElement | null>>([]);
   const partners = q.data?.partners ?? [];
@@ -359,15 +363,13 @@ export function ConsultingPartnersSection({ companyId }: { companyId: string }) 
         </h2>
         {q.data ? <RunStatus run={q.data.run} canRefresh={canRefresh} pending={refresh.isPending} onRefresh={() => refresh.mutate()} /> : null}
       </header>
-      {q.isLoading ? (
-        <div className="cp-skel" aria-busy="true" data-testid="partners-skeleton">
-          <div className="sg-skel" />
-          <div className="sg-skel" />
-          <div className="sg-skel" />
-        </div>
-      ) : q.isError ? (
+      {phase === 'failed' ? (
         <p className="sg-empty" role="alert">
           <span>Couldn&apos;t load consulting partners</span>
+        </p>
+      ) : phase === 'unread' ? (
+        <p className="sg-empty" role="status">
+          Checking consulting partners. The list has not arrived.
         </p>
       ) : partners.length === 0 || !current ? (
         <p className="ci-none" data-testid="partners-empty">
