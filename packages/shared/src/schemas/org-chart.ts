@@ -296,13 +296,14 @@ export const OrgChartImportResult = z.object({
   /** Non-blocking notes: values left empty because they were invalid, placeholder root added. */
   warnings: z.array(z.object({ line: z.number().int(), message: z.string(), name: z.string().optional() })).optional(),
   chartVersion: z.number().int().nullable(),
-  /** HTML imports: detected layout, people found, skipped (system accounts) and a preview of every row. */
+  /** HTML imports: detected layout, people found, and people skipped (system accounts). */
   format: z.string().optional(),
   found: z.number().int().optional(),
   skipped: z.number().int().optional(),
   photos: z.number().int().optional(),
   /** HTML imports: people left out because they are not the account's own staff, by reason. */
   skippedBy: z.array(z.object({ reason: OrgChartSkipReason, label: z.string(), count: z.number().int() })).optional(),
+  /** People the file would add or update. CSV and HTML dry runs both send this. */
   preview: z.array(OrgChartImportPreviewRow).optional(),
 });
 export type OrgChartImportResult = z.infer<typeof OrgChartImportResult>;

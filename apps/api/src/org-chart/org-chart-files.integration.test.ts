@@ -108,6 +108,13 @@ describe('CSV import', () => {
     const res = await importCsv(good(), { dryRun: true });
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json()).toMatchObject({ dryRun: true, created: 3, updated: 0, errors: [], chartVersion: null });
+    // WHY: a count with no names leaves the people tray empty, so the
+    // operator would confirm a file they cannot see.
+    expect(res.json().preview).toEqual([
+      expect.objectContaining({ name: 'Ada Ceo', manager: null, action: 'create', title: 'Chief Executive Officer' }),
+      expect.objectContaining({ name: 'Marie Curie', manager: 'Ada Ceo', action: 'create', title: 'CFO' }),
+      expect.objectContaining({ name: 'Dupont, Jean', manager: 'Marie Curie', action: 'create', title: 'Head of IT' }),
+    ]);
     expect(await liveCount()).toBe(0);
   });
 
