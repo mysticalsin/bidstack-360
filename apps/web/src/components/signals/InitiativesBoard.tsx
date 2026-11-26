@@ -13,6 +13,7 @@ import { useAccountInitiatives } from '@/hooks/useAccountSignals';
 
 import { noDash, sourceLabel } from './category';
 import { initiativeEvidenceLabel, shownInitiativeEvidence } from './initiative-evidence-caption';
+import { initiativesListPhase } from './initiatives-list-read';
 
 const TOP = 4;
 const CONF_LABEL: Record<Initiative['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
@@ -115,22 +116,30 @@ export function InitiativesView({ items }: { items: Initiative[] }) {
 
 export function InitiativesBoard({ companyId }: { companyId: string }) {
   const q = useAccountInitiatives(companyId);
+  const phase = initiativesListPhase({
+    data: q.data,
+    isError: q.isError,
+    status: q.status,
+  });
+  const payload = phase === 'ready' ? q.data : undefined;
   return (
     <section id="initiatives" className="sg sg-surface" style={{ marginBottom: 24, scrollMarginTop: 80 }} aria-labelledby="sg-init-h" data-testid="initiatives-board">
       <header className="sg-head">
         <h2 id="sg-init-h" className="sg-h">What they&apos;re likely doing</h2>
         <span className="sg-meta">Inferred from hiring, news and meetings</span>
       </header>
-      {q.isLoading ? (
-        <div className="sg-skel" aria-busy="true" style={{ minHeight: 200 }} />
-      ) : q.isError || !q.data ? (
+      {phase === 'unread' ? (
+        <p className="sg-empty" role="status">
+          Checking initiatives. The list has not arrived.
+        </p>
+      ) : null}
+      {phase === 'failed' ? (
         <p className="sg-empty" role="alert">
           <span>Couldn&apos;t load initiatives</span>
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
         </p>
-      ) : (
-        <InitiativesView items={q.data.items} />
-      )}
+      ) : null}
+      {payload ? <InitiativesView items={payload.items} /> : null}
     </section>
   );
 }
