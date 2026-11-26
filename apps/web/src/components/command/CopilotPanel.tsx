@@ -36,12 +36,22 @@ import { useJarvisStore } from './jarvisStore';
 
 export type CopilotKeyHandler = (e: KeyboardEvent<HTMLInputElement>) => boolean;
 
+/** Sentence from checkDailyCap when Redis cannot answer the daily budget.
+ *  Kept in lockstep with AI_BUDGET_UNAVAILABLE_REASON in the API helper. */
+const AI_BUDGET_UNAVAILABLE = 'AI budget state is unavailable.';
+
+/** The quota store did not answer. That is not a spent cap: Retry can succeed. */
+function isBudgetUnread(error: Error | null): boolean {
+  return error instanceof ApiError && error.message === AI_BUDGET_UNAVAILABLE;
+}
+
 /** The AI endpoints return HTTP 429 when an org trips a daily AI cap (session
- *  count OR cost). That's a deterministic quota that resets at UTC midnight —
- *  never a transient failure — so it must be classified by status code, not by
- *  substring-matching the message (the session-cap message contains no "cap"). */
+ *  count OR cost). That's a deterministic quota that resets at UTC midnight,
+ *  never a transient failure, so a spent cap is classified by status code, not
+ *  by substring-matching the message (the session-cap message contains no "cap").
+ *  A failed store read is also a 429, and that one must stay out of this bucket. */
 function isDailyCapError(error: Error | null): boolean {
-  return error instanceof ApiError && error.status === 429;
+  return error instanceof ApiError && error.status === 429 && !isBudgetUnread(error);
 }
 
 interface CopilotPanelProps {
@@ -198,9 +208,14 @@ function CopilotStatusArea({
       ) : error ? (
         <div>
           <p className="text-xs text-[var(--danger)]" role="alert">
-            {isDailyCapError(error)
-              ? t('copilot.errorCap', 'Daily AI budget spent — it resets tomorrow.')
-              : t('copilot.errorGeneric', 'Copilot couldn’t read this record. Try again.')}
+            {isBudgetUnread(error)
+              ? t(
+                  'copilot.errorQuotaUnread',
+                  'The daily AI budget could not be read. Try again.',
+                )
+              : isDailyCapError(error)
+                ? t('copilot.errorCap', 'Daily AI budget spent — it resets tomorrow.')
+                : t('copilot.errorGeneric', 'Copilot couldn’t read this record. Try again.')}
           </p>
           {/* A daily cap is deterministic until it resets — retrying just fails
               again with the same 429, so don't offer a doomed Retry. */}

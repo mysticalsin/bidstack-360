@@ -15,7 +15,11 @@ vi.mock('../redis.js', () => ({
 }));
 
 import { redis } from '../redis.js';
-import { checkDailyCap } from './ai-assistant.helpers.js';
+import {
+  AI_BUDGET_UNAVAILABLE_REASON,
+  checkDailyCap,
+  noteWhenDailyCapDenies,
+} from './ai-assistant.helpers.js';
 
 const mget = vi.mocked(redis.mget);
 const log = { warn: vi.fn(), info: vi.fn(), error: vi.fn() };
@@ -32,7 +36,21 @@ describe('checkDailyCap', () => {
     mget.mockRejectedValue(new Error('ECONNREFUSED'));
     const result = await checkDailyCap('org', 'user', log as never);
     expect(result.allowed).toBe(false);
-    expect(result.reason).toMatch(/budget state is unavailable/i);
+    expect(result.reason).toBe(AI_BUDGET_UNAVAILABLE_REASON);
+    // WHY: Jarvis puts this sentence in "Missing data". Calling a store miss
+    // "budget reached" tells the reader the quota is zero when it was not read.
+    expect(noteWhenDailyCapDenies(result)).toBe(
+      'AI budget could not be read. Answered from records only.',
+    );
+  });
+
+  it('still calls a real session cap reached', () => {
+    expect(
+      noteWhenDailyCapDenies({
+        allowed: false,
+        reason: 'Daily AI session limit of 100 reached.',
+      }),
+    ).toBe('AI budget reached, answered from records only.');
   });
 
   it('still allows a call when the store shows the cap has not been reached', async () => {

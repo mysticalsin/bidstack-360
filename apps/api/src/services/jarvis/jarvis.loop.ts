@@ -19,6 +19,7 @@ import {
   checkDailyCap,
   completeChatOrNull,
   estimateCost,
+  noteWhenDailyCapDenies,
   recordCost,
   resolveActiveLlm,
 } from '../ai-assistant.helpers.js';
@@ -131,7 +132,7 @@ async function planner(input: JarvisRunInput): Promise<{
   if (!resolved) return { mode: 'demo', llm: null, note: null };
   const cap = await checkDailyCap(input.orgId, input.userId, input.log);
   if (!cap.allowed) {
-    return { mode: 'demo', llm: null, note: 'AI budget reached, answered from records only.' };
+    return { mode: 'demo', llm: null, note: noteWhenDailyCapDenies(cap) };
   }
   const llm: LlmFn = async ({ system, user }) => {
     const started = Date.now();
