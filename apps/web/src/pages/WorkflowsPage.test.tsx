@@ -30,8 +30,27 @@ vi.mock('@/hooks/useWorkflows', () => ({
   useRunWorkflow: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-const capabilitiesMocks = vi.hoisted(() => ({ useHasPermission: vi.fn(() => true) }));
+const capabilitiesMocks = vi.hoisted(() => ({
+  useHasPermission: vi.fn(() => true),
+  useCapabilities: vi.fn(),
+}));
 vi.mock('@/hooks/useCapabilities', () => capabilitiesMocks);
+
+function capabilitiesResult(allowed: boolean) {
+  return {
+    data: {
+      userId: 'user-1',
+      orgId: 'org-1',
+      legacyRole: allowed ? 'admin' : 'member',
+      roles: [allowed ? 'admin' : 'member'],
+      permissions: allowed ? ['workflows:write'] : [],
+      isAdmin: allowed,
+    },
+    isError: false,
+    status: 'success' as const,
+    error: null,
+  };
+}
 
 const WORKFLOW: Workflow = {
   id: 'w-1',
@@ -69,6 +88,7 @@ function renderPage() {
 describe('WorkflowsPage — workflows:write gating', () => {
   beforeEach(() => {
     capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    capabilitiesMocks.useCapabilities.mockReturnValue(capabilitiesResult(true));
     vi.mocked(useWorkflows).mockReturnValue({
       data: { items: [WORKFLOW] },
       isLoading: false,
@@ -85,6 +105,7 @@ describe('WorkflowsPage — workflows:write gating', () => {
 
   it('shows the New workflow button and enables card actions for a user with workflows:write', () => {
     capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    capabilitiesMocks.useCapabilities.mockReturnValue(capabilitiesResult(true));
 
     renderPage();
 
@@ -104,6 +125,7 @@ describe('WorkflowsPage — workflows:write gating', () => {
 
   it('hides the New workflow button and disables card actions for a user without workflows:write', () => {
     capabilitiesMocks.useHasPermission.mockReturnValue(false);
+    capabilitiesMocks.useCapabilities.mockReturnValue(capabilitiesResult(false));
 
     renderPage();
 
@@ -136,6 +158,7 @@ describe('WorkflowsPage — workflows:write gating', () => {
 
   it('hides the New workflow empty-state action for a user without workflows:write', () => {
     capabilitiesMocks.useHasPermission.mockReturnValue(false);
+    capabilitiesMocks.useCapabilities.mockReturnValue(capabilitiesResult(false));
     vi.mocked(useWorkflows).mockReturnValue({
       data: { items: [] },
       isLoading: false,

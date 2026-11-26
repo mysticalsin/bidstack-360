@@ -16,9 +16,10 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import type { WorkflowCreate } from '@bidstack/shared';
 import { NewWorkflowDialog } from './workflowsPage/NewWorkflowDialog';
+import { workflowAccessPhase } from './workflowsPage/workflow-access-read';
 import { WORKFLOW_LIST_PAGE, workflowListCaption } from './workflowsPage/workflow-list-caption';
 
 export function WorkflowsPage() {
@@ -35,11 +36,26 @@ export function WorkflowsPage() {
   // server-side behind workflows:write — hide the primary CTA, disable the
   // per-card affordances (matches ReportsListPage/TerritoriesPage) so a
   // read-only viewer sees the workflow list without a 403-on-click trap.
-  const canWrite = useHasPermission('workflows:write');
+  const access = useCapabilities();
+  const accessPhase = workflowAccessPhase(access, 'workflows:write');
+  const canWrite = accessPhase === 'allowed';
   const readOnlyHint = t(
     'workflows.readOnlyHint',
     'You need workflows write access to manage this workflow.',
   );
+  // Unread and failed are not a denial. Run stays unavailable until the
+  // manifest arrives, and the copy says the check has not arrived.
+  const accessHold =
+    accessPhase === 'unread'
+      ? t(
+          'workflows.accessUnread',
+          'Checking workflow access. The permission has not arrived.',
+        )
+      : accessPhase === 'failed'
+        ? t('workflows.accessFailed', 'Could not check workflow access.')
+        : null;
+  const accessDetail =
+    accessPhase === 'failed' && access.error instanceof Error ? access.error.message : null;
 
   const items = data?.items ?? [];
   // pageContinues is the workflow the list read past this page and dropped.
@@ -132,6 +148,13 @@ export function WorkflowsPage() {
         </div>
       </div>
 
+      {accessHold ? (
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          <span>{accessHold}</span>
+          {accessDetail ? <span className="mt-1 block">{accessDetail}</span> : null}
+        </p>
+      ) : null}
+
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
@@ -196,7 +219,7 @@ export function WorkflowsPage() {
               <div className="mt-3 flex items-center justify-between border-t border-[var(--border-subtle)] pt-3">
                 <label
                   className="flex cursor-pointer items-center gap-2 text-xs text-[var(--fg-secondary)]"
-                  title={canWrite ? undefined : readOnlyHint}
+                  title={accessHold ?? (canWrite ? undefined : readOnlyHint)}
                 >
                   <input
                     type="checkbox"
@@ -204,13 +227,15 @@ export function WorkflowsPage() {
                     onChange={() => handleToggle(w.id, w.active)}
                     disabled={updateWf.isPending || !canWrite}
                     aria-label={
-                      canWrite
-                        ? undefined
-                        : `${
-                            w.active
-                              ? t('workflows.statusActive', 'Active')
-                              : t('workflows.statusPaused', 'Paused')
-                          } — ${readOnlyHint}`
+                      accessHold
+                        ? accessHold
+                        : canWrite
+                          ? undefined
+                          : `${
+                              w.active
+                                ? t('workflows.statusActive', 'Active')
+                                : t('workflows.statusPaused', 'Paused')
+                            } — ${readOnlyHint}`
                     }
                     className="h-4 w-4 rounded border-[var(--border-subtle)]"
                   />
@@ -224,9 +249,13 @@ export function WorkflowsPage() {
                     variant="secondary"
                     onClick={() => handleRun(w.id)}
                     disabled={runWf.isPending || !canWrite}
-                    title={canWrite ? undefined : readOnlyHint}
+                    title={accessHold ?? (canWrite ? undefined : readOnlyHint)}
                     aria-label={
-                      canWrite ? undefined : `${t('workflows.run', 'Run')} — ${readOnlyHint}`
+                      accessHold
+                        ? accessHold
+                        : canWrite
+                          ? undefined
+                          : `${t('workflows.run', 'Run')} — ${readOnlyHint}`
                     }
                   >
                     {runWf.isPending
@@ -237,12 +266,16 @@ export function WorkflowsPage() {
                     type="button"
                     onClick={() => handleDelete(w.id, w.name)}
                     aria-label={
-                      canWrite
-                        ? t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', { name: w.name })
-                        : `${t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', { name: w.name })} — ${readOnlyHint}`
+                      accessHold
+                        ? accessHold
+                        : canWrite
+                          ? t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', {
+                              name: w.name,
+                            })
+                          : `${t('workflows.deleteAriaLabel', 'Delete workflow: {{name}}', { name: w.name })} — ${readOnlyHint}`
                     }
                     disabled={deleteWf.isPending || !canWrite}
-                    title={canWrite ? undefined : readOnlyHint}
+                    title={accessHold ?? (canWrite ? undefined : readOnlyHint)}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--fg-tertiary)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--danger)] disabled:opacity-50 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
                   >
                     <Icon name="trash" size={15} ariaHidden />
