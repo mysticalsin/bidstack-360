@@ -14,6 +14,7 @@
 import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useCollabNotesRead } from '@/hooks/useCollabNotesRead';
 import { useUser } from '@/lib/auth';
 
 // Tiptap + Y.js are heavy (~hundreds of KB) and only mount on the three detail
@@ -43,6 +44,7 @@ export function CollaborativeNotesSection({
 }: Props) {
   const { user } = useUser();
   const { t } = useTranslation('crm');
+  const phase = useCollabNotesRead(entityType, entityId, fieldKey);
 
   const heading = label ?? t('collaborativeNotes.heading', 'Live collaboration');
 
@@ -58,29 +60,50 @@ export function CollaborativeNotesSection({
         </span>
       </h2>
 
-      <Suspense
-        fallback={
-          <div
-            className="min-h-[8rem] animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)]"
-            aria-busy="true"
-            aria-label={t('collaborativeNotes.loadingEditor', 'Loading editor')}
+      {phase === 'failed' ? (
+        <p role="alert" className="text-sm text-[var(--fg-secondary)]">
+          {t(
+            'collaborativeNotes.failed',
+            'Could not load collaborative notes. The notes have not arrived.',
+          )}
+        </p>
+      ) : phase === 'checking' ? (
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t(
+            'collaborativeNotes.checking',
+            'Checking collaborative notes. They have not arrived.',
+          )}
+        </p>
+      ) : null}
+
+      {/* The editor still mounts while the read is open so the socket can
+          start. It stays out of the accessibility tree until the note is
+          ready, so a blank pad is not announced as an empty note. */}
+      <div hidden={phase !== 'ready'}>
+        <Suspense
+          fallback={
+            <div
+              className="min-h-[8rem] animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)]"
+              aria-busy="true"
+              aria-label={t('collaborativeNotes.loadingEditor', 'Loading editor')}
+            />
+          }
+        >
+          <CollaborativeRichTextEditor
+            yjsOptions={{
+              entityType,
+              entityId,
+              fieldKey,
+              enabled: Boolean(entityId),
+            }}
+            userName={user?.fullName ?? undefined}
+            userId={user?.id ?? undefined}
+            placeholder={t('collaborativeNotes.placeholder', 'Start writing collaborative notes…')}
+            readOnly={readOnly || !entityId}
+            className="min-h-[8rem]"
           />
-        }
-      >
-        <CollaborativeRichTextEditor
-          yjsOptions={{
-            entityType,
-            entityId,
-            fieldKey,
-            enabled: Boolean(entityId),
-          }}
-          userName={user?.fullName ?? undefined}
-          userId={user?.id ?? undefined}
-          placeholder={t('collaborativeNotes.placeholder', 'Start writing collaborative notes…')}
-          readOnly={readOnly || !entityId}
-          className="min-h-[8rem]"
-        />
-      </Suspense>
+        </Suspense>
+      </div>
     </section>
   );
 }

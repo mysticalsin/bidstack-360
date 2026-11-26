@@ -22,6 +22,14 @@ import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { fromUint8Array, toUint8Array } from 'js-base64';
 
+import {
+  closeCollabDoc,
+  collabDocKey,
+  collabServerMessageFailed,
+  collabSocketClosed,
+  publishCollabDoc,
+} from '@/lib/collab-notes-read';
+
 export interface YjsClientOptions {
   entityType: string;
   entityId: string;
@@ -61,9 +69,13 @@ export class YjsClient {
   private reconnectAttempts = 0;
   private destroyed = false;
   private connectionState: ConnectionState = 'disconnected';
+  /** A server error envelope is a failed read. Do not treat the next close as a drop. */
+  private readFailed = false;
   private readonly pendingUpdates: Uint8Array[] = [];
+  private readonly docKey: string;
 
   constructor(private readonly opts: YjsClientOptions) {
+    this.docKey = collabDocKey(opts.entityType, opts.entityId, opts.fieldKey);
     this.doc = new Y.Doc();
 
     // Persist to IndexedDB under a stable key per (entityType, entityId, fieldKey).
@@ -77,7 +89,9 @@ export class YjsClient {
       } else {
         this.pendingUpdates.push(update);
       }
+      this.publish();
     });
+    this.publish();
   }
 
   /** Open the WebSocket connection and begin syncing. */
@@ -107,9 +121,15 @@ export class YjsClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    closeCollabDoc(this.docKey);
     this.ws?.close();
     this.idb?.destroy();
     this.doc.destroy();
+  }
+
+  /** Apply one server envelope. The socket and tests share this path. */
+  ingestServerMessage(raw: string): void {
+    this.handleMessage(raw);
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────
@@ -156,13 +176,15 @@ export class YjsClient {
     };
 
     socket.onmessage = (event) => {
-      this.handleMessage(event.data as string);
+      this.ingestServerMessage(event.data as string);
     };
 
     socket.onclose = () => {
-      this.setConnectionState('disconnected');
       this.ws = null;
-      if (!this.destroyed) this.scheduleReconnect();
+      if (this.destroyed) return;
+      const next = collabSocketClosed(this.readFailed);
+      this.setConnectionState(next.connection);
+      if (next.reconnect) this.scheduleReconnect();
     };
 
     socket.onerror = () => {
@@ -212,7 +234,12 @@ export class YjsClient {
       }
 
       case 'error': {
-        // Server sent a protocol error — do not reconnect immediately.
+        // A rejected read is not an empty document and must not reconnect
+        // into another blank pad.
+        if (collabServerMessageFailed(msg.type)) {
+          this.readFailed = true;
+          this.setConnectionState('error');
+        }
         break;
       }
     }
@@ -250,8 +277,20 @@ export class YjsClient {
   }
 
   private setConnectionState(state: ConnectionState): void {
-    if (this.connectionState === state) return;
+    if (this.connectionState === state) {
+      this.publish();
+      return;
+    }
     this.connectionState = state;
     this.opts.onConnectionChange?.(state);
+    this.publish();
+  }
+
+  private publish(): void {
+    if (this.destroyed) return;
+    publishCollabDoc(this.docKey, {
+      connection: this.connectionState,
+      textLength: this.doc.getText(this.opts.fieldKey).length,
+    });
   }
 }
