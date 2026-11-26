@@ -207,17 +207,19 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
   const { t } = useTranslation('crm');
   const agreements = useContractAgreements(accountKey);
   const canWrite = useIsAdmin();
-  const items = agreements.data ?? [];
-  const activeCount = items.filter((item) => item.status === 'active').length;
-  const coveredCountries = new Set(items.flatMap((item) => item.countries)).size;
-  const nextReview = items
+  // undefined means the list has not arrived. An empty array is a settled book.
+  const items = agreements.data;
+  const settled = items ?? [];
+  const activeCount = settled.filter((item) => item.status === 'active').length;
+  const coveredCountries = new Set(settled.flatMap((item) => item.countries)).size;
+  const nextReview = settled
     .map((item) => item.nextRateReviewAt ?? item.expiryDate)
     .filter((value): value is string => Boolean(value))
     .sort()[0];
-  const activeSource = summarizeFieldSources(items, ['status'], 'Active agreement count');
-  const coverageSource = summarizeFieldSources(items, ['countries'], 'Country coverage');
+  const activeSource = summarizeFieldSources(settled, ['status'], 'Active agreement count');
+  const coverageSource = summarizeFieldSources(settled, ['countries'], 'Country coverage');
   const nextSource = summarizeFieldSources(
-    items,
+    settled,
     ['nextRateReviewAt', 'expiryDate'],
     'Next legal review date',
   );
@@ -233,7 +235,7 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
         action={canWrite ? <CreateAgreement accountKey={accountKey} /> : undefined}
       />
       <div className="px-5 pb-5">
-        {!agreements.isLoading && !agreements.isError && items.length > 0 && (
+        {items && items.length > 0 && !agreements.isError && (
           <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <ContractMetricTile
               label={t('contractAgreements.metricActive', 'Active')}
@@ -255,13 +257,15 @@ export function ContractAgreementsCard({ accountKey }: { accountKey: string }) {
             />
           </div>
         )}
-        {agreements.isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : agreements.isError ? (
+        {agreements.isError ? (
           <ErrorState
             title={t('contractAgreements.loadErrorTitle', 'Could not load contractual agreements')}
             message={agreements.error?.message ?? t('contractAgreements.tryAgainShortly', 'Try again shortly.')}
           />
+        ) : !items ? (
+          // Pending, paused, or not fetched yet. isLoading is false on that
+          // first paint, so a missing payload would read as no agreements.
+          <LoadingSkeleton rows={3} />
         ) : items.length === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
             {t(
