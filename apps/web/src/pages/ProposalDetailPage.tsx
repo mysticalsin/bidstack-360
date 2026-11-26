@@ -16,6 +16,8 @@ import {
 } from '@/components/rfp/shared/ProposalStatusChip';
 import { useHasPermission } from '@/hooks/useCapabilities';
 
+import { proposalRecordPhase } from './proposal-record-read';
+
 interface ProposalSection {
   id: string;
   proposalId: string;
@@ -56,8 +58,11 @@ export function ProposalDetailPage() {
   const {
     data: proposal,
     isLoading,
+    isPending,
     isError,
     error,
+    fetchStatus,
+    status: proposalReadStatus,
   } = useQuery({
     queryKey: ['proposal', id],
     queryFn: async () => {
@@ -147,13 +152,28 @@ export function ProposalDetailPage() {
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
 
-  if (isLoading) {
+  const phase = proposalRecordPhase({
+    data: proposal,
+    isLoading,
+    isPending,
+    isError,
+    fetchStatus,
+    status: proposalReadStatus,
+  });
+  // A pause reports isLoading false, so the old order fell through to
+  // "Proposal not found." before any record had arrived.
+  if (phase === 'unread') {
+    const checking = t('proposalDetail.checkingTitle', 'Checking this proposal');
+    const waiting = t('proposalDetail.checkingMessage', 'The proposal has not arrived.');
     return (
       <div
         aria-busy="true"
         aria-label={t('proposalDetail.loadingAriaLabel', 'Loading proposal')}
         className="space-y-4"
       >
+        <p role="status" className="text-sm text-fg-secondary">
+          {checking}. {waiting}
+        </p>
         <div className="animate-pulse h-8 bg-surface-sunken rounded w-1/2" />
         {[1, 2, 3].map((i) => (
           <GlassCard key={i} padding="md" className="animate-pulse space-y-2">
@@ -165,7 +185,7 @@ export function ProposalDetailPage() {
     );
   }
 
-  if (isError) {
+  if (phase === 'failed') {
     return (
       <GlassCard className="py-12 text-center" role="alert">
         <p className="text-sm font-medium text-red-600 dark:text-red-400">
@@ -188,7 +208,7 @@ export function ProposalDetailPage() {
     );
   }
 
-  if (!proposal) {
+  if (phase === 'missing' || !proposal) {
     return (
       <GlassCard className="py-12 text-center">
         <p className="text-fg-tertiary text-sm">
