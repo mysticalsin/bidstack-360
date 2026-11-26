@@ -18,6 +18,7 @@ import {
   type MeetingListQuery, type MeetingSource, type SeniorityLevel,
 } from '@/lib/meeting-intel/client';
 
+import { meetingsListPhase } from './meetings-list-read';
 import { MeetingsTabs } from './MeetingsTabs';
 
 const LEVELS: SeniorityLevel[] = ['c_level', 'vp', 'director', 'manager', 'ic', 'unknown'];
@@ -42,6 +43,7 @@ export default function MeetingsPage() {
     cursor,
   };
   const list = useMeetingList(query);
+  const phase = meetingsListPhase(list);
   const canWrite = useHasPermission('meetings:write');
   const [logOpen, setLogOpen] = useState(false);
   const setParam = (k: string, v: string | undefined) => {
@@ -84,7 +86,12 @@ export default function MeetingsPage() {
         ) : null}
       </div>
 
-      {list.isLoading ? <LoadingSkeleton rows={5} /> : list.isError ? (
+      {phase === 'unread' ? (
+        <>
+          <p role="status" className="mi-caption">Checking meetings. The list has not arrived.</p>
+          <LoadingSkeleton rows={5} />
+        </>
+      ) : phase === 'failed' ? (
         <ErrorState title="Couldn't load meetings" message="Check your connection, or that you have meetings:read." action={<Button variant="secondary" onClick={() => void list.refetch()}>Retry</Button>} />
       ) : rows.length === 0 ? (
         <p className="mi-empty">
