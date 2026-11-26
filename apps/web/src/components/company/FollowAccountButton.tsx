@@ -7,6 +7,8 @@ import type {
 
 import { useAccountFollow, useSetAccountFollow } from '@/hooks/useAccountTeam';
 
+import { followAccountPhase } from './follow-account-read';
+
 const REASON_TEXT: Record<AccountFollowReason, string> = {
   team: 'You are on the account team',
   key_account_owner: 'You own this account',
@@ -60,9 +62,27 @@ export function followView(state: AccountFollowState): View {
       };
 }
 
+const STATUS_CLASS =
+  'inline-flex min-h-9 shrink-0 items-center text-xs text-[var(--fg-secondary)]';
+
 export function FollowAccountButton({ companyId }: { companyId: string }) {
   const follow = useAccountFollow(companyId);
   const set = useSetAccountFollow(companyId);
+  const phase = followAccountPhase(follow);
+  if (phase === 'unread') {
+    return (
+      <span className={STATUS_CLASS}>
+        Checking follow. The status has not arrived.
+      </span>
+    );
+  }
+  if (phase === 'failed') {
+    return (
+      <span role="alert" className={STATUS_CLASS}>
+        Could not load the follow status.
+      </span>
+    );
+  }
   if (!follow.data) return null;
   const view = followView(follow.data);
   const Icon = view.icon;
