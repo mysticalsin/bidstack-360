@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { type useAddCustomObjectField, type useCustomObjectFields } from '@/hooks/useCustomObjects';
 import { FIELD_TYPES } from './customObjectEditorConfig';
+import { fieldsListPhase } from './fields-list-read';
 
 interface Props {
   addField: ReturnType<typeof useAddCustomObjectField>;
@@ -15,6 +16,8 @@ interface Props {
 
 export function FieldsSection({ addField, fieldsQuery }: Props) {
   const { t } = useTranslation('crm');
+  // A missing payload is not an empty list. Empty is only a settled read.
+  const phase = fieldsListPhase(fieldsQuery);
   const [showFieldForm, setShowFieldForm] = useState(false);
   const [newField, setNewField] = useState({
     fieldKey: '',
@@ -174,11 +177,11 @@ export function FieldsSection({ addField, fieldsQuery }: Props) {
           </form>
         )}
 
-        {fieldsQuery.isLoading ? (
-          <p className="p-4 text-sm text-[var(--text-secondary)]">
-            {t('fields.loading', 'Loading fields…')}
+        {phase === 'unread' ? (
+          <p className="p-4 text-sm text-[var(--text-secondary)]" role="status">
+            {t('fields.unread', 'Checking fields. The list has not arrived.')}
           </p>
-        ) : fieldsQuery.isError ? (
+        ) : phase === 'failed' ? (
           <p className="p-4 text-sm text-red-600 dark:text-red-400" role="alert">
             {t('fields.loadError', 'Could not load fields. Please retry.')}
           </p>
