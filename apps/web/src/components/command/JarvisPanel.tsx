@@ -40,6 +40,7 @@ import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
 
+import './jarvis-sheet.css';
 import { parseJarvisContext, type JarvisContext } from './copilotActions';
 import { useJarvisStore } from './jarvisStore';
 import {
@@ -60,8 +61,10 @@ interface Turn {
 
 type Decision = 'confirmed' | 'cancelled' | 'failed';
 
+// 44px with no pointer query. A demo window resized to a phone keeps
+// pointer:fine, so the coarse-pointer floor never lifts a 36px control.
 const ICON_BUTTON = cn(
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)]',
+  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[var(--fg-tertiary)]',
   'hover:bg-[var(--surface-hover)] hover:text-[var(--fg-primary)]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring-color)]',
   'disabled:cursor-not-allowed disabled:opacity-50',
@@ -534,6 +537,10 @@ export function JarvisPanel() {
                 transition={springModal}
                 className="fixed bottom-0 right-0 top-0 z-50 flex w-[min(460px,94vw)] flex-col border-l border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-lg)] outline-none"
               >
+                {/* Panel edge stays on the screen. This frame clears the status
+                    bar, a landscape notch, and the home indicator. Motion owns
+                    the aside style, so the inset lives on this frame. */}
+                <div className="jarvis-sheet-frame flex min-h-0 flex-1 flex-col">
                 <header className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
                   <span
                     aria-hidden
@@ -637,6 +644,7 @@ export function JarvisPanel() {
                     <SendHorizontal size={18} aria-hidden />
                   </button>
                 </form>
+                </div>
               </motion.aside>
             </RadixDialog.Content>
           </RadixDialog.Portal>

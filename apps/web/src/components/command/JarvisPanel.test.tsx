@@ -5,6 +5,8 @@
 // - a write shows the exact change and only a Confirm click sends it,
 // - the mic only appears where the browser can listen,
 // - the mute choice persists.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -195,9 +197,14 @@ describe('JarvisPanel', () => {
     expect(sheet.className).toContain('top-0');
     expect(sheet.className).toContain('right-0');
     expect(sheet.className).toContain('bottom-0');
-    expect(sheet.style.paddingTop).toBe('env(safe-area-inset-top, 0px)');
-    expect(sheet.style.paddingRight).toBe('env(safe-area-inset-right, 0px)');
-    expect(sheet.style.paddingBottom).toBe('env(safe-area-inset-bottom, 0px)');
+    const frame = sheet.firstElementChild;
+    if (!(frame instanceof HTMLElement)) throw new Error('Jarvis sheet has no content frame');
+    expect(frame.classList.contains('jarvis-sheet-frame')).toBe(true);
+    const css = readFileSync(join(process.cwd(), 'src/components/command/jarvis-sheet.css'), 'utf8');
+    const rule = css.slice(css.indexOf('.jarvis-sheet-frame'));
+    expect(rule).toContain('padding-top: env(safe-area-inset-top, 0px)');
+    expect(rule).toContain('padding-right: env(safe-area-inset-right, 0px)');
+    expect(rule).toContain('padding-bottom: env(safe-area-inset-bottom, 0px)');
     for (const name of ['Mute voice', 'Close Jarvis']) {
       const button = screen.getByRole('button', { name });
       expect(button.className).toContain('h-11');
