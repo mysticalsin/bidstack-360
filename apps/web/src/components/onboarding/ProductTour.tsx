@@ -50,7 +50,7 @@ function useTargetRect(selector: string | undefined): TargetRect | null {
       // The account timeline sits below the cockpit fold. A hole around an
       // off-screen marker looks like the same empty dark sheet.
       if (isOffscreen(r) && scrolledFor.current !== selector) {
-        scrolledFor.current = selector;
+        scrolledFor.current = selector ?? null;
         el.scrollIntoView({ block: 'center', inline: 'nearest' });
         r = el.getBoundingClientRect();
       }
