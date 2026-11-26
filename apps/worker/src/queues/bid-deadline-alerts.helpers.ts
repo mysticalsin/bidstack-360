@@ -4,6 +4,8 @@
 // dedupe key can be unit-tested without Postgres, Redis, or BullMQ. The worker
 // (bid-deadline-alerts.ts) supplies the org-scoped I/O around these.
 
+import type { Prisma } from '@bidstack/db';
+
 /**
  * Alert thresholds, in days-before-due. Order matters: closest deadline first so
  * a notification's copy reflects the most-urgent crossed boundary, and the
@@ -122,15 +124,21 @@ export function overdueByLabel(daysOverdue: number): string {
  * the board already marked won or lost on its pipeline stage while that
  * legacy column is still open. A bid with no pipeline stage stays in.
  */
-export function deadlineScanWhere(windowStart: Date, windowEnd: Date) {
+export function deadlineScanWhere(
+  windowStart: Date,
+  windowEnd: Date,
+): Prisma.OpportunityWhereInput {
+  // Each arm is an OpportunityWhereInput. A bare array of those two shapes
+  // infers a union with `pipelineStage?: undefined`, which Prisma rejects.
+  const stillOpen: Prisma.OpportunityWhereInput[] = [
+    { pipelineStageId: null },
+    { pipelineStage: { isWon: false, isLost: false } },
+  ];
   return {
     deletedAt: null,
-    stage: { notIn: ['closed_won', 'closed_lost'] as const },
+    stage: { notIn: ['closed_won', 'closed_lost'] },
     ownerId: { not: null },
     dueDate: { gte: windowStart, lte: windowEnd },
-    OR: [
-      { pipelineStageId: null },
-      { pipelineStage: { isWon: false, isLost: false } },
-    ],
+    OR: stillOpen,
   };
 }
