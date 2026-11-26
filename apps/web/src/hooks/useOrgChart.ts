@@ -22,11 +22,11 @@ export function useOrgChart(companyId: string | undefined) {
     enabled: Boolean(companyId),
     staleTime: 0,
   });
-  const live = Boolean(saved.data);
+  const hasChart = Boolean(saved.data);
   const cov = useQuery({
     queryKey: ['orgchart', companyId, 'coverage', saved.data?.version],
     queryFn: ({ signal }) => fetchOrgChartCoverage(companyId!, signal),
-    enabled: live,
+    enabled: hasChart,
   });
   const list = useMeetingList({ groupId: companyId, limit: 50 } as Parameters<typeof useMeetingList>[0], Boolean(companyId));
   const ids = useMemo(() => (list.data?.items ?? []).slice(0, MAX_DETAILS).map((m) => m.id), [list.data]);
@@ -43,12 +43,18 @@ export function useOrgChart(companyId: string | undefined) {
   const people = useMemo(() => [...new Set(coverage.values())], [coverage]);
 
   const chart: OrgChart | null = useMemo(() => {
-    if (!companyId || saved.isLoading) return null;
+    if (!companyId || saved.isPending) return null;
+    // A failed chart read is not "no chart". Do not invent a Sample structure.
+    if (saved.isError) return null;
     if (saved.data) return { ...saved.data, ...normalise(saved.data.nodes, saved.data.rootId) };
     if (list.isLoading || !detailsDone) return null;
     return sampleChart(companyId, people);
-  }, [companyId, saved.isLoading, saved.data, list.isLoading, detailsDone, people]);
+  }, [companyId, saved.isPending, saved.isError, saved.data, list.isLoading, detailsDone, people]);
 
+  // Coverage that has not arrived, or failed, is not a settled live chart.
+  // Callers treat `live` as "the API gap list is the gap list".
+  const coverageUnread = hasChart && cov.isPending;
+  const live = hasChart && !coverageUnread && !cov.isError;
   const metById = useMemo(() => new Map((cov.data?.nodes ?? []).map((n) => [n.nodeId, n])), [cov.data]);
   const unmetSenior = useMemo(() => new Set(cov.data?.unmetSenior ?? []), [cov.data]);
 
@@ -74,8 +80,8 @@ export function useOrgChart(companyId: string | undefined) {
     live,
     /** Reference "now" for strength, taken from data freshness (keeps render pure). */
     asOf: list.dataUpdatedAt || saved.dataUpdatedAt,
-    isLoading: !chart,
-    error: saved.error,
+    isLoading: !(saved.error || (hasChart && cov.isError)) && (coverageUnread || !chart),
+    error: saved.error ?? (hasChart && cov.isError ? cov.error : null),
     meetingsError: list.error,
   };
 }
