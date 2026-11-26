@@ -29,7 +29,7 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { toast } from '@/components/ui/Toast';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useAppModules, useUpdateAppModules } from '@/hooks/useAppModules';
 import {
   useApproveSerumConfigVersion,
@@ -546,11 +546,12 @@ export function SerumControlPlaneSection() {
     void status.refetch();
   };
 
-  const serumOn = Boolean(appModules.data?.serumEnabled);
-  // Master on/off — rendered in every state so an admin can always reach it,
-  // even when SERUM status fails to load. Deployment env SERUM_ENABLED stays the
-  // runtime kill-switch for connectors/gateway; this is the org-level switch.
-  const masterToggle = (
+  const moduleRecord = appModules.data;
+  const serumOn = Boolean(moduleRecord?.serumEnabled);
+  // The org switch stays reachable when SERUM status fails, once the saved
+  // module record has arrived. An unread record is not a saved off switch.
+  // Deployment env SERUM_ENABLED stays the runtime kill-switch.
+  const masterToggle = moduleRecord ? (
     <Card>
       <div className="flex items-center justify-between gap-4 p-4">
         <div className="min-w-0">
@@ -571,7 +572,7 @@ export function SerumControlPlaneSection() {
           role="switch"
           aria-checked={serumOn}
           aria-label={t('serum.master.toggle', 'Enable SERUM Control Plane')}
-          disabled={appModules.isLoading || updateModules.isPending}
+          disabled={updateModules.isPending}
           onClick={() => updateModules.mutate({ serumEnabled: !serumOn })}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
             serumOn ? 'bg-[var(--brand-primary)]' : 'border border-[var(--border-default)] bg-[var(--surface-sunken)]'
@@ -583,6 +584,34 @@ export function SerumControlPlaneSection() {
             }`}
           />
         </button>
+      </div>
+    </Card>
+  ) : (
+    <Card>
+      <div className="space-y-3 p-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
+            {t('serum.master.title', 'SERUM Control Plane')}
+          </h3>
+          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
+            {appModules.isError
+              ? t('serum.master.notLoaded', 'The saved SERUM switch has not arrived.')
+              : t('serum.master.checking', 'Checking the saved SERUM switch.')}
+          </p>
+        </div>
+        {appModules.isError ? (
+          <ErrorState
+            title={t('serum.master.errorTitle', 'Could not load the SERUM switch')}
+            message={t('serum.master.errorMessage', 'Retry before changing the saved switch.')}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => void appModules.refetch()}>
+                {t('serum.master.retry', 'Retry')}
+              </Button>
+            }
+          />
+        ) : (
+          <LoadingSkeleton rows={2} />
+        )}
       </div>
     </Card>
   );
