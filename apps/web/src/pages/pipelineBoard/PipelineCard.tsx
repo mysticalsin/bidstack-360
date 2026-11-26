@@ -182,7 +182,7 @@ export const PipelineCard = memo(function PipelineCard({
             <Badge
               tone="gray"
               aria-label={closedDueLabel}
-              className="gap-0.5 px-1.5 py-0 text-[9px] font-medium"
+              className="gap-0.5 px-1.5 py-0 text-xs font-medium"
             >
               <Icon name="clock" size={10} strokeWidth={2} />
               {t('pipeline.boardCardClosed', 'Closed')}
