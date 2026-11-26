@@ -14,6 +14,7 @@ import {
 import { TAG_COLORS, type TaggableEntityType, type TagSuggestion } from '@bidstack/shared';
 
 import { TagChip } from './TagChip';
+import { tagListPhase } from './tag-list-read';
 
 /**
  * Sprint 1 — Krayin import.
@@ -37,7 +38,13 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
 
-  const { data: entityTagsData } = useEntityTags(entityType, entityId);
+  const entityTags = useEntityTags(entityType, entityId);
+  const entityTagsData = entityTags.data;
+  const phase = tagListPhase({
+    data: entityTags.data,
+    isError: entityTags.isError,
+    status: entityTags.status,
+  });
   const { data: allTagsData } = useTags();
   const apply = useApplyTags();
   const remove = useRemoveTags();
@@ -87,6 +94,22 @@ export function TagPicker({ entityType, entityId, suggestionContext }: TagPicker
     apply.mutate({ entityType, entityId, tagIds: [tag.id] });
     setSearch('');
   };
+
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className="text-sm text-[var(--fg-secondary)]">
+        {t('tagPicker.loadError', 'Could not load tags.')}
+      </p>
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p role="status" className="text-sm text-[var(--fg-secondary)]">
+        {t('tagPicker.checking', 'Checking tags. The list has not arrived.')}
+      </p>
+    );
+  }
 
   return (
     <div className="relative inline-flex flex-wrap items-center gap-1.5">
