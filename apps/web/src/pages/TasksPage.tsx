@@ -199,9 +199,11 @@ export function TasksPage() {
             {t('tasks.title', 'Tasks')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {caption.count === undefined
-              ? t(caption.key, caption.fallback)
-              : t(caption.key, caption.fallback, { count: caption.count })}
+            {caption.key === 'tasks.subtitle'
+              ? t('tasks.subtitle', caption.fallback, { count: caption.count ?? 0 })
+              : caption.count === undefined
+                ? t(caption.key, caption.fallback)
+                : t(caption.key, caption.fallback, { count: caption.count })}
           </p>
         </div>
         <div className="flex items-center gap-2">
