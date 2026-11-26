@@ -28,6 +28,7 @@ import {
 } from '@/hooks/useCalls';
 import { formatDate } from '@/lib/format';
 import type { BadgeTone } from '@/components/ui/Badge';
+import { callTimelinePhase } from './call-timeline-read';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -151,12 +152,31 @@ interface ExpandedDetailProps {
 
 function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps) {
   const { t } = useTranslation('crm');
-  const { data: call, isLoading, isError } = useCall(callSessionId);
+  const detail = useCall(callSessionId);
+  // A missing payload is not a failed load. Failure is only a read that
+  // errored before any detail arrived.
+  const phase = callTimelinePhase(detail);
+  const call = detail.data;
   const extractInsights = useExtractInsights(callSessionId);
 
-  if (isLoading) {
+  if (phase === 'failed') {
     return (
-      <div className="mt-3 space-y-2">
+      <p className="mt-3 text-xs text-[var(--danger)]" role="alert">
+        {t('callTimeline.loadError', 'Failed to load call details.')}
+      </p>
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <div
+        className="mt-3 space-y-2"
+        aria-busy="true"
+        aria-label={t('callTimeline.detailUnreadLabel', 'Loading call detail')}
+      >
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('callTimeline.detailUnread', 'Checking the call detail. The detail has not arrived.')}
+        </p>
         {[1, 2].map((i) => (
           <div key={i} className="h-4 w-full animate-pulse rounded bg-[var(--surface-sunken)]" />
         ))}
@@ -164,13 +184,7 @@ function ExpandedDetail({ callSessionId, onOpenTranscript }: ExpandedDetailProps
     );
   }
 
-  if (isError || !call) {
-    return (
-      <p className="mt-3 text-xs text-[var(--danger)]">
-        {t('callTimeline.loadError', 'Failed to load call details.')}
-      </p>
-    );
-  }
+  if (!call) return null;
 
   const actionItems = Array.isArray(call.actionItems) ? call.actionItems : [];
 
