@@ -70,6 +70,17 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
   const closingItems = (closing.data?.items ?? []).filter(isOpenOpp);
   const closingValue = closingItems.reduce((acc, opp) => acc + (opp.value ?? 0), 0);
   const winRate = deriveWinRate(report.data);
+  // A missing payload is not an empty week and not an empty closed book.
+  const closingRead: ClosingRead = {
+    count: closingItems.length,
+    pending: closing.isLoading && !closing.isError,
+    failed: closing.isError,
+  };
+  const closedBook: ClosedBookRead = {
+    pending: report.isLoading && !report.isError,
+    failed: report.isError,
+    winRate,
+  };
 
   const signals = buildSignals({
     summary,
@@ -97,8 +108,8 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
         summary={summary}
         heroValue={summary.pipelineValue ?? 0}
         formatValue={(n) => formatUnspecifiedAmount(n)}
-        winRate={winRate}
-        closingCount={closingItems.length}
+        closedBook={closedBook}
+        closing={closingRead}
         t={t}
       />
       <StaggerList
@@ -116,16 +127,28 @@ export function OrgCommandHero({ summary }: { summary: OrgSummary }) {
 
 // ─── Hero panel (left) ───────────────────────────────────────────────────────
 
+interface ClosingRead {
+  count: number;
+  pending: boolean;
+  failed: boolean;
+}
+
+interface ClosedBookRead {
+  pending: boolean;
+  failed: boolean;
+  winRate: number | null;
+}
+
 interface HeroPanelProps {
   summary: OrgSummary;
   heroValue: number;
   formatValue: (n: number) => string;
-  winRate: number | null;
-  closingCount: number;
+  closedBook: ClosedBookRead;
+  closing: ClosingRead;
   t: TFunction;
 }
 
-function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }: HeroPanelProps) {
+function HeroPanel({ summary, heroValue, formatValue, closedBook, closing, t }: HeroPanelProps) {
   return (
     <div className="command-center-hero">
       <div className="command-center-orbit" aria-hidden>
@@ -143,7 +166,7 @@ function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }
       <p className="text-xs text-[var(--fg-tertiary)]">
         {t('orgHero.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}
       </p>
-      <p>{deriveFocusLine(summary, closingCount, t)}</p>
+      <p>{deriveFocusLine(summary, closing, t)}</p>
       <div
         className="command-center-actions"
         aria-label={t('orgHero.badges.ariaLabel', 'Portfolio status badges')}
@@ -153,10 +176,8 @@ function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }
             count: summary.openOpportunities,
           })}
         </Badge>
-        <Badge tone={winRateTone(winRate)}>
-          {winRate === null
-            ? t('orgHero.badge.noClosed', 'No closed bids yet')
-            : t('orgHero.badge.winRate', '{{rate}}% win rate', { rate: winRate })}
+        <Badge tone={closedBookTone(closedBook)}>
+          {closedBookLabel(closedBook, t)}
         </Badge>
         <Badge tone={summary.overdueTasks > 0 ? 'rose' : 'jade'}>
           {t('orgHero.badge.overdue', '{{count}} overdue follow-ups', {
@@ -171,21 +192,42 @@ function HeroPanel({ summary, heroValue, formatValue, winRate, closingCount, t }
 // The single sentence under the hero number. Mirrors the account cockpit's
 // deriveNextMove: always a concrete, data-backed instruction — never generic
 // dashboard copy — so the first screen tells the bid lead where to act.
-function deriveFocusLine(summary: OrgSummary, closingCount: number, t: TFunction): string {
+function deriveFocusLine(summary: OrgSummary, closing: ClosingRead, t: TFunction): string {
   if (summary.overdueTasks > 0) {
     return t('orgHero.focus.overdue', 'Clear {{count}} overdue follow-ups before new bids go out.', {
       count: summary.overdueTasks,
     });
   }
-  if (closingCount > 0) {
+  // A missing due list is not an empty week. The clear sentence is only for a
+  // settled read with nothing due, and only when open bids still exist.
+  const weekKnown = !closing.pending && !closing.failed;
+  if (weekKnown && closing.count > 0) {
     return t('orgHero.focus.closing', '{{count}} bids close within 7 days — run those reviews first.', {
-      count: closingCount,
+      count: closing.count,
     });
   }
   if (summary.openOpportunities === 0) {
     return t('orgHero.focus.noOpen', 'No open bids yet. Qualify the next lead to start the pipeline.');
   }
+  if (closing.failed) {
+    return t('orgHero.focus.closingFailed', 'The closing window did not load.');
+  }
+  if (closing.pending) {
+    return t('orgHero.focus.closingPending', 'Checking which bids are due this week.');
+  }
   return t('orgHero.focus.clear', 'Nothing due this week — runway is clear to advance mid-stage bids.');
+}
+
+function closedBookLabel(closedBook: ClosedBookRead, t: TFunction): string {
+  if (closedBook.failed) return t('orgHero.badge.closedFailed', 'Closed bids not loaded');
+  if (closedBook.pending) return t('orgHero.badge.closedPending', 'Checking closed bids');
+  if (closedBook.winRate === null) return t('orgHero.badge.noClosed', 'No closed bids yet');
+  return t('orgHero.badge.winRate', '{{rate}}% win rate', { rate: closedBook.winRate });
+}
+
+function closedBookTone(closedBook: ClosedBookRead): BadgeTone {
+  if (closedBook.failed || closedBook.pending || closedBook.winRate === null) return 'gray';
+  return winRateTone(closedBook.winRate);
 }
 
 function winRateTone(rate: number | null): BadgeTone {
