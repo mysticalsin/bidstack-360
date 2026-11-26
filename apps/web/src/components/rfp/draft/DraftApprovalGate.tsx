@@ -3,14 +3,20 @@ import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { useIsAdmin } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { Sentry } from '@/lib/sentry';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { useApproveDrafting } from '@/hooks/rfp/useApproveDrafting';
+import { useCapabilities } from '@/hooks/useCapabilities';
+
+import { draftAdminGranted, draftAdminPhase } from './draft-approval-read';
 
 export function DraftApprovalGate() {
   const { t } = useTranslation('rfp');
-  const isAdmin = useIsAdmin();
+  const auth = useAuth();
+  const caps = useCapabilities({ enabled: auth.isLoaded && auth.isSignedIn });
+  const phase = draftAdminPhase(caps);
+  const isAdmin = phase === 'ready' && draftAdminGranted(caps.data);
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
   const orchestrationId = useRfpPipelineStore((s) => s.orchestrationId);
   const stage = useRfpPipelineStore((s) => s.stage);
@@ -56,14 +62,27 @@ export function DraftApprovalGate() {
         The pipeline has paused before generating the RFP drafts. Please review the extracted requirements and matched stories above to ensure the AI has the correct context before spending tokens on full section drafts.
       </div>
 
-      {!isAdmin && (
+      {phase === 'unread' ? (
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t(
+            'approval.adminUnread',
+            'Checking admin access. The permission read has not arrived.',
+          )}
+        </p>
+      ) : null}
+      {phase === 'failed' ? (
+        <p role="alert" className="text-sm text-[var(--danger)]">
+          {t('approval.adminFailed', 'Could not check admin access.')}
+        </p>
+      ) : null}
+      {phase === 'ready' && !isAdmin ? (
         <div
           role="alert"
           className="rounded-lg border border-[var(--tag-amber-bg)] bg-[var(--tag-amber-bg)]/20 p-3 text-xs text-[var(--tag-amber-fg)]"
         >
           {t('approval.requiresAdmin')}
         </div>
-      )}
+      ) : null}
 
       <fieldset>
         <div className="mt-2 space-y-2">
