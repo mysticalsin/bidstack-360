@@ -24,14 +24,25 @@ export function PipelineStageChart() {
         ? 'empty'
         : 'ready';
 
-  const currencyNote = visual?.currency
-    ? `Amounts are in ${visual.currency}.`
-    : 'Amounts use the API value. Currency is unspecified because this endpoint does not send one.';
+  // A read that has not arrived has no currency to report. Saying the
+  // endpoint omitted one would mark the demo pipeline as missing a currency
+  // it has not shown. A settled payload still says unspecified when no code
+  // arrived, and names a code only when the rows share one.
+  const currencyNote =
+    query.isSuccess && visual
+      ? visual.currency
+        ? `Amounts are in ${visual.currency}.`
+        : 'Amounts use the API value. Currency is unspecified because this endpoint does not send one.'
+      : null;
 
   return (
     <InsightFrame
       title="Pipeline by stage"
-      caption={`Width is the opportunity count. ${currencyNote}`}
+      caption={
+        currencyNote
+          ? `Width is the opportunity count. ${currencyNote}`
+          : 'Width is the opportunity count.'
+      }
       status={status}
       errorMessage={insightErrorText(query.error)}
       onRetry={() => void query.refetch()}
