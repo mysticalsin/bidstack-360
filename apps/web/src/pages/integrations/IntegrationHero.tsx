@@ -2,9 +2,9 @@
  * integrations/IntegrationHero.tsx — hero banner and metric card strip for the
  * Integrations page.
  *
- * WHY a separate module: IntegrationHero is ~109 lines and IntegrationMetricCard
- * is ~36 lines. Together they are a self-contained "above the fold" section with
- * no query dependencies — they only receive props from IntegrationsPage.
+ * WHY a separate module: IntegrationHero and IntegrationMetricCard are the
+ * above-the-fold section. The webhook figure shares the event-list read.
+ * The other tiles still receive their numbers as props.
  */
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,10 +82,7 @@ export function IntegrationHero({
     status: eventsRead.status,
   });
   return (
-    <section
-      data-events-phase={eventsPhase}
-      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-6"
-    >
+    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <h1 className="text-[28px] font-medium text-[var(--fg-primary)]">
@@ -157,7 +154,18 @@ export function IntegrationHero({
           icon="bell"
           label={t('integrationHero.metrics.webhookEvents.label', 'Webhook events')}
           value={
-            eventsContinue ? (
+            eventsPhase === 'unread' ? (
+              <span role="status" className="text-sm font-medium leading-5">
+                {t(
+                  'integrationHero.metrics.webhookEvents.checking',
+                  'Checking events. The list has not arrived.',
+                )}
+              </span>
+            ) : eventsPhase === 'failed' ? (
+              <span role="alert" className="text-sm font-medium leading-5">
+                {t('integrationHero.metrics.webhookEvents.failed', 'Failed to load events')}
+              </span>
+            ) : eventsContinue ? (
               <span className="text-sm font-medium leading-5">
                 {t(
                   'integrationHero.metrics.webhookEvents.partial',
@@ -168,13 +176,38 @@ export function IntegrationHero({
               <AnimatedMetric value={String(summary.webhookEvents)} />
             )
           }
-          tone={summary.attentionEvents > 0 ? 'tomato' : 'blue'}
+          tone={
+            eventsPhase === 'failed'
+              ? 'tomato'
+              : eventsPhase === 'unread'
+                ? 'gray'
+                : summary.attentionEvents > 0
+                  ? 'tomato'
+                  : 'blue'
+          }
           helper={
-            summary.attentionEvents > 0
-              ? t('integrationHero.metrics.webhookEvents.helperNeedReview', '{{count}} need review', {
-                  count: summary.attentionEvents,
-                })
-              : t('integrationHero.metrics.webhookEvents.helperNoErrors', 'No event errors loaded')
+            eventsPhase === 'unread'
+              ? t(
+                  'integrationHero.metrics.webhookEvents.checkingHelper',
+                  'The list has not arrived.',
+                )
+              : eventsPhase === 'failed'
+                ? t(
+                    'integrationHero.metrics.webhookEvents.failedHelper',
+                    'The event list did not load.',
+                  )
+                : summary.attentionEvents > 0
+                  ? t(
+                      'integrationHero.metrics.webhookEvents.helperNeedReview',
+                      '{{count}} need review',
+                      {
+                        count: summary.attentionEvents,
+                      },
+                    )
+                  : t(
+                      'integrationHero.metrics.webhookEvents.helperNoErrors',
+                      'No event errors loaded',
+                    )
           }
         />
         <IntegrationMetricCard
