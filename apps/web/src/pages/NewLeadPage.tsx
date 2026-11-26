@@ -5,19 +5,28 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { toast } from '@/components/ui/Toast';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useCreateLead } from '@/hooks/useLeads';
 import type { LeadCreate } from '@bidstack/shared';
+
+import { newLeadAccessPhase } from './new-lead-access-read';
 
 export function NewLeadPage() {
   const { t } = useTranslation('crm');
   const nav = useNavigate();
   const create = useCreateLead();
   // POST /api/leads is gated server-side behind leads:write
-  // (apps/api/src/routes/leads.write.routes.ts) — show a read-only notice
-  // instead of a form that always 403s on submit when this page is reached
-  // directly (e.g. a bookmarked/typed URL) without the permission.
-  const canWrite = useHasPermission('leads:write');
+  // (apps/api/src/routes/leads.write.routes.ts). A settled manifest without
+  // that grant shows a read-only notice instead of a form that would 403.
+  // A payload that has not arrived is not that denial.
+  const caps = useCapabilities();
+  const phase = newLeadAccessPhase({
+    data: caps.data,
+    isError: caps.isError,
+    status: caps.status,
+  });
+  const canWrite =
+    caps.data != null && (caps.data.isAdmin || caps.data.permissions.includes('leads:write'));
   const firstNameRef = useRef<HTMLInputElement>(null);
   const lastNameRef = useRef<HTMLInputElement>(null);
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -61,7 +70,7 @@ export function NewLeadPage() {
       return;
     }
     setErrors({});
-    // Omit empty optional strings — the server schema rejects "" for fields like
+    // Omit empty optional strings. The server schema rejects "" for fields like
     // email (.email()), so blank optionals must be undefined, not "".
     const opt = (v: string | undefined): string | undefined => {
       const trimmed = v?.trim();
@@ -73,7 +82,7 @@ export function NewLeadPage() {
       lastName: form.lastName.trim(),
       email: opt(form.email),
       phone: opt(form.phone),
-      // companyName is required (schema min(1)) — keep it a string, just trimmed.
+      // companyName is required (schema min(1)). Keep it a string, just trimmed.
       companyName: form.companyName.trim(),
       title: opt(form.title),
     };
@@ -104,7 +113,7 @@ export function NewLeadPage() {
     </nav>
   );
 
-  if (!canWrite) {
+  if (phase !== 'ready' || !canWrite) {
     return (
       <div className="mx-auto max-w-2xl">
         {breadcrumb}
@@ -113,12 +122,26 @@ export function NewLeadPage() {
             <h1 className="text-xl font-semibold text-[var(--fg-primary)]">
               {t('newLead.heading', 'New lead')}
             </h1>
-            <p className="mt-2 text-sm text-[var(--fg-secondary)]">
-              {t('newLead.readOnlyNotice', 'You need lead write access to create a lead.')}
-            </p>
-            <Button variant="secondary" className="mt-4" onClick={() => nav('/leads')}>
-              {t('newLead.backToLeads', 'Back to leads')}
-            </Button>
+            {phase === 'unread' ? (
+              <p role="status" className="mt-2 text-sm text-[var(--fg-secondary)]">
+                {t('newLead.checking', 'Checking lead access. It has not arrived.')}
+              </p>
+            ) : null}
+            {phase === 'failed' ? (
+              <p role="alert" className="mt-2 text-sm text-[var(--fg-secondary)]">
+                {t('newLead.accessError', 'Could not check lead access.')}
+              </p>
+            ) : null}
+            {phase === 'ready' ? (
+              <>
+                <p className="mt-2 text-sm text-[var(--fg-secondary)]">
+                  {t('newLead.readOnlyNotice', 'You need lead write access to create a lead.')}
+                </p>
+                <Button variant="secondary" className="mt-4" onClick={() => nav('/leads')}>
+                  {t('newLead.backToLeads', 'Back to leads')}
+                </Button>
+              </>
+            ) : null}
           </div>
         </Card>
       </div>

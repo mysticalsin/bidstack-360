@@ -4,16 +4,36 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { NewLeadPage } from './NewLeadPage';
-import { useHasPermission } from '@/hooks/useCapabilities';
 
 // POST /api/leads is gated server-side behind leads:write
-// (apps/api/src/routes/leads.write.routes.ts) — a role without it must see a
-// read-only notice instead of a form that always 403s on submit.
+// (apps/api/src/routes/leads.write.routes.ts). A settled manifest without
+// that grant shows a read-only notice instead of a form that would 403.
+const caps = vi.hoisted(() => ({
+  current: {
+    data: { isAdmin: false, permissions: [] as string[] } as
+      | { isAdmin: boolean; permissions: string[] }
+      | null
+      | undefined,
+    isError: false,
+    status: 'success' as string,
+  },
+}));
+
 vi.mock('@/hooks/useLeads', () => ({
   useCreateLead: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn() }));
+vi.mock('@/hooks/useCapabilities', () => ({
+  useCapabilities: () => caps.current,
+}));
+
+function settled(permissions: string[]) {
+  caps.current = {
+    data: { isAdmin: false, permissions },
+    isError: false,
+    status: 'success',
+  };
+}
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -27,7 +47,7 @@ function renderWithProviders() {
   );
 }
 
-describe('NewLeadPage — leads:write gating', () => {
+describe('NewLeadPage leads:write gating', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -37,7 +57,7 @@ describe('NewLeadPage — leads:write gating', () => {
   });
 
   it('shows a read-only notice instead of the create form for a user without leads:write', () => {
-    vi.mocked(useHasPermission).mockReturnValue(false);
+    settled([]);
 
     renderWithProviders();
 
@@ -50,7 +70,7 @@ describe('NewLeadPage — leads:write gating', () => {
   });
 
   it('renders the full create form for a user with leads:write', () => {
-    vi.mocked(useHasPermission).mockReturnValue(true);
+    settled(['leads:write']);
 
     renderWithProviders();
 
@@ -60,7 +80,7 @@ describe('NewLeadPage — leads:write gating', () => {
   });
 
   it('carries no tagline under the heading', () => {
-    vi.mocked(useHasPermission).mockReturnValue(true);
+    settled(['leads:write']);
 
     renderWithProviders();
 
