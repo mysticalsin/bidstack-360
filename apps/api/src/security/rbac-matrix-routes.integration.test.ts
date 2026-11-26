@@ -120,6 +120,8 @@ const READ_LIKE_MUTATIONS: Record<string, string> = {
   'PUT /api/v1/companies/:id/follow':
     'Follows or mutes an account the caller can read; writes only the caller’s own follow row.',
   'POST /api/v1/presence': 'Ephemeral presence heartbeat; no record data.',
+  'POST /api/v1/presence/heartbeat':
+    'Refreshes the signed-in caller presence row; no record data.',
   'POST /api/v1/email-templates/render': 'Renders a template preview; read only.',
   'POST /api/v1/email-templates/:id/track-use': 'Usage counter on send; no content change.',
   'POST /api/v1/leads/:id/recovery-suggest': 'AI suggestion; nothing persisted.',
