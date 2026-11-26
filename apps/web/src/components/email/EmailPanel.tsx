@@ -10,10 +10,11 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Sheet, SheetContent } from '@/components/ui/Sheet';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { DraftComposer, type DraftLink } from './DraftComposer';
+import { emailListPhase } from './email-list-read';
 import { EmailThreadView } from './EmailThreadView';
 
 const LIMIT = 25;
@@ -53,9 +54,16 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
     getNextPageParam: (last, pages) => (last.hasMore ? pages.length + 1 : undefined),
     staleTime: 60_000,
   });
+  const phase = emailListPhase({
+    data: list.data,
+    isError: list.isError,
+    status: list.status,
+  });
+  const pages =
+    phase === 'ready' && list.data && Array.isArray(list.data.pages) ? list.data.pages : [];
   const threads = useMemo(
-    () => latestPerThread(list.data?.pages.flatMap((p) => p.messages) ?? []),
-    [list.data],
+    () => latestPerThread(pages.flatMap((page) => page.messages)),
+    [pages],
   );
 
   return (
@@ -69,11 +77,7 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
           </Button>
         }
       />
-      {list.isLoading ? (
-        <div className="p-5">
-          <LoadingSkeleton rows={3} />
-        </div>
-      ) : list.isError ? (
+      {phase === 'failed' ? (
         <ErrorState
           title={t('emailPanel.loadError', 'Could not load email')}
           action={
@@ -82,6 +86,10 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
             </Button>
           }
         />
+      ) : phase === 'unread' ? (
+        <p role="status" className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+          {t('emailPanel.checking', 'Checking email. The list has not arrived.')}
+        </p>
       ) : threads.length === 0 ? (
         <EmptyState title={t('emailPanel.empty', 'No email yet')} />
       ) : (
