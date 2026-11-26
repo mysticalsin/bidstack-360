@@ -9,6 +9,8 @@
  *
  * Color bands: risk (<40%) / watch (40-69%) / healthy (≥70%) — mapping and
  * theme-token pairs live in scoreTone.ts (shared with LeadScoreBadge).
+ *
+ * Unread says the probability has not arrived. A number, including 0, is only a settled read.
  */
 
 import { useState, useRef } from 'react';
@@ -16,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
 import { useOppScore } from '@/hooks/usePredictiveScore';
+import { oppWinProbabilityPhase } from '@/components/scoring/opp-win-probability-read';
 import { SCORE_TONE_CLASSES, oppWinProbabilityTone } from '@/components/scoring/scoreTone';
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -48,20 +51,6 @@ function featureLabel(feature: string, t: TFunction): string {
       'Qualification Score Norm',
       t('oppWinProbabilityBadge.featureQualificationScore', 'Qualification Score')
     );
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────
-
-function ProbSkeleton({ size = 'md' }: { size?: 'sm' | 'md' }) {
-  const { t } = useTranslation('crm');
-  const h = size === 'sm' ? 'h-5 w-14' : 'h-6 w-18';
-  return (
-    <span
-      className={`inline-block rounded-full animate-pulse bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] ${h}`}
-      aria-label={t('oppWinProbabilityBadge.loading', 'Loading probability...')}
-      aria-busy="true"
-    />
-  );
 }
 
 // ─── Popover ─────────────────────────────────────────────────────────────
@@ -138,16 +127,39 @@ export function OppWinProbabilityBadge({
   size = 'md',
 }: OppWinProbabilityBadgeProps) {
   const { t } = useTranslation('crm');
-  const { data, isLoading, isError } = useOppScore(prefetched ? undefined : oppId);
+  const query = useOppScore(prefetched ? undefined : oppId);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const prob = prefetched?.winProbability ?? data?.winProbability;
-  const factors = prefetched?.factors ?? data?.factors ?? [];
-  const recommendation = data?.recommendation ?? '';
+  const phase = oppWinProbabilityPhase(
+    prefetched
+      ? { data: prefetched, isError: false, status: 'success' }
+      : { data: query.data, isError: query.isError, status: query.status },
+  );
 
-  if (isLoading) return <ProbSkeleton size={size} />;
-  if (isError || prob === undefined) return null;
+  if (phase === 'unread') {
+    return (
+      <p className="text-xs text-[var(--fg-secondary)]">
+        {t(
+          'oppWinProbabilityBadge.checking',
+          'Checking the win probability. The probability has not arrived.',
+        )}
+      </p>
+    );
+  }
+
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className="text-xs text-[var(--danger)]">
+        {t('oppWinProbabilityBadge.loadError', 'Could not load the win probability.')}
+      </p>
+    );
+  }
+
+  const prob = prefetched?.winProbability ?? query.data?.winProbability;
+  const factors = prefetched?.factors ?? query.data?.factors ?? [];
+  const recommendation = query.data?.recommendation ?? '';
+  if (prob === undefined) return null;
 
   const colorClasses = SCORE_TONE_CLASSES[oppWinProbabilityTone(prob)];
   const label = probLabel(prob, t);
