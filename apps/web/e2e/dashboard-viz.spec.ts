@@ -75,6 +75,7 @@ test.describe('Account header brief', () => {
     await page.keyboard.press('Shift+B');
     const generating = page.getByTestId('brief-generating');
     await expect(generating).toBeVisible({ timeout: 10_000 });
-    await expect(generating.getByText('Reading the account')).toBeVisible();
+    await expect(generating).toContainText('Checking the brief. It has not arrived.');
+    await expect(generating.getByText('Reading the account')).toHaveCount(0);
   });
 });
