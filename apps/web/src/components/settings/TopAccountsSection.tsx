@@ -11,12 +11,14 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { TopAccountBadge } from '@/components/company/AccountTierBadges';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useTopAccounts, useUpdateTopAccountList } from '@/hooks/useTopAccounts';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { TOP_ACCOUNTS_MAX } from '@bidstack/shared';
+
+import { topAccountsReadPhase } from './top-accounts-read';
 
 interface PickedCompany {
   id: string;
@@ -75,8 +77,15 @@ export function TopAccountsSection() {
     }
   };
 
-  if (current.isLoading) return <LoadingSkeleton rows={4} />;
-  if (current.isError) {
+  const phase = topAccountsReadPhase(current);
+  if (phase === 'unread') {
+    return (
+      <p role="status" className="text-sm text-[var(--fg-secondary)]">
+        {t('topAccounts.checking', 'Checking the top accounts. The list has not arrived.')}
+      </p>
+    );
+  }
+  if (phase === 'error') {
     return (
       <ErrorState
         title={t('topAccounts.errorTitle', "Couldn't load the current Top 10")}
