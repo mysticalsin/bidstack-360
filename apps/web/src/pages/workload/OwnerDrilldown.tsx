@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import type { Opportunity } from '@bidstack/shared';
+import { ownerDrilldownPhase } from './owner-drilldown-read';
 
 interface Props {
   /** Owner email — the filter key the opportunities API understands. */
@@ -26,17 +27,22 @@ export function OwnerDrilldown({ email, ownerLabel }: Props) {
   const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
   const opps = useOpportunities({ owner: email, limit: 200 });
+  // A missing payload is not an empty desk. Empty is only a settled read.
+  const phase = ownerDrilldownPhase(opps);
 
-  if (opps.isLoading) {
+  if (phase === 'unread') {
     return (
       <div className="space-y-2 px-5 py-4" aria-busy="true" aria-live="polite">
+        <p role="status" className="text-xs text-[var(--fg-secondary)]">
+          {t('workload.drilldownUnread', 'Checking this desk. The live bids have not arrived.')}
+        </p>
         <div className="bs-shimmer h-8" />
         <div className="bs-shimmer h-8" />
       </div>
     );
   }
 
-  if (opps.isError) {
+  if (phase === 'failed') {
     return (
       <p role="alert" className="px-5 py-4 text-xs text-[var(--danger)]">
         {t('workload.drilldownError', "Couldn't load {{owner}}'s bids — expand again to retry.", {
