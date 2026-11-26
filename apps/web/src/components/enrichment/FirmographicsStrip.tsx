@@ -15,6 +15,7 @@ import { beatsProvider, figureText, useSourcedFigures } from '@/hooks/useSourced
 import { trendPct } from '@/lib/enrichment/aggregate';
 import { fmtAsOf, fmtMoney } from '@/lib/enrichment/client';
 
+import { firmographicsPhase } from './firmographics-read';
 import { SampleBadge, SourceNote } from './SourceNote';
 
 const NA = <span className="en-fact-sm" style={{ color: 'var(--fg-tertiary)' }}>Not known</span>;
@@ -25,7 +26,18 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
   const canRefresh = useHasPermission('companies:write');
   const [allLocations, setAllLocations] = useState(false);
   const sourced = useSourcedFigures(companyId);
-  if (!q.data) return null;
+  const phase = firmographicsPhase(q);
+  if (phase === 'unread') {
+    return <p className="en-src">Checking company facts. The enrichment has not arrived.</p>;
+  }
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className="en-src">
+        Could not load company facts.
+      </p>
+    );
+  }
+  if (q.data == null) return null;
   const d = q.data;
   const f = d.firmographics;
   const hc = f.headcount;
