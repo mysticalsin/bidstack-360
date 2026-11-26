@@ -235,7 +235,7 @@ export function CountryDetailPanel({
 
 export function TerritoryListPanel({
   items,
-  isLoading,
+  payloadArrived,
   isError,
   errorMessage,
   onRetry,
@@ -246,7 +246,12 @@ export function TerritoryListPanel({
   pageContinues = false,
 }: {
   items: Territory[];
-  isLoading: boolean;
+  /**
+   * False when this list read has no payload yet: idle, paused, or in flight.
+   * isLoading is false for the idle and paused cases, so a missing payload
+   * must not become "0 total" or "No territories".
+   */
+  payloadArrived: boolean;
   isError: boolean;
   errorMessage?: string;
   onRetry: () => void;
@@ -265,23 +270,36 @@ export function TerritoryListPanel({
           <Icon name="building" size={14} className="text-[var(--brand-primary)]" />
           {t('territoryPanels.territories', 'Territories')}
         </h2>
-        <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
-          {pageContinues
-            ? t(
-                'territoryPanels.countPartial',
-                territoryListCaption(items.length, true, TERRITORY_LIST_PAGE),
-              )
-            : t('territoryPanels.countTotal', '{{count}} total', { count: items.length })}
-        </span>
+        {payloadArrived ? (
+          <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
+            {pageContinues
+              ? t(
+                  'territoryPanels.countPartial',
+                  territoryListCaption(items.length, true, TERRITORY_LIST_PAGE),
+                )
+              : t('territoryPanels.countTotal', '{{count}} total', { count: items.length })}
+          </span>
+        ) : null}
       </div>
-      {isError ? (
-        <ErrorState
-          title={t('territoryPanels.failedToLoad', 'Failed to load')}
-          message={errorMessage}
-          action={<Button onClick={onRetry}>{t('territoryPanels.retry', 'Retry')}</Button>}
-        />
-      ) : isLoading ? (
-        <TableSkeleton rows={4} />
+      {!payloadArrived ? (
+        isError ? (
+          <div
+            role="alert"
+            className="space-y-1 rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-center text-xs text-[var(--fg-secondary)]"
+          >
+            <p>{t('territoryPanels.listFailed', 'Could not read territories.')}</p>
+            {errorMessage ? <p className="text-[var(--fg-tertiary)]">{errorMessage}</p> : null}
+            <Button onClick={onRetry}>{t('territoryPanels.retry', 'Retry')}</Button>
+          </div>
+        ) : (
+          <p
+            role="status"
+            aria-busy="true"
+            className="rounded-lg border border-dashed border-[var(--border-subtle)] p-3 text-center text-xs text-[var(--fg-tertiary)]"
+          >
+            {t('territoryPanels.listChecking', 'Checking territories. They have not arrived.')}
+          </p>
+        )
       ) : items.length === 0 ? (
         <EmptyState title={t('territoryPanels.noTerritories', 'No territories')} />
       ) : (
