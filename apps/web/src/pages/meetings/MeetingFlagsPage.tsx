@@ -12,6 +12,7 @@ import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useDismissFlag, useMeetingFlags } from '@/hooks/useMeetingIntel';
 
 import { shownMeetingFlags } from './meeting-flag-caption';
+import { meetingFlagsPhase } from './meeting-flags-read';
 import { MeetingsTabs } from './MeetingsTabs';
 
 type Status = 'open' | 'dismissed';
@@ -20,6 +21,7 @@ export default function MeetingFlagsPage() {
   const { flagId } = useParams();
   const [status, setStatus] = useState<Status>('open');
   const flags = useMeetingFlags(flagId ? 'all' : status);
+  const phase = meetingFlagsPhase(flags);
   const dismiss = useDismissFlag();
   const page = shownMeetingFlags(flags.data?.items ?? [], flags.data?.flagsContinue);
   const items = page.items.filter((f) => (flagId ? true : f.status === status));
@@ -45,7 +47,12 @@ export default function MeetingFlagsPage() {
           ))}
         </div>
       ) : null}
-      {flags.isLoading ? <LoadingSkeleton rows={3} /> : flags.isError ? (
+      {phase === 'unread' ? (
+        <>
+          <p role="status" className="mi-caption">Checking flags. They have not arrived.</p>
+          <LoadingSkeleton rows={3} />
+        </>
+      ) : phase === 'failed' ? (
         <ErrorState title="Couldn't load flags" action={<Button variant="secondary" onClick={() => void flags.refetch()}>Retry</Button>} />
       ) : ordered.length === 0 ? (
         <p className="mi-empty">{status === 'open' ? 'No open flags. When a colleague meets someone at a sister account, it shows up here.' : 'Nothing dismissed.'}</p>
