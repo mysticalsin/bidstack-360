@@ -105,7 +105,16 @@ export function MeetingSourcesSection() {
   const canWrite = useHasPermission('meetings:write');
   if (q.isLoading) return <p className="mi-empty">Loading sources…</p>;
   if (q.isError) return <p className="mi-empty" role="alert">Meeting sources are unavailable{q.error instanceof ApiError && q.error.status === 403 ? ': you need meetings:read.' : '.'}</p>;
-  const items = q.data?.items ?? [];
+  // A paused first read has isLoading false and no payload. Connect Métis and
+  // Sync now are the not-connected book. That list has not arrived.
+  if (q.data == null) {
+    return (
+      <p className="mi-empty" role="status">
+        Checking meeting sources. They have not arrived.
+      </p>
+    );
+  }
+  const items = q.data.items;
   return (
     <div style={{ display: 'grid', gap: 24 }} id="meeting-sources">
       <MetisCard s={items.find((i) => i.source === 'metis')} canWrite={canWrite} />
