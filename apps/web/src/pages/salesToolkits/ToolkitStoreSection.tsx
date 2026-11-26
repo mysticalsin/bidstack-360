@@ -22,6 +22,8 @@ import {
 } from '@/hooks/useSalesToolkitStore';
 import type { SalesToolkit, SalesToolkitCreate } from '@bidstack/shared';
 
+import { toolkitStorePhase } from './toolkit-store-read';
+
 const CATEGORIES: Array<{ value: SalesToolkitCreate['category']; label: string }> = [
   { value: 'deck', label: 'Deck' },
   { value: 'template', label: 'Template' },
@@ -53,6 +55,8 @@ export function ToolkitStoreSection() {
   const [category, setCategory] = useState<string>('');
   const [draft, setDraft] = useState<DraftState | null>(null);
   const store = useSalesToolkitStore(category ? { category } : undefined);
+  // A missing payload is not an empty library. Empty is only a settled read.
+  const phase = toolkitStorePhase(store);
   const create = useCreateToolkit();
   const update = useUpdateToolkit();
   const remove = useDeleteToolkit();
@@ -230,9 +234,14 @@ export function ToolkitStoreSection() {
       ) : null}
 
       <div className="p-4">
-        {store.isLoading ? (
-          <LoadingSkeleton rows={4} />
-        ) : store.isError ? (
+        {phase === 'unread' ? (
+          <>
+            <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+              Checking stored toolkits. The list has not arrived.
+            </p>
+            <LoadingSkeleton rows={4} />
+          </>
+        ) : phase === 'failed' ? (
           <ErrorState
             title="Couldn't load toolkits"
             message={store.error?.message ?? 'Try again shortly.'}
