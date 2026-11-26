@@ -209,3 +209,42 @@ describe('computeSlots', () => {
     expect(result).toHaveLength(0);
   });
 });
+
+function zonedDay(iso: string, tz: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+describe('one booking calendar day', () => {
+  // WHY: the seeded discovery page offers 09:00–17:00 every day. The public
+  // window is noon UTC through 23:59 UTC of the requested date. In Paris that
+  // end is already 00:59 the next morning, so Thursday's page also offers
+  // Friday 09:00. A guest books the wrong day.
+  it('does not offer the next morning when the guest is ahead of UTC', () => {
+    const date = '2026-11-26';
+    const tz = 'Europe/Paris';
+    const rules: AvailabilityRule[] = [4, 5].map((dayOfWeek) => ({
+      dayOfWeek,
+      startTime: '09:00',
+      endTime: '10:00',
+    }));
+    const slots = computeSlots({
+      rules,
+      existingEvents: [],
+      rangeStart: new Date(`${date}T12:00:00.000Z`),
+      rangeEnd: new Date(`${date}T23:59:59.000Z`),
+      durationMinutes: 30,
+      tz,
+      minNoticeHours: 0,
+    });
+
+    expect(slots.length).toBeGreaterThan(0);
+    expect(slots.every((slot) => zonedDay(slot, tz) === date)).toBe(true);
+  });
+});
