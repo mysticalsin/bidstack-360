@@ -20,11 +20,14 @@ import { useHasPermission } from '@/hooks/useCapabilities';
 import type { WorkflowCreate } from '@bidstack/shared';
 import { NewWorkflowDialog } from './workflowsPage/NewWorkflowDialog';
 import { WORKFLOW_LIST_PAGE, workflowListCaption } from './workflowsPage/workflow-list-caption';
+import { workflowsListPhase } from './workflows-list-read';
 
 export function WorkflowsPage() {
   const { t } = useTranslation('crm');
   const [showActiveOnly, setShowActiveOnly] = useState<boolean | undefined>(undefined);
-  const { data, isLoading, isError, error, refetch } = useWorkflows(showActiveOnly);
+  const list = useWorkflows(showActiveOnly);
+  const phase = workflowsListPhase(list);
+  const { data, error, refetch } = list;
 
   const createWf = useCreateWorkflow();
   const updateWf = useUpdateWorkflow();
@@ -110,6 +113,27 @@ export function WorkflowsPage() {
     });
   };
 
+  if (phase === 'unread') {
+    return (
+      <div className="page">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('workflows.unread', 'Checking workflows. The list has not arrived.')}
+        </p>
+        <TableSkeleton rows={6} />
+      </div>
+    );
+  }
+
+  if (phase === 'failed') {
+    return (
+      <ErrorState
+        title={t('workflows.errorTitle', 'Failed to load workflows')}
+        message={error?.message}
+        action={<Button onClick={() => refetch()}>{t('workflows.retry', 'Retry')}</Button>}
+      />
+    );
+  }
+
   return (
     <div className="page">
       <div className="page-head">
@@ -134,20 +158,12 @@ export function WorkflowsPage() {
 
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!isLoading && data
+        {data
           ? `${workflowCountLabel}${showActiveOnly ? t('workflows.activeOnlySuffix', ' · active only') : ''}`
           : ''}
       </p>
 
-      {isError ? (
-        <ErrorState
-          title={t('workflows.errorTitle', 'Failed to load workflows')}
-          message={error?.message}
-          action={<Button onClick={() => refetch()}>{t('workflows.retry', 'Retry')}</Button>}
-        />
-      ) : isLoading ? (
-        <TableSkeleton rows={6} />
-      ) : items.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyState
           title={t('workflows.emptyTitle', 'No workflows yet')}
           action={
