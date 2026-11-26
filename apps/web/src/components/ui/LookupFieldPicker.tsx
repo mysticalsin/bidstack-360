@@ -83,10 +83,13 @@ export function LookupFieldPicker({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<LookupOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [readFailed, setReadFailed] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bumped when the query changes so an older reply cannot land on this query.
+  const requestRef = useRef(0);
 
   // Displayed options: recents when query is empty, search results otherwise.
   const options = useMemo<LookupOption[]>(() => {
@@ -98,26 +101,43 @@ export function LookupFieldPicker({
   const safeIdx = options.length === 0 ? 0 : Math.min(activeIdx, options.length - 1);
 
   // Debounced search: cancel on query change, fire after delay.
+  // A reply is applied only when it is still the latest query. An older
+  // empty list is not this query, and a rejected read is not an empty catalog.
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (query.trim().length < MIN_QUERY_LEN) {
+    const trimmed = query.trim();
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+    if (trimmed.length < MIN_QUERY_LEN) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- short queries clear stale async search results.
       setResults([]);
-
+      setReadFailed(false);
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    setReadFailed(false);
     timerRef.current = setTimeout(() => {
-      void onSearch(query.trim()).then((r) => {
-        setResults(r);
-        setLoading(false);
-        setActiveIdx(0);
-      });
+      void onSearch(trimmed)
+        .then((rows) => {
+          if (requestId !== requestRef.current) return;
+          setResults(rows);
+          setReadFailed(false);
+          setLoading(false);
+          setActiveIdx(0);
+        })
+        .catch(() => {
+          if (requestId !== requestRef.current) return;
+          setResults([]);
+          setReadFailed(true);
+          setLoading(false);
+        });
     }, debounceMs);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      // Drop an in-flight reply when this query is replaced or the picker unmounts.
+      requestRef.current += 1;
     };
   }, [query, debounceMs, onSearch]);
 
@@ -246,6 +266,10 @@ export function LookupFieldPicker({
             {loading ? (
               <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]" aria-live="polite">
                 {t('lookupFieldPicker.searching', 'Searching…')}
+              </li>
+            ) : readFailed ? (
+              <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]" aria-live="polite">
+                {t('lookupFieldPicker.searchFailed', 'Search could not be completed.')}
               </li>
             ) : options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-[var(--fg-tertiary)]">
