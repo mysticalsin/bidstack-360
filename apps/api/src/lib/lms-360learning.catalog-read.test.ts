@@ -44,8 +44,9 @@ describe('live toolkit catalog read', () => {
       ),
     );
 
-    await expect(fetchLmsCourses()).rejects.toBeInstanceOf(LmsError);
-    await expect(fetchLmsCourses()).rejects.toThrow('LMS returned an unexpected payload shape');
+    const read = fetchLmsCourses();
+    await expect(read).rejects.toBeInstanceOf(LmsError);
+    await expect(read).rejects.toThrow('LMS returned an unexpected payload shape');
   });
 
   it('still returns a settled empty catalog', async () => {
