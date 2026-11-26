@@ -24,9 +24,16 @@ export function UserRolesManager({ userId, userName }: Props) {
   const revoke = useRevokeUserRole(userId);
   const [pickerValue, setPickerValue] = useState('');
 
-  const assigned = assignedQuery.data ?? [];
-  const assignedIds = new Set(assigned.map((r) => r.roleId));
-  const assignable = (allRoles.data?.items ?? []).filter((r) => !assignedIds.has(r.id));
+  // An unread grant is not an empty assignment. An unread catalog is not a
+  // full one. Assign stays hidden until both reads have arrived.
+  const assignedList =
+    !assignedQuery.isPending && !assignedQuery.isError && assignedQuery.data !== undefined
+      ? assignedQuery.data
+      : null;
+  const catalog =
+    !allRoles.isPending && !allRoles.isError && allRoles.data !== undefined ? allRoles.data : null;
+  const assignedIds = new Set((assignedList ?? []).map((role) => role.roleId));
+  const assignable = (catalog?.items ?? []).filter((role) => !assignedIds.has(role.id));
 
   function onAssign() {
     if (!pickerValue) return;
@@ -39,21 +46,25 @@ export function UserRolesManager({ userId, userName }: Props) {
         {t('userRolesManager.heading', 'Roles for {{userName}}', { userName })}
       </p>
 
-      {assignedQuery.isError ? (
-        <p className="text-sm text-[var(--danger)]">
-          {t('userRolesManager.errorLoading', 'Could not load this user’s roles.')}
+      {assignedQuery.isPending ? (
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('userRolesManager.checking', 'Checking roles for {{userName}}.', { userName })}
         </p>
-      ) : assignedQuery.isLoading ? (
-        <p className="text-sm text-[var(--fg-secondary)]">
-          {t('userRolesManager.loading', 'Loading roles…')}
+      ) : assignedList === null ? (
+        <p role="alert" className="text-sm text-[var(--danger)]">
+          {t(
+            'userRolesManager.failed',
+            'Could not load roles for {{userName}}. The saved roles have not arrived.',
+            { userName },
+          )}
         </p>
-      ) : assigned.length === 0 ? (
+      ) : assignedList.length === 0 ? (
         <p className="text-sm text-[var(--fg-secondary)]">
           {t('userRolesManager.empty', 'No custom roles assigned yet.')}
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {assigned.map((r) => (
+          {assignedList.map((r) => (
             <span key={r.roleId} className="inline-flex items-center gap-1">
               <Badge tone="purple">{r.name}</Badge>
               <button
@@ -73,39 +84,56 @@ export function UserRolesManager({ userId, userName }: Props) {
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-2">
-        <label className="sr-only" htmlFor={`assign-role-${userId}`}>
-          {t('userRolesManager.assignLabel', 'Assign a role to {{userName}}', { userName })}
-        </label>
-        <select
-          id={`assign-role-${userId}`}
-          className="input max-w-[16rem]"
-          value={pickerValue}
-          onChange={(e) => setPickerValue(e.target.value)}
-          disabled={allRoles.isLoading || assignable.length === 0}
-        >
-          <option value="">
-            {assignable.length === 0
-              ? t('userRolesManager.allAssigned', 'All roles assigned')
-              : t('userRolesManager.selectPlaceholder', 'Select a role to assign…')}
-          </option>
-          {assignable.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
+      {assignedList !== null && allRoles.isPending ? (
+        <p role="status" className="mt-3 text-sm text-[var(--fg-secondary)]">
+          {t('userRolesManager.catalogChecking', 'Checking the role list.')}
+        </p>
+      ) : null}
+
+      {assignedList !== null && !allRoles.isPending && catalog === null ? (
+        <p role="alert" className="mt-3 text-sm text-[var(--danger)]">
+          {t(
+            'userRolesManager.catalogFailed',
+            'Could not load the role list. The saved roles have not arrived.',
+          )}
+        </p>
+      ) : null}
+
+      {assignedList !== null && catalog !== null ? (
+        <div className="mt-3 flex items-center gap-2">
+          <label className="sr-only" htmlFor={`assign-role-${userId}`}>
+            {t('userRolesManager.assignLabel', 'Assign a role to {{userName}}', { userName })}
+          </label>
+          <select
+            id={`assign-role-${userId}`}
+            className="input max-w-[16rem]"
+            value={pickerValue}
+            onChange={(e) => setPickerValue(e.target.value)}
+            disabled={assignable.length === 0}
+          >
+            <option value="">
+              {assignable.length === 0
+                ? t('userRolesManager.allAssigned', 'All roles assigned')
+                : t('userRolesManager.selectPlaceholder', 'Select a role to assign…')}
             </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          disabled={!pickerValue || assign.isPending}
-          onClick={onAssign}
-        >
-          {assign.isPending
-            ? t('userRolesManager.assigning', 'Assigning…')
-            : t('userRolesManager.assign', 'Assign')}
-        </button>
-      </div>
+            {assignable.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={!pickerValue || assign.isPending}
+            onClick={onAssign}
+          >
+            {assign.isPending
+              ? t('userRolesManager.assigning', 'Assigning…')
+              : t('userRolesManager.assign', 'Assign')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
