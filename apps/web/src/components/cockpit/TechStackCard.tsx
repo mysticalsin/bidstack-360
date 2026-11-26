@@ -206,6 +206,28 @@ export const TechStackCard = memo(function TechStackCard({ cockpit }: Props) {
     }
   };
 
+  // No saved payload yet, and the cockpit snapshot has no technologies either.
+  // That is a read that has not settled, not an empty stack to build from.
+  if (technicalStack.data == null && cockpit.technicalStack.length === 0) {
+    const readStatus = technicalStack.isError
+      ? t(
+          'techStack.readFailed',
+          'Could not load the technical stack. The saved stack has not arrived.',
+        )
+      : t(
+          'techStack.readPending',
+          'Checking the technical stack. The saved stack has not arrived.',
+        );
+    return (
+      <Card role="region" aria-label={t('techStack.regionLabel', 'Technical Stack Overview')}>
+        <SectionHeader title={t('techStack.title', 'Technical Stack Overview')} />
+        <p role="status" className="px-5 pb-5 text-sm text-[var(--fg-secondary)]">
+          {readStatus}
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card role="region" aria-label={t('techStack.regionLabel', 'Technical Stack Overview')}>
       <SectionHeader
