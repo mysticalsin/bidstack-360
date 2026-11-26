@@ -16,7 +16,7 @@ import { DotHistogram } from '@/components/charts/tuffui/dot-histogram';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select, type SelectOption } from '@/components/ui/Select';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useUsers } from '@/hooks/useUsers';
 import { REASON_LABELS } from '@/pages/winLoss/reasonLabels';
 import { WinLossRecentTable } from '@/pages/winLoss/WinLossRecentTable';
@@ -101,6 +101,12 @@ export default function WinLossPage() {
     setOwnerId('');
   };
   const isEmpty = Boolean(data && data.totalWon + data.totalLost === 0);
+  // A read that has not arrived is not an empty review. A paused read has no
+  // payload and isLoading is false, so the empty sentence would say this range
+  // already has no closed bids. An in-flight read is the same unread review.
+  // A failed read with no payload keeps the error. A later failure keeps the
+  // closed bids already on screen. A payload that arrived empty still says
+  // there are no closed bids in this range.
 
   return (
     <div className="space-y-5">
@@ -144,29 +150,23 @@ export default function WinLossPage() {
         )}
       </div>
 
-      {analysis.isLoading ? (
-        <>
-          <div className="grid gap-3 md:grid-cols-3">
-            <KpiCard title="" value={0} loading />
-            <KpiCard title="" value={0} loading />
-            <KpiCard title="" value={0} loading />
-          </div>
-          <ChartContainer loading title={t('winLoss.quarterChartTitle', 'Wins vs losses by quarter')}>
-            <div />
-          </ChartContainer>
-          <LoadingSkeleton rows={5} />
-        </>
-      ) : analysis.isError ? (
-        <ErrorState
-          title={t('winLoss.errorTitle', 'Could not load the win/loss analysis')}
-          message={analysis.error?.message ?? t('winLoss.errorMessage', 'Try again shortly.')}
-          action={
-            <Button variant="secondary" size="sm" onClick={() => void analysis.refetch()}>
-              {t('winLoss.retry', 'Retry')}
-            </Button>
-          }
-        />
-      ) : isEmpty || !data ? (
+      {data == null ? (
+        analysis.isError ? (
+          <ErrorState
+            title={t('winLoss.errorTitle', 'Could not load the win/loss analysis')}
+            message={analysis.error?.message ?? t('winLoss.errorMessage', 'Try again shortly.')}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => void analysis.refetch()}>
+                {t('winLoss.retry', 'Retry')}
+              </Button>
+            }
+          />
+        ) : (
+          <p role="status" aria-busy="true" className="text-sm text-[var(--fg-secondary)]">
+            {t('winLoss.checking', 'Checking the win/loss review. It has not arrived.')}
+          </p>
+        )
+      ) : isEmpty ? (
         <EmptyState
           title={t('winLoss.emptyTitle', 'No closed bids in this range yet')}
           message={t(
