@@ -23,6 +23,7 @@ import {
 } from '@/hooks/useApiKeys';
 import { formatDate, relativeTime } from '@/lib/format';
 import { apiKeyListCaption } from './api-key-list-caption';
+import { apiKeyListPhase } from './api-key-list-read';
 
 const MCP_SCOPES = ['mcp', 'read', 'write'] as const satisfies readonly ApiKeyScope[];
 const REST_READ_SCOPES = PERMISSION_KEYS.filter((scope) => scope.endsWith(':read'));
@@ -47,6 +48,8 @@ export function ApiKeysSection() {
   const list = useApiKeys();
   const create = useCreateApiKey();
   const revoke = useRevokeApiKey();
+  // A missing payload is not an empty key list. Empty is only a settled read.
+  const phase = apiKeyListPhase(list);
   const [open, setOpen] = useState(false);
   const [revealed, setRevealed] = useState<ApiKeyCreated | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -336,22 +339,14 @@ export function ApiKeysSection() {
         </div>
       ) : null}
 
-      {list.isLoading ? (
-        <ul className="divide-y divide-[var(--border-subtle)] text-sm">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <li key={i} className="px-5 py-4">
-              {/* Use the shared `bs-shimmer` keyframe so loading
-                  states across the app feel identical — instead of the
-                  generic Tailwind .animate-pulse which uses a different
-                  curve. */}
-              <div className="bs-shimmer h-4 w-1/3" />
-            </li>
-          ))}
-        </ul>
-      ) : list.isError ? (
+      {phase === 'unread' ? (
+        <p className="px-5 py-6 text-center text-sm text-[var(--fg-secondary)]" role="status">
+          {t('apiKeys.unreadMessage', 'Checking API keys. The payload has not arrived.')}
+        </p>
+      ) : phase === 'failed' ? (
         <div className="p-5">
           <ErrorState
-            title={t('apiKeys.loadError.title', "Couldn't load API keys")}
+            title={t('apiKeys.loadError.title', 'API keys did not load.')}
             message={
               list.error instanceof Error
                 ? list.error.message
