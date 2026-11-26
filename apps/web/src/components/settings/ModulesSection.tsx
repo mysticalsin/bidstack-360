@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useAppModules, useUpdateAppModules } from '@/hooks/useAppModules';
 import type { AppModules, AppModulesUpdate } from '@bidstack/shared';
 
@@ -40,18 +41,52 @@ function Toggle({
 }
 
 export function ModulesSection() {
-  const { data, isLoading } = useAppModules();
+  const { data, isLoading, isError, refetch } = useAppModules();
   const update = useUpdateAppModules();
   // Draft overlays the server value (no setState-in-effect); a key is "edited"
   // once it's present in draft.
   const [draft, setDraft] = useState<AppModulesUpdate>({});
 
+  // Save waits until the module record arrives. A load in progress and a failed
+  // read stay off the toggles, so a missing record is not written as saved off.
+  if (!data) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <SectionHeader
+            title="Modules"
+            caption={
+              isError
+                ? 'Optional workspace modules are not loaded.'
+                : 'Checking saved module settings.'
+            }
+          />
+          <div className="px-5 pb-4">
+            {isError ? (
+              <ErrorState
+                title="Could not load modules"
+                message="Retry the module list before saving."
+                action={
+                  <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+                    Retry
+                  </Button>
+                }
+              />
+            ) : (
+              <LoadingSkeleton rows={4} />
+            )}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   const view: AppModules = {
-    agentStudioEnabled: draft.agentStudioEnabled ?? data?.agentStudioEnabled ?? false,
-    appflowyEnabled: draft.appflowyEnabled ?? data?.appflowyEnabled ?? false,
-    appflowyUrl: draft.appflowyUrl !== undefined ? draft.appflowyUrl : (data?.appflowyUrl ?? null),
+    agentStudioEnabled: draft.agentStudioEnabled ?? data.agentStudioEnabled,
+    appflowyEnabled: draft.appflowyEnabled ?? data.appflowyEnabled,
+    appflowyUrl: draft.appflowyUrl !== undefined ? draft.appflowyUrl : data.appflowyUrl,
     // SERUM is toggled in its own section; preserve the current value here.
-    serumEnabled: draft.serumEnabled ?? data?.serumEnabled ?? false,
+    serumEnabled: draft.serumEnabled ?? data.serumEnabled,
   };
   const set = <K extends keyof AppModulesUpdate>(k: K, v: AppModulesUpdate[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
