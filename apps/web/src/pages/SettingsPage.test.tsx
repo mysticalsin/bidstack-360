@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,8 @@ const authMocks = vi.hoisted(() => ({
   isAdmin: true,
   canReadAudit: false,
   loading: false,
+  failed: false,
+  refetch: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -16,17 +18,24 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/lib/auth', () => ({
-  useIsAdmin: () => !authMocks.loading && authMocks.isAdmin,
+  useIsAdmin: () => !authMocks.loading && !authMocks.failed && authMocks.isAdmin,
   useOrgAdminStatus: () => ({
-    isAdmin: !authMocks.loading && authMocks.isAdmin,
+    // A failed manifest has no permissions. Production reports not-admin, not a loaded denial.
+    isAdmin: !authMocks.loading && !authMocks.failed && authMocks.isAdmin,
     isLoading: authMocks.loading,
   }),
 }));
 
 vi.mock('@/hooks/useCapabilities', () => ({
-  useCapabilities: () => ({ isLoading: authMocks.loading }),
+  useCapabilities: () => ({
+    isLoading: authMocks.loading,
+    isPending: authMocks.loading,
+    isError: authMocks.failed,
+    data: authMocks.loading || authMocks.failed ? undefined : {},
+    refetch: authMocks.refetch,
+  }),
   useHasPermission: (key: string) =>
-    !authMocks.loading && key === 'audit-log:read' && authMocks.canReadAudit,
+    !authMocks.loading && !authMocks.failed && key === 'audit-log:read' && authMocks.canReadAudit,
 }));
 
 vi.mock('@/components/settings/SettingsLayout', () => ({
@@ -122,6 +131,8 @@ describe('SettingsPage routing guard', () => {
     authMocks.isAdmin = true;
     authMocks.canReadAudit = false;
     authMocks.loading = false;
+    authMocks.failed = false;
+    authMocks.refetch.mockReset();
   });
 
   afterEach(() => cleanup());
@@ -174,6 +185,29 @@ describe('SettingsPage routing guard', () => {
     expect(screen.getByTestId('active-tab').textContent).toBe('identity');
     expect(screen.getByText('Identity panel')).toBeTruthy();
     expect(screen.getByTestId('location').textContent).toBe('/settings?tab=identity');
+  });
+
+  it('does not unload the Modules tab when the access check fails', async () => {
+    // WHY: Demo settings open Modules before the capability manifest returns.
+    // A failed read has no saved answer. Treating that miss as a non-admin
+    // visit rewrites the tab to overview and unloads the module switches.
+    // An unread check and a loaded non-admin visit are different.
+    authMocks.isAdmin = true;
+    authMocks.failed = true;
+
+    renderPage('/settings?tab=modules');
+
+    expect(screen.getByRole('heading', { name: 'Modules' })).toBeTruthy();
+    expect(screen.getByText('Could not check settings access')).toBeTruthy();
+    expect(screen.getByText('Module switches stay hidden until this check arrives.')).toBeTruthy();
+    expect(screen.queryByText('Modules panel')).toBeNull();
+    expect(screen.queryByText('Overview panel')).toBeNull();
+    expect(screen.queryByText('SERUM panel')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(authMocks.refetch).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toBe('/settings?tab=modules'),
+    );
   });
 
   it('keeps an admin deep link while capabilities are still loading', async () => {
