@@ -327,8 +327,24 @@ export function SerumAuditDrawer({ latestConfigChangeAt }: { latestConfigChangeA
   );
 }
 
-export function SerumApprovalCard({ openApprovals }: { openApprovals: number }) {
+export function SerumApprovalCard({
+  openApprovals,
+  report,
+}: {
+  openApprovals: number;
+  report?: SerumStatusCard;
+}) {
   const { t } = useTranslation('crm');
+  // Ready and active are settled counts. Anything else on the approvals card
+  // means the pending total has not arrived, so the none line stays off.
+  const unsettled = report != null && report.status !== 'ready' && report.status !== 'active';
+  const body = unsettled
+    ? report.detail
+    : openApprovals > 0
+      ? t('crm.serumApproval.pending', '{{count}} RFP approval gates need review.', {
+          count: openApprovals,
+        })
+      : t('crm.serumApproval.none', 'No pending human gates from existing approval workflows.');
   return (
     <SerumPanel className="p-5">
       <div className="flex items-start gap-3">
@@ -339,12 +355,11 @@ export function SerumApprovalCard({ openApprovals }: { openApprovals: number }) 
           <h3 className="text-sm font-semibold text-[var(--fg-primary)]">
             {t('crm.serumApproval.title', 'Human approval')}
           </h3>
-          <p className="mt-1 text-sm leading-6 text-[var(--fg-secondary)]">
-            {openApprovals > 0
-              ? t('crm.serumApproval.pending', '{{count}} RFP approval gates need review.', {
-                  count: openApprovals,
-                })
-              : t('crm.serumApproval.none', 'No pending human gates from existing approval workflows.')}
+          <p
+            className="mt-1 text-sm leading-6 text-[var(--fg-secondary)]"
+            role={report?.status === 'error' ? 'alert' : undefined}
+          >
+            {body}
           </p>
         </div>
       </div>

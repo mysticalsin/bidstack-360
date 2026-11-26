@@ -155,7 +155,10 @@ export function SerumMissionControlPage() {
 
         <div className="space-y-5">
           <SerumInspector module={selectedModule} />
-          <SerumApprovalCard openApprovals={snapshot.summary.openApprovals} />
+          <SerumApprovalCard
+            openApprovals={snapshot.summary.openApprovals}
+            report={snapshot.cards.find((card) => card.id === 'approvals')}
+          />
           <SerumAuditDrawer latestConfigChangeAt={snapshot.summary.latestConfigChangeAt} />
         </div>
       </SerumSplitView>

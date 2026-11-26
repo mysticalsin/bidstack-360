@@ -50,6 +50,7 @@ import {
 } from '@bidstack/shared';
 
 import { getEnv } from '../env.js';
+import { approvalGateCountCard, approvalGateCountPhase } from './serum-approval-count.js';
 import {
   getOrgActiveAgentProvider,
   listOrgAgentProviderCredentials,
@@ -1092,25 +1093,32 @@ function latestConfigSql(available: boolean | null | undefined, orgId: string): 
   `;
 }
 
-async function readSignalTableAvailability(log: WarnLogger): Promise<SignalTableAvailability> {
-  const rows = await readSignal(
+async function readSignalTableAvailability(log: WarnLogger): Promise<{
+  tables: SignalTableAvailability;
+  failed: boolean;
+}> {
+  const outcome = await readSignal(
     log,
     'serum_signal_table_availability',
-    () => prisma.$queryRaw<SignalTableAvailability[]>`
-      SELECT
-        to_regclass('crew_agents') IS NOT NULL AS crew_agents,
-        to_regclass('crew_runs') IS NOT NULL AS crew_runs,
-        to_regclass('rfp_orchestrations') IS NOT NULL AS rfp_orchestrations,
-        to_regclass('document_versions') IS NOT NULL AS document_versions,
-        to_regclass('approval_gates') IS NOT NULL AS approval_gates,
-        to_regclass('ai_invocations') IS NOT NULL AS ai_invocations,
-        to_regclass('audit_log') IS NOT NULL AS audit_log,
-        to_regclass('provider_health') IS NOT NULL AS provider_health,
-        to_regclass('queue_health') IS NOT NULL AS queue_health
-    `,
-    [emptyTableAvailability],
+    async () => {
+      const rows = await prisma.$queryRaw<SignalTableAvailability[]>`
+        SELECT
+          to_regclass('crew_agents') IS NOT NULL AS crew_agents,
+          to_regclass('crew_runs') IS NOT NULL AS crew_runs,
+          to_regclass('rfp_orchestrations') IS NOT NULL AS rfp_orchestrations,
+          to_regclass('document_versions') IS NOT NULL AS document_versions,
+          to_regclass('approval_gates') IS NOT NULL AS approval_gates,
+          to_regclass('ai_invocations') IS NOT NULL AS ai_invocations,
+          to_regclass('audit_log') IS NOT NULL AS audit_log,
+          to_regclass('provider_health') IS NOT NULL AS provider_health,
+          to_regclass('queue_health') IS NOT NULL AS queue_health
+      `;
+      return { failed: false, rows };
+    },
+    { failed: true, rows: [emptyTableAvailability] },
   );
-  return rows[0] ?? emptyTableAvailability;
+  const tables = outcome.rows[0] ?? emptyTableAvailability;
+  return { tables, failed: outcome.failed || outcome.rows[0] == null };
 }
 
 async function readCoreSignals(
@@ -1118,7 +1126,7 @@ async function readCoreSignals(
   orgId: string,
   today: Date,
   tables: SignalTableAvailability,
-): Promise<CoreSignalRow> {
+): Promise<{ row: CoreSignalRow; failed: boolean }> {
   const activeAgentsSql = signalSql(
     tables.crew_agents,
     Prisma.sql`
@@ -1222,25 +1230,29 @@ async function readCoreSignals(
     `,
   );
 
-  const rows = await readSignal(
+  const outcome = await readSignal(
     log,
     'serum_core_signals',
-    () => prisma.$queryRaw<CoreSignalRow[]>(Prisma.sql`
-      SELECT
-        ${activeAgentsSql} AS active_agents,
-        ${activeCrewRunsSql} AS active_crew_runs,
-        ${activeRfpRunsSql} AS active_rfp_runs,
-        ${failedRfpRunsSql} AS failed_rfp_runs,
-        ${documentsProcessedSql} AS documents_processed_today,
-        ${failedDocumentsSql} AS failed_documents_today,
-        ${openApprovalsSql} AS open_approvals,
-        ${modelCallsSql} AS model_calls_today,
-        ${modelTokensSql} AS model_tokens_today,
-        ${latestConfigSql(tables.audit_log, orgId)} AS latest_config_change_at
-    `),
-    [emptyCoreSignals],
+    async () => {
+      const rows = await prisma.$queryRaw<CoreSignalRow[]>(Prisma.sql`
+        SELECT
+          ${activeAgentsSql} AS active_agents,
+          ${activeCrewRunsSql} AS active_crew_runs,
+          ${activeRfpRunsSql} AS active_rfp_runs,
+          ${failedRfpRunsSql} AS failed_rfp_runs,
+          ${documentsProcessedSql} AS documents_processed_today,
+          ${failedDocumentsSql} AS failed_documents_today,
+          ${openApprovalsSql} AS open_approvals,
+          ${modelCallsSql} AS model_calls_today,
+          ${modelTokensSql} AS model_tokens_today,
+          ${latestConfigSql(tables.audit_log, orgId)} AS latest_config_change_at
+      `);
+      return { failed: false, rows };
+    },
+    { failed: true, rows: [emptyCoreSignals] },
   );
-  return rows[0] ?? emptyCoreSignals;
+  const row = outcome.rows[0] ?? emptyCoreSignals;
+  return { row, failed: outcome.failed || outcome.rows[0] == null };
 }
 
 export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -1256,11 +1268,12 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
       const orgId = req.auth.orgId;
       const today = new Date();
       today.setUTCHours(0, 0, 0, 0);
-      const signalTables = await readSignalTableAvailability(req.log);
+      const tableRead = await readSignalTableAvailability(req.log);
+      const signalTables = tableRead.tables;
       const coreSignalsPromise = readCoreSignals(req.log, orgId, today, signalTables);
 
       const [
-        coreSignals,
+        coreRead,
         queueRows,
         providerRows,
         providerCredentials,
@@ -1301,6 +1314,7 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         readSignal(req.log, 'dust_credentials', () => resolveOrgDustCredentials(orgId), null),
       ]);
 
+      const coreSignals = coreRead.row;
       const activeAgents = toInt(coreSignals.active_agents);
       const activeCrewRuns = toInt(coreSignals.active_crew_runs);
       const activeRfpRuns = toInt(coreSignals.active_rfp_runs);
@@ -1366,9 +1380,14 @@ export const serumRoutes: FastifyPluginAsyncZod = async (server) => {
         {
           id: 'approvals',
           title: 'Open approvals',
-          value: String(openApprovals),
-          detail: 'Human review gates awaiting a decision.',
-          status: statusForCount(openApprovals, 'ready'),
+          ...approvalGateCountCard({
+            phase: approvalGateCountPhase({
+              availabilityFailed: tableRead.failed,
+              tableAvailable: signalTables.approval_gates === true,
+              countFailed: coreRead.failed,
+            }),
+            count: openApprovals,
+          }),
         },
         {
           id: 'models',

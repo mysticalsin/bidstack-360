@@ -1,6 +1,7 @@
 // The open-approvals card may say the pending count only after both reads
 // arrive. A failed catalog probe has not seen approval_gates. A missing table
 // substitutes 0 and is still unread. A failed count query is not a zero.
+// Error wins, then a missing table is unread, else the count is ready.
 
 import type { SerumSignalStatus } from '@bidstack/shared';
 
@@ -19,13 +20,12 @@ export interface ApprovalGateCountCard {
 }
 
 const SETTLED_DETAIL = 'Human review gates awaiting a decision.';
+const UNREAD_DETAIL = 'Approval gates have not been read. The pending count has not arrived.';
+const FAILED_DETAIL = 'Could not load approval gates. The pending count has not arrived.';
 
 export function approvalGateCountPhase(input: ApprovalGateCountRead): ApprovalGateCountPhase {
-  // Current lie, kept so the red test can fail before the status change.
-  // A missing table and a failed read both become a settled zero.
-  if (input.availabilityFailed || input.countFailed || !input.tableAvailable) {
-    return 'ready';
-  }
+  if (input.availabilityFailed || input.countFailed) return 'failed';
+  if (!input.tableAvailable) return 'unread';
   return 'ready';
 }
 
@@ -33,8 +33,12 @@ export function approvalGateCountCard(input: {
   phase: ApprovalGateCountPhase;
   count: number;
 }): ApprovalGateCountCard {
-  // The phase is ignored. Unread and failed still print the substituted zero.
-  void input.phase;
+  if (input.phase === 'failed') {
+    return { value: 'Not loaded', detail: FAILED_DETAIL, status: 'error' };
+  }
+  if (input.phase === 'unread') {
+    return { value: 'Not read', detail: UNREAD_DETAIL, status: 'attention' };
+  }
   const count = Number.isFinite(input.count) ? input.count : 0;
   return {
     value: String(count),
