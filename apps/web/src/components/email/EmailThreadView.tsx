@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { sanitizeEmailHtml, splitQuotedText } from '@/lib/email/sanitize';
 import { api } from '@/lib/api';
+import { emailThreadPhase } from './email-thread-read';
 
 const BODY = 'email-body isolate overflow-x-auto text-sm leading-6 text-[var(--fg-primary)] break-words [&_a]:text-[var(--brand-primary)] [&_a]:underline';
 
@@ -21,8 +22,19 @@ export function EmailThreadView({ threadId }: { threadId: string }) {
     queryFn: () => api(`/api/email/threads/${encodeURIComponent(threadId)}`),
   });
 
-  if (thread.isLoading) return <LoadingSkeleton rows={3} />;
-  if (thread.isError || !thread.data) {
+  // A missing payload is not a failed thread. Failure is only a settled miss.
+  const phase = emailThreadPhase(thread);
+  if (phase === 'unread') {
+    return (
+      <div>
+        <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+          {t('emailThread.unread', 'Checking this thread. The messages have not arrived.')}
+        </p>
+        <LoadingSkeleton rows={3} />
+      </div>
+    );
+  }
+  if (phase === 'failed' || thread.data == null) {
     return <ErrorState title={t('emailThread.loadError', 'Could not load this thread')} />;
   }
   return (
