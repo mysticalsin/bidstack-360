@@ -3,16 +3,44 @@ import { CircleCheck, LoaderCircle } from 'lucide-react';
 
 import type { IntelImportBatchView } from '@bidstack/shared';
 
+import { useIntelImports } from '@/hooks/useCompanyIntelSummary';
+
 const ORIGIN: Record<IntelImportBatchView['origin'], string> = {
   csv: 'CSV import',
   hubspot: 'HubSpot import',
 };
 
-export function IntelImportProgress({ batches }: { batches: IntelImportBatchView[] }) {
-  if (!batches.length) return null;
+const UNREAD = 'Import enrichment has not arrived.';
+const READ_FAILED = 'Could not load import enrichment. It has not arrived.';
+
+export function IntelImportProgress({
+  batches: _batches,
+}: {
+  batches: IntelImportBatchView[];
+}) {
+  // The companies list still passes `data?.items ?? []`. That empty array is
+  // also what a read looks like before it arrives and after it fails. The
+  // query result is the source of truth so those two are not drawn as no imports.
+  const read = useIntelImports();
+  if (read.isError) {
+    return (
+      <p className="text-sm text-[var(--danger)]" role="alert">
+        {READ_FAILED}
+      </p>
+    );
+  }
+  const items = read.data?.items;
+  if (!items) {
+    return (
+      <p className="text-sm text-[var(--fg-secondary)]" role="status">
+        {UNREAD}
+      </p>
+    );
+  }
+  if (items.length === 0) return null;
   return (
     <ul aria-label="Import enrichment" className="space-y-2">
-      {batches.map((b) => {
+      {items.map((b) => {
         const running = b.status === 'running';
         const settled = b.done + b.failed;
         const pct = b.total ? Math.round((settled / b.total) * 100) : 100;
