@@ -13,6 +13,11 @@ import { Button } from '@/components/ui/Button';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
+import {
+  contactDuplicateFailedMessage,
+  contactDuplicateRead,
+  contactDuplicateUnreadMessage,
+} from '@/components/contact/contact-duplicate-read';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
@@ -151,6 +156,26 @@ export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialo
 
   const copy = entityCopy(entity, t);
   const active = entity === 'company' ? companyQuery : contactQuery;
+  // A missing contact scan is not a clean book. Pending wins over no rows.
+  // The company scan keeps its own pending and error branch below.
+  const contactClusters = contactQuery.data ? contactQuery.data.clusters : null;
+  const contactRead =
+    entity === 'contact'
+      ? contactDuplicateRead({
+          isError: contactQuery.isError,
+          isPending:
+            Boolean(contactQuery.isPending) ||
+            contactQuery.isLoading ||
+            contactQuery.data == null,
+          clusters: contactClusters,
+        })
+      : null;
+  const contactNotArrived = t('duplicates.contactNotArrived', contactDuplicateFailedMessage());
+  const contactChecking = t('duplicates.contactChecking', contactDuplicateUnreadMessage());
+  const contactFailed =
+    contactQuery.error instanceof Error && contactQuery.error.message
+      ? `${contactQuery.error.message} ${contactNotArrived}`
+      : contactNotArrived;
   const clusters: CompareCluster[] =
     entity === 'company'
       ? (companyQuery.data?.clusters ?? []).map((c, i) => ({
@@ -222,14 +247,33 @@ export function DuplicatesDialog({ entity, open, onOpenChange }: DuplicatesDialo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={copy.title} description={copy.description} className="w-[min(820px,94vw)]">
-        {active.isPending ? (
+        {entity === 'contact' && contactRead?.phase === 'failed' ? (
+          <ErrorState
+            title={t('duplicates.scanFailedTitle', 'The duplicate scan failed')}
+            message={contactFailed}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => void contactQuery.refetch()}>
+                {t('duplicates.scanAgain', 'Scan again')}
+              </Button>
+            }
+          />
+        ) : entity === 'contact' && contactRead?.phase === 'unread' && contactQuery.isLoading ? (
           <LoadingSkeleton rows={3} />
-        ) : active.isError ? (
+        ) : entity === 'contact' && contactRead?.phase === 'unread' ? (
+          <p
+            className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]"
+            role="status"
+          >
+            {contactChecking}
+          </p>
+        ) : entity !== 'contact' && active.isPending ? (
+          <LoadingSkeleton rows={3} />
+        ) : entity !== 'contact' && active.isError ? (
           <ErrorState
             title={t('duplicates.scanFailedTitle', 'The duplicate scan failed')}
             message={t(
               'duplicates.scanFailedMessage',
-              'Nothing was merged. Retry the scan — it only reads records.',
+              'Nothing was merged. Retry the scan. It only reads records.',
             )}
             action={
               <Button variant="secondary" size="sm" onClick={() => void active.refetch()}>

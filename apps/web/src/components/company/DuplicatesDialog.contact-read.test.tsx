@@ -109,6 +109,19 @@ describe('contact duplicate scan read', () => {
     expect(screen.queryByRole('heading', { name: 'Ada Example' })).toBeNull();
   });
 
+  it('does not call a paused duplicate scan a clean book', () => {
+    // WHY: React Query pauses with isPending true and isLoading false.
+    // The skeleton is for the first fetch. A pause still has no clusters.
+    mockScan({ data: undefined, isPending: true, isLoading: false });
+
+    renderScan();
+
+    expect(screen.queryByRole('heading', { name: 'Every contact is one person' })).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe(
+      'Checking duplicate contacts. They have not arrived.',
+    );
+  });
+
   it('does not call a failed duplicate scan a clean book', () => {
     // WHY: the scan failed. Ada Example may still share an email with a
     // twin. A clean book would hide that, and the error has to say the
