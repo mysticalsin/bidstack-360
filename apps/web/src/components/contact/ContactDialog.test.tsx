@@ -13,6 +13,19 @@ const hookMocks = vi.hoisted(() => ({
 
 vi.mock('@/hooks/useCapabilities', () => ({
   useHasPermission: () => hookMocks.canWrite,
+  useCapabilities: () => ({
+    data: {
+      userId: 'user',
+      orgId: 'org',
+      legacyRole: 'member',
+      roles: [] as string[],
+      permissions: hookMocks.canWrite ? ['contacts:write'] : [],
+      isAdmin: false,
+    },
+    isError: false,
+    isLoading: false,
+    status: 'success',
+  }),
 }));
 
 vi.mock('@/hooks/useContacts', () => ({
