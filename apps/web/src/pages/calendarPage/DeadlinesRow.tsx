@@ -18,6 +18,7 @@ import { useCalendarDeadlines, type CalendarDeadline } from '@/hooks/useCalendar
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 
+import { calendarDeadlinesPhase } from './calendar-deadlines-read';
 import { toLocalIsoDate } from './dateUtils';
 
 const LANE_GRID = 'grid border-b border-[var(--border-subtle)]';
@@ -119,7 +120,8 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
   // API window is [from, to) — pass the day after the last visible column.
   const to = toLocalIsoDate(new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1));
 
-  const { data, isLoading, isError, refetch } = useCalendarDeadlines(from, to);
+  const { data, isError, status, refetch } = useCalendarDeadlines(from, to);
+  const phase = calendarDeadlinesPhase({ data, isError, status });
 
   const laneLabel = (
     <div className="flex items-start justify-end pr-2 pt-2 text-xs font-semibold text-[var(--fg-tertiary)]">
@@ -127,25 +129,25 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
     </div>
   );
 
-  if (isLoading) {
+  if (phase === 'unread') {
     return (
       <div
         className={LANE_GRID}
         style={laneColumns(days.length)}
         role="status"
-        aria-label={t('calendar.deadlinesLoading', 'Loading deadlines…')}
+        aria-live="polite"
       >
         {laneLabel}
-        {days.map((day) => (
-          <div key={toLocalIsoDate(day)} className="border-l border-[var(--border-subtle)] p-1">
-            <div className="h-9 animate-pulse rounded-md bg-[var(--surface-sunken)]" />
-          </div>
-        ))}
+        <div style={FULL_ROW} className="flex items-center px-2 py-2">
+          <span className="text-xs text-[var(--fg-secondary)]">
+            {t('calendar.deadlinesWaiting', 'Checking deadlines. They have not arrived.')}
+          </span>
+        </div>
       </div>
     );
   }
 
-  if (isError) {
+  if (phase === 'failed') {
     return (
       <div className={LANE_GRID} style={laneColumns(days.length)}>
         {laneLabel}
