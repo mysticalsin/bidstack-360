@@ -93,6 +93,15 @@ describe('extension search results', () => {
     expect(stale.text).toBe(SEARCHING);
     expect(stale.text).not.toBe(EMPTY);
     expect(stale.kind).toBe('searching');
+
+    const waiting = paintExtensionSearch({
+      activeQuery: 'Zephyrine',
+      requestQuery: 'Zephyrine',
+      phase: 'pending',
+      payload: null,
+    });
+    expect(waiting.text).toBe(SEARCHING);
+    expect(waiting.kind).toBe('searching');
   });
 
   it('does not leave a failed read blank or empty', () => {
@@ -151,12 +160,15 @@ describe('extension search results', () => {
     // not arrived. The panel has to drop a reply that is no longer current.
     const popup = readFileSync(popupPath, 'utf8');
     const reader = readFileSync(readPath, 'utf8');
+    const searchStart = popup.indexOf('// ── Search');
+    const searchEnd = popup.indexOf("// ── Today's Tasks");
+    const searchSrc = popup.slice(searchStart, searchEnd);
 
     expect(popup).toContain("from './search-results-read.js'");
-    expect(popup).toContain('paintExtensionSearch(');
-    expect(popup).not.toContain('result?.data ?? []');
-    expect(popup).not.toContain('No results found');
-    expect(popup).toContain('token !== generation');
+    expect(searchSrc).toContain('paintExtensionSearch(');
+    expect(searchSrc).not.toContain('result?.data ?? []');
+    expect(searchSrc).not.toContain('No results found');
+    expect(searchSrc).toContain('token !== generation');
     expect(reader).toContain(NOT_ARRIVED);
     expect(reader).toContain(DID_NOT_LOAD);
     expect(reader).toContain(EMPTY);

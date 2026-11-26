@@ -5,6 +5,8 @@
  * script never touches credentials directly.
  */
 
+import { paintExtensionSearch } from './search-results-read.js';
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 function send(type, payload = {}) {
@@ -33,38 +35,72 @@ const searchInput = el('search-input');
 const searchResults = el('search-results');
 
 let searchDebounce = null;
+let generation = 0;
+let activeQuery = '';
+let requestQuery = '';
+let phase = 'pending';
+let payload = null;
 
-searchInput.addEventListener('input', () => {
-  clearTimeout(searchDebounce);
-  const q = searchInput.value.trim();
-  if (!q) {
+function showSearch() {
+  const view = paintExtensionSearch({ activeQuery, requestQuery, phase, payload });
+  if (view.kind === 'clear') {
     searchResults.innerHTML = '';
     return;
   }
-  searchResults.innerHTML = '<div class="loading-state">Searching…</div>';
-  searchDebounce = setTimeout(() => runSearch(q), 300);
-});
-
-async function runSearch(q) {
-  try {
-    const result = await send('SEARCH_RECORDS', { query: q });
-    renderSearchResults(result?.data ?? []);
-  } catch (err) {
-    searchResults.innerHTML = `<div class="error-state">${escHtml(err.message)}</div>`;
-  }
-}
-
-function renderSearchResults(items) {
-  if (!items.length) {
-    searchResults.innerHTML = '<div class="empty-state">No results found</div>';
-    return;
-  }
-  searchResults.innerHTML = items.map((item) => `
+  if (view.kind === 'ready') {
+    searchResults.innerHTML = view.items
+      .map(
+        (item) => `
     <a class="result-item" href="${escHtml(item.url ?? '#')}" target="_blank" rel="noopener" tabindex="0">
       <span class="result-name">${escHtml(item.name)}</span>
       <span class="result-type">${escHtml(item.type ?? '')}</span>
     </a>
-  `).join('');
+  `,
+      )
+      .join('');
+    return;
+  }
+  const tone =
+    view.kind === 'failed'
+      ? 'error-state'
+      : view.kind === 'empty'
+        ? 'empty-state'
+        : view.kind === 'unread'
+          ? 'unread-state'
+          : 'loading-state';
+  searchResults.innerHTML = `<div class="${tone}">${escHtml(view.text)}</div>`;
+}
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  const q = searchInput.value.trim();
+  generation += 1;
+  const token = generation;
+  activeQuery = q;
+  phase = 'pending';
+  payload = null;
+  showSearch();
+  if (!q) return;
+  searchDebounce = setTimeout(() => {
+    void runSearch(q, token);
+  }, 300);
+});
+
+async function runSearch(q, token) {
+  try {
+    const result = await send('SEARCH_RECORDS', { query: q });
+    if (token !== generation) return;
+    requestQuery = q;
+    phase = 'resolved';
+    payload = result;
+    showSearch();
+  } catch {
+    if (token !== generation) return;
+    requestQuery = q;
+    phase = 'rejected';
+    payload = null;
+    showSearch();
+  }
 }
 
 // ── Today's Tasks ─────────────────────────────────────────────────────────────
