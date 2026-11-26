@@ -350,7 +350,7 @@ export function ContactTable({
                       {c.email ? (
                         <a
                           href={`mailto:${c.email}`}
-                          className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+                          className="inline-flex min-h-[44px] items-center rounded text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
                         >
                           {c.email}
                         </a>

@@ -95,9 +95,11 @@ describe('contacts list call', () => {
     expect(call.textContent).toBe('+49 30 1234 5670');
     expectsCallTarget(call);
 
-    expect(screen.getByRole('link', { name: 'klaus.vogt.demo@example.com' }).getAttribute('href')).toBe(
-      'mailto:klaus.vogt.demo@example.com',
-    );
+    const mail = screen.getByRole('link', { name: 'klaus.vogt.demo@example.com' });
+    expect(mail.getAttribute('href')).toBe('mailto:klaus.vogt.demo@example.com');
+    // The call link sits under this address. A line-height mail target fails
+    // the axe target-size rule once a 44px control is adjacent.
+    expect(mail.className).toContain('min-h-[44px]');
   });
 
   it('leaves a fragment as text', () => {
