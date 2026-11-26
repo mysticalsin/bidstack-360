@@ -9,9 +9,11 @@ import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { api } from '@/lib/api';
 import { relativeTime } from '@/lib/format';
+
+import { workspaceAccountsPhase } from './workspace-accounts-read';
 
 /** Pinned in tests: the consent promise shown above both accounts. */
 export const WORKSPACE_CONSENT_COPY = 'Read-only. Polo never sends mail or changes your calendar.';
@@ -49,6 +51,11 @@ export function WorkspaceAccountsCard() {
     queryFn: () => api('/api/integrations/workspace'),
     staleTime: 30_000,
   });
+  const phase = workspaceAccountsPhase({
+    data: query.data,
+    isError: query.isError,
+    status: query.status,
+  });
 
   return (
     <Card data-testid="workspace-accounts">
@@ -56,11 +63,7 @@ export function WorkspaceAccountsCard() {
         title={t('workspace.title', 'Email and calendar')}
         caption={t('workspace.consent', WORKSPACE_CONSENT_COPY)}
       />
-      {query.isLoading ? (
-        <div className="p-5">
-          <LoadingSkeleton rows={2} />
-        </div>
-      ) : query.isError ? (
+      {phase === 'failed' ? (
         <ErrorState
           title={t('workspace.loadError', 'Could not load accounts')}
           action={
@@ -69,6 +72,10 @@ export function WorkspaceAccountsCard() {
             </Button>
           }
         />
+      ) : phase === 'unread' ? (
+        <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]" role="status">
+          {t('workspace.checking', 'Checking email and calendar. The list has not arrived.')}
+        </p>
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
           {(query.data?.providers ?? []).map((card) => (
