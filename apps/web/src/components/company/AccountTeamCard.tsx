@@ -97,12 +97,14 @@ export function AccountTeamCard({ companyId }: { companyId: string }) {
         ) : null}
       </div>
       <div className="p-4">
-        {team.isLoading ? (
-          <LoadingSkeleton rows={2} />
-        ) : team.isError ? (
+        {team.isError ? (
           <p className="text-sm text-[var(--fg-secondary)]">
             The account team could not be loaded.
           </p>
+        ) : !team.data ? (
+          // Pending, paused, or not fetched yet. isLoading is false on that
+          // first paint, so an empty members list would read as a real zero.
+          <LoadingSkeleton rows={2} />
         ) : (
           <ul className="flex flex-col divide-y divide-[var(--border-subtle)]">
             {owner ? (
