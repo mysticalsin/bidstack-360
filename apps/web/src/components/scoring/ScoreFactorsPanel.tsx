@@ -15,11 +15,14 @@
  *
  * Dark mode: theme tokens only (--fg-*, --surface-*, --border-*, --success,
  * --danger) — every color resolves in both themes from index.css.
+ *
+ * Unread says the factors have not arrived. A score, including 0, is only a settled read.
  */
 
 import { useTranslation } from 'react-i18next';
 import { useLeadScore, useOppScore } from '@/hooks/usePredictiveScore';
 import type { ScoreFactor } from '@/hooks/usePredictiveScore';
+import { scoreFactorsPhase } from '@/components/scoring/score-factors-read';
 
 type TFunc = ReturnType<typeof useTranslation>['t'];
 
@@ -109,27 +112,6 @@ function FactorBar({ factor, maxAbs }: { factor: ScoreFactor; maxAbs: number }) 
         {positive ? '+' : ''}{(factor.contribution * 100).toFixed(1)}
       </span>
     </li>
-  );
-}
-
-// ─── Skeleton ─────────────────────────────────────────────────────────────
-
-function PanelSkeleton() {
-  const { t } = useTranslation('crm');
-  return (
-    <div
-      className="animate-pulse space-y-3"
-      aria-label={t('scoreFactors.loadingAria', 'Loading score factors')}
-      aria-busy="true"
-    >
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <div className="h-4 w-36 bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] rounded" />
-          <div className="flex-1 h-4 bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] rounded" />
-          <div className="h-4 w-10 bg-[var(--surface-sunken)] dark:bg-[var(--surface-hover)] rounded" />
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -234,12 +216,28 @@ export function ScoreFactorsPanel({ entityType, entityId }: ScoreFactorsPanelPro
   const { t } = useTranslation('crm');
   const leadQuery = useLeadScore(entityType === 'lead' ? entityId : undefined);
   const oppQuery = useOppScore(entityType === 'opportunity' ? entityId : undefined);
+  const active = entityType === 'lead' ? leadQuery : oppQuery;
+  const phase = scoreFactorsPhase({
+    data: active.data,
+    isError: active.isError,
+    status: active.status,
+  });
 
-  const isLoading = entityType === 'lead' ? leadQuery.isLoading : oppQuery.isLoading;
-  const isError = entityType === 'lead' ? leadQuery.isError : oppQuery.isError;
+  if (phase === 'unread') {
+    return (
+      <p className="text-xs text-[var(--fg-secondary)]">
+        {t('scoreFactors.checking', 'Checking the score factors. The factors have not arrived.')}
+      </p>
+    );
+  }
 
-  if (isLoading) return <PanelSkeleton />;
-  if (isError) return null;
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className="text-xs text-[var(--danger)]">
+        {t('scoreFactors.loadError', 'Could not load the score factors.')}
+      </p>
+    );
+  }
 
   if (entityType === 'lead' && leadQuery.data) {
     const { score, factors, modelVersion } = leadQuery.data;
