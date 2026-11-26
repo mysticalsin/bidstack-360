@@ -1158,7 +1158,8 @@
       "run": "导入"
     },
     "progress": {
-      "starting": "正在开始导入…",
+      "statusUnread": "导入状态尚未到达。",
+      "statusReadFailed": "无法加载这次导入。状态尚未到达。",
       "statusComplete": "导入完成",
       "statusImporting": "正在导入…",
       "statusCancelled": "导入已取消",

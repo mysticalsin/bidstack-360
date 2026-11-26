@@ -1,7 +1,8 @@
 {
   "csvImport": {
     "progress": {
-      "starting": "جارٍ بدء الاستيراد…",
+      "statusUnread": "لم تصل حالة الاستيراد.",
+      "statusReadFailed": "تعذر تحميل الاستيراد. لم تصل حالته.",
       "statusComplete": "اكتمل الاستيراد",
       "statusImporting": "جارٍ الاستيراد…",
       "statusCancelled": "أُلغي الاستيراد",

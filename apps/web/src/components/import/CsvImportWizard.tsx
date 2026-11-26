@@ -488,8 +488,8 @@ export function CsvImportWizard() {
 
       {step === 'run' && (
         <ImportProgress
-          job={job.data ?? null}
-          isLoading={job.isLoading}
+          job={job.isError ? null : (job.data ?? null)}
+          readFailed={job.isError === true}
           onDone={reset}
           onCancel={() => {
             if (jobId) cancel.mutate(jobId);
@@ -551,7 +551,7 @@ async function fileToBase64(file: File): Promise<string> {
 
 function ImportProgress({
   job,
-  isLoading,
+  readFailed,
   onDone,
   onCancel,
   onRetry,
@@ -561,7 +561,7 @@ function ImportProgress({
   retryError,
 }: {
   job: MigrationJob | null;
-  isLoading: boolean;
+  readFailed: boolean;
   onDone: () => void;
   onCancel: () => void;
   onRetry: () => void;
@@ -571,10 +571,20 @@ function ImportProgress({
   retryError: unknown;
 }) {
   const { t } = useTranslation('crm');
-  if (isLoading || !job) {
+  if (readFailed || !job) {
     return (
-      <p className="text-sm text-[var(--fg-secondary)]">
-        {t('csvImport.progress.starting', 'Starting import…')}
+      <p
+        className={
+          readFailed ? 'text-sm text-[var(--danger)]' : 'text-sm text-[var(--fg-secondary)]'
+        }
+        role={readFailed ? 'alert' : 'status'}
+      >
+        {readFailed
+          ? t(
+              'csvImport.progress.statusReadFailed',
+              'Could not load the import. It has not arrived.',
+            )
+          : t('csvImport.progress.statusUnread', 'The import status has not arrived.')}
       </p>
     );
   }
