@@ -16,6 +16,7 @@ import { TransitionPanel } from '@/components/motion-primitives/transition-panel
 import { useAccountTimeline } from '@/hooks/useAccountSignals';
 
 import { CATEGORY_LABEL, CATEGORY_TONE, noDash, OUR_FILTERS, sourceLabel, THEIR_FILTERS } from './category';
+import { signalsTimelinePhase } from './signals-timeline-read';
 import { shownTimelineEvents, timelineEventCaption, timelineEventMoreLabel } from './timeline-event-caption';
 
 const MOBILE_TOP = 8;
@@ -272,7 +273,12 @@ function groupByMonth(items: TimelineItem[]): Array<[string, TimelineItem[]]> {
 
 export function SignalsTimeline({ companyId }: { companyId: string }) {
   const q = useAccountTimeline(companyId);
-  const sample = q.data?.items.some((i) => i.sample);
+  const phase = signalsTimelinePhase({
+    data: q.data,
+    isError: q.isError,
+    status: q.status,
+  });
+  const sample = phase === 'ready' && q.data?.items.some((i) => i.sample);
   return (
     <section id="signals-timeline" className="sg sg-surface" style={{ marginBottom: 24, scrollMarginTop: 80 }} aria-labelledby="sg-tl-h" data-testid="signals-timeline">
       <header className="sg-head">
@@ -281,12 +287,14 @@ export function SignalsTimeline({ companyId }: { companyId: string }) {
           Our activity and their news, last 12 months {sample ? <span className="sg-sample">Sample</span> : null}
         </span>
       </header>
-      {q.isLoading ? (
-        <div className="sg-skel" aria-busy="true" style={{ minHeight: 232 }} />
-      ) : q.isError || !q.data ? (
+      {phase === 'failed' ? (
         <p className="sg-empty" role="alert">
-          <span>Couldn&apos;t load the timeline</span>
+          <span>The signals timeline did not load.</span>
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
+        </p>
+      ) : phase !== 'ready' || !q.data ? (
+        <p className="sg-empty" role="status">
+          Checking the signals timeline. The payload has not arrived.
         </p>
       ) : (
         <TimelineView
