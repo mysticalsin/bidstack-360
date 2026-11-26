@@ -184,4 +184,26 @@ describe('JarvisPanel', () => {
       'true',
     );
   });
+
+  // A resized demo window stays pointer:fine, so the coarse-pointer 44px floor
+  // never applies. index.html sets viewport-fit=cover, so the notch and the
+  // home indicator are real bands. The sheet edge stays on the screen. Mute
+  // and Close have to clear both, or they sit in the status bar at 36px.
+  it('keeps mute and close at 44px clear of the phone chrome', () => {
+    renderAt('/dashboard');
+    const sheet = screen.getByRole('dialog', { name: 'Jarvis' });
+    expect(sheet.className).toContain('top-0');
+    expect(sheet.className).toContain('right-0');
+    expect(sheet.className).toContain('bottom-0');
+    expect(sheet.style.paddingTop).toBe('env(safe-area-inset-top, 0px)');
+    expect(sheet.style.paddingRight).toBe('env(safe-area-inset-right, 0px)');
+    expect(sheet.style.paddingBottom).toBe('env(safe-area-inset-bottom, 0px)');
+    for (const name of ['Mute voice', 'Close Jarvis']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.className).toContain('h-11');
+      expect(button.className).toContain('w-11');
+      expect(button.className).not.toContain('h-9');
+      expect(button.className).not.toContain('w-9');
+    }
+  });
 });
