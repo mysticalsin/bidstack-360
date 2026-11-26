@@ -33,10 +33,14 @@ interface EditingCell {
   value: number;
 }
 
+export type ForecastListRead = 'checking' | 'failed' | 'settled';
+
 interface ForecastListProps {
   rows: ForecastRow[];
   isLoading: boolean;
   isError: boolean;
+  /** checking: no payload yet. failed: error or a payload with no items list. settled: items arrived. */
+  listRead: ForecastListRead;
   errorMessage?: string;
   onRetry: () => void;
   onNewForecast: () => void;
@@ -60,6 +64,7 @@ export function ForecastList({
   rows,
   isLoading,
   isError,
+  listRead,
   errorMessage,
   onRetry,
   onNewForecast,
@@ -107,25 +112,39 @@ export function ForecastList({
       <SectionHeader
         title={t('forecastList.sectionTitle', 'Forecast Details')}
         caption={
-          pageContinues
-            ? t(
-                'forecastList.sectionCaptionPartial',
-                forecastGroupCaption(rows.length, true, FORECAST_LIST_PAGE),
-              )
-            : t('forecastList.sectionCaption', '{{count}} forecast groups', {
-                count: rows.length,
-              })
+          listRead !== 'settled'
+            ? t('forecastList.unreadCaption', 'The forecast list has not arrived.')
+            : pageContinues
+              ? t(
+                  'forecastList.sectionCaptionPartial',
+                  forecastGroupCaption(rows.length, true, FORECAST_LIST_PAGE),
+                )
+              : t('forecastList.sectionCaption', '{{count}} forecast groups', {
+                  count: rows.length,
+                })
         }
       />
 
-      {isError ? (
+      {listRead === 'failed' || isError ? (
         <ErrorState
-          title={t('forecastList.errorTitle', 'Failed to load forecasts')}
-          message={errorMessage}
+          title={
+            isError
+              ? t('forecastList.errorTitle', 'Failed to load forecasts')
+              : t(
+                  'forecastList.missingTitle',
+                  'Could not load the forecast list. It has not arrived.',
+                )
+          }
+          message={isError ? errorMessage : undefined}
           action={<Button onClick={onRetry}>{t('forecastList.retry', 'Retry')}</Button>}
         />
-      ) : isLoading ? (
-        <LoadingSkeleton rows={4} />
+      ) : listRead === 'checking' || isLoading ? (
+        <>
+          <p className="px-5 pt-4 text-sm text-[var(--fg-secondary)]">
+            {t('forecastList.checking', 'Checking the forecast list. It has not arrived.')}
+          </p>
+          <LoadingSkeleton rows={4} />
+        </>
       ) : rows.length === 0 ? (
         <EmptyState
           title={t('forecastList.emptyTitle', 'No forecasts found')}
