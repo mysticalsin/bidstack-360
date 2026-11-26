@@ -8,9 +8,11 @@ import { ImageOff } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
-import { sanitizeEmailHtml, splitQuotedText } from '@/lib/email/sanitize';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { api } from '@/lib/api';
+import { sanitizeEmailHtml, splitQuotedText } from '@/lib/email/sanitize';
+
+import { emailThreadPhase } from './email-thread-read';
 
 const BODY = 'email-body isolate overflow-x-auto text-sm leading-6 text-[var(--fg-primary)] break-words [&_a]:text-[var(--brand-primary)] [&_a]:underline';
 
@@ -20,14 +22,26 @@ export function EmailThreadView({ threadId }: { threadId: string }) {
     queryKey: ['email-thread', threadId],
     queryFn: () => api(`/api/email/threads/${encodeURIComponent(threadId)}`),
   });
+  const phase = emailThreadPhase({
+    data: thread.data,
+    isError: thread.isError,
+    status: thread.status,
+  });
 
-  if (thread.isLoading) return <LoadingSkeleton rows={3} />;
-  if (thread.isError || !thread.data) {
+  if (phase === 'unread') {
+    return (
+      <p role="status" className="text-sm text-[var(--fg-secondary)]">
+        {t('emailThread.checking', 'Checking this thread. It has not arrived.')}
+      </p>
+    );
+  }
+  if (phase === 'failed') {
     return <ErrorState title={t('emailThread.loadError', 'Could not load this thread')} />;
   }
+  const messages = thread.data?.messages ?? [];
   return (
     <ol className="space-y-4" data-testid="email-thread">
-      {thread.data.messages.map((m) => (
+      {messages.map((m) => (
         <ThreadMessage key={m.id} message={m} />
       ))}
     </ol>
