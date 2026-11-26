@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 
 import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -126,8 +126,13 @@ describe('TemplatePicker unread catalog', () => {
 
     renderPicker();
 
-    expect(await screen.findByRole('button', { name: 'Install pipeline' })).toBeTruthy();
-    expect(screen.queryByText(WAITING)).toBeNull();
+    // The install button is on screen during the unread frame. Wait until that
+    // frame ends, so a settled empty catalog is not scored while the read is
+    // still in flight.
+    await waitFor(() => {
+      expect(screen.queryByText(WAITING)).toBeNull();
+    });
+    expect(screen.getByRole('button', { name: 'Install pipeline' })).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
     expectNoSettledMiss();
   });
