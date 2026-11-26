@@ -10,7 +10,11 @@ import type { AuditLogEntry } from '@bidstack/shared';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string | Record<string, unknown>, vars?: Record<string, unknown>) => {
+    t: (
+      key: string,
+      fallback?: string | Record<string, unknown>,
+      vars?: Record<string, unknown>,
+    ) => {
       const template = typeof fallback === 'string' ? fallback : key;
       const values = typeof fallback === 'object' && fallback !== null ? fallback : vars;
       if (!values) return template;
@@ -22,6 +26,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+import { auditPayloadArrived, type AuditQuerySnapshot } from './audit-log-arrival';
 import { AuditInsightStrip } from './AuditLogInsights';
 
 const SAMPLE_ENTRY: AuditLogEntry = {
@@ -124,5 +129,70 @@ describe('Audit insight strip when the page has not arrived', () => {
     expect(screen.getByText('Sample Admin')).toBeTruthy();
     expect(screen.queryByText('Audit entries are not loaded')).toBeNull();
     expect(screen.queryByText('No loaded events')).toBeNull();
+  });
+});
+
+function snapshot(overrides: Partial<AuditQuerySnapshot>): AuditQuerySnapshot {
+  return {
+    data: undefined,
+    dataUpdatedAt: 0,
+    errorUpdatedAt: 0,
+    fetchStatus: 'idle',
+    ...overrides,
+  };
+}
+
+describe('auditPayloadArrived', () => {
+  it('is false when no audit query has been registered', () => {
+    // WHY: an empty row list with no query is a page that has not been read.
+    expect(auditPayloadArrived([])).toBe(false);
+  });
+
+  it('is false when the only query failed or is still fetching', () => {
+    // WHY: failure and in-flight both have no page. Neither is a settled empty trail.
+    expect(auditPayloadArrived([snapshot({ fetchStatus: 'idle', errorUpdatedAt: 10 })])).toBe(
+      false,
+    );
+    expect(auditPayloadArrived([snapshot({ fetchStatus: 'fetching' })])).toBe(false);
+  });
+
+  it('is true for a settled page, including one with no rows', () => {
+    // WHY: data that arrived as an empty page is empty. The score is allowed.
+    expect(
+      auditPayloadArrived([
+        snapshot({ data: { items: [], nextCursor: null }, dataUpdatedAt: 20, fetchStatus: 'idle' }),
+      ]),
+    ).toBe(true);
+  });
+
+  it('is false while a newer page is in flight beside an older settled page', () => {
+    // WHY: moving to the next page clears the visible rows before that page
+    // arrives. The older page must not be scored as this view.
+    expect(
+      auditPayloadArrived([
+        snapshot({ data: { items: [], nextCursor: '2' }, dataUpdatedAt: 20, fetchStatus: 'idle' }),
+        snapshot({ fetchStatus: 'fetching', dataUpdatedAt: 0 }),
+      ]),
+    ).toBe(false);
+  });
+
+  it('is false when a newer read failed after a settled page', () => {
+    // WHY: the latest attempt failed. The previous page is not the current read.
+    expect(
+      auditPayloadArrived([
+        snapshot({ data: { items: [], nextCursor: null }, dataUpdatedAt: 20 }),
+        snapshot({ errorUpdatedAt: 40, fetchStatus: 'idle' }),
+      ]),
+    ).toBe(false);
+  });
+
+  it('is true when a settled page is newer than an old failure', () => {
+    // WHY: a later successful read replaces the failure, even if the page is empty.
+    expect(
+      auditPayloadArrived([
+        snapshot({ errorUpdatedAt: 10, fetchStatus: 'idle' }),
+        snapshot({ data: { items: [], nextCursor: null }, dataUpdatedAt: 30, fetchStatus: 'idle' }),
+      ]),
+    ).toBe(true);
   });
 });
