@@ -25,6 +25,7 @@ import {
   opportunityDocumentCaption,
   shownOpportunityDocuments,
 } from './opportunity-document-caption';
+import { dealDocumentPhase } from './deal-document-read';
 
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
@@ -52,6 +53,11 @@ interface OpportunityTabsProps {
   documents?: Array<{ id: string; name: string; kind: string; bytes: number | null }>;
   /** True when the detail query read one file past the drawn page and dropped it. */
   documentsContinue?: boolean;
+  /**
+   * The file read failed. An empty array must not stand in for that failure.
+   * Leave this unset when the list has not been requested yet.
+   */
+  documentsFailed?: boolean;
   // The Activity tab body — the page injects the timeline component
   // (pages/opportunityDetail/TimelinePanel) so this container stays dumb about
   // how the deal narrative is fetched and rendered.
@@ -62,8 +68,9 @@ export function OpportunityTabs({
   oppId,
   customer,
   intelDecisionUnit = [],
-  documents = [],
+  documents,
   documentsContinue = false,
+  documentsFailed = false,
   activityContent = null,
 }: OpportunityTabsProps) {
   const { t } = useTranslation('crm');
@@ -99,7 +106,11 @@ export function OpportunityTabs({
         <TasksPanel oppId={oppId} />
       </TabsContent>
       <TabsContent value="documents">
-        <DocumentsPanel documents={documents} documentsContinue={documentsContinue} />
+        <DocumentsPanel
+          documents={documents}
+          documentsContinue={documentsContinue}
+          documentsFailed={documentsFailed}
+        />
       </TabsContent>
       <TabsContent value="calls">
         <CallsPanel oppId={oppId} />
@@ -368,12 +379,34 @@ function CallsPanel({ oppId }: { oppId: string }) {
 function DocumentsPanel({
   documents,
   documentsContinue,
+  documentsFailed,
 }: {
-  documents: NonNullable<OpportunityTabsProps['documents']>;
+  documents: OpportunityTabsProps['documents'];
   documentsContinue: boolean;
+  documentsFailed: boolean;
 }) {
   const { t } = useTranslation('crm');
   const [sendOpen, setSendOpen] = useState(false);
+  const phase = dealDocumentPhase({ documents, documentsFailed });
+  // A missing list is not an empty bid. The default used to be [], which
+  // painted "No documents attached" before any file payload arrived.
+  if (phase === 'failed') {
+    return (
+      <ErrorState
+        title={t('opportunityTabs.documentsErrorTitle', "Couldn't load documents")}
+        message={t('opportunityTabs.documentsErrorMessage', 'The file list did not load.')}
+      />
+    );
+  }
+  if (phase === 'unread' || documents === undefined) {
+    return (
+      <p role="status" className="px-5 py-8 text-sm text-[var(--fg-secondary)]">
+        {t('opportunityTabs.documentsCheckingTitle', 'Checking documents')}
+        {'. '}
+        {t('opportunityTabs.documentsCheckingMessage', 'The file list has not arrived.')}
+      </p>
+    );
+  }
   const page = shownOpportunityDocuments(documents, documentsContinue);
   const primaryDocumentId = page.items[0]?.id;
   const hasDocument = page.items.length > 0;
