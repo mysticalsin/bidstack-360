@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useCreateMsa, useUploadMsaVersion } from '@/hooks/useMsa';
+import { agreementAccountPhase } from './agreement-account-read';
 import { validateMsaFile, type UploadStage } from '@/lib/msa/client';
 import { fmtBytes, KIND_LABEL, STATUS_LABEL } from '@/lib/msa/labels';
 import { MSA_KINDS, MSA_STATUSES, type MsaKind, type MsaStatus } from '@/lib/msa/types';
@@ -48,6 +49,7 @@ export function UploadDialog({ open, onOpenChange, target, disabledReason }: {
   const [expiry, setExpiry] = useState('');
   const [notice, setNotice] = useState('');
   const companies = useCompanies();
+  const accountPhase = agreementAccountPhase(companies);
   const create = useCreateMsa();
   const upload = useUploadMsaVersion((s) => setStage(s));
   const busy = stage !== null && stage !== 'done' && !error;
@@ -106,10 +108,16 @@ export function UploadDialog({ open, onOpenChange, target, disabledReason }: {
               <label>Title<input value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={300} disabled={Boolean(disabledReason)} /></label>
               <div className="row">
                 <label>Account
-                  <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} required disabled={Boolean(disabledReason) || Boolean(target.companyId)}>
-                    <option value="">Choose an account</option>
-                    {(companies.data?.items ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  {accountPhase === 'unread' ? (
+                    <p>Checking accounts. The list has not arrived.</p>
+                  ) : accountPhase === 'failed' ? (
+                    <p role="alert">Could not load accounts.</p>
+                  ) : (
+                    <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} required disabled={Boolean(disabledReason) || Boolean(target.companyId)}>
+                      <option value="">Choose an account</option>
+                      {(companies.data?.items ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  )}
                 </label>
                 <label>Type
                   <select value={kind} onChange={(e) => setKind(e.target.value as MsaKind)} disabled={Boolean(disabledReason)}>
