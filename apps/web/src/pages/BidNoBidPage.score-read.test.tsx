@@ -158,7 +158,8 @@ describe('BidNoBidPage unread score', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('alert', { name: FAILED }, { timeout: 10000 })).toBeTruthy();
+    const failed = await screen.findByText(FAILED, {}, { timeout: 10000 });
+    expect(failed.getAttribute('role')).toBe('alert');
     expect(screen.queryByText(NOT_YET)).toBeNull();
     expect(screen.queryByRole('group', { name: SCORE_ZERO })).toBeNull();
     expect(screen.queryByText(RATIO_ZERO)).toBeNull();
@@ -189,7 +190,7 @@ describe('BidNoBidPage unread score', () => {
     expect(screen.getByText(RATIO_ZERO)).toBeTruthy();
     expect(screen.getByText(ZERO_LINE)).toBeTruthy();
     expect(screen.queryByText(WAITING)).toBeNull();
-    expect(screen.queryByRole('alert', { name: FAILED })).toBeNull();
+    expect(screen.queryByText(FAILED)).toBeNull();
   });
 
   it('still shows a score that has arrived', async () => {
@@ -218,6 +219,6 @@ describe('BidNoBidPage unread score', () => {
     expect(screen.getByText('1/10 criteria rated.')).toBeTruthy();
     expect(screen.queryByText(NOT_YET)).toBeNull();
     expect(screen.queryByText(WAITING)).toBeNull();
-    expect(screen.queryByRole('alert', { name: FAILED })).toBeNull();
+    expect(screen.queryByText(FAILED)).toBeNull();
   });
 });
