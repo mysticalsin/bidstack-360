@@ -12,6 +12,8 @@ import { useIsAdmin } from '@/lib/auth';
 import { useDataResidency, useUpdateDataResidency } from '@/hooks/useDataResidency';
 import type { DataRegion, OrgDataResidencyView } from '@bidstack/shared';
 
+import { dataResidencyClaim } from './data-residency-claim';
+
 // '' is the wire's `null` (not pinned); a select cannot carry null.
 const OPTIONS: { value: DataRegion | ''; labelKey: string; fallback: string }[] = [
   { value: '', labelKey: 'dataResidency.regionNone', fallback: 'Not pinned (deployment default)' },
@@ -24,9 +26,23 @@ const OPTIONS: { value: DataRegion | ''; labelKey: string; fallback: string }[] 
 export function DataResidencySection() {
   const { t } = useTranslation('settings');
   const residency = useDataResidency();
+  const claim = dataResidencyClaim({
+    data: residency.data,
+    isError: residency.isError,
+    isLoading: residency.isLoading,
+    isPlaceholderData: residency.isPlaceholderData,
+    status: residency.status,
+  });
 
-  if (residency.isLoading) return <LoadingSkeleton rows={2} />;
-  if (residency.isError || !residency.data) {
+  if (claim === 'skeleton') return <LoadingSkeleton rows={2} />;
+  if (claim === 'withheld') {
+    return (
+      <p role="status" className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('dataResidency.notArrived', 'The data region has not arrived.')}
+      </p>
+    );
+  }
+  if (claim !== 'ready' || !residency.data) {
     return (
       <ErrorState
         title={t('dataResidency.loadErrorTitle', 'Could not load the data region')}
