@@ -4,21 +4,15 @@ import { Link } from 'react-router-dom';
 
 import { usePoloPublicIdentity, type PoloPublicIdentity } from '@/hooks/usePoloIdentity';
 
-const LAST_MODE_KEY = 'polo:last-data-mode';
+import { dataModePhase } from './data-mode-read';
 
-function readLastMode(): PoloPublicIdentity['dataMode'] {
-  try {
-    return localStorage.getItem(LAST_MODE_KEY) === 'real' ? 'real' : 'demo';
-  } catch {
-    return 'demo';
-  }
-}
+const LAST_MODE_KEY = 'polo:last-data-mode';
 
 function rememberMode(mode: PoloPublicIdentity['dataMode']) {
   try {
     if (localStorage.getItem(LAST_MODE_KEY) !== mode) localStorage.setItem(LAST_MODE_KEY, mode);
   } catch {
-    // Storage can be blocked; the placeholder then falls back to demo.
+    // Storage can be blocked. The next visit still reads the mode from the server.
   }
 }
 
@@ -36,41 +30,22 @@ export function DataModeBanner() {
     if (mode) rememberMode(mode);
   }, [mode]);
 
-  if (!data) {
-    if (!identity.isLoading) return null;
-    // The banner sits above the topbar, so appearing late pushes the whole page
-    // down. Reserve its box with the same copy (hidden) for the last-known mode.
-    const lastMode = readLastMode();
+  const phase = dataModePhase(identity);
+  if (phase === 'unread') {
     return (
-      <div
-        aria-hidden="true"
-        data-testid="data-mode-banner-placeholder"
-        className={lastMode === 'real' ? REAL_CLASS : DEMO_CLASS}
-      >
-        <span className="invisible">
-          {lastMode === 'real' ? (
-            <>
-              {t(
-                'dataModeBanner.real',
-                'Real-data mode. Signed MSAs and revenue figures are live. Changes are audited.',
-              )}{' '}
-              {t('dataModeBanner.identityLink', 'Identity & roles')}
-            </>
-          ) : (
-            <>
-              <strong className="font-semibold">{t('dataModeBanner.demoTitle', 'DEMO MODE')}</strong>
-              {': '}
-              {t(
-                'dataModeBanner.demo',
-                'Fixture and synthetic data only. Do not load real accounts, revenue, or signed MSAs until POLO_DATA_MODE=real and Cloudflare Access identity are configured.',
-              )}{' '}
-              {t('dataModeBanner.whyLink', 'Why this banner')}
-            </>
-          )}
-        </span>
-      </div>
+      <p className={REAL_CLASS}>
+        {t('dataModeBanner.checking', 'Checking the data mode. The mode has not arrived.')}
+      </p>
     );
   }
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className={REAL_CLASS}>
+        {t('dataModeBanner.loadError', 'Could not load the data mode.')}
+      </p>
+    );
+  }
+  if (!data) return null;
 
   if (data.dataMode === 'real') {
     return (
