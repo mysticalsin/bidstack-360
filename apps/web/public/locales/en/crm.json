@@ -3005,6 +3005,8 @@
     "caption": "Why deals close — and the pattern across the org",
     "errorTitle": "Could not load win/loss patterns",
     "errorMessage": "Try again shortly.",
+    "checking": "Checking win/loss reasons. They have not arrived.",
+    "refreshFailed": "Could not refresh win/loss reasons. The reasons already on screen stay.",
     "recordedCount": "{{won}} won · {{lost}} lost recorded",
     "patternBadge": "Pattern",
     "mostLossesCitePrefix": "Most losses cite ",

@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useIsAdmin } from '@/lib/auth';
 import { useUpsertWinLoss, useWinLossPatterns } from '@/hooks/useWinLoss';
@@ -55,6 +55,12 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
   const reasonLabel = useReasonLabels();
   const patterns = useWinLossPatterns();
   const canWrite = useIsAdmin();
+  const arrived = patterns.data;
+  // isLoading is false while a read is paused, so a missing payload is not a
+  // settled empty book. A payload that arrived stays through a later failure.
+  const waiting = !arrived && !patterns.isError;
+  const failed = !arrived && patterns.isError;
+  const refreshFailed = Boolean(arrived) && patterns.isError;
 
   return (
     <Card role="region" aria-label={t('winLossReasons.regionLabel', 'Win/loss reasons')}>
@@ -63,26 +69,39 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
         caption={t('winLossReasons.caption', 'Why deals close — and the pattern across the org')}
       />
       <div className="px-5 pb-5 space-y-4">
-        {patterns.isLoading ? (
-          <LoadingSkeleton rows={2} />
-        ) : patterns.isError ? (
+        {waiting ? (
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t(
+              'winLossReasons.checking',
+              'Checking win/loss reasons. They have not arrived.',
+            )}
+          </p>
+        ) : failed || !arrived ? (
           <ErrorState
             title={t('winLossReasons.errorTitle', 'Could not load win/loss patterns')}
             message={patterns.error?.message ?? t('winLossReasons.errorMessage', 'Try again shortly.')}
           />
         ) : (
           <div>
+            {refreshFailed ? (
+              <p role="alert" className="mb-2 text-sm text-[var(--danger)]">
+                {t(
+                  'winLossReasons.refreshFailed',
+                  'Could not refresh win/loss reasons. The reasons already on screen stay.',
+                )}
+              </p>
+            ) : null}
             <p className="text-sm text-[var(--fg-secondary)]">
               {t('winLossReasons.recordedCount', '{{won}} won · {{lost}} lost recorded', {
-                won: patterns.data!.totalWon,
-                lost: patterns.data!.totalLost,
+                won: arrived.totalWon,
+                lost: arrived.totalLost,
               })}
             </p>
-            {patterns.data!.topLossReason ? (
+            {arrived.topLossReason ? (
               <p className="mt-2 flex items-center gap-2 text-sm text-[var(--fg-primary)]">
                 <Badge tone="tomato">{t('winLossReasons.patternBadge', 'Pattern')}</Badge>
                 {t('winLossReasons.mostLossesCitePrefix', 'Most losses cite ')}
-                <strong>{reasonLabel[patterns.data!.topLossReason]}</strong>.
+                <strong>{reasonLabel[arrived.topLossReason]}</strong>.
               </p>
             ) : (
               <p className="mt-2 text-sm text-[var(--fg-tertiary)]">
@@ -92,9 +111,9 @@ export function WinLossReasonsCard({ closedOpps }: { closedOpps: ClosedOpp[] }) 
                 )}
               </p>
             )}
-            {patterns.data!.rows.filter((r) => r.outcome === 'lost').length > 0 && (
+            {arrived.rows.filter((r) => r.outcome === 'lost').length > 0 && (
               <ul className="mt-2 flex flex-wrap gap-1.5">
-                {patterns.data!.rows
+                {arrived.rows
                   .filter((r) => r.outcome === 'lost')
                   .sort((a, b) => b.count - a.count)
                   .map((r) => (
