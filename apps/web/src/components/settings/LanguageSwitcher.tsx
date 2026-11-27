@@ -6,12 +6,17 @@
 // WHY separate from CurrencyLocaleSection: language is a personal preference
 // (per-user), whereas currency/timezone are workspace-level defaults.
 
-import { useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { cn } from '@/lib/cn';
 import { isSupportedLocale, type SupportedLocale } from '@/i18n';
+import {
+  appearanceLanguagePhase,
+  appearanceLanguageSnapshot,
+  type AppearanceLanguageSource,
+} from './appearance-language-read';
 
 // The locales we expose in the switcher. AR is supported in the codebase but
 // deferred from the UI switcher until RTL layout is fully QA'd.
@@ -55,33 +60,92 @@ function persistLocale(locale: SupportedLocale): void {
   document.documentElement.lang = locale;
 }
 
+function languageReadFlags(i18n: object): Pick<AppearanceLanguageSource, 'isError' | 'status'> {
+  const record = i18n as { isError?: unknown; status?: unknown };
+  return {
+    isError: typeof record.isError === 'boolean' ? record.isError : undefined,
+    status: typeof record.status === 'string' ? record.status : undefined,
+  };
+}
+
+function selectedLocale(data: unknown): DisplayLocale | null {
+  if (typeof data !== 'string' || data.length === 0) return null;
+  const base = data.split('-')[0] ?? data;
+  if (!isSupportedLocale(base)) return null;
+  return DISPLAY_LOCALES.includes(base as DisplayLocale) ? (base as DisplayLocale) : null;
+}
+
 /** Standalone language-switcher widget rendered inside SettingsPage. */
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation('settings');
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  const rawLocale = isSupportedLocale(i18n.language) ? i18n.language : 'en';
-  const activeLocale: DisplayLocale = DISPLAY_LOCALES.includes(rawLocale as DisplayLocale)
-    ? (rawLocale as DisplayLocale)
-    : 'en';
+  useEffect(() => {
+    if (typeof i18n.on !== 'function' || typeof i18n.off !== 'function') return;
+    const onFail = () => {
+      if (!i18n.isInitialized) setLoadFailed(true);
+    };
+    const onInit = () => setLoadFailed(false);
+    i18n.on('failedLoading', onFail);
+    i18n.on('initialized', onInit);
+    return () => {
+      i18n.off('failedLoading', onFail);
+      i18n.off('initialized', onInit);
+    };
+  }, [i18n]);
 
-  const changeLanguage = useCallback(
-    async (locale: DisplayLocale) => {
-      if (locale === activeLocale) return;
-      persistLocale(locale);
-      await i18n.changeLanguage(locale);
-      // Announce change to screen readers via a live region managed by LiveAnnouncer.
-      // We dispatch a custom event rather than importing LiveAnnouncer to avoid
-      // a circular dep (LiveAnnouncer already imports from i18n).
-      window.dispatchEvent(
-        new CustomEvent('bidstack:announce', {
-          detail: {
-            message: t('languageSwitcher.changeSuccess', { lang: LOCALE_FULL_LABEL[locale] }),
-          },
-        }),
-      );
-    },
-    [activeLocale, i18n, t],
-  );
+  const flags = languageReadFlags(i18n);
+  const read = appearanceLanguageSnapshot({
+    language: i18n.language,
+    resolvedLanguage: i18n.resolvedLanguage,
+    isInitialized: i18n.isInitialized,
+    isError: loadFailed || flags.isError === true,
+    status: flags.status,
+  });
+  const phase = appearanceLanguagePhase(read);
+  const activeLocale = selectedLocale(read.data);
+
+  const changeLanguage = async (locale: DisplayLocale) => {
+    if (locale === activeLocale) return;
+    persistLocale(locale);
+    await i18n.changeLanguage(locale);
+    // Announce change to screen readers via a live region managed by LiveAnnouncer.
+    // We dispatch a custom event rather than importing LiveAnnouncer to avoid
+    // a circular dep (LiveAnnouncer already imports from i18n).
+    window.dispatchEvent(
+      new CustomEvent('bidstack:announce', {
+        detail: {
+          message: t('languageSwitcher.changeSuccess', { lang: LOCALE_FULL_LABEL[locale] }),
+        },
+      }),
+    );
+  };
+
+  if (phase === 'unread') {
+    return (
+      <p role="status">
+        {t('languageSwitcher.checking', 'Checking language. The preference has not arrived.')}
+      </p>
+    );
+  }
+  if (phase === 'failed') {
+    return (
+      <p role="alert">
+        {t('languageSwitcher.loadError', 'Could not load language. Please retry.')}
+      </p>
+    );
+  }
+
+  const currentLanguage =
+    activeLocale != null
+      ? t('languageSwitcher.currentLanguage', 'Current language: {{lang}}', {
+          lang: LOCALE_FULL_LABEL[activeLocale],
+        })
+      : typeof read.data === 'string' && read.data.length > 0
+        ? t('languageSwitcher.currentLanguage', 'Current language: {{lang}}', {
+            lang: read.data,
+          })
+        : t('languageSwitcher.noneSaved', 'No language preference is saved.');
 
   return (
     <Card>
@@ -133,7 +197,7 @@ export function LanguageSwitcher() {
             })}
           </div>
           <p className="mt-2 text-xs text-[var(--fg-secondary)] dark:text-[var(--fg-muted)]">
-            {t('languageSwitcher.currentLanguage', { lang: LOCALE_FULL_LABEL[activeLocale] })}
+            {currentLanguage}
           </p>
         </fieldset>
       </div>
