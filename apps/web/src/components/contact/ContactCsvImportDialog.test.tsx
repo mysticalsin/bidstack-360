@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { rowsToCsv } from '@/lib/csv';
+
 const hookMocks = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
   useCreateContact: vi.fn(),
@@ -183,6 +185,44 @@ describe('ContactCsvImportDialog', () => {
     const textarea = screen.getByLabelText('CSV contact rows') as HTMLTextAreaElement;
     await waitFor(() => expect(textarea.value).toBe('name,customer\nBob,Mantu'));
     expect(screen.getByRole('button', { name: 'Import 1' })).toBeTruthy();
+  });
+
+  it('saves the phone the contacts export printed, not the spreadsheet escape', async () => {
+    // WHY: demo phones start with +. The list export prefixes an apostrophe so
+    // a spreadsheet does not run +49 30 1234 5670 as a formula. Pasting that
+    // file back has to store the number on the row. The escape is not a phone.
+    hookMocks.mutateAsync.mockResolvedValue(undefined);
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    const csv = rowsToCsv(
+      [
+        { name: 'Michael Johnson', customer: 'CI Financial', phone: '+1 416 555 0142' },
+        { name: 'Klaus Vogt', customer: 'Siemens', phone: '+49 30 1234 5670' },
+      ],
+      [
+        { key: 'name', label: 'Name' },
+        { key: 'customer', label: 'Customer' },
+        { key: 'phone', label: 'Phone' },
+      ],
+    );
+    expect(csv).toContain("'+1 416 555 0142");
+    expect(csv).toContain("'+49 30 1234 5670");
+
+    pasteCsv(csv);
+
+    expect(screen.getByText('+1 416 555 0142', { exact: true })).toBeTruthy();
+    expect(screen.getByText('+49 30 1234 5670', { exact: true })).toBeTruthy();
+    expect(screen.queryByText("'+1 416 555 0142", { exact: true })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import 2' }));
+
+    await waitFor(() => expect(hookMocks.mutateAsync).toHaveBeenCalledTimes(2));
+    expect(hookMocks.mutateAsync.mock.calls.map((call) => call[0].phone)).toEqual([
+      '+1 416 555 0142',
+      '+49 30 1234 5670',
+    ]);
   });
 
   it('the textarea is labeled and wired to the error message via aria-describedby when a row is invalid', async () => {
