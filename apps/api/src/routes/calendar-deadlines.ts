@@ -13,9 +13,11 @@
 
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { prisma } from '@bidstack/db';
+import { OpportunityStage, prisma } from '@bidstack/db';
+import { fixtureOpenDueInWindow, projectFixtureOpportunityDueDate } from '@bidstack/shared';
 
 import { canViewAllRfps } from '../lib/rfp-visibility.js';
+import { getPoloDataMode } from '../lib/polo-mode.js';
 
 const DeadlineQuery = z.object({
   /** Inclusive start of the window (date-only — dueDate columns are @db.Date). */
@@ -56,21 +58,40 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.badRequest('`from` must be before `to`');
       }
 
+      const mode = getPoloDataMode();
+      const now = new Date();
+      const extras = fixtureOpenDueInWindow(from, to, now, mode);
+      const openStage = { notIn: [OpportunityStage.closed_won, OpportunityStage.closed_lost] };
+      const pipelineOpen = {
+        OR: [{ pipelineStageId: null }, { pipelineStage: { isWon: false, isLost: false } }],
+      };
       const [opportunities, proposals] = await Promise.all([
         prisma.opportunity.findMany({
-          where: {
-            orgId,
-            deletedAt: null,
-            dueDate: { gte: from, lt: to },
-            // Closed bids have no live deadline — filter on BOTH the legacy
-            // stage enum and the Phase-5 pipelineStage flags, since either may
-            // be the source of truth depending on the org's data vintage.
-            stage: { notIn: ['closed_won', 'closed_lost'] },
-            OR: [{ pipelineStageId: null }, { pipelineStage: { isWon: false, isLost: false } }],
-          },
+          where:
+            extras.length === 0
+              ? {
+                  orgId,
+                  deletedAt: null,
+                  dueDate: { gte: from, lt: to },
+                  stage: openStage,
+                  ...pipelineOpen,
+                }
+              : {
+                  orgId,
+                  deletedAt: null,
+                  OR: [
+                    { dueDate: { gte: from, lt: to }, stage: openStage, ...pipelineOpen },
+                    ...extras.map((row) => ({
+                      code: row.code,
+                      dueDate: new Date(`${row.storedDate}T00:00:00.000Z`),
+                      stage: openStage,
+                      ...pipelineOpen,
+                    })),
+                  ],
+                },
           orderBy: { dueDate: 'asc' },
           take: 200,
-          select: { id: true, code: true, customer: true, name: true, dueDate: true },
+          select: { id: true, code: true, customer: true, name: true, dueDate: true, stage: true },
         }),
         prisma.proposal.findMany({
           where: {
@@ -93,8 +114,14 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
           name: o.name,
           customer: o.customer,
           code: o.code,
-          // dueDate is non-null here — the range filter excludes null rows.
-          dueDate: toDateOnly(o.dueDate as Date),
+          dueDate: (() => {
+            const projected = projectFixtureOpportunityDueDate(
+              { code: o.code, stage: o.stage, dueDate: o.dueDate },
+              now,
+              mode,
+            );
+            return toDateOnly(projected instanceof Date ? projected : new Date(o.dueDate as Date));
+          })(),
         })),
         ...proposals.map((p) => ({
           kind: 'proposal' as const,

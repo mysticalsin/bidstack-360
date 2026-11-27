@@ -11,6 +11,9 @@ import { z } from 'zod';
 
 import { Prisma, prisma } from '@bidstack/db';
 
+import { getPoloDataMode } from '../lib/polo-mode.js';
+import { projectedOpportunityDueSql } from '../demo/fixture-opportunity-due-sql.js';
+
 const WorkloadOwner = z.object({
   /** null = the unassigned bucket (open bids/tasks nobody owns). */
   ownerId: z.string().uuid().nullable(),
@@ -47,7 +50,7 @@ interface BidAggRow {
  * The 7-day window is [today, today+7) on the DB's date, matching the
  * dueWithinDays semantics of the opportunities list route.
  */
-function aggregateBids(orgId: string): Promise<BidAggRow[]> {
+function aggregateBids(orgId: string, due: Prisma.Sql): Promise<BidAggRow[]> {
   return prisma.$queryRaw<BidAggRow[]>(Prisma.sql`
     SELECT
       o.owner_id                             AS "ownerId",
@@ -56,8 +59,8 @@ function aggregateBids(orgId: string): Promise<BidAggRow[]> {
       COALESCE(SUM(ROUND(o.value_micros * o.probability / 100.0)), 0)::text
                                              AS "weightedValueMicros",
       COUNT(*) FILTER (
-        WHERE o.due_date >= CURRENT_DATE
-          AND o.due_date < CURRENT_DATE + 7
+        WHERE ${due} >= CURRENT_DATE
+          AND ${due} < CURRENT_DATE + 7
       )::int                                 AS "closingWithin7Days"
     FROM opportunities o
     WHERE o.org_id = ${orgId}::uuid
@@ -125,7 +128,7 @@ async function buildWorkload(orgId: string): Promise<z.infer<typeof WorkloadResp
       // page can show.
       take: 200,
     }),
-    aggregateBids(orgId),
+    aggregateBids(orgId, projectedOpportunityDueSql(new Date(), getPoloDataMode())),
     aggregateTasks(orgId),
   ]);
 

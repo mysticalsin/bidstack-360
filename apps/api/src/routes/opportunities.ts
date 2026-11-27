@@ -53,7 +53,8 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // M7 access scoping: group-restricted users only see opportunities in
       // their countries (or that they own). See lib/access-scope.ts.
       const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
-      const dueDateFilter = opportunityDueDateWhere({ dueWithinDays, overdue }).dueDate;
+      const dueWhere = opportunityDueDateWhere({ dueWithinDays, overdue });
+      const hasDueFilter = dueWithinDays !== undefined || Boolean(overdue);
       return req.cache(
         async () => {
           const items = await prisma.opportunity.findMany({
@@ -66,7 +67,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 ...(industry ? { industry } : {}),
                 ...(companyId ? { companyId } : {}),
                 ...(owner ? { owner: { email: owner } } : {}),
-                ...(dueDateFilter ? { dueDate: dueDateFilter } : {}),
+                ...dueWhere,
                 ...(search
                   ? {
                       OR: [
@@ -130,7 +131,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             // from "not yet" among equal sort keys). The unique `id` makes the
             // sort total, matching companies.ts/tasks.ts/activities.ts. Tiebreaker
             // direction follows the primary sort so the cursor walks monotonically.
-            orderBy: dueDateFilter
+            orderBy: hasDueFilter
               ? [{ dueDate: 'asc' }, { id: 'asc' }]
               : [{ updatedAt: 'desc' }, { id: 'desc' }],
             take: limit + 1,
