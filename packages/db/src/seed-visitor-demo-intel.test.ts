@@ -63,6 +63,16 @@ describe('visitor demo company intel', () => {
     }
   });
 
+  it('gives each sample posting its own fetch time', () => {
+    // WHY: MSA whitespace orders postings by fetchedAt and hashes that order.
+    // A tie lets the database return them either way, so a dismissal stored
+    // against one order does not hide the line on the next read.
+    const account = VISITOR_DEMO_ACCOUNTS[0]!;
+    const input = hostedIntelSummaryInput(account, NOW, 'company-1');
+    const stamps = input.postings.map((posting) => posting.fetchedAt);
+    expect(new Set(stamps).size).toBe(stamps.length);
+  });
+
   it('summarises accounts that already have fixture postings, including ones this list does not name', () => {
     // WHY: the Pfizer whitespace fixture already writes sample postings and a
     // post, and never rebuilds the summary. The companies list reads that

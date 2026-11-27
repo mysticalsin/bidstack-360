@@ -121,7 +121,9 @@ export function hostedIntelSummaryInput(
       source: 'fixture',
       url: `https://${account.domain}/`,
       sample: true,
-      fetchedAt,
+      // Distinct fetch times. Whitespace orders by fetchedAt and hashes that
+      // order; a tie makes a dismissal fail to hide the line.
+      fetchedAt: new Date(now.getTime() - DAY - i * 60_000).toISOString(),
     })),
     posts: [
       {
@@ -177,6 +179,9 @@ export async function seedVisitorDemoCompanyIntel(
     });
     const region = regionFor(company.countryCode ?? account.country);
     for (const [i, posting] of input.postings.entries()) {
+      if (typeof posting.postedAt !== 'string' || typeof posting.lastSeenAt !== 'string' || typeof posting.fetchedAt !== 'string') {
+        throw new Error(`visitor demo posting for ${account.name} is missing a clock`);
+      }
       const row = {
         title: posting.title,
         url: posting.url,
@@ -184,9 +189,9 @@ export async function seedVisitorDemoCompanyIntel(
         function: posting.function,
         seniority: 'senior',
         skills: posting.skills,
-        postedAt: new Date(posting.postedAt as string),
-        lastSeenAt: new Date(posting.lastSeenAt as string),
-        fetchedAt,
+        postedAt: new Date(posting.postedAt),
+        lastSeenAt: new Date(posting.lastSeenAt),
+        fetchedAt: new Date(posting.fetchedAt),
         sample: true,
       };
       await prisma.companyJobPosting.upsert({
