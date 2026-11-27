@@ -44,6 +44,7 @@ export function AuditLogSection() {
   );
 
   const query = useAuditLogs(filter);
+  const pageArrived = query.data != null;
   const rows = query.data?.items ?? EMPTY_AUDIT_ROWS;
   const visibleRows = useMemo(
     () =>
@@ -81,6 +82,7 @@ export function AuditLogSection() {
         totalVisible={visibleRows.length}
         page={cursorStack.length + 1}
         isLoading={query.isLoading || query.isFetching}
+        pageArrived={pageArrived}
         lastRefreshedAt={
           query.dataUpdatedAt ? new Date(query.dataUpdatedAt).toISOString() : undefined
         }
@@ -118,7 +120,7 @@ export function AuditLogSection() {
           : ''}
       </p>
 
-      <AuditInsightStrip rows={visibleRows} />
+      {pageArrived ? <AuditInsightStrip rows={visibleRows} /> : null}
 
       {query.isLoading && <LoadingSkeleton rows={8} />}
       {query.error && (
@@ -127,7 +129,7 @@ export function AuditLogSection() {
           message={String(query.error)}
         />
       )}
-      {!query.isLoading && rows.length === 0 && (
+      {pageArrived && !query.isLoading && rows.length === 0 && (
         <EmptyState
           title={t('auditLog.emptyTitle', 'No audit entries')}
           message={t('auditLog.emptyMessage', 'No audit entries match this range.')}
