@@ -9,7 +9,7 @@ import { DueDateChip } from '@/components/ui/DueDateChip';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import {
@@ -48,6 +48,7 @@ import {
 import { BidScoreCard } from './opportunityDetail/BidScoreCard';
 import { TimelinePanel } from './opportunityDetail/TimelinePanel';
 import { LessonsLearnedCard } from './opportunityDetail/LessonsLearnedCard';
+import { opportunityRecordPhase } from './opportunity-record-read';
 import { BidGovernancePanel } from '@/components/bid/BidGovernancePanel';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
@@ -74,7 +75,8 @@ export function OpportunityDetailPage() {
     { value: 'closed_lost', label: t('opportunityDetail.stageClosedLost', 'Closed lost') },
   ];
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading, isError, error, refetch } = useOpportunity(id);
+  const { data, isLoading, isPending, isError, error, refetch, fetchStatus, status } =
+    useOpportunity(id);
   const patch = usePatchOpportunity();
   const stageMove = useStageMutation();
   // Delete/patch/stage-move all 403 server-side without opportunities:write
@@ -148,10 +150,31 @@ export function OpportunityDetailPage() {
       : [],
   );
 
-  if (isLoading) return <DetailPageSkeleton tabs columns={2} cards={3} />;
-  // A 404 (deleted, foreign or out of access scope) is "not found", not a failure.
-  const notFound = isError ? error instanceof ApiError && error.status === 404 : !data;
-  if (isError && !notFound)
+  const phase = opportunityRecordPhase({
+    data,
+    isError,
+    isLoading,
+    isPending,
+    fetchStatus,
+    status,
+    error,
+  });
+  // A pause reports isLoading false, so the old order fell through to
+  // "Opportunity not found" before any record had arrived. A 404 stays a
+  // settled miss. Any other error stays a failed read.
+  if (phase === 'unread') {
+    const checking = t('opportunityDetail.checkingTitle', 'Checking this opportunity');
+    const waiting = t('opportunityDetail.checkingMessage', 'The opportunity has not arrived.');
+    return (
+      <div className="space-y-4">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {checking}. {waiting}
+        </p>
+        <DetailPageSkeleton tabs columns={2} cards={3} />
+      </div>
+    );
+  }
+  if (phase === 'failed')
     return (
       <ErrorState
         title={t('opportunityDetail.errorTitle', "Couldn't load this opportunity")}
@@ -163,7 +186,7 @@ export function OpportunityDetailPage() {
         }
       />
     );
-  if (notFound || !data) {
+  if (phase === 'missing' || !data) {
     return (
       <EmptyState
         title={t('opportunityDetail.notFoundTitle', 'Opportunity not found')}
