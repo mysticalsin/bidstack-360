@@ -24,7 +24,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { parseAsString, useQueryState } from 'nuqs';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -39,15 +39,14 @@ import { Sheet, SheetContent } from '@/components/ui/Sheet';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { api } from '@/lib/api';
-import { keepPreviousTableData, tableFetchState, useTableQuery } from '@/lib/table/use-table-query';
+import { useTableQuery } from '@/lib/table/use-table-query';
 import {
-  PROPOSALS_WINDOW,
   PROPOSAL_STAGES,
   proposalsSearchParams,
   selectProposals,
-  type ProposalPage,
   type ProposalRow,
 } from './proposals-search-params';
+import { proposalsEmptyIsFiltered, useProposalListWindow } from './proposals-list-window';
 import {
   useOwnerLabel,
   useProposalColumns,
@@ -189,24 +188,12 @@ export function ProposalsPage() {
   const { query, input } = useTableQuery(proposalsSearchParams);
 
   const search = useDebounced(input.q);
-  // Named `windowQuery`, not `window` — the loaded slice is a window over the
+  // Named `windowQuery`, not `window`. The loaded slice is a window over the
   // server's result set, and shadowing the global would be a landmine.
-  const windowQuery = useQuery({
-    queryKey: ['proposals', 'list', { status: input.status, search }],
-    queryFn: ({ signal }) => {
-      const params = new URLSearchParams({ limit: String(PROPOSALS_WINDOW) });
-      if (input.status !== 'all') params.set('status', input.status);
-      if (search) params.set('search', search);
-      return api<ProposalPage>(`/api/v1/proposals?${params.toString()}`, { signal });
-    },
-    // The port must not feel worse than a server-rendered list on a filter
-    // change (ROUND2-ULTRAPLAN risk #7): keep the previous rows on screen and
-    // move the pagination spinner instead of blanking the table.
-    placeholderData: keepPreviousTableData,
-  });
-  const { showSkeleton, showSpinner } = tableFetchState(windowQuery);
-
-  const items = useMemo(() => windowQuery.data?.items ?? [], [windowQuery.data]);
+  const { windowQuery, items, showSkeleton, showSpinner } = useProposalListWindow(
+    input.status,
+    search,
+  );
   const selection = useMemo(
     () => selectProposals(items, input, ownerLabel),
     [items, input, ownerLabel],
@@ -294,7 +281,23 @@ export function ProposalsPage() {
         facets={facets}
         leadingActions={<ProposalSearch value={query.q} onChange={query.setQ} />}
         onRowClick={(row) => navigate(`/proposals/${row.id}`)}
-        empty={showSkeleton ? <LoadingRows /> : <ProposalsEmpty filtered={items.length > 0} />}
+        empty={
+          showSkeleton ? (
+            <LoadingRows />
+          ) : (
+            <ProposalsEmpty
+              filtered={proposalsEmptyIsFiltered({
+                status: input.status,
+                q: input.q,
+                settledSearch: search,
+                owner: input.owner,
+                dueWindow: input.dueWindow,
+                compliance: input.compliance,
+                windowCount: items.length,
+              })}
+            />
+          )
+        }
         // The table's own scroller is what makes the header sticky, so it needs a
         // bounded height — the page itself scrolls with the shell. Sizing, not
         // geometry: the design-law rule scopes to radius/shadow/spacing only.
