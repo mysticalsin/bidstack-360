@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
+  api: vi.fn(async () => ({ id: 'n1', readAt: '2026-11-25T00:00:00.000Z' })),
   getAuthToken: vi.fn(async () => 'tok'),
 }));
 
@@ -13,6 +14,7 @@ vi.mock('@/components/ui/Toast', () => ({
   toast: { info: vi.fn(() => `t${Math.random()}`), dismiss: vi.fn(), error: vi.fn() },
 }));
 
+import { api } from '@/lib/api';
 import { toast } from '@/components/ui/Toast';
 import { parseNotificationFrame, realtimeUrl } from '@/lib/notification-socket';
 
@@ -122,8 +124,18 @@ describe('notification stream', () => {
     expect(opts.action?.label).toBe('Open');
     const firstId = vi.mocked(toast.info).mock.results[0]!.value as string;
 
-    act(() => opts.action!.onClick());
+    // mutate() starts the read on a microtask. Flush it before asserting,
+    // or the badge clear looks missing even though Open already queued it.
+    await act(async () => {
+      opts.action!.onClick();
+    });
     expect(seen.path).toBe('/companies/c1');
+    // Opening the alert is the same act as opening its row in the bell. The
+    // unread badge has to drop. If Open only navigates, the badge still says
+    // the alert is new after the rep already followed it.
+    expect(vi.mocked(api)).toHaveBeenCalledWith('/api/notifications/n1/read', {
+      method: 'PATCH',
+    });
 
     act(() =>
       socket.emit(
