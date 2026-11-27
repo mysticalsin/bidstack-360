@@ -11,13 +11,10 @@
  */
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 
-import { dueDateUrgency } from '@/components/ui/DueDateChip';
-import { useCalendarDeadlines, type CalendarDeadline } from '@/hooks/useCalendarDeadlines';
-import { cn } from '@/lib/cn';
-import { formatDate } from '@/lib/format';
+import { useCalendarDeadlines } from '@/hooks/useCalendarDeadlines';
 
+import { DeadlineChip, DeadlineJump, jumpTarget } from './DeadlineJump';
 import { toLocalIsoDate } from './dateUtils';
 
 const LANE_GRID = 'grid border-b border-[var(--border-subtle)]';
@@ -28,90 +25,14 @@ function laneColumns(count: number): CSSProperties {
 }
 const FULL_ROW: CSSProperties = { gridColumn: '2 / -1' };
 
-interface ChipTone {
-  className: string;
-  /** Filled diamond = needs attention (shape + fill, not hue alone — WCAG 1.4.1). */
-  filled: boolean;
-  overdue: boolean;
-  dueToday: boolean;
-}
-
-function chipTone(dueDate: string): ChipTone {
-  const { urgency, days } = dueDateUrgency(dueDate);
-  if (urgency === 'danger') {
-    // --danger on --danger-tint: 5.31:1 light / dark pair verified in index.css.
-    return {
-      className:
-        'border-[var(--danger)] bg-[var(--danger-tint)] text-[var(--danger)] font-semibold',
-      filled: true,
-      overdue: true,
-      dueToday: false,
-    };
-  }
-  if (days === 0) {
-    // Due today — amber emphasis, same tone DueDateChip uses for "Due today".
-    // --warning on --warning-tint: 5.28:1 light / dark pair verified in index.css.
-    return {
-      className:
-        'border-[var(--warning)] bg-[var(--warning-tint)] text-[var(--warning)] font-semibold',
-      filled: true,
-      overdue: false,
-      dueToday: true,
-    };
-  }
-  return {
-    className: 'border-[var(--border-strong)] text-[var(--fg-secondary)]',
-    filled: false,
-    overdue: false,
-    dueToday: false,
-  };
-}
-
-function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
-  const { t } = useTranslation('crm');
-  const { className, filled, overdue, dueToday } = chipTone(deadline.dueDate);
-
-  const isOpp = deadline.kind === 'opportunity';
-  const label =
-    isOpp && deadline.customer ? `${deadline.customer} · ${deadline.name}` : deadline.name;
-  const kindLabel = isOpp
-    ? t('calendar.deadlineKindOpportunity', 'Bid deadline')
-    : t('calendar.deadlineKindProposal', 'Proposal deadline');
-  const stateSuffix = overdue
-    ? t('calendar.deadlineOverdueSuffix', ', overdue')
-    : dueToday
-      ? t('calendar.deadlineDueTodaySuffix', ', due today')
-      : '';
-
-  return (
-    <Link
-      to={isOpp ? `/opportunities/${deadline.id}` : `/proposals/${deadline.id}`}
-      title={`${kindLabel}: ${label}`}
-      aria-label={
-        `${kindLabel}: ${label}, ` +
-        t('calendar.deadlineDue', 'due {{date}}', { date: formatDate(deadline.dueDate) }) +
-        stateSuffix
-      }
-      className={cn(
-        // min-h-[44px] keeps the tap target compliant even in the dense lane.
-        'flex min-h-[44px] w-full items-center gap-1.5 rounded-md border bg-transparent px-1.5 text-xs font-medium leading-tight',
-        'hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]',
-        className,
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className={cn(
-          'inline-block h-1.5 w-1.5 shrink-0 rotate-45 border border-current',
-          filled && 'bg-current',
-        )}
-      />
-      <span className="truncate">{label}</span>
-    </Link>
-  );
-}
-
-export function DeadlinesRow({ days }: { days: Date[] }) {
+export function DeadlinesRow({
+  days,
+  onJumpToDay,
+}: {
+  days: Date[];
+  /** Opens the calendar on a day outside this range. */
+  onJumpToDay?: (day: string) => void;
+}) {
   const { t } = useTranslation('crm');
   const first = days[0] ?? new Date();
   const last = days[days.length - 1] ?? first;
@@ -168,13 +89,22 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
   const items = data?.items ?? [];
 
   if (items.length === 0) {
+    const outside = jumpTarget(data?.nearestAfter, data?.nearestBefore);
     return (
       <div className={LANE_GRID} style={laneColumns(days.length)}>
         {laneLabel}
         <div style={FULL_ROW} className="flex items-center px-2 py-2">
-          <span className="text-xs text-[var(--fg-muted)]">
-            {t('calendar.deadlinesEmptyRange', 'No deadlines')}
-          </span>
+          {outside && onJumpToDay ? (
+            <DeadlineJump
+              nearestAfter={data?.nearestAfter}
+              nearestBefore={data?.nearestBefore}
+              onJump={onJumpToDay}
+            />
+          ) : (
+            <span className="text-xs text-[var(--fg-muted)]">
+              {t('calendar.deadlinesEmptyRange', 'No deadlines')}
+            </span>
+          )}
         </div>
       </div>
     );

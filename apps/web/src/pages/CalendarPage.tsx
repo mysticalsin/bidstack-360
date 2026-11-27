@@ -13,10 +13,12 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ErrorState } from '@/components/ui/StateMessages';
+import { useCalendarDeadlines } from '@/hooks/useCalendarDeadlines';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { AgendaList } from './calendarPage/AgendaList';
 import { CreateEventModal } from './calendarPage/CreateEventModal';
+import { DeadlineJump, jumpTarget } from './calendarPage/DeadlineJump';
 import { EventPanel } from './calendarPage/EventPanel';
 import {
   addDays,
@@ -30,6 +32,50 @@ import {
 } from './calendarPage/layout';
 import { TimeGrid } from './calendarPage/TimeGrid';
 import type { CalendarEvent, CreateEventBody } from './calendarPage/types';
+
+function AgendaPane({
+  keys,
+  tz,
+  events,
+  todayKey,
+  onSelect,
+  onJumpToDay,
+}: {
+  keys: string[];
+  tz: string;
+  events: CalendarEvent[];
+  todayKey: string;
+  onSelect: (ev: CalendarEvent) => void;
+  onJumpToDay: (day: string) => void;
+}) {
+  const fromKey = keys[0] ?? '';
+  const toKey = addDays(keys[keys.length - 1] ?? fromKey, 1);
+  const { data, isLoading, isError, refetch } = useCalendarDeadlines(fromKey, toKey);
+  const outside = jumpTarget(data?.nearestAfter, data?.nearestBefore);
+  const inRange = data?.items.length ?? 0;
+  const deadlineJump =
+    !isLoading && !isError && inRange === 0 && outside ? (
+      <DeadlineJump
+        nearestAfter={data?.nearestAfter}
+        nearestBefore={data?.nearestBefore}
+        onJump={onJumpToDay}
+      />
+    ) : undefined;
+
+  return (
+    <AgendaList
+      keys={keys}
+      tz={tz}
+      events={events}
+      todayKey={todayKey}
+      onSelect={onSelect}
+      deadlineJump={deadlineJump}
+      deadlines={data?.items ?? []}
+      deadlinesState={isLoading ? 'loading' : isError ? 'error' : 'ready'}
+      onRetryDeadlines={() => void refetch()}
+    />
+  );
+}
 
 type View = 'week' | 'day' | 'agenda';
 type ProviderFilter = 'all' | 'google_workspace' | 'microsoft_graph';
@@ -189,7 +235,11 @@ export function CalendarPage() {
           <span className="text-xs text-[var(--fg-secondary)]">{timeZoneLabel(tz)}</span>
         )}
 
-        <div role="group" aria-label={t('calendar.filterGroup', 'Calendar filter')} className="flex gap-1">
+        <div
+          role="group"
+          aria-label={t('calendar.filterGroup', 'Calendar filter')}
+          className="flex gap-1"
+        >
           {providers.map(([p, label]) => (
             <button
               key={p}
@@ -208,9 +258,16 @@ export function CalendarPage() {
             type="button"
             onClick={() => setShowDeadlines((v) => !v)}
             aria-pressed={showDeadlines}
-            className={cn(CHIP, 'inline-flex items-center gap-1.5', showDeadlines ? CHIP_ON : CHIP_OFF)}
+            className={cn(
+              CHIP,
+              'inline-flex items-center gap-1.5',
+              showDeadlines ? CHIP_ON : CHIP_OFF,
+            )}
           >
-            <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rotate-45 border border-current" />
+            <span
+              aria-hidden="true"
+              className="inline-block h-1.5 w-1.5 rotate-45 border border-current"
+            />
             {t('calendar.deadlinesToggle', 'Deadlines')}
           </button>
         ) : null}
@@ -242,18 +299,21 @@ export function CalendarPage() {
           <ErrorState
             title={t('calendar.loadError', 'Could not load events')}
             action={
-              <button
-                type="button"
-                onClick={() => void refetch()}
-                className={cn(CHIP, CHIP_OFF)}
-              >
+              <button type="button" onClick={() => void refetch()} className={cn(CHIP, CHIP_OFF)}>
                 {t('calendar.retry', 'Retry')}
               </button>
             }
           />
         </div>
       ) : view === 'agenda' ? (
-        <AgendaList keys={keys} tz={tz} events={events} todayKey={todayKey} onSelect={setSelected} />
+        <AgendaPane
+          keys={keys}
+          tz={tz}
+          events={events}
+          todayKey={todayKey}
+          onSelect={setSelected}
+          onJumpToDay={setAnchor}
+        />
       ) : (
         <TimeGrid
           keys={keys}
@@ -263,6 +323,7 @@ export function CalendarPage() {
           showDeadlines={showDeadlines}
           onSlot={(key, hour) => setDraftSlot({ key, hour })}
           onSelect={setSelected}
+          onJumpToDay={setAnchor}
         />
       )}
 

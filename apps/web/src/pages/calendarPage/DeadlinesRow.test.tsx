@@ -56,12 +56,12 @@ const DEADLINES = [
   },
 ];
 
-function renderRow() {
+function renderRow(onJumpToDay?: (day: string) => void) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <DeadlinesRow days={WEEK} />
+        <DeadlinesRow days={WEEK} onJumpToDay={onJumpToDay} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -100,9 +100,7 @@ describe('DeadlinesRow', () => {
     expect(overdueChip.getAttribute('aria-label')).toContain('Bid deadline');
 
     const todayChip = screen.getByRole('link', { name: /due today/ });
-    expect(todayChip.getAttribute('href')).toBe(
-      '/proposals/22222222-2222-4222-8222-222222222222',
-    );
+    expect(todayChip.getAttribute('href')).toBe('/proposals/22222222-2222-4222-8222-222222222222');
     expect(todayChip.className).toContain('--warning');
     expect(todayChip.getAttribute('aria-label')).toContain('Proposal deadline');
 
@@ -158,8 +156,44 @@ describe('DeadlinesRow', () => {
 
     renderRow();
 
-    expect(
-      await screen.findByText('No deadlines'),
-    ).toBeTruthy();
+    expect(await screen.findByText('No deadlines')).toBeTruthy();
+  });
+
+  // WHY: the demo book stores every proposal 30 days out and every open bid
+  // 45 days out. The week on screen is empty. "No deadlines" hides the next
+  // day a bid team can still make, so the lane has to name that day and open it.
+  it('jumps to the next deadline when this week is empty', async () => {
+    apiMock.mockResolvedValue({
+      items: [],
+      nearestBefore: '2026-02-02',
+      nearestAfter: '2026-04-09',
+    });
+    const onJumpToDay = vi.fn();
+
+    renderRow(onJumpToDay);
+
+    const jump = await screen.findByRole('button', { name: /Next deadline/ });
+    expect(jump.getAttribute('data-date')).toBe('2026-04-09');
+    expect(screen.queryByText('No deadlines')).toBeNull();
+    fireEvent.click(jump);
+    expect(onJumpToDay).toHaveBeenCalledWith('2026-04-09');
+  });
+
+  // WHY: a week after the book has nothing ahead of it. The control must walk
+  // back to the latest missed day, not the oldest one the route already dropped.
+  it('jumps to the most recent past deadline when nothing is ahead', async () => {
+    apiMock.mockResolvedValue({
+      items: [],
+      nearestBefore: '2026-02-02',
+      nearestAfter: null,
+    });
+    const onJumpToDay = vi.fn();
+
+    renderRow(onJumpToDay);
+
+    const jump = await screen.findByRole('button', { name: /Previous deadline/ });
+    expect(jump.getAttribute('data-date')).toBe('2026-02-02');
+    fireEvent.click(jump);
+    expect(onJumpToDay).toHaveBeenCalledWith('2026-02-02');
   });
 });
