@@ -27,6 +27,7 @@ import {
   DUE_WINDOWS,
   STAGE_TONE,
   UNASSIGNED_OWNER,
+  formatProposalDueDate,
   type ProposalRow,
 } from '../proposals-search-params';
 
@@ -66,7 +67,7 @@ export function useOwnerLabel(): OwnerLabel {
 }
 
 export function useProposalColumns(ownerLabel: OwnerLabel): DataTableColumn<ProposalRow>[] {
-  const { t } = useTranslation('rfp');
+  const { t, i18n } = useTranslation('rfp');
   return useMemo(
     () => [
       {
@@ -132,7 +133,8 @@ export function useProposalColumns(ownerLabel: OwnerLabel): DataTableColumn<Prop
         sortable: true,
         width: 'w-32',
         numeric: true,
-        cell: (row) => (row.dueDate ? formatDate(row.dueDate) : null),
+        cell: (row) =>
+          row.dueDate ? formatProposalDueDate(row.dueDate, i18n.language) : null,
       },
       {
         id: 'updated',
@@ -144,7 +146,7 @@ export function useProposalColumns(ownerLabel: OwnerLabel): DataTableColumn<Prop
         cell: (row) => formatDate(row.updatedAt),
       },
     ],
-    [ownerLabel, t],
+    [i18n.language, ownerLabel, t],
   );
 }
 

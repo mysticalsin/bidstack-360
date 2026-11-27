@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   complianceBandOf,
   dueWindowOf,
+  formatProposalDueDate,
   proposalsSearchParams,
   selectProposals,
   type ProposalListInput,
@@ -50,6 +51,30 @@ function input(overrides: Partial<ProposalListInput> = {}): ProposalListInput {
 }
 
 const noOwners = () => null;
+
+describe('formatProposalDueDate', () => {
+  it('prints the calendar day, not the previous evening west of UTC', () => {
+    // WHY: `new Date('2026-12-25')` is UTC midnight. America/Toronto formats
+    // that instant as Dec 24. The deadline on the proposal is the calendar
+    // day, and the Due column has to agree with the date input.
+    const utcMidnight = new Date('2026-12-25T00:00:00.000Z');
+    const toronto = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'America/Toronto',
+    }).format(utcMidnight);
+    expect(toronto).toBe('Dec 24, 2026');
+    expect(formatProposalDueDate('2026-12-25', 'en-US')).toBe('Dec 25, 2026');
+    expect(formatProposalDueDate('2026-12-25', 'en-US')).not.toBe(toronto);
+  });
+
+  it('leaves a value that is not a calendar date untouched', () => {
+    expect(formatProposalDueDate('not-a-date', 'en-US')).toBe('not-a-date');
+    // 31 Feb is not a deadline. Overflowing it into March would invent a day.
+    expect(formatProposalDueDate('2026-02-31', 'en-US')).toBe('2026-02-31');
+  });
+});
 
 describe('dueWindowOf', () => {
   it('buckets a date-only deadline against today, not against the clock', () => {

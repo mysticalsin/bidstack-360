@@ -61,7 +61,25 @@ function renderPage() {
 describe('ProposalDetailPage — due date mutation', () => {
   afterEach(() => {
     cleanup();
+    process.env.TZ = 'UTC';
     vi.clearAllMocks();
+  });
+
+  it('prints the calendar day of a date-only deadline, not the previous evening west of UTC', async () => {
+    // WHY: the subtitle used `new Date('YYYY-MM-DD')`, UTC midnight. In
+    // America/Toronto that is still the previous evening, so a proposal due
+    // 2026-12-01 read "11/30/2026" while the date input kept 2026-12-01.
+    process.env.TZ = 'America/Toronto';
+    apiMock.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path === '/api/me/capabilities') return Promise.resolve(CAPABILITIES);
+      if (path === '/api/v1/proposals/p1' && !opts?.method) return Promise.resolve(PROPOSAL);
+      return Promise.reject(new Error(`unhandled: ${path}`));
+    });
+
+    renderPage();
+
+    expect(await screen.findByText(/Due Dec 1, 2026/)).toBeTruthy();
+    expect(screen.queryByText(/11\/30\/2026|Nov 30, 2026/)).toBeNull();
   });
 
   it('sends the native date input value as-is (YYYY-MM-DD), not an ISO timestamp', async () => {
