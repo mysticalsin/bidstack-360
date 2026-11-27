@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { toast } from '@/components/ui/Toast';
+import { usePoloPublicIdentity } from '@/hooks/usePoloIdentity';
 import { api } from '@/lib/api';
+import { projectFixtureIntel } from '@/lib/fixture-intel-clock';
 
 import type {
   Opportunity,
@@ -71,11 +73,21 @@ export interface OpportunityFull extends Opportunity {
 }
 
 export function useOpportunity(id: string | undefined) {
-  return useQuery({
+  const identity = usePoloPublicIdentity();
+  const query = useQuery({
     enabled: !!id,
     queryKey: ['opportunity', id],
     queryFn: ({ signal }) => api<OpportunityFull>(`/api/opportunities/${id}`, { signal }),
   });
+  const mode = identity.data?.dataMode;
+  const data = useMemo(() => {
+    const row = query.data;
+    if (!row) return row;
+    const intel = projectFixtureIntel(row.intel, new Date(), mode);
+    if (intel === row.intel) return row;
+    return { ...row, intel };
+  }, [query.data, mode]);
+  return { ...query, data };
 }
 
 // P2 #31: extracted from CreateOpportunityDialog — create mutation should be a
