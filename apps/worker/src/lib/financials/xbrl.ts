@@ -8,7 +8,9 @@
  * Only undimensioned (consolidated total) facts are used. Nothing is
  * estimated: a metric is either the filed number with its concept, or absent.
  */
-import type { FinancialMetric, FinancialValue } from '@bidstack/shared';
+import { derived, type FinancialMetric, type FinancialValue } from '@bidstack/shared';
+
+export { derived };
 
 /** Concepts per metric, first match wins. `*:Name` matches any prefix (filer extensions). */
 export const CONCEPTS: Record<FinancialMetric, string[]> = {
@@ -278,15 +280,3 @@ export function textBlocksFromXbrlJson(doc: XbrlJson): Array<{ concept: string; 
   return out;
 }
 
-/** Operating and net margin in % and free cash flow (OCF minus capex), when the inputs exist. */
-export function derived(m: Partial<Record<FinancialMetric, FinancialValue>>): { operatingMargin: number | null; netMargin: number | null; freeCashFlow: number | null } {
-  const rev = m.revenue?.value;
-  const op = m.operatingIncome?.value;
-  const ocf = m.operatingCashFlow?.value;
-  const capex = m.capex?.value;
-  return {
-    operatingMargin: rev && op !== undefined && rev > 0 ? Math.round((op / rev) * 1000) / 10 : null,
-    netMargin: rev && m.netIncome && rev > 0 ? Math.round((m.netIncome.value / rev) * 1000) / 10 : null,
-    freeCashFlow: ocf !== undefined && capex !== undefined ? ocf - Math.abs(capex) : null,
-  };
-}

@@ -1,8 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { AccountWatchdog } from '@/hooks/useAccountWatchdog';
 
+const COMPANY = '6f1c2a3b-4d5e-4f60-8a1b-2c3d4e5f6a7b';
+vi.mock('@/lib/api', () => ({
+  api: vi.fn(async (path: string) => {
+    if (path.includes('/hiring') || path.includes('/projects')) throw new Error('no rows');
+    return {
+      companyId: COMPANY,
+      status: 'not_enriched',
+      stale: true,
+      fetchedAt: null,
+      expiresAt: null,
+      annualRevenueUsd: null,
+      revenueRange: null,
+      employeeCount: null,
+      employeeRange: null,
+      headcountGrowth6m: null,
+      headcountGrowth12m: null,
+      headcountGrowth24m: null,
+      industry: null,
+      industries: [],
+      locations: [],
+      techStack: [],
+      departmentHeadcount: null,
+      openJobs: 0,
+      provenance: {},
+      providers: {},
+    };
+  }),
+}));
+
 import { breakdown, mergeEnrichmentSignals, recentCount, trendPct } from './aggregate';
+import { fetchEnrichment } from './client';
 import { mockEnrichment } from './mock';
 
 const wd: AccountWatchdog = {
@@ -13,6 +43,17 @@ const wd: AccountWatchdog = {
   pastProjects: [],
   history: [],
 };
+
+describe('fetchEnrichment', () => {
+  it('does not invent revenue when the account has not been enriched', async () => {
+    // WHY: a browser mock was filling not_enriched accounts with a CAD figure
+    // that was never fetched. An empty enrichment stays empty. Pipeline value
+    // is not revenue.
+    const e = await fetchEnrichment(COMPANY);
+    expect(e.status).toBe('not_enriched');
+    expect(e.firmographics.revenue).toBeNull();
+  });
+});
 
 describe('enrichment mock', () => {
   it('is deterministic per company and always flagged as sample', () => {

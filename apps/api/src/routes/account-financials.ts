@@ -14,16 +14,20 @@ import {
   SAMPLE_FINANCIAL_PERIODS,
   SAMPLE_FINANCIAL_SIGNALS,
   TrackFinancialsUpdate,
+  derived,
   filingPeriodPage,
   financialPeriodTake,
   financialsEligible,
   financialsGate,
   tierLabel,
   FINANCIAL_SOURCE_LABEL,
+  type FinancialMetric,
   type FinancialPeriod,
+  type FinancialValue,
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { getPoloDataMode } from '../lib/polo-mode.js';
 import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
@@ -57,6 +61,8 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
   const status = !financialsEligible(c) ? 'paused' : (p?.status ?? 'pending');
   const loaded: FinancialPeriod[] = c.financialPeriods.map((r) => {
     const { _derived, ...metrics } = r.metrics as Record<string, { value: number; concept: string }> & { _derived?: FinancialPeriod['derived'] };
+    // A real pull stores _derived. Fixture years and older rows often have only the inputs.
+    const computed = derived(metrics as Partial<Record<FinancialMetric, FinancialValue>>);
     return {
       periodType: r.periodType === 'Q' ? 'Q' : 'FY',
       fiscalYear: r.fiscalYear,
@@ -67,16 +73,20 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
       sourceUrl: r.sourceUrl,
       filedAt: r.filedAt ? r.filedAt.toISOString() : null,
       metrics,
-      derived: { operatingMargin: _derived?.operatingMargin ?? null, netMargin: _derived?.netMargin ?? null, freeCashFlow: _derived?.freeCashFlow ?? null },
+      derived: {
+        operatingMargin: _derived?.operatingMargin ?? computed.operatingMargin,
+        netMargin: _derived?.netMargin ?? computed.netMargin,
+        freeCashFlow: _derived?.freeCashFlow ?? computed.freeCashFlow,
+      },
     };
   });
   // The probe is the row past the list. It is not a period to show.
   const page = filingPeriodPage(loaded);
   const periods = page.periods;
   const signals = z.array(FinancialSignal).catch([]).parse(p?.signals ?? []);
-  // Sample only for tracked accounts still waiting for real filings; General
-  // accounts get the plain empty state instead.
-  const sample = periods.length === 0 && financialsEligible(c);
+  // Sample only in demo, and only for tracked accounts still waiting for real
+  // filings. Real mode and General accounts get the plain empty state.
+  const sample = getPoloDataMode() === 'demo' && periods.length === 0 && financialsEligible(c);
   return {
     companyId: c.id,
     tier: c.tier,

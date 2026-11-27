@@ -28,6 +28,7 @@ import {
 } from '@bidstack/shared';
 
 import type { AccessScope } from '../../lib/access-scope.js';
+import { isRealDataMode } from '../../lib/polo-mode.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
 import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
@@ -128,6 +129,11 @@ const pctChange = (cur: number | null | undefined, prev: number | null | undefin
 
 const marginOf = (p: FinancialPeriod) =>
   p.derived.operatingMargin != null ? { label: 'Operating margin', value: p.derived.operatingMargin } : p.derived.netMargin != null ? { label: 'Net margin', value: p.derived.netMargin } : null;
+
+/** Fixture rows and the built-in example. A real filing never uses these sources. */
+function isSampleFilingSource(source: string): boolean {
+  return source === 'sample' || source === 'fixture' || source === FINANCIAL_SOURCE_LABEL.fixture;
+}
 
 const STALE_DAYS = 548;
 
@@ -390,7 +396,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
   const wiki = extra.wikidataRevenue;
   const revenue = pickFigure<{ origin: FigureOrigin; item: () => KeyNumber }>([
     rev && latest
-      ? { origin: filedRank, item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: latest.source === FINANCIAL_SOURCE_LABEL.fixture, provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
+      ? { origin: filedRank, item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', unit: 'money', currency: latest.currency, value: rev.value, delta: pctChange(rev.value, prev?.metrics.revenue?.value), deltaUnit: 'pct', series: asc.map((p) => p.metrics.revenue?.value ?? NaN).filter(Number.isFinite), source: latest.source, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health', sample: isSampleFilingSource(latest.source), provenance: { origin: 'filed', label: latest.source, year: `FY${latest.fiscalYear}`, url: latest.sourceUrl || null } }) }
       : null,
     revOverride && typeof revOverride.value === 'number'
       ? { origin: manualOrigin(revOverride), item: () => base({ id: 'revenue', group: 'company', label: 'Revenue', ...manualRevenueUnit(revOverride), source: revOverride.sourceLabel ?? 'Manual entry', period: `Annual, entered ${revOverride.updatedAt.toISOString().slice(0, 10)}`, sourceUrl: revOverride.sourceUrl, provenance: manualProvenance(revOverride) }) }
@@ -410,12 +416,21 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     editKey: 'annualRevenueMicros',
   });
 
-  // Margin trend.
-  const lm = latest ? marginOf(latest) : null;
-  if (lm && latest) {
-    const pm = prev ? marginOf(prev) : null;
-    const series = asc.map((p) => (lm.label === 'Operating margin' ? p.derived.operatingMargin : p.derived.netMargin)).filter((v): v is number => v != null);
-    items.push(base({ id: 'margin', group: 'company', label: lm.label, unit: 'pct', value: Math.round(lm.value * 10) / 10, delta: pm && pm.label === lm.label ? Math.round((lm.value - pm.value) * 10) / 10 : null, deltaUnit: 'pts', series, source: `${latest.source}, derived by Polo`, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
+  // Margin trend. A real filing wins. Sample filings fill the tile only in demo, and stay labelled sample.
+  const fyAll = fin.periods.filter((p) => p.periodType === 'FY').sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
+  const isSamplePeriod = (p: FinancialPeriod) => fin.sample || isSampleFilingSource(p.source);
+  const realFy = fyAll.filter((p) => !isSamplePeriod(p));
+  const sampleFy = fyAll.filter(isSamplePeriod);
+  const firstWithMargin = (rows: FinancialPeriod[]) => rows.find((p) => marginOf(p));
+  const marginLatest = firstWithMargin(realFy) ?? (isRealDataMode() ? undefined : firstWithMargin(sampleFy));
+  const marginRows = marginLatest && isSamplePeriod(marginLatest) ? sampleFy : realFy;
+  const marginPrev = marginLatest ? marginRows.find((p) => p.fiscalYear === marginLatest.fiscalYear - 1) : undefined;
+  const marginAsc = [...marginRows].reverse();
+  const lm = marginLatest ? marginOf(marginLatest) : null;
+  if (lm && marginLatest) {
+    const pm = marginPrev ? marginOf(marginPrev) : null;
+    const series = marginAsc.map((p) => (lm.label === 'Operating margin' ? p.derived.operatingMargin : p.derived.netMargin)).filter((v): v is number => v != null);
+    items.push(base({ id: 'margin', group: 'company', label: lm.label, unit: 'pct', value: Math.round(lm.value * 10) / 10, delta: pm && pm.label === lm.label ? Math.round((lm.value - pm.value) * 10) / 10 : null, deltaUnit: 'pts', series, source: `${marginLatest.source}, derived by Polo`, period: `${fy(marginLatest)}, change vs prior year`, sourceUrl: marginLatest.sourceUrl, anchor: 'financial-health', sample: isSamplePeriod(marginLatest) }));
   } else items.push(base({ id: 'margin', group: 'company', label: 'Margin', unit: 'pct', source: 'None', missing: latest ? 'No margin in the filed numbers' : finMissing }));
 
   // Open jobs and hiring trend.

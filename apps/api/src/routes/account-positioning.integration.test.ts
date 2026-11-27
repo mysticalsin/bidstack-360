@@ -276,4 +276,118 @@ describe('GET /accounts/:id/key-numbers', () => {
     expect(by.revenue!.missing).toContain('No public revenue figure found yet');
     expect(by.employees).toMatchObject({ value: null, editKey: 'employeeCount' });
   });
+
+  it('derives operating margin when a fixture year has revenue and operating income but no _derived', async () => {
+    // WHY: a real pull stores metrics._derived. Fixture filings store the two
+    // inputs and nothing else, so the strip was reading only _derived and
+    // saying "No margin in the filed numbers".
+    const name = `${TAG} FixtureMargin`;
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name, tier: 'key' } })).id;
+    const revenue = 85_300_000_000;
+    const operatingIncome = 51_000_000_000;
+    await prisma.accountFinancialPeriod.create({
+      data: {
+        orgId: orgA.orgId,
+        companyId: id,
+        source: 'fixture',
+        entityId: 'sample',
+        periodType: 'FY',
+        fiscalYear: 2025,
+        periodStart: new Date('2025-01-01'),
+        periodEnd: new Date('2025-12-31'),
+        currency: 'NOK',
+        sourceUrl: 'https://www.dnb.no/',
+        metrics: {
+          revenue: { value: revenue, concept: 'sample:Revenue' },
+          operatingIncome: { value: operatingIncome, concept: 'sample:OperatingIncome' },
+        },
+      },
+    });
+    const margin = (await get(`/accounts/${id}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'margin')!;
+    expect(margin).toMatchObject({
+      label: 'Operating margin',
+      unit: 'pct',
+      value: Math.round((operatingIncome / revenue) * 1000) / 10,
+    });
+    expect(margin.missing).toBeNull();
+  });
+
+  async function seedFixtureYear(name: string) {
+    const id = (await prisma.company.create({ data: { orgId: orgA.orgId, name, tier: 'key' } })).id;
+    const revenue = 85_300_000_000;
+    const operatingIncome = 51_000_000_000;
+    await prisma.accountFinancialPeriod.create({
+      data: {
+        orgId: orgA.orgId,
+        companyId: id,
+        source: 'fixture',
+        entityId: 'sample',
+        periodType: 'FY',
+        fiscalYear: 2025,
+        periodStart: new Date('2025-01-01'),
+        periodEnd: new Date('2025-12-31'),
+        currency: 'NOK',
+        sourceUrl: 'https://www.dnb.no/',
+        metrics: {
+          revenue: { value: revenue, concept: 'sample:Revenue' },
+          operatingIncome: { value: operatingIncome, concept: 'sample:OperatingIncome' },
+        },
+      },
+    });
+    return { id, revenue, operatingIncome, margin: Math.round((operatingIncome / revenue) * 1000) / 10 };
+  }
+
+  it('flags a fixture margin as sample in demo mode', async () => {
+    // WHY: demo may show the fixture margin, but it has to be marked sample
+    // so it is not read as a filing. Revenue from that same fixture is marked too.
+    const prev = process.env.POLO_DATA_MODE;
+    delete process.env.POLO_DATA_MODE;
+    try {
+      const seeded = await seedFixtureYear(`${TAG} DemoSample`);
+      const items = (await get(`/accounts/${seeded.id}/key-numbers`)).json<AccountKeyNumbers>().items;
+      const margin = items.find((i) => i.id === 'margin')!;
+      const revenue = items.find((i) => i.id === 'revenue')!;
+      expect(margin).toMatchObject({ label: 'Operating margin', value: seeded.margin, sample: true });
+      expect(revenue).toMatchObject({ value: seeded.revenue, sample: true });
+    } finally {
+      if (prev === undefined) delete process.env.POLO_DATA_MODE;
+      else process.env.POLO_DATA_MODE = prev;
+    }
+  });
+
+  it('ignores the same fixture margin in real mode', async () => {
+    // WHY: real mode must not surface sample filings. Deriving the margin
+    // does not make the fixture number a filing.
+    const prev = process.env.POLO_DATA_MODE;
+    process.env.POLO_DATA_MODE = 'real';
+    try {
+      const seeded = await seedFixtureYear(`${TAG} RealSample`);
+      const margin = (await get(`/accounts/${seeded.id}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'margin')!;
+      expect(margin.value).toBeNull();
+      expect(margin.sample).toBe(false);
+      const filedId = (await prisma.company.create({ data: { orgId: orgA.orgId, name: `${TAG} RealFiled`, tier: 'key' } })).id;
+      await prisma.accountFinancialPeriod.create({
+        data: {
+          orgId: orgA.orgId,
+          companyId: filedId,
+          source: 'esef',
+          entityId: 'lei',
+          periodType: 'FY',
+          fiscalYear: 2025,
+          periodEnd: new Date('2025-12-31'),
+          currency: 'EUR',
+          sourceUrl: 'https://filings.xbrl.org/x',
+          metrics: {
+            revenue: { value: 1000, concept: 'ifrs-full:Revenue' },
+            operatingIncome: { value: 150, concept: 'ifrs-full:ProfitLossFromOperatingActivities' },
+          },
+        },
+      });
+      const filed = (await get(`/accounts/${filedId}/key-numbers`)).json<AccountKeyNumbers>().items.find((i) => i.id === 'margin')!;
+      expect(filed).toMatchObject({ label: 'Operating margin', value: 15, sample: false });
+    } finally {
+      if (prev === undefined) delete process.env.POLO_DATA_MODE;
+      else process.env.POLO_DATA_MODE = prev;
+    }
+  });
 });
