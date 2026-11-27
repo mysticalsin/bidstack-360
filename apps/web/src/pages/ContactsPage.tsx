@@ -30,6 +30,7 @@ import type { Contact } from '@bidstack/shared';
 import { ContactContextMenu } from './contacts/ContactContextMenu';
 import { ContactTable } from './contacts/ContactTable';
 import type { ContactSortKey, ContactSortState } from './contacts/ContactTable';
+import { contactListPhoneQuery, contactPhoneMatches } from './contacts/contact-list-phone-query';
 import { useContactsKeyboard } from './contacts/useContactsKeyboard';
 
 export function ContactsPage() {
@@ -38,13 +39,16 @@ export function ContactsPage() {
   // useDeferredValue keeps typing snappy; the table re-renders on the next
   // idle tick rather than on every keystroke.
   const deferredSearch = useDeferredValue(search);
+  // A full phone is not a name. Leave it off the server search so the loaded
+  // page can be matched by digits. Name, customer, and role still go to the API.
+  const phoneQuery = contactListPhoneQuery(deferredSearch);
   const [editTarget, setEditTarget] = useState<Contact | null>(null);
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   // Reset to page 1 whenever the result set changes (new search or sort).
   const pager = useCursorPagination(`${deferredSearch}|${searchParams.get('sort') ?? ''}`);
   const { data, isLoading, isError, error, refetch } = useContacts({
-    search: deferredSearch.trim() || undefined,
+    search: phoneQuery ? undefined : deferredSearch.trim() || undefined,
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
   });
@@ -101,10 +105,14 @@ export function ContactsPage() {
     else params.set('sort', `${next.key}.${next.dir}`);
     setSearchParams(params, { replace: true });
   };
-  const { sorted: items } = useTableSort(raw, accessors, {
+  const { sorted } = useTableSort(raw, accessors, {
     state: sortState,
     onChange: setSortState,
   });
+  const items = useMemo(
+    () => (phoneQuery ? sorted.filter((c) => contactPhoneMatches(c.phone, phoneQuery)) : sorted),
+    [phoneQuery, sorted],
+  );
 
   // Saved views. Search lives in component state (deferred, never in the URL),
   // so serialize it explicitly on save and re-apply it on recall; sort already
