@@ -16,15 +16,17 @@
 // (grep `dist/assets/index-*.js` for "clerk").
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, type ReactNode } from 'react';
 
 import {
   AuthProvider,
+  DEMO_EMAIL_KEY,
   DEMO_SIGNED_OUT_KEY,
   DEMO_TOKEN_KEY,
   isTransientMeFailure,
   useAuth,
+  useSignInAction,
   useSignOut,
   useUser,
 } from './auth';
@@ -218,6 +220,24 @@ function FetchingChild() {
   return null;
 }
 
+// The topbar session block prints fullName and the primary email. Demo mode
+// has no separate person record, so both lines are this stored address.
+function DemoSessionProbe() {
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  const { signIn } = useSignInAction();
+  return (
+    <div>
+      <span data-testid="signed-in">{String(isSignedIn)}</span>
+      <span data-testid="email">{user?.primaryEmailAddress?.emailAddress ?? 'none'}</span>
+      <span data-testid="name">{user?.fullName ?? 'none'}</span>
+      <button type="button" onClick={() => signIn()}>
+        Sign in
+      </button>
+    </div>
+  );
+}
+
 describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
   it('registers the api token provider synchronously, before a child effect can fire the first request', async () => {
     vi.stubEnv('VITE_AUTH_MODE', 'demo');
@@ -263,6 +283,94 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
     expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
     expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
+  });
+
+  it('replaces the session banner when this tab signs into a different demo email', () => {
+    // WHY: the banner already shows a signed-in demo visitor. signIn() only
+    // flips that flag, so a second email in this tab never repaints the name.
+    // The bearer token is read live. The banner must name the same visitor.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem('bidstack:session', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'token-ada');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'ada.visitor@example.test');
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <DemoSessionProbe />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId('email').textContent).toBe('ada.visitor@example.test');
+    expect(screen.getByTestId('name').textContent).toBe('ada.visitor@example.test');
+
+    localStorage.setItem(DEMO_TOKEN_KEY, 'token-bao');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'bao.visitor@example.test');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+    expect(screen.getByTestId('email').textContent).toBe('bao.visitor@example.test');
+    expect(screen.getByTestId('name').textContent).toBe('bao.visitor@example.test');
+  });
+
+  it('drops a demo session banner when another tab clears the token', () => {
+    // WHY: sign-out in another tab deletes the token without remounting this
+    // one. An idle page never hits the 401 handler, so the banner would keep
+    // naming a visitor who is already signed out.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem('bidstack:session', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'token-ada');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'ada.visitor@example.test');
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <DemoSessionProbe />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId('name').textContent).toBe('ada.visitor@example.test');
+
+    localStorage.removeItem(DEMO_TOKEN_KEY);
+    localStorage.removeItem(DEMO_EMAIL_KEY);
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: DEMO_TOKEN_KEY,
+          newValue: null,
+          storageArea: localStorage,
+        }),
+      );
+    });
+
+    expect(screen.getByTestId('signed-in').textContent).toBe('false');
+    expect(screen.getByTestId('email').textContent).toBe('none');
+    expect(screen.getByTestId('name').textContent).toBe('none');
+  });
+
+  it('follows the demo email another tab stored on the open session', () => {
+    // WHY: the other tab replaced the sandbox visitor. Requests from this tab
+    // already send the new bearer token. The banner has to stop naming the
+    // previous email, or the page looks signed in as the wrong person.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem('bidstack:session', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'token-ada');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'ada.visitor@example.test');
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <DemoSessionProbe />
+      </AuthProvider>,
+    );
+
+    localStorage.setItem(DEMO_TOKEN_KEY, 'token-bao');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'bao.visitor@example.test');
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: DEMO_EMAIL_KEY,
+          newValue: 'bao.visitor@example.test',
+          storageArea: localStorage,
+        }),
+      );
+    });
+
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+    expect(screen.getByTestId('email').textContent).toBe('bao.visitor@example.test');
+    expect(screen.getByTestId('name').textContent).toBe('bao.visitor@example.test');
   });
 });
 
