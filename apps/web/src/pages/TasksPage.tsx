@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
+import { orderRecentFollowUps } from '@/components/task/task-recent-order';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
@@ -96,9 +97,10 @@ export function TasksPage() {
     });
   }, [data?.items, filter]);
 
-  // Sort. Default 'natural' = server order (createdAt desc on the backend).
-  // 'due' sorts asc with nulls last so overdue surfaces at the top of the
-  // filter result; 'status' clusters open → in_progress → blocked → done.
+  // Sort. Default 'natural' (Recent) keeps the loaded order, with a finished
+  // row after the rows that are still open. The route orders by due day, so
+  // without that split the done handover leads. 'due' sorts by the due day,
+  // earliest first, nulls last. 'status' clusters open, in progress, blocked, done.
   type Sort = 'natural' | 'due' | 'status';
   const STATUS_ORDER: Record<TaskStatus, number> = {
     open: 0,
@@ -113,10 +115,13 @@ export function TasksPage() {
   const setOrder = useTaskOrder((s) => s.setOrder);
   const items = useMemo(() => {
     if (sort === 'natural') {
-      // Stable sort by (clientOrdinal, naturalIndex). Tasks the user has
-      // never reordered keep their original server order — ordinalOf
-      // returns Infinity for them so they fall after explicit picks.
-      const indexed = filteredItems.map((t, i) => ({ t, i }));
+      // A saved drag wins. With no personal order, a finished row follows
+      // the open rows and the loaded order stays inside each group.
+      // ordinalOf returns Infinity for a row the user has not placed, so
+      // those rows fall after an explicit pick.
+      const dragged = filteredItems.some((task) => Number.isFinite(ordinalOf(task.id)));
+      const base = dragged ? filteredItems : orderRecentFollowUps(filteredItems);
+      const indexed = base.map((t, i) => ({ t, i }));
       indexed.sort((a, b) => {
         const oa = ordinalOf(a.t.id);
         const ob = ordinalOf(b.t.id);
