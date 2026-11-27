@@ -72,6 +72,7 @@ export function ProviderHealthSection() {
   const caption = getCaption(t, {
     isLoading,
     isFetching,
+    isError,
     providerCount: items.length,
     downCount,
     degradedCount,
@@ -96,12 +97,18 @@ export function ProviderHealthSection() {
                 ? t('crm.providerHealth.testing', 'Testing…')
                 : t('crm.providerHealth.testNow', 'Test now')}
             </Button>
-            <Badge tone={downCount > 0 ? 'tomato' : degradedCount > 0 ? 'amber' : 'jade'}>
-              {isFetching
-                ? t('crm.providerHealth.badge.refreshing', 'refreshing')
-                : downCount + degradedCount > 0
-                  ? t('crm.providerHealth.badge.attention', 'attention')
-                  : t('crm.providerHealth.badge.stable', 'stable')}
+            <Badge
+              tone={
+                isError ? 'gray' : downCount > 0 ? 'tomato' : degradedCount > 0 ? 'amber' : 'jade'
+              }
+            >
+              {isError
+                ? t('crm.providerHealth.badge.notLoaded', 'not loaded')
+                : isFetching
+                  ? t('crm.providerHealth.badge.refreshing', 'refreshing')
+                  : downCount + degradedCount > 0
+                    ? t('crm.providerHealth.badge.attention', 'attention')
+                    : t('crm.providerHealth.badge.stable', 'stable')}
             </Badge>
           </div>
         }
@@ -294,6 +301,7 @@ function getCaption(
   {
     isLoading,
     isFetching,
+    isError,
     providerCount,
     downCount,
     degradedCount,
@@ -301,6 +309,7 @@ function getCaption(
   }: {
     isLoading: boolean;
     isFetching: boolean;
+    isError: boolean;
     providerCount: number;
     downCount: number;
     degradedCount: number;
@@ -308,6 +317,7 @@ function getCaption(
   },
 ) {
   if (isLoading) return t('crm.providerHealth.caption.loading', 'Checking provider status...');
+  if (isError) return t('crm.providerHealth.caption.failed', 'Provider health is not loaded.');
   if (providerCount === 0)
     return t('crm.providerHealth.caption.none', 'No providers configured yet.');
   if (unverifiedCount > 0 && downCount + degradedCount === 0) {
