@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, Plus, Search } from 'lucide-react';
 
+import { competitorProfilesPhase } from './competitor-profiles-read';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
@@ -73,7 +74,17 @@ function ResearchControls({ opportunityId }: { opportunityId: string }) {
   const [selectedId, setSelectedId] = useState('');
   const [newName, setNewName] = useState('');
 
-  const options = competitors.data?.items ?? [];
+  // A missing catalog is not an empty org. Empty is only a settled read.
+  const phase = competitorProfilesPhase(competitors);
+  const options = phase === 'ready' ? (competitors.data?.items ?? []) : [];
+  const catalogLabel =
+    phase === 'unread'
+      ? t('competitor.profilesUnread', 'Checking competitors. The list has not arrived.')
+      : phase === 'failed'
+        ? t('competitor.profilesFailed', 'Could not load competitors.')
+        : options.length
+          ? t('competitor.selectPlaceholder')
+          : t('competitor.profilesEmpty', 'No competitors yet');
 
   async function onResearch() {
     if (!selectedId) return;
@@ -99,15 +110,26 @@ function ResearchControls({ opportunityId }: { opportunityId: string }) {
 
   return (
     <div className="flex flex-wrap items-end gap-2">
+      {phase === 'unread' ? (
+        <p role="status" className="w-full text-sm text-[var(--fg-secondary)]">
+          {catalogLabel}
+        </p>
+      ) : null}
+      {phase === 'failed' ? (
+        <p role="alert" className="w-full text-sm text-red-600 dark:text-red-400">
+          {competitors.error instanceof Error ? competitors.error.message : catalogLabel}
+        </p>
+      ) : null}
       <label className="flex flex-col gap-1 text-[11px] font-medium text-[var(--fg-tertiary)]">
         {t('competitor.selectLabel')}
         <select
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
-          disabled={options.length === 0}
+          disabled={phase !== 'ready' || options.length === 0}
+          aria-busy={phase === 'unread'}
           className="min-h-[44px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--fg-primary)] disabled:opacity-60"
         >
-          <option value="">{options.length ? t('competitor.selectPlaceholder') : '—'}</option>
+          <option value="">{catalogLabel}</option>
           {options.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
