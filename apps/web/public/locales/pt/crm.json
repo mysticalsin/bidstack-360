@@ -4048,5 +4048,15 @@
     "title": "Lições Aprendidas",
     "update": "Atualizar debriefing",
     "winFactor": "Fator decisivo do ganho"
+  },
+  "dueDateChip": {
+    "noDate": "Sem data",
+    "overdueBy_one": "{{count}} d em atraso",
+    "overdueBy_other": "{{count}} d em atraso",
+    "dueToday": "Vence hoje",
+    "daysLeft_one": "{{count}} d restante",
+    "daysLeft_other": "{{count}} d restantes",
+    "ariaLabel": "Vence em {{date}}",
+    "ariaLabelNoDate": "Sem data de vencimento"
   }
 }

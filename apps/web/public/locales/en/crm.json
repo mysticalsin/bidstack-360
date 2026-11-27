@@ -4019,8 +4019,12 @@
   "dueDateChip": {
     "noDate": "No date",
     "overdueBy": "{{count}}d overdue",
+    "overdueBy_one": "{{count}}d overdue",
+    "overdueBy_other": "{{count}}d overdue",
     "dueToday": "Due today",
     "daysLeft": "{{count}}d left",
+    "daysLeft_one": "{{count}}d left",
+    "daysLeft_other": "{{count}}d left",
     "ariaLabel": "Due {{date}}",
     "ariaLabelNoDate": "No due date set"
   },

@@ -4042,5 +4042,15 @@
     "title": "Lezioni apprese",
     "update": "Aggiorna debrief",
     "winFactor": "Fattore decisivo di vittoria"
+  },
+  "dueDateChip": {
+    "noDate": "Nessuna data",
+    "overdueBy_one": "{{count}} g di ritardo",
+    "overdueBy_other": "{{count}} g di ritardo",
+    "dueToday": "Scade oggi",
+    "daysLeft_one": "{{count}} g rimanente",
+    "daysLeft_other": "{{count}} g rimanenti",
+    "ariaLabel": "Scadenza {{date}}",
+    "ariaLabelNoDate": "Nessuna data di scadenza"
   }
 }
