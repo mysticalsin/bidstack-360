@@ -6,4 +6,4 @@ Open fixture tasks store absolute due dates from 2026-05-12 through 2026-05-23. 
 
 `real`, `Demo`, `DEMO`, `demo-x`, and `notdemo` do not slide. A different id, an edited date, and a done task stay on the stored day. While the seeded dates are still today or later, the shift is zero.
 
-The task list, the task summary, and the dashboard overdue count use that clock. The workload aggregate and the due-alert worker still read the stored date.
+The task list, the task summary, and the dashboard overdue count use that clock. The shift is added as `due_date + shift::integer`. Prisma binds the number as bigint, and Postgres has no `date + bigint` operator. The workload aggregate and the due-alert worker still read the stored date.

@@ -20,6 +20,7 @@ describe('projected task due SQL', () => {
     const text = demo.strings.join('?');
     expect(text).toContain('WHEN id = ?::uuid');
     expect(text).toContain("status <> 'done'");
+    expect(text).toContain('(due_date + ?::integer)');
     expect(text).toContain('ELSE due_date END');
     expect(demo.values).toContain('00000000-0000-4000-8000-000000010003');
     expect(demo.values).toContain('2026-05-12');

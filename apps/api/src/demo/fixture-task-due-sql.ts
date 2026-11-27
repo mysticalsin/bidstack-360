@@ -11,7 +11,7 @@ export function projectedTaskDueSql(now: Date, mode: string | undefined): Prisma
   if (shift === 0) return Prisma.sql`due_date`;
   const branches = Object.entries(FIXTURE_TASK_DUE_DATES).map(
     ([id, date]) =>
-      Prisma.sql`WHEN id = ${id}::uuid AND due_date = ${date}::date AND status <> 'done' THEN (due_date + ${shift})::date`,
+      Prisma.sql`WHEN id = ${id}::uuid AND due_date = ${date}::date AND status <> 'done' THEN (due_date + ${shift}::integer)`,
   );
   return Prisma.sql`(CASE ${Prisma.join(branches, ' ')} ELSE due_date END)`;
 }
