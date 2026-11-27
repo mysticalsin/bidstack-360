@@ -28,11 +28,15 @@ export function AnalyticsDashboardPage() {
   const { t } = useTranslation('crm');
   const [searchParams] = useSearchParams();
   const {
-    data: dashboards = [],
-    isLoading: dashLoading,
+    data: dashboardPayload,
     isError: dashError,
     refetch: refetchDashboards,
   } = useDashboards();
+  // A missing payload is unread, paused, or still in flight. isLoading is
+  // false for the idle and paused cases, so defaulting that payload to []
+  // paints "No dashboards" before the demo command center arrives.
+  const dashboardsArrived = dashboardPayload != null;
+  const dashboards = dashboardPayload ?? [];
   // Initialise from ?id= so deep-links and the Dashboards list (which links
   // to /analytics?id=<id>) open the chosen dashboard instead of always the first.
   const [activeDashId, setActiveDashId] = useState<string>(searchParams.get('id') ?? '');
@@ -109,19 +113,6 @@ export function AnalyticsDashboardPage() {
     },
     [activeDash, deleteWidgetMutation, t],
   );
-
-  if (dashLoading) {
-    return (
-      <div className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="h-52 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] animate-pulse"
-          />
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full">
@@ -223,19 +214,32 @@ export function AnalyticsDashboardPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {dashError && dashboards.length === 0 ? (
-          <ErrorState
-            title={t('analyticsDashboard.loadDashboardsError', 'Could not load dashboards')}
-            action={
-              <button
-                type="button"
-                onClick={() => void refetchDashboards()}
-                className="min-h-[44px] rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]"
-              >
-                {t('analyticsDashboard.retry', 'Retry')}
-              </button>
-            }
-          />
+        {!dashboardsArrived ? (
+          dashError ? (
+            <ErrorState
+              title={t('analyticsDashboard.loadDashboardsError', 'Could not load dashboards')}
+              action={
+                <button
+                  type="button"
+                  onClick={() => void refetchDashboards()}
+                  className="min-h-[44px] rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)]"
+                >
+                  {t('analyticsDashboard.retry', 'Retry')}
+                </button>
+              }
+            />
+          ) : (
+            <p
+              role="status"
+              aria-busy="true"
+              className="rounded-lg border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--fg-secondary)]"
+            >
+              {t(
+                'analyticsDashboard.listChecking',
+                'Checking dashboards. They have not arrived.',
+              )}
+            </p>
+          )
         ) : !activeDash ? (
           <EmptyState
             title={t('analyticsDashboard.noDashboardsTitle', 'No dashboards')}
