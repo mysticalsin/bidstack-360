@@ -47,6 +47,9 @@ export function PipelinePage() {
   const pageContinues = Boolean(data?.nextCursor);
   const latest = data?.items.length ?? 0;
   const configuredStages = usePipelineStages();
+  // An unread stage list is not the default funnel. The header filter used to
+  // list S1 Lead while this request was still open.
+  const stageListUnread = configuredStages.data == null && !configuredStages.isError;
   // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
   // board itself only loads the first 50 cards, so totals/win-rate computed
   // from `data.items` were silently truncated for any org past 50 deals.
@@ -204,19 +207,25 @@ export function PipelinePage() {
           <PipelineViewSwitch current="board" />
           <label className="flex items-center gap-1.5 text-xs text-[var(--fg-tertiary)]">
             <span>{t('pipeline.stageFilterLabel', 'Stage')}</span>
-            <select
-              aria-label={t('pipeline.stageFilterAriaLabel', 'Filter pipeline by stage')}
-              value={stageFilter ?? ''}
-              onChange={(e) => setStageFilter(e.target.value || null)}
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
-            >
-              <option value="">{t('pipeline.stageFilterAllOption', 'All')}</option>
-              {stages.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            {stageListUnread ? (
+              <span className="text-xs text-[var(--fg-secondary)]">
+                {t('pipeline.stageFilterUnread', 'Stages have not loaded')}
+              </span>
+            ) : (
+              <select
+                aria-label={t('pipeline.stageFilterAriaLabel', 'Filter pipeline by stage')}
+                value={stageFilter ?? ''}
+                onChange={(e) => setStageFilter(e.target.value || null)}
+                className="rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-2 py-1 text-xs text-[var(--fg-primary)]"
+              >
+                <option value="">{t('pipeline.stageFilterAllOption', 'All')}</option>
+                {stages.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
         </div>
         {move.isPending ? (
