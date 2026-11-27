@@ -19,6 +19,8 @@ import {
   proposalStatusTone,
 } from '@/components/rfp/shared/ProposalStatusChip';
 
+import { rfpAnalyticsPhase } from './rfp-analytics-read';
+
 interface OwnerRow {
   ownerId: string | null;
   ownerName: string;
@@ -53,11 +55,19 @@ export function RfpAnalyticsSection() {
     queryFn: ({ signal }) => api<RfpAnalytics>('/api/v1/proposals/admin/analytics', { signal }),
   });
 
-  const closed = (q.data?.wonCount ?? 0) + (q.data?.lostCount ?? 0);
-  const winRate = closed > 0 ? Math.round(((q.data?.wonCount ?? 0) / closed) * 100) : null;
-  const inFlight = (q.data?.totalCount ?? 0) - closed;
-
-  if (q.isError) {
+  const phase = rfpAnalyticsPhase({
+    data: q.data,
+    isError: q.isError,
+    status: q.status,
+  });
+  if (phase === 'unread') {
+    return (
+      <p role="status">
+        {t('rfpAnalytics.checking', 'Checking RFP analytics. The rollup has not arrived.')}
+      </p>
+    );
+  }
+  if (phase === 'failed') {
     return (
       <Card className="p-6">
         <div role="alert" className="text-sm text-red-600 dark:text-red-400">
@@ -66,6 +76,10 @@ export function RfpAnalyticsSection() {
       </Card>
     );
   }
+
+  const closed = (q.data?.wonCount ?? 0) + (q.data?.lostCount ?? 0);
+  const winRate = closed > 0 ? Math.round(((q.data?.wonCount ?? 0) / closed) * 100) : null;
+  const inFlight = (q.data?.totalCount ?? 0) - closed;
 
   return (
     <div className="space-y-6">
