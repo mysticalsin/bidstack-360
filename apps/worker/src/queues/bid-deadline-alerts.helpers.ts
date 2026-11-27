@@ -12,6 +12,14 @@
  */
 export const DEADLINE_THRESHOLD_DAYS = [7, 3, 1] as const;
 
+/**
+ * How far past its due date the scan still looks for a not-yet-alerted overdue
+ * opportunity. Bounded so an old open backlog cannot grow the query without
+ * limit. 30 days is the window in which a missed-deadline nudge is still
+ * actionable.
+ */
+export const OVERDUE_LOOKBACK_DAYS = 30;
+
 export type DeadlineThresholdDay = (typeof DEADLINE_THRESHOLD_DAYS)[number];
 
 /**
