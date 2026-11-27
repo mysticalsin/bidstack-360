@@ -20,7 +20,15 @@ import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import { useAppModules } from '@/hooks/useAppModules';
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
+import {
+  ADMIN_SETTINGS,
+  MEMBER_SETTINGS,
+  NAV_SECTIONS,
+  isNavItemActive,
+  isNavItemVisible,
+  type NavItem,
+  type NavSection,
+} from './navConfig';
 import { useIsWideShell } from './shellBreakpoint';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -293,37 +301,19 @@ function MobileNavItem({
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const location = useLocation();
-
-  const isActive = (() => {
-    try {
-      const toUrl = new URL(item.to, window.location.origin);
-      const toPath = toUrl.pathname;
-      const toTab = toUrl.searchParams.get('tab');
-
-      const currentTab = new URLSearchParams(location.search).get('tab');
-
-      if (location.pathname !== toPath) return false;
-
-      if (toTab) {
-        return currentTab === toTab;
-      } else {
-        return !currentTab || currentTab === 'overview';
-      }
-    } catch {
-      return false;
-    }
-  })();
+  const active = isNavItemActive(item, location);
 
   return (
     <NavLink
       to={item.to}
       className={cn(
         'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-        isActive
+        active
           ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
           : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
       )}
       end={item.end ?? item.to === '/'}
+      aria-current={active ? 'page' : undefined}
       onClick={onNavigate}
       onMouseEnter={() => prefetchRoute(item.to)}
     >
