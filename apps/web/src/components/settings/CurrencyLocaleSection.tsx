@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useOrgLocaleSettings, useUpdateOrgLocaleSettings } from '@/hooks/useOrgLocaleSettings';
 import { useIsAdmin } from '@/lib/auth';
@@ -13,6 +13,8 @@ import {
   ORG_LOCALE_TIMEZONES,
   type OrgLocaleSettings,
 } from '@bidstack/shared';
+
+import { currencyLocalePhase } from './currency-locale-read';
 
 const CURRENCY_LABELS: Record<OrgLocaleSettings['currency'], string> = {
   CAD: 'CAD - Canadian Dollar',
@@ -42,9 +44,13 @@ function syncCurrencyLocaleStorage(settings: OrgLocaleSettings): void {
 export function CurrencyLocaleSection() {
   const { t } = useTranslation('settings');
   const locale = useOrgLocaleSettings();
+  const phase = currencyLocalePhase({
+    data: locale.data,
+    isError: locale.isError,
+    status: locale.status,
+  });
 
-  if (locale.isLoading) return <LoadingSkeleton rows={3} />;
-  if (locale.isError || !locale.data) {
+  if (phase === 'failed') {
     return (
       <ErrorState
         title={t('currencyLocale.loadErrorTitle', 'Could not load currency and locale')}
@@ -52,6 +58,25 @@ export function CurrencyLocaleSection() {
           locale.error?.message ?? t('currencyLocale.loadErrorMessage', 'Try again shortly.')
         }
       />
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t(
+          'currencyLocale.checking',
+          'Checking currency and locale. The settings have not arrived.',
+        )}
+      </p>
+    );
+  }
+
+  if (locale.data == null) {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('currencyLocale.none', 'No currency and locale are saved.')}
+      </p>
     );
   }
 
