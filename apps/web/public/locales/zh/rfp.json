@@ -21,6 +21,7 @@
     "saving": "正在保存…",
     "save": "保存",
     "emptyContent": "暂无内容。使用 AI 草稿生成初始版本。",
+    "emptySections": "此提案没有章节。",
     "draftSectionError": "无法生成 AI 草稿，请重试。"
   },
   "proposals": {

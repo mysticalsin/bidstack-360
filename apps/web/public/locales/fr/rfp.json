@@ -21,6 +21,7 @@
     "saving": "Enregistrement…",
     "save": "Enregistrer",
     "emptyContent": "Aucun contenu pour l'instant. Utilisez le brouillon IA pour générer une première version.",
+    "emptySections": "Cette proposition ne contient aucune section.",
     "draftSectionError": "Impossible de générer le brouillon IA. Veuillez réessayer."
   },
   "proposals": {

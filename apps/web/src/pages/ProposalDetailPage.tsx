@@ -367,6 +367,13 @@ export function ProposalDetailPage() {
       </div>
 
       <div className="space-y-4">
+        {proposal.sections.length === 0 && (
+          <GlassCard className="py-12 text-center">
+            <p className="text-fg-tertiary text-sm" role="status">
+              {t('proposalDetail.emptySections', 'This proposal has no sections.')}
+            </p>
+          </GlassCard>
+        )}
         {proposal.sections.map((section) => (
           <GlassCard key={section.id} padding="lg">
             <div className="flex items-center justify-between mb-3">

@@ -21,6 +21,7 @@
     "saving": "Salvataggio…",
     "save": "Salva",
     "emptyContent": "Ancora nessun contenuto. Usa Bozza IA per generare una prima versione.",
+    "emptySections": "Questa proposta non ha sezioni.",
     "draftSectionError": "Impossibile generare la bozza IA. Riprova."
   },
   "proposals": {

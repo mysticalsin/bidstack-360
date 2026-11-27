@@ -21,6 +21,7 @@
     "saving": "Salvando…",
     "save": "Salvar",
     "emptyContent": "Ainda sem conteúdo. Use Rascunho de IA para gerar uma primeira versão.",
+    "emptySections": "Esta proposta não tem seções.",
     "draftSectionError": "Não foi possível gerar o rascunho de IA. Tente novamente."
   },
   "proposals": {
