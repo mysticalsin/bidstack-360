@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { Sentry } from '@/lib/sentry';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { useRfpDraft } from '@/hooks/rfp/useRfpDraft';
+import { approvalDraftPhase } from './approval-draft-read';
 
 /** Review steps that must all be checked before the Approve button is enabled. */
 const REVIEW_STEPS = [
@@ -81,6 +82,28 @@ export function ApprovalGate() {
     if (!canApprove) return;
     approveMutation.mutate({ notes: reviewNotes });
   };
+
+  const phase = approvalDraftPhase({
+    data: draftQuery.data,
+    isError: draftQuery.isError,
+    status: draftQuery.status,
+  });
+
+  if (phase === 'unread') {
+    return (
+      <Card className="space-y-4 p-4">
+        <p>{t('approval.draftChecking', 'Checking the draft. The proposal has not arrived.')}</p>
+      </Card>
+    );
+  }
+
+  if (phase === 'failed') {
+    return (
+      <Card className="space-y-4 p-4">
+        <p role="alert">{t('approval.draftFailed', 'Could not load the draft.')}</p>
+      </Card>
+    );
+  }
 
   return (
     <Card className="space-y-4 p-4">
