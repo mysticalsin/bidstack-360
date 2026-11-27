@@ -10,6 +10,22 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useRoles', () => ({
+  useRoles: () => ({
+    status: 'success',
+    fetchStatus: 'idle',
+    data: { items: [{ name: 'Admin' }, { name: 'Sales Manager' }], pageContinues: false },
+  }),
+}));
+
+vi.mock('@/hooks/useUserGroups', () => ({
+  useUserGroups: () => ({
+    status: 'success',
+    fetchStatus: 'idle',
+    data: { items: [{ name: 'France' }, { name: 'Spain' }], pageContinues: false },
+  }),
+}));
+
 import { PolicyBuilder } from './PolicyBuilder';
 
 const OPTIONS = { roles: ['Admin', 'Sales Manager'], teams: ['France', 'Spain'] };
