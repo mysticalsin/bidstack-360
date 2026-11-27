@@ -20,6 +20,12 @@ import { staggerParent, staggerChild } from '@/lib/motion';
 
 import { type OrgKpi } from './dashboard-types';
 
+function kpiLinkName(kpi: OrgKpi): string {
+  const count = kpi.value.toLocaleString();
+  if (!kpi.caption) return `${kpi.label}: ${count}`;
+  return `${kpi.label}: ${count}, ${kpi.caption}`;
+}
+
 export function KpiRow({ kpis, reduced }: { kpis: OrgKpi[]; reduced: boolean | null }) {
   const { t } = useTranslation('crm');
   return (
@@ -39,7 +45,7 @@ export function KpiRow({ kpis, reduced }: { kpis: OrgKpi[]; reduced: boolean | n
           <Link
             to={kpi.href}
             className={`kpi-strip-item${kpi.emphasis ? ' is-primary' : ''}`}
-            aria-label={`${kpi.label}: ${kpi.value.toLocaleString()}`}
+            aria-label={kpiLinkName(kpi)}
           >
             <span className="kpi-strip-label">{kpi.label}</span>
             <span className="kpi-strip-value">
@@ -49,6 +55,7 @@ export function KpiRow({ kpis, reduced }: { kpis: OrgKpi[]; reduced: boolean | n
                 format={(n) => Math.round(n).toLocaleString()}
               />
             </span>
+            {kpi.caption ? <span className="kpi-strip-caption">{kpi.caption}</span> : null}
           </Link>
         </motion.div>
       ))}

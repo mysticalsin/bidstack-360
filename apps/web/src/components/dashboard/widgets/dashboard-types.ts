@@ -20,6 +20,11 @@ export interface OrgKpi {
   signal: SignalPoint[];
   /** The one metric the strip is allowed to accent (see KpiRow) — at most one. */
   emphasis?: boolean;
+  /**
+   * Short line under the count. Used when the number alone is easy to
+   * misread: overdue follow-ups, or a zero that means there are none.
+   */
+  caption?: string;
 }
 
 export type KpiTone = 'blue' | 'jade' | 'purple' | 'amber' | 'teal' | 'rose';
