@@ -47,7 +47,13 @@ export function resolvePipelineStage(opp: Opportunity): PipelineStage {
   };
 }
 
-export function getPipelineStageBusinessKey(stage: PipelineStage): string {
+type StageIdentity = PipelineStage & { key?: string };
+
+export function getPipelineStageBusinessKey(stage: StageIdentity): string {
+  // The demo column title is "Technical Iteration", not "S3 Technical Iteration".
+  // The stage key is still s3_technical_iteration, which is what a seeded bid stores.
+  const key = stage.key?.trim();
+  if (key) return key;
   if (isPipelineStageIdUuid(stage.id)) {
     const legacy = LEGACY_PIPELINE_STAGES.find((s) => s.name.toLowerCase() === stage.name.toLowerCase());
     return legacy ? legacy.id : stage.id;
@@ -62,11 +68,11 @@ export function getOpportunityStageBusinessKey(opp: Opportunity): string {
 
 export function getPipelineStages(
   items: Opportunity[],
-  configuredStages: PipelineStage[] = [],
+  configuredStages: StageIdentity[] = [],
 ): PipelineStage[] {
   const hasCanonicalStages = items.some((opp) => opp.pipelineStage);
   const hasConfiguredStages = configuredStages.length > 0;
-  const map = new Map<string, PipelineStage>();
+  const map = new Map<string, StageIdentity>();
 
   for (const stage of configuredStages) {
     map.set(getPipelineStageBusinessKey(stage), stage);
@@ -79,6 +85,11 @@ export function getPipelineStages(
   for (const opp of items) {
     const stage = resolvePipelineStage(opp);
     if (stage.id !== 'unknown') {
+      // A backfilled bid carries the same stage id as the demo column. Filing
+      // it again under the legacy label draws a second column and leaves the
+      // titled column empty.
+      const sameRow = [...map.values()].some((existing) => existing.id === stage.id);
+      if (sameRow) continue;
       const bkey = getPipelineStageBusinessKey(stage);
       if (!map.has(bkey) || (!hasConfiguredStages && isPipelineStageIdUuid(stage.id))) {
         map.set(bkey, stage);

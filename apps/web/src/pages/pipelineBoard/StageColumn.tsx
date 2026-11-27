@@ -97,15 +97,17 @@ export const StageColumn = memo(function StageColumn({
         <span className="text-xs text-[var(--fg-tertiary)] tabular-nums">
           {pageContinues ? countLabel : <AnimatedNumber value={items.length} duration={0.6} />}
           {' · '}
-          <AnimatedNumber
-            value={total}
-            duration={0.7}
-            // Use the app's money formatter (source = EUR, like PipelineCard)
-            // so the column total honors the selected display currency instead
-            // of always rendering euros. Round to whole units so the cents
-            // portion doesn't jitter during the tween.
-            format={(n) => formatMoney(Math.round(n), 'EUR')}
-          />
+          <span data-testid="pipeline-column-value" data-value={String(total)}>
+            <AnimatedNumber
+              value={total}
+              duration={0.7}
+              // Use the app's money formatter (source = EUR, like PipelineCard)
+              // so the column total honors the selected display currency instead
+              // of always rendering euros. Round to whole units so the cents
+              // portion doesn't jitter during the tween.
+              format={(n) => formatMoney(Math.round(n), 'EUR')}
+            />
+          </span>
         </span>
       </div>
       <GlassCard

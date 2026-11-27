@@ -99,4 +99,63 @@ describe('pipeline stage normalization', () => {
     expect(getOpportunityStageBusinessKey(legacyS2)).toBe('s2_sent');
     expect(getOpportunityStageBusinessKey(canonicalS2)).toBe('s2_sent');
   });
+
+  it('files a demo bid on the stage key when the column title is not the legacy label', () => {
+    // WHY: the demo pipeline titles are Lead and Technical Iteration. Seeded
+    // bids still store s3_technical_iteration and often have no pipelineStage
+    // row. Matching only the legacy label "S3 Technical Iteration" leaves the
+    // demo column empty, parks the bid on a second column, and leaves that
+    // column's value at 0. A drop onto the empty demo column then says the
+    // bid moved.
+    const lead = {
+      id: '11111111-1111-4111-8111-111111111111',
+      key: 's1_lead',
+      name: 'Lead',
+      probability: 10,
+      color: '#6366f1',
+      isWon: false,
+      isLost: false,
+    };
+    const technical = {
+      id: '33333333-3333-4333-8333-333333333333',
+      key: 's3_technical_iteration',
+      name: 'Technical Iteration',
+      probability: 65,
+      color: '#06b6d4',
+      isWon: false,
+      isLost: false,
+    };
+    const seeded = {
+      ...baseOpportunity,
+      name: 'Global ERP Modernization',
+      customer: 'Siemens',
+      stage: 's3_technical_iteration',
+      pipelineStageId: null,
+      pipelineStage: null,
+      value: 1_200_000,
+    };
+    const backfilled = {
+      ...seeded,
+      id: '55555555-5555-4555-8555-555555555555',
+      stage: 'Technical Iteration',
+      pipelineStageId: technical.id,
+      pipelineStage: {
+        id: technical.id,
+        name: technical.name,
+        probability: technical.probability,
+        color: technical.color,
+        isWon: false,
+        isLost: false,
+      },
+    };
+
+    const seededStages = getPipelineStages([seeded], [lead, technical]);
+    expect(seededStages.map((stage) => stage.name)).toEqual(['Lead', 'Technical Iteration']);
+    expect(getPipelineStageBusinessKey(technical)).toBe('s3_technical_iteration');
+    expect(getOpportunityStageBusinessKey(seeded)).toBe('s3_technical_iteration');
+
+    const backfilledStages = getPipelineStages([backfilled], [lead, technical]);
+    expect(backfilledStages.map((stage) => stage.name)).toEqual(['Lead', 'Technical Iteration']);
+    expect(backfilledStages.filter((stage) => stage.id === technical.id)).toHaveLength(1);
+  });
 });
