@@ -25,12 +25,7 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useTableSort } from '@/hooks/useTableSort';
 import { api, downloadFromApi } from '@/lib/api';
-import {
-  getPipelineStages,
-  isLegacyOpportunityStage,
-  isPipelineStageIdUuid,
-  resolvePipelineStage,
-} from '@/lib/pipeline-stages';
+import { getPipelineStages, resolvePipelineStage } from '@/lib/pipeline-stages';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
@@ -45,6 +40,7 @@ import {
   type DueQuickFilter,
 } from './opportunities/OppToolbar';
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
+import { opportunityStageListQuery } from './opportunities/opportunity-list-stage';
 
 export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
@@ -84,24 +80,28 @@ export function OpportunitiesPage() {
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
   const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
+  // Stage catalog before the list read: a demo chip id is a UUID, and the
+  // seed stores the stage key with a null pipelineStageId.
+  const configuredStages = usePipelineStages();
+  const stageKeyById = useMemo(() => {
+    const keys = new Map<string, string>();
+    for (const stage of configuredStages.data?.items ?? []) {
+      if (stage.key) keys.set(stage.id, stage.key);
+    }
+    return keys;
+  }, [configuredStages.data?.items]);
+  const stageQuery = opportunityStageListQuery(stageFilter, stageKeyById);
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
     ...(search ? { search } : {}),
-    ...(stageFilter
-      ? isPipelineStageIdUuid(stageFilter)
-        ? { pipelineStageId: stageFilter }
-        : isLegacyOpportunityStage(stageFilter)
-          ? { stage: stageFilter }
-          : {}
-      : {}),
+    ...stageQuery,
     ...(dueFilter === 'within7' ? { dueWithinDays: 7 } : {}),
     ...(dueFilter === 'overdue' ? { overdue: true } : {}),
   });
   // Tenant-wide aggregate for the KPI strip — the cursor page only ever holds 50
   // rows, so headline totals must come from the server, not data.items.
   const orgSummary = useOrgSummary();
-  const configuredStages = usePipelineStages();
   const configuredStageOptions = useMemo<PipelineStage[]>(
     () =>
       configuredStages.data?.items.map((stage) => ({
@@ -310,18 +310,10 @@ export function OpportunitiesPage() {
     setIsExporting(true);
     try {
       await downloadFromApi('/api/opportunities/export', `polo-presales-opportunities-${stamp}.csv`, {
-        // Mirror the list query's stage branching: a configured stage is a UUID
-        // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
-        // legacy enum as pipelineStageId 400s the export.
-        // Export must send the same filters as the list query.
+        // Same stage clause as the list. A demo chip exports the seeded key.
+        // Sending that enum as pipelineStageId 400s the export.
         querystring: {
-          ...(stageFilter
-            ? isPipelineStageIdUuid(stageFilter)
-              ? { pipelineStageId: stageFilter }
-              : isLegacyOpportunityStage(stageFilter)
-                ? { stage: stageFilter }
-                : {}
-            : {}),
+          ...stageQuery,
           ...(search ? { search } : {}),
           ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
           ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
