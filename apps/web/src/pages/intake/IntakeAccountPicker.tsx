@@ -1,5 +1,5 @@
 /**
- * IntakeAccountPicker — inline account search-select for the Intake workflow.
+ * IntakeAccountPicker: inline account search-select for the Intake workflow.
  *
  * WHY this exists: the '/intake' rail item carries no account id, and until
  * now the only way to attach one was hand-editing the URL query string. This
@@ -9,10 +9,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { Input } from '@/components/ui/Input';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+
+import { intakeAccountPhase } from './intake-account-read';
 
 interface IntakeAccountPickerProps {
   onSelect: (id: string) => void;
@@ -23,7 +25,12 @@ export function IntakeAccountPicker({ onSelect }: IntakeAccountPickerProps) {
   const [q, setQ] = useState('');
   const debounced = useDebouncedValue(q, 250);
   const companies = useCompanies({ search: debounced.trim() || undefined });
-  const items = companies.data?.items ?? [];
+  const phase = intakeAccountPhase({
+    data: companies.data,
+    isError: companies.isError,
+    status: companies.status,
+  });
+  const items = phase === 'ready' ? (companies.data?.items ?? []) : [];
 
   return (
     <div className="space-y-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-4">
@@ -42,13 +49,15 @@ export function IntakeAccountPicker({ onSelect }: IntakeAccountPickerProps) {
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
-      {companies.isError ? (
+      {phase === 'failed' ? (
         <ErrorState
           title={t('crm.receiveStep.pickAccountErrorTitle', 'Could not load accounts')}
           message={companies.error instanceof Error ? companies.error.message : undefined}
         />
-      ) : companies.isLoading ? (
-        <LoadingSkeleton rows={3} />
+      ) : phase === 'unread' ? (
+        <p className="px-2 py-6 text-center text-sm text-[var(--fg-secondary)]" role="status">
+          {t('crm.receiveStep.pickAccountChecking', 'Checking accounts. The list has not arrived.')}
+        </p>
       ) : (
         <ul
           className="max-h-64 space-y-1 overflow-y-auto"
