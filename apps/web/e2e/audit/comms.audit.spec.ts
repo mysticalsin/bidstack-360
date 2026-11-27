@@ -278,13 +278,25 @@ for (const route of ROUTES) {
 
 // ─── Behaviour ─────────────────────────────────────────────────────────────
 
+/**
+ * beforeAll stamps the meetings to "today", then the click audit can run
+ * past midnight. Day and agenda follow the clock, so step back one range
+ * when the fixtures are no longer inside it.
+ */
+async function showStampedMeetings(page: Page, probe: ReturnType<Page['locator']>) {
+  const seen = await probe.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true).catch(() => false);
+  if (seen) return;
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await expect(probe).toBeVisible();
+}
+
 test('calendar lays overlapping meetings side by side with a full-title tooltip', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page, '/calendar');
   await page.getByRole('button', { name: 'Day', exact: true }).click();
   const a = page.locator('[data-testid="calendar-event"]', { hasText: 'Audit overlap A' }).first();
   const b = page.locator('[data-testid="calendar-event"]', { hasText: 'Audit overlap B' }).first();
-  await expect(a).toBeVisible();
+  await showStampedMeetings(page, a);
   const [ra, rb] = [await a.boundingBox(), await b.boundingBox()];
   expect(ra && rb).toBeTruthy();
   const overlapX = Math.min(ra!.x + ra!.width, rb!.x + rb!.width) - Math.max(ra!.x, rb!.x);
@@ -300,7 +312,9 @@ test('calendar lays overlapping meetings side by side with a full-title tooltip'
 test('calendar agenda groups events by day and the time zone switch keeps the range', async ({ page }) => {
   await open(page, '/calendar');
   await page.getByRole('button', { name: 'Agenda', exact: true }).click();
-  await expect(page.getByTestId('calendar-agenda')).toContainText('Audit short sync');
+  const agenda = page.getByTestId('calendar-agenda');
+  await showStampedMeetings(page, agenda);
+  await expect(agenda).toContainText('Audit short sync');
   const zones = page.getByRole('group', { name: 'Time zone' });
   if (await zones.isVisible()) {
     await zones.getByRole('button').last().click();

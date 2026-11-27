@@ -1,5 +1,6 @@
 // Pure derivations behind the dashboard + account visuals. Everything here is
 // computed from API rows; nothing is invented. Kept pure so it is unit-tested.
+import { compactKeepsUnits } from '@/lib/compact-units';
 import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 export const OPEN_STAGES = ['s1_lead', 's1_ongoing', 's2_sent', 's3_technical_iteration', 's4_negotiation'] as const;
@@ -146,19 +147,6 @@ export function cumulativeOpen(rows: OppRow[]) {
 
 const chartCompact = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 2 });
 const chartCompactRounded = new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 });
-
-/** True when two fraction digits still name this unit count. */
-function compactKeepsUnits(units: number): boolean {
-  const abs = Math.abs(units);
-  for (const div of [1e9, 1e6, 1e3]) {
-    if (abs < div) continue;
-    for (let digits = 0; digits <= 2; digits += 1) {
-      if (Number((abs / div).toFixed(digits)) * div === abs) return true;
-    }
-    return false;
-  }
-  return false;
-}
 
 /**
  * Currency-free amount. Two digits when they name the same unit (7.86m, 11.89m).
