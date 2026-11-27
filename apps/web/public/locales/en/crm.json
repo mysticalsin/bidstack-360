@@ -1083,6 +1083,7 @@
   },
   "dashboard": {
     "srHeading": "Dashboard",
+    "cockpitChecking": "Checking the account cockpit. It has not arrived.",
     "cockpitErrorTitle": "Couldn't load the account cockpit",
     "cockpitErrorMessage": "The dashboard endpoint did not respond.",
     "retry": "Retry",

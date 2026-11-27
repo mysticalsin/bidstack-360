@@ -323,6 +323,8 @@ describe('DashboardPage account cockpit', () => {
       data: undefined,
       isLoading: false,
       isError: true,
+      status: 'error',
+      fetchStatus: 'idle',
       error: new Error('Request failed (500)'),
       refetch,
     } as never);
@@ -331,7 +333,69 @@ describe('DashboardPage account cockpit', () => {
 
     expect(screen.getByRole('alert')).toBeDefined();
     expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
+    expect(screen.queryByText(/has not arrived/)).toBeNull();
     expect(screen.queryByTestId('page-head')).toBeNull();
+  });
+
+  it('does not call a paused cockpit read a failed load', () => {
+    // A paused read has no payload and isLoading is false. That is not a
+    // failed cockpit, and it is not an empty account.
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isPending: true,
+      isFetching: false,
+      isError: false,
+      status: 'pending',
+      fetchStatus: 'paused',
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    expect(screen.getByText('Checking the account cockpit. It has not arrived.')).toBeTruthy();
+    expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
+    expect(screen.queryByTestId('page-head')).toBeNull();
+  });
+
+  it('says an in-flight cockpit read has not arrived', () => {
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isPending: true,
+      isFetching: true,
+      isError: false,
+      status: 'pending',
+      fetchStatus: 'fetching',
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    expect(screen.getByText('Checking the account cockpit. It has not arrived.')).toBeTruthy();
+    expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
+    expect(screen.queryByTestId('page-head')).toBeNull();
+  });
+
+  it('keeps a settled cockpit on screen', () => {
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: dashboardSnapshot('fresh'),
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      status: 'success',
+      fetchStatus: 'idle',
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    expect(screen.getByTestId('page-head').textContent).toBe('Acme');
+    expect(screen.queryByText('Checking the account cockpit. It has not arrived.')).toBeNull();
+    expect(screen.queryByText("Couldn't load the account cockpit")).toBeNull();
   });
 
   it('uses the tab-local verified cockpit snapshot when a resumed page gets a transient 500', () => {

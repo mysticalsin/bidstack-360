@@ -181,8 +181,26 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     dashboard.isError && !(dashboard.error instanceof ApiError && dashboard.error.status === 404);
   const snapshot = dashboard.data ?? (isTransientError ? cachedSnapshot : null);
 
-  if (dashboard.isLoading && !snapshot) {
-    return <DashboardSkeleton />;
+  // A paused or in-flight read has no payload. isLoading is false while paused,
+  // so that read must not use the failed-load sentence.
+  const readNotArrived =
+    !snapshot &&
+    !dashboard.isError &&
+    (dashboard.status === 'pending' ||
+      dashboard.isPending ||
+      dashboard.isLoading ||
+      dashboard.fetchStatus === 'paused' ||
+      dashboard.fetchStatus === 'fetching');
+
+  if (readNotArrived) {
+    return (
+      <div data-testid="cockpit-read-pending">
+        <p role="status">
+          {t('dashboard.cockpitChecking', 'Checking the account cockpit. It has not arrived.')}
+        </p>
+        <DashboardSkeleton />
+      </div>
+    );
   }
 
   if (!snapshot) {
