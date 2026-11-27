@@ -109,6 +109,9 @@ export function ProposalDetailPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['proposal', id] });
+      // The list stage column and the stage tabs read ['proposals'], and that
+      // cache stays fresh for two minutes. Delete and revise already drop it.
+      void qc.invalidateQueries({ queryKey: ['proposals'] });
     },
   });
 
