@@ -34,10 +34,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
   const readiness = deriveReadiness(cockpit);
   const nextMove = deriveNextMove(cockpit, t);
   const committee = deriveCommittee(cockpit, t);
-  const openRisks = cockpit.risks.filter((risk) => risk.status !== 'mitigated').length;
-  const criticalRisks = cockpit.risks.filter(
-    (risk) => risk.severity === 'critical' || risk.severity === 'high',
-  ).length;
+  const riskLoad = riskLoadSignal(cockpit.risks, t);
   const proofCount = cockpit.company.sourceAttribution.length + (cockpit.company.logo ? 1 : 0);
   const stackCount = cockpit.technicalStack.reduce((acc, row) => acc + row.items.length, 0);
   const primaryKpi = cockpit.kpis[0];
@@ -73,14 +70,7 @@ export const CommandCenter = memo(function CommandCenter({ cockpit }: Props) {
     },
     {
       label: t('commandCenter.signal.risk.label', 'Open risk load'),
-      value: criticalRisks
-        ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
-        : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
-      detail: criticalRisks
-        ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
-        : t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up'),
-      progress: Math.max(8, 100 - criticalRisks * 26 - openRisks * 7),
-      tone: criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
+      ...riskLoad,
     },
   ];
 
@@ -198,6 +188,39 @@ function SourcedRevenue({ companyId, companyName, crmValue }: { companyId: strin
       {shown === text && revenue?.provenance ? <SourceChip p={revenue.provenance} testId="command-chip-revenue" /> : null}
     </>
   );
+}
+
+/**
+ * An empty risk file is not a managed load. "0 open" and a full jade bar wait
+ * until rows exist. A high or critical row still escalates. A file whose rows
+ * are all mitigated stays manageable.
+ */
+export function riskLoadSignal(
+  risks: RiskItem[],
+  t: TFunction,
+): Pick<CommandSignal, 'value' | 'detail' | 'progress' | 'tone'> {
+  if (risks.length === 0) {
+    return {
+      value: t('commandCenter.signal.risk.valueUnrecorded', 'Not recorded'),
+      detail: t('commandCenter.signal.risk.detailUnrecorded', 'no risks on file'),
+      progress: 0,
+      tone: 'gray',
+    };
+  }
+  const openRisks = risks.filter((risk) => risk.status !== 'mitigated').length;
+  const criticalRisks = risks.filter(
+    (risk) => risk.severity === 'critical' || risk.severity === 'high',
+  ).length;
+  return {
+    value: criticalRisks
+      ? t('commandCenter.signal.risk.valueHigh', '{{count}} high', { count: criticalRisks })
+      : t('commandCenter.signal.risk.valueOpen', '{{count}} open', { count: openRisks }),
+    detail: criticalRisks
+      ? t('commandCenter.signal.risk.detailEscalate', 'escalate before proposal')
+      : t('commandCenter.signal.risk.detailManageable', 'manageable with owner follow-up'),
+    progress: Math.max(8, 100 - criticalRisks * 26 - openRisks * 7),
+    tone: criticalRisks ? 'tomato' : openRisks ? 'amber' : 'jade',
+  };
 }
 
 function deriveReadiness(cockpit: AccountCockpitSnapshot): number {
