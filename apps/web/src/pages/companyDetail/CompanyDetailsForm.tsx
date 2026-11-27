@@ -14,13 +14,8 @@ import type { CompanyDetail, CompanyPatch } from '@bidstack/shared';
 
 const TIERS = ['key', 'top', 'standard'] as const;
 
-export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail; onDone: () => void }) {
-  const update = useUpdateCompany();
-  // PATCH /companies/:id is admin-only (companies:write) — surface that up
-  // front so non-admins don't fill out the whole form only to have it
-  // rejected on submit.
-  const canWrite = useHasAdminPermission('companies:write');
-  const [form, setForm] = useState({
+function draftFrom(company: CompanyDetail) {
+  return {
     name: company.name,
     legalName: company.legalName ?? '',
     domain: company.domain ?? '',
@@ -31,8 +26,26 @@ export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail
     tier: company.tier ?? 'standard',
     taxId: company.taxId ?? '',
     billingEmail: company.billingEmail ?? '',
-  });
+  };
+}
+
+export function CompanyDetailsForm({ company, onDone }: { company: CompanyDetail; onDone: () => void }) {
+  const update = useUpdateCompany();
+  // PATCH /companies/:id is admin-only (companies:write) — surface that up
+  // front so non-admins don't fill out the whole form only to have it
+  // rejected on submit.
+  const canWrite = useHasAdminPermission('companies:write');
+  const [form, setForm] = useState(() => draftFrom(company));
+  const [accountId, setAccountId] = useState(company.id);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // /companies/:id keeps this page mounted. A cached account skips the
+  // loading skeleton, so a draft opened on the previous account would
+  // otherwise save that account's fields onto this one.
+  if (company.id !== accountId) {
+    setAccountId(company.id);
+    setForm(draftFrom(company));
+    setErrors({});
+  }
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const validate = (): boolean => {
