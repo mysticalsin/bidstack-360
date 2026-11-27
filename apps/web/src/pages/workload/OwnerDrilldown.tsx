@@ -7,9 +7,10 @@ import { useTranslation } from 'react-i18next';
 
 import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import type { Opportunity } from '@bidstack/shared';
+
+import { ownerDrilldownAmount } from './owner-drilldown-amount';
 
 interface Props {
   /** Owner email — the filter key the opportunities API understands. */
@@ -24,7 +25,6 @@ function isOpen(o: Opportunity): boolean {
 
 export function OwnerDrilldown({ email, ownerLabel }: Props) {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const opps = useOpportunities({ owner: email, limit: 200 });
 
   if (opps.isLoading) {
@@ -68,10 +68,10 @@ export function OwnerDrilldown({ email, ownerLabel }: Props) {
               {o.customer} — {o.name}
             </span>
             <span className="tabular-nums text-[var(--fg-secondary)]">
-              {/* Opportunity.value is already denominated in units (serialized
-                  from micros server-side) — convert back for the shared
-                  micros formatter. */}
-              {formatMoneyMicros(Math.round(o.value * 1_000_000))}
+              {/* Opportunity.value is already units. Those rows do not store a
+                  currency, so the label is the grouped units. The team total
+                  and the desk row stay on their own formatters. */}
+              {ownerDrilldownAmount(o.value)}
             </span>
             <DueDateChip dueDate={o.dueDate} size="sm" />
             <Icon name="chevron-right" size={12} className="text-[var(--fg-tertiary)]" />
