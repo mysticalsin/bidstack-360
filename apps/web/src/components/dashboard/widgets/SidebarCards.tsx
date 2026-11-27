@@ -51,7 +51,10 @@ export function QuickActionsCard() {
 // ─── QuickLinksCard ──────────────────────────────────────────────────────────
 
 const QUICK_LINKS = [
-  { id: 'pipeline', label: 'Pipeline', href: '/pipeline', icon: 'briefcase' },
+  // The rail dropped /pipeline as its own door. That board's Total pipeline
+  // adds won and lost bids and prints the sum as euros. The open book, with
+  // no currency on record, is the Opportunities list.
+  { id: 'pipeline', label: 'Pipeline', href: '/opportunities', icon: 'briefcase' },
   { id: 'reports', label: 'Reports', href: '/reports/list', icon: 'reports' },
   { id: 'tasks', label: 'Tasks', href: '/tasks', icon: 'tasks' },
   { id: 'settings', label: 'Settings', href: '/settings', icon: 'settings' },
