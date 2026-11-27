@@ -17,6 +17,7 @@ import { useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
+import { accountIndustryLabel } from './accountIndustryLabel';
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
 import { StrategicSignalInsight } from './StrategicSignalInsight';
 import { topAccountSignal } from './strategicSignals';
@@ -55,13 +56,17 @@ export function AccountsTopSegment() {
   );
   const industryBreakdown = useMemo(() => {
     const unclassifiedIndustry = t('topAccounts.unclassifiedIndustry', 'Unclassified');
-    const byIndustry = new Map<string, { count: number; pipeline: number; filterValue: string | null }>();
+    const byIndustry = new Map<
+      string,
+      { label: string; count: number; pipeline: number; filterValue: string | null }
+    >();
     for (const account of items) {
       const key = account.industry || unclassifiedIndustry;
       const current = byIndustry.get(key) ?? {
+        label: account.industry ? accountIndustryLabel(account.industry) : unclassifiedIndustry,
         count: 0,
         pipeline: 0,
-        filterValue: account.industry,
+        filterValue: account.industry || null,
       };
       current.count += 1;
       current.pipeline += account.totalValue;
@@ -135,7 +140,7 @@ export function AccountsTopSegment() {
             </option>
             {(industries.data?.items ?? []).map((i: string) => (
               <option key={i} value={i}>
-                {i}
+                {accountIndustryLabel(i)}
               </option>
             ))}
           </FilterSelect>
@@ -199,7 +204,7 @@ export function AccountsTopSegment() {
           <InsightPanel
             eyebrow={t('topAccounts.industryMixEyebrow', 'Industry mix')}
             heading={t('topAccounts.industryMixTitle', 'Pipeline by industry')}
-            aside={industry ? <Badge tone="blue">{industry}</Badge> : null}
+            aside={industry ? <Badge tone="blue">{accountIndustryLabel(industry)}</Badge> : null}
           >
             <div className="space-y-2">
               {industryBreakdown.map((item) => (
@@ -209,7 +214,7 @@ export function AccountsTopSegment() {
                   aria-label={
                     item.filterValue
                       ? t('topAccounts.filterByIndustry', 'Filter top accounts by {{industry}}', {
-                          industry: item.name,
+                          industry: item.label,
                         })
                       : t('topAccounts.clearIndustryFilter', 'Clear top account industry filter')
                   }
@@ -222,7 +227,7 @@ export function AccountsTopSegment() {
                   className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3 text-left transition hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
+                    <span className="truncate font-semibold text-[var(--fg-primary)]">{item.label}</span>
                     <span className="font-medium text-[var(--fg-tertiary)]">{formatMoney(item.pipeline, 'EUR')}</span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
@@ -243,7 +248,7 @@ export function AccountsTopSegment() {
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!accounts.isLoading && accounts.data
-          ? `${t('topAccounts.resultCount', '{{count}} account', { count: items.length })}${industry ? ` · ${industry}` : ''}`
+          ? `${t('topAccounts.resultCount', '{{count}} account', { count: items.length })}${industry ? ` · ${accountIndustryLabel(industry)}` : ''}`
           : ''}
       </p>
 
@@ -345,7 +350,7 @@ export function AccountsTopSegment() {
                         <TopAccountBadge rank={account.topAccountRank ?? index + 1} />
                       )}
                       {account.tier === 'key' && <KeyAccountBadge />}
-                      {account.industry && <Badge tone="gray">{account.industry}</Badge>}
+                      {account.industry && <Badge tone="gray">{accountIndustryLabel(account.industry)}</Badge>}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--fg-secondary)]">
                       <span>

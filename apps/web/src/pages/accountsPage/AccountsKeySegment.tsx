@@ -20,6 +20,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
+import { accountIndustryLabel } from './accountIndustryLabel';
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
 
@@ -79,22 +80,32 @@ export function AccountsKeySegment() {
     [items],
   );
   const industryBreakdown = useMemo(() => {
-    const byIndustry = new Map<string, { count: number; pipeline: number }>();
+    const byIndustry = new Map<
+      string,
+      { label: string; filterValue: string | null; count: number; pipeline: number }
+    >();
     for (const account of signalItems) {
-      const key = account.industry || unclassifiedIndustry;
-      const current = byIndustry.get(key) ?? { count: 0, pipeline: 0 };
+      const filterValue = account.industry || null;
+      const key = filterValue ?? '';
+      const current = byIndustry.get(key) ?? {
+        label: filterValue ? accountIndustryLabel(filterValue) : unclassifiedIndustry,
+        filterValue,
+        count: 0,
+        pipeline: 0,
+      };
       current.count += 1;
       current.pipeline += account.totalValue;
       byIndustry.set(key, current);
     }
-    return [...byIndustry.entries()]
-      .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => b.pipeline - a.pipeline || b.count - a.count)
-      .slice(0, 6);
+    return [...byIndustry.values()].sort((a, b) => b.pipeline - a.pipeline || b.count - a.count);
   }, [signalItems, unclassifiedIndustry]);
-  const maxIndustryPipeline = Math.max(1, ...industryBreakdown.map((item) => item.pipeline));
-  const selectedIndustryStats = industryBreakdown.find((item) => item.name === industry);
-  const leadingIndustry = selectedIndustryStats ?? industryBreakdown[0] ?? null;
+  const industrySignal = industryBreakdown.slice(0, 6);
+  const maxIndustryPipeline = Math.max(1, ...industrySignal.map((item) => item.pipeline));
+  const selectedIndustryStats = industryBreakdown.find(
+    (item) => item.filterValue !== null && item.filterValue === industry,
+  );
+  const leadingIndustry = industryBreakdown[0] ?? null;
+  const headingIndustry = selectedIndustryStats ?? leadingIndustry;
 
   return (
     <motion.div
@@ -143,7 +154,7 @@ export function AccountsKeySegment() {
             </option>
             {(industries.data?.items ?? []).map((i) => (
               <option key={i} value={i}>
-                {i}
+                {accountIndustryLabel(i)}
               </option>
             ))}
           </FilterSelect>
@@ -169,41 +180,53 @@ export function AccountsKeySegment() {
         </FilterRow>
       </motion.div>
 
-      {!accounts.isError && industryBreakdown.length > 0 ? (
+      {!accounts.isError && industrySignal.length > 0 ? (
         <motion.div variants={reducedMotion ? undefined : staggerChild}>
           <InsightPanel
             ariaLabel={t('keyAccounts.industrySignalLabel', 'Key account industry signal')}
             eyebrow={t('keyAccounts.industrySignalEyebrow', 'Industry signal')}
             heading={
-              leadingIndustry
-                ? t('keyAccounts.industrySignalTitle', '{{industry}} leads the view', {
-                    industry: leadingIndustry.name,
+              selectedIndustryStats
+                ? t('keyAccounts.industrySignalFiltered', 'Filtered to {{industry}}', {
+                    industry: selectedIndustryStats.label,
                   })
-                : t('keyAccounts.industrySignalFallback', 'No industry signal')
+                : leadingIndustry
+                  ? t('keyAccounts.industrySignalTitle', '{{industry}} leads the view', {
+                      industry: leadingIndustry.label,
+                    })
+                  : t('keyAccounts.industrySignalFallback', 'No industry signal')
             }
             sub={
-              leadingIndustry
+              headingIndustry
                 ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
-                    count: leadingIndustry.count,
-                    pipeline: formatMoney(leadingIndustry.pipeline, 'EUR'),
+                    count: headingIndustry.count,
+                    pipeline: formatMoney(headingIndustry.pipeline, 'EUR'),
                   })
                 : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
             }
           >
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {industryBreakdown.map((item) => (
+              {industrySignal.map((item) => (
                 <button
-                  key={item.name}
+                  key={item.filterValue ?? 'unclassified'}
                   type="button"
-                  aria-label={t('keyAccounts.filterByIndustry', 'Filter key accounts by {{industry}}', {
-                    industry: item.name,
-                  })}
-                  aria-pressed={industry === item.name}
-                  onClick={() => setIndustry(industry === item.name ? '' : item.name)}
+                  aria-label={
+                    item.filterValue
+                      ? t('keyAccounts.filterByIndustry', 'Filter key accounts by {{industry}}', {
+                          industry: item.label,
+                        })
+                      : t('keyAccounts.clearIndustryFilter', 'Clear key account industry filter')
+                  }
+                  aria-pressed={item.filterValue !== null && industry === item.filterValue}
+                  onClick={() =>
+                    item.filterValue
+                      ? setIndustry(industry === item.filterValue ? '' : item.filterValue)
+                      : setIndustry('')
+                  }
                   className="group rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3 text-left transition hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="truncate font-semibold text-[var(--fg-primary)]">{item.name}</span>
+                    <span className="truncate font-semibold text-[var(--fg-primary)]">{item.label}</span>
                     <span className="font-medium text-[var(--fg-tertiary)]">{item.count}</span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]">
@@ -228,7 +251,7 @@ export function AccountsKeySegment() {
               items.length === 1
                 ? t('keyAccounts.resultCount_one', '{{count}} account', { count: items.length })
                 : t('keyAccounts.resultCount_other', '{{count}} accounts', { count: items.length })
-            }${industry ? ` · ${industry}` : ''}`
+            }${industry ? ` · ${accountIndustryLabel(industry)}` : ''}`
           : ''}
       </p>
 
@@ -333,7 +356,9 @@ export function AccountsKeySegment() {
                             {account.name}
                           </Link>
                           <KeyAccountBadge />
-                          {account.industry ? <Badge tone="gray">{account.industry}</Badge> : null}
+                          {account.industry ? (
+                            <Badge tone="gray">{accountIndustryLabel(account.industry)}</Badge>
+                          ) : null}
                         </div>
                         {account.domain ? (
                           <div className="text-xs text-[var(--fg-tertiary)]">{account.domain}</div>
