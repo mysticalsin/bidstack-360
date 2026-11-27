@@ -17,6 +17,8 @@ import {
   type NotificationType,
 } from '@/hooks/useNotifications';
 
+import { notificationOpenPath } from './notification-open-path';
+
 const TYPE_ICON: Record<NotificationType, IconName> = {
   mention: 'messageCircle',
   assignment: 'target',
@@ -55,8 +57,9 @@ export function NotificationsBell() {
 
   function openItem(id: string, url: string | null, read: boolean) {
     if (!read) markRead.mutate(id);
-    if (url) {
-      navigate(url);
+    const path = notificationOpenPath(url);
+    if (path) {
+      navigate(path);
       setOpen(false);
     }
   }
