@@ -1,4 +1,4 @@
-import { formatMicrosDecimal } from '@bidstack/shared';
+import { opportunityBriefAmount } from './opportunity-brief-amount.js';
 
 interface BriefOpportunity {
   code: string;
@@ -42,9 +42,10 @@ export interface OpportunityBriefInput {
 }
 
 function formatMoneyMicros(valueMicros: bigint | number): string {
-  // Exact decimal — Intl on Number(micros)/1e6 drops fractional cents and
-  // corrupts values past the safe-integer cliff.
-  return `EUR ${formatMicrosDecimal(valueMicros)}`;
+  // Exact decimal. Intl on Number(micros)/1e6 drops fractional cents and
+  // corrupts values past the safe-integer cliff. The column has no currency,
+  // so the label is those units and does not name EUR.
+  return opportunityBriefAmount(valueMicros);
 }
 
 function formatDate(value: Date | null): string {
