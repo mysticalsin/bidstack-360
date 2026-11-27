@@ -19,6 +19,8 @@ import {
   buildProjectionWindow,
   type ProjectionRow,
 } from './forecasts-projection.helpers.js';
+import { getPoloDataMode } from '../lib/polo-mode.js';
+import { projectedOpportunityDueSql } from '../demo/fixture-opportunity-due-sql.js';
 
 const FORWARD_QUARTERS = 2; // current quarter + next 2 = 3-period rolling window
 const FORECAST_CURRENCY = 'EUR'; // micros are EUR at rest (CLAUDE.md money convention)
@@ -34,6 +36,7 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
       const window = buildProjectionWindow(new Date(), FORWARD_QUARTERS);
       const curStart = isoDate(window.curQuarterStart);
       const winEnd = isoDate(window.windowEndExclusive);
+      const due = projectedOpportunityDueSql(new Date(), getPoloDataMode());
 
       // Aggregate in Postgres so the payload is bounded to periods × owners ×
       // stages. Open pipeline with a null/overdue close date rolls into the
@@ -43,16 +46,16 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
           CASE
             WHEN o.stage = 'closed_won' THEN
               CASE
-                WHEN o.due_date >= ${curStart}::date AND o.due_date < ${winEnd}::date
-                  THEN to_char(o.due_date, 'YYYY"-Q"Q')
+                WHEN ${due} >= ${curStart}::date AND ${due} < ${winEnd}::date
+                  THEN to_char(${due}, 'YYYY"-Q"Q')
                 ELSE NULL
               END
             ELSE
               CASE
-                WHEN o.due_date IS NULL OR o.due_date < ${curStart}::date
+                WHEN ${due} IS NULL OR ${due} < ${curStart}::date
                   THEN ${window.currentPeriod}
-                WHEN o.due_date < ${winEnd}::date
-                  THEN to_char(o.due_date, 'YYYY"-Q"Q')
+                WHEN ${due} < ${winEnd}::date
+                  THEN to_char(${due}, 'YYYY"-Q"Q')
                 ELSE NULL
               END
           END AS period,

@@ -10,14 +10,15 @@
 import { type z } from 'zod';
 
 import { OpportunityStage, Prisma, type PrismaClient } from '@bidstack/db';
-import type {
-  CrmCompany,
-  CrmDeal,
-  DashboardWidget,
-  AccountCockpitSnapshot,
-  ProviderHealth,
-  QueueHealth,
-  ReleaseScore,
+import {
+  projectFixtureOpportunityDueDate,
+  type CrmCompany,
+  type CrmDeal,
+  type DashboardWidget,
+  type AccountCockpitSnapshot,
+  type ProviderHealth,
+  type QueueHealth,
+  type ReleaseScore,
 } from '@bidstack/shared';
 
 import { buildCompanies } from './company-enrichment.service.js';
@@ -31,11 +32,13 @@ import {
   type AccessScope,
 } from '../../lib/access-scope.js';
 import { canReadAccount } from '../../lib/account-access.js';
+import { getPoloDataMode } from '../../lib/polo-mode.js';
 
 // ─── Row serializers ──────────────────────────────────────────────────────────
 
 export function serializeDeal(opportunity: {
   id: string;
+  code?: string;
   customer: string;
   name: string;
   stage: string;
@@ -55,8 +58,21 @@ export function serializeDeal(opportunity: {
   updatedAt: Date;
   /** Opportunity has no currency column. Callers must not invent one. */
   currencyCode?: string | null;
-}): z.infer<typeof CrmDeal> {
+}, now: Date = new Date()): z.infer<typeof CrmDeal> {
   const recorded = opportunity.currencyCode?.trim();
+  const projected = opportunity.dueDate
+    ? projectFixtureOpportunityDueDate(
+        {
+          code: opportunity.code ?? '',
+          stage: opportunity.stage,
+          dueDate: opportunity.dueDate,
+          pipelineStage: opportunity.pipelineStage,
+        },
+        now,
+        getPoloDataMode(),
+      )
+    : null;
+  const closeDate = projected instanceof Date ? projected.toISOString().slice(0, 10) : null;
   return {
     id: opportunity.id,
     source: 'external_crm',
@@ -67,7 +83,7 @@ export function serializeDeal(opportunity: {
     amountMicros: Math.round(Number(opportunity.valueMicros ?? 0)),
     currencyCode: recorded && recorded.length === 3 ? recorded : null,
     probability: opportunity.probability,
-    closeDate: opportunity.dueDate ? opportunity.dueDate.toISOString().slice(0, 10) : null,
+    closeDate,
     ownerId: opportunity.ownerId,
     ownerName: opportunity.owner?.name ?? opportunity.owner?.email ?? null,
     updatedAt: opportunity.updatedAt.toISOString(),

@@ -28,3 +28,4 @@ export * from './comms/index.js';
 export * from './public-sector/attribution.js';
 export * from './consulting-partners/index.js';
 export * from './account-alerts/index.js';
+export * from './demo/fixture-opportunity-clock.js';

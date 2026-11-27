@@ -45,4 +45,31 @@ describe('deal currency is omitted when the opportunity has none', () => {
     });
     expect(deal.currencyCode).toBeNull();
   });
+
+  it('slides a seeded open close date in demo and keeps the stored day in real', () => {
+    // WHY: the dashboard deal list reads the same absolute fixture due dates.
+    // After 2026-06-30 the Rush deal would show as already closed.
+    const row = {
+      id: '6b1b3a2e-1c4d-4e5f-8a9b-0c1d2e3f4a5b',
+      code: 'OP-2043',
+      customer: 'Rush University System for Health',
+      name: 'EHR Cloud Migration',
+      stage: 's4_negotiation',
+      pipelineStage: null,
+      valueMicros: 1_000_000,
+      probability: 78,
+      dueDate: new Date('2026-06-30T00:00:00.000Z'),
+      ownerId: null,
+      owner: null,
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    const now = new Date('2026-11-27T00:00:00.000Z');
+    const previous = process.env.POLO_DATA_MODE;
+    process.env.POLO_DATA_MODE = 'demo';
+    expect(serializeDeal(row, now).closeDate).toBe('2026-11-28');
+    process.env.POLO_DATA_MODE = 'real';
+    expect(serializeDeal(row, now).closeDate).toBe('2026-06-30');
+    if (previous === undefined) delete process.env.POLO_DATA_MODE;
+    else process.env.POLO_DATA_MODE = previous;
+  });
 });

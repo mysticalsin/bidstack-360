@@ -4,9 +4,12 @@
 import type { Task, Document, OpportunityStage } from '@bidstack/db';
 import {
   microsToUnits,
+  projectFixtureOpportunityDueDate,
   type Opportunity as ApiOpportunity,
   type OpportunityFull as ApiOpportunityFull,
 } from '@bidstack/shared';
+
+import { getPoloDataMode } from '../lib/polo-mode.js';
 
 type SerializedOwner = { id: string; name: string | null; email: string };
 type SerializedPipelineStage = {
@@ -68,9 +71,29 @@ function serializePipelineStage(
   };
 }
 
+function projectedDueDate(
+  o: Pick<SerializedOpportunity, 'code' | 'stage' | 'dueDate' | 'pipelineStage'>,
+  now: Date,
+): string | null {
+  if (!o.dueDate) return null;
+  const projected = projectFixtureOpportunityDueDate(
+    {
+      code: o.code,
+      stage: o.stage,
+      dueDate: o.dueDate,
+      pipelineStage: o.pipelineStage,
+    },
+    now,
+    getPoloDataMode(),
+  );
+  if (projected == null || !(projected instanceof Date)) return null;
+  return projected.toISOString().slice(0, 10);
+}
+
 export function serializeOpportunity(
   o: WithOwner & { territory?: { name: string } | null },
   counts?: OpportunityCounts,
+  now: Date = new Date(),
 ): ApiOpportunity {
   return {
     id: o.id,
@@ -85,7 +108,7 @@ export function serializeOpportunity(
     // corrupts on the wire. Storage stays micros.
     value: microsToUnits(o.valueMicros),
     probability: o.probability,
-    dueDate: o.dueDate ? o.dueDate.toISOString().slice(0, 10) : null,
+    dueDate: projectedDueDate(o, now),
     owner: o.owner?.email ?? null,
     industry: o.industry ?? null,
     logo: o.logoUrl,
@@ -103,9 +126,9 @@ export function serializeOpportunity(
   };
 }
 
-export function serializeOpportunityFull(o: Full): ApiOpportunityFull {
+export function serializeOpportunityFull(o: Full, now: Date = new Date()): ApiOpportunityFull {
   return {
-    ...serializeOpportunity(o),
+    ...serializeOpportunity(o, undefined, now),
     intel: o.intel as ApiOpportunityFull['intel'],
     tasks: o.tasks.map((t) => ({
       id: t.id,

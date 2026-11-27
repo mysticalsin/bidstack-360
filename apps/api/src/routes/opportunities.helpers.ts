@@ -4,8 +4,10 @@
  * WHY separate: mintNextCode and isUniqueViolation have no Fastify dependency
  * and are used from create, import, and lead conversion handlers.
  */
-import { Prisma } from '@bidstack/db';
-import { normalizeName } from '@bidstack/shared';
+import { OpportunityStage, Prisma } from '@bidstack/db';
+import { fixtureOpenDueInWindow, fixtureOpenNotOverdue, normalizeName } from '@bidstack/shared';
+
+import { getPoloDataMode } from '../lib/polo-mode.js';
 
 type MaxOpportunityCodeRow = {
   maxCode: number | bigint | null;
@@ -126,21 +128,41 @@ export async function resolveCompanyIdByName(
  * in step with the DueDateChip and the bid-deadline-alerts worker
  * (apps/worker/src/queues/bid-deadline-alerts.helpers.ts daysUntilDue).
  */
+const OPEN_FIXTURE_STAGE = {
+  notIn: [OpportunityStage.closed_won, OpportunityStage.closed_lost],
+};
+
+function fixtureDueMatch(code: string, storedDate: string): Prisma.OpportunityWhereInput {
+  return {
+    code,
+    dueDate: new Date(`${storedDate}T00:00:00.000Z`),
+    stage: OPEN_FIXTURE_STAGE,
+    OR: [{ pipelineStageId: null }, { pipelineStage: { isWon: false, isLost: false } }],
+  };
+}
+
 export function opportunityDueDateWhere(
   filter: { dueWithinDays?: number; overdue?: boolean },
   now: Date = new Date(),
-): Pick<Prisma.OpportunityWhereInput, 'dueDate'> {
+  mode: string | undefined = getPoloDataMode(),
+): Prisma.OpportunityWhereInput {
   const startOfTodayUTC = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
   if (filter.dueWithinDays !== undefined) {
+    const end = new Date(startOfTodayUTC.getTime() + filter.dueWithinDays * 86_400_000);
+    const live = { dueDate: { gte: startOfTodayUTC, lte: end } };
+    const extras = fixtureOpenDueInWindow(startOfTodayUTC, new Date(end.getTime() + 86_400_000), now, mode);
+    if (extras.length === 0) return live;
+    return { AND: [{ OR: [live, ...extras.map((row) => fixtureDueMatch(row.code, row.storedDate))] }] };
+  }
+  if (filter.overdue) {
+    const past = { dueDate: { lt: startOfTodayUTC } };
+    const kept = fixtureOpenNotOverdue(now, mode);
+    if (kept.length === 0) return past;
     return {
-      dueDate: {
-        gte: startOfTodayUTC,
-        lte: new Date(startOfTodayUTC.getTime() + filter.dueWithinDays * 86_400_000),
-      },
+      AND: [past, { NOT: { OR: kept.map((row) => fixtureDueMatch(row.code, row.storedDate)) } }],
     };
   }
-  if (filter.overdue) return { dueDate: { lt: startOfTodayUTC } };
   return {};
 }
