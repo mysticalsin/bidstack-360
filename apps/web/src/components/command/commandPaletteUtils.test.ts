@@ -109,6 +109,20 @@ describe('fuzzyMatch', () => {
     expect(fuzzyMatch('', 'anything')).toBeNull();
     expect(fuzzyMatch('zz', 'abc')).toBeNull();
   });
+
+  it('keeps a finished label when the next word is still one letter', () => {
+    // WHY: "CI Financial" is the whole account. The following "I" is the
+    // start of the next word, not a reason to drop the account. Two letters
+    // are a real token, and a letter glued on is still the same word.
+    expect(fuzzyMatch('CI Financial I', 'CI Financial')?.indices).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    ]);
+    expect(fuzzyMatch('CI Financial IT', 'CI Financial')).toBeNull();
+    expect(fuzzyMatch('CI FinancialI', 'CI Financial')).toBeNull();
+    expect(score('CI Financial I', 'CI Financial IT modernization')).toBeGreaterThan(
+      score('CI Financial I', 'CI Financial'),
+    );
+  });
 });
 
 describe('matchCompanies', () => {
@@ -129,6 +143,18 @@ describe('matchCompanies', () => {
   it('matches on secondary fields (domain), not just the name', () => {
     const results = matchCompanies(COMPANIES, 'aritzia.com', 10);
     expect(results.map((r) => r.value.id)).toEqual(['co_aritzia']);
+  });
+
+  it('keeps CI Financial when the query adds one stranded letter', () => {
+    // WHY: the demo account has to stay in the palette while the next word
+    // is a single letter. MAPFRE does not start that query, so it stays out.
+    const rows = [
+      company({ id: 'co_ci', name: 'CI Financial', domain: 'ci.com' }),
+      company({ id: 'co_mapfre', name: 'MAPFRE', domain: 'mapfre.com' }),
+    ];
+    expect(matchCompanies(rows, 'CI Financial I', 10).map((r) => r.value.name)).toEqual([
+      'CI Financial',
+    ]);
   });
 
   it('returns the first N with neutral scores on an empty query (browse mode)', () => {

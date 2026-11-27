@@ -51,6 +51,24 @@ function boundaryBonus(text: string, i: number): number {
 }
 
 /**
+ * The label is already complete and the query has only started the next
+ * word. "CI Financial I" still means the account. Two letters are a token
+ * the label has to contain, and a letter glued on ("FinancialI") is the
+ * same word, so those stay on the normal path and miss.
+ */
+function finishedLabelWithOneNewLetter(query: string, text: string): FuzzyMatch | null {
+  const t = text.toLowerCase();
+  if (t.length !== text.length || !query.startsWith(t)) return null;
+  const rest = query.slice(t.length).replace(/\s+$/, '');
+  if (!/^[^0-9a-z]+[0-9a-z]$/.test(rest)) return null;
+  let score = 0;
+  for (let k = 0; k < t.length; k++) {
+    score += SCORE_CHAR + (k === 0 ? BONUS_TEXT_START : BONUS_CONSECUTIVE);
+  }
+  return { score, indices: Array.from({ length: t.length }, (_, k) => k) };
+}
+
+/**
  * Score `query` against `text`. Returns null when the query does not match
  * under the anchored-or-contiguous model (see module doc). Case-insensitive.
  *
@@ -63,7 +81,10 @@ export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
   const t = text.toLowerCase();
   const n = q.length;
   const m = t.length;
-  if (n === 0 || n > m || n > MAX_QUERY || m > MAX_TEXT) return null;
+  if (n === 0 || m === 0 || n > MAX_QUERY || m > MAX_TEXT) return null;
+  // A query longer than the label used to miss outright, so the first
+  // letter of the next word stranded a row the user had already found.
+  if (n > m) return finishedLabelWithOneNewLetter(q, text);
 
   const NEG = Number.NEGATIVE_INFINITY;
   const bonus: number[] = new Array<number>(m);
