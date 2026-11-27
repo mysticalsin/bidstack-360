@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { agentStudioRunPhase } from './agent-studio-run-read';
 
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -466,6 +467,7 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
   });
 
   const roleByKey = new Map(agents.map((a) => [a.agentKey, a.role]));
+  const runPhase = agentStudioRunPhase(run);
 
   return (
     <div className="space-y-3 bg-[var(--surface-sunken)] px-4 py-3">
@@ -521,11 +523,22 @@ function RunPanel({ crewId, agents }: { crewId: string; agents: CrewAgent[] }) {
               role="status"
               aria-live="polite"
             >
-              {run.data && RUNNING.has(run.data.status) ? (
+              {runPhase === 'ready' && run.data && RUNNING.has(run.data.status) ? (
                 <Icon name="loader" size={13} className="animate-spin" />
               ) : null}
-              {t('agentStudio.statusLabel', 'Status:')}{' '}
-              <span className="font-medium">{run.data?.status ?? 'queued'}</span>
+              {runPhase === 'unread' ? (
+                <span className="font-medium">
+                  {t(
+                    'agentStudio.runStatusUnread',
+                    'Checking the run. The status has not arrived.',
+                  )}
+                </span>
+              ) : runPhase === 'ready' ? (
+                <>
+                  {t('agentStudio.statusLabel', 'Status:')}{' '}
+                  <span className="font-medium">{run.data?.status}</span>
+                </>
+              ) : null}
             </div>
             {run.data && RUNNING.has(run.data.status) && (
               <Button
