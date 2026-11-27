@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
@@ -30,6 +30,18 @@ const MAX_STARRED = 6;
 
 type Badges = { openBids: number; overdueTasks: number };
 
+// The calls list is /calls (command palette). That page is the Opportunities
+// door. The deal board is /pipeline, and a deeper /calls/... path is not
+// this list.
+function isCallsListPath(pathname: string): boolean {
+  return pathname === '/calls';
+}
+
+function itemOwnsSectionPath(itemTo: string, pathname: string): boolean {
+  if (itemTo === '/opportunities' && isCallsListPath(pathname)) return true;
+  return pathname === itemTo || pathname.startsWith(`${itemTo}/`);
+}
+
 // Same route-match rule SidebarSection uses to decide isActiveSection —
 // pulled out so the route-sync effect below (Sidebar()) and the per-section
 // render (SidebarSection()) can't drift on what counts as "this section owns
@@ -39,7 +51,7 @@ function findSectionKeyForPath(pathname: string): string | undefined {
   return NAV_SECTIONS.find(
     (section) =>
       section.key !== 'home' &&
-      section.items.some((it) => pathname === it.to || pathname.startsWith(`${it.to}/`)),
+      section.items.some((it) => itemOwnsSectionPath(it.to, pathname)),
   )?.key;
 }
 
@@ -230,9 +242,7 @@ function SidebarSection({
   // Accordion: a section is collapsed by default unless it holds the active
   // route — so only one section's items show at once and the rail never needs
   // an internal scroll. An explicit user toggle (override) wins and persists.
-  const isActiveSection = section.items.some(
-    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
-  );
+  const isActiveSection = section.items.some((it) => itemOwnsSectionPath(it.to, location.pathname));
   const sectionCollapsed = override === undefined ? !isActiveSection : override;
 
   if (collapsed) {
@@ -269,9 +279,20 @@ function SidebarSection({
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+              const label = t(item.labelKey, item.label);
+              // NavLink clears aria-current unless `to` is the URL you are on.
+              // The calls list is an alias, so the current mark is a Link.
+              if (item.to === '/opportunities' && isCallsListPath(location.pathname)) {
+                return (
+                  <Link key={item.to} to={item.to} className="sb-flyout-item" aria-current="page">
+                    <span>{label}</span>
+                    {badge > 0 && <span className="sb-badge">{badge}</span>}
+                  </Link>
+                );
+              }
               return (
                 <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
-                  <span>{t(item.labelKey, item.label)}</span>
+                  <span>{label}</span>
                   {badge > 0 && <span className="sb-badge">{badge}</span>}
                 </NavLink>
               );
@@ -348,6 +369,7 @@ function SidebarItem({
   const prefetch = () => prefetchRoute(item.to);
 
   const isActive = useMemo(() => {
+    if (item.to === '/opportunities' && isCallsListPath(location.pathname)) return true;
     try {
       const toUrl = new URL(item.to, window.location.origin);
       const toPath = toUrl.pathname;
@@ -367,23 +389,45 @@ function SidebarItem({
     }
   }, [location, item.to]);
 
-  const link = (
-    <NavLink
-      to={item.to}
-      end={item.end}
-      aria-current={isActive ? 'page' : undefined}
-      className={cn('sb-item', isActive && 'is-active')}
-      aria-label={label}
-      title={collapsed ? undefined : label}
-      onMouseEnter={prefetch}
-      onFocus={prefetch}
-      onTouchStart={prefetch}
-    >
+  const className = cn('sb-item', isActive && 'is-active');
+  const itemBody = (
+    <>
       <Icon name={item.icon} size={16} />
       <span>{label}</span>
       {badge > 0 && <span className="sb-badge">{badge}</span>}
-    </NavLink>
+    </>
   );
+  // NavLink clears aria-current unless `to` is the URL you are on. The
+  // calls list is an alias of Opportunities, so that current mark is a Link.
+  const link =
+    isActive && item.to === '/opportunities' && isCallsListPath(location.pathname) ? (
+      <Link
+        to={item.to}
+        aria-current="page"
+        className={className}
+        aria-label={label}
+        title={collapsed ? undefined : label}
+        onMouseEnter={prefetch}
+        onFocus={prefetch}
+        onTouchStart={prefetch}
+      >
+        {itemBody}
+      </Link>
+    ) : (
+      <NavLink
+        to={item.to}
+        end={item.end}
+        aria-current={isActive ? 'page' : undefined}
+        className={className}
+        aria-label={label}
+        title={collapsed ? undefined : label}
+        onMouseEnter={prefetch}
+        onFocus={prefetch}
+        onTouchStart={prefetch}
+      >
+        {itemBody}
+      </NavLink>
+    );
   // Tooltips only when the label is hidden (collapsed mode) — otherwise
   // the label itself is the affordance and a tooltip would be redundant.
   if (collapsed) {
