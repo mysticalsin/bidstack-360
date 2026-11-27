@@ -63,6 +63,14 @@ export function LessonsLearnedCard({ opportunityId, outcome }: Props) {
   // from yet, and forcing the card onto every opportunity would be noise.
   if (!outcome) return null;
 
+  // A read that has not arrived is not an empty debrief. A paused read has no
+  // payload and isLoading is false, so the empty sentence would say this bid
+  // already has no win/loss record. An in-flight read is the same unread
+  // record. A failed read with no payload keeps the error and Retry. A later
+  // failure keeps the debrief already on screen. A payload that arrived empty
+  // (null) still says no debrief was recorded.
+  const arrived = record.data !== undefined;
+
   return (
     <Card>
       <SectionHeader
@@ -74,12 +82,29 @@ export function LessonsLearnedCard({ opportunityId, outcome }: Props) {
         )}
       />
       <div className="p-5">
-        {record.isLoading ? (
-          <div className="h-4 w-48 animate-pulse rounded bg-[var(--surface-sunken)]" />
-        ) : record.isError ? (
-          <p role="alert" className="text-xs text-[var(--danger)]">
-            {t('lessonsLearned.loadError', 'Could not load the debrief. Refresh to try again.')}
-          </p>
+        {!arrived ? (
+          record.isError ? (
+            <div role="alert" className="space-y-2">
+              <p className="text-xs text-[var(--danger)]">
+                {t('lessonsLearned.loadError', 'Could not load the debrief. Refresh to try again.')}
+              </p>
+              {record.error instanceof Error && record.error.message ? (
+                <p className="text-xs text-[var(--fg-secondary)]">{record.error.message}</p>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void record.refetch()}
+              >
+                {t('lessonsLearned.retry', 'Retry')}
+              </Button>
+            </div>
+          ) : (
+            <p role="status" aria-busy="true" className="text-xs text-[var(--fg-secondary)]">
+              {t('lessonsLearned.checking', 'Checking the win/loss debrief. It has not arrived.')}
+            </p>
+          )
         ) : (
           <DebriefForm
             key={record.data?.updatedAt ?? 'empty'}
