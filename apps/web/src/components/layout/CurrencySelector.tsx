@@ -48,11 +48,18 @@ export function CurrencySelector() {
 
   const selectedIndex = SUPPORTED_CURRENCIES.findIndex((c) => c.code === currency);
   const selected = SUPPORTED_CURRENCIES[selectedIndex];
-  const statusText = ratesLoading
-    ? t('currencySelector.statusUpdating', 'Updating live rates')
-    : ratesError
-      ? t('currencySelector.statusCached', 'Using cached rates')
-      : formatRateStatus(rates?.date, t);
+  // "Live rates" and "Using cached rates" are settled sentences. They wait
+  // until a payload is in hand.
+  const statusText =
+    rates == null
+      ? ratesError
+        ? t('currencySelector.statusFailed', 'Rates did not load.')
+        : t('currencySelector.statusUnread', 'The rates have not arrived.')
+      : ratesLoading
+        ? t('currencySelector.statusUpdating', 'Updating live rates')
+        : ratesError
+          ? t('currencySelector.statusCached', 'Using cached rates')
+          : formatRateStatus(rates.date, t);
 
   // WHY useLayoutEffect: syncing visual keyboard-navigation highlight before
   // paint — classic useLayoutEffect use-case. setState-in-effect is flagged
@@ -288,9 +295,9 @@ export function CurrencySelector() {
 }
 
 function formatRateStatus(date: string | undefined, t: TFunction): string {
-  if (!date) return t('currencySelector.statusLiveRates', 'Live rates');
-  const parsed = Date.parse(date);
-  if (!Number.isFinite(parsed)) return t('currencySelector.statusLiveRates', 'Live rates');
+  // A payload with no usable date is an empty sheet.
+  const parsed = date ? Date.parse(date) : Number.NaN;
+  if (!Number.isFinite(parsed)) return t('currencySelector.statusEmpty', 'No rates are listed.');
   return t('currencySelector.statusRatesUpdated', 'Rates updated {{date}}', {
     date: new Intl.DateTimeFormat(undefined, {
       month: 'short',
