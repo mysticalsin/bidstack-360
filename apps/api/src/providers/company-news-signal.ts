@@ -5,13 +5,62 @@
 //
 // Honest scope: this is NEWS-as-signal, not licensed buyer-intent (Bombora/6sense
 // are paid). The host is fixed (news.google.com); the company name is URL-encoded
-// into the query, so there is no SSRF surface. Fail-open: any error → [].
+// into the query, so there is no SSRF surface. A feed that does not answer is
+// `unavailable`, not an empty match. Confidence is attached only after an answer.
 
 export interface NewsSignalItem {
   title: string;
   url: string;
   source: string | null;
   publishedAt: string | null;
+}
+
+/** `ok` means the feed answered, including a real empty channel. */
+export type NewsSignalRead =
+  | { read: 'ok'; items: NewsSignalItem[] }
+  | { read: 'unavailable'; items: [] };
+
+/** Courtesy-feed confidence. Only present after the feed answered. */
+const OPEN_WEB_CONFIDENCE = 0.62;
+
+export interface AccountNewsSignalBody {
+  source: 'google-news';
+  fetchedAt: string;
+  read: 'ok' | 'unavailable';
+  sourceAttribution?: {
+    source: string;
+    label: string;
+    sourceUrl: string;
+    fetchedAt: string;
+    confidence: number;
+    providerMetadata: Record<string, unknown>;
+  };
+  items: NewsSignalItem[];
+}
+
+/** Wire body for the account news card. A missed feed carries no confidence score. */
+export function accountNewsSignalBody(
+  result: NewsSignalRead,
+  fetchedAt: string,
+  accountQuery: string,
+): AccountNewsSignalBody {
+  if (result.read !== 'ok') {
+    return { source: 'google-news', fetchedAt, read: 'unavailable', items: [] };
+  }
+  return {
+    source: 'google-news',
+    fetchedAt,
+    read: 'ok',
+    sourceAttribution: {
+      source: 'google_news_open_web',
+      label: 'Google News',
+      sourceUrl: 'https://news.google.com/',
+      fetchedAt,
+      confidence: OPEN_WEB_CONFIDENCE,
+      providerMetadata: { signalType: 'public_news', accountQuery },
+    },
+    items: result.items,
+  };
 }
 
 const FEED_TIMEOUT_MS = 8_000;
@@ -38,15 +87,16 @@ function tag(block: string, name: string): string | null {
 
 /**
  * Fetch recent news headlines for a company name. Returns at most MAX_ITEMS,
- * newest first as served by Google News. Returns [] on any failure (keyless,
- * best-effort). `fetchImpl` is injectable for tests.
+ * newest first as served by Google News. A blank name is an empty match.
+ * A non-200 or a thrown fetch is `unavailable`: the feed did not answer.
+ * `fetchImpl` is injectable for tests.
  */
 export async function fetchCompanyNewsSignals(
   name: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<NewsSignalItem[]> {
+): Promise<NewsSignalRead> {
   const q = name.trim();
-  if (!q) return [];
+  if (!q) return { read: 'ok', items: [] };
   const url =
     `https://news.google.com/rss/search?q=${encodeURIComponent(`"${q}"`)}` +
     `&hl=en-US&gl=US&ceid=US:en`;
@@ -57,10 +107,10 @@ export async function fetchCompanyNewsSignals(
       signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
       headers: { accept: 'application/rss+xml, application/xml, text/xml' },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { read: 'unavailable', items: [] };
     xml = await res.text();
   } catch {
-    return [];
+    return { read: 'unavailable', items: [] };
   }
 
   const items: NewsSignalItem[] = [];
@@ -82,5 +132,5 @@ export async function fetchCompanyNewsSignals(
     items.push({ title, url: link, source, publishedAt });
     if (items.length >= MAX_ITEMS) break;
   }
-  return items;
+  return { read: 'ok', items };
 }

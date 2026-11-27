@@ -63,7 +63,7 @@ export function AccountNewsSignalCard({ accountId }: { accountId: string }) {
       <div className="p-5">
         {news.isLoading ? (
           <LoadingSkeleton rows={4} />
-        ) : news.isError ? (
+        ) : news.isError || news.data?.read === 'unavailable' ? (
           <ErrorState
             title={t('accountNewsSignal.errorTitle', 'Could not load news')}
             message={t(
