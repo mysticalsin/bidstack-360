@@ -162,13 +162,22 @@ interface DraftCitation {
   sourceUrl?: string;
 }
 
-function formatMoneyMicros(valueMicros: bigint | number): string {
-  const value = Number(valueMicros) / 1_000_000;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value);
+const MICROS_PER_UNIT = 1_000_000n;
+
+/**
+ * Opportunity valueMicros has no currency column. Group the units.
+ * A euro sign here would price a synthetic bid the CRM never recorded.
+ */
+function formatProposalUnits(valueMicros: bigint | number): string {
+  const value = typeof valueMicros === 'bigint' ? valueMicros : BigInt(Math.trunc(valueMicros));
+  const negative = value < 0n;
+  const abs = negative ? -value : value;
+  const whole = abs / MICROS_PER_UNIT;
+  const remainder = abs % MICROS_PER_UNIT;
+  const units = Number(whole) + Number(remainder) / 1_000_000;
+  if (!Number.isFinite(units)) return 'Not a number';
+  const signed = negative ? -units : units;
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(signed);
 }
 
 function formatDate(value: Date | null): string {
@@ -194,7 +203,7 @@ function formatStakeholder(contact: DraftContact): string {
 
 function sectionBody(input: GroundedDraftInput): string[] {
   const { opportunity, references, tasks, contacts, notes } = input;
-  const value = formatMoneyMicros(opportunity.valueMicros);
+  const value = formatProposalUnits(opportunity.valueMicros);
   const due = formatDate(opportunity.dueDate);
   const refLine = references[0]
     ? `The strongest reusable proof point is "${references[0].title}", which should be adapted to ${opportunity.customer}'s context.`
@@ -288,7 +297,7 @@ export function buildGroundedProposalDraft(input: GroundedDraftInput): {
   ];
 
   const evidenceLines = [
-    `- Opportunity: ${input.opportunity.code}, ${input.opportunity.stage}, ${formatMoneyMicros(
+    `- Opportunity: ${input.opportunity.code}, ${input.opportunity.stage}, ${formatProposalUnits(
       input.opportunity.valueMicros,
     )}, ${input.opportunity.probability}% probability.`,
     input.references.length
