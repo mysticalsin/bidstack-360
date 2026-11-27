@@ -363,8 +363,11 @@ export function mostFrequent(values: string[]) {
 // writeClipboard, exportCsv → audit-log-export.ts
 
 export function safeStringify(value: unknown) {
+  // A missing diff is not a stored empty object. Export and search must not
+  // invent "{}" for a payload that never arrived.
+  if (value == null) return '';
   try {
-    return JSON.stringify(value ?? {});
+    return JSON.stringify(value);
   } catch {
     return '';
   }

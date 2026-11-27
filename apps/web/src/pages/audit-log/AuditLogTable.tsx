@@ -174,6 +174,8 @@ function AuditRow({
   const fields = summarizeDiff(row.diff);
   const href = recordHref(row);
   const risk = riskScore(row);
+  const payloadCaptured = row.diff != null;
+  const rawPayload = payloadCaptured ? JSON.stringify(row.diff, null, 2) : '';
 
   return (
     <>
@@ -349,40 +351,51 @@ function AuditRow({
                       </li>
                     ))}
                   </ul>
-                ) : (
+                ) : payloadCaptured ? (
                   <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
                     {t(
                       'auditLogTable.noStructuredDiff',
                       'No structured diff was captured for this event. Use the raw payload when forensic detail is required.',
                     )}
                   </p>
-                )}
+                ) : null}
               </div>
               <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                     {t('auditLogTable.rawPayloadTitle', 'Raw evidence payload')}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void writeClipboard(
-                          JSON.stringify(row.diff ?? {}, null, 2),
-                          t('auditLogTable.jsonCopied', 'JSON copied'),
-                          t('auditLogTable.copyFailed', 'Copy failed'),
-                        )
-                      }
-                      className="inline-flex min-h-8 items-center rounded-lg border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
-                    >
-                      {t('auditLogTable.copyJson', 'Copy JSON')}
-                    </button>
-                    <Badge tone="gray">{t('auditLogTable.immutable', 'Immutable')}</Badge>
-                  </div>
+                  {payloadCaptured ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void writeClipboard(
+                            rawPayload,
+                            t('auditLogTable.jsonCopied', 'JSON copied'),
+                            t('auditLogTable.copyFailed', 'Copy failed'),
+                          )
+                        }
+                        className="inline-flex min-h-8 items-center rounded-lg border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--accent-primary)]/15"
+                      >
+                        {t('auditLogTable.copyJson', 'Copy JSON')}
+                      </button>
+                      <Badge tone="gray">{t('auditLogTable.immutable', 'Immutable')}</Badge>
+                    </div>
+                  ) : null}
                 </div>
-                <pre className="max-h-[360px] overflow-auto rounded-xl bg-[var(--code-bg)] p-4 text-xs leading-6 text-[var(--code-fg)]">
-                  {JSON.stringify(row.diff ?? {}, null, 2)}
-                </pre>
+                {payloadCaptured ? (
+                  <pre className="max-h-[360px] overflow-auto rounded-xl bg-[var(--code-bg)] p-4 text-xs leading-6 text-[var(--code-fg)]">
+                    {rawPayload}
+                  </pre>
+                ) : (
+                  <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                    {t(
+                      'auditLogTable.payloadNotCaptured',
+                      'No raw evidence payload was captured for this event.',
+                    )}
+                  </p>
+                )}
               </div>
             </div>
           </td>
