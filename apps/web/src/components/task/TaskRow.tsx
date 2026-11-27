@@ -271,6 +271,11 @@ export const TaskRow = memo(function TaskRow({
             </span>
           ) : null}
         </div>
+        {task.assignee ? (
+          <div className="truncate text-xs text-[var(--fg-secondary)]" title={task.assignee}>
+            {t('taskRow.assignedTo', 'Assigned to {{assignee}}', { assignee: task.assignee })}
+          </div>
+        ) : null}
       </div>
       <div className="flex items-center gap-1.5">
         {task.status !== 'done' ? (

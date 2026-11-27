@@ -1354,7 +1354,8 @@
     "snoozeTask": "Reporter {{title}}",
     "statusAction": "Statut : {{status}}. Activer pour passer à {{next}}.",
     "statusTitle": "Activer pour changer le statut en {{next}}",
-    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux tâches pour modifier cette tâche."
+    "readOnlyHint": "Vous avez besoin d’un accès en écriture aux tâches pour modifier cette tâche.",
+    "assignedTo": "Attribué à {{assignee}}"
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} est en train de modifier",

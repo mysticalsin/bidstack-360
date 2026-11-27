@@ -1299,7 +1299,8 @@
     "snoozeTask": "Posticipa {{title}}",
     "statusAction": "Stato: {{status}}. Attiva per passare a {{next}}.",
     "statusTitle": "Attiva per cambiare lo stato in {{next}}",
-    "readOnlyHint": "Hai bisogno dell’accesso in scrittura alle attività per modificare questa attività."
+    "readOnlyHint": "Hai bisogno dell’accesso in scrittura alle attività per modificare questa attività.",
+    "assignedTo": "Assegnato a {{assignee}}"
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} sta modificando",

@@ -1332,7 +1332,8 @@
     "snoozeTask": "Posponer {{title}}",
     "statusAction": "Estado: {{status}}. Activar para cambiar a {{next}}.",
     "statusTitle": "Activar para cambiar el estado a {{next}}",
-    "readOnlyHint": "Necesitas acceso de escritura a tareas para editar esta tarea."
+    "readOnlyHint": "Necesitas acceso de escritura a tareas para editar esta tarea.",
+    "assignedTo": "Asignado a {{assignee}}"
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} está editando",

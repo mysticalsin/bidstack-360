@@ -1299,7 +1299,8 @@
     "snoozeTask": "Adiar {{title}}",
     "statusAction": "Status: {{status}}. Ativar para mudar para {{next}}.",
     "statusTitle": "Ativar para alterar o status para {{next}}",
-    "readOnlyHint": "Você precisa de acesso de escrita a tarefas para editar esta tarefa."
+    "readOnlyHint": "Você precisa de acesso de escrita a tarefas para editar esta tarefa.",
+    "assignedTo": "Atribuído a {{assignee}}"
   },
   "collaborativeRichTextEditor": {
     "editingAnnouncementOne": "{{names}} está editando",
