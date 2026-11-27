@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { buildApiUrl } from '@/lib/api';
 import { cn } from '@/lib/cn';
 
+import { publicBookingPhase } from './public-booking-read';
+
 interface AvailabilityResponse {
   slots: string[];
   durationMinutes: number;
@@ -35,7 +37,10 @@ export function PublicBookingPage() {
   const [date, setDate] = useState(() => isoDate(1));
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [read, setRead] = useState<{ failed: boolean; httpStatus: number | null }>({
+    failed: false,
+    httpStatus: null,
+  });
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [attendeeName, setAttendeeName] = useState('');
   const [attendeeEmail, setAttendeeEmail] = useState('');
@@ -49,7 +54,7 @@ export function PublicBookingPage() {
     const controller = new AbortController();
     async function loadAvailability() {
       setLoading(true);
-      setError(null);
+      setRead({ failed: false, httpStatus: null });
       setSelectedSlot(null);
       try {
         const params = new URLSearchParams({ date, tz: timezone });
@@ -57,22 +62,21 @@ export function PublicBookingPage() {
           signal: controller.signal,
         });
         if (!res.ok) {
-          throw new Error(
-            res.status === 404
-              ? t('publicBooking.errorNotFound', 'Booking page not found')
-              : t('publicBooking.errorAvailabilityFailed', 'Availability failed'),
-          );
+          if (!controller.signal.aborted) {
+            setAvailability(null);
+            setRead({ failed: true, httpStatus: res.status });
+          }
+          return;
         }
         const data = (await res.json()) as AvailabilityResponse;
-        setAvailability(data);
-      } catch (err) {
+        if (!controller.signal.aborted) {
+          setAvailability(data);
+          setRead({ failed: false, httpStatus: null });
+        }
+      } catch {
         if (!controller.signal.aborted) {
           setAvailability(null);
-          setError(
-            err instanceof Error
-              ? err.message
-              : t('publicBooking.errorUnavailable', 'Booking page unavailable'),
-          );
+          setRead({ failed: true, httpStatus: null });
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -80,7 +84,7 @@ export function PublicBookingPage() {
     }
     void loadAvailability();
     return () => controller.abort();
-  }, [date, slug, timezone, t]);
+  }, [date, slug, timezone]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -110,7 +114,27 @@ export function PublicBookingPage() {
     }
   }
 
-  if (error) {
+  // A missing payload is not an invalid link. Empty is only a settled day.
+  const phase = publicBookingPhase({
+    loading,
+    availability,
+    failed: read.failed,
+    httpStatus: read.httpStatus,
+  });
+
+  if (phase === 'failed') {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--surface-page)] px-4">
+        <section className="max-w-md text-center" role="alert">
+          <h1 className="text-2xl font-semibold text-[var(--fg-primary)]">
+            {t('publicBooking.loadFailed', 'Could not load this booking page.')}
+          </h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (phase === 'missing') {
     return (
       <main className="grid min-h-screen place-items-center bg-[var(--surface-page)] px-4">
         <section className="max-w-md text-center">
@@ -136,7 +160,9 @@ export function PublicBookingPage() {
             {t('publicBooking.eyebrow', 'Polo PreSales scheduling')}
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--fg-primary)]">
-            {loading ? t('publicBooking.loadingTitle', 'Loading booking page') : availability?.name}
+            {phase === 'unread'
+              ? t('publicBooking.loadingTitle', 'Loading booking page')
+              : availability?.name}
           </h1>
           {availability?.description && (
             <p className="mt-2 text-sm leading-6 text-[var(--fg-secondary)]">
@@ -193,7 +219,7 @@ export function PublicBookingPage() {
               <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
                 {t('publicBooking.availableTimesHeading', 'Available times')}
               </h2>
-              {loading ? (
+              {phase === 'unread' ? (
                 <div className="mt-4 space-y-2">
                   {[1, 2, 3].map((i) => (
                     <div
