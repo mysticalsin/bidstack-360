@@ -34,6 +34,7 @@ import {
   useTransitionInitiative,
 } from '@/hooks/useKam';
 
+import { kamInitiativeBoardPhase } from './kam-initiative-board-read';
 import { kamInitiativeColumnHeading } from './kam-initiative-caption';
 import { kamTodoCaption, kamTodoEmptyMessage } from './kam-todo-caption';
 
@@ -159,19 +160,25 @@ function InitiativeCard({ init, companyId }: { init: KamInitiativeDetail; compan
 }
 
 export function KamInitiativeBoard({ companyId }: { companyId: string }) {
-  const { data, isLoading, isError } = useKamInitiatives(companyId);
-  if (isLoading)
-    return (
-      <Card>
-        <LoadingSkeleton rows={3} />
-      </Card>
-    );
-  if (isError)
+  const query = useKamInitiatives(companyId);
+  // A missing payload is not an empty board. Empty is only a settled read.
+  const phase = kamInitiativeBoardPhase(query);
+  if (phase === 'failed')
     return (
       <Card>
         <ErrorState title="Couldn't load initiatives" />
       </Card>
     );
+  if (phase === 'unread')
+    return (
+      <Card>
+        <SectionHeader title="Initiatives" caption="Initiative → Lead → Opportunity → Dropped" />
+        <p className="px-5 py-6 text-sm text-[var(--fg-secondary)]" role="status">
+          Checking the initiative board. It has not arrived.
+        </p>
+      </Card>
+    );
+  const data = query.data;
   const items = data?.items ?? [];
   // nextCursor is the row the list read past this page and dropped. It is
   // not an initiative total.
