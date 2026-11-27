@@ -12,6 +12,7 @@ import { OpportunityStage } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { LEGACY_PIPELINE_STAGES } from '@/lib/pipeline-stages';
 
 interface ConvertForm {
   opportunityName?: string;
@@ -34,7 +35,9 @@ export function ConvertLeadDialog({
   const [form, setForm] = useState<Required<ConvertForm>>({
     opportunityName: '',
     opportunityValueMicros: 0,
-    stage: 's1_ongoing',
+    // First board column. The previous default was s1_ongoing under the label
+    // "Discovery", so a convert skipped S1 Lead.
+    stage: 's1_lead',
   });
 
   return (
@@ -85,26 +88,25 @@ export function ConvertLeadDialog({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]">
+            <label
+              htmlFor="convert-lead-stage"
+              className="mb-1 block text-xs font-medium text-[var(--fg-secondary)]"
+            >
               {t('convertLead.stageLabel', 'Stage')}
             </label>
             <select
+              id="convert-lead-stage"
               value={form.stage}
               onChange={(e) =>
                 setForm((s) => ({ ...s, stage: OpportunityStage.parse(e.target.value) }))
               }
               className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-3 py-2 text-sm text-[var(--fg-primary)] outline-none focus:border-[var(--brand-primary)]"
             >
-              <option value="s1_ongoing">{t('convertLead.stageDiscovery', 'Discovery')}</option>
-              <option value="s2_sent">{t('convertLead.stageQualified', 'Qualified')}</option>
-              <option value="s3_technical_iteration">
-                {t('convertLead.stageProposal', 'Proposal')}
-              </option>
-              <option value="s4_negotiation">
-                {t('convertLead.stageNegotiation', 'Negotiation')}
-              </option>
-              <option value="closed_won">{t('convertLead.stageClosedWon', 'Closed won')}</option>
-              <option value="closed_lost">{t('convertLead.stageClosedLost', 'Closed lost')}</option>
+              {LEGACY_PIPELINE_STAGES.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {t(`convertLead.stageOption.${stage.id}`, stage.name)}
+                </option>
+              ))}
             </select>
           </div>
         </div>
