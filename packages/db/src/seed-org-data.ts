@@ -23,6 +23,7 @@ import type { Prisma, PrismaClient } from '../generated/client/index.js';
 import { seedRolesAndPermissions } from './seed.rbac.js';
 import { seedSigningEntities } from './seed-signing-entities.js';
 import { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
+import { DEMO_CALENDAR_LINKS, seedFixtureCalendar } from './seed-calendar-fixtures.js';
 
 /**
  * A Prisma client capable of running the seed. Accepts either the top-level
@@ -898,4 +899,5 @@ export async function seedOrgData(
   await seedContacts(prisma, orgId, opts.namespace, companyByName);
   await seedLeads(prisma, orgId, byInitials, opts.namespace);
   await seedTasks(prisma, orgId, byInitials, oppByCode);
+  await seedFixtureCalendar(prisma, orgId, visitorId, DEMO_CALENDAR_LINKS);
 }

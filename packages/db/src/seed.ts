@@ -31,6 +31,7 @@ import { seedTechStacks } from './seed-tech-stack.js';
 import { seedBidChartDemo } from './seed-bid-charts.js';
 import { demoWinLoss, fixtureClosedDeals } from './seed-data.bid-charts.js';
 import { seedConsultingPartners } from './seed-consulting-partners.js';
+import { FIXTURE_CALENDAR_LINKS, seedFixtureCalendar } from './seed-calendar-fixtures.js';
 
 // PERMISSION_SEEDS, ROLE_SEEDS, LEGACY_ROLE_ASSIGNMENTS, helper functions,
 // and seedRolesAndPermissions() extracted to ./seed.rbac.ts (BS-R1)
@@ -565,6 +566,16 @@ async function main() {
     }
   }
   console.log(`  ✓ linked contacts → companies: ${linkedContacts}`);
+
+  const calendarOwner = await prisma.user.findFirst({
+    where: { orgId: org.id },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  if (calendarOwner) {
+    const meetings = await seedFixtureCalendar(prisma, org.id, calendarOwner.id, FIXTURE_CALENDAR_LINKS);
+    console.log(`  ✓ fixture calendar: ${meetings}`);
+  }
 
   // Rank the top 3 companies by total pipeline+won value so /accounts/top curated
   // mode highlights the marquee accounts. Clear stale ranks first (idempotent).
