@@ -14,9 +14,11 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/Dialog';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useCreateContact, useUpdateContact } from '@/hooks/useContacts';
 import type { Contact, Sentiment } from '@bidstack/shared';
+
+import { contactAccessPhase, contactsWriteAllowed } from './contact-access-read';
 
 interface Props {
   /** Edit mode if provided. Omitted = create mode. */
@@ -105,9 +107,12 @@ function ContactForm({
   // POST/PATCH /api/contacts are gated server-side behind contacts:write
   // (apps/api/src/routes/contacts.ts). This dialog can be opened from
   // read-only paths (row Edit, context menu, Quick Look), so rather than
-  // hiding the whole form we disable Save/Create with a hint — a dead-end
+  // hiding the whole form we disable Save/Create with a hint. A dead-end
   // 403 after filling out the form is worse than knowing up front.
-  const canWrite = useHasPermission('contacts:write');
+  // A read that has not arrived is not that hint.
+  const access = useCapabilities();
+  const phase = contactAccessPhase(access);
+  const canWrite = phase === 'ready' && contactsWriteAllowed(access.data);
   const readOnlyHint = t(
     'contact.readOnlyHint',
     'You need contacts write access to save this contact.',
@@ -245,7 +250,20 @@ function ContactForm({
         </p>
       ) : null}
 
-      {!canWrite ? (
+      {phase === 'unread' ? (
+        <p className="text-xs text-[var(--fg-secondary)]">
+          {t(
+            'contact.accessChecking',
+            'Checking contact access. The permission has not arrived.',
+          )}
+        </p>
+      ) : null}
+      {phase === 'failed' ? (
+        <p role="alert" className="text-xs text-[var(--danger)]">
+          {t('contact.accessFailed', 'Could not load contact access.')}
+        </p>
+      ) : null}
+      {phase === 'ready' && !canWrite ? (
         <p className="text-xs text-[var(--danger)]">{readOnlyHint}</p>
       ) : null}
 
@@ -257,15 +275,15 @@ function ContactForm({
           type="submit"
           size="sm"
           disabled={isPending || !canWrite}
-          title={canWrite ? undefined : readOnlyHint}
+          title={phase === 'ready' && !canWrite ? readOnlyHint : undefined}
           aria-label={
-            canWrite
-              ? undefined
-              : `${
+            phase === 'ready' && !canWrite
+              ? `${
                   contact
                     ? t('contact.saveChanges', 'Save changes')
                     : t('contact.createContact', 'Create contact')
-                } — ${readOnlyHint}`
+                }. ${readOnlyHint}`
+              : undefined
           }
         >
           {isPending
