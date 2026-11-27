@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { useHasPermission } from '@/hooks/useCapabilities';
+import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
 import { useIsAdmin } from '@/lib/auth';
 
 export type SettingsSection =
@@ -98,7 +98,11 @@ interface Props {
 export function SettingsLayout({ active, children }: Props) {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
+  const capabilities = useCapabilities();
   const canReadAudit = useHasPermission('audit-log:read');
+  // A failed manifest is not a loaded member visit. Keep the admin links,
+  // including Modules, so the menu does not look like the switches were removed.
+  const accessFailed = capabilities.isError && capabilities.data == null;
   const [menuOpen, setMenuOpen] = useState(false);
   const navId = 'settings-section-nav';
 
@@ -196,7 +200,7 @@ export function SettingsLayout({ active, children }: Props) {
                   {group.items
                     .filter((item) => {
                       if (!item.admin) return true;
-                      if (isAdmin) return true;
+                      if (isAdmin || accessFailed) return true;
                       return item.permission === 'audit-log:read' && canReadAudit;
                     })
                     .map((item) => (

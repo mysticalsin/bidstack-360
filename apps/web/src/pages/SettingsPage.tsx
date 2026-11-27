@@ -25,7 +25,8 @@ import { OpportunityFiltersSection } from '@/components/settings/OpportunityFilt
 import { SerumControlPlaneSection } from '@/components/settings/SerumControlPlaneSection';
 import { ModulesSection } from '@/components/settings/ModulesSection';
 import { SigningEntitiesSection } from '@/components/settings/SigningEntitiesSection';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { Button } from '@/components/ui/Button';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useCapabilities, useHasPermission } from '@/hooks/useCapabilities';
 import { useOrgAdminStatus } from '@/lib/auth';
 
@@ -94,20 +95,30 @@ export function SettingsPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin, isLoading: adminLoading } = useOrgAdminStatus();
-  const capabilitiesLoading = useCapabilities().isLoading;
+  const capabilities = useCapabilities();
   const canReadAudit = useHasPermission('audit-log:read');
   const requestedTab = searchParams.get('tab');
-  // Until the capability manifest arrives every gated tab resolves to
-  // overview, so a deep link must not be rewritten (or rendered) yet.
-  const accessPending = adminLoading || capabilitiesLoading;
-  const activeTab = resolveSettingsTab(requestedTab, isAdmin, canReadAudit);
+  // A missing manifest is not a loaded non-admin answer. Loading and a failed
+  // read both leave the requested tab in place. Rewriting it to overview
+  // unloads the module switches the screen never checked.
+  const manifestMissing = capabilities.data == null;
+  const accessFailed = capabilities.isError && manifestMissing;
+  const accessPending =
+    adminLoading || (manifestMissing && (capabilities.isLoading || capabilities.isPending));
+  const accessUnchecked = accessPending || accessFailed;
+  const resolvedTab = resolveSettingsTab(requestedTab, isAdmin, canReadAudit);
+  const requestedIsSection =
+    requestedTab != null && SETTINGS_SECTIONS.has(requestedTab as SettingsSection);
+  const activeTab =
+    accessUnchecked && requestedIsSection ? (requestedTab as SettingsSection) : resolvedTab;
+  const blockBody = accessUnchecked && requestedTab != null && requestedTab !== resolvedTab;
 
   useEffect(() => {
-    if (accessPending) return;
+    if (accessUnchecked) return;
     if (requestedTab && requestedTab !== activeTab) {
       setSearchParams({ tab: activeTab }, { replace: true });
     }
-  }, [accessPending, activeTab, requestedTab, setSearchParams]);
+  }, [accessUnchecked, activeTab, requestedTab, setSearchParams]);
 
   const setActive = (tab: SettingsSection) => {
     setSearchParams({ tab });
@@ -172,8 +183,23 @@ export function SettingsPage() {
             {t(`settings.${SECTION_TITLES[activeTab][0]}`, SECTION_TITLES[activeTab][1])}
           </h2>
         </div>
-        {accessPending && requestedTab && requestedTab !== activeTab ? (
-          <LoadingSkeleton rows={4} />
+        {blockBody ? (
+          accessFailed ? (
+            <ErrorState
+              title={t('settings.accessErrorTitle', 'Could not check settings access')}
+              message={t(
+                'settings.accessErrorMessage',
+                'Module switches stay hidden until this check arrives.',
+              )}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => void capabilities.refetch()}>
+                  {t('settings.accessRetry', 'Retry')}
+                </Button>
+              }
+            />
+          ) : (
+            <LoadingSkeleton rows={4} />
+          )
         ) : (
           sections[activeTab]
         )}
