@@ -13,11 +13,12 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { LiquidGlassButton } from '@/components/ui/LiquidGlassButton';
 import { relativeTime } from '@/lib/format';
 
+import { connectionGuidePhase } from './connection-guide-read';
 import { EndpointBox, SnippetBox } from './IntegrationAtoms';
 import { getPathDetail, readinessBadgeLabel } from './integration-helpers';
 import type { IntegrationSetupGuide } from './types';
@@ -126,13 +127,13 @@ function ConnectionPathPanel({
 
 export function ConnectionCommandCenter({
   guide,
-  isLoading,
   isError,
   onRetry,
   dustConfigured,
   dustAgents,
 }: {
   guide?: IntegrationSetupGuide;
+  // Callers still pass isLoading. A pause is isLoading false with no guide.
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
@@ -141,18 +142,9 @@ export function ConnectionCommandCenter({
 }) {
   const { t } = useTranslation('integrations');
   const [active, setActive] = useState<PathKey>('mcp');
+  const phase = connectionGuidePhase({ data: guide, isError });
 
-  if (isLoading) {
-    return (
-      <Card>
-        <div className="p-5">
-          <LoadingSkeleton rows={5} />
-        </div>
-      </Card>
-    );
-  }
-
-  if (isError || !guide) {
+  if (phase === 'failed') {
     return (
       <Card>
         <ErrorState
@@ -167,6 +159,19 @@ export function ConnectionCommandCenter({
             </Button>
           }
         />
+      </Card>
+    );
+  }
+
+  if (phase === 'unread' || guide === undefined) {
+    return (
+      <Card>
+        <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]" role="status">
+          {t(
+            'connectionCommandCenter.checking',
+            'Checking the setup guide. The contract has not arrived.',
+          )}
+        </p>
       </Card>
     );
   }
