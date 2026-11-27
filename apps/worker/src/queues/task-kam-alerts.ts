@@ -67,6 +67,7 @@ import {
   isInitiativeStale,
   KAM_STALE_THRESHOLD_DAYS,
   utcDayKey,
+  legacyTaskDueDedupeUrl,
   taskDueDedupeUrl,
   initiativeStaleDedupeUrl,
 } from './task-kam-alerts.helpers.js';
@@ -103,7 +104,7 @@ interface DueTask {
  * Create the task-due alert IF the assignee has not opted out and it was not
  * already sent today. Returns true when a new notification was written.
  */
-async function alertTaskIfNew(task: DueTask, daysUntil: number, url: string): Promise<boolean> {
+async function alertTaskIfNew(task: DueTask, daysUntil: number, dayKey: string): Promise<boolean> {
   // No pref row = deliver (default); only an explicit opt-out suppresses —
   // mirrors createNotification's own GATED_BY_PREF semantics.
   const pref = await prisma.notificationPref.findUnique({
@@ -112,8 +113,15 @@ async function alertTaskIfNew(task: DueTask, daysUntil: number, url: string): Pr
   });
   if (pref && pref.taskDueSoon === false) return false;
 
+  const url = taskDueDedupeUrl(task.id, dayKey);
+  // The previous marker was the list query. Treat that row as already sent
+  // today so the first scan after this change does not nudge twice.
   const existing = await prisma.notification.findFirst({
-    where: { orgId: task.orgId, userId: task.assigneeId, url },
+    where: {
+      orgId: task.orgId,
+      userId: task.assigneeId,
+      url: { in: [url, legacyTaskDueDedupeUrl(task.id, dayKey)] },
+    },
     select: { id: true },
   });
   if (existing) return false;
@@ -168,7 +176,7 @@ export async function scanTaskDueAlerts(now: Date, log: pino.Logger): Promise<nu
         title: task.title,
         assigneeId: task.assigneeId,
       };
-      if (await alertTaskIfNew(scanned, daysUntil, taskDueDedupeUrl(task.id, dayKey))) created += 1;
+      if (await alertTaskIfNew(scanned, daysUntil, dayKey)) created += 1;
     } catch (err) {
       log.error({ err, taskId: task.id }, 'task-due alert failed');
     }

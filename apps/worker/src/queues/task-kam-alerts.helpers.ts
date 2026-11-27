@@ -53,8 +53,23 @@ export function utcDayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Deterministic per-(task, day) dedupe marker, carried in Notification.url. */
+/**
+ * Where the bell opens a due follow-up, and the per-(task, day) marker.
+ *
+ * The tasks list reads filter, sort, and view. It does not read `taskId`, so
+ * `/tasks?taskId=` drops the reader on the unfiltered list. The record is
+ * `/tasks/:id`. The day stays on the query so a follow-up that is still late
+ * tomorrow does not match today's row.
+ */
 export function taskDueDedupeUrl(taskId: string, dayKey: string): string {
+  return `/tasks/${encodeURIComponent(taskId)}?due=${encodeURIComponent(dayKey)}`;
+}
+
+/**
+ * Marker written before the alert opened the record. A row stored with this
+ * URL is still "already sent today" and must suppress a second nudge.
+ */
+export function legacyTaskDueDedupeUrl(taskId: string, dayKey: string): string {
   return `/tasks?taskId=${taskId}&due=${dayKey}`;
 }
 

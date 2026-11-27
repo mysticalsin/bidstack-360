@@ -14,8 +14,16 @@ import {
   KAM_STALE_THRESHOLD_DAYS,
   utcDayKey,
   taskDueDedupeUrl,
+  legacyTaskDueDedupeUrl,
   initiativeStaleDedupeUrl,
 } from './task-kam-alerts.helpers.js';
+
+// Demo follow-up "Submit revised pricing & SoW v2". The bell's Open action
+// navigates to Notification.url. The tasks list reads filter, sort, and view.
+// It does not read taskId, so a query-string id drops the assignee on the
+// whole list. The record is /tasks/:id. The day has to stay on the URL so a
+// follow-up that is still late tomorrow can nudge again.
+const PRICING_ID = '00000000-0000-4000-8000-000000010001';
 
 const at = (iso: string): Date => new Date(iso);
 
@@ -87,5 +95,19 @@ describe('utcDayKey + dedupe URLs (idempotency)', () => {
     expect(taskDueDedupeUrl('task-1', day)).toBe(taskDueDedupeUrl('task-1', day));
     expect(taskDueDedupeUrl('task-1', day)).not.toBe(taskDueDedupeUrl('task-2', day));
     expect(initiativeStaleDedupeUrl('init-1', day)).not.toBe(taskDueDedupeUrl('init-1', day));
+  });
+
+  it('opens the demo pricing follow-up on its record and still changes the next day', () => {
+    const today = taskDueDedupeUrl(PRICING_ID, '2026-11-25');
+    const tomorrow = taskDueDedupeUrl(PRICING_ID, '2026-11-26');
+
+    expect(today).toBe(`/tasks/${PRICING_ID}?due=2026-11-25`);
+    expect(today).not.toContain('taskId=');
+    expect(tomorrow).toBe(`/tasks/${PRICING_ID}?due=2026-11-26`);
+    expect(tomorrow).not.toBe(today);
+    // Rows already stored with the list query still identify "sent today".
+    expect(legacyTaskDueDedupeUrl(PRICING_ID, '2026-11-25')).toBe(
+      `/tasks?taskId=${PRICING_ID}&due=2026-11-25`,
+    );
   });
 });
