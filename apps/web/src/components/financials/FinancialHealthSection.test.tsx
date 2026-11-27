@@ -9,6 +9,11 @@ vi.mock('@/hooks/useAccountFinancials', () => ({
   useTrackFinancials: () => ({ mutate, isPending: false, isError: false }),
 }));
 
+const identity: { dataMode?: 'demo' | 'real' } = {};
+vi.mock('@/hooks/usePoloIdentity', () => ({
+  usePoloPublicIdentity: () => ({ data: identity.dataMode ? { dataMode: identity.dataMode } : undefined }),
+}));
+
 import { FinancialHealthSection } from './FinancialHealthSection';
 import { buildTiles, fmtMoney } from './financials-format';
 
@@ -87,10 +92,22 @@ describe('FinancialHealthSection', () => {
   });
 
   it('sample state is labelled Sample everywhere', () => {
+    identity.dataMode = 'demo';
     state.data = { ...real, status: 'pending', statusCopy: 'Queued: the next financials pull will fill this in.', entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: SAMPLE_FINANCIAL_SIGNALS, sample: true };
     render(<FinancialHealthSection companyId="c1" />);
     expect(screen.getAllByText('Sample').length).toBeGreaterThan(2);
     expect(screen.getByTestId('fh-tile-revenue').querySelector('a')).toBeNull();
+  });
+
+  it('does not render the example periods when the data mode is real', () => {
+    // WHY: a stale sample payload must not show fictional filings once identity
+    // says this workspace is real. The numbers are an example, not a filing.
+    identity.dataMode = 'real';
+    state.data = { ...real, status: 'pending', statusCopy: 'Queued: the next financials pull will fill this in.', entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: SAMPLE_FINANCIAL_SIGNALS, sample: true };
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.queryByText(/Example layout/)).toBeNull();
+    expect(screen.queryByTestId('fh-tile-revenue')).toBeNull();
   });
 
   it('falls back to net margin for banks and formats money', () => {
