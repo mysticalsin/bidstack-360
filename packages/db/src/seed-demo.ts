@@ -12,6 +12,7 @@ import dotenvFlow from 'dotenv-flow';
 
 import { PrismaClient } from '../generated/client/index.js';
 import { seedOrgData } from './seed-org-data.js';
+import { seedTechStacks } from './seed-tech-stack.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenvFlow.config({ path: path.resolve(__dirname, '../../..'), silent: true });
@@ -32,6 +33,8 @@ async function main() {
     ownerName: 'Demo User',
     namespace: stamp,
   });
+  const techStacks = await seedTechStacks(prisma, org.id);
+  console.log(`   sample tech stacks: ${techStacks}`);
 
   const [opps, proposals, leads, contacts, tasks, users] = await Promise.all([
     prisma.opportunity.count({ where: { orgId: org.id } }),

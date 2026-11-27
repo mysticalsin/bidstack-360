@@ -3,13 +3,16 @@
  * accounts. Every snapshot is sample=true with open_data:* sources, so the UI
  * shows the "Sample" tag and the first real refresh replaces it. Records say
  * "Sample" and carry no links, so nothing here reads as fetched evidence.
- * Accounts that are not in the org (Pfizer on most seeds) are skipped.
- * Idempotent: writes one providerMetadata key per account.
+ * Accounts that are not in the org are skipped. The visitor demo accounts are
+ * included here; the dev fixture seed and both demo doors call this after the
+ * companies exist. Idempotent: writes one providerMetadata key per account.
  */
 import { OpenTechStackSnapshot, type OpenTechLane } from '@bidstack/shared';
 
-import type { PrismaClient } from '../generated/client/index.js';
+import type { Prisma, PrismaClient } from '../generated/client/index.js';
 import { normalizeEnrichmentName } from './open-tech-refresh.js';
+
+type TechSeedDb = Prisma.TransactionClient | PrismaClient;
 
 type Row = [lane: OpenTechLane, name: string, category: string, confidence: number, record: string];
 
@@ -149,6 +152,79 @@ const STACKS: SampleStack[] = [
     rows: [['dns', 'Google Workspace', 'Collaboration', 0.95, 'Sample: MX points to Google']],
     empty: ['ct', 'web', 'jobs', 'github'],
   },
+  {
+    name: 'Siemens',
+    domain: 'siemens.com',
+    rows: [
+      ...M365,
+      ['ct', 'SAP SuccessFactors', 'HR', 0.8, 'Sample: certificate for a SuccessFactors tenant host'],
+      ['web', 'Adobe Experience Manager', 'Web', 0.75, 'Sample: homepage markup marker'],
+      ['jobs', 'SAP S/4HANA', 'ERP', 0.71, 'Sample: named in 2 of 8 public job postings'],
+      ['jobs', 'Microsoft Azure', 'Cloud', 0.71, 'Sample: named in 2 of 8 public job postings'],
+      ['jobs', 'Siemens Teamcenter', 'Data', 0.63, 'Sample: named in 1 of 8 public job postings'],
+    ],
+    empty: ['github'],
+  },
+  {
+    name: 'IKEA',
+    domain: 'ikea.com',
+    rows: [
+      ['dns', 'Google Workspace', 'Collaboration', 0.95, 'Sample: MX points to Google'],
+      ['dns', 'Cloudflare', 'Cloud', 0.9, 'Sample: name servers at Cloudflare'],
+      ['web', 'Google Analytics', 'Analytics', 0.9, 'Sample: homepage script marker'],
+      ['jobs', 'SAP S/4HANA', 'ERP', 0.63, 'Sample: named in 1 of 6 public job postings'],
+      ['jobs', 'Google Cloud', 'Cloud', 0.63, 'Sample: named in 1 of 6 public job postings'],
+    ],
+    empty: ['ct', 'github'],
+  },
+  {
+    name: 'Sanofi',
+    domain: 'sanofi.com',
+    rows: [
+      ...M365,
+      ['ct', 'Veeva', 'CRM', 0.8, 'Sample: certificate for a Veeva tenant host'],
+      ['web', 'Adobe Analytics', 'Analytics', 0.9, 'Sample: homepage script marker'],
+      ['jobs', 'Veeva', 'CRM', 0.71, 'Sample: named in 2 of 7 public job postings'],
+      ['jobs', 'AWS', 'Cloud', 0.63, 'Sample: named in 1 of 7 public job postings'],
+    ],
+    empty: ['github'],
+  },
+  {
+    name: 'HSBC',
+    domain: 'hsbc.com',
+    rows: [
+      ...M365,
+      ['dns', 'Proofpoint', 'Security', 0.95, 'Sample: MX points to Proofpoint'],
+      ['web', 'Salesforce', 'CRM', 0.75, 'Sample: homepage form marker'],
+      ['jobs', 'Microsoft Azure', 'Cloud', 0.71, 'Sample: named in 2 of 9 public job postings'],
+      ['jobs', 'ServiceNow', 'ITSM', 0.63, 'Sample: named in 1 of 9 public job postings'],
+    ],
+    empty: ['github'],
+  },
+  {
+    name: 'Stellantis',
+    domain: 'stellantis.com',
+    rows: [
+      ...M365,
+      ['ct', 'ServiceNow', 'ITSM', 0.8, 'Sample: certificate for a ServiceNow tenant host'],
+      ['web', 'Adobe Experience Manager', 'Web', 0.75, 'Sample: homepage markup marker'],
+      ['jobs', 'SAP S/4HANA', 'ERP', 0.71, 'Sample: named in 2 of 6 public job postings'],
+      ['jobs', 'AWS', 'Cloud', 0.63, 'Sample: named in 1 of 6 public job postings'],
+    ],
+    empty: ['github'],
+  },
+  {
+    name: 'Spotify',
+    domain: 'spotify.com',
+    rows: [
+      ['dns', 'Google Workspace', 'Collaboration', 0.95, 'Sample: MX points to Google'],
+      ['dns', 'Cloudflare', 'Cloud', 0.9, 'Sample: name servers at Cloudflare'],
+      ['web', 'Google Tag Manager', 'Analytics', 0.9, 'Sample: homepage script marker'],
+      ['jobs', 'Google Cloud', 'Cloud', 0.79, 'Sample: named in 2 of 5 public job postings'],
+      ['jobs', 'Kafka', 'Data', 0.63, 'Sample: named in 1 of 5 public job postings'],
+    ],
+    empty: ['ct', 'github'],
+  },
 ];
 
 export function sampleTechSnapshot(stack: SampleStack, checkedAt: string): OpenTechStackSnapshot {
@@ -184,7 +260,12 @@ export function sampleTechSnapshot(stack: SampleStack, checkedAt: string): OpenT
 
 export const SAMPLE_TECH_STACK_ACCOUNTS = STACKS.map((s) => s.name);
 
-export async function seedTechStacks(prisma: PrismaClient, orgId: string, now: Date = new Date()): Promise<number> {
+/** The sample stack for one account name, or undefined when this seed does not host one. */
+export function sampleStackForAccount(name: string): SampleStack | undefined {
+  return STACKS.find((stack) => stack.name === name);
+}
+
+export async function seedTechStacks(prisma: TechSeedDb, orgId: string, now: Date = new Date()): Promise<number> {
   const checkedAt = new Date(now.getTime() - 2 * 86_400_000).toISOString();
   let written = 0;
   for (const stack of STACKS) {

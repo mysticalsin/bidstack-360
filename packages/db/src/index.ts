@@ -239,6 +239,7 @@ export {
   refreshCompanyOpenTechStack,
 } from './open-tech-refresh.js';
 export type { ApolloFallbackDecision, OpenTechApolloJob, OpenTechRefreshResult } from './open-tech-refresh.js';
+export { seedTechStacks } from './seed-tech-stack.js';
 // Inbound activity API + account activity aggregates. One service behind the
 // REST route (apps/api) and the MCP tools (apps/mcp-server).
 export {

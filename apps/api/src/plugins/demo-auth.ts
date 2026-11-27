@@ -26,7 +26,7 @@ import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 
 import type { FastifyRequest } from 'fastify';
 
-import { Prisma, prisma, seedOrgData } from '@bidstack/db';
+import { Prisma, prisma, seedOrgData, seedTechStacks } from '@bidstack/db';
 
 import { enqueueApolloEnrich } from '../queues/company-enrich-apollo.js';
 
@@ -283,6 +283,9 @@ export async function provisionDemoSession(
           ownerName: name,
           namespace: slug,
         });
+        // Sample technology snapshots for the accounts just created. A live
+        // scan replaces a sample row; a real snapshot already stored is left.
+        await seedTechStacks(tx, created.id);
         return created;
       },
       // Seeding a whole workspace inside one transaction is heavy (it upserts the
