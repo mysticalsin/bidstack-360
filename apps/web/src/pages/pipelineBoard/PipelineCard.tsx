@@ -14,6 +14,7 @@ import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
 
+import { pipelineCardOwnerEmail } from './pipeline-card-owner';
 import { getStageName } from './pipelineUtils';
 
 interface PipelineCardProps {
@@ -56,6 +57,10 @@ export const PipelineCard = memo(function PipelineCard({
     dueDateUrgency(opp.dueDate).urgency === 'danger' &&
     stageName !== 'Closed Won' &&
     stageName !== 'Closed Lost';
+  const ownerEmail = pipelineCardOwnerEmail(opp.owner);
+  const ownerCaption = ownerEmail
+    ? t('pipeline.boardCardOwnedBy', 'Owned by {{owner}}', { owner: ownerEmail })
+    : t('pipeline.boardCardNoOwner', 'No owner');
 
   return (
     <motion.li
@@ -107,7 +112,9 @@ export const PipelineCard = memo(function PipelineCard({
                 name: opp.name,
                 stage: stageName,
                 value: formatMoney(opp.value, 'EUR'),
-              })) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
+              })) +
+          (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '') +
+          ` ${ownerCaption}`
         }
         className={cn(
           'block rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 shadow-[var(--shadow-xs)] transition-shadow hover:shadow-[var(--shadow-sm)]',
@@ -131,6 +138,8 @@ export const PipelineCard = memo(function PipelineCard({
         <div className="mt-1 text-xs font-medium text-[var(--fg-secondary)] line-clamp-2">
           {opp.name}
         </div>
+
+        <p className="mt-1 truncate text-xs text-[var(--fg-secondary)]">{ownerCaption}</p>
 
         {/* Territory badge */}
         {opp.territoryName && (
