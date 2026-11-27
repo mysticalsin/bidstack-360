@@ -2,7 +2,8 @@
 // Key accounts are manually flagged (tier = 'key') — regional strategic accounts.
 // Top accounts are the admin-curated global top-10 (Company.topAccountRank);
 // when no curation exists the endpoint falls back to an auto leaderboard
-// ranked by total revenue/pipeline and labels the payload source: 'auto'.
+// ranked by open pipeline plus won revenue. A lost bid is neither, so it
+// does not raise the rank. The payload source is 'auto' in that fallback.
 
 import type { FastifyPluginAsync } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -10,6 +11,7 @@ import { z } from 'zod';
 import { prisma, Prisma } from '@bidstack/db';
 import { TOP_ACCOUNTS_MAX, TopAccountListUpdate, TopAccountsSource } from '@bidstack/shared';
 
+import { ACCOUNT_RANK_EXCLUDED_STAGE } from './account-rank-value.js';
 import { emptyAccountStats, fetchAccountStats } from './accounts.helpers.js';
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 
@@ -205,6 +207,8 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
       // beyond position 1,000, and always loaded the full company+opp set even
       // when limit=5. A single GROUP BY query pushes all aggregation to Postgres
       // and returns exactly `limit` rows regardless of org size.
+      // totalValue excludes closed_lost (ACCOUNT_RANK_EXCLUDED_STAGE). Won
+      // revenue stays in the rank. A lost-only account sorts as zero.
       //
       // Conditional filters are expressed as (${param}::text IS NULL OR ...)
       // so Prisma can parameterize all values safely without dynamic SQL.
@@ -276,7 +280,9 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           c.key_account_owner_id AS "keyAccountOwnerId",
           c.key_account_notes    AS "keyAccountNotes",
           c.top_account_rank     AS "topAccountRank",
-          COALESCE(SUM(o.value_micros), 0)::float8 / 1000000.0 AS "totalValue",
+          COALESCE(SUM(CASE WHEN o.stage <> ${ACCOUNT_RANK_EXCLUDED_STAGE}::opportunity_stage
+                            THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0
+                                                                         AS "totalValue",
           COALESCE(SUM(CASE WHEN o.stage = 'closed_won'::opportunity_stage
                             THEN o.value_micros ELSE 0 END), 0)::float8 / 1000000.0
                                                                          AS "wonValue",
