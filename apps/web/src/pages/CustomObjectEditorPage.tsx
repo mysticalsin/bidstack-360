@@ -23,29 +23,34 @@ import { ErrorState } from '@/components/ui/StateMessages';
 import { ObjectSettingsForm } from './customObjectEditor/ObjectSettingsForm';
 import { FieldsSection } from './customObjectEditor/FieldsSection';
 import { RelationsSection } from './customObjectEditor/RelationsSection';
+import { customObjectEditorPhase } from './custom-object-editor-read';
 
 export function CustomObjectEditorPage() {
   const { t } = useTranslation('crm');
   const { id = '' } = useParams<{ id: string }>();
-  const { data: defsData, isLoading, isError, error, refetch } = useCustomObjectDefs();
+  const { data: defsData, isError, error, refetch, status } = useCustomObjectDefs();
   const relationsQuery = useCustomObjectRelations(id);
   const updateDef = useUpdateCustomObjectDef(id);
   const addField = useAddCustomObjectField(id);
   const fieldsQuery = useCustomObjectFields(id);
   const addRelation = useAddCustomObjectRelation(id);
 
-  const def = defsData?.items.find((d) => d.id === id);
+  const phase = customObjectEditorPhase({ data: defsData, isError, status });
 
-  if (isLoading) {
+  if (phase === 'unread') {
     return (
-      <div className="p-6 space-y-4 max-w-3xl mx-auto animate-pulse">
-        <div className="h-8 w-48 bg-[var(--surface-2)] rounded" />
-        <div className="h-40 bg-[var(--surface-2)] rounded-xl" />
+      <div className="p-6 max-w-3xl mx-auto">
+        <p role="status">
+          {t(
+            'customObjectEditor.checking',
+            'Checking this object. The record has not arrived.',
+          )}
+        </p>
       </div>
     );
   }
 
-  if (isError) {
+  if (phase === 'failed') {
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <ErrorState
@@ -64,6 +69,8 @@ export function CustomObjectEditorPage() {
       </div>
     );
   }
+
+  const def = defsData?.items.find((d) => d.id === id);
 
   if (!def) {
     return (
