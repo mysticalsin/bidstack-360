@@ -69,12 +69,18 @@ export function EventPanel({ event, tz, onClose }: EventPanelProps) {
           </dl>
 
           <div className="flex flex-wrap gap-2">
-            <Badge tone={event.provider === 'microsoft_graph' ? 'purple' : 'blue'}>
-              {event.provider === 'microsoft_graph'
-                ? t('calendar.providerMicrosoft', 'Microsoft')
-                : t('calendar.providerGoogle', 'Google')}
-            </Badge>
-            {event.localOnly ? <Badge tone="gray">{t('calendar.localOnly', 'Only in Polo')}</Badge> : null}
+            {event.provider === 'logged_meeting' ? (
+              <Badge tone="gray">{t('calendar.loggedMeeting', 'Logged meeting')}</Badge>
+            ) : (
+              <Badge tone={event.provider === 'microsoft_graph' ? 'purple' : 'blue'}>
+                {event.provider === 'microsoft_graph'
+                  ? t('calendar.providerMicrosoft', 'Microsoft')
+                  : t('calendar.providerGoogle', 'Google')}
+              </Badge>
+            )}
+            {event.localOnly && event.provider !== 'logged_meeting' ? (
+              <Badge tone="gray">{t('calendar.localOnly', 'Only in Polo')}</Badge>
+            ) : null}
             {event.syncState === 'CONFLICT' ? (
               <Badge tone="amber">{t('calendar.syncConflict', 'Sync conflict')}</Badge>
             ) : null}
@@ -110,7 +116,7 @@ export function EventPanel({ event, tz, onClose }: EventPanelProps) {
             )}
           </section>
 
-          <MeetingPrepCard calendarEventId={event.id} />
+          {event.provider === 'logged_meeting' ? null : <MeetingPrepCard calendarEventId={event.id} />}
         </div>
       </SheetContent>
     </Sheet>

@@ -86,6 +86,27 @@ describe('multi-day timed events', () => {
     expect(agenda.textContent).not.toContain('All day');
   });
 
+  it('does not call a logged meeting a Google or Microsoft event', () => {
+    render(
+      <MemoryRouter>
+        <EventPanel
+          event={event({
+            provider: 'logged_meeting',
+            localOnly: true,
+            subject: 'Landing zone scoping workshop',
+            opportunityId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+          })}
+          tz={TZ}
+          onClose={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Landing zone scoping workshop')).toBeTruthy();
+    const panel = screen.getByTestId('calendar-event-panel');
+    expect(panel.textContent).toContain('Logged meeting');
+    expect(panel.textContent).not.toMatch(/Google|Microsoft/);
+  });
+
   it('still labels a true all-day event as all day', () => {
     render(
       <MemoryRouter>
