@@ -1,10 +1,6 @@
-// Regression: the world map's legend/tooltip/aria-label money figures must
-// track the user's selected display currency (via useCurrencyStore), not a
-// hardcoded EUR. WHY: WorldMap is shared by Territories + Sector View, where
-// every other money surface already converts — the map showing '€1M' while the
-// KPI tiles show '$2M' for the same portfolio is a silently-wrong figure to a
-// bid director, not a cosmetic mismatch. Fails if the component reverts to the
-// module-level formatMoneyMicros with a hardcoded output currency.
+// The map legend labels opportunity valueMicros. Those rows do not store a
+// currency. WHY: a selected display currency and a cached EUR to USD rate must
+// not turn 1,000,000 units into $2M. Fails if the legend borrows EUR again.
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,7 +32,7 @@ const item: TerritoryAnalyticsItem = {
   countryCode: 'FR',
   countryCodeA3: 'FRA',
   opportunityCount: 3,
-  totalValueMicros: 1_000_000_000_000, // €1,000,000 at rest
+  totalValueMicros: 1_000_000_000_000, // 1,000,000 units at rest
   avgProbability: 60,
   territories: ['EMEA'],
   ownerNames: ['Alex'],
@@ -55,12 +51,15 @@ beforeEach(() => {
 });
 
 describe('WorldMap currency display', () => {
-  it('renders the pipeline legend in the user-selected currency, converted from EUR', () => {
+  it('does not convert a country pipeline into the selected currency', () => {
     render(<WorldMap data={[item]} />);
 
-    // maxValue = €1,000,000 → at USD rate 2.0 the top legend bracket is $2M.
-    // The pre-fix code hardcoded 'EUR' and would render '€1M' regardless.
-    expect(screen.getByText(/\$2M/)).toBeDefined();
-    expect(screen.queryByText(/€1M/)).toBeNull();
+    // 1,000,000 units. A USD selector and an EUR to USD rate of 2 must not
+    // print $2M or a euro symbol. The color scale is not asserted here.
+    const legend = screen.getByText('Pipeline').parentElement;
+    const labels = legend?.querySelectorAll('span.tabular-nums');
+    const top = labels?.[labels.length - 1]?.textContent ?? '';
+    expect(top).not.toMatch(/EUR|€|\$/);
+    expect(top.replace(/\D/g, '')).toBe('1000000');
   });
 });
