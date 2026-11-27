@@ -8,7 +8,7 @@ import type {
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import {
   useClearTeamsWebhook,
   useNotificationChannels,
@@ -112,8 +112,49 @@ export function NotificationDeliverySection() {
   const channels = useNotificationChannels();
   const update = useUpdateNotificationChannels();
 
-  if (channels.isLoading) return <LoadingSkeleton rows={3} />;
-  if (!channels.data) return null;
+  if (channels.isLoading) {
+    return (
+      <div
+        aria-busy="true"
+        aria-live="polite"
+        aria-label={t('notificationPrefs.delivery.loading', 'Loading delivery settings')}
+      >
+        <LoadingSkeleton rows={3} />
+      </div>
+    );
+  }
+  if (channels.isError) {
+    return (
+      <ErrorState
+        title={t('notificationPrefs.delivery.errorTitle', "Couldn't load delivery settings")}
+        message={t(
+          'notificationPrefs.delivery.errorMessage',
+          'In-app, email, and Teams choices could not load.',
+        )}
+        action={
+          <Button size="sm" variant="secondary" onClick={() => void channels.refetch()}>
+            {t('notificationPrefs.retry', 'Retry')}
+          </Button>
+        }
+      />
+    );
+  }
+  if (!channels.data) {
+    return (
+      <EmptyState
+        title={t('notificationPrefs.delivery.emptyTitle', 'Delivery settings are not loaded')}
+        message={t(
+          'notificationPrefs.delivery.emptyMessage',
+          'Channel choices have no saved settings to show.',
+        )}
+        action={
+          <Button size="sm" variant="secondary" onClick={() => void channels.refetch()}>
+            {t('notificationPrefs.retry', 'Retry')}
+          </Button>
+        }
+      />
+    );
+  }
   const settings = channels.data;
 
   const toggle = (group: NotificationKindGroup, channel: NotificationChannel) => {
