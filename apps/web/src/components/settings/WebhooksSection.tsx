@@ -53,6 +53,8 @@ export function WebhooksSection() {
   );
 
   const metrics = useMemo(() => buildWebhookMetrics(subs.data?.items ?? []), [subs.data]);
+  // A missing page is not an empty book. Counts, All clear, and Add wait until it arrives.
+  const pageReady = subs.data != null && !subs.isLoading && !subs.isError;
   const drawnCaption =
     subs.data && subs.data.pageContinues ? webhookListCaption(subs.data.items.length, true) : null;
 
@@ -82,10 +84,12 @@ export function WebhooksSection() {
               )}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => setShowCreate(true)}>
-                <Icon name="plus" size={14} className="mr-1.5" />
-                {t('webhooks.addSubscription', 'Add subscription')}
-              </Button>
+              {pageReady ? (
+                <Button size="sm" onClick={() => setShowCreate(true)}>
+                  <Icon name="plus" size={14} className="mr-1.5" />
+                  {t('webhooks.addSubscription', 'Add subscription')}
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 variant="secondary"
@@ -102,32 +106,34 @@ export function WebhooksSection() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <MetricCard
-              label={drawnCaption ?? t('webhooks.metricTotal', 'Total')}
-              value={metrics.total}
-              icon="webhook"
-              tone="blue"
-            />
-            <MetricCard
-              label={t('webhooks.metricActive', 'Active')}
-              value={metrics.active}
-              icon="checkCircle"
-              tone="jade"
-            />
-            <MetricCard
-              label={t('webhooks.metricFailing', 'Failing')}
-              value={metrics.failing}
-              icon="warning"
-              tone="tomato"
-            />
-            <MetricCard
-              label={t('webhooks.metricEvents', 'Events')}
-              value={metrics.eventCount}
-              icon="list"
-              tone="purple"
-            />
-          </div>
+          {pageReady ? (
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                label={drawnCaption ?? t('webhooks.metricTotal', 'Total')}
+                value={metrics.total}
+                icon="webhook"
+                tone="blue"
+              />
+              <MetricCard
+                label={t('webhooks.metricActive', 'Active')}
+                value={metrics.active}
+                icon="checkCircle"
+                tone="jade"
+              />
+              <MetricCard
+                label={t('webhooks.metricFailing', 'Failing')}
+                value={metrics.failing}
+                icon="warning"
+                tone="tomato"
+              />
+              <MetricCard
+                label={t('webhooks.metricEvents', 'Events')}
+                value={metrics.eventCount}
+                icon="list"
+                tone="purple"
+              />
+            </div>
+          ) : null}
         </div>
       </Card>
 
@@ -208,19 +214,27 @@ export function WebhooksSection() {
                   <p className="mt-1 text-xs text-[var(--fg-tertiary)]">{drawnCaption}</p>
                 ) : null}
                 <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-                  {metrics.lastActivity
-                    ? t('webhooks.lastActivity', 'Last activity {{time}}', {
-                        time: relativeTime(metrics.lastActivity),
-                      })
-                    : t('webhooks.noActivity', 'No delivery activity recorded yet.')}
+                  {subs.isError
+                    ? t('webhooks.activityNotLoaded', 'Subscriptions are not loaded.')
+                    : !pageReady
+                      ? t('webhooks.activityChecking', 'Checking subscriptions.')
+                      : metrics.lastActivity
+                        ? t('webhooks.lastActivity', 'Last activity {{time}}', {
+                            time: relativeTime(metrics.lastActivity),
+                          })
+                        : t('webhooks.noActivity', 'No delivery activity recorded yet.')}
                 </p>
               </div>
-              <Badge tone={metrics.failing > 0 ? 'tomato' : 'jade'}>
-                {metrics.failing > 0
-                  ? t('webhooks.needAttention', '{{count}} need attention', {
-                      count: metrics.failing,
-                    })
-                  : t('webhooks.allClear', 'All clear')}
+              <Badge tone={!pageReady ? 'gray' : metrics.failing > 0 ? 'tomato' : 'jade'}>
+                {subs.isError
+                  ? t('webhooks.statusNotLoaded', 'not loaded')
+                  : !pageReady
+                    ? t('webhooks.statusChecking', 'checking')
+                    : metrics.failing > 0
+                      ? t('webhooks.needAttention', '{{count}} need attention', {
+                          count: metrics.failing,
+                        })
+                      : t('webhooks.allClear', 'All clear')}
               </Badge>
             </div>
 
