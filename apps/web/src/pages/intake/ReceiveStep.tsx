@@ -14,6 +14,7 @@ import { type useFiles, useUploadFile } from '@/hooks/useFiles';
 import { FILE_INPUT_ACCEPT } from '@bidstack/shared';
 
 import { IntakeAccountPicker } from './IntakeAccountPicker';
+import { receiveDocumentsPhase } from './receive-documents-read';
 
 interface ReceiveStepProps {
   accountId: string;
@@ -34,6 +35,8 @@ export function ReceiveStep({
 }: ReceiveStepProps) {
   const { t } = useTranslation('crm');
   const upload = useUploadFile(accountId);
+  // A missing payload is not an empty list. Empty is only a settled read.
+  const phase = receiveDocumentsPhase(files);
   const [isDragging, setIsDragging] = useState(false);
   const canUpload = Boolean(accountId) && !upload.isPending;
 
@@ -160,32 +163,15 @@ export function ReceiveStep({
 
       {!accountId ? (
         <IntakeAccountPicker onSelect={onSelectAccount} />
-      ) : files.isError ? (
+      ) : phase === 'failed' ? (
         <ErrorState
           title={t('crm.receiveStep.loadFailedTitle', 'Failed to load files')}
           message={files.error?.message}
         />
-      ) : files.isLoading ? (
-        // Shimmer rows shaped like the selectable file rows below — shared
-        // bs-shimmer system, not a bare "Loading..." string.
-        <div
-          className="space-y-2"
-          aria-busy="true"
-          aria-live="polite"
-          aria-label={t('crm.receiveStep.loading', 'Loading...')}
-        >
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3"
-              aria-hidden
-            >
-              <span className="bs-shimmer h-5 w-5 rounded" />
-              <span className="bs-shimmer h-4 w-1/2" />
-              <span className="bs-shimmer ml-auto h-3 w-16" />
-            </div>
-          ))}
-        </div>
+      ) : phase === 'unread' ? (
+        <p className="p-4 text-sm text-[var(--fg-secondary)]" role="status">
+          {t('crm.receiveStep.unread', 'Checking documents. The list has not arrived.')}
+        </p>
       ) : files.data?.items.length === 0 ? (
         <EmptyState
           title={t('crm.receiveStep.noDocsTitle', 'No documents yet')}
