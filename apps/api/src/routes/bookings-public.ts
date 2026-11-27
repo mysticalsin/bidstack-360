@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@bidstack/db';
 import { Queue } from 'bullmq';
 import {
+  bookingDayWindow,
   computeSlots,
   type AvailabilityRule,
   type BlockingEvent,
@@ -87,12 +88,14 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
       });
       if (!page) throw server.httpErrors.notFound('Booking page not found');
 
-      const rangeStart = new Date(`${date}T12:00:00Z`);
-      const rangeEnd = new Date(`${date}T23:59:59Z`);
+      // Noon UTC stays the advance check. The slot window is the guest's
+      // calendar day: 23:59 UTC is already the next morning ahead of UTC.
+      const advanceMark = new Date(`${date}T12:00:00Z`);
+      const { rangeStart, rangeEnd } = bookingDayWindow(date, tz);
 
       const maxDate = new Date();
       maxDate.setDate(maxDate.getDate() + page.maxAdvanceDays);
-      if (rangeStart > maxDate) {
+      if (advanceMark > maxDate) {
         return reply.send({
           slots: [],
           durationMinutes: page.durationMinutes,
@@ -217,8 +220,7 @@ export const bookingsPublicRoutes: FastifyPluginAsyncZod = async (server) => {
       const endAt = new Date(startAt.getTime() + page.durationMinutes * 60_000);
 
       const dayStr = dateKeyInTz(startAt, tz);
-      const rangeStart = new Date(`${dayStr}T12:00:00Z`);
-      const rangeEnd = new Date(`${dayStr}T23:59:59Z`);
+      const { rangeStart, rangeEnd } = bookingDayWindow(dayStr, tz);
 
       const blockingEvents = await prisma.calendarEvent.findMany({
         where: {
