@@ -40,7 +40,7 @@ interface StageColumnProps {
   onCardDragEnd: () => void;
   onCardFocus: (id: string) => void;
   onCardBlur: (id: string) => void;
-  onCardKey: (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => void;
+  onCardKey: (e: KeyboardEvent<HTMLDivElement>, opp: Opportunity) => void;
 }
 
 export const StageColumn = memo(function StageColumn({
