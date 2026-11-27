@@ -19,6 +19,7 @@ let dbReachable = false;
 let orgId: string | null = null;
 let restoreAuth: (() => void) | null = null;
 const createdReportIds: string[] = [];
+const createdDashboardIds: string[] = [];
 
 const TASK_COUNT_QUERY = {
   entity: 'task',
@@ -43,6 +44,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  for (const id of createdDashboardIds) {
+    await purgeAuditRows({ where: { targetType: 'analytics_dashboard', targetId: id } });
+    await prisma.analyticsDashboardWidget.deleteMany({ where: { dashboardId: id } });
+    await prisma.analyticsDashboard.deleteMany({ where: { id } });
+  }
   for (const id of createdReportIds) {
     await purgeAuditRows({ where: { targetType: 'analytics_report', targetId: id } });
     await prisma.analyticsReportRun.deleteMany({ where: { reportId: id } });
@@ -282,6 +288,355 @@ describe('analytics reports routes', () => {
       await prisma.org.delete({ where: { id: foreignOrg.id } });
     }
   });
+
+  skipIfNoDb(
+    'a reports:write user who cannot edit every referencing dashboard gets 403 on PATCH, DELETE, and run',
+    async () => {
+      // WHY: PATCH, DELETE, and POST /reports/:id/run rewrite a report, remove
+      // it, or persist a run that dashboards surface as latestRunId. Those
+      // three routes are gated only on reports:write, so a teammate with that
+      // permission can change a report that sits on someone else's widgets.
+      // The caller must canEdit (dashboard owner, or a system Admin) every
+      // live dashboard whose widgets reference the report. Editing one of
+      // those dashboards is not enough. A report with no widget references
+      // stays mutable with reports:write alone.
+      const previous = process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+      process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = 'true';
+      const ownerHeaders = { 'x-bidstack-e2e-role': 'sales-manager' };
+      const intruderHeaders = { 'x-bidstack-e2e-role': 'account-executive' };
+      const editorOnly = 'Only an editor of every dashboard using this report can change it';
+      let grant: { roleId: string; permissionId: string } | null = null;
+      try {
+        const permission = await prisma.permission.findUniqueOrThrow({
+          where: { key: 'reports:write' },
+          select: { id: true },
+        });
+        const aeRole = await prisma.role.findFirstOrThrow({
+          where: { orgId: orgId!, name: 'Account Executive', deletedAt: null },
+          select: { id: true },
+        });
+        // The seeded Account Executive can read reports but cannot write them.
+        // This grant is the synthetic reports:write the finding is about, on a
+        // user who is neither a dashboard owner nor a system Admin.
+        await prisma.rolePermission.updateMany({
+          where: {
+            roleId: aeRole.id,
+            permissionId: permission.id,
+            deletedAt: { not: null },
+          },
+          data: { deletedAt: null },
+        });
+        await prisma.rolePermission.upsert({
+          where: {
+            roleId_permissionId: { roleId: aeRole.id, permissionId: permission.id },
+          },
+          create: { roleId: aeRole.id, permissionId: permission.id, orgId: orgId! },
+          update: { orgId: orgId!, deletedAt: null },
+        });
+        grant = { roleId: aeRole.id, permissionId: permission.id };
+
+        const caps = async (headers?: Record<string, string>) => {
+          const res = await server.inject({
+            method: 'GET',
+            url: '/api/me/capabilities',
+            ...(headers ? { headers } : {}),
+          });
+          expect(res.statusCode).toBe(200);
+          return res.json() as {
+            userId: string;
+            permissions: string[];
+            isAdmin: boolean;
+          };
+        };
+        const intruder = await caps(intruderHeaders);
+        const owner = await caps(ownerHeaders);
+        const admin = await caps();
+        expect(intruder.permissions).toContain('reports:write');
+        expect(owner.permissions).toContain('reports:write');
+        expect(admin.permissions).toContain('reports:write');
+        expect(intruder.isAdmin).toBe(false);
+        expect(owner.isAdmin).toBe(false);
+        expect(admin.isAdmin).toBe(true);
+        expect(new Set([intruder.userId, owner.userId, admin.userId]).size).toBe(3);
+
+        const loose = await server.inject({
+          method: 'POST',
+          url: '/api/reports',
+          headers: intruderHeaders,
+          payload: { name: 'Unreferenced report', query: TASK_COUNT_QUERY, chartType: 'bar' },
+        });
+        expect(loose.statusCode).toBe(201);
+        const looseId = (loose.json() as { id: string }).id;
+        createdReportIds.push(looseId);
+        const loosePatch = await server.inject({
+          method: 'PATCH',
+          url: `/api/reports/${looseId}`,
+          headers: intruderHeaders,
+          payload: { name: 'Unreferenced report renamed' },
+        });
+        expect(loosePatch.statusCode).toBe(200);
+        const looseRun = await server.inject({
+          method: 'POST',
+          url: `/api/reports/${looseId}/run`,
+          headers: intruderHeaders,
+          payload: {},
+        });
+        expect(looseRun.statusCode).toBe(200);
+        const looseDelete = await server.inject({
+          method: 'DELETE',
+          url: `/api/reports/${looseId}`,
+          headers: intruderHeaders,
+        });
+        expect(looseDelete.statusCode).toBe(204);
+
+        const created = await server.inject({
+          method: 'POST',
+          url: '/api/reports',
+          headers: ownerHeaders,
+          payload: { name: 'Widget source', query: TASK_COUNT_QUERY, chartType: 'bar' },
+        });
+        expect(created.statusCode).toBe(201);
+        const reportId = (created.json() as { id: string }).id;
+        createdReportIds.push(reportId);
+
+        const board = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          headers: ownerHeaders,
+          payload: { name: 'Owner shared board', isShared: true },
+        });
+        expect(board.statusCode).toBe(201);
+        const dashboardId = (board.json() as { id: string }).id;
+        createdDashboardIds.push(dashboardId);
+        const widget = await server.inject({
+          method: 'POST',
+          url: `/api/dashboards/${dashboardId}/widgets`,
+          headers: ownerHeaders,
+          payload: { reportId, title: 'Owner widget', type: 'kpi' },
+        });
+        expect(widget.statusCode).toBe(201);
+        const widgetId = (widget.json() as { id: string }).id;
+
+        const readBoard = async (headers?: Record<string, string>) => {
+          const res = await server.inject({
+            method: 'GET',
+            url: `/api/dashboards/${dashboardId}`,
+            ...(headers ? { headers } : {}),
+          });
+          expect(res.statusCode).toBe(200);
+          return res.json() as { ownerId: string; canEdit: boolean };
+        };
+        const ownerView = await readBoard(ownerHeaders);
+        const adminView = await readBoard();
+        const intruderView = await readBoard(intruderHeaders);
+        expect(ownerView.ownerId).toBe(owner.userId);
+        expect(ownerView.canEdit).toBe(true);
+        expect(adminView.ownerId).toBe(owner.userId);
+        expect(adminView.canEdit).toBe(true);
+        expect(intruderView.canEdit).toBe(false);
+
+        const storedName = async () => {
+          const row = await prisma.analyticsReport.findFirstOrThrow({
+            where: { id: reportId, orgId: orgId! },
+            select: { name: true, deletedAt: true },
+          });
+          return row;
+        };
+        const runCount = () =>
+          prisma.analyticsReportRun.count({ where: { orgId: orgId!, reportId } });
+
+        const deniedPatch = await server.inject({
+          method: 'PATCH',
+          url: `/api/reports/${reportId}`,
+          headers: intruderHeaders,
+          payload: { name: 'Taken over' },
+        });
+        expect(deniedPatch.statusCode).toBe(403);
+        expect((deniedPatch.json() as { message: string }).message).toBe(editorOnly);
+        expect((await storedName()).name).toBe('Widget source');
+
+        const runsBefore = await runCount();
+        const deniedRun = await server.inject({
+          method: 'POST',
+          url: `/api/reports/${reportId}/run`,
+          headers: intruderHeaders,
+          payload: {},
+        });
+        expect(deniedRun.statusCode).toBe(403);
+        expect((deniedRun.json() as { message: string }).message).toBe(editorOnly);
+        expect(await runCount()).toBe(runsBefore);
+
+        const deniedDelete = await server.inject({
+          method: 'DELETE',
+          url: `/api/reports/${reportId}`,
+          headers: intruderHeaders,
+        });
+        expect(deniedDelete.statusCode).toBe(403);
+        expect((deniedDelete.json() as { message: string }).message).toBe(editorOnly);
+        expect((await storedName()).deletedAt).toBeNull();
+        const stillLinked = await prisma.analyticsDashboardWidget.findFirstOrThrow({
+          where: { id: widgetId, orgId: orgId! },
+          select: { reportId: true },
+        });
+        expect(stillLinked.reportId).toBe(reportId);
+
+        const ownerPatch = await server.inject({
+          method: 'PATCH',
+          url: `/api/reports/${reportId}`,
+          headers: ownerHeaders,
+          payload: { name: 'Owner renamed' },
+        });
+        expect(ownerPatch.statusCode).toBe(200);
+        expect((ownerPatch.json() as { name: string }).name).toBe('Owner renamed');
+        const ownerRun = await server.inject({
+          method: 'POST',
+          url: `/api/reports/${reportId}/run`,
+          headers: ownerHeaders,
+          payload: {},
+        });
+        expect(ownerRun.statusCode).toBe(200);
+        expect((ownerRun.json() as { status: string }).status).toBe('done');
+
+        const adminPatch = await server.inject({
+          method: 'PATCH',
+          url: `/api/reports/${reportId}`,
+          payload: { name: 'Admin renamed' },
+        });
+        expect(adminPatch.statusCode).toBe(200);
+        expect((adminPatch.json() as { name: string }).name).toBe('Admin renamed');
+        const adminRun = await server.inject({
+          method: 'POST',
+          url: `/api/reports/${reportId}/run`,
+          payload: {},
+        });
+        expect(adminRun.statusCode).toBe(200);
+        expect((adminRun.json() as { status: string }).status).toBe('done');
+
+        const ownerOnly = await server.inject({
+          method: 'POST',
+          url: '/api/reports',
+          headers: ownerHeaders,
+          payload: { name: 'Owner-only source', query: TASK_COUNT_QUERY, chartType: 'bar' },
+        });
+        expect(ownerOnly.statusCode).toBe(201);
+        const ownerOnlyId = (ownerOnly.json() as { id: string }).id;
+        createdReportIds.push(ownerOnlyId);
+        const ownerOnlyWidget = await server.inject({
+          method: 'POST',
+          url: `/api/dashboards/${dashboardId}/widgets`,
+          headers: ownerHeaders,
+          payload: { reportId: ownerOnlyId, title: 'Owner-only widget', type: 'kpi' },
+        });
+        expect(ownerOnlyWidget.statusCode).toBe(201);
+        const intruderDeletesOwnerOnly = await server.inject({
+          method: 'DELETE',
+          url: `/api/reports/${ownerOnlyId}`,
+          headers: intruderHeaders,
+        });
+        expect(intruderDeletesOwnerOnly.statusCode).toBe(403);
+        expect((intruderDeletesOwnerOnly.json() as { message: string }).message).toBe(editorOnly);
+        const ownerDeletes = await server.inject({
+          method: 'DELETE',
+          url: `/api/reports/${ownerOnlyId}`,
+          headers: ownerHeaders,
+        });
+        expect(ownerDeletes.statusCode).toBe(204);
+
+        // A second live dashboard, owned by the intruder, also shows the
+        // report. Each of those two users canEdit exactly one board, so
+        // neither may change the report. The admin canEdit both.
+        const second = await server.inject({
+          method: 'POST',
+          url: '/api/dashboards',
+          headers: intruderHeaders,
+          payload: { name: 'Intruder shared board', isShared: true },
+        });
+        expect(second.statusCode).toBe(201);
+        const secondId = (second.json() as { id: string }).id;
+        createdDashboardIds.push(secondId);
+        const secondWidget = await server.inject({
+          method: 'POST',
+          url: `/api/dashboards/${secondId}/widgets`,
+          headers: intruderHeaders,
+          payload: { reportId, title: 'Intruder widget', type: 'kpi' },
+        });
+        expect(secondWidget.statusCode).toBe(201);
+        const ownerOnSecond = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${secondId}`,
+          headers: ownerHeaders,
+        });
+        const intruderOnSecond = await server.inject({
+          method: 'GET',
+          url: `/api/dashboards/${secondId}`,
+          headers: intruderHeaders,
+        });
+        expect(ownerOnSecond.statusCode).toBe(200);
+        expect(intruderOnSecond.statusCode).toBe(200);
+        expect((ownerOnSecond.json() as { canEdit: boolean }).canEdit).toBe(false);
+        expect((intruderOnSecond.json() as { canEdit: boolean }).canEdit).toBe(true);
+
+        const runsBeforeSplit = await runCount();
+        for (const headers of [ownerHeaders, intruderHeaders]) {
+          const patch = await server.inject({
+            method: 'PATCH',
+            url: `/api/reports/${reportId}`,
+            headers,
+            payload: { name: 'Split takeover' },
+          });
+          expect(patch.statusCode).toBe(403);
+          expect((patch.json() as { message: string }).message).toBe(editorOnly);
+          const run = await server.inject({
+            method: 'POST',
+            url: `/api/reports/${reportId}/run`,
+            headers,
+            payload: {},
+          });
+          expect(run.statusCode).toBe(403);
+          expect((run.json() as { message: string }).message).toBe(editorOnly);
+          const del = await server.inject({
+            method: 'DELETE',
+            url: `/api/reports/${reportId}`,
+            headers,
+          });
+          expect(del.statusCode).toBe(403);
+          expect((del.json() as { message: string }).message).toBe(editorOnly);
+        }
+        expect((await storedName()).name).toBe('Admin renamed');
+        expect((await storedName()).deletedAt).toBeNull();
+        expect(await runCount()).toBe(runsBeforeSplit);
+
+        const adminAfterSplit = await server.inject({
+          method: 'PATCH',
+          url: `/api/reports/${reportId}`,
+          payload: { name: 'Admin kept both boards' },
+        });
+        expect(adminAfterSplit.statusCode).toBe(200);
+        const adminRunAfterSplit = await server.inject({
+          method: 'POST',
+          url: `/api/reports/${reportId}/run`,
+          payload: {},
+        });
+        expect(adminRunAfterSplit.statusCode).toBe(200);
+        expect((adminRunAfterSplit.json() as { status: string }).status).toBe('done');
+        const adminDelete = await server.inject({
+          method: 'DELETE',
+          url: `/api/reports/${reportId}`,
+        });
+        expect(adminDelete.statusCode).toBe(204);
+        const gone = await server.inject({ method: 'GET', url: `/api/reports/${reportId}` });
+        expect(gone.statusCode).toBe(404);
+      } finally {
+        if (grant) {
+          await prisma.rolePermission.deleteMany({
+            where: { roleId: grant.roleId, permissionId: grant.permissionId },
+          });
+        }
+        if (previous === undefined) delete process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER;
+        else process.env.BIDSTACK_ALLOW_STUB_ROLE_HEADER = previous;
+      }
+    },
+  );
 
   skipIfNoDb('DELETE /api/reports/:id soft-deletes and hides the report', async () => {
     const create = await server.inject({

@@ -25,6 +25,7 @@ import {
   latestRunIds,
   serializeDashboard,
   serializeWidget,
+  userIsSystemAdmin,
   type DbDashboard,
 } from './analytics-dashboards.helpers.js';
 
@@ -33,18 +34,7 @@ const WidgetParams = z.object({ id: z.string().uuid(), widgetId: z.string().uuid
 
 export const analyticsDashboardsRoutes: FastifyPluginAsyncZod = async (server) => {
   async function isOrgAdmin(req: FastifyRequest): Promise<boolean> {
-    const adminRoleCount = await prisma.userRole.count({
-      where: {
-        userId: req.auth.userId,
-        // Revocation soft-deletes the assignment row; without this filter a
-        // revoked Admin keeps read/edit/delete on every private dashboard in
-        // the org. Same omission as lib/rbac-decision-cache.ts had.
-        deletedAt: null,
-        user: { orgId: req.auth.orgId, deletedAt: null },
-        role: { orgId: req.auth.orgId, name: 'Admin', isSystem: true, deletedAt: null },
-      },
-    });
-    return adminRoleCount > 0;
+    return userIsSystemAdmin(req.auth.orgId, req.auth.userId);
   }
 
   /** Org-scoped fetch honoring the shared/owner/admin visibility rule. 404s otherwise. */

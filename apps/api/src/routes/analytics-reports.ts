@@ -6,6 +6,7 @@
 // the legacy routes keep winning their paths.
 import { randomUUID } from 'node:crypto';
 
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -21,6 +22,7 @@ import {
 
 import { AnalyticsQueryError, compileAnalyticsQuery } from '../lib/analytics-engine.js';
 import { getEntitySpec } from '../lib/analytics-fields.js';
+import { callerCanEditEveryReferencingDashboard } from './analytics-dashboards.helpers.js';
 import {
   executeAnalyticsQuery,
   runPersistedReport,
@@ -31,6 +33,28 @@ import {
 const IdParam = z.object({ id: z.string().uuid() });
 
 export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
+  /**
+   * A report on a dashboard is part of that dashboard. reports:write alone
+   * must not rewrite, delete, or persist a run that other people's widgets
+   * display. canEdit (owner or system Admin) is required on every live
+   * dashboard that references the report.
+   */
+  async function requireReferencingDashboardEditor(
+    req: FastifyRequest,
+    reportId: string,
+  ): Promise<void> {
+    const allowed = await callerCanEditEveryReferencingDashboard(
+      req.auth.orgId,
+      req.auth.userId,
+      reportId,
+    );
+    if (!allowed) {
+      throw server.httpErrors.forbidden(
+        'Only an editor of every dashboard using this report can change it',
+      );
+    }
+  }
+
   /** Dry-compile so invalid queries are rejected at save time, not run time. */
   function validateQuery(orgId: string, query: AnalyticsQuery): void {
     try {
@@ -134,6 +158,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true },
       });
       if (!existing) throw server.httpErrors.notFound('Report not found');
+      await requireReferencingDashboardEditor(req, existing.id);
       if (req.body.query) validateQuery(req.auth.orgId, req.body.query);
 
       await prisma.analyticsReport.updateMany({
@@ -211,6 +236,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, name: true },
       });
       if (!existing) throw server.httpErrors.notFound('Report not found');
+      await requireReferencingDashboardEditor(req, existing.id);
       await prisma.$transaction([
         prisma.analyticsReport.updateMany({
           where: { id: existing.id, orgId: req.auth.orgId, deletedAt: null },
@@ -276,9 +302,10 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
 
   // Synchronous run: persists the outcome (done|error) and returns the final
   // run row. Engine failures land on run.error, not HTTP 5xx.
-  // reports:write gate: a persisted run mutates official run history that
-  // dashboards surface via latestRunId — and the body can override the stored
-  // query — so read-only members must use POST /reports/run (ephemeral).
+  // reports:write plus canEdit on every dashboard whose widgets reference
+  // this report. A persisted run mutates official run history that dashboards
+  // surface via latestRunId — and the body can override the stored query —
+  // so read-only members must use POST /reports/run (ephemeral).
   server.post(
     '/reports/:id/run',
     {
@@ -296,6 +323,7 @@ export const analyticsReportsRoutes: FastifyPluginAsyncZod = async (server) => {
         select: { id: true, query: true },
       });
       if (!report) throw server.httpErrors.notFound('Report not found');
+      await requireReferencingDashboardEditor(req, report.id);
       // Stored queries were validated by the AnalyticsQuery schema on write.
       const query = req.body?.query ?? (report.query as unknown as AnalyticsQuery);
       const run = await runPersistedReport({
