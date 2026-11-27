@@ -3,6 +3,7 @@
 // Endpoint:
 //   GET /forecasts/projection — derived weighted-pipeline forecast for the
 //   current quarter + next 2, bucketed by close-date period and owner.
+//   Weight is each bid's own probability, summed before the stage group.
 //
 // Manual /forecasts rows are surfaced as per-period commit overrides; the
 // derived baseline never goes blank while open pipeline exists.
@@ -59,7 +60,17 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
           o.owner_id AS "ownerId",
           COALESCE(u.name, 'Unassigned') AS "ownerName",
           o.stage::text AS stage,
-          COALESCE(SUM(o.value_micros), 0)::text AS "valueMicros"
+          COALESCE(SUM(o.value_micros), 0)::text AS "valueMicros",
+          -- Per bid, then summed. A stage rate would replace the probability
+          -- on the record (demo OP-0002 is 75%, negotiation defaults to 80%).
+          -- Won stays 0: closed revenue is an actual, not a weight.
+          -- bidWeightedMicros is the same round for one bid.
+          COALESCE(SUM(
+            CASE
+              WHEN o.stage = 'closed_won' THEN 0
+              ELSE ROUND(o.value_micros * o.probability / 100.0)
+            END
+          ), 0)::bigint::text AS "weightedMicros"
         FROM opportunities o
         LEFT JOIN users u ON u.id = o.owner_id AND u.org_id = o.org_id
         WHERE o.org_id = ${orgId}::uuid
@@ -68,29 +79,18 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
         GROUP BY 1, o.owner_id, u.name, o.stage
       `);
 
-      const [stageProbabilities, manualCommitByPeriod] = await Promise.all([
-        loadStageProbabilities(orgId),
-        loadManualCommit(orgId, window.periods, FORECAST_CURRENCY, req.log),
-      ]);
+      const manualCommitByPeriod = await loadManualCommit(
+        orgId,
+        window.periods,
+        FORECAST_CURRENCY,
+        req.log,
+      );
 
-      const periods = aggregateProjection(rows, window, stageProbabilities, manualCommitByPeriod);
+      const periods = aggregateProjection(rows, window, manualCommitByPeriod);
       return { currency: FORECAST_CURRENCY, generatedAt: new Date().toISOString(), periods };
     },
   );
 };
-
-/** Org's configurable stage win-probabilities, keyed by stage key (first wins). */
-async function loadStageProbabilities(orgId: string): Promise<Map<string, number>> {
-  const stages = await prisma.pipelineStage.findMany({
-    where: { orgId, deletedAt: null },
-    select: { key: true, probability: true },
-    orderBy: { orderIndex: 'asc' },
-    take: 200,
-  });
-  const map = new Map<string, number>();
-  for (const s of stages) if (!map.has(s.key)) map.set(s.key, Number(s.probability));
-  return map;
-}
 
 /**
  * Sum of manual commit forecasts per in-window period (the override headline),
