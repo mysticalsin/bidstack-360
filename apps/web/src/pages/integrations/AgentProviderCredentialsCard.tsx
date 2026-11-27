@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Dialog, DialogClose, DialogContent } from '@/components/ui/Dialog';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import {
   useAgentProviderCredentials,
@@ -19,6 +19,7 @@ import {
   type DirectAgentProvider,
 } from '@/hooks/useAgentProviderCredentials';
 import { useIsAdmin } from '@/lib/auth';
+import { agentProviderCredentialsPhase } from './agent-provider-credentials-read';
 // Catalogue only (pure data) — the LLM wire client stays out of the web bundle.
 import {
   CLOUDFLARE_DEFAULT_MODEL,
@@ -119,8 +120,10 @@ export function AgentProviderCredentialsCard() {
   const [testResults, setTestResults] = useState<Record<string, AgentProviderTestResult>>({});
   const [testingProvider, setTestingProvider] = useState<DirectAgentProvider | null>(null);
 
-  const items = credentials.data?.items ?? [];
-  const active = credentials.data?.active ?? null;
+  // A missing payload is not an empty catalog. Empty is only a settled read.
+  const phase = agentProviderCredentialsPhase(credentials);
+  const items = phase === 'ready' ? (credentials.data?.items ?? []) : [];
+  const active = phase === 'ready' ? (credentials.data?.active ?? null) : null;
   const configuredCount = items.filter((item) => item.configured).length;
 
   const onSetActive = async (provider: DirectAgentProvider | null) => {
@@ -332,9 +335,7 @@ export function AgentProviderCredentialsCard() {
       />
 
       <div className="p-5">
-        {credentials.isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : credentials.isError ? (
+        {phase === 'failed' ? (
           <ErrorState
             title={t('agentProviderCredentials.errorState.title', 'Could not load provider keys')}
             message={t(
@@ -347,6 +348,13 @@ export function AgentProviderCredentialsCard() {
               </Button>
             }
           />
+        ) : phase === 'unread' ? (
+          <p className="py-6 text-center text-sm text-[var(--fg-secondary)]" role="status">
+            {t(
+              'agentProviderCredentials.unread',
+              'Checking model providers. The list has not arrived.',
+            )}
+          </p>
         ) : items.length === 0 ? (
           <EmptyState
             title={t('agentProviderCredentials.emptyState.title', 'No provider list returned')}
