@@ -25,12 +25,26 @@ import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import { pushUndo } from '@/stores/undoStack';
-import type { Contact } from '@bidstack/shared';
+import type { Contact, Sentiment } from '@bidstack/shared';
 
 import { ContactContextMenu } from './contacts/ContactContextMenu';
 import { ContactTable } from './contacts/ContactTable';
 import type { ContactSortKey, ContactSortState } from './contacts/ContactTable';
 import { useContactsKeyboard } from './contacts/useContactsKeyboard';
+
+// Warmth scale. A string sort is not this scale: "warm" sorts above "hot".
+// Null stays null so a missing sentiment sorts last in both directions.
+const SENTIMENT_RANK: Record<Sentiment, number> = {
+  cold: 1,
+  neutral: 2,
+  warm: 3,
+  hot: 4,
+};
+
+function contactSentimentRank(sentiment: Sentiment | null): number | null {
+  if (sentiment == null) return null;
+  return SENTIMENT_RANK[sentiment];
+}
 
 export function ContactsPage() {
   const { t } = useTranslation('crm');
@@ -78,7 +92,7 @@ export function ContactsPage() {
       role: (c: Contact) => c.role,
       customer: (c: Contact) => c.customer,
       influence: (c: Contact) => c.influence,
-      sentiment: (c: Contact) => c.sentiment,
+      sentiment: (c: Contact) => contactSentimentRank(c.sentiment),
     }),
     [],
   );
