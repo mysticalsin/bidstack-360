@@ -6,11 +6,13 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useIsAdmin } from '@/lib/auth';
 import { useDataResidency, useUpdateDataResidency } from '@/hooks/useDataResidency';
 import type { DataRegion, OrgDataResidencyView } from '@bidstack/shared';
+
+import { dataResidencyPhase } from './data-residency-read';
 
 // '' is the wire's `null` (not pinned); a select cannot carry null.
 const OPTIONS: { value: DataRegion | ''; labelKey: string; fallback: string }[] = [
@@ -25,8 +27,13 @@ export function DataResidencySection() {
   const { t } = useTranslation('settings');
   const residency = useDataResidency();
 
-  if (residency.isLoading) return <LoadingSkeleton rows={2} />;
-  if (residency.isError || !residency.data) {
+  const phase = dataResidencyPhase({
+    data: residency.data,
+    isError: residency.isError,
+    status: residency.status,
+  });
+
+  if (phase === 'failed') {
     return (
       <ErrorState
         title={t('dataResidency.loadErrorTitle', 'Could not load the data region')}
@@ -36,6 +43,23 @@ export function DataResidencySection() {
       />
     );
   }
+
+  if (phase === 'unread') {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('dataResidency.checking', 'Checking the data region. The setting has not arrived.')}
+      </p>
+    );
+  }
+
+  if (residency.data == null) {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('dataResidency.none', 'No data region is saved.')}
+      </p>
+    );
+  }
+
   return <DataResidencyForm key={JSON.stringify(residency.data)} initial={residency.data} />;
 }
 
