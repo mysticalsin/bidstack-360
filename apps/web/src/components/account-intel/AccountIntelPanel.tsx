@@ -59,20 +59,34 @@ export function AccountIntelPanel({ accountId }: Props) {
   const solutions = intel.data?.solutions ?? [];
   const products = intel.data?.products ?? [];
   const extractions = intel.data?.extractions ?? [];
+  // A missing snapshot is not an empty catalog. Counts stay hidden until the read lands.
+  const countsReady = !intel.isLoading && !intel.isError && intel.data != null;
   const tabs: Array<{ key: IntelTabKey; label: string }> = [
     {
       key: 'solutions',
-      label: t('accountIntel.tabSolutions', 'Solutions ({{count}})', { count: solutions.length }),
+      label: countsReady
+        ? t('accountIntel.tabSolutions', 'Solutions ({{count}})', { count: solutions.length })
+        : intel.isError
+          ? t('accountIntel.tabSolutionsNotLoaded', 'Solutions, not loaded')
+          : t('accountIntel.tabSolutionsChecking', 'Solutions, checking'),
     },
     {
       key: 'products',
-      label: t('accountIntel.tabProducts', 'Products ({{count}})', { count: products.length }),
+      label: countsReady
+        ? t('accountIntel.tabProducts', 'Products ({{count}})', { count: products.length })
+        : intel.isError
+          ? t('accountIntel.tabProductsNotLoaded', 'Products, not loaded')
+          : t('accountIntel.tabProductsChecking', 'Products, checking'),
     },
     {
       key: 'extractions',
-      label: t('accountIntel.tabExtractions', 'Extractions ({{count}})', {
-        count: extractions.length,
-      }),
+      label: countsReady
+        ? t('accountIntel.tabExtractions', 'Extractions ({{count}})', {
+            count: extractions.length,
+          })
+        : intel.isError
+          ? t('accountIntel.tabExtractionsNotLoaded', 'Extractions, not loaded')
+          : t('accountIntel.tabExtractionsChecking', 'Extractions, checking'),
     },
   ];
 
@@ -111,7 +125,13 @@ export function AccountIntelPanel({ accountId }: Props) {
     >
       <SectionHeader
         title={t('accountIntel.title', 'Account Intelligence')}
-        caption={t('accountIntel.caption', 'Solutions, products & document extractions')}
+        caption={
+          intel.isError
+            ? t('accountIntel.captionNotLoaded', 'Account intelligence is not loaded.')
+            : countsReady
+              ? t('accountIntel.caption', 'Solutions, products & document extractions')
+              : t('accountIntel.captionChecking', 'Checking account intelligence.')
+        }
       />
 
       <div
