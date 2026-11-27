@@ -27,6 +27,7 @@ import {
   agreementsListCaption,
   agreementsListPage,
 } from './agreements-list-caption';
+import { leverageFilterHold } from './leverage-filter-read';
 import { applyView, headline, type AgreementsView } from './view';
 
 const WINDOWS = [
@@ -58,6 +59,12 @@ export default function AgreementsPage() {
   const sample = Boolean(list.data?.sample);
   const nums = useMemo(() => headline(rows, now), [rows, now]);
   const shown = useMemo(() => applyView(rows, params, now), [rows, params, now]);
+  const leverageHold = leverageFilterHold({
+    leverageOn: params.get('leverage') === '1',
+    matchCount: shown.length,
+    pageContinues: agreementsContinue,
+    sample,
+  });
   const soon = useMemo(
     () => rows.filter((r) => r.status === 'active' && r.daysToExpiry != null && r.daysToExpiry >= 0 && r.daysToExpiry <= 90).slice(0, 8),
     [rows],
@@ -170,12 +177,14 @@ export default function AgreementsPage() {
               {filtered ? <button type="button" className="drill-more" onClick={() => setParams(new URLSearchParams(), { replace: true })}>Clear filters</button> : null}
             </div>
             <p className="agr-caption" aria-live="polite" data-testid="agreements-count">
-              {agreementsListCaption(shown.length, agreementsContinue, {
+              {leverageHold ?? agreementsListCaption(shown.length, agreementsContinue, {
                 filtered,
                 nestedNote: !params.get('q') && !params.get('kind') && !view,
               })}
             </p>
-            {shown.length === 0 ? <p className="drill-empty">No agreements match these filters.</p> : (
+            {shown.length === 0 ? (
+              leverageHold ? null : <p className="drill-empty">No agreements match these filters.</p>
+            ) : (
               <div className="agr-table-wrap">
                 <table className="drill-table agr-table" data-testid="agreements-table">
                   <thead>
