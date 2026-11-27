@@ -282,6 +282,14 @@ export function ProposalsPage() {
         rows={selection.rows}
         total={selection.total}
         getRowId={(row) => row.id}
+        // The footer counts rows. Zero before the first payload arrives is not
+        // an empty desk: pagination would say "No results" beside the skeleton,
+        // including a paused read (pending, not loading).
+        meta={
+          showSkeleton
+            ? t('proposals.listUnread', 'Checking proposals. The list has not arrived.')
+            : undefined
+        }
         loading={showSpinner}
         tabs={{
           id: 'status',
